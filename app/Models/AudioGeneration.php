@@ -1,0 +1,30 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class AudioGeneration extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'text_item_id',
+        'input_text',
+        'source_language',
+        'target_language',
+        'voice_name',
+        'translate',
+        'audio_path',
+        'duration_seconds',
+        'status',
+        'error_message',
+    ];
+
+    protected $casts = [
+        'translate' => 'boolean',
+        'duration_seconds' => 'integer',
+    ];
+}
