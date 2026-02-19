@@ -8,6 +8,8 @@ use App\Services\TtsService;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -16,15 +18,7 @@ class HomeController extends Controller
     public function index()
     {
         $pricingPlans = $this->pricingPlans();
-        $highlightPlans = collect($pricingPlans)
-            ->filter(fn (array $plan) => $plan['price_monthly'] > 0)
-            ->take(3)
-            ->values()
-            ->all();
-
-        if (count($highlightPlans) === 0) {
-            $highlightPlans = array_slice($pricingPlans, 0, 3);
-        }
+        $highlightPlans = array_slice($pricingPlans, 0, 3);
 
         return view('landing', [
             'highlightPlans' => $highlightPlans,
@@ -49,8 +43,10 @@ class HomeController extends Controller
 
     public function demo(Request $request)
     {
+        $maxChars = $request->user() ? 3500 : 1500;
+
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:8000'],
+            'text' => ['required', 'string', 'max:'.$maxChars],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -64,6 +60,8 @@ class HomeController extends Controller
         $text = trim($validated['text']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         $estimate = UsageEstimator::estimate($text);
+
+        $this->enforceDemoPolicy($request, $estimate['chars'], false);
 
         return response()->json([
             'ok' => true,
@@ -86,8 +84,10 @@ class HomeController extends Controller
         TranslationService $translationService,
         TtsService $ttsService,
     ) {
+        $maxChars = $request->user() ? 1500 : 700;
+
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:1200'],
+            'text' => ['required', 'string', 'max:'.$maxChars],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -100,6 +100,8 @@ class HomeController extends Controller
 
         $text = trim($validated['text']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
+
+        $this->enforceDemoPolicy($request, UsageEstimator::estimate($text)['chars'], true);
 
         $textForSpeech = $translationService->maybeTranslate(
             $text,
@@ -132,6 +134,44 @@ class HomeController extends Controller
                 'error' => app()->environment('local') ? $e->getMessage() : null,
             ], 422);
         }
+    }
+
+    private function enforceDemoPolicy(Request $request, int $chars, bool $preview): void
+    {
+        $identity = $request->user()
+            ? 'u:'.$request->user()->id
+            : 'ip:'.$request->ip();
+
+        $scope = $preview ? 'preview' : 'check';
+        $maxPerMinute = $preview
+            ? ($request->user() ? 30 : 8)
+            : ($request->user() ? 80 : 20);
+
+        $rateKey = "demo:rate:{$scope}:{$identity}";
+        if (RateLimiter::tooManyAttempts($rateKey, $maxPerMinute)) {
+            $retryAfter = max(1, RateLimiter::availableIn($rateKey));
+
+            throw ValidationException::withMessages([
+                'text' => "Too many demo requests. Please retry in {$retryAfter}s.",
+            ]);
+        }
+
+        RateLimiter::hit($rateKey, 60);
+
+        $dailyCapChars = $preview
+            ? ($request->user() ? 120000 : 20000)
+            : ($request->user() ? 250000 : 50000);
+
+        $dailyKey = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$identity;
+        $used = (int) Cache::get($dailyKey, 0);
+
+        if (($used + $chars) > $dailyCapChars) {
+            throw ValidationException::withMessages([
+                'text' => 'Demo daily character limit reached. Please try again tomorrow or sign in for higher limits.',
+            ]);
+        }
+
+        Cache::put($dailyKey, $used + $chars, now()->addDay());
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey): string

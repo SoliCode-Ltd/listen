@@ -37,15 +37,6 @@ class PlanSeeder extends Seeder
                 'features' => ['Faster processing lane', 'Usage analytics', 'Webhook-ready API'],
                 'is_active' => true,
             ],
-            [
-                'slug' => 'scale',
-                'name' => 'Scale',
-                'price_cents' => 7900,
-                'monthly_minutes' => 1800,
-                'max_chars_per_request' => 12000,
-                'features' => ['Team seats', 'Advanced controls', 'Priority support'],
-                'is_active' => true,
-            ],
         ];
 
         foreach ($plans as $plan) {
