@@ -33,7 +33,7 @@ class HomeController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'Demo pipeline validated. Use Preview Voice to generate actual audio instantly.',
+            'message' => 'Preview is ready. Click "Generate Voice" to synthesize real audio.',
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
             'translate' => (bool) ($validated['translate'] ?? false),
@@ -51,7 +51,6 @@ class HomeController extends Controller
             'text' => ['required', 'string', 'max:1200'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
-            'fast_mode' => ['nullable', 'boolean'],
         ]);
 
         $text = trim($validated['text']);
@@ -64,17 +63,23 @@ class HomeController extends Controller
             (bool) ($validated['translate'] ?? false),
         );
 
-        $fastMode = (bool) ($validated['fast_mode'] ?? true);
-        $audio = $ttsService->synthesize($textForSpeech, $validated['target_language'], null, $fastMode);
+        try {
+            $audio = $ttsService->synthesize($textForSpeech, $validated['target_language']);
 
-        return response()->json([
-            'ok' => true,
-            'provider' => $audio['provider'] ?? 'unknown',
-            'fast_mode' => $fastMode,
-            'source_language' => $sourceLanguage,
-            'target_language' => $validated['target_language'],
-            'audio_url' => Storage::disk('public')->url($audio['audio_path']),
-            'duration_seconds' => $audio['duration_seconds'] ?? null,
-        ]);
+            return response()->json([
+                'ok' => true,
+                'provider' => $audio['provider'] ?? 'google-cloud-tts',
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'audio_url' => Storage::disk('public')->url($audio['audio_path']),
+                'duration_seconds' => $audio['duration_seconds'] ?? null,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Voice generation failed. Please verify Google TTS credentials and try again.',
+                'error' => app()->environment('local') ? $e->getMessage() : null,
+            ], 422);
+        }
     }
 }

@@ -5,21 +5,26 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class MessageReaderController extends Controller
 {
     public function queue(Request $request)
     {
         $userId = $this->resolveApiUserId($request);
+        $activePlan = $this->resolveActivePlan($userId);
+        $maxChars = max(200, (int) ($activePlan?->max_chars_per_request ?? 600));
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:20000'],
+            'content' => ['required', 'string', 'max:'.$maxChars],
             'target_language' => ['required', 'in:ar,en'],
             'source_type' => ['required', 'in:email,message,file'],
             'voice_name' => ['nullable', 'string', 'max:120'],
@@ -29,6 +34,19 @@ class MessageReaderController extends Controller
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         [$estimatedSeconds, $estimatedMinutes] = $this->estimateTiming($text);
+
+        $period = now()->format('Y-m');
+        $counter = UsageCounter::firstOrCreate(
+            ['user_id' => $userId, 'period_ym' => $period],
+            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
+        );
+
+        $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
+        if (($counter->total_minutes + $estimatedMinutes) > $planMinutes) {
+            throw ValidationException::withMessages([
+                'content' => 'Monthly plan minutes exceeded. Please upgrade your plan to continue.',
+            ]);
+        }
 
         $item = TextItem::create([
             'user_id' => $userId,
@@ -46,17 +64,12 @@ class MessageReaderController extends Controller
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
-            'voice_name' => $validated['voice_name'] ?? 'default',
+            'voice_name' => $validated['voice_name'] ?? null,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimatedSeconds,
             'status' => 'queued',
         ]);
 
-        $period = now()->format('Y-m');
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
         $counter->increment('total_requests');
         $counter->increment('total_chars', mb_strlen($text));
         $counter->increment('total_minutes', $estimatedMinutes);
@@ -135,7 +148,7 @@ class MessageReaderController extends Controller
 
         $apiKey = (string) env('LISTEN_API_KEY', '');
         if ($apiKey === '') {
-            return 1;
+            abort(401, 'API access is disabled.');
         }
 
         $provided = $request->header('X-Listen-Key')
@@ -148,5 +161,26 @@ class MessageReaderController extends Controller
         }
 
         return 1;
+    }
+
+    private function resolveActivePlan(int $userId): ?Plan
+    {
+        $subscription = Subscription::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->where(function ($query) {
+                $query->whereNull('current_period_end')
+                    ->orWhere('current_period_end', '>=', now());
+            })
+            ->latest('id')
+            ->with('plan')
+            ->first();
+
+        if ($subscription?->plan) {
+            return $subscription->plan;
+        }
+
+        return Plan::query()->where('slug', 'free')->first()
+            ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
     }
 }

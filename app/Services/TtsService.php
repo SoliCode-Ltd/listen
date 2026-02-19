@@ -2,10 +2,10 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Symfony\Component\Process\Process;
 
 class TtsService
 {
@@ -24,129 +24,182 @@ class TtsService
         }
 
         $mode = $preferFast ? 'fast' : 'quality';
-        $hash = sha1($mode.'|'.$targetLanguage.'|'.$text);
+        $voice = $this->resolveVoiceName($targetLanguage, $voiceName);
+        $hash = sha1($mode.'|'.$targetLanguage.'|'.$voice.'|'.$text);
 
         if ($cached = $this->findCachedAudio($hash, $targetLanguage)) {
             return [
                 'audio_path' => $cached,
-                'duration_seconds' => $this->getDurationSeconds(Storage::disk('public')->path($cached)),
+                'duration_seconds' => $this->estimateDurationSeconds($text),
                 'provider' => 'cache',
             ];
         }
 
-        if ($preferFast) {
-            $generated = $this->synthesizeWithEspeak($text, $targetLanguage);
-        } else {
-            $generated = $this->synthesizeWithChatterbox($text, $targetLanguage);
-            if (! $generated) {
-                // Safety fallback if Chatterbox service is unavailable.
-                $generated = $this->synthesizeWithEspeak($text, $targetLanguage);
-            }
-        }
-
+        $generated = $this->synthesizeWithGoogleCloud($text, $targetLanguage, $voice);
         $cachedPath = $this->storeInCache($generated['audio_path'], $hash, $targetLanguage);
 
         return [
             'audio_path' => $cachedPath,
-            'duration_seconds' => $generated['duration_seconds'] ?? $this->getDurationSeconds(Storage::disk('public')->path($cachedPath)),
-            'provider' => $generated['provider'] ?? 'unknown',
+            'duration_seconds' => $generated['duration_seconds'] ?? $this->estimateDurationSeconds($text),
+            'provider' => $generated['provider'] ?? 'google-cloud-tts',
         ];
     }
 
-    private function synthesizeWithChatterbox(string $text, string $targetLanguage): ?array
+    private function synthesizeWithGoogleCloud(string $text, string $targetLanguage, string $voice): array
     {
-        $baseUrl = rtrim((string) config('services.chatterbox.url', 'http://127.0.0.1:8123'), '/');
-        $timeout = (int) config('services.chatterbox.timeout_seconds', 240);
+        $endpoint = (string) config('services.google_tts.endpoint');
+        $timeout = (int) config('services.google_tts.timeout_seconds', 30);
 
-        try {
-            $response = Http::timeout($timeout)->post("{$baseUrl}/synthesize", [
-                'text' => mb_substr($text, 0, 20000),
-                'target_language' => $targetLanguage,
+        $response = Http::timeout($timeout)
+            ->withToken($this->getGoogleAccessToken())
+            ->post($endpoint, [
+                'input' => [
+                    'text' => mb_substr($text, 0, 5000),
+                ],
+                'voice' => [
+                    'languageCode' => $targetLanguage === 'ar' ? 'ar-XA' : 'en-US',
+                    'name' => $voice,
+                ],
+                'audioConfig' => [
+                    'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
+                    'speakingRate' => (float) config('services.google_tts.speaking_rate', 1.0),
+                    'pitch' => (float) config('services.google_tts.pitch', 0.0),
+                ],
             ]);
 
-            if (! $response->ok()) {
-                return null;
-            }
-
-            $json = $response->json();
-            if (! is_array($json) || empty($json['audio_file'])) {
-                return null;
-            }
-
-            $audioFile = basename((string) $json['audio_file']);
-            $relativePath = 'audio/'.$audioFile;
-            $absolutePath = Storage::disk('public')->path($relativePath);
-
-            // Some filesystems need a tiny delay before file visibility.
-            $tries = 0;
-            while (! is_file($absolutePath) && $tries < 30) {
-                usleep(150000);
-                $tries++;
-            }
-
-            if (! is_file($absolutePath)) {
-                return null;
-            }
-
-            return [
-                'audio_path' => $relativePath,
-                'duration_seconds' => isset($json['duration_seconds']) ? (int) $json['duration_seconds'] : null,
-                'provider' => (string) ($json['provider'] ?? 'chatterbox'),
-            ];
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private function synthesizeWithEspeak(string $text, string $targetLanguage): array
-    {
-        $bin = trim((string) shell_exec('command -v espeak-ng || command -v espeak || true'));
-        if ($bin === '') {
-            throw new \RuntimeException('No TTS provider available.');
+        if (! $response->ok()) {
+            throw new \RuntimeException('Google TTS request failed: '.$response->body());
         }
 
-        $voice = $targetLanguage === 'ar' ? 'ar' : 'en';
-
-        $filename = 'audio/'.now()->format('Ymd_His').'_'.Str::random(10).'.wav';
-        $absolute = Storage::disk('public')->path($filename);
-
-        if (! is_dir(dirname($absolute))) {
-            mkdir(dirname($absolute), 0775, true);
+        $json = $response->json();
+        $audioContent = is_array($json) ? ($json['audioContent'] ?? null) : null;
+        if (! is_string($audioContent) || $audioContent === '') {
+            throw new \RuntimeException('Google TTS returned empty audio payload.');
         }
 
-        $process = new Process([$bin, '-v', $voice, '-w', $absolute, mb_substr($text, 0, 12000)]);
-        $process->setTimeout(90);
-        $process->mustRun();
+        $binary = base64_decode($audioContent, true);
+        if ($binary === false || $binary === '') {
+            throw new \RuntimeException('Failed to decode Google TTS audio payload.');
+        }
+
+        $filename = 'audio/'.now()->format('Ymd_His').'_'.Str::random(12).'.mp3';
+        $disk = Storage::disk('public');
+
+        if (! $disk->exists('audio')) {
+            $disk->makeDirectory('audio');
+        }
+
+        $disk->put($filename, $binary);
 
         return [
             'audio_path' => $filename,
-            'duration_seconds' => $this->getDurationSeconds($absolute),
-            'provider' => basename($bin),
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+            'provider' => 'google-cloud-tts',
         ];
+    }
+
+    private function getGoogleAccessToken(): string
+    {
+        $credentials = $this->loadGoogleCredentials();
+        $clientEmail = (string) ($credentials['client_email'] ?? '');
+        $privateKey = (string) ($credentials['private_key'] ?? '');
+
+        if ($clientEmail === '' || $privateKey === '') {
+            throw new \RuntimeException('Missing Google TTS service-account credentials.');
+        }
+
+        $cacheKey = 'listen:google_tts_token:'.sha1($clientEmail);
+
+        return Cache::remember($cacheKey, now()->addMinutes(50), function () use ($clientEmail, $privateKey) {
+            $tokenUri = (string) config('services.google_tts.token_uri', 'https://oauth2.googleapis.com/token');
+            $now = time();
+
+            $header = $this->base64UrlEncode(json_encode([
+                'alg' => 'RS256',
+                'typ' => 'JWT',
+            ], JSON_THROW_ON_ERROR));
+
+            $claims = $this->base64UrlEncode(json_encode([
+                'iss' => $clientEmail,
+                'scope' => 'https://www.googleapis.com/auth/cloud-platform',
+                'aud' => $tokenUri,
+                'exp' => $now + 3600,
+                'iat' => $now,
+            ], JSON_THROW_ON_ERROR));
+
+            $unsigned = $header.'.'.$claims;
+            $signature = '';
+            $ok = openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256);
+            if (! $ok) {
+                throw new \RuntimeException('Unable to sign Google OAuth JWT assertion.');
+            }
+
+            $assertion = $unsigned.'.'.$this->base64UrlEncode($signature);
+
+            $response = Http::asForm()->timeout(15)->post($tokenUri, [
+                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                'assertion' => $assertion,
+            ]);
+
+            if (! $response->ok()) {
+                throw new \RuntimeException('Failed fetching Google OAuth token: '.$response->body());
+            }
+
+            $token = $response->json('access_token');
+            if (! is_string($token) || $token === '') {
+                throw new \RuntimeException('Google OAuth token response missing access_token.');
+            }
+
+            return $token;
+        });
+    }
+
+    private function loadGoogleCredentials(): array
+    {
+        $json = trim((string) config('services.google_tts.credentials_json', ''));
+        if ($json !== '') {
+            $decoded = json_decode($json, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        $path = trim((string) config('services.google_tts.credentials_path', ''));
+        if ($path !== '' && is_file($path)) {
+            $contents = file_get_contents($path);
+            $decoded = is_string($contents) ? json_decode($contents, true) : null;
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        throw new \RuntimeException('Google TTS credentials are not configured. Set GOOGLE_TTS_CREDENTIALS_JSON or GOOGLE_TTS_CREDENTIALS_PATH.');
+    }
+
+    private function resolveVoiceName(string $targetLanguage, ?string $voiceName): string
+    {
+        $voiceName = trim((string) $voiceName);
+        if ($voiceName !== '') {
+            return $voiceName;
+        }
+
+        return $targetLanguage === 'ar'
+            ? (string) config('services.google_tts.voice_ar', 'ar-XA-Wavenet-D')
+            : (string) config('services.google_tts.voice_en', 'en-US-Wavenet-D');
     }
 
     private function findCachedAudio(string $hash, string $targetLanguage): ?string
     {
         $disk = Storage::disk('public');
-        $paths = [
-            "audio/cache/{$targetLanguage}_{$hash}.wav",
-            "audio/cache/{$targetLanguage}_{$hash}.mp3",
-        ];
+        $path = "audio/cache/{$targetLanguage}_{$hash}.mp3";
 
-        foreach ($paths as $path) {
-            if ($disk->exists($path)) {
-                return $path;
-            }
-        }
-
-        return null;
+        return $disk->exists($path) ? $path : null;
     }
 
     private function storeInCache(string $sourcePath, string $hash, string $targetLanguage): string
     {
         $disk = Storage::disk('public');
-        $ext = pathinfo($sourcePath, PATHINFO_EXTENSION) ?: 'wav';
-        $cachePath = "audio/cache/{$targetLanguage}_{$hash}.{$ext}";
+        $cachePath = "audio/cache/{$targetLanguage}_{$hash}.mp3";
 
         if (! $disk->exists($cachePath)) {
             $dir = dirname($disk->path($cachePath));
@@ -159,46 +212,18 @@ class TtsService
         return $cachePath;
     }
 
-    private function getDurationSeconds(string $path): ?int
+    private function estimateDurationSeconds(string $text): int
     {
-        if (! is_file($path)) {
-            return null;
-        }
+        $wordEstimate = max(
+            str_word_count(strip_tags($text)),
+            (int) ceil(mb_strlen($text) / 5)
+        );
 
-        $ext = strtolower((string) pathinfo($path, PATHINFO_EXTENSION));
-        if ($ext === 'wav') {
-            return $this->getWavDurationSeconds($path);
-        }
-
-        // Quick fallback when metadata parsing is unavailable.
-        return null;
+        return max(3, (int) ceil($wordEstimate / 2.6));
     }
 
-    private function getWavDurationSeconds(string $path): ?int
+    private function base64UrlEncode(string $data): string
     {
-        if (! is_file($path) || filesize($path) < 44) {
-            return null;
-        }
-
-        $fp = fopen($path, 'rb');
-        if (! $fp) {
-            return null;
-        }
-
-        $header = fread($fp, 44);
-        fclose($fp);
-
-        if (strlen($header) < 44) {
-            return null;
-        }
-
-        $channels = unpack('v', substr($header, 22, 2))[1] ?? 1;
-        $sampleRate = unpack('V', substr($header, 24, 4))[1] ?? 22050;
-        $bitsPerSample = unpack('v', substr($header, 34, 2))[1] ?? 16;
-
-        $dataBytes = max(0, filesize($path) - 44);
-        $bytesPerSecond = max(1, (int) ($sampleRate * $channels * ($bitsPerSample / 8)));
-
-        return (int) ceil($dataBytes / $bytesPerSecond);
+        return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
     }
 }

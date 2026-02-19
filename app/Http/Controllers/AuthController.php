@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -54,6 +56,17 @@ class AuthController extends Controller
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
         ]);
+
+        $freePlan = Plan::query()->where('slug', 'free')->first();
+        if ($freePlan) {
+            Subscription::create([
+                'user_id' => $user->id,
+                'plan_id' => $freePlan->id,
+                'status' => 'active',
+                'current_period_start' => now(),
+                'current_period_end' => now()->addMonth(),
+            ]);
+        }
 
         Auth::login($user);
         $request->session()->regenerate();

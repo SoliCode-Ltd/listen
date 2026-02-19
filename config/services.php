@@ -35,13 +35,17 @@ return [
         ],
     ],
 
-    'openai' => [
-        'key' => env('OPENAI_API_KEY'),
-    ],
-
-    'chatterbox' => [
-        'url' => env('CHATTERBOX_URL', 'http://127.0.0.1:8123'),
-        'timeout_seconds' => env('CHATTERBOX_TIMEOUT_SECONDS', 240),
+    'google_tts' => [
+        'endpoint' => env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize'),
+        'token_uri' => env('GOOGLE_TTS_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+        'credentials_json' => env('GOOGLE_TTS_CREDENTIALS_JSON', ''),
+        'credentials_path' => env('GOOGLE_TTS_CREDENTIALS_PATH', ''),
+        'voice_ar' => env('GOOGLE_TTS_VOICE_AR', 'ar-XA-Wavenet-D'),
+        'voice_en' => env('GOOGLE_TTS_VOICE_EN', 'en-US-Wavenet-D'),
+        'audio_encoding' => env('GOOGLE_TTS_AUDIO_ENCODING', 'MP3'),
+        'speaking_rate' => (float) env('GOOGLE_TTS_SPEAKING_RATE', 1.0),
+        'pitch' => (float) env('GOOGLE_TTS_PITCH', 0.0),
+        'timeout_seconds' => (int) env('GOOGLE_TTS_TIMEOUT_SECONDS', 30),
     ],
 
 ];
