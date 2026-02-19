@@ -166,7 +166,7 @@
             <div class="stat"><small class="muted">Voice modes</small><b>Male + Female</b></div>
             <div class="stat"><small class="muted">Languages</small><b>Arabic + English</b></div>
             <div class="stat"><small class="muted">Engine layer</small><b>Soli Voice Stack</b></div>
-            <div class="stat"><small class="muted">Scale model</small><b>Queue + Plans</b></div>
+            <div class="stat"><small class="muted">Plan model</small><b>Queue + Plans</b></div>
           </div>
         </aside>
       </div>

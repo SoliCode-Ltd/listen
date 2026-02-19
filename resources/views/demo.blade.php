@@ -12,7 +12,7 @@
     html[data-theme="light"]{--bg:#eff3ff;--surface:#fff;--surface2:#f7f9ff;--line:#d8e2f1;--text:#121a2d;--muted:#5b6c89;--shadow:0 14px 34px rgba(35,56,97,.13)}
     *{box-sizing:border-box}html,body{margin:0;padding:0;scroll-behavior:smooth}
     body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 500px at 92% -20%,color-mix(in oklab,var(--b) 25%,transparent),transparent 60%),radial-gradient(900px 420px at -5% 0%,color-mix(in oklab,var(--a) 18%,transparent),transparent 58%),var(--bg);color:var(--text)}
-    .container{width:min(1240px,92%);margin:auto}
+    .container{width:min(1240px,calc(100% - 1.35rem));margin:auto}
 
     .bg-orb{position:fixed;z-index:-1;pointer-events:none;border-radius:999px;filter:blur(36px);opacity:.25;animation:float 10s ease-in-out infinite}
     .bg-orb.a{width:16rem;height:16rem;background:color-mix(in oklab,var(--a) 74%,white 26%);left:-4rem;top:15vh}
@@ -43,9 +43,9 @@
     .mobile-menu.open{display:grid;gap:.35rem}
     .mobile-user{padding:.42rem .62rem;border-radius:.62rem;background:var(--surface);border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 
-    .hero{padding:2.8rem 0 1.3rem}
-    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:.9rem}
-    .card{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .22s ease,border-color .22s ease}
+    .hero{padding:2.4rem 0 1rem}
+    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:1rem}
+    .card{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1.1rem;box-shadow:var(--shadow);transition:transform .22s ease,border-color .22s ease}
     .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
     .eyebrow{display:inline-block;padding:.3rem .62rem;border-radius:999px;border:1px solid var(--line);font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
     h1{margin:.65rem 0 .65rem;font-size:clamp(2rem,5vw,3.6rem);line-height:1.04;letter-spacing:-.03em}
@@ -60,12 +60,12 @@
     .stat{background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.62rem}
     .stat b{display:block;font-size:1.03rem}
 
-    .lab{padding:1rem 0 3rem}
-    .lab-grid{display:grid;grid-template-columns:1.03fr .97fr;gap:.9rem}
-    .form-grid{display:grid;gap:.68rem}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:.62rem}
+    .lab{padding:.85rem 0 2.4rem}
+    .lab-grid{display:grid;grid-template-columns:1.03fr .97fr;gap:1rem}
+    .form-grid{display:grid;gap:.8rem}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:.72rem}
     label{font-size:.86rem;color:color-mix(in oklab,var(--text) 86%,var(--muted) 14%)}
-    input,select,textarea{width:100%;padding:.72rem;border-radius:.68rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+    input,select,textarea{width:100%;padding:.8rem .86rem;border-radius:.78rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
     textarea{min-height:170px;resize:vertical}
 
     .chips{display:flex;gap:.42rem;flex-wrap:wrap}
@@ -96,7 +96,11 @@
     @media (max-width:960px){
       .desktop-nav,.desktop-actions{display:none}
       .mobile-controls{display:flex}
+      .hero{padding:1.45rem 0 .65rem}
+      .lab{padding:.55rem 0 1.7rem}
       .hero-grid,.lab-grid,.two,.stats,.voice-grid{grid-template-columns:1fr}
+      .card{padding:.95rem}
+      .sound-wave{margin-top:.7rem}
     }
   </style>
   <script>
@@ -311,6 +315,12 @@
       return list.filter((voice) => gender === 'all' ? true : voice.gender === gender);
     }
 
+    function formatGender(value) {
+      const text = String(value || '').trim().toLowerCase();
+      if (!text) return 'Any';
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
     function tokenHash(input) {
       let h = 0;
       for (let i = 0; i < input.length; i++) {
@@ -370,8 +380,8 @@
         for (const voice of voices) {
           const option = document.createElement('option');
           option.value = voice.key;
-          const rec = voice.recommended ? ' ⭐' : '';
-          option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
+          const rec = voice.recommended ? ' · Recommended' : '';
+          option.textContent = `${voice.label} · ${formatGender(voice.gender)}${rec}`;
           voiceSelect.appendChild(option);
         }
       }
@@ -391,8 +401,8 @@
         card.innerHTML = `
           <div class="voice-avatar">${robotSvg(token, voice.gender)}</div>
           <div class="voice-meta">
-            <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">★ Recommended</span>' : ''}</strong>
-            <small>${voice.gender.toUpperCase()}</small>
+            <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">Recommended</span>' : ''}</strong>
+            <small>${formatGender(voice.gender)}</small>
           </div>
         `;
         voiceCards.appendChild(card);
@@ -424,7 +434,7 @@
         previewAudio.load();
 
         const label = data?.voice?.label || 'Selected voice';
-        const gender = data?.voice?.gender ? ` (${String(data.voice.gender).toUpperCase()})` : '';
+        const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
         audioMeta.textContent = `Voice: ${label}${gender} · ${data.translate_note}`;
       } catch (err) {
         setError(err?.message || 'Preview failed');

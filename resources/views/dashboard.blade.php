@@ -293,6 +293,12 @@
     const translateSelect = document.getElementById('translateSelect');
     const translateHint = document.getElementById('translateHint');
 
+    function formatGender(value) {
+      const text = String(value || '').trim().toLowerCase();
+      if (!text) return 'Any';
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
     function renderVoiceOptions() {
       const lang = targetLanguage?.value || 'ar';
       const voices = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
@@ -303,8 +309,8 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        const rec = voice.recommended ? ' ⭐' : '';
-        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
+        const rec = voice.recommended ? ' · Recommended' : '';
+        option.textContent = `${voice.label} · ${formatGender(voice.gender)}${rec}`;
         voiceSelect.appendChild(option);
       }
 
