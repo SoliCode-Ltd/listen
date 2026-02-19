@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Plan;
 use App\Services\TranslationService;
 use App\Services\TtsService;
+use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,12 +15,27 @@ class HomeController extends Controller
 {
     public function index()
     {
-        return view('landing');
+        $pricingPlans = $this->pricingPlans();
+        $highlightPlans = collect($pricingPlans)
+            ->filter(fn (array $plan) => $plan['price_monthly'] > 0)
+            ->take(3)
+            ->values()
+            ->all();
+
+        if (count($highlightPlans) === 0) {
+            $highlightPlans = array_slice($pricingPlans, 0, 3);
+        }
+
+        return view('landing', [
+            'highlightPlans' => $highlightPlans,
+        ]);
     }
 
     public function pricingPage()
     {
-        return view('pricing');
+        return view('pricing', [
+            'pricingPlans' => $this->pricingPlans(),
+        ]);
     }
 
     public function demoPage()
@@ -46,12 +63,7 @@ class HomeController extends Controller
 
         $text = trim($validated['text']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
-
-        $estimatedWords = max(
-            str_word_count(strip_tags($text)),
-            (int) ceil(mb_strlen($text) / 5)
-        );
-        $estimatedSeconds = max(3, (int) ceil($estimatedWords / 2.6));
+        $estimate = UsageEstimator::estimate($text);
 
         return response()->json([
             'ok' => true,
@@ -63,8 +75,9 @@ class HomeController extends Controller
                 ? 'Text will be translated to the target language before audio generation.'
                 : 'Text will be spoken as-is without translation.',
             'voice' => VoiceCatalog::voiceMeta($voiceName),
-            'estimated_seconds' => $estimatedSeconds,
-            'estimated_minutes' => max(1, (int) ceil($estimatedSeconds / 60)),
+            'estimated_chars' => $estimate['chars'],
+            'estimated_seconds' => $estimate['seconds'],
+            'estimated_minutes' => $estimate['minutes'],
         ]);
     }
 
@@ -97,6 +110,7 @@ class HomeController extends Controller
 
         try {
             $audio = $ttsService->synthesize($textForSpeech, $validated['target_language'], $voiceName);
+            $estimate = UsageEstimator::estimate($textForSpeech);
 
             return response()->json([
                 'ok' => true,
@@ -108,7 +122,8 @@ class HomeController extends Controller
                     : 'Text was spoken as-is without translation.',
                 'voice' => VoiceCatalog::voiceMeta($voiceName),
                 'audio_url' => Storage::disk('public')->url($audio['audio_path']),
-                'duration_seconds' => $audio['duration_seconds'] ?? null,
+                'duration_seconds' => $audio['duration_seconds'] ?? $estimate['seconds'],
+                'estimated_chars' => $estimate['chars'],
             ]);
         } catch (\Throwable $e) {
             return response()->json([
@@ -135,5 +150,41 @@ class HomeController extends Controller
         }
 
         return $voiceName;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function pricingPlans(): array
+    {
+        $plans = Plan::query()
+            ->where('is_active', true)
+            ->orderBy('price_cents')
+            ->get();
+
+        $mapped = $plans->map(function (Plan $plan): array {
+            $monthly = round($plan->price_cents / 100, 2);
+            $yearly = round($monthly * 0.8, 2);
+
+            return [
+                'slug' => $plan->slug,
+                'name' => $plan->name,
+                'price_monthly' => $monthly,
+                'price_yearly' => $yearly,
+                'monthly_minutes' => (int) $plan->monthly_minutes,
+                'max_chars_per_request' => (int) $plan->max_chars_per_request,
+                'features' => is_array($plan->features) ? $plan->features : [],
+            ];
+        })->values();
+
+        $paid = $mapped->filter(fn (array $plan) => $plan['price_monthly'] > 0)->values();
+        $popularSlug = $paid->count() > 1
+            ? (string) $paid->get(1)['slug']
+            : (string) ($paid->first()['slug'] ?? '');
+
+        return $mapped->map(function (array $plan) use ($popularSlug): array {
+            $plan['is_popular'] = $popularSlug !== '' && $plan['slug'] === $popularSlug;
+            return $plan;
+        })->all();
     }
 }

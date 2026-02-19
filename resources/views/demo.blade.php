@@ -81,25 +81,8 @@
     .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:420px;overflow:auto;padding-right:.2rem}
     .voice-item{display:flex;gap:.55rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.58rem;transition:transform .2s ease,border-color .2s ease}
     .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .voice-avatar{position:relative;width:2rem;height:2rem;border-radius:.55rem;display:block;border:1px solid color-mix(in oklab,var(--line) 70%,transparent);background:linear-gradient(145deg,var(--robot-a,#6b78ff),var(--robot-b,#7c3aed));overflow:hidden}
-    .voice-avatar::before{content:'';position:absolute;top:.35rem;left:50%;transform:translateX(-50%);width:1rem;height:.5rem;border-radius:.25rem;background:rgba(7,10,22,.75)}
-    .voice-avatar::after{content:'';position:absolute;bottom:.26rem;left:50%;transform:translateX(-50%);width:.95rem;height:.22rem;border-radius:999px;background:rgba(255,255,255,.82)}
-    .voice-avatar i{position:absolute;top:.2rem;left:50%;transform:translateX(-50%);width:.14rem;height:.2rem;border-radius:999px;background:rgba(255,255,255,.9)}
-    .voice-avatar i::after{content:'';position:absolute;top:-.12rem;left:50%;transform:translateX(-50%);width:.28rem;height:.12rem;border-radius:999px;background:rgba(255,255,255,.85)}
-    .voice-avatar.avatar-female-a{--robot-a:#ff6f91;--robot-b:#7c3aed}
-    .voice-avatar.avatar-female-b{--robot-a:#ff9a76;--robot-b:#6d28d9}
-    .voice-avatar.avatar-female-c{--robot-a:#f472b6;--robot-b:#5b21b6}
-    .voice-avatar.avatar-female-d{--robot-a:#fb7185;--robot-b:#4c1d95}
-    .voice-avatar.avatar-female-e{--robot-a:#f59e0b;--robot-b:#6d28d9}
-    .voice-avatar.avatar-female-f{--robot-a:#ec4899;--robot-b:#4338ca}
-    .voice-avatar.avatar-female-g{--robot-a:#f97316;--robot-b:#7e22ce}
-    .voice-avatar.avatar-male-a{--robot-a:#38bdf8;--robot-b:#2563eb}
-    .voice-avatar.avatar-male-b{--robot-a:#60a5fa;--robot-b:#3730a3}
-    .voice-avatar.avatar-male-c{--robot-a:#22d3ee;--robot-b:#4f46e5}
-    .voice-avatar.avatar-male-d{--robot-a:#06b6d4;--robot-b:#4338ca}
-    .voice-avatar.avatar-male-e{--robot-a:#3b82f6;--robot-b:#6d28d9}
-    .voice-avatar.avatar-male-f{--robot-a:#0ea5e9;--robot-b:#312e81}
-    .voice-avatar.avatar-male-g{--robot-a:#14b8a6;--robot-b:#3730a3}
+    .voice-avatar{width:2.3rem;height:2.3rem;border-radius:.62rem;overflow:hidden;border:1px solid color-mix(in oklab,var(--line) 65%,transparent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+    .voice-avatar svg{width:100%;height:100%;display:block}
     .voice-meta strong{display:block;font-size:.92rem}
     .voice-meta small{color:var(--muted)}
     .rec-badge{display:inline-flex;align-items:center;gap:.22rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.34rem}
@@ -328,6 +311,54 @@
       return list.filter((voice) => gender === 'all' ? true : voice.gender === gender);
     }
 
+    function tokenHash(input) {
+      let h = 0;
+      for (let i = 0; i < input.length; i++) {
+        h = ((h << 5) - h) + input.charCodeAt(i);
+        h |= 0;
+      }
+      return Math.abs(h);
+    }
+
+    function robotSvg(token, gender) {
+      const hash = tokenHash(token || 'voice');
+      const h1 = hash % 360;
+      const h2 = (h1 + 48) % 360;
+      const eyeVariant = hash % 3;
+      const mouthVariant = hash % 4;
+      const accent = String(gender).toLowerCase() === 'female' ? '95%' : '88%';
+
+      const eyes = eyeVariant === 0
+        ? `<rect x="9" y="13" width="7" height="3" rx="1.5" fill="white"/><rect x="20" y="13" width="7" height="3" rx="1.5" fill="white"/>`
+        : eyeVariant === 1
+          ? `<circle cx="12.5" cy="14.5" r="1.8" fill="white"/><circle cx="23.5" cy="14.5" r="1.8" fill="white"/>`
+          : `<rect x="9" y="13" width="7" height="2" rx="1" fill="white"/><rect x="20" y="13" width="7" height="2" rx="1" fill="white"/>`;
+
+      const mouth = mouthVariant === 0
+        ? `<rect x="12" y="23" width="12" height="2.4" rx="1.2" fill="rgba(255,255,255,0.9)"/>`
+        : mouthVariant === 1
+          ? `<path d="M12 24c2 2 8 2 12 0" stroke="rgba(255,255,255,0.9)" stroke-width="2" fill="none" stroke-linecap="round"/>`
+          : mouthVariant === 2
+            ? `<circle cx="18" cy="24" r="2" fill="rgba(255,255,255,0.9)"/>`
+            : `<rect x="14" y="23" width="8" height="2" rx="1" fill="rgba(255,255,255,0.9)"/>`;
+
+      return `
+        <svg viewBox="0 0 36 36" aria-hidden="true" role="img">
+          <defs>
+            <linearGradient id="g-${hash}" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="hsl(${h1} ${accent} 62%)"/>
+              <stop offset="100%" stop-color="hsl(${h2} ${accent} 48%)"/>
+            </linearGradient>
+          </defs>
+          <rect x="4" y="5" width="28" height="26" rx="8" fill="url(#g-${hash})"/>
+          <rect x="8" y="10" width="20" height="9" rx="4.5" fill="rgba(9,14,28,.58)"/>
+          ${eyes}
+          ${mouth}
+          <rect x="16" y="2.5" width="4" height="4" rx="2" fill="rgba(255,255,255,.85)"/>
+        </svg>
+      `;
+    }
+
     function renderVoiceOptions() {
       const voices = getFilteredVoices();
       const current = voiceSelect.value;
@@ -356,10 +387,9 @@
       for (const voice of voices) {
         const card = document.createElement('div');
         card.className = 'voice-item';
-        const token = String(voice.avatar || 'profile').toLowerCase().replace(/[^a-z0-9-]/g, '');
-        const avatarClass = `avatar-${token}`;
+        const token = String(voice.avatar || voice.key || voice.label || 'voice');
         card.innerHTML = `
-          <div class="voice-avatar ${avatarClass}"><i></i></div>
+          <div class="voice-avatar">${robotSvg(token, voice.gender)}</div>
           <div class="voice-meta">
             <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">★ Recommended</span>' : ''}</strong>
             <small>${voice.gender.toUpperCase()}</small>

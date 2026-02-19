@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -78,7 +79,7 @@ class DashboardController extends Controller
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
-        [$estimatedSeconds, $estimatedMinutes] = $this->estimateTiming($text);
+        $estimate = UsageEstimator::estimate($text);
 
         $period = now()->format('Y-m');
         $counter = UsageCounter::firstOrCreate(
@@ -87,7 +88,7 @@ class DashboardController extends Controller
         );
 
         $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
-        if (($counter->total_minutes + $estimatedMinutes) > $planMinutes) {
+        if (($counter->total_minutes + $estimate['minutes']) > $planMinutes) {
             throw ValidationException::withMessages([
                 'content' => 'Monthly plan minutes exceeded. Please upgrade your plan to continue.',
             ]);
@@ -111,13 +112,14 @@ class DashboardController extends Controller
             'target_language' => $validated['target_language'],
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
-            'duration_seconds' => $estimatedSeconds,
+            'duration_seconds' => $estimate['seconds'],
             'status' => 'queued',
         ]);
 
+        // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         $counter->increment('total_requests');
-        $counter->increment('total_chars', mb_strlen($text));
-        $counter->increment('total_minutes', $estimatedMinutes);
+        $counter->increment('total_chars', $estimate['chars']);
+        $counter->increment('total_minutes', $estimate['minutes']);
 
         GenerateAudioJob::dispatch($job->id);
 
@@ -143,19 +145,6 @@ class DashboardController extends Controller
 
         return Plan::query()->where('slug', 'free')->first()
             ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
-    }
-
-    private function estimateTiming(string $text): array
-    {
-        $wordEstimate = max(
-            str_word_count(strip_tags($text)),
-            (int) ceil(mb_strlen($text) / 5)
-        );
-
-        $seconds = max(3, (int) ceil($wordEstimate / 2.6));
-        $minutes = max(1, (int) ceil($seconds / 60));
-
-        return [$seconds, $minutes];
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey): string

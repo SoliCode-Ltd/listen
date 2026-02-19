@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root{--bg:#070910;--surface:#11182a;--surface2:#15213a;--line:#2b3a5d;--text:#f4f7ff;--muted:#9fb0d4;--a:#fb8308;--b:#5906b2;--ok:#33c58f;--shadow:0 16px 46px rgba(0,0,0,.30)}
+    :root{--bg:#070910;--surface:#11182a;--surface2:#15213a;--line:#2b3a5d;--text:#f4f7ff;--muted:#9fb0d4;--a:#fb8308;--b:#5906b2;--shadow:0 16px 46px rgba(0,0,0,.30)}
     html[data-theme="light"]{--bg:#eff3ff;--surface:#fff;--surface2:#f7f9ff;--line:#d8e2f1;--text:#121a2d;--muted:#5b6c89;--shadow:0 14px 34px rgba(35,56,97,.13)}
     *{box-sizing:border-box}html,body{margin:0;padding:0;scroll-behavior:smooth}
     body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 500px at 92% -20%,color-mix(in oklab,var(--b) 25%,transparent),transparent 60%),radial-gradient(900px 420px at -5% 0%,color-mix(in oklab,var(--a) 18%,transparent),transparent 58%),var(--bg);color:var(--text)}
@@ -40,7 +40,7 @@
     .mobile-menu.open{display:grid;gap:.35rem}
     .mobile-user{padding:.42rem .62rem;border-radius:.62rem;background:var(--surface);border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 
-    .hero{padding:3.4rem 0 1.6rem;text-align:center}
+    .hero{padding:3.3rem 0 1.4rem;text-align:center}
     h1{margin:.6rem 0 .7rem;font-size:clamp(2rem,5.5vw,4rem);line-height:1.04;letter-spacing:-.03em}
     .muted{color:var(--muted)}
 
@@ -49,12 +49,12 @@
     .toggle button{border:0;background:transparent;color:var(--muted);font-weight:700;padding:.42rem .78rem;border-radius:999px;cursor:pointer}
     .toggle button.active{background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
-    .plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem}
+    .plans{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:.8rem}
     .plan{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);position:relative;overflow:hidden;transition:transform .25s ease,border-color .25s ease}
     .plan:hover{transform:translateY(-4px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
     .plan.popular{border-color:color-mix(in oklab,var(--b) 58%,var(--line) 42%)}
     .badge{position:absolute;top:.8rem;right:.8rem;font-size:.72rem;border:1px solid color-mix(in oklab,var(--a) 55%,var(--line) 45%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 82%,var(--text) 18%);padding:.2rem .52rem;border-radius:999px}
-    .price{font-size:2.2rem;font-weight:900;margin:.28rem 0 .15rem}
+    .price{font-size:2.15rem;font-weight:900;margin:.28rem 0 .15rem}
     .plan ul{margin:.7rem 0 0 1rem;padding:0;display:grid;gap:.35rem;color:var(--muted)}
 
     .faq{margin-top:1.7rem;display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
@@ -70,7 +70,7 @@
     @media (max-width:960px){
       .desktop-nav,.desktop-actions{display:none}
       .mobile-controls{display:flex}
-      .plans,.faq{grid-template-columns:1fr}
+      .faq{grid-template-columns:1fr}
     }
   </style>
   <script>
@@ -136,8 +136,8 @@
 
   <main class="container">
     <section class="hero reveal">
-      <h1>Pricing that helps you start fast and scale hard.</h1>
-      <p class="muted">No confusing tiers. Clear limits, clean economics, and enough room to grow into a category leader.</p>
+      <h1>Pricing powered by your live plans table.</h1>
+      <p class="muted">No hardcoded cards. Any backend plan update appears here automatically.</p>
       <div class="toggle-wrap">
         <div class="toggle">
           <button id="monthlyBtn" class="active" type="button">Monthly</button>
@@ -147,42 +147,34 @@
     </section>
 
     <section class="plans">
-      <article class="plan reveal" data-month="9" data-year="7">
-        <h2 style="margin:.1rem 0 .2rem;font-size:1.15rem">Starter</h2>
-        <p class="muted">Best for early creators</p>
-        <div class="price">$<span class="price-value">9</span><span style="font-size:1rem">/mo</span></div>
-        <ul>
-          <li>120 minutes / month</li>
-          <li>2,500 chars per request</li>
-          <li>Arabic + English voices</li>
-          <li>Email support</li>
-        </ul>
-      </article>
-
-      <article class="plan popular reveal" data-month="29" data-year="23">
-        <span class="badge">Most Popular</span>
-        <h2 style="margin:.1rem 0 .2rem;font-size:1.15rem">Growth</h2>
-        <p class="muted">For real product traction</p>
-        <div class="price">$<span class="price-value">29</span><span style="font-size:1rem">/mo</span></div>
-        <ul>
-          <li>500 minutes / month</li>
-          <li>6,000 chars per request</li>
-          <li>Priority generation</li>
-          <li>Usage analytics + exports</li>
-        </ul>
-      </article>
-
-      <article class="plan reveal" data-month="79" data-year="63">
-        <h2 style="margin:.1rem 0 .2rem;font-size:1.15rem">Scale</h2>
-        <p class="muted">For serious SaaS teams</p>
-        <div class="price">$<span class="price-value">79</span><span style="font-size:1rem">/mo</span></div>
-        <ul>
-          <li>1,800 minutes / month</li>
-          <li>12,000 chars per request</li>
-          <li>Faster queue lane</li>
-          <li>Team seats + integrations</li>
-        </ul>
-      </article>
+      @forelse($pricingPlans as $plan)
+        <article class="plan reveal {{ $plan['is_popular'] ? 'popular' : '' }}" data-month="{{ number_format($plan['price_monthly'], 2, '.', '') }}" data-year="{{ number_format($plan['price_yearly'], 2, '.', '') }}">
+          @if($plan['is_popular'])
+            <span class="badge">Most Popular</span>
+          @endif
+          <h2 style="margin:.1rem 0 .2rem;font-size:1.15rem">{{ $plan['name'] }}</h2>
+          <p class="muted">{{ $plan['slug'] === 'free' ? 'Perfect to get started' : 'Built for growing teams' }}</p>
+          <div class="price">
+            @if($plan['price_monthly'] <= 0)
+              Free
+            @else
+              $<span class="price-value">{{ rtrim(rtrim(number_format($plan['price_monthly'], 2, '.', ''), '0'), '.') }}</span><span style="font-size:1rem">/mo</span>
+            @endif
+          </div>
+          <ul>
+            <li>{{ number_format($plan['monthly_minutes']) }} minutes / month</li>
+            <li>{{ number_format($plan['max_chars_per_request']) }} chars per request</li>
+            @foreach(array_slice($plan['features'], 0, 3) as $feature)
+              <li>{{ $feature }}</li>
+            @endforeach
+          </ul>
+        </article>
+      @empty
+        <article class="plan reveal">
+          <h2 style="margin:.1rem 0 .2rem;font-size:1.15rem">No plans found</h2>
+          <p class="muted">Please seed plans in the database.</p>
+        </article>
+      @endforelse
     </section>
 
     <section class="faq reveal">
@@ -205,8 +197,8 @@
     </section>
 
     <section class="cta reveal">
-      <h2 style="margin:.1rem 0 .45rem">Ready to make Listen famous?</h2>
-      <p class="muted" style="margin:0 0 .8rem">Start with Starter, move to Growth once traction hits, and scale confidently.</p>
+      <h2 style="margin:.1rem 0 .45rem">Ready to grow fast?</h2>
+      <p class="muted" style="margin:0 0 .8rem">Start free, then move up as your usage scales.</p>
       @auth
         <a class="btn primary" href="{{ route('dashboard') }}">Open Dashboard</a>
       @else
@@ -244,15 +236,22 @@
     const yearlyBtn = document.getElementById('yearlyBtn');
     const plans = Array.from(document.querySelectorAll('.plan'));
 
+    function formatPrice(v) {
+      const n = Number(v || 0);
+      return n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.00$/, '');
+    }
+
     function setBilling(mode) {
       const isYearly = mode === 'yearly';
       monthlyBtn?.classList.toggle('active', !isYearly);
       yearlyBtn?.classList.toggle('active', isYearly);
 
       plans.forEach((plan) => {
+        const priceEl = plan.querySelector('.price-value');
+        if (!priceEl) return; // free plan
+
         const value = isYearly ? plan.dataset.year : plan.dataset.month;
-        const priceValue = plan.querySelector('.price-value');
-        if (priceValue) priceValue.textContent = value || '0';
+        priceEl.textContent = formatPrice(value);
       });
     }
 

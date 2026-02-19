@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -41,7 +42,7 @@ class MessageReaderController extends Controller
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
-        [$estimatedSeconds, $estimatedMinutes] = $this->estimateTiming($text);
+        $estimate = UsageEstimator::estimate($text);
 
         $period = now()->format('Y-m');
         $counter = UsageCounter::firstOrCreate(
@@ -50,7 +51,7 @@ class MessageReaderController extends Controller
         );
 
         $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
-        if (($counter->total_minutes + $estimatedMinutes) > $planMinutes) {
+        if (($counter->total_minutes + $estimate['minutes']) > $planMinutes) {
             throw ValidationException::withMessages([
                 'content' => 'Monthly plan minutes exceeded. Please upgrade your plan to continue.',
             ]);
@@ -74,13 +75,14 @@ class MessageReaderController extends Controller
             'target_language' => $validated['target_language'],
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
-            'duration_seconds' => $estimatedSeconds,
+            'duration_seconds' => $estimate['seconds'],
             'status' => 'queued',
         ]);
 
+        // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         $counter->increment('total_requests');
-        $counter->increment('total_chars', mb_strlen($text));
-        $counter->increment('total_minutes', $estimatedMinutes);
+        $counter->increment('total_chars', $estimate['chars']);
+        $counter->increment('total_minutes', $estimate['minutes']);
 
         GenerateAudioJob::dispatch($job->id);
 
@@ -90,8 +92,9 @@ class MessageReaderController extends Controller
             'item_id' => $item->id,
             'status' => $job->status,
             'voice' => VoiceCatalog::voiceMeta($voiceName),
-            'estimated_seconds' => $estimatedSeconds,
-            'estimated_minutes' => $estimatedMinutes,
+            'estimated_chars' => $estimate['chars'],
+            'estimated_seconds' => $estimate['seconds'],
+            'estimated_minutes' => $estimate['minutes'],
         ], 202);
     }
 
@@ -136,19 +139,6 @@ class MessageReaderController extends Controller
             'count' => $jobs->count(),
             'jobs' => $jobs,
         ]);
-    }
-
-    private function estimateTiming(string $text): array
-    {
-        $wordEstimate = max(
-            str_word_count(strip_tags($text)),
-            (int) ceil(mb_strlen($text) / 5)
-        );
-
-        $seconds = max(3, (int) ceil($wordEstimate / 2.6));
-        $minutes = max(1, (int) ceil($seconds / 60));
-
-        return [$seconds, $minutes];
     }
 
     private function resolveApiUserId(Request $request): int

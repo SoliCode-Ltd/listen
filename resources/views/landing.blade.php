@@ -193,23 +193,26 @@
 
     <section class="section reveal">
       <h2>Starter pricing that scales</h2>
-      <p class="muted">Clear, simple, and ready for your first wave of users.</p>
+      <p class="muted">Live plan data from your database — always in sync with backend pricing.</p>
       <div class="pricing-strip">
-        <article class="plan reveal">
-          <h4>Starter</h4>
-          <div class="price">$9<span style="font-size:.9rem">/mo</span></div>
-          <p class="muted">120 minutes · 2,500 chars/request</p>
-        </article>
-        <article class="plan reveal">
-          <h4>Growth</h4>
-          <div class="price">$29<span style="font-size:.9rem">/mo</span></div>
-          <p class="muted">500 minutes · 6,000 chars/request</p>
-        </article>
-        <article class="plan reveal">
-          <h4>Scale</h4>
-          <div class="price">$79<span style="font-size:.9rem">/mo</span></div>
-          <p class="muted">1,800 minutes · 12,000 chars/request</p>
-        </article>
+        @forelse($highlightPlans as $plan)
+          <article class="plan reveal">
+            <h4>{{ $plan['name'] }}</h4>
+            <div class="price">
+              @if($plan['price_monthly'] <= 0)
+                Free
+              @else
+                ${{ rtrim(rtrim(number_format($plan['price_monthly'], 2, '.', ''), '0'), '.') }}<span style="font-size:.9rem">/mo</span>
+              @endif
+            </div>
+            <p class="muted">{{ number_format($plan['monthly_minutes']) }} minutes · {{ number_format($plan['max_chars_per_request']) }} chars/request</p>
+          </article>
+        @empty
+          <article class="plan reveal">
+            <h4>Pricing unavailable</h4>
+            <p class="muted">No active plans found yet.</p>
+          </article>
+        @endforelse
       </div>
       <div style="margin-top:.85rem">
         <a class="btn primary" href="{{ route('pricing') }}">Open Full Pricing Page</a>
