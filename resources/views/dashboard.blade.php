@@ -15,12 +15,14 @@
     .header{position:sticky;top:0;z-index:40;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(9px);border-bottom:1px solid var(--line)}
     .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:1rem}
     .brand{font-weight:900}.brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;color:transparent}
-    .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:.66rem .9rem;border-radius:.72rem;border:1px solid var(--line);color:var(--text);font-weight:700;background:var(--surface);cursor:pointer}
+    .btn{display:inline-flex;align-items:center;justify-content:center;text-decoration:none;padding:.66rem .9rem;border-radius:.72rem;border:1px solid var(--line);color:var(--text);font-weight:700;background:var(--surface);cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 22px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
     .hero{padding:1rem 0}
     .hero-grid{display:grid;grid-template-columns:1.08fr .92fr;gap:.95rem}
-    .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow)}
+    .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .25s ease,border-color .25s ease}
+    .card:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 40%,var(--line) 60%)}
     h1{margin:.2rem 0 .5rem;font-size:1.45rem}h2{margin:.2rem 0 .7rem;font-size:1.1rem}h3{margin:.1rem 0 .4rem;font-size:1rem}.muted{color:var(--muted)}
 
     .meter{margin-top:.75rem}
@@ -52,6 +54,8 @@
     audio{max-width:240px;width:240px;height:32px}
 
     .footer{color:var(--muted);border-top:1px solid var(--line);padding:1rem 0 1.6rem;margin-top:.3rem}
+    .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease,transform .55s ease}
+    .reveal.show{opacity:1;transform:translateY(0)}
 
     @media (max-width:1020px){.hero-grid,.main,.kpis,.two,.mini{grid-template-columns:1fr}}
   </style>
@@ -64,7 +68,7 @@
   </script>
 </head>
 <body>
-  <header class="header">
+  <header class="header reveal">
     <div class="container nav">
       <div class="brand">🎧 <span>Listen</span> Dashboard</div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
@@ -84,7 +88,7 @@
   <main class="container">
     <section class="hero">
       <div class="hero-grid">
-        <article class="card">
+        <article class="card reveal">
           <h1>Command Center</h1>
           <p class="muted">Manage queued voice generation, monitor usage, and keep delivery smooth for your customers.</p>
 
@@ -104,7 +108,7 @@
           </div>
         </article>
 
-        <aside class="card">
+        <aside class="card reveal">
           <h2>System health</h2>
           <div class="mini">
             <div class="box"><small class="muted">Queued</small><div><b>{{ $stats['queued'] }}</b></div></div>
@@ -118,7 +122,7 @@
     </section>
 
     <section class="main" id="queue">
-      <article class="card">
+      <article class="card reveal">
         <h2>Queue a new job</h2>
         @if(session('ok'))
           <div class="note">{{ session('ok') }}</div>
@@ -177,14 +181,14 @@
       </article>
 
       <aside class="side-cards">
-        <section class="card">
+        <section class="card reveal">
           <h3>Current plan</h3>
           <p class="muted">{{ $activePlan?->name ?? 'Free' }}</p>
           <p class="muted">Monthly minutes: {{ $planMinutes }}</p>
           <p class="muted">Max chars per request: {{ $activePlan?->max_chars_per_request ?? 600 }}</p>
         </section>
 
-        <section class="card">
+        <section class="card reveal">
           <h3>Voice defaults</h3>
           <p class="muted">Arabic preset: {{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</p>
           <p class="muted">English preset: {{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</p>
@@ -193,7 +197,7 @@
       </aside>
     </section>
 
-    <section class="card" style="margin-bottom:1rem">
+    <section class="card reveal" style="margin-bottom:1rem">
       <h2>Recent jobs</h2>
       <div style="overflow:auto">
         <table>
@@ -259,7 +263,8 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}`;
+        const rec = voice.recommended ? ' ⭐' : '';
+        option.textContent = `${voice.avatar || '🎙️'} ${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
         voiceSelect.appendChild(option);
       }
 
@@ -270,6 +275,14 @@
 
     targetLanguage?.addEventListener('change', renderVoiceOptions);
     renderVoiceOptions();
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) entry.target.classList.add('show');
+      }
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
 
     document.getElementById('themeToggle')?.addEventListener('click', () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';

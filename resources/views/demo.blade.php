@@ -19,18 +19,24 @@
     *{box-sizing:border-box}
     html,body{margin:0;padding:0;scroll-behavior:smooth}
     body{font-family:Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(1000px 540px at 92% -16%,color-mix(in oklab,var(--b) 28%,transparent),transparent 64%),radial-gradient(900px 380px at 4% -12%,color-mix(in oklab,var(--a) 22%,transparent),transparent 58%),var(--bg)}
+    .bg-orb{position:fixed;z-index:-1;filter:blur(30px);pointer-events:none;opacity:.32;border-radius:999px;animation:float 10s ease-in-out infinite}
+    .bg-orb.a{width:16rem;height:16rem;background:color-mix(in oklab,var(--a) 72%,white 28%);left:-3rem;top:14vh}
+    .bg-orb.b{width:20rem;height:20rem;background:color-mix(in oklab,var(--b) 72%,white 28%);right:-4rem;bottom:10vh;animation-delay:-3s}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
     .container{width:min(1240px,92%);margin:0 auto}
     .header{position:sticky;top:0;z-index:50;background:color-mix(in oklab,var(--bg) 84%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
     .nav{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:1rem}
     .brand{font-weight:900;display:flex;align-items:center;gap:.55rem}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
     .nav-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;padding:.72rem .95rem;border-radius:.76rem;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;padding:.72rem .95rem;border-radius:.76rem;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,background .2s ease}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn-primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
     .hero{padding:3rem 0 1.5rem}
     .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:1rem;align-items:stretch}
-    .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow)}
+    .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .25s ease,border-color .25s ease}
+    .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--b) 48%,var(--line) 52%)}
     .eyebrow{display:inline-block;padding:.3rem .65rem;border-radius:999px;border:1px solid var(--line);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
     h1{margin:.7rem 0 .7rem;font-size:clamp(2rem,5.2vw,3.8rem);line-height:1.04;letter-spacing:-.03em}
     p{margin:0;color:var(--muted)}
@@ -53,9 +59,13 @@
     .chip{padding:.42rem .62rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.78rem;color:var(--muted);cursor:pointer}
 
     .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:270px;overflow:auto;padding-right:.25rem}
-    .voice-item{border:1px solid var(--line);border-radius:.78rem;background:var(--surface);padding:.58rem}
+    .voice-item{border:1px solid var(--line);border-radius:.78rem;background:var(--surface);padding:.58rem;display:flex;gap:.58rem;align-items:center;transition:transform .2s ease,border-color .2s ease}
+    .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
+    .voice-avatar{width:2rem;height:2rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 30%,transparent),color-mix(in oklab,var(--b) 30%,transparent));font-size:1.05rem}
+    .voice-meta{display:grid;gap:.08rem}
     .voice-item strong{display:block;font-size:.92rem}
     .voice-item small{color:var(--muted)}
+    .rec-badge{display:inline-flex;align-items:center;gap:.2rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.38rem}
 
     .result{white-space:pre-wrap;background:var(--surface);border:1px solid var(--line);border-radius:.8rem;padding:.8rem;min-height:180px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
     .audio-wrap{margin-top:.75rem;border:1px solid var(--line);border-radius:.8rem;background:var(--surface);padding:.72rem}
@@ -65,6 +75,8 @@
     .error{margin-top:.6rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
 
     .footer{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
+    .reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+    .reveal.show{opacity:1;transform:translateY(0)}
 
     @media (max-width:1080px){.hero-grid,.lab-grid,.two{grid-template-columns:1fr}.voice-grid{grid-template-columns:1fr}}
   </style>
@@ -77,7 +89,10 @@
   </script>
 </head>
 <body>
-  <header class="header">
+  <div class="bg-orb a"></div>
+  <div class="bg-orb b"></div>
+
+  <header class="header reveal">
     <div class="container nav">
       <div class="brand">🎧 <span>Listen Demo Lab</span></div>
       <div class="nav-actions">
@@ -95,7 +110,7 @@
   <main class="container">
     <section class="hero">
       <div class="hero-grid">
-        <article class="card">
+        <article class="card reveal">
           <span class="eyebrow">Voice experience lab</span>
           <h1>Pick Arabic or English voices, male or female, and hear the difference.</h1>
           <p>Designed for real product validation: test translation behavior, compare voice color, and confirm output quality before shipping to users.</p>
@@ -106,7 +121,7 @@
           </div>
         </article>
 
-        <aside class="card">
+        <aside class="card reveal">
           <h3 style="margin:.1rem 0 .45rem">Voice inventory</h3>
           <p>All voices below are available in your current Listen voice library.</p>
           <div class="status-grid">
@@ -121,7 +136,7 @@
 
     <section class="lab">
       <div class="lab-grid">
-        <section class="card">
+        <section class="card reveal">
           <h3 style="margin:.1rem 0 .7rem">Run a perfect demo</h3>
           <form id="demoForm" class="form-grid">
             <div>
@@ -164,7 +179,7 @@
                 <option value="1">Yes — convert text to target language first</option>
                 <option value="0">No — keep original text language</option>
               </select>
-              <div class="hint">If enabled, we first translate your text to the selected target language, then generate the voice from that translated text.</div>
+              <div class="hint" id="translateHint">If enabled, we first translate your text to the selected target language, then generate the voice from that translated text.</div>
             </div>
 
             <div style="display:flex;gap:.62rem;flex-wrap:wrap">
@@ -182,7 +197,7 @@
           </div>
         </section>
 
-        <aside class="card">
+        <aside class="card reveal">
           <h3 style="margin:.1rem 0 .7rem">Result payload</h3>
           <div id="result" class="result">Waiting...</div>
 
@@ -210,6 +225,8 @@
     const previewAudio = document.getElementById('previewAudio');
     const audioMeta = document.getElementById('audioMeta');
     const errorBox = document.getElementById('errorBox');
+    const translateSelect = document.getElementById('translate');
+    const translateHint = document.getElementById('translateHint');
 
     const csrfHeaders = {
       'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -246,27 +263,46 @@
         for (const voice of voices) {
           const option = document.createElement('option');
           option.value = voice.key;
-          option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}`;
+          const rec = voice.recommended ? ' ⭐' : '';
+          option.textContent = `${voice.avatar || '🎙️'} ${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
           voiceSelect.appendChild(option);
         }
       }
 
       if (voices.some((v) => v.key === previous)) {
         voiceSelect.value = previous;
+      } else {
+        const recommended = voices.find((v) => v.recommended);
+        if (recommended) voiceSelect.value = recommended.key;
       }
 
       voiceCards.innerHTML = '';
       for (const voice of voices) {
         const card = document.createElement('div');
         card.className = 'voice-item';
-        card.innerHTML = `<strong>${voice.label}</strong><small>${voice.gender.toUpperCase()}</small>`;
+        card.innerHTML = `
+          <div class="voice-avatar">${voice.avatar || '🎙️'}</div>
+          <div class="voice-meta">
+            <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">★ Recommended</span>' : ''}</strong>
+            <small>${voice.gender.toUpperCase()}</small>
+          </div>
+        `;
         voiceCards.appendChild(card);
       }
     }
 
+    function updateTranslateHint() {
+      if (!translateHint || !translateSelect) return;
+      translateHint.textContent = translateSelect.value === '1'
+        ? 'Enabled: your text is translated first, then converted to voice in the selected target language.'
+        : 'Disabled: your text is spoken directly in its original language style.';
+    }
+
     targetLanguage.addEventListener('change', renderVoiceOptions);
     voiceGender.addEventListener('change', renderVoiceOptions);
+    translateSelect?.addEventListener('change', updateTranslateHint);
     renderVoiceOptions();
+    updateTranslateHint();
 
     document.querySelectorAll('[data-sample]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -330,6 +366,14 @@
         audioMeta.textContent = 'Failed to generate preview.';
       }
     });
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) entry.target.classList.add('show');
+      }
+    }, { threshold: 0.12 });
+
+    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
 
     document.getElementById('themeToggle')?.addEventListener('click', () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
