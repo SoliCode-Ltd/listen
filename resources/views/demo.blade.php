@@ -79,7 +79,6 @@
     .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
     .audio audio{width:100%;height:34px}
 
-    .recommended-note{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .5rem;border:1px solid color-mix(in oklab,var(--a) 50%,var(--line) 50%);border-radius:999px;background:color-mix(in oklab,var(--a) 14%,var(--surface) 86%);font-size:.72rem;color:color-mix(in oklab,var(--a) 80%,var(--text) 20%)}
 
     .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease, transform .55s ease}
     .reveal.show{opacity:1;transform:translateY(0)}
@@ -228,7 +227,6 @@
             <div>
               <label for="voice_key">Voice</label>
               <select id="voice_key" name="voice_key"></select>
-              <div class="hint" style="margin-top:.4rem"><span class="recommended-note">Recommended</span> voices are highlighted in the selector.</div>
             </div>
 
             <div>
