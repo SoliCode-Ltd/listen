@@ -283,7 +283,7 @@
         const option = document.createElement('option');
         option.value = voice.key;
         const rec = voice.recommended ? ' ⭐' : '';
-        option.textContent = `${voice.avatar || '🎙️'} ${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
+        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
         voiceSelect.appendChild(option);
       }
 

@@ -5,6 +5,7 @@ Arabic-first AI voice app for messages/emails/files with translation + queued TT
 ## Live URLs
 - Landing: https://bot.solicode.me/listen/
 - Demo Lab: https://bot.solicode.me/listen/demo
+- Pricing: https://bot.solicode.me/listen/pricing
 - Login: https://bot.solicode.me/listen/login
 - Dashboard: https://bot.solicode.me/listen/dashboard
 
@@ -12,7 +13,7 @@ Arabic-first AI voice app for messages/emails/files with translation + queued TT
 - Laravel 12
 - SQLite (`database/database.sqlite`)
 - Queue: database driver + worker
-- **Single TTS provider: Google Cloud Text-to-Speech (WaveNet by default)**
+- **Single TTS provider behind branded Soli voice presets**
 - Translation fallback: Google `gtx` endpoint
 - Light/Dark themes on landing, demo lab, auth, and dashboard pages
 
@@ -46,6 +47,11 @@ APP_URL=https://bot.solicode.me/listen
 # Protect API access if you expose API routes
 LISTEN_API_KEY=your_generated_key_here
 
+# Google OAuth (Login with Gmail)
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=https://bot.solicode.me/listen/auth/google/callback
+
 # Google Cloud TTS
 # Option A (simple): API key
 GOOGLE_TTS_API_KEY=
@@ -62,6 +68,7 @@ GOOGLE_TTS_TIMEOUT_SECONDS=30
 
 ## Notes
 - Other TTS providers were removed from the app code.
-- Voice selection supports Arabic/English with male and female WaveNet voices.
-- Demo Lab is isolated on `/demo` for polished user-facing voice testing.
+- Voice selection supports Arabic/English with branded male and female personas.
+- Demo Lab is isolated on `/demo` with animated preview UX for polished user-facing voice testing.
+- Unified responsive header/footer is shared visually across landing, demo, pricing, dashboard, and auth pages.
 - API routes can still be used server-to-server when secured with `LISTEN_API_KEY`.

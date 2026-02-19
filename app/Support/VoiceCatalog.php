@@ -73,7 +73,7 @@ class VoiceCatalog
                     'name' => $name,
                     'label' => (string) ($voice['label'] ?? $name),
                     'gender' => (string) ($voice['gender'] ?? 'neutral'),
-                    'avatar' => (string) ($voice['avatar'] ?? '🎙️'),
+                    'avatar' => (string) ($voice['avatar'] ?? 'profile'),
                     'recommended' => (bool) ($voice['recommended'] ?? false),
                     'language' => (string) $language,
                 ];
@@ -103,7 +103,7 @@ class VoiceCatalog
                     'key' => (string) ($voice['key'] ?? ($language.'_'.($index + 1))),
                     'label' => (string) ($voice['label'] ?? $voice['name']),
                     'gender' => (string) ($voice['gender'] ?? 'neutral'),
-                    'avatar' => (string) ($voice['avatar'] ?? '🎙️'),
+                    'avatar' => (string) ($voice['avatar'] ?? 'profile'),
                     'recommended' => (bool) ($voice['recommended'] ?? false),
                 ];
             }
@@ -129,7 +129,7 @@ class VoiceCatalog
             'key' => $meta['key'] ?? null,
             'label' => $meta['label'] ?? null,
             'gender' => $meta['gender'] ?? null,
-            'avatar' => $meta['avatar'] ?? '🎙️',
+            'avatar' => $meta['avatar'] ?? 'profile',
             'recommended' => (bool) ($meta['recommended'] ?? false),
             'language' => $meta['language'] ?? null,
         ];

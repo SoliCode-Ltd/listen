@@ -42,6 +42,11 @@
     .eyebrow{display:inline-block;padding:.3rem .62rem;border-radius:999px;border:1px solid var(--line);font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
     h1{margin:.65rem 0 .65rem;font-size:clamp(2rem,5vw,3.6rem);line-height:1.04;letter-spacing:-.03em}
     .hero-list{display:grid;gap:.45rem;margin-top:.75rem;color:var(--muted)}
+    .sound-wave{margin-top:.9rem;display:flex;align-items:flex-end;gap:4px;height:36px}
+    .sound-wave span{display:block;width:4px;border-radius:999px;background:linear-gradient(180deg,var(--a),var(--b));animation:wavePulse 1s ease-in-out infinite;opacity:.9}
+    .sound-wave span:nth-child(2){animation-delay:.08s}.sound-wave span:nth-child(3){animation-delay:.16s}.sound-wave span:nth-child(4){animation-delay:.24s}.sound-wave span:nth-child(5){animation-delay:.32s}.sound-wave span:nth-child(6){animation-delay:.40s}.sound-wave span:nth-child(7){animation-delay:.48s}.sound-wave span:nth-child(8){animation-delay:.56s}.sound-wave span:nth-child(9){animation-delay:.64s}.sound-wave span:nth-child(10){animation-delay:.72s}.sound-wave span:nth-child(11){animation-delay:.80s}.sound-wave span:nth-child(12){animation-delay:.88s}
+    .sound-wave.dynamic span{animation-duration:.75s}
+    @keyframes wavePulse{0%,100%{height:6px}50%{height:34px}}
 
     .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.7rem}
     .stat{background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.62rem}
@@ -69,7 +74,11 @@
     .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:420px;overflow:auto;padding-right:.2rem}
     .voice-item{display:flex;gap:.55rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.58rem;transition:transform .2s ease,border-color .2s ease}
     .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .voice-avatar{width:2rem;height:2rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 35%,transparent),color-mix(in oklab,var(--b) 35%,transparent));font-size:1rem}
+    .voice-avatar{position:relative;width:2rem;height:2rem;border-radius:999px;display:block;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 30%,transparent),color-mix(in oklab,var(--b) 30%,transparent));border:1px solid color-mix(in oklab,var(--line) 70%,transparent)}
+    .voice-avatar::before{content:'';position:absolute;top:20%;left:50%;transform:translateX(-50%);width:.55rem;height:.55rem;border-radius:50%;background:#fff}
+    .voice-avatar::after{content:'';position:absolute;bottom:16%;left:50%;transform:translateX(-50%);width:1rem;height:.62rem;border-radius:.62rem .62rem .34rem .34rem;background:#fff}
+    .voice-avatar.female{background:linear-gradient(135deg,color-mix(in oklab,#ff8ec9 40%,transparent),color-mix(in oklab,var(--b) 30%,transparent))}
+    .voice-avatar.male{background:linear-gradient(135deg,color-mix(in oklab,#7bb7ff 40%,transparent),color-mix(in oklab,var(--a) 26%,transparent))}
     .voice-meta strong{display:block;font-size:.92rem}
     .voice-meta small{color:var(--muted)}
     .rec-badge{display:inline-flex;align-items:center;gap:.22rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.34rem}
@@ -147,6 +156,10 @@
             <div>• Branded voice personas only</div>
             <div>• Clear translation behavior</div>
             <div>• Instant audio preview</div>
+          </div>
+          <div class="sound-wave" id="heroWave" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+            <span></span><span></span><span></span><span></span><span></span><span></span>
           </div>
         </article>
 
@@ -254,6 +267,7 @@
     const errorBox = document.getElementById('errorBox');
     const translateSelect = document.getElementById('translate');
     const translateHint = document.getElementById('translateHint');
+    const heroWave = document.getElementById('heroWave');
 
     const csrfHeaders = {
       'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -296,7 +310,7 @@
           const option = document.createElement('option');
           option.value = voice.key;
           const rec = voice.recommended ? ' ⭐' : '';
-          option.textContent = `${voice.avatar || '🎙️'} ${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
+          option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}${rec}`;
           voiceSelect.appendChild(option);
         }
       }
@@ -312,8 +326,9 @@
       for (const voice of voices) {
         const card = document.createElement('div');
         card.className = 'voice-item';
+        const avatarClass = String(voice.gender).toLowerCase() === 'female' ? 'female' : 'male';
         card.innerHTML = `
-          <div class="voice-avatar">${voice.avatar || '🎙️'}</div>
+          <div class="voice-avatar ${avatarClass}"></div>
           <div class="voice-meta">
             <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">★ Recommended</span>' : ''}</strong>
             <small>${voice.gender.toUpperCase()}</small>
@@ -346,6 +361,7 @@
     });
 
     previewBtn?.addEventListener('click', async () => {
+      heroWave?.classList.add('dynamic');
       try {
         statusBox.textContent = 'Generating voice...';
         audioWrap.style.display = 'block';
@@ -363,6 +379,8 @@
       } catch (err) {
         statusBox.textContent = 'Preview failed.';
         setError(err?.message || 'Preview failed');
+      } finally {
+        setTimeout(() => heroWave?.classList.remove('dynamic'), 900);
       }
     });
 
