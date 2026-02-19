@@ -50,22 +50,30 @@ class TtsService
         $endpoint = (string) config('services.google_tts.endpoint');
         $timeout = (int) config('services.google_tts.timeout_seconds', 30);
 
-        $response = Http::timeout($timeout)
-            ->withToken($this->getGoogleAccessToken())
-            ->post($endpoint, [
-                'input' => [
-                    'text' => mb_substr($text, 0, 5000),
-                ],
-                'voice' => [
-                    'languageCode' => $targetLanguage === 'ar' ? 'ar-XA' : 'en-US',
-                    'name' => $voice,
-                ],
-                'audioConfig' => [
-                    'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
-                    'speakingRate' => (float) config('services.google_tts.speaking_rate', 1.0),
-                    'pitch' => (float) config('services.google_tts.pitch', 0.0),
-                ],
-            ]);
+        $payload = [
+            'input' => [
+                'text' => mb_substr($text, 0, 5000),
+            ],
+            'voice' => [
+                'languageCode' => $targetLanguage === 'ar' ? 'ar-XA' : 'en-US',
+                'name' => $voice,
+            ],
+            'audioConfig' => [
+                'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
+                'speakingRate' => (float) config('services.google_tts.speaking_rate', 1.0),
+                'pitch' => (float) config('services.google_tts.pitch', 0.0),
+            ],
+        ];
+
+        $apiKey = trim((string) config('services.google_tts.api_key', ''));
+        if ($apiKey !== '') {
+            $separator = str_contains($endpoint, '?') ? '&' : '?';
+            $response = Http::timeout($timeout)->post($endpoint.$separator.'key='.$apiKey, $payload);
+        } else {
+            $response = Http::timeout($timeout)
+                ->withToken($this->getGoogleAccessToken())
+                ->post($endpoint, $payload);
+        }
 
         if (! $response->ok()) {
             throw new \RuntimeException('Google TTS request failed: '.$response->body());

@@ -37,6 +37,7 @@ return [
 
     'google_tts' => [
         'endpoint' => env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize'),
+        'api_key' => env('GOOGLE_TTS_API_KEY', ''),
         'token_uri' => env('GOOGLE_TTS_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
         'credentials_json' => env('GOOGLE_TTS_CREDENTIALS_JSON', ''),
         'credentials_path' => env('GOOGLE_TTS_CREDENTIALS_PATH', ''),
