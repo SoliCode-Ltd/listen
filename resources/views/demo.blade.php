@@ -3,82 +3,88 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Demo Lab — Voice Playground</title>
+  <title>Listen Demo Lab</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    :root{
-      --bg:#06080f;--surface:#11192b;--surface-2:#17223a;--line:#2a395c;--text:#f5f7ff;--muted:#a8b7da;
-      --a:#fb8308;--b:#5906b2;--ok:#35c792;--shadow:0 22px 50px rgba(0,0,0,.35);
-    }
-    html[data-theme="light"]{
-      --bg:#eef2ff;--surface:#ffffff;--surface-2:#f6f9ff;--line:#d9e2f1;--text:#111a2c;--muted:#586988;
-      --a:#fb8308;--b:#5906b2;--ok:#1c996e;--shadow:0 14px 34px rgba(31,53,97,.15);
-    }
-    *{box-sizing:border-box}
-    html,body{margin:0;padding:0;scroll-behavior:smooth}
-    body{font-family:Inter,system-ui,sans-serif;color:var(--text);background:radial-gradient(1000px 540px at 92% -16%,color-mix(in oklab,var(--b) 28%,transparent),transparent 64%),radial-gradient(900px 380px at 4% -12%,color-mix(in oklab,var(--a) 22%,transparent),transparent 58%),var(--bg)}
-    .bg-orb{position:fixed;z-index:-1;filter:blur(30px);pointer-events:none;opacity:.32;border-radius:999px;animation:float 10s ease-in-out infinite}
-    .bg-orb.a{width:16rem;height:16rem;background:color-mix(in oklab,var(--a) 72%,white 28%);left:-3rem;top:14vh}
-    .bg-orb.b{width:20rem;height:20rem;background:color-mix(in oklab,var(--b) 72%,white 28%);right:-4rem;bottom:10vh;animation-delay:-3s}
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
-    .container{width:min(1240px,92%);margin:0 auto}
-    .header{position:sticky;top:0;z-index:50;background:color-mix(in oklab,var(--bg) 84%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-    .nav{min-height:78px;display:flex;align-items:center;justify-content:space-between;gap:1rem}
-    .brand{font-weight:900;display:flex;align-items:center;gap:.55rem}
+    :root{--bg:#070910;--surface:#11182a;--surface2:#15213a;--line:#2b3a5d;--text:#f4f7ff;--muted:#9fb0d4;--a:#fb8308;--b:#5906b2;--shadow:0 16px 46px rgba(0,0,0,.30)}
+    html[data-theme="light"]{--bg:#eff3ff;--surface:#fff;--surface2:#f7f9ff;--line:#d8e2f1;--text:#121a2d;--muted:#5b6c89;--shadow:0 14px 34px rgba(35,56,97,.13)}
+    *{box-sizing:border-box}html,body{margin:0;padding:0;scroll-behavior:smooth}
+    body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 500px at 92% -20%,color-mix(in oklab,var(--b) 25%,transparent),transparent 60%),radial-gradient(900px 420px at -5% 0%,color-mix(in oklab,var(--a) 18%,transparent),transparent 58%),var(--bg);color:var(--text)}
+    .container{width:min(1240px,92%);margin:auto}
+
+    .bg-orb{position:fixed;z-index:-1;pointer-events:none;border-radius:999px;filter:blur(36px);opacity:.25;animation:float 10s ease-in-out infinite}
+    .bg-orb.a{width:16rem;height:16rem;background:color-mix(in oklab,var(--a) 74%,white 26%);left:-4rem;top:15vh}
+    .bg-orb.b{width:20rem;height:20rem;background:color-mix(in oklab,var(--b) 75%,white 25%);right:-4rem;bottom:8vh;animation-delay:-3s}
+
+    .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+    .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
+    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
-    .nav-actions{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.42rem;padding:.72rem .95rem;border-radius:.76rem;font-weight:700;text-decoration:none;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .2s ease,box-shadow .2s ease,background .2s ease}
-    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 24px color-mix(in oklab,var(--b) 22%,transparent)}
-    .btn-primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
-    .hero{padding:3rem 0 1.5rem}
-    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:1rem;align-items:stretch}
-    .card{background:linear-gradient(180deg,var(--surface-2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .25s ease,border-color .25s ease}
-    .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--b) 48%,var(--line) 52%)}
-    .eyebrow{display:inline-block;padding:.3rem .65rem;border-radius:999px;border:1px solid var(--line);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
-    h1{margin:.7rem 0 .7rem;font-size:clamp(2rem,5.2vw,3.8rem);line-height:1.04;letter-spacing:-.03em}
-    p{margin:0;color:var(--muted)}
-    .hero-list{display:grid;gap:.5rem;margin-top:1rem}
-    .hero-list div{display:flex;align-items:center;gap:.45rem;color:color-mix(in oklab,var(--text) 88%,var(--muted) 12%)}
-    .dot{width:.54rem;height:.54rem;border-radius:999px;background:linear-gradient(90deg,var(--a),var(--b))}
+    .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
+    .desktop-nav a,.mobile-menu a{text-decoration:none;color:var(--muted);font-weight:600;padding:.5rem .62rem;border-radius:.6rem}
+    .desktop-nav a:hover,.mobile-menu a:hover{color:var(--text);background:color-mix(in oklab,var(--surface) 85%,transparent)}
 
-    .status-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.8rem}
-    .status{border:1px solid var(--line);border-radius:.8rem;background:var(--surface);padding:.68rem}
-    .status b{display:block;font-size:1.1rem}
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.7rem .92rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
+    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
+    .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
-    .lab{padding:1.2rem 0 3rem}
-    .lab-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:1rem}
-    .form-grid{display:grid;gap:.72rem}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:.72rem}
-    label{font-size:.87rem;color:color-mix(in oklab,var(--text) 86%,var(--muted) 14%)}
-    input,select,textarea{width:100%;padding:.72rem;border-radius:.7rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
-    textarea{min-height:180px;resize:vertical}
-    .quick{display:flex;gap:.42rem;flex-wrap:wrap}
-    .chip{padding:.42rem .62rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.78rem;color:var(--muted);cursor:pointer}
+    .mobile-controls{display:none;align-items:center;gap:.45rem}
+    .mobile-menu{display:none;padding:0 0 1rem}
+    .mobile-menu.open{display:grid;gap:.35rem}
 
-    .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:270px;overflow:auto;padding-right:.25rem}
-    .voice-item{border:1px solid var(--line);border-radius:.78rem;background:var(--surface);padding:.58rem;display:flex;gap:.58rem;align-items:center;transition:transform .2s ease,border-color .2s ease}
+    .hero{padding:2.8rem 0 1.3rem}
+    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:.9rem}
+    .card{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .22s ease,border-color .22s ease}
+    .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
+    .eyebrow{display:inline-block;padding:.3rem .62rem;border-radius:999px;border:1px solid var(--line);font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+    h1{margin:.65rem 0 .65rem;font-size:clamp(2rem,5vw,3.6rem);line-height:1.04;letter-spacing:-.03em}
+    .hero-list{display:grid;gap:.45rem;margin-top:.75rem;color:var(--muted)}
+
+    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.7rem}
+    .stat{background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.62rem}
+    .stat b{display:block;font-size:1.03rem}
+
+    .lab{padding:1rem 0 3rem}
+    .lab-grid{display:grid;grid-template-columns:1.03fr .97fr;gap:.9rem}
+    .form-grid{display:grid;gap:.68rem}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:.62rem}
+    label{font-size:.86rem;color:color-mix(in oklab,var(--text) 86%,var(--muted) 14%)}
+    input,select,textarea{width:100%;padding:.72rem;border-radius:.68rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+    textarea{min-height:170px;resize:vertical}
+
+    .chips{display:flex;gap:.42rem;flex-wrap:wrap}
+    .chip{padding:.4rem .62rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.77rem;color:var(--muted);cursor:pointer;transition:all .2s ease}
+    .chip:hover{transform:translateY(-1px);border-color:color-mix(in oklab,var(--b) 45%,var(--line) 55%)}
+
+    .hint{font-size:.83rem;color:var(--muted)}
+    .status-box{margin-top:.72rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface);font-size:.88rem;color:var(--muted)}
+    .error{margin-top:.62rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
+
+    .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
+    .audio audio{width:100%;height:34px}
+
+    .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:420px;overflow:auto;padding-right:.2rem}
+    .voice-item{display:flex;gap:.55rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.58rem;transition:transform .2s ease,border-color .2s ease}
     .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .voice-avatar{width:2rem;height:2rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 30%,transparent),color-mix(in oklab,var(--b) 30%,transparent));font-size:1.05rem}
-    .voice-meta{display:grid;gap:.08rem}
-    .voice-item strong{display:block;font-size:.92rem}
-    .voice-item small{color:var(--muted)}
-    .rec-badge{display:inline-flex;align-items:center;gap:.2rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.38rem}
+    .voice-avatar{width:2rem;height:2rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 35%,transparent),color-mix(in oklab,var(--b) 35%,transparent));font-size:1rem}
+    .voice-meta strong{display:block;font-size:.92rem}
+    .voice-meta small{color:var(--muted)}
+    .rec-badge{display:inline-flex;align-items:center;gap:.22rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.34rem}
 
-    .result{white-space:pre-wrap;background:var(--surface);border:1px solid var(--line);border-radius:.8rem;padding:.8rem;min-height:180px;color:var(--muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.85rem}
-    .audio-wrap{margin-top:.75rem;border:1px solid var(--line);border-radius:.8rem;background:var(--surface);padding:.72rem}
-    .audio-wrap h4{margin:.1rem 0 .55rem}.audio-wrap audio{width:100%;height:34px}
-
-    .hint{margin-top:.55rem;color:var(--muted);font-size:.84rem}
-    .error{margin-top:.6rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
-
-    .footer{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
-    .reveal{opacity:0;transform:translateY(14px);transition:opacity .55s ease,transform .55s ease}
+    .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease, transform .55s ease}
     .reveal.show{opacity:1;transform:translateY(0)}
 
-    @media (max-width:1080px){.hero-grid,.lab-grid,.two{grid-template-columns:1fr}.voice-grid{grid-template-columns:1fr}}
+    .foot{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
+
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+    @media (max-width:960px){
+      .desktop-nav,.desktop-actions{display:none}
+      .mobile-controls{display:flex}
+      .hero-grid,.lab-grid,.two,.stats,.voice-grid{grid-template-columns:1fr}
+    }
   </style>
   <script>
     (() => {
@@ -95,15 +101,38 @@
   <header class="header reveal">
     <div class="container nav">
       <div class="brand">🎧 <span>Listen Demo Lab</span></div>
-      <div class="nav-actions">
-        <button class="btn" type="button" id="themeToggle" aria-label="Toggle theme">🌓</button>
-        <a class="btn" href="{{ route('home') }}">Home</a>
+
+      <nav class="desktop-nav">
+        <a href="{{ route('home') }}">Home</a>
+        <a href="{{ route('demo.page') }}">Demo</a>
+        <a href="{{ route('pricing') }}">Pricing</a>
+      </nav>
+
+      <div class="desktop-actions">
+        <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
         @auth
-          <a class="btn" href="{{ route('dashboard') }}">Dashboard</a>
+          <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
         @else
           <a class="btn" href="{{ route('login') }}">Login</a>
+          <a class="btn primary" href="{{ route('register') }}">Start Free</a>
         @endauth
       </div>
+
+      <div class="mobile-controls">
+        <button type="button" class="btn" id="themeToggleMobile" aria-label="Toggle theme">🌓</button>
+        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+      </div>
+    </div>
+    <div class="container mobile-menu" id="mobileMenu">
+      <a href="{{ route('home') }}">Home</a>
+      <a href="{{ route('demo.page') }}">Demo</a>
+      <a href="{{ route('pricing') }}">Pricing</a>
+      @auth
+        <a href="{{ route('dashboard') }}">Dashboard</a>
+      @else
+        <a href="{{ route('login') }}">Login</a>
+        <a href="{{ route('register') }}">Start Free</a>
+      @endauth
     </div>
   </header>
 
@@ -111,24 +140,23 @@
     <section class="hero">
       <div class="hero-grid">
         <article class="card reveal">
-          <span class="eyebrow">Voice experience lab</span>
-          <h1>Pick Arabic or English voices, male or female, and hear the difference.</h1>
-          <p>Designed for real product validation: test translation behavior, compare voice color, and confirm output quality before shipping to users.</p>
+          <span class="eyebrow">Live voice test studio</span>
+          <h1>Choose voice, language, and translation behavior — then preview instantly.</h1>
+          <p class="muted">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
           <div class="hero-list">
-            <div><span class="dot"></span> Curated Soli voice collection</div>
-            <div><span class="dot"></span> Language-aware voice filtering</div>
-            <div><span class="dot"></span> Instant preview and production-safe output</div>
+            <div>• Branded voice personas only</div>
+            <div>• Clear translation behavior</div>
+            <div>• Instant audio preview</div>
           </div>
         </article>
 
         <aside class="card reveal">
-          <h3 style="margin:.1rem 0 .45rem">Voice inventory</h3>
-          <p>All voices below are available in your current Listen voice library.</p>
-          <div class="status-grid">
-            <div class="status"><small>Arabic</small><b>{{ count($voiceCatalog['ar'] ?? []) }} voices</b></div>
-            <div class="status"><small>English</small><b>{{ count($voiceCatalog['en'] ?? []) }} voices</b></div>
-            <div class="status"><small>Default Arabic</small><b>{{ $defaultVoiceAr['label'] ?? 'Soli Noor' }}</b></div>
-            <div class="status"><small>Default English</small><b>{{ $defaultVoiceEn['label'] ?? 'Soli Nova' }}</b></div>
+          <h3 style="margin:.1rem 0 .4rem">Voice coverage</h3>
+          <div class="stats">
+            <div class="stat"><small class="muted">Arabic voices</small><b>{{ count($voiceCatalog['ar'] ?? []) }}</b></div>
+            <div class="stat"><small class="muted">English voices</small><b>{{ count($voiceCatalog['en'] ?? []) }}</b></div>
+            <div class="stat"><small class="muted">Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Soli Noor' }}</b></div>
+            <div class="stat"><small class="muted">English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Soli Nova' }}</b></div>
           </div>
         </aside>
       </div>
@@ -137,14 +165,14 @@
     <section class="lab">
       <div class="lab-grid">
         <section class="card reveal">
-          <h3 style="margin:.1rem 0 .7rem">Run a perfect demo</h3>
+          <h3 style="margin:.1rem 0 .65rem">Try your best demo flow</h3>
           <form id="demoForm" class="form-grid">
             <div>
               <label for="text">Text input</label>
-              <textarea id="text" name="text" placeholder="Paste text to synthesize..."></textarea>
+              <textarea id="text" name="text" placeholder="Paste content to test..." required></textarea>
             </div>
 
-            <div class="quick">
+            <div class="chips">
               <button class="chip" type="button" data-sample="Welcome to SoliCode. We build software that sounds as good as it works.">English sample</button>
               <button class="chip" type="button" data-sample="مرحباً بك في سولي كود. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
               <button class="chip" type="button" data-sample="Hello, this is a bilingual test. مرحباً، هذا اختبار ثنائي اللغة.">Bilingual sample</button>
@@ -169,47 +197,45 @@
             </div>
 
             <div>
-              <label for="voice_name">Voice</label>
-              <select id="voice_name" name="voice_key"></select>
+              <label for="voice_key">Voice</label>
+              <select id="voice_key" name="voice_key"></select>
             </div>
 
             <div>
               <label for="translate">Translate before speaking</label>
               <select id="translate" name="translate">
-                <option value="1">Yes — convert text to target language first</option>
-                <option value="0">No — keep original text language</option>
+                <option value="1">Yes — translate text first</option>
+                <option value="0">No — keep text as-is</option>
               </select>
-              <div class="hint" id="translateHint">If enabled, we first translate your text to the selected target language, then generate the voice from that translated text.</div>
+              <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected target language.</div>
             </div>
 
-            <div style="display:flex;gap:.62rem;flex-wrap:wrap">
-              <button class="btn btn-primary" type="submit">Validate setup</button>
-              <button class="btn" type="button" id="previewBtn">Generate voice preview</button>
+            <div style="display:flex;gap:.55rem;flex-wrap:wrap">
+              <button class="btn" type="button" id="validateBtn">Validate Setup</button>
+              <button class="btn primary" type="button" id="previewBtn">Generate Voice</button>
             </div>
+
+            <div class="status-box" id="statusBox">Ready.</div>
           </form>
 
           <div id="errorBox" class="error" style="display:none"></div>
 
-          <div class="audio-wrap" id="audioWrap" style="display:none">
-            <h4>Playback</h4>
+          <div class="audio" id="audioWrap" style="display:none">
             <audio id="previewAudio" controls preload="none"></audio>
-            <div class="hint" id="audioMeta"></div>
+            <div class="hint" id="audioMeta" style="margin-top:.5rem"></div>
           </div>
         </section>
 
         <aside class="card reveal">
-          <h3 style="margin:.1rem 0 .7rem">Result payload</h3>
-          <div id="result" class="result">Waiting...</div>
-
-          <h3 style="margin:1rem 0 .55rem">Voices for current filters</h3>
+          <h3 style="margin:.1rem 0 .65rem">Available voices</h3>
           <div id="voiceCards" class="voice-grid"></div>
         </aside>
       </div>
     </section>
   </main>
 
-  <footer class="footer">
-    <div class="container">© {{ date('Y') }} Listen Demo Lab · Crafted for accurate voice evaluation.</div>
+  <footer class="foot">
+    <div class="container">© {{ date('Y') }} Listen Demo Lab</div>
   </footer>
 
   <script>
@@ -217,10 +243,11 @@
     const form = document.getElementById('demoForm');
     const targetLanguage = document.getElementById('target_language');
     const voiceGender = document.getElementById('voice_gender');
-    const voiceSelect = document.getElementById('voice_name');
+    const voiceSelect = document.getElementById('voice_key');
     const voiceCards = document.getElementById('voiceCards');
-    const result = document.getElementById('result');
+    const validateBtn = document.getElementById('validateBtn');
     const previewBtn = document.getElementById('previewBtn');
+    const statusBox = document.getElementById('statusBox');
     const audioWrap = document.getElementById('audioWrap');
     const previewAudio = document.getElementById('previewAudio');
     const audioMeta = document.getElementById('audioMeta');
@@ -239,22 +266,27 @@
         errorBox.textContent = '';
         return;
       }
-
       errorBox.style.display = 'block';
       errorBox.textContent = message;
+    }
+
+    function updateTranslateHint() {
+      if (!translateHint || !translateSelect) return;
+      translateHint.textContent = translateSelect.value === '1'
+        ? 'Enabled: text is translated first, then spoken in the selected target language.'
+        : 'Disabled: original text is spoken directly without translation.';
     }
 
     function getFilteredVoices() {
       const lang = targetLanguage.value;
       const gender = voiceGender.value;
       const list = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
-
       return list.filter((voice) => gender === 'all' ? true : voice.gender === gender);
     }
 
     function renderVoiceOptions() {
       const voices = getFilteredVoices();
-      const previous = voiceSelect.value;
+      const current = voiceSelect.value;
 
       voiceSelect.innerHTML = '';
       if (!voices.length) {
@@ -269,8 +301,8 @@
         }
       }
 
-      if (voices.some((v) => v.key === previous)) {
-        voiceSelect.value = previous;
+      if (voices.some((v) => v.key === current)) {
+        voiceSelect.value = current;
       } else {
         const recommended = voices.find((v) => v.recommended);
         if (recommended) voiceSelect.value = recommended.key;
@@ -291,18 +323,48 @@
       }
     }
 
-    function updateTranslateHint() {
-      if (!translateHint || !translateSelect) return;
-      translateHint.textContent = translateSelect.value === '1'
-        ? 'Enabled: your text is translated first, then converted to voice in the selected target language.'
-        : 'Disabled: your text is spoken directly in its original language style.';
+    async function callEndpoint(endpoint) {
+      setError('');
+      const fd = new FormData(form);
+      const res = await fetch(endpoint, { method: 'POST', headers: csrfHeaders, body: fd });
+      const data = await res.json();
+
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.message || 'Request failed');
+      }
+      return data;
     }
 
-    targetLanguage.addEventListener('change', renderVoiceOptions);
-    voiceGender.addEventListener('change', renderVoiceOptions);
-    translateSelect?.addEventListener('change', updateTranslateHint);
-    renderVoiceOptions();
-    updateTranslateHint();
+    validateBtn?.addEventListener('click', async () => {
+      try {
+        statusBox.textContent = 'Validating...';
+        const data = await callEndpoint('{{ route('demo.run') }}');
+        statusBox.textContent = `${data.message} ${data.translate_note}`;
+      } catch (err) {
+        setError(err?.message || 'Validation failed');
+      }
+    });
+
+    previewBtn?.addEventListener('click', async () => {
+      try {
+        statusBox.textContent = 'Generating voice...';
+        audioWrap.style.display = 'block';
+        previewAudio.removeAttribute('src');
+
+        const data = await callEndpoint('{{ route('demo.preview') }}');
+
+        previewAudio.src = data.audio_url;
+        previewAudio.load();
+
+        const label = data?.voice?.label || 'Selected voice';
+        const gender = data?.voice?.gender ? ` (${String(data.voice.gender).toUpperCase()})` : '';
+        audioMeta.textContent = `Voice: ${label}${gender} · ${data.translate_note}`;
+        statusBox.textContent = 'Done. Audio preview is ready.';
+      } catch (err) {
+        statusBox.textContent = 'Preview failed.';
+        setError(err?.message || 'Preview failed');
+      }
+    });
 
     document.querySelectorAll('[data-sample]').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -310,77 +372,31 @@
       });
     });
 
-    form?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      setError('');
-      result.textContent = 'Processing...';
-
-      try {
-        const fd = new FormData(form);
-        const res = await fetch('{{ route('demo.run') }}', {
-          method: 'POST',
-          headers: csrfHeaders,
-          body: fd,
-        });
-
-        const data = await res.json();
-        if (!res.ok || data?.ok === false) {
-          throw new Error(data?.message || data?.error || 'Validation failed');
-        }
-
-        result.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        setError(err?.message || 'Unknown error');
-        result.textContent = 'Error';
-      }
-    });
-
-    previewBtn?.addEventListener('click', async () => {
-      setError('');
-      audioWrap.style.display = 'block';
-      audioMeta.textContent = 'Generating...';
-      previewAudio.removeAttribute('src');
-
-      try {
-        const fd = new FormData(form);
-        const res = await fetch('{{ route('demo.preview') }}', {
-          method: 'POST',
-          headers: csrfHeaders,
-          body: fd,
-        });
-
-        const data = await res.json();
-        if (!res.ok || !data?.ok || !data?.audio_url) {
-          throw new Error(data?.message || 'Preview generation failed');
-        }
-
-        previewAudio.src = data.audio_url;
-        previewAudio.load();
-        const voiceLabel = data?.voice?.label || 'Selected voice';
-        const voiceGender = data?.voice?.gender ? ` (${String(data.voice.gender).toUpperCase()})` : '';
-        const translateNote = data?.translate_note ? ` · ${data.translate_note}` : '';
-        audioMeta.textContent = `Voice: ${voiceLabel}${voiceGender} · Duration: ${data.duration_seconds || '?'}s${translateNote}`;
-        result.textContent = JSON.stringify(data, null, 2);
-      } catch (err) {
-        setError(err?.message || 'Preview generation failed');
-        audioMeta.textContent = 'Failed to generate preview.';
-      }
-    });
+    targetLanguage?.addEventListener('change', renderVoiceOptions);
+    voiceGender?.addEventListener('change', renderVoiceOptions);
+    translateSelect?.addEventListener('change', updateTranslateHint);
+    renderVoiceOptions();
+    updateTranslateHint();
 
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (entry.isIntersecting) entry.target.classList.add('show');
       }
     }, { threshold: 0.12 });
-
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
 
-    document.getElementById('themeToggle')?.addEventListener('click', () => {
+    const setTheme = () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
       localStorage.setItem('listen_theme', next);
-    });
+    };
+    document.getElementById('themeToggleDesktop')?.addEventListener('click', setTheme);
+    document.getElementById('themeToggleMobile')?.addEventListener('click', setTheme);
+
+    const menuBtn = document.getElementById('mobileMenuBtn');
+    const mobileMenu = document.getElementById('mobileMenu');
+    menuBtn?.addEventListener('click', () => mobileMenu?.classList.toggle('open'));
   </script>
 </body>
 </html>

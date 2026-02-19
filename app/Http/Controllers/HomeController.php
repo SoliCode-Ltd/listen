@@ -16,6 +16,11 @@ class HomeController extends Controller
         return view('landing');
     }
 
+    public function pricingPage()
+    {
+        return view('pricing');
+    }
+
     public function demoPage()
     {
         return view('demo', [
@@ -50,7 +55,7 @@ class HomeController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'Ready. Click "Generate Voice" to produce audio.',
+            'message' => 'Setup validated. You can generate voice now.',
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
             'translate' => (bool) ($validated['translate'] ?? false),
