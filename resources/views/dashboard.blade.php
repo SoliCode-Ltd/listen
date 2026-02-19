@@ -311,37 +311,17 @@
         return;
       }
 
-      const recommended = voices.filter((v) => v.recommended);
-      const others = voices.filter((v) => !v.recommended);
-
-      const appendOptions = (list, parent) => {
-        for (const voice of list) {
-          const option = document.createElement('option');
-          option.value = voice.key;
-          option.textContent = `${voice.label} · ${formatGender(voice.gender)}`;
-          parent.appendChild(option);
-        }
-      };
-
-      if (recommended.length) {
-        const recGroup = document.createElement('optgroup');
-        recGroup.label = 'Recommended';
-        appendOptions(recommended, recGroup);
-        voiceSelect.appendChild(recGroup);
-      }
-
-      if (others.length) {
-        const allGroup = document.createElement('optgroup');
-        allGroup.label = recommended.length ? 'All voices' : 'Voices';
-        appendOptions(others, allGroup);
-        voiceSelect.appendChild(allGroup);
+      for (const voice of voices) {
+        const option = document.createElement('option');
+        option.value = voice.key;
+        option.textContent = `${voice.label} · ${formatGender(voice.gender)}`;
+        voiceSelect.appendChild(option);
       }
 
       if (voices.some(v => v.key === current)) {
         voiceSelect.value = current;
       } else {
-        const defaultVoice = recommended[0] || voices[0];
-        if (defaultVoice) voiceSelect.value = defaultVoice.key;
+        voiceSelect.value = voices[0].key;
       }
     }
 
