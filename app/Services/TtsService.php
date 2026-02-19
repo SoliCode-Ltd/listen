@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\VoiceCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -187,13 +188,12 @@ class TtsService
     private function resolveVoiceName(string $targetLanguage, ?string $voiceName): string
     {
         $voiceName = trim((string) $voiceName);
-        if ($voiceName !== '') {
+
+        if ($voiceName !== '' && VoiceCatalog::isAllowedForLanguage($voiceName, $targetLanguage)) {
             return $voiceName;
         }
 
-        return $targetLanguage === 'ar'
-            ? (string) config('services.google_tts.voice_ar', 'ar-XA-Wavenet-D')
-            : (string) config('services.google_tts.voice_en', 'en-US-Wavenet-D');
+        return VoiceCatalog::defaultForLanguage($targetLanguage);
     }
 
     private function findCachedAudio(string $hash, string $targetLanguage): ?string

@@ -6,8 +6,9 @@ use App\Http\Controllers\HomeController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
-Route::post('/demo', [HomeController::class, 'demo'])->name('demo');
-Route::post('/preview', [HomeController::class, 'preview'])->name('preview');
+Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
+Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
+Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
 
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'showLogin'])->name('login');

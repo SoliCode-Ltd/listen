@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
@@ -41,7 +42,17 @@ class DashboardController extends Controller
         $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
         $usagePercent = min(100, (int) round(($usage->total_minutes / $planMinutes) * 100));
 
-        return view('dashboard', compact('usage', 'jobs', 'stats', 'activePlan', 'planMinutes', 'usagePercent'));
+        return view('dashboard', [
+            'usage' => $usage,
+            'jobs' => $jobs,
+            'stats' => $stats,
+            'activePlan' => $activePlan,
+            'planMinutes' => $planMinutes,
+            'usagePercent' => $usagePercent,
+            'voiceCatalog' => VoiceCatalog::byLanguage(),
+            'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar'),
+            'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en'),
+        ]);
     }
 
     public function queue(Request $request)
@@ -58,6 +69,11 @@ class DashboardController extends Controller
             'translate' => ['nullable', 'boolean'],
             'voice_name' => ['nullable', 'string', 'max:120'],
         ]);
+
+        $voiceName = $this->normalizeVoiceSelection(
+            $validated['target_language'],
+            $validated['voice_name'] ?? null,
+        );
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -92,7 +108,7 @@ class DashboardController extends Controller
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
-            'voice_name' => $validated['voice_name'] ?? null,
+            'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimatedSeconds,
             'status' => 'queued',
@@ -139,5 +155,22 @@ class DashboardController extends Controller
         $minutes = max(1, (int) ceil($seconds / 60));
 
         return [$seconds, $minutes];
+    }
+
+    private function normalizeVoiceSelection(string $language, ?string $voiceName): string
+    {
+        $voiceName = trim((string) $voiceName);
+
+        if ($voiceName === '') {
+            return VoiceCatalog::defaultForLanguage($language);
+        }
+
+        if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language)) {
+            throw ValidationException::withMessages([
+                'voice_name' => 'Selected voice is not available for the chosen language.',
+            ]);
+        }
+
+        return $voiceName;
     }
 }

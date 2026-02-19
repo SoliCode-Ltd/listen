@@ -71,6 +71,7 @@
         <small class="muted">{{ auth()->user()->name }} · {{ auth()->user()->email }}</small>
         <button type="button" class="btn" id="themeToggle">Theme</button>
         <a class="btn" href="{{ route('home') }}">Website</a>
+        <a class="btn" href="{{ route('demo.page') }}">Demo Lab</a>
         <a class="btn primary" href="#queue">New Job</a>
         <form method="POST" action="{{ route('logout') }}" style="margin:0">
           @csrf
@@ -109,9 +110,9 @@
             <div class="box"><small class="muted">Queued</small><div><b>{{ $stats['queued'] }}</b></div></div>
             <div class="box"><small class="muted">Done</small><div><b>{{ $stats['done'] }}</b></div></div>
             <div class="box"><small class="muted">Failed</small><div><b>{{ $stats['failed'] }}</b></div></div>
-            <div class="box"><small class="muted">Provider</small><div><b>Google Cloud TTS</b></div></div>
+            <div class="box"><small class="muted">Provider</small><div><b>Google WaveNet</b></div></div>
           </div>
-          <p class="muted" style="margin:.8rem 0 0">This workspace is optimized for subscription-based text-to-speech delivery.</p>
+          <p class="muted" style="margin:.8rem 0 0">Male and female voices are available for Arabic and English.</p>
         </aside>
       </div>
     </section>
@@ -151,14 +152,14 @@
           <div class="two">
             <div>
               <label>Target language</label>
-              <select name="target_language">
+              <select name="target_language" id="target_language">
                 <option value="ar">Arabic</option>
                 <option value="en">English</option>
               </select>
             </div>
             <div>
-              <label>Voice name (optional)</label>
-              <input name="voice_name" placeholder="ar-XA-Wavenet-D" value="{{ old('voice_name') }}" />
+              <label>Voice</label>
+              <select name="voice_name" id="voice_name"></select>
             </div>
           </div>
 
@@ -183,14 +184,10 @@
         </section>
 
         <section class="card">
-          <h3>SaaS checklist</h3>
-          <ul class="muted" style="margin:.35rem 0 0 1rem;padding:0">
-            <li>Auth and isolated user data</li>
-            <li>Plan-based usage enforcement</li>
-            <li>Queued background generation</li>
-            <li>Persistent audio storage</li>
-            <li>Ready for payment integration</li>
-          </ul>
+          <h3>Voice defaults</h3>
+          <p class="muted">Arabic: {{ $defaultVoiceAr }}</p>
+          <p class="muted">English: {{ $defaultVoiceEn }}</p>
+          <p class="muted" style="margin-top:.45rem">Need quick side-by-side voice tests? Use Demo Lab.</p>
         </section>
       </aside>
     </section>
@@ -204,9 +201,9 @@
               <th>ID</th>
               <th>Status</th>
               <th>Flow</th>
+              <th>Voice</th>
               <th>Translate</th>
               <th>Estimated</th>
-              <th>Preview</th>
               <th>Audio</th>
               <th>Created</th>
             </tr>
@@ -217,12 +214,12 @@
                 <td>#{{ $job->id }}</td>
                 <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
                 <td>{{ $job->source_language ?? '-' }} → {{ $job->target_language }}</td>
+                <td>{{ $job->voice_name ?? '-' }}</td>
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
                 <td>{{ $job->duration_seconds ? $job->duration_seconds . 's' : '-' }}</td>
-                <td>{{ \\Illuminate\\Support\\Str::limit($job->input_text, 90) }}</td>
                 <td>
                   @if($job->audio_path)
-                    <audio controls preload="none" src="{{ \\Illuminate\\Support\\Facades\\Storage::disk('public')->url($job->audio_path) }}"></audio>
+                    <audio controls preload="none" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($job->audio_path) }}"></audio>
                   @elseif($job->status === 'failed')
                     <small style="color:color-mix(in oklab,var(--danger) 80%,var(--text) 20%)">{{ $job->error_message ?: 'Generation failed' }}</small>
                   @else
@@ -245,8 +242,35 @@
   </footer>
 
   <script>
-    const toggle = document.getElementById('themeToggle');
-    toggle?.addEventListener('click', () => {
+    const voiceCatalog = @json($voiceCatalog);
+    const targetLanguage = document.getElementById('target_language');
+    const voiceSelect = document.getElementById('voice_name');
+    const oldVoice = @json(old('voice_name'));
+
+    function renderVoiceOptions() {
+      if (!targetLanguage || !voiceSelect) return;
+
+      const lang = targetLanguage.value;
+      const voices = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
+      const current = voiceSelect.value || oldVoice || '';
+
+      voiceSelect.innerHTML = '';
+      for (const voice of voices) {
+        const option = document.createElement('option');
+        option.value = voice.name;
+        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()} · ${voice.name}`;
+        voiceSelect.appendChild(option);
+      }
+
+      if (voices.some(v => v.name === current)) {
+        voiceSelect.value = current;
+      }
+    }
+
+    targetLanguage?.addEventListener('change', renderVoiceOptions);
+    renderVoiceOptions();
+
+    document.getElementById('themeToggle')?.addEventListener('click', () => {
       const current = document.documentElement.getAttribute('data-theme') || 'dark';
       const next = current === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);

@@ -4,6 +4,7 @@ Arabic-first AI voice app for messages/emails/files with translation + queued TT
 
 ## Live URLs
 - Landing: https://bot.solicode.me/listen/
+- Demo Lab: https://bot.solicode.me/listen/demo
 - Login: https://bot.solicode.me/listen/login
 - Dashboard: https://bot.solicode.me/listen/dashboard
 
@@ -13,7 +14,7 @@ Arabic-first AI voice app for messages/emails/files with translation + queued TT
 - Queue: database driver + worker
 - **Single TTS provider: Google Cloud Text-to-Speech (WaveNet by default)**
 - Translation fallback: Google `gtx` endpoint
-- Light/Dark themes on public and auth/dashboard pages
+- Light/Dark themes on landing, demo lab, auth, and dashboard pages
 
 ## SaaS-Ready Features
 - Auth system (register/login/logout)
@@ -45,7 +46,10 @@ APP_URL=https://bot.solicode.me/listen
 # Protect API access if you expose API routes
 LISTEN_API_KEY=your_generated_key_here
 
-# Google Cloud TTS (set one credential source)
+# Google Cloud TTS
+# Option A (simple): API key
+GOOGLE_TTS_API_KEY=
+# Option B (enterprise): service-account
 GOOGLE_TTS_CREDENTIALS_JSON=
 GOOGLE_TTS_CREDENTIALS_PATH=/absolute/path/to/service-account.json
 GOOGLE_TTS_VOICE_AR=ar-XA-Wavenet-D
@@ -58,5 +62,6 @@ GOOGLE_TTS_TIMEOUT_SECONDS=30
 
 ## Notes
 - Other TTS providers were removed from the app code.
-- Dashboard/landing avoid exposing API integration details in UI.
+- Voice selection supports Arabic/English with male and female WaveNet voices.
+- Demo Lab is isolated on `/demo` for polished user-facing voice testing.
 - API routes can still be used server-to-server when secured with `LISTEN_API_KEY`.

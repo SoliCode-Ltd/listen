@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -30,6 +31,11 @@ class MessageReaderController extends Controller
             'voice_name' => ['nullable', 'string', 'max:120'],
             'translate' => ['nullable', 'boolean'],
         ]);
+
+        $voiceName = $this->normalizeVoiceSelection(
+            $validated['target_language'],
+            $validated['voice_name'] ?? null,
+        );
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -64,7 +70,7 @@ class MessageReaderController extends Controller
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
-            'voice_name' => $validated['voice_name'] ?? null,
+            'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimatedSeconds,
             'status' => 'queued',
@@ -81,6 +87,7 @@ class MessageReaderController extends Controller
             'job_id' => $job->id,
             'item_id' => $item->id,
             'status' => $job->status,
+            'voice_name' => $voiceName,
             'estimated_seconds' => $estimatedSeconds,
             'estimated_minutes' => $estimatedMinutes,
         ], 202);
@@ -99,6 +106,7 @@ class MessageReaderController extends Controller
                 'id',
                 'source_language',
                 'target_language',
+                'voice_name',
                 'translate',
                 'status',
                 'duration_seconds',
@@ -111,6 +119,7 @@ class MessageReaderController extends Controller
                     'id' => $job->id,
                     'source_language' => $job->source_language,
                     'target_language' => $job->target_language,
+                    'voice_name' => $job->voice_name,
                     'translate' => $job->translate,
                     'status' => $job->status,
                     'duration_seconds' => $job->duration_seconds,
@@ -182,5 +191,22 @@ class MessageReaderController extends Controller
 
         return Plan::query()->where('slug', 'free')->first()
             ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
+    }
+
+    private function normalizeVoiceSelection(string $language, ?string $voiceName): string
+    {
+        $voiceName = trim((string) $voiceName);
+
+        if ($voiceName === '') {
+            return VoiceCatalog::defaultForLanguage($language);
+        }
+
+        if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language)) {
+            throw ValidationException::withMessages([
+                'voice_name' => 'Selected voice is not available for the chosen language.',
+            ]);
+        }
+
+        return $voiceName;
     }
 }
