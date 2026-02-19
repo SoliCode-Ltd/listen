@@ -54,7 +54,7 @@
     <div class="container nav">
       <div class="brand">🎧 <span>Listen</span></div>
       <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <button type="button" class="btn" id="themeToggle">Theme</button>
+        <button type="button" class="btn" id="themeToggle" aria-label="Toggle theme">🌓</button>
         <a class="btn" href="{{ route('demo.page') }}">Demo Lab</a>
         @auth
           <a class="btn btn-primary" href="{{ route('dashboard') }}">Dashboard</a>
@@ -71,7 +71,7 @@
         <div>
           <span class="eyebrow">Premium text-to-speech SaaS</span>
           <h1>World-class voice output for Arabic and English.</h1>
-          <p>Listen is built for scale: subscription control, usage governance, queue reliability, and curated WaveNet voices for male and female playback.</p>
+          <p>Listen is built for scale: subscription control, usage governance, queue reliability, and curated male and female voices for Arabic and English playback.</p>
           <div class="cta">
             <a class="btn btn-primary" href="{{ route('demo.page') }}">Try the Voice Demo</a>
             @auth
@@ -88,7 +88,7 @@
           <div class="grid">
             <div class="box"><small>Voices</small><b>Male + Female</b></div>
             <div class="box"><small>Languages</small><b>Arabic + English</b></div>
-            <div class="box"><small>Engine</small><b>Google WaveNet</b></div>
+            <div class="box"><small>Voices</small><b>Soli Premium Voices</b></div>
             <div class="box"><small>Architecture</small><b>Queue + SaaS limits</b></div>
           </div>
         </aside>

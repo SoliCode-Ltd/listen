@@ -34,7 +34,7 @@
     @csrf
     <div style="display:flex;justify-content:space-between;align-items:center;gap:.6rem">
       <h1>Create your Listen account</h1>
-      <button class="btn-theme" type="button" id="themeToggle">Theme</button>
+      <button class="btn-theme" type="button" id="themeToggle" aria-label="Toggle theme">🌓</button>
     </div>
     <p class="muted">Start your SaaS voice workspace in minutes.</p>
 

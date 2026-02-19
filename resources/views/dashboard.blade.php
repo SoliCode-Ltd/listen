@@ -69,7 +69,7 @@
       <div class="brand">🎧 <span>Listen</span> Dashboard</div>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
         <small class="muted">{{ auth()->user()->name }} · {{ auth()->user()->email }}</small>
-        <button type="button" class="btn" id="themeToggle">Theme</button>
+        <button type="button" class="btn" id="themeToggle" aria-label="Toggle theme">🌓</button>
         <a class="btn" href="{{ route('home') }}">Website</a>
         <a class="btn" href="{{ route('demo.page') }}">Demo Lab</a>
         <a class="btn primary" href="#queue">New Job</a>
@@ -105,12 +105,12 @@
         </article>
 
         <aside class="card">
-          <h2>Pipeline health</h2>
+          <h2>System health</h2>
           <div class="mini">
             <div class="box"><small class="muted">Queued</small><div><b>{{ $stats['queued'] }}</b></div></div>
             <div class="box"><small class="muted">Done</small><div><b>{{ $stats['done'] }}</b></div></div>
             <div class="box"><small class="muted">Failed</small><div><b>{{ $stats['failed'] }}</b></div></div>
-            <div class="box"><small class="muted">Provider</small><div><b>Google WaveNet</b></div></div>
+            <div class="box"><small class="muted">Voice Set</small><div><b>Soli Premium Voices</b></div></div>
           </div>
           <p class="muted" style="margin:.8rem 0 0">Male and female voices are available for Arabic and English.</p>
         </aside>
@@ -159,16 +159,17 @@
             </div>
             <div>
               <label>Voice</label>
-              <select name="voice_name" id="voice_name"></select>
+              <select name="voice_key" id="voice_name"></select>
             </div>
           </div>
 
           <div>
-            <label>Translate first</label>
+            <label>Translate before speaking</label>
             <select name="translate">
-              <option value="1">Yes</option>
-              <option value="0">No</option>
+              <option value="1">Yes — convert text to target language first</option>
+              <option value="0">No — keep original text language</option>
             </select>
+            <small class="muted">When enabled, your text is translated first, then spoken in the selected target language.</small>
           </div>
 
           <button class="btn primary" type="submit">Queue Voice Job</button>
@@ -185,8 +186,8 @@
 
         <section class="card">
           <h3>Voice defaults</h3>
-          <p class="muted">Arabic: {{ $defaultVoiceAr }}</p>
-          <p class="muted">English: {{ $defaultVoiceEn }}</p>
+          <p class="muted">Arabic preset: {{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</p>
+          <p class="muted">English preset: {{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</p>
           <p class="muted" style="margin-top:.45rem">Need quick side-by-side voice tests? Use Demo Lab.</p>
         </section>
       </aside>
@@ -214,7 +215,7 @@
                 <td>#{{ $job->id }}</td>
                 <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
                 <td>{{ $job->source_language ?? '-' }} → {{ $job->target_language }}</td>
-                <td>{{ $job->voice_name ?? '-' }}</td>
+                <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice' }}</td>
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
                 <td>{{ $job->duration_seconds ? $job->duration_seconds . 's' : '-' }}</td>
                 <td>
@@ -245,7 +246,7 @@
     const voiceCatalog = @json($voiceCatalog);
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_name');
-    const oldVoice = @json(old('voice_name'));
+    const oldVoice = @json(old('voice_key'));
 
     function renderVoiceOptions() {
       if (!targetLanguage || !voiceSelect) return;
@@ -257,12 +258,12 @@
       voiceSelect.innerHTML = '';
       for (const voice of voices) {
         const option = document.createElement('option');
-        option.value = voice.name;
-        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()} · ${voice.name}`;
+        option.value = voice.key;
+        option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}`;
         voiceSelect.appendChild(option);
       }
 
-      if (voices.some(v => v.name === current)) {
+      if (voices.some(v => v.key === current)) {
         voiceSelect.value = current;
       }
     }

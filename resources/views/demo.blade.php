@@ -81,7 +81,7 @@
     <div class="container nav">
       <div class="brand">🎧 <span>Listen Demo Lab</span></div>
       <div class="nav-actions">
-        <button class="btn" type="button" id="themeToggle">Theme</button>
+        <button class="btn" type="button" id="themeToggle" aria-label="Toggle theme">🌓</button>
         <a class="btn" href="{{ route('home') }}">Home</a>
         @auth
           <a class="btn" href="{{ route('dashboard') }}">Dashboard</a>
@@ -96,11 +96,11 @@
     <section class="hero">
       <div class="hero-grid">
         <article class="card">
-          <span class="eyebrow">Wavenet voice playground</span>
+          <span class="eyebrow">Voice experience lab</span>
           <h1>Pick Arabic or English voices, male or female, and hear the difference.</h1>
-          <p>Designed for real product validation: test translations, compare voice color, and confirm output quality before shipping to users.</p>
+          <p>Designed for real product validation: test translation behavior, compare voice color, and confirm output quality before shipping to users.</p>
           <div class="hero-list">
-            <div><span class="dot"></span> 100% Google WaveNet voices</div>
+            <div><span class="dot"></span> Curated Soli voice collection</div>
             <div><span class="dot"></span> Language-aware voice filtering</div>
             <div><span class="dot"></span> Instant preview and production-safe output</div>
           </div>
@@ -108,12 +108,12 @@
 
         <aside class="card">
           <h3 style="margin:.1rem 0 .45rem">Voice inventory</h3>
-          <p>All voices below are live from your configured Google TTS setup.</p>
+          <p>All voices below are available in your current Listen voice library.</p>
           <div class="status-grid">
             <div class="status"><small>Arabic</small><b>{{ count($voiceCatalog['ar'] ?? []) }} voices</b></div>
             <div class="status"><small>English</small><b>{{ count($voiceCatalog['en'] ?? []) }} voices</b></div>
-            <div class="status"><small>Default Arabic</small><b>{{ $defaultVoiceAr }}</b></div>
-            <div class="status"><small>Default English</small><b>{{ $defaultVoiceEn }}</b></div>
+            <div class="status"><small>Default Arabic</small><b>{{ $defaultVoiceAr['label'] ?? 'Soli Noor' }}</b></div>
+            <div class="status"><small>Default English</small><b>{{ $defaultVoiceEn['label'] ?? 'Soli Nova' }}</b></div>
           </div>
         </aside>
       </div>
@@ -155,19 +155,20 @@
 
             <div>
               <label for="voice_name">Voice</label>
-              <select id="voice_name" name="voice_name"></select>
+              <select id="voice_name" name="voice_key"></select>
             </div>
 
             <div>
               <label for="translate">Translate before speaking</label>
               <select id="translate" name="translate">
-                <option value="1">Yes</option>
-                <option value="0">No</option>
+                <option value="1">Yes — convert text to target language first</option>
+                <option value="0">No — keep original text language</option>
               </select>
+              <div class="hint">If enabled, we first translate your text to the selected target language, then generate the voice from that translated text.</div>
             </div>
 
             <div style="display:flex;gap:.62rem;flex-wrap:wrap">
-              <button class="btn btn-primary" type="submit">Validate pipeline</button>
+              <button class="btn btn-primary" type="submit">Validate setup</button>
               <button class="btn" type="button" id="previewBtn">Generate voice preview</button>
             </div>
           </form>
@@ -244,13 +245,13 @@
       } else {
         for (const voice of voices) {
           const option = document.createElement('option');
-          option.value = voice.name;
-          option.textContent = `${voice.label} · ${voice.gender.toUpperCase()} · ${voice.name}`;
+          option.value = voice.key;
+          option.textContent = `${voice.label} · ${voice.gender.toUpperCase()}`;
           voiceSelect.appendChild(option);
         }
       }
 
-      if (voices.some((v) => v.name === previous)) {
+      if (voices.some((v) => v.key === previous)) {
         voiceSelect.value = previous;
       }
 
@@ -258,7 +259,7 @@
       for (const voice of voices) {
         const card = document.createElement('div');
         card.className = 'voice-item';
-        card.innerHTML = `<strong>${voice.label}</strong><small>${voice.gender.toUpperCase()} · ${voice.name}</small>`;
+        card.innerHTML = `<strong>${voice.label}</strong><small>${voice.gender.toUpperCase()}</small>`;
         voiceCards.appendChild(card);
       }
     }
@@ -319,7 +320,10 @@
 
         previewAudio.src = data.audio_url;
         previewAudio.load();
-        audioMeta.textContent = `Voice: ${data.voice_name} · Provider: ${data.provider} · Duration: ${data.duration_seconds || '?'}s`;
+        const voiceLabel = data?.voice?.label || 'Selected voice';
+        const voiceGender = data?.voice?.gender ? ` (${String(data.voice.gender).toUpperCase()})` : '';
+        const translateNote = data?.translate_note ? ` · ${data.translate_note}` : '';
+        audioMeta.textContent = `Voice: ${voiceLabel}${voiceGender} · Duration: ${data.duration_seconds || '?'}s${translateNote}`;
         result.textContent = JSON.stringify(data, null, 2);
       } catch (err) {
         setError(err?.message || 'Preview generation failed');

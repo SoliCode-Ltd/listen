@@ -49,7 +49,8 @@ class DashboardController extends Controller
             'activePlan' => $activePlan,
             'planMinutes' => $planMinutes,
             'usagePercent' => $usagePercent,
-            'voiceCatalog' => VoiceCatalog::byLanguage(),
+            'voiceCatalog' => VoiceCatalog::publicCatalog(),
+            'voiceNameMap' => VoiceCatalog::mapByName(),
             'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar'),
             'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en'),
         ]);
@@ -67,12 +68,12 @@ class DashboardController extends Controller
             'source_type' => ['required', 'in:email,message,file'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
-            'voice_name' => ['nullable', 'string', 'max:120'],
+            'voice_key' => ['nullable', 'string', 'max:60'],
         ]);
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
-            $validated['voice_name'] ?? null,
+            $validated['voice_key'] ?? null,
         );
 
         $text = trim($validated['content']);
@@ -157,17 +158,18 @@ class DashboardController extends Controller
         return [$seconds, $minutes];
     }
 
-    private function normalizeVoiceSelection(string $language, ?string $voiceName): string
+    private function normalizeVoiceSelection(string $language, ?string $voiceKey): string
     {
-        $voiceName = trim((string) $voiceName);
+        $voiceKey = trim((string) $voiceKey);
 
-        if ($voiceName === '') {
+        if ($voiceKey === '') {
             return VoiceCatalog::defaultForLanguage($language);
         }
 
-        if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language)) {
+        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey);
+        if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_name' => 'Selected voice is not available for the chosen language.',
+                'voice_key' => 'Selected voice is not available for the chosen language.',
             ]);
         }
 

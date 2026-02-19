@@ -19,9 +19,9 @@ class HomeController extends Controller
     public function demoPage()
     {
         return view('demo', [
-            'voiceCatalog' => VoiceCatalog::byLanguage(),
-            'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar'),
-            'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en'),
+            'voiceCatalog' => VoiceCatalog::publicCatalog(),
+            'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar')),
+            'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en')),
         ]);
     }
 
@@ -31,12 +31,12 @@ class HomeController extends Controller
             'text' => ['required', 'string', 'max:8000'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
-            'voice_name' => ['nullable', 'string', 'max:120'],
+            'voice_key' => ['nullable', 'string', 'max:60'],
         ]);
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
-            $validated['voice_name'] ?? null,
+            $validated['voice_key'] ?? null,
         );
 
         $text = trim($validated['text']);
@@ -50,11 +50,14 @@ class HomeController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'Preview is ready. Click "Generate Voice" to synthesize real audio.',
+            'message' => 'Ready. Click "Generate Voice" to produce audio.',
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
             'translate' => (bool) ($validated['translate'] ?? false),
-            'voice_name' => $voiceName,
+            'translate_note' => (bool) ($validated['translate'] ?? false)
+                ? 'Text will be translated to the target language before audio generation.'
+                : 'Text will be spoken as-is without translation.',
+            'voice' => VoiceCatalog::voiceMeta($voiceName),
             'estimated_seconds' => $estimatedSeconds,
             'estimated_minutes' => max(1, (int) ceil($estimatedSeconds / 60)),
         ]);
@@ -69,12 +72,12 @@ class HomeController extends Controller
             'text' => ['required', 'string', 'max:1200'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
-            'voice_name' => ['nullable', 'string', 'max:120'],
+            'voice_key' => ['nullable', 'string', 'max:60'],
         ]);
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
-            $validated['voice_name'] ?? null,
+            $validated['voice_key'] ?? null,
         );
 
         $text = trim($validated['text']);
@@ -92,33 +95,37 @@ class HomeController extends Controller
 
             return response()->json([
                 'ok' => true,
-                'provider' => $audio['provider'] ?? 'google-cloud-tts',
                 'source_language' => $sourceLanguage,
                 'target_language' => $validated['target_language'],
-                'voice_name' => $voiceName,
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'translate_note' => (bool) ($validated['translate'] ?? false)
+                    ? 'Text was translated to the target language before audio generation.'
+                    : 'Text was spoken as-is without translation.',
+                'voice' => VoiceCatalog::voiceMeta($voiceName),
                 'audio_url' => Storage::disk('public')->url($audio['audio_path']),
                 'duration_seconds' => $audio['duration_seconds'] ?? null,
             ]);
         } catch (\Throwable $e) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Voice generation failed. Please verify Google TTS credentials and try again.',
+                'message' => 'Voice generation failed. Please try again in a moment.',
                 'error' => app()->environment('local') ? $e->getMessage() : null,
             ], 422);
         }
     }
 
-    private function normalizeVoiceSelection(string $language, ?string $voiceName): string
+    private function normalizeVoiceSelection(string $language, ?string $voiceKey): string
     {
-        $voiceName = trim((string) $voiceName);
+        $voiceKey = trim((string) $voiceKey);
 
-        if ($voiceName === '') {
+        if ($voiceKey === '') {
             return VoiceCatalog::defaultForLanguage($language);
         }
 
-        if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language)) {
+        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey);
+        if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_name' => 'Selected voice is not available for the chosen language.',
+                'voice_key' => 'Selected voice is not available for the chosen language.',
             ]);
         }
 

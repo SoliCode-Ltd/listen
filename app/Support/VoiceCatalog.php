@@ -52,6 +52,111 @@ class VoiceCatalog
         return $names;
     }
 
+    public static function mapByName(): array
+    {
+        $map = [];
+
+        foreach (self::byLanguage() as $language => $voices) {
+            if (! is_array($voices)) {
+                continue;
+            }
+
+            foreach ($voices as $index => $voice) {
+                if (! is_array($voice) || empty($voice['name'])) {
+                    continue;
+                }
+
+                $name = (string) $voice['name'];
+                $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
+                $map[$name] = [
+                    'key' => $key,
+                    'name' => $name,
+                    'label' => (string) ($voice['label'] ?? $name),
+                    'gender' => (string) ($voice['gender'] ?? 'neutral'),
+                    'language' => (string) $language,
+                ];
+            }
+        }
+
+        return $map;
+    }
+
+    public static function publicCatalog(): array
+    {
+        $catalog = [];
+
+        foreach (self::byLanguage() as $language => $voices) {
+            if (! is_array($voices)) {
+                continue;
+            }
+
+            $catalog[$language] = [];
+
+            foreach ($voices as $index => $voice) {
+                if (! is_array($voice) || empty($voice['name'])) {
+                    continue;
+                }
+
+                $catalog[$language][] = [
+                    'key' => (string) ($voice['key'] ?? ($language.'_'.($index + 1))),
+                    'label' => (string) ($voice['label'] ?? $voice['name']),
+                    'gender' => (string) ($voice['gender'] ?? 'neutral'),
+                ];
+            }
+        }
+
+        return $catalog;
+    }
+
+    public static function voiceMeta(?string $voiceName): ?array
+    {
+        $voiceName = trim((string) $voiceName);
+        if ($voiceName === '') {
+            return null;
+        }
+
+        $map = self::mapByName();
+        $meta = $map[$voiceName] ?? null;
+        if (! is_array($meta)) {
+            return null;
+        }
+
+        return [
+            'key' => $meta['key'] ?? null,
+            'label' => $meta['label'] ?? null,
+            'gender' => $meta['gender'] ?? null,
+            'language' => $meta['language'] ?? null,
+        ];
+    }
+
+    public static function labelForName(?string $voiceName): string
+    {
+        $meta = self::voiceMeta($voiceName);
+
+        return $meta['label'] ?? 'Default voice';
+    }
+
+    public static function nameFromKeyForLanguage(string $language, ?string $voiceKey): ?string
+    {
+        $voiceKey = trim((string) $voiceKey);
+        if ($voiceKey === '') {
+            return null;
+        }
+
+        foreach (self::forLanguage($language) as $index => $voice) {
+            if (! is_array($voice) || empty($voice['name'])) {
+                continue;
+            }
+
+            $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
+            if ($key === $voiceKey) {
+                return (string) $voice['name'];
+            }
+        }
+
+        return null;
+    }
+
     public static function isAllowedForLanguage(?string $voiceName, string $language): bool
     {
         $voiceName = trim((string) $voiceName);
