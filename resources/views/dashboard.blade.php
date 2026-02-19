@@ -309,7 +309,7 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        const rec = voice.recommended ? ' · Recommended' : '';
+        const rec = voice.recommended ? ' (Recommended)' : '';
         option.textContent = `${voice.label} · ${formatGender(voice.gender)}${rec}`;
         voiceSelect.appendChild(option);
       }

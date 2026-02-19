@@ -61,11 +61,12 @@
     .stat b{display:block;font-size:1.03rem}
 
     .lab{padding:.85rem 0 2.4rem}
-    .lab-grid{display:grid;grid-template-columns:1.03fr .97fr;gap:1rem}
-    .form-grid{display:grid;gap:.8rem}
+    .lab-grid{display:grid;grid-template-columns:1fr;gap:1rem}
+    .form-grid{display:grid;gap:.9rem}
+    .form-grid > div{padding-inline:.1rem}
     .two{display:grid;grid-template-columns:1fr 1fr;gap:.72rem}
-    label{font-size:.86rem;color:color-mix(in oklab,var(--text) 86%,var(--muted) 14%)}
-    input,select,textarea{width:100%;padding:.8rem .86rem;border-radius:.78rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
+    label{display:block;margin:0 0 .42rem;font-size:.9rem;font-weight:600;color:color-mix(in oklab,var(--text) 88%,var(--muted) 12%)}
+    input,select,textarea{width:100%;padding:.84rem .9rem;border-radius:.8rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
     textarea{min-height:170px;resize:vertical}
 
     .chips{display:flex;gap:.42rem;flex-wrap:wrap}
@@ -78,14 +79,7 @@
     .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
     .audio audio{width:100%;height:34px}
 
-    .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:420px;overflow:auto;padding-right:.2rem}
-    .voice-item{display:flex;gap:.55rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.58rem;transition:transform .2s ease,border-color .2s ease}
-    .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .voice-avatar{width:2.3rem;height:2.3rem;border-radius:.62rem;overflow:hidden;border:1px solid color-mix(in oklab,var(--line) 65%,transparent);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-    .voice-avatar svg{width:100%;height:100%;display:block}
-    .voice-meta strong{display:block;font-size:.92rem}
-    .voice-meta small{color:var(--muted)}
-    .rec-badge{display:inline-flex;align-items:center;gap:.22rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.34rem}
+    .recommended-note{display:inline-flex;align-items:center;gap:.25rem;padding:.2rem .5rem;border:1px solid color-mix(in oklab,var(--a) 50%,var(--line) 50%);border-radius:999px;background:color-mix(in oklab,var(--a) 14%,var(--surface) 86%);font-size:.72rem;color:color-mix(in oklab,var(--a) 80%,var(--text) 20%)}
 
     .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease, transform .55s ease}
     .reveal.show{opacity:1;transform:translateY(0)}
@@ -98,7 +92,7 @@
       .mobile-controls{display:flex}
       .hero{padding:1.45rem 0 .65rem}
       .lab{padding:.55rem 0 1.7rem}
-      .hero-grid,.lab-grid,.two,.stats,.voice-grid{grid-template-columns:1fr}
+      .hero-grid,.lab-grid,.two,.stats{grid-template-columns:1fr}
       .card{padding:.95rem}
       .sound-wave{margin-top:.7rem}
     }
@@ -234,6 +228,7 @@
             <div>
               <label for="voice_key">Voice</label>
               <select id="voice_key" name="voice_key"></select>
+              <div class="hint" style="margin-top:.4rem"><span class="recommended-note">Recommended</span> voices are highlighted in the selector.</div>
             </div>
 
             <div>
@@ -258,10 +253,6 @@
           </div>
         </section>
 
-        <aside class="card reveal">
-          <h3 style="margin:.1rem 0 .65rem">Available voices</h3>
-          <div id="voiceCards" class="voice-grid"></div>
-        </aside>
       </div>
     </section>
   </main>
@@ -276,7 +267,6 @@
     const targetLanguage = document.getElementById('target_language');
     const voiceGender = document.getElementById('voice_gender');
     const voiceSelect = document.getElementById('voice_key');
-    const voiceCards = document.getElementById('voiceCards');
     const previewBtn = document.getElementById('previewBtn');
     const audioWrap = document.getElementById('audioWrap');
     const previewAudio = document.getElementById('previewAudio');
@@ -321,54 +311,6 @@
       return text.charAt(0).toUpperCase() + text.slice(1);
     }
 
-    function tokenHash(input) {
-      let h = 0;
-      for (let i = 0; i < input.length; i++) {
-        h = ((h << 5) - h) + input.charCodeAt(i);
-        h |= 0;
-      }
-      return Math.abs(h);
-    }
-
-    function robotSvg(token, gender) {
-      const hash = tokenHash(token || 'voice');
-      const h1 = hash % 360;
-      const h2 = (h1 + 48) % 360;
-      const eyeVariant = hash % 3;
-      const mouthVariant = hash % 4;
-      const accent = String(gender).toLowerCase() === 'female' ? '95%' : '88%';
-
-      const eyes = eyeVariant === 0
-        ? `<rect x="9" y="13" width="7" height="3" rx="1.5" fill="white"/><rect x="20" y="13" width="7" height="3" rx="1.5" fill="white"/>`
-        : eyeVariant === 1
-          ? `<circle cx="12.5" cy="14.5" r="1.8" fill="white"/><circle cx="23.5" cy="14.5" r="1.8" fill="white"/>`
-          : `<rect x="9" y="13" width="7" height="2" rx="1" fill="white"/><rect x="20" y="13" width="7" height="2" rx="1" fill="white"/>`;
-
-      const mouth = mouthVariant === 0
-        ? `<rect x="12" y="23" width="12" height="2.4" rx="1.2" fill="rgba(255,255,255,0.9)"/>`
-        : mouthVariant === 1
-          ? `<path d="M12 24c2 2 8 2 12 0" stroke="rgba(255,255,255,0.9)" stroke-width="2" fill="none" stroke-linecap="round"/>`
-          : mouthVariant === 2
-            ? `<circle cx="18" cy="24" r="2" fill="rgba(255,255,255,0.9)"/>`
-            : `<rect x="14" y="23" width="8" height="2" rx="1" fill="rgba(255,255,255,0.9)"/>`;
-
-      return `
-        <svg viewBox="0 0 36 36" aria-hidden="true" role="img">
-          <defs>
-            <linearGradient id="g-${hash}" x1="0" x2="1" y1="0" y2="1">
-              <stop offset="0%" stop-color="hsl(${h1} ${accent} 62%)"/>
-              <stop offset="100%" stop-color="hsl(${h2} ${accent} 48%)"/>
-            </linearGradient>
-          </defs>
-          <rect x="4" y="5" width="28" height="26" rx="8" fill="url(#g-${hash})"/>
-          <rect x="8" y="10" width="20" height="9" rx="4.5" fill="rgba(9,14,28,.58)"/>
-          ${eyes}
-          ${mouth}
-          <rect x="16" y="2.5" width="4" height="4" rx="2" fill="rgba(255,255,255,.85)"/>
-        </svg>
-      `;
-    }
-
     function renderVoiceOptions() {
       const voices = getFilteredVoices();
       const current = voiceSelect.value;
@@ -380,7 +322,7 @@
         for (const voice of voices) {
           const option = document.createElement('option');
           option.value = voice.key;
-          const rec = voice.recommended ? ' · Recommended' : '';
+          const rec = voice.recommended ? ' (Recommended)' : '';
           option.textContent = `${voice.label} · ${formatGender(voice.gender)}${rec}`;
           voiceSelect.appendChild(option);
         }
@@ -393,20 +335,6 @@
         if (recommended) voiceSelect.value = recommended.key;
       }
 
-      voiceCards.innerHTML = '';
-      for (const voice of voices) {
-        const card = document.createElement('div');
-        card.className = 'voice-item';
-        const token = String(voice.avatar || voice.key || voice.label || 'voice');
-        card.innerHTML = `
-          <div class="voice-avatar">${robotSvg(token, voice.gender)}</div>
-          <div class="voice-meta">
-            <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">Recommended</span>' : ''}</strong>
-            <small>${formatGender(voice.gender)}</small>
-          </div>
-        `;
-        voiceCards.appendChild(card);
-      }
     }
 
     async function callEndpoint(endpoint) {
