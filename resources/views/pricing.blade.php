@@ -28,9 +28,17 @@
     .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
+    .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+    .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
+    .user-avatar img{width:100%;height:100%;object-fit:cover}
+    .user-meta{display:grid;line-height:1.1}
+    .user-meta strong{font-size:.74rem}
+    .user-meta small{font-size:.66rem;color:var(--muted)}
+
     .mobile-controls{display:none;align-items:center;gap:.45rem}
     .mobile-menu{display:none;padding:0 0 1rem}
     .mobile-menu.open{display:grid;gap:.35rem}
+    .mobile-user{padding:.42rem .62rem;border-radius:.62rem;background:var(--surface);border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 
     .hero{padding:3.4rem 0 1.6rem;text-align:center}
     h1{margin:.6rem 0 .7rem;font-size:clamp(2rem,5.5vw,4rem);line-height:1.04;letter-spacing:-.03em}
@@ -87,6 +95,19 @@
       <div class="desktop-actions">
         <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
         @auth
+          <div class="user-chip">
+            <div class="user-avatar">
+              @if(auth()->user()->google_avatar)
+                <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
+              @else
+                {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+              @endif
+            </div>
+            <div class="user-meta">
+              <strong>{{ auth()->user()->name }}</strong>
+              <small>{{ auth()->user()->email }}</small>
+            </div>
+          </div>
           <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
         @else
           <a class="btn" href="{{ route('login') }}">Login</a>
@@ -104,6 +125,7 @@
       <a href="{{ route('demo.page') }}">Demo</a>
       <a href="{{ route('pricing') }}">Pricing</a>
       @auth
+        <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
         <a href="{{ route('dashboard') }}">Dashboard</a>
       @else
         <a href="{{ route('login') }}">Login</a>
@@ -194,7 +216,7 @@
   </main>
 
   <footer class="foot">
-    <div class="container">© {{ date('Y') }} Listen · Pricing built for growth.</div>
+    <div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div>
   </footer>
 
   <script>

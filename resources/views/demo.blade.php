@@ -31,9 +31,17 @@
     .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
 
+    .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
+    .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
+    .user-avatar img{width:100%;height:100%;object-fit:cover}
+    .user-meta{display:grid;line-height:1.1}
+    .user-meta strong{font-size:.74rem}
+    .user-meta small{font-size:.66rem;color:var(--muted)}
+
     .mobile-controls{display:none;align-items:center;gap:.45rem}
     .mobile-menu{display:none;padding:0 0 1rem}
     .mobile-menu.open{display:grid;gap:.35rem}
+    .mobile-user{padding:.42rem .62rem;border-radius:.62rem;background:var(--surface);border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
 
     .hero{padding:2.8rem 0 1.3rem}
     .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:.9rem}
@@ -65,7 +73,6 @@
     .chip:hover{transform:translateY(-1px);border-color:color-mix(in oklab,var(--b) 45%,var(--line) 55%)}
 
     .hint{font-size:.83rem;color:var(--muted)}
-    .status-box{margin-top:.72rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface);font-size:.88rem;color:var(--muted)}
     .error{margin-top:.62rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
 
     .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
@@ -74,11 +81,25 @@
     .voice-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.56rem;max-height:420px;overflow:auto;padding-right:.2rem}
     .voice-item{display:flex;gap:.55rem;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.58rem;transition:transform .2s ease,border-color .2s ease}
     .voice-item:hover{transform:translateY(-2px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .voice-avatar{position:relative;width:2rem;height:2rem;border-radius:999px;display:block;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 30%,transparent),color-mix(in oklab,var(--b) 30%,transparent));border:1px solid color-mix(in oklab,var(--line) 70%,transparent)}
-    .voice-avatar::before{content:'';position:absolute;top:20%;left:50%;transform:translateX(-50%);width:.55rem;height:.55rem;border-radius:50%;background:#fff}
-    .voice-avatar::after{content:'';position:absolute;bottom:16%;left:50%;transform:translateX(-50%);width:1rem;height:.62rem;border-radius:.62rem .62rem .34rem .34rem;background:#fff}
-    .voice-avatar.female{background:linear-gradient(135deg,color-mix(in oklab,#ff8ec9 40%,transparent),color-mix(in oklab,var(--b) 30%,transparent))}
-    .voice-avatar.male{background:linear-gradient(135deg,color-mix(in oklab,#7bb7ff 40%,transparent),color-mix(in oklab,var(--a) 26%,transparent))}
+    .voice-avatar{position:relative;width:2rem;height:2rem;border-radius:.55rem;display:block;border:1px solid color-mix(in oklab,var(--line) 70%,transparent);background:linear-gradient(145deg,var(--robot-a,#6b78ff),var(--robot-b,#7c3aed));overflow:hidden}
+    .voice-avatar::before{content:'';position:absolute;top:.35rem;left:50%;transform:translateX(-50%);width:1rem;height:.5rem;border-radius:.25rem;background:rgba(7,10,22,.75)}
+    .voice-avatar::after{content:'';position:absolute;bottom:.26rem;left:50%;transform:translateX(-50%);width:.95rem;height:.22rem;border-radius:999px;background:rgba(255,255,255,.82)}
+    .voice-avatar i{position:absolute;top:.2rem;left:50%;transform:translateX(-50%);width:.14rem;height:.2rem;border-radius:999px;background:rgba(255,255,255,.9)}
+    .voice-avatar i::after{content:'';position:absolute;top:-.12rem;left:50%;transform:translateX(-50%);width:.28rem;height:.12rem;border-radius:999px;background:rgba(255,255,255,.85)}
+    .voice-avatar.avatar-female-a{--robot-a:#ff6f91;--robot-b:#7c3aed}
+    .voice-avatar.avatar-female-b{--robot-a:#ff9a76;--robot-b:#6d28d9}
+    .voice-avatar.avatar-female-c{--robot-a:#f472b6;--robot-b:#5b21b6}
+    .voice-avatar.avatar-female-d{--robot-a:#fb7185;--robot-b:#4c1d95}
+    .voice-avatar.avatar-female-e{--robot-a:#f59e0b;--robot-b:#6d28d9}
+    .voice-avatar.avatar-female-f{--robot-a:#ec4899;--robot-b:#4338ca}
+    .voice-avatar.avatar-female-g{--robot-a:#f97316;--robot-b:#7e22ce}
+    .voice-avatar.avatar-male-a{--robot-a:#38bdf8;--robot-b:#2563eb}
+    .voice-avatar.avatar-male-b{--robot-a:#60a5fa;--robot-b:#3730a3}
+    .voice-avatar.avatar-male-c{--robot-a:#22d3ee;--robot-b:#4f46e5}
+    .voice-avatar.avatar-male-d{--robot-a:#06b6d4;--robot-b:#4338ca}
+    .voice-avatar.avatar-male-e{--robot-a:#3b82f6;--robot-b:#6d28d9}
+    .voice-avatar.avatar-male-f{--robot-a:#0ea5e9;--robot-b:#312e81}
+    .voice-avatar.avatar-male-g{--robot-a:#14b8a6;--robot-b:#3730a3}
     .voice-meta strong{display:block;font-size:.92rem}
     .voice-meta small{color:var(--muted)}
     .rec-badge{display:inline-flex;align-items:center;gap:.22rem;font-size:.66rem;padding:.15rem .42rem;border-radius:999px;border:1px solid color-mix(in oklab,var(--a) 58%,var(--line) 42%);background:color-mix(in oklab,var(--a) 16%,var(--surface) 84%);color:color-mix(in oklab,var(--a) 84%,var(--text) 16%);margin-left:.34rem}
@@ -109,7 +130,7 @@
 
   <header class="header reveal">
     <div class="container nav">
-      <div class="brand">🎧 <span>Listen Demo Lab</span></div>
+      <div class="brand">🎧 <span>Listen</span></div>
 
       <nav class="desktop-nav">
         <a href="{{ route('home') }}">Home</a>
@@ -120,6 +141,19 @@
       <div class="desktop-actions">
         <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
         @auth
+          <div class="user-chip">
+            <div class="user-avatar">
+              @if(auth()->user()->google_avatar)
+                <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
+              @else
+                {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+              @endif
+            </div>
+            <div class="user-meta">
+              <strong>{{ auth()->user()->name }}</strong>
+              <small>{{ auth()->user()->email }}</small>
+            </div>
+          </div>
           <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
         @else
           <a class="btn" href="{{ route('login') }}">Login</a>
@@ -137,6 +171,7 @@
       <a href="{{ route('demo.page') }}">Demo</a>
       <a href="{{ route('pricing') }}">Pricing</a>
       @auth
+        <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
         <a href="{{ route('dashboard') }}">Dashboard</a>
       @else
         <a href="{{ route('login') }}">Login</a>
@@ -224,11 +259,8 @@
             </div>
 
             <div style="display:flex;gap:.55rem;flex-wrap:wrap">
-              <button class="btn" type="button" id="validateBtn">Validate Setup</button>
               <button class="btn primary" type="button" id="previewBtn">Generate Voice</button>
             </div>
-
-            <div class="status-box" id="statusBox">Ready.</div>
           </form>
 
           <div id="errorBox" class="error" style="display:none"></div>
@@ -248,7 +280,7 @@
   </main>
 
   <footer class="foot">
-    <div class="container">© {{ date('Y') }} Listen Demo Lab</div>
+    <div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div>
   </footer>
 
   <script>
@@ -258,9 +290,7 @@
     const voiceGender = document.getElementById('voice_gender');
     const voiceSelect = document.getElementById('voice_key');
     const voiceCards = document.getElementById('voiceCards');
-    const validateBtn = document.getElementById('validateBtn');
     const previewBtn = document.getElementById('previewBtn');
-    const statusBox = document.getElementById('statusBox');
     const audioWrap = document.getElementById('audioWrap');
     const previewAudio = document.getElementById('previewAudio');
     const audioMeta = document.getElementById('audioMeta');
@@ -326,9 +356,10 @@
       for (const voice of voices) {
         const card = document.createElement('div');
         card.className = 'voice-item';
-        const avatarClass = String(voice.gender).toLowerCase() === 'female' ? 'female' : 'male';
+        const token = String(voice.avatar || 'profile').toLowerCase().replace(/[^a-z0-9-]/g, '');
+        const avatarClass = `avatar-${token}`;
         card.innerHTML = `
-          <div class="voice-avatar ${avatarClass}"></div>
+          <div class="voice-avatar ${avatarClass}"><i></i></div>
           <div class="voice-meta">
             <strong>${voice.label}${voice.recommended ? '<span class="rec-badge">★ Recommended</span>' : ''}</strong>
             <small>${voice.gender.toUpperCase()}</small>
@@ -350,22 +381,12 @@
       return data;
     }
 
-    validateBtn?.addEventListener('click', async () => {
-      try {
-        statusBox.textContent = 'Validating...';
-        const data = await callEndpoint('{{ route('demo.run') }}');
-        statusBox.textContent = `${data.message} ${data.translate_note}`;
-      } catch (err) {
-        setError(err?.message || 'Validation failed');
-      }
-    });
-
     previewBtn?.addEventListener('click', async () => {
       heroWave?.classList.add('dynamic');
       try {
-        statusBox.textContent = 'Generating voice...';
         audioWrap.style.display = 'block';
         previewAudio.removeAttribute('src');
+        audioMeta.textContent = 'Generating voice preview...';
 
         const data = await callEndpoint('{{ route('demo.preview') }}');
 
@@ -375,10 +396,9 @@
         const label = data?.voice?.label || 'Selected voice';
         const gender = data?.voice?.gender ? ` (${String(data.voice.gender).toUpperCase()})` : '';
         audioMeta.textContent = `Voice: ${label}${gender} · ${data.translate_note}`;
-        statusBox.textContent = 'Done. Audio preview is ready.';
       } catch (err) {
-        statusBox.textContent = 'Preview failed.';
         setError(err?.message || 'Preview failed');
+        audioMeta.textContent = 'Preview failed. Try another text or voice.';
       } finally {
         setTimeout(() => heroWave?.classList.remove('dynamic'), 900);
       }

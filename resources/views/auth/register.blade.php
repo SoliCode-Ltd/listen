@@ -122,7 +122,7 @@
     </form>
   </main>
 
-  <footer class="foot"><div class="container">© {{ date('Y') }} Listen</div></footer>
+  <footer class="foot"><div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div></footer>
 
   <script>
     const setTheme = () => {
