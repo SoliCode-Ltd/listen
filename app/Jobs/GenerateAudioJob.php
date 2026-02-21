@@ -66,6 +66,7 @@ class GenerateAudioJob implements ShouldQueue
             $this->applyUsageDelta(
                 (int) $generation->user_id,
                 $this->usagePeriod($generation),
+                0,
                 $actualChars - $reserved['chars'],
                 $actualMinutes - $reserved['minutes'],
             );
@@ -99,6 +100,7 @@ class GenerateAudioJob implements ShouldQueue
         $this->applyUsageDelta(
             (int) $generation->user_id,
             $this->usagePeriod($generation),
+            -1,
             -$reserved['chars'],
             -$reserved['minutes'],
         );
@@ -128,13 +130,13 @@ class GenerateAudioJob implements ShouldQueue
         return $generation->created_at?->format('Y-m') ?? now()->format('Y-m');
     }
 
-    private function applyUsageDelta(int $userId, string $periodYm, int $charsDelta, int $minutesDelta): void
+    private function applyUsageDelta(int $userId, string $periodYm, int $requestsDelta, int $charsDelta, int $minutesDelta): void
     {
-        if ($charsDelta === 0 && $minutesDelta === 0) {
+        if ($requestsDelta === 0 && $charsDelta === 0 && $minutesDelta === 0) {
             return;
         }
 
-        DB::transaction(function () use ($userId, $periodYm, $charsDelta, $minutesDelta) {
+        DB::transaction(function () use ($userId, $periodYm, $requestsDelta, $charsDelta, $minutesDelta) {
             $counter = UsageCounter::query()
                 ->where('user_id', $userId)
                 ->where('period_ym', $periodYm)
@@ -151,10 +153,12 @@ class GenerateAudioJob implements ShouldQueue
                 ]);
             }
 
+            $nextRequests = max(0, (int) $counter->total_requests + $requestsDelta);
             $nextChars = max(0, (int) $counter->total_chars + $charsDelta);
             $nextMinutes = max(0, (int) $counter->total_minutes + $minutesDelta);
 
             $counter->update([
+                'total_requests' => $nextRequests,
                 'total_chars' => $nextChars,
                 'total_minutes' => $nextMinutes,
             ]);

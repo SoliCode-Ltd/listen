@@ -15,13 +15,21 @@ class Plan extends Model
         'name',
         'price_cents',
         'monthly_minutes',
+        'monthly_chars',
+        'monthly_requests',
         'max_chars_per_request',
+        'allow_overage',
+        'overage_price_per_million_cents',
+        'commercial_use_allowed',
+        'processing_priority',
         'features',
         'is_active',
     ];
 
     protected $casts = [
         'features' => 'array',
+        'allow_overage' => 'boolean',
+        'commercial_use_allowed' => 'boolean',
         'is_active' => 'boolean',
     ];
 

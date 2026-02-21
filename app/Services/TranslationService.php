@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class TranslationService
 {
@@ -18,27 +19,38 @@ class TranslationService
             return $text;
         }
 
-        $cacheKey = 'listen:tr:v1:'.sha1($sourceLanguage.'|'.$targetLanguage.'|'.$text);
+        $cacheKey = 'listen:tr:v2:'.sha1($sourceLanguage.'|'.$targetLanguage.'|'.$text);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
 
-        $translated = Cache::remember($cacheKey, now()->addDays(14), function () use ($text, $sourceLanguage, $targetLanguage) {
-            return $this->googleTranslate($text, $sourceLanguage, $targetLanguage) ?: $text;
-        });
+        $translated = $this->googleTranslate($text, $sourceLanguage, $targetLanguage);
+        if (is_string($translated) && $translated !== '') {
+            Cache::put($cacheKey, $translated, now()->addDays(14));
+            return $translated;
+        }
 
-        return is_string($translated) && $translated !== '' ? $translated : $text;
+        return $text;
     }
 
     private function googleTranslate(string $text, string $source, string $target): ?string
     {
         try {
-            $response = Http::timeout(8)
-                ->retry(1, 200)
-                ->get('https://translate.googleapis.com/translate_a/single', [
-                    'client' => 'gtx',
-                    'sl' => $source ?: 'auto',
-                    'tl' => $target,
-                    'dt' => 't',
-                    'q' => $text,
-                ]);
+            $verifySsl = (bool) config('services.google_tts.verify_ssl', true);
+            $response = $this->sendWithSslFallback(
+                fn (bool $verify) => Http::timeout(8)
+                    ->retry(1, 200)
+                    ->withOptions(['verify' => $verify])
+                    ->get('https://translate.googleapis.com/translate_a/single', [
+                        'client' => 'gtx',
+                        'sl' => $source ?: 'auto',
+                        'tl' => $target,
+                        'dt' => 't',
+                        'q' => $text,
+                    ]),
+                $verifySsl,
+            );
 
             if (! $response->ok()) {
                 return null;
@@ -60,5 +72,33 @@ class TranslationService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function sendWithSslFallback(callable $sender, bool $verifySsl)
+    {
+        try {
+            return $sender($verifySsl);
+        } catch (\Throwable $e) {
+            if (! $this->shouldRetryWithoutSsl($e, $verifySsl)) {
+                throw $e;
+            }
+
+            Log::warning('Google Translate request failed SSL verification on local environment; retrying without verification.');
+
+            return $sender(false);
+        }
+    }
+
+    private function shouldRetryWithoutSsl(\Throwable $e, bool $verifySsl): bool
+    {
+        if (! $verifySsl || ! app()->environment('local')) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'curl error 60')
+            || str_contains($message, 'ssl certificate problem')
+            || str_contains($message, 'unable to get local issuer certificate');
     }
 }

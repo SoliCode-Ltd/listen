@@ -1,9 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Demo Lab</title>
+  <title>Listen | Demo</title>
+  <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -20,7 +21,9 @@
 
     .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
     .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900}
+    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
+    .brand-icon{width:1.2rem;height:1.2rem;display:block}
+    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
 
     .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
@@ -30,6 +33,11 @@
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.7rem .92rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
     .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
+    .theme-btn{padding:.58rem;min-width:2.4rem}
+    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
+    .theme-btn .sun{display:none}
+    html[data-theme="light"] .theme-btn .sun{display:block}
+    html[data-theme="light"] .theme-btn .moon{display:none}
 
     .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
     .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
@@ -75,6 +83,15 @@
 
     .hint{font-size:.83rem;color:var(--muted)}
     .error{margin-top:.62rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
+    .quota{margin:.55rem .1rem .8rem;padding:.76rem .82rem;border-radius:.75rem;border:1px solid var(--line);background:color-mix(in oklab,var(--surface) 84%,transparent)}
+    .quota-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.44rem}
+    .quota-label{font-size:.82rem;color:var(--muted)}
+    .quota-value{font-size:.86rem;font-weight:700;color:var(--text)}
+    .quota-track{height:10px;border-radius:999px;border:1px solid color-mix(in oklab,var(--line) 75%,transparent);background:color-mix(in oklab,var(--surface2) 85%,transparent);overflow:hidden}
+    .quota-fill{height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .25s ease}
+    .quota-note{margin-top:.42rem;font-size:.8rem;color:var(--muted)}
+    .quota-upgrade{display:none;margin-top:.62rem;padding:.75rem .82rem;border-radius:.74rem;border:1px solid color-mix(in oklab,var(--a) 45%,var(--line) 55%);background:color-mix(in oklab,var(--a) 11%,var(--surface) 89%)}
+    .quota-upgrade p{margin:0 0 .55rem;color:var(--muted);font-size:.86rem}
 
     .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
     .audio audio{width:100%;height:34px}
@@ -110,16 +127,25 @@
 
   <header class="header reveal">
     <div class="container nav">
-      <div class="brand">🎧 <span>Listen</span></div>
+      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+        </span>
+        <span>Listen</span>
+      </a>
 
       <nav class="desktop-nav">
         <a href="{{ route('home') }}">Home</a>
         <a href="{{ route('demo.page') }}">Demo</a>
         <a href="{{ route('pricing') }}">Pricing</a>
+        <a href="{{ route('extension.page') }}">Chrome Extension</a>
       </nav>
 
       <div class="desktop-actions">
-        <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
+        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
         @auth
           <div class="user-chip">
             <div class="user-avatar">
@@ -142,14 +168,18 @@
       </div>
 
       <div class="mobile-controls">
-        <button type="button" class="btn" id="themeToggleMobile" aria-label="Toggle theme">🌓</button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
+        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
       </div>
     </div>
     <div class="container mobile-menu" id="mobileMenu">
       <a href="{{ route('home') }}">Home</a>
       <a href="{{ route('demo.page') }}">Demo</a>
       <a href="{{ route('pricing') }}">Pricing</a>
+      <a href="{{ route('extension.page') }}">Chrome Extension</a>
       @auth
         <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
         <a href="{{ route('dashboard') }}">Dashboard</a>
@@ -164,13 +194,13 @@
     <section class="hero">
       <div class="hero-grid">
         <article class="card reveal">
-          <span class="eyebrow">Live voice test studio</span>
-          <h1>Choose voice, language, and translation behavior — then preview instantly.</h1>
+          <!-- <span class="eyebrow">Live voice test studio</span> -->
+          <h1>Choose voice, language, and translation behavior - then preview instantly.</h1>
           <p class="muted">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
           <div class="hero-list">
-            <div>• Branded voice personas only</div>
-            <div>• Clear translation behavior</div>
-            <div>• Instant audio preview</div>
+            <div>- Branded voice personas only</div>
+            <div>- Clear translation behavior</div>
+            <div>- Instant audio preview</div>
           </div>
           <div class="sound-wave" id="heroWave" aria-hidden="true">
             <span></span><span></span><span></span><span></span><span></span><span></span>
@@ -183,8 +213,8 @@
           <div class="stats">
             <div class="stat"><small class="muted">Arabic voices</small><b>{{ count($voiceCatalog['ar'] ?? []) }}</b></div>
             <div class="stat"><small class="muted">English voices</small><b>{{ count($voiceCatalog['en'] ?? []) }}</b></div>
-            <div class="stat"><small class="muted">Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Soli Noor' }}</b></div>
-            <div class="stat"><small class="muted">English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Soli Nova' }}</b></div>
+            <div class="stat"><small class="muted">Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Dai' }}</b></div>
+            <div class="stat"><small class="muted">English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Ember' }}</b></div>
           </div>
         </aside>
       </div>
@@ -194,6 +224,19 @@
       <div class="lab-grid">
         <section class="card reveal">
           <h3 style="margin:.1rem 0 .65rem">Try your best demo flow</h3>
+          <p class="hint" style="margin:-.2rem 0 .45rem">Guest demo includes one-time starter credit. Create a free account for full starter capacity.</p>
+          <div class="quota" id="quotaBox">
+            <div class="quota-head">
+              <span class="quota-label">Guest starter allowance</span>
+              <strong class="quota-value" id="quotaValue">
+                {{ number_format((int) ($demoQuota['remaining_chars'] ?? $guestAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $guestAllowanceChars)) }} chars left
+              </strong>
+            </div>
+            <div class="quota-track">
+              <div class="quota-fill" id="quotaFill"></div>
+            </div>
+            <div class="quota-note">One-time guest credit. Create a free account to unlock {{ number_format((int) $starterPlanChars) }} characters.</div>
+          </div>
           <form id="demoForm" class="form-grid">
             <div>
               <label for="text">Text input</label>
@@ -201,9 +244,9 @@
             </div>
 
             <div class="chips">
-              <button class="chip" type="button" data-sample="Welcome to SoliCode. We build software that sounds as good as it works.">English sample</button>
-              <button class="chip" type="button" data-sample="مرحباً بك في سولي كود. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
-              <button class="chip" type="button" data-sample="Hello, this is a bilingual test. مرحباً، هذا اختبار ثنائي اللغة.">Bilingual sample</button>
+              <button class="chip" type="button" data-sample="Welcome to our platform. We build software that sounds as good as it works.">English sample</button>
+              <button class="chip" type="button" data-sample="مرحبا بك في منصتنا. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
+              <button class="chip" type="button" data-sample="Hello, this is a bilingual test. مرحبا، هذا اختبار ثنائي اللغة.">Bilingual sample</button>
             </div>
 
             <div class="two">
@@ -232,8 +275,8 @@
             <div>
               <label for="translate">Translate before speaking</label>
               <select id="translate" name="translate">
-                <option value="1">Yes — translate text first</option>
-                <option value="0">No — keep text as-is</option>
+                <option value="1">Yes - translate text first</option>
+                <option value="0">No - keep text as-is</option>
               </select>
               <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected target language.</div>
             </div>
@@ -244,6 +287,10 @@
           </form>
 
           <div id="errorBox" class="error" style="display:none"></div>
+          <div class="quota-upgrade" id="upgradeBox">
+            <p id="upgradeText">Guest demo quota reached. Create a free account to unlock {{ number_format((int) $starterPlanChars) }} characters and continue instantly.</p>
+            <a class="btn primary" href="{{ route('register') }}">Create Free Account</a>
+          </div>
 
           <div class="audio" id="audioWrap" style="display:none">
             <audio id="previewAudio" controls preload="none"></audio>
@@ -256,7 +303,7 @@
   </main>
 
   <footer class="foot">
-    <div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div>
+    <div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div>
   </footer>
 
   <script>
@@ -270,14 +317,47 @@
     const previewAudio = document.getElementById('previewAudio');
     const audioMeta = document.getElementById('audioMeta');
     const errorBox = document.getElementById('errorBox');
+    const quotaBox = document.getElementById('quotaBox');
+    const quotaValue = document.getElementById('quotaValue');
+    const quotaFill = document.getElementById('quotaFill');
+    const upgradeBox = document.getElementById('upgradeBox');
+    const upgradeText = document.getElementById('upgradeText');
     const translateSelect = document.getElementById('translate');
     const translateHint = document.getElementById('translateHint');
     const heroWave = document.getElementById('heroWave');
+    const textInput = document.getElementById('text');
+    const demoQuota = @json($demoQuota ?? null);
+    const starterPlanChars = Number(@json((int) $starterPlanChars));
 
     const csrfHeaders = {
       'X-CSRF-TOKEN': '{{ csrf_token() }}',
       'Accept': 'application/json',
+      'X-Requested-With': 'XMLHttpRequest',
     };
+
+    let currentQuota = {
+      limit_chars: Number(demoQuota?.limit_chars || 300),
+      remaining_chars: Number(demoQuota?.remaining_chars || 300),
+      used_chars: Number(demoQuota?.used_chars || 0),
+      is_exhausted: Boolean(demoQuota?.is_exhausted),
+    };
+    let clientFingerprint = '';
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat().format(Number(value || 0));
+    }
+
+    function countNonSpaceChars(value) {
+      return String(value || '').replace(/\s+/g, '').length;
+    }
+
+    function hideAudioPreview() {
+      audioWrap.style.display = 'none';
+      previewAudio.pause();
+      previewAudio.removeAttribute('src');
+      previewAudio.load();
+      audioMeta.textContent = '';
+    }
 
     function setError(message = '') {
       if (!message) {
@@ -287,6 +367,64 @@
       }
       errorBox.style.display = 'block';
       errorBox.textContent = message;
+    }
+
+    function setUpgradeVisible(show, customMessage = '') {
+      if (!upgradeBox) return;
+      upgradeBox.style.display = show ? 'block' : 'none';
+      if (show && upgradeText) {
+        const fallback = `Guest demo quota reached. Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue instantly.`;
+        upgradeText.textContent = customMessage || fallback;
+      }
+    }
+
+    function renderQuota(quota) {
+      if (!quota || typeof quota !== 'object') return;
+      currentQuota = {
+        ...currentQuota,
+        ...quota,
+      };
+      if (quotaValue) {
+        quotaValue.textContent = `${formatNumber(currentQuota.remaining_chars)} / ${formatNumber(currentQuota.limit_chars)} chars left`;
+      }
+      if (quotaFill) {
+        const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+        const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
+        const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+        quotaFill.style.width = `${percent}%`;
+      }
+      if (quotaBox) {
+        const pending = countNonSpaceChars(textInput?.value || '');
+        if (pending > 0) {
+          quotaBox.title = `${formatNumber(pending)} chars selected`;
+        }
+      }
+      setUpgradeVisible(Boolean(currentQuota.is_exhausted), `Guest demo quota reached (${formatNumber(currentQuota.limit_chars)} chars total). Create a free account to unlock ${formatNumber(starterPlanChars)} characters to start.`);
+    }
+
+    async function buildFingerprint() {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+      const raw = [
+        navigator.userAgent || '',
+        navigator.language || '',
+        Array.isArray(navigator.languages) ? navigator.languages.join(',') : '',
+        navigator.platform || '',
+        String(navigator.hardwareConcurrency || ''),
+        String(navigator.maxTouchPoints || ''),
+        timezone,
+        `${screen.width}x${screen.height}`,
+        String(screen.colorDepth || ''),
+        String(window.devicePixelRatio || ''),
+      ].join('|');
+
+      if (!window.crypto?.subtle || !window.TextEncoder) {
+        return raw;
+      }
+
+      const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+      return Array.from(new Uint8Array(digest))
+        .map((value) => value.toString(16).padStart(2, '0'))
+        .join('');
     }
 
     function updateTranslateHint() {
@@ -322,7 +460,7 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        option.textContent = `${voice.label} · ${formatGender(voice.gender)}`;
+        option.textContent = `${voice.label} - ${formatGender(voice.gender)}`;
         voiceSelect.appendChild(option);
       }
 
@@ -335,12 +473,22 @@
 
     async function callEndpoint(endpoint) {
       setError('');
+      setUpgradeVisible(false);
       const fd = new FormData(form);
-      const res = await fetch(endpoint, { method: 'POST', headers: csrfHeaders, body: fd });
-      const data = await res.json();
+      const headers = { ...csrfHeaders };
+      if (clientFingerprint) {
+        headers['X-Listen-Fingerprint'] = clientFingerprint;
+      }
+      const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok || data?.ok === false) {
-        throw new Error(data?.message || 'Request failed');
+        const firstError = data?.errors && typeof data.errors === 'object'
+          ? Object.values(data.errors)[0]
+          : null;
+        const firstErrorText = Array.isArray(firstError) ? String(firstError[0] || '') : '';
+        const message = String(data?.message || firstErrorText || 'Request failed');
+        throw new Error(message);
       }
       return data;
     }
@@ -348,22 +496,55 @@
     previewBtn?.addEventListener('click', async () => {
       heroWave?.classList.add('dynamic');
       try {
-        audioWrap.style.display = 'block';
-        previewAudio.removeAttribute('src');
-        audioMeta.textContent = 'Generating voice preview...';
+        const rawText = String(textInput?.value || '');
+        const trimmed = rawText.trim();
+        const selectedChars = countNonSpaceChars(trimmed);
+
+        if (!trimmed) {
+          hideAudioPreview();
+          setError('The text field is required.');
+          return;
+        }
+
+        if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
+          hideAudioPreview();
+          const message = `You selected ${formatNumber(selectedChars)} characters, but only ${formatNumber(currentQuota.remaining_chars)} are left in guest demo credit.`;
+          setError(message);
+          setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+          return;
+        }
+
+        previewBtn.disabled = true;
+        previewBtn.textContent = 'Generating...';
+        hideAudioPreview();
 
         const data = await callEndpoint('{{ route('demo.preview') }}');
+        renderQuota(data?.quota || null);
 
+        if (!data?.audio_url) {
+          hideAudioPreview();
+          setError('Voice generation did not return audio. Please try again.');
+          return;
+        }
+
+        audioWrap.style.display = 'block';
         previewAudio.src = data.audio_url;
         previewAudio.load();
 
         const label = data?.voice?.label || 'Selected voice';
         const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
-        audioMeta.textContent = `Voice: ${label}${gender} · ${data.translate_note}`;
+        audioMeta.textContent = `Voice: ${label}${gender} - ${data.translate_note}`;
       } catch (err) {
-        setError(err?.message || 'Preview failed');
-        audioMeta.textContent = 'Preview failed. Try another text or voice.';
+        hideAudioPreview();
+        const message = String(err?.message || 'Preview failed. Try another text or voice.');
+        setError(message);
+        if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
+          setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+          renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0 });
+        }
       } finally {
+        previewBtn.disabled = false;
+        previewBtn.textContent = 'Generate Voice';
         setTimeout(() => heroWave?.classList.remove('dynamic'), 900);
       }
     });
@@ -377,8 +558,22 @@
     targetLanguage?.addEventListener('change', renderVoiceOptions);
     voiceGender?.addEventListener('change', renderVoiceOptions);
     translateSelect?.addEventListener('change', updateTranslateHint);
+    textInput?.addEventListener('input', () => {
+      if (currentQuota.remaining_chars <= 0) {
+        setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+      }
+    });
     renderVoiceOptions();
     updateTranslateHint();
+    renderQuota(currentQuota);
+
+    buildFingerprint()
+      .then((fingerprint) => {
+        clientFingerprint = String(fingerprint || '').slice(0, 256);
+      })
+      .catch(() => {
+        clientFingerprint = '';
+      });
 
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
@@ -402,3 +597,5 @@
   </script>
 </body>
 </html>
+
+

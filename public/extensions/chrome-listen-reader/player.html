@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Listen Player</title>
+  <style>
+    body{margin:0;padding:18px;font:14px/1.45 Inter,Segoe UI,Roboto,Arial,sans-serif;background:#0f1728;color:#f4f8ff}
+    .card{max-width:760px;margin:0 auto;padding:16px;border-radius:12px;border:1px solid #334260;background:linear-gradient(180deg,#1a2945,#141f36)}
+    h1{margin:.1rem 0 .5rem;font-size:1.15rem}
+    p{margin:.3rem 0;color:#9db0d2}
+    audio{width:100%;margin-top:.8rem}
+    .hint{margin-top:.6rem;font-size:.88rem;color:#8aa2cc}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Listen Player</h1>
+    <p id="textPreview">Preparing audio...</p>
+    <audio id="audio" controls autoplay preload="auto"></audio>
+    <div class="hint">Keep this tab open while listening.</div>
+  </div>
+
+  <script src="player.js"></script>
+</body>
+</html>
+

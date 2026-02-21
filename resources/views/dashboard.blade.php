@@ -1,9 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Dashboard</title>
+  <title>Listen | Dashboard</title>
+  <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -16,7 +17,9 @@
 
     .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
     .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900}
+    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
+    .brand-icon{width:1.2rem;height:1.2rem;display:block}
+    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
 
     .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
@@ -26,6 +29,11 @@
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.68rem .9rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
     .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
+    .theme-btn{padding:.58rem;min-width:2.4rem}
+    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
+    .theme-btn .sun{display:none}
+    html[data-theme="light"] .theme-btn .sun{display:block}
+    html[data-theme="light"] .theme-btn .moon{display:none}
 
     .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
     .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
@@ -49,7 +57,8 @@
 
     .meter{margin-top:.65rem}
     .meter-track{height:12px;border-radius:999px;border:1px solid var(--line);background:var(--surface);overflow:hidden}
-    .meter-fill{height:100%;width:{{ $usagePercent }}%;background:linear-gradient(90deg,var(--a),var(--b))}
+    .meter-fill{height:100%;background:linear-gradient(90deg,var(--a),var(--b))}
+    .meter-fill.requests{background:linear-gradient(90deg,var(--b),var(--a))}
 
     .kpis{margin-top:.8rem;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.55rem}
     .kpi{background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.62rem}
@@ -73,6 +82,7 @@
     th{color:color-mix(in oklab,var(--text) 85%,var(--muted) 15%);font-weight:700}
     .status{display:inline-block;padding:.2rem .46rem;border-radius:999px;font-size:.74rem;border:1px solid var(--line)}
     .status.queued{background:color-mix(in oklab,var(--a) 12%,var(--surface) 88%)}
+    .status.processing{background:color-mix(in oklab,var(--a) 12%,var(--surface) 88%)}
     .status.done{background:color-mix(in oklab,var(--ok) 12%,var(--surface) 88%)}
     .status.failed{background:color-mix(in oklab,var(--danger) 12%,var(--surface) 88%)}
     audio{max-width:230px;width:230px;height:32px}
@@ -99,16 +109,24 @@
 <body>
   <header class="header reveal">
     <div class="container nav">
-      <div class="brand">🎧 <span>Listen</span></div>
+      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+        </span>
+        <span>Listen</span>
+      </a>
 
       <nav class="desktop-nav">
         <a href="{{ route('home') }}">Home</a>
-        <a href="{{ route('demo.page') }}">Demo</a>
         <a href="{{ route('pricing') }}">Pricing</a>
+        <a href="{{ route('extension.page') }}">Chrome Extension</a>
       </nav>
 
       <div class="desktop-actions">
-        <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
+        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
         <div class="user-chip">
           <div class="user-avatar">
             @if(auth()->user()->google_avatar)
@@ -126,15 +144,18 @@
       </div>
 
       <div class="mobile-controls">
-        <button type="button" class="btn" id="themeToggleMobile" aria-label="Toggle theme">🌓</button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
+        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
       </div>
     </div>
     <div class="container mobile-menu" id="mobileMenu">
       <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
       <a href="{{ route('home') }}">Home</a>
-      <a href="{{ route('demo.page') }}">Demo</a>
       <a href="{{ route('pricing') }}">Pricing</a>
+      <a href="{{ route('extension.page') }}">Chrome Extension</a>
       <form method="POST" action="{{ route('logout') }}" style="margin-top:.4rem">@csrf<button class="btn" type="submit">Logout</button></form>
     </div>
   </header>
@@ -148,27 +169,39 @@
 
           <div class="meter">
             <div style="display:flex;justify-content:space-between;margin-bottom:.35rem">
-              <small class="muted">Plan usage ({{ $activePlan?->name ?? 'Free' }})</small>
-              <small>{{ $usage->total_minutes }} / {{ $planMinutes }} min</small>
+              <small class="muted">Characters usage ({{ $activePlan?->name ?? 'Free' }})</small>
+              <small id="usageCharsText">{{ number_format($usage->total_chars) }} / {{ number_format($planChars) }} chars</small>
             </div>
-            <div class="meter-track"><div class="meter-fill"></div></div>
+            <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ $usageCharsPercent }}%"></div></div>
+          </div>
+
+          <div class="meter">
+            <div style="display:flex;justify-content:space-between;margin-bottom:.35rem">
+              <small class="muted">Requests usage</small>
+              <small id="usageRequestsText">
+                {{ $usage->total_requests }} /
+                {{ $requestsUnlimited ? 'Unlimited' : $planRequests }}
+                requests
+              </small>
+            </div>
+            <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ $usageRequestsPercent }}%"></div></div>
           </div>
 
           <div class="kpis">
-            <div class="kpi"><small class="muted">Requests</small><b>{{ $usage->total_requests }}</b></div>
-            <div class="kpi"><small class="muted">Characters</small><b>{{ number_format($usage->total_chars) }}</b></div>
-            <div class="kpi"><small class="muted">Minutes</small><b>{{ $usage->total_minutes }}</b></div>
-            <div class="kpi"><small class="muted">Total Jobs</small><b>{{ $stats['total'] }}</b></div>
+            <div class="kpi"><small class="muted">Requests</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
+            <div class="kpi"><small class="muted">Characters</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
+            <div class="kpi"><small class="muted">Minutes</small><b id="kpiMinutes">{{ $usage->total_minutes }}</b></div>
+            <div class="kpi"><small class="muted">Total Jobs</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
         </article>
 
         <aside class="card reveal">
           <h2>System health</h2>
           <div class="mini">
-            <div class="box"><small class="muted">Queued</small><div><b>{{ $stats['queued'] }}</b></div></div>
-            <div class="box"><small class="muted">Done</small><div><b>{{ $stats['done'] }}</b></div></div>
-            <div class="box"><small class="muted">Failed</small><div><b>{{ $stats['failed'] }}</b></div></div>
-            <div class="box"><small class="muted">Voice Set</small><div><b>Soli Premium</b></div></div>
+            <div class="box"><small class="muted">Processing</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
+            <div class="box"><small class="muted">Done</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
+            <div class="box"><small class="muted">Failed</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
+            <div class="box"><small class="muted">Voice Set</small><div><b>WaveNet Only</b></div></div>
           </div>
           <p class="muted" style="margin-top:.7rem">Arabic and English voices with male/female options are enabled.</p>
         </aside>
@@ -177,11 +210,13 @@
 
     <section class="main" id="queue">
       <article class="card reveal">
-        <h2>Queue a new job</h2>
+        <h2>Generate a new voice</h2>
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
+        @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
+        <div id="formMessage"></div>
 
-        <form method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
+        <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
           <div class="two">
             <div>
@@ -220,26 +255,30 @@
           <div>
             <label>Translate before speaking</label>
             <select name="translate" id="translateSelect">
-              <option value="1">Yes — translate text first</option>
-              <option value="0">No — keep text as-is</option>
+              <option value="1">Yes - translate text first</option>
+              <option value="0">No - keep text as-is</option>
             </select>
             <small class="muted" id="translateHint">Enabled: text is translated first, then spoken in target language.</small>
           </div>
 
-          <button class="btn primary" type="submit">Queue Voice Job</button>
+          <button class="btn primary" id="generateBtn" type="submit">Generate Voice Now</button>
         </form>
       </article>
 
       <aside class="card reveal">
         <h3 style="margin:.1rem 0 .45rem">Plan + Voice Defaults</h3>
         <p class="muted">Current plan: {{ $activePlan?->name ?? 'Free' }}</p>
-        <p class="muted">Monthly minutes: {{ $planMinutes }}</p>
+        <p class="muted">Monthly characters: {{ number_format($planChars) }}</p>
+        <p class="muted">Monthly requests: {{ $requestsUnlimited ? 'Unlimited' : $planRequests }}</p>
+        <p class="muted">Overage: {{ ($activePlan?->allow_overage ?? false) ? ('$'.number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2).' per 1,000,000 chars') : 'Not allowed' }}</p>
+        <p class="muted">Commercial use: {{ ($activePlan?->commercial_use_allowed ?? false) ? 'Allowed' : 'Not allowed' }}</p>
+        <p class="muted">Processing: {{ ucfirst((string) ($activePlan?->processing_priority ?? 'standard')) }} priority</p>
         <p class="muted">Max chars/request: {{ $activePlan?->max_chars_per_request ?? 600 }}</p>
         <hr style="border:0;border-top:1px solid var(--line);margin:.8rem 0">
         <p class="muted">Arabic default: {{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</p>
         <p class="muted">English default: {{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</p>
         <div style="margin-top:.7rem;display:flex;gap:.5rem;flex-wrap:wrap">
-          <a class="btn" href="{{ route('demo.page') }}">Open Demo Lab</a>
+          <a class="btn" href="{{ route('extension.page') }}">Chrome Extension</a>
           <a class="btn" href="{{ route('pricing') }}">View Pricing</a>
         </div>
       </aside>
@@ -254,18 +293,18 @@
               <th>ID</th><th>Status</th><th>Flow</th><th>Voice</th><th>Translate</th><th>Est.</th><th>Audio</th><th>Created</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="jobsTableBody">
             @forelse($jobs as $job)
-              <tr>
+              <tr data-job-id="{{ $job->id }}">
                 <td>#{{ $job->id }}</td>
                 <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
-                <td>{{ $job->source_language ?? '-' }} → {{ $job->target_language }}</td>
+                <td>{{ $job->source_language ?? '-' }} -> {{ $job->target_language }}</td>
                 <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice' }}</td>
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
                 <td>{{ $job->duration_seconds ? $job->duration_seconds.'s' : '-' }}</td>
                 <td>
                   @if($job->audio_path)
-                    <audio controls preload="none" src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url($job->audio_path) }}"></audio>
+                    <audio controls preload="none" src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"></audio>
                   @elseif($job->status === 'failed')
                     <small style="color:color-mix(in oklab,var(--danger) 80%,var(--text) 20%)">{{ $job->error_message ?: 'Generation failed' }}</small>
                   @else
@@ -275,7 +314,7 @@
                 <td>{{ $job->created_at?->diffForHumans() }}</td>
               </tr>
             @empty
-              <tr><td colspan="8" class="muted">No jobs yet.</td></tr>
+              <tr id="jobsEmptyRow"><td colspan="8" class="muted">No jobs yet.</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -283,15 +322,43 @@
     </section>
   </main>
 
-  <footer class="foot"><div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div></footer>
+  <footer class="foot"><div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div></footer>
 
-  <script>
+    <script>
     const voiceCatalog = @json($voiceCatalog);
+    const oldVoice = @json(old('voice_key'));
+
+    const queueUrl = '{{ route('dashboard.queue') }}';
+    const csrfToken = '{{ csrf_token() }}';
+
+    const voiceForm = document.getElementById('voiceForm');
+    const formMessage = document.getElementById('formMessage');
+    const generateBtn = document.getElementById('generateBtn');
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_key');
-    const oldVoice = @json(old('voice_key'));
     const translateSelect = document.getElementById('translateSelect');
     const translateHint = document.getElementById('translateHint');
+    const jobsTableBody = document.getElementById('jobsTableBody');
+
+    const usageCharsText = document.getElementById('usageCharsText');
+    const usageRequestsText = document.getElementById('usageRequestsText');
+    const usageCharsMeter = document.getElementById('usageCharsMeter');
+    const usageRequestsMeter = document.getElementById('usageRequestsMeter');
+
+    const kpiRequests = document.getElementById('kpiRequests');
+    const kpiChars = document.getElementById('kpiChars');
+    const kpiMinutes = document.getElementById('kpiMinutes');
+    const kpiTotal = document.getElementById('kpiTotal');
+
+    const statProcessing = document.getElementById('statProcessing');
+    const statDone = document.getElementById('statDone');
+    const statFailed = document.getElementById('statFailed');
+
+    let preferredVoiceKey = oldVoice || '';
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat().format(Number(value || 0));
+    }
 
     function formatGender(value) {
       const text = String(value || '').trim().toLowerCase();
@@ -299,10 +366,30 @@
       return text.charAt(0).toUpperCase() + text.slice(1);
     }
 
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function showFormMessage(type, message) {
+      if (!formMessage) return;
+      if (!message) {
+        formMessage.innerHTML = '';
+        return;
+      }
+
+      const cls = type === 'error' ? 'error' : 'note';
+      formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+    }
+
     function renderVoiceOptions() {
       const lang = targetLanguage?.value || 'ar';
       const voices = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
-      const current = voiceSelect?.value || oldVoice || '';
+      const current = voiceSelect?.value || preferredVoiceKey || '';
 
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
@@ -314,15 +401,17 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        option.textContent = `${voice.label} · ${formatGender(voice.gender)}`;
+        option.textContent = `${voice.label} - ${formatGender(voice.gender)}`;
         voiceSelect.appendChild(option);
       }
 
-      if (voices.some(v => v.key === current)) {
+      if (voices.some((v) => v.key === current)) {
         voiceSelect.value = current;
       } else {
         voiceSelect.value = voices[0].key;
       }
+
+      preferredVoiceKey = voiceSelect.value;
     }
 
     function updateTranslateHint() {
@@ -332,8 +421,163 @@
         : 'Disabled: original text is spoken directly without translation.';
     }
 
+    function updateUsagePanel(usage) {
+      if (!usage || typeof usage !== 'object') return;
+      const requestsUnlimited = Boolean(usage.requests_unlimited);
+
+      if (usageCharsText) {
+        usageCharsText.textContent = `${formatNumber(usage.total_chars)} / ${formatNumber(usage.plan_chars)} chars`;
+      }
+      if (usageRequestsText) {
+        usageRequestsText.textContent = requestsUnlimited
+          ? `${formatNumber(usage.total_requests)} / Unlimited requests`
+          : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} requests`;
+      }
+      if (usageCharsMeter) {
+        usageCharsMeter.style.width = `${Number(usage.chars_percent || 0)}%`;
+      }
+      if (usageRequestsMeter) {
+        usageRequestsMeter.style.width = requestsUnlimited
+          ? '100%'
+          : `${Number(usage.requests_percent || 0)}%`;
+      }
+
+      if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
+      if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
+      if (kpiMinutes) kpiMinutes.textContent = formatNumber(usage.total_minutes);
+    }
+
+    function updateStats(stats) {
+      if (!stats || typeof stats !== 'object') return;
+      if (statProcessing) statProcessing.textContent = formatNumber(stats.processing);
+      if (statDone) statDone.textContent = formatNumber(stats.done);
+      if (statFailed) statFailed.textContent = formatNumber(stats.failed);
+      if (kpiTotal) kpiTotal.textContent = formatNumber(stats.total);
+    }
+
+    function renderJobRow(job) {
+      const status = String(job?.status || 'processing').toLowerCase();
+      const statusClass = ['queued', 'processing', 'done', 'failed'].includes(status) ? status : 'processing';
+      const statusLabel = statusClass.toUpperCase();
+      const sourceLanguage = escapeHtml(job?.source_language || '-');
+      const targetLanguageValue = escapeHtml(job?.target_language || '-');
+      const voiceLabel = escapeHtml(job?.voice_label || 'Default voice');
+      const translateLabel = job?.translate ? 'Yes' : 'No';
+      const duration = job?.duration_seconds ? `${Number(job.duration_seconds)}s` : '-';
+      const created = escapeHtml(job?.created_human || 'just now');
+      const errorMessage = escapeHtml(job?.error_message || 'Generation failed');
+      const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
+
+      let audioCell = '<small class="muted">Processing...</small>';
+      if (audioUrl) {
+        audioCell = `<audio controls preload="none" src="${audioUrl}"></audio>`;
+      } else if (statusClass === 'failed') {
+        audioCell = `<small style="color:color-mix(in oklab,var(--danger) 80%,var(--text) 20%)">${errorMessage}</small>`;
+      }
+
+      return `
+        <tr data-job-id="${Number(job?.id || 0)}">
+          <td>#${Number(job?.id || 0)}</td>
+          <td><span class="status ${statusClass}">${statusLabel}</span></td>
+          <td>${sourceLanguage} -> ${targetLanguageValue}</td>
+          <td>${voiceLabel}</td>
+          <td>${translateLabel}</td>
+          <td>${duration}</td>
+          <td>${audioCell}</td>
+          <td>${created}</td>
+        </tr>
+      `;
+    }
+
+    function upsertJobRow(job) {
+      if (!jobsTableBody || !job || !job.id) return;
+
+      const emptyRow = document.getElementById('jobsEmptyRow');
+      if (emptyRow) emptyRow.remove();
+
+      const rowHtml = renderJobRow(job);
+      const existing = jobsTableBody.querySelector(`tr[data-job-id="${Number(job.id)}"]`);
+      if (existing) {
+        existing.outerHTML = rowHtml;
+      } else {
+        jobsTableBody.insertAdjacentHTML('afterbegin', rowHtml);
+      }
+    }
+
+    function extractErrorMessage(data, fallback = 'Voice generation failed. Please try again.') {
+      if (data?.message) return String(data.message);
+      if (data?.error_message) return String(data.error_message);
+
+      const errors = data?.errors;
+      if (errors && typeof errors === 'object') {
+        const keys = Object.keys(errors);
+        if (keys.length > 0 && Array.isArray(errors[keys[0]]) && errors[keys[0]][0]) {
+          return String(errors[keys[0]][0]);
+        }
+      }
+
+      return fallback;
+    }
+
+    async function submitVoiceForm(event) {
+      event.preventDefault();
+      if (!voiceForm || !generateBtn) return;
+
+      showFormMessage(null, '');
+      const defaultText = generateBtn.textContent || 'Generate Voice Now';
+      generateBtn.disabled = true;
+      generateBtn.textContent = 'Generating...';
+
+      let data = null;
+
+      try {
+        const response = await fetch(queueUrl, {
+          method: 'POST',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+          body: new FormData(voiceForm),
+        });
+
+        data = await response.json().catch(() => ({}));
+
+        if (data?.job) {
+          upsertJobRow(data.job);
+        }
+        if (data?.usage) {
+          updateUsagePanel(data.usage);
+        }
+        if (data?.stats) {
+          updateStats(data.stats);
+        }
+
+        if (!response.ok || data?.ok === false) {
+          throw new Error(extractErrorMessage(data));
+        }
+
+        showFormMessage('ok', data?.message || 'Voice generated successfully.');
+
+        const titleField = voiceForm.querySelector('input[name="title"]');
+        const contentField = voiceForm.querySelector('textarea[name="content"]');
+        if (titleField) titleField.value = '';
+        if (contentField) contentField.value = '';
+      } catch (error) {
+        showFormMessage('error', extractErrorMessage(data, error?.message || 'Voice generation failed.'));
+      } finally {
+        generateBtn.disabled = false;
+        generateBtn.textContent = defaultText;
+      }
+    }
+
     targetLanguage?.addEventListener('change', renderVoiceOptions);
+    voiceSelect?.addEventListener('change', () => {
+      preferredVoiceKey = voiceSelect.value;
+    });
     translateSelect?.addEventListener('change', updateTranslateHint);
+    voiceForm?.addEventListener('submit', submitVoiceForm);
+
     renderVoiceOptions();
     updateTranslateHint();
 
@@ -359,3 +603,4 @@
   </script>
 </body>
 </html>
+

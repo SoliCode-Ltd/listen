@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Support\VoiceCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -50,6 +51,7 @@ class TtsService
     {
         $endpoint = (string) config('services.google_tts.endpoint');
         $timeout = (int) config('services.google_tts.timeout_seconds', 30);
+        $verifySsl = (bool) config('services.google_tts.verify_ssl', true);
 
         $payload = [
             'input' => [
@@ -58,6 +60,7 @@ class TtsService
             'voice' => [
                 'languageCode' => $targetLanguage === 'ar' ? 'ar-XA' : 'en-US',
                 'name' => $voice,
+                'ssmlGender' => $this->resolveSsmlGender($voice),
             ],
             'audioConfig' => [
                 'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
@@ -69,11 +72,22 @@ class TtsService
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
         if ($apiKey !== '') {
             $separator = str_contains($endpoint, '?') ? '&' : '?';
-            $response = Http::timeout($timeout)->post($endpoint.$separator.'key='.$apiKey, $payload);
+            $response = $this->sendWithSslFallback(
+                fn (bool $verify) => Http::timeout($timeout)
+                    ->withOptions(['verify' => $verify])
+                    ->post($endpoint.$separator.'key='.$apiKey, $payload),
+                $verifySsl,
+                'Google TTS API request',
+            );
         } else {
-            $response = Http::timeout($timeout)
-                ->withToken($this->getGoogleAccessToken())
-                ->post($endpoint, $payload);
+            $response = $this->sendWithSslFallback(
+                fn (bool $verify) => Http::timeout($timeout)
+                    ->withOptions(['verify' => $verify])
+                    ->withToken($this->getGoogleAccessToken())
+                    ->post($endpoint, $payload),
+                $verifySsl,
+                'Google TTS OAuth request',
+            );
         }
 
         if (! $response->ok()) {
@@ -121,6 +135,7 @@ class TtsService
 
         return Cache::remember($cacheKey, now()->addMinutes(50), function () use ($clientEmail, $privateKey) {
             $tokenUri = (string) config('services.google_tts.token_uri', 'https://oauth2.googleapis.com/token');
+            $verifySsl = (bool) config('services.google_tts.verify_ssl', true);
             $now = time();
 
             $header = $this->base64UrlEncode(json_encode([
@@ -145,10 +160,17 @@ class TtsService
 
             $assertion = $unsigned.'.'.$this->base64UrlEncode($signature);
 
-            $response = Http::asForm()->timeout(15)->post($tokenUri, [
-                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                'assertion' => $assertion,
-            ]);
+            $response = $this->sendWithSslFallback(
+                fn (bool $verify) => Http::asForm()
+                    ->timeout(15)
+                    ->withOptions(['verify' => $verify])
+                    ->post($tokenUri, [
+                        'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+                        'assertion' => $assertion,
+                    ]),
+                $verifySsl,
+                'Google OAuth token request',
+            );
 
             if (! $response->ok()) {
                 throw new \RuntimeException('Failed fetching Google OAuth token: '.$response->body());
@@ -189,11 +211,30 @@ class TtsService
     {
         $voiceName = trim((string) $voiceName);
 
-        if ($voiceName !== '' && VoiceCatalog::isAllowedForLanguage($voiceName, $targetLanguage)) {
+        if (
+            $voiceName !== ''
+            && VoiceCatalog::isAllowedForLanguage($voiceName, $targetLanguage)
+            && (
+                ! config('listen.voice.require_wavenet', true)
+                || VoiceCatalog::isWaveNetVoiceName($voiceName)
+            )
+        ) {
             return $voiceName;
         }
 
         return VoiceCatalog::defaultForLanguage($targetLanguage);
+    }
+
+    private function resolveSsmlGender(string $voiceName): string
+    {
+        $meta = VoiceCatalog::voiceMeta($voiceName);
+        $gender = strtolower((string) ($meta['gender'] ?? ''));
+
+        return match ($gender) {
+            'male' => 'MALE',
+            'female' => 'FEMALE',
+            default => 'NEUTRAL',
+        };
     }
 
     private function findCachedAudio(string $hash, string $targetLanguage): ?string
@@ -233,5 +274,33 @@ class TtsService
     private function base64UrlEncode(string $data): string
     {
         return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+    }
+
+    private function sendWithSslFallback(callable $sender, bool $verifySsl, string $context)
+    {
+        try {
+            return $sender($verifySsl);
+        } catch (\Throwable $e) {
+            if (! $this->shouldRetryWithoutSsl($e, $verifySsl)) {
+                throw $e;
+            }
+
+            Log::warning($context.' failed SSL verification on local environment; retrying once without verification.');
+
+            return $sender(false);
+        }
+    }
+
+    private function shouldRetryWithoutSsl(\Throwable $e, bool $verifySsl): bool
+    {
+        if (! $verifySsl || ! app()->environment('local')) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'curl error 60')
+            || str_contains($message, 'ssl certificate problem')
+            || str_contains($message, 'unable to get local issuer certificate');
     }
 }

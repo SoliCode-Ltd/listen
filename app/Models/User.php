@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -24,6 +25,9 @@ class User extends Authenticatable
         'password',
         'google_id',
         'google_avatar',
+        'api_key_hash',
+        'api_key_last4',
+        'api_key_created_at',
     ];
 
     /**
@@ -34,6 +38,7 @@ class User extends Authenticatable
     protected $hidden = [
         'password',
         'remember_token',
+        'api_key_hash',
     ];
 
     public function subscriptions(): HasMany
@@ -56,6 +61,33 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'api_key_created_at' => 'datetime',
         ];
+    }
+
+    public static function hashApiKey(string $plainTextKey): string
+    {
+        return hash('sha256', $plainTextKey);
+    }
+
+    public function issueApiKey(): string
+    {
+        $plain = 'lk_live_'.Str::random(48);
+        $this->forceFill([
+            'api_key_hash' => self::hashApiKey($plain),
+            'api_key_last4' => substr($plain, -4),
+            'api_key_created_at' => now(),
+        ])->save();
+
+        return $plain;
+    }
+
+    public function revokeApiKey(): void
+    {
+        $this->forceFill([
+            'api_key_hash' => null,
+            'api_key_last4' => null,
+            'api_key_created_at' => null,
+        ])->save();
     }
 }

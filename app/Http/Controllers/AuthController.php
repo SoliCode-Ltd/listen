@@ -5,11 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\InvalidStateException;
 
 class AuthController extends Controller
 {
@@ -75,7 +78,7 @@ class AuthController extends Controller
             ]);
         }
 
-        return Socialite::driver('google')
+        return $this->googleProvider()
             ->scopes(['openid', 'profile', 'email'])
             ->redirect();
     }
@@ -83,8 +86,17 @@ class AuthController extends Controller
     public function handleGoogleCallback(Request $request)
     {
         try {
-            $googleUser = Socialite::driver('google')->user();
-        } catch (\Throwable) {
+            $googleUser = $this->googleProvider()->user();
+        } catch (InvalidStateException) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Google login session expired. Please try again.',
+            ]);
+        } catch (\Throwable $exception) {
+            Log::warning('Google OAuth callback failed.', [
+                'message' => $exception->getMessage(),
+                'exception' => get_class($exception),
+            ]);
+
             return redirect()->route('login')->withErrors([
                 'email' => 'Google login failed. Please try again.',
             ]);
@@ -164,5 +176,17 @@ class AuthController extends Controller
             'current_period_start' => now(),
             'current_period_end' => now()->addMonth(),
         ]);
+    }
+
+    private function googleProvider()
+    {
+        $provider = Socialite::driver('google');
+        $verifySsl = (bool) config('services.google.verify_ssl', true);
+
+        if (! $verifySsl) {
+            $provider->setHttpClient(new GuzzleClient(['verify' => false]));
+        }
+
+        return $provider;
     }
 }

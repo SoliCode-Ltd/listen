@@ -3,8 +3,9 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen — Premium Voice SaaS</title>
+  <title>Listen</title>
   <meta name="description" content="Launch your voice SaaS with premium Arabic and English playback, polished UX, and production-ready architecture." />
+  <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -20,7 +21,9 @@
 
     .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
     .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900}
+    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
+    .brand-icon{width:1.2rem;height:1.2rem;display:block}
+    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
 
     .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
@@ -30,6 +33,11 @@
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.7rem .92rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
     .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
+    .theme-btn{padding:.58rem;min-width:2.4rem}
+    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
+    .theme-btn .sun{display:none}
+    html[data-theme="light"] .theme-btn .sun{display:block}
+    html[data-theme="light"] .theme-btn .moon{display:none}
 
     .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
     .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
@@ -50,11 +58,27 @@
     .lead{margin:0;color:var(--muted);max-width:58ch}
     .hero-cta{display:flex;gap:.58rem;flex-wrap:wrap;margin-top:1.2rem}
 
-    .panel{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem;box-shadow:var(--shadow);transition:transform .25s ease,border-color .25s ease}
-    .panel:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--b) 45%,var(--line) 55%)}
-    .stat-grid{margin-top:.75rem;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.58rem}
-    .stat{background:var(--surface);border:1px solid var(--line);border-radius:.74rem;padding:.62rem}
-    .stat b{display:block;font-size:1.06rem}
+    .hero-art{position:relative;display:grid;place-items:center}
+    .hero-art::before{
+      content:"";
+      position:absolute;
+      width:min(420px,82%);
+      aspect-ratio:1/1;
+      border-radius:999px;
+      background:radial-gradient(circle,color-mix(in oklab,var(--a) 30%,transparent),transparent 68%);
+      filter:blur(18px);
+      opacity:.45;
+      animation:pulseGlow 6s ease-in-out infinite;
+      z-index:0;
+    }
+    .hero-art img{
+      width:min(520px,100%);
+      height:auto;
+      filter:drop-shadow(0 16px 28px rgba(0,0,0,.24));
+      animation:float 7s ease-in-out infinite;
+      position:relative;
+      z-index:1;
+    }
 
     .section{padding:3.2rem 0}
     .section h2{margin:0 0 .45rem;font-size:clamp(1.5rem,3.3vw,2.55rem)}
@@ -65,10 +89,18 @@
     .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
     .card h3{margin:.2rem 0 .48rem}
 
-    .pricing-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem;margin-top:1rem}
-    .plan{border:1px solid var(--line);background:var(--surface);border-radius:1rem;padding:1rem}
-    .plan h4{margin:.1rem 0 .35rem;font-size:1.05rem}
-    .price{font-size:1.9rem;font-weight:900;margin:.2rem 0 .4rem}
+    .premium-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem;margin-top:1rem}
+    .premium-card{
+      background:linear-gradient(180deg,var(--surface2),var(--surface));
+      border:1px solid var(--line);
+      border-radius:1rem;
+      padding:1rem;
+      box-shadow:var(--shadow);
+      transition:transform .22s ease,border-color .22s ease;
+    }
+    .premium-card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--a) 40%,var(--line) 60%)}
+    .premium-card h3{margin:.2rem 0 .4rem;font-size:1.05rem}
+    .premium-metric{display:inline-block;margin-top:.5rem;padding:.3rem .56rem;border-radius:999px;border:1px solid var(--line);font-size:.78rem;color:var(--muted)}
 
     .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease, transform .55s ease}
     .reveal.show{opacity:1;transform:translateY(0)}
@@ -76,10 +108,11 @@
     .foot{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
 
     @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
+    @keyframes pulseGlow{0%,100%{transform:scale(.95);opacity:.35}50%{transform:scale(1.05);opacity:.58}}
     @media (max-width:960px){
       .desktop-nav,.desktop-actions{display:none}
       .mobile-controls{display:flex}
-      .hero-grid,.cards,.pricing-strip,.stat-grid{grid-template-columns:1fr}
+      .hero-grid,.cards,.premium-grid{grid-template-columns:1fr}
     }
   </style>
   <script>
@@ -96,16 +129,27 @@
 
   <header class="header reveal">
     <div class="container nav">
-      <div class="brand">🎧 <span>Listen</span></div>
+      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+        </span>
+        <span>Listen</span>
+      </a>
 
       <nav class="desktop-nav">
         <a href="{{ route('home') }}">Home</a>
-        <a href="{{ route('demo.page') }}">Demo</a>
+        @guest
+          <a href="{{ route('demo.page') }}">Demo</a>
+        @endguest
         <a href="{{ route('pricing') }}">Pricing</a>
+        <a href="{{ route('extension.page') }}">Chrome Extension</a>
       </nav>
 
       <div class="desktop-actions">
-        <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
+        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
         @auth
           <div class="user-chip">
             <div class="user-avatar">
@@ -115,10 +159,10 @@
                 {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
               @endif
             </div>
-            <div class="user-meta">
-              <strong>{{ auth()->user()->name }}</strong>
-              <small>{{ auth()->user()->email }}</small>
-            </div>
+          <div class="user-meta">
+            <strong>{{ auth()->user()->name }}</strong>
+            <small>{{ auth()->user()->email }}</small>
+          </div>
           </div>
           <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
         @else
@@ -128,14 +172,20 @@
       </div>
 
       <div class="mobile-controls">
-        <button type="button" class="btn" id="themeToggleMobile" aria-label="Toggle theme">🌓</button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
+        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
       </div>
     </div>
     <div class="container mobile-menu" id="mobileMenu">
       <a href="{{ route('home') }}">Home</a>
-      <a href="{{ route('demo.page') }}">Demo</a>
+      @guest
+        <a href="{{ route('demo.page') }}">Demo</a>
+      @endguest
       <a href="{{ route('pricing') }}">Pricing</a>
+      <a href="{{ route('extension.page') }}">Chrome Extension</a>
       @auth
         <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
         <a href="{{ route('dashboard') }}">Dashboard</a>
@@ -150,78 +200,78 @@
     <section class="hero">
       <div class="hero-grid">
         <div class="reveal">
-          <span class="eyebrow">Voice SaaS designed for growth</span>
+          <!-- <span class="eyebrow">Voice SaaS designed for growth</span> -->
           <h1>Build voice experiences users actually love.</h1>
           <p class="lead">Listen helps you launch and scale a modern voice product with polished UX, premium voice presets, bilingual support, and production-ready architecture.</p>
           <div class="hero-cta">
-            <a class="btn primary" href="{{ route('demo.page') }}">Try Demo</a>
-            <a class="btn" href="{{ route('pricing') }}">See Pricing</a>
+            @guest
+              <a class="btn primary" href="{{ route('demo.page') }}">Try Demo</a>
+              <a class="btn" href="{{ route('register') }}">Create Free Account</a>
+            @else
+              <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
+              <a class="btn" href="{{ route('extension.page') }}">Chrome Extension</a>
+            @endguest
           </div>
         </div>
 
-        <aside class="panel reveal">
-          <h3 style="margin:.1rem 0 .4rem">Why this feels premium</h3>
-          <p class="muted">Great first impression, reliable backend, and clear subscription model.</p>
-          <div class="stat-grid">
-            <div class="stat"><small class="muted">Voice modes</small><b>Male + Female</b></div>
-            <div class="stat"><small class="muted">Languages</small><b>Arabic + English</b></div>
-            <div class="stat"><small class="muted">Engine layer</small><b>Soli Voice Stack</b></div>
-            <div class="stat"><small class="muted">Plan model</small><b>Queue + Plans</b></div>
-          </div>
+        <aside class="hero-art reveal">
+          <img src="{{ asset('icons/listen-galaxy2.png') }}" alt="Listen people collaboration illustration" />
         </aside>
       </div>
     </section>
 
     <section class="section reveal">
-      <h2>Everything needed to launch fast</h2>
-      <p class="muted">Built for founders who want product quality and speed.</p>
+      <h2>Enterprise-Grade Delivery Surface</h2>
+      <p class="muted">Purpose-built for teams that require reliability, auditability, and predictable voice operations at scale.</p>
       <div class="cards">
         <article class="card reveal">
-          <h3>Product-ready UI</h3>
-          <p class="muted">Premium layouts, micro animations, theme toggle, and clean conversion flow.</p>
+          <h3>Operational Reliability</h3>
+          <p class="muted">Deterministic processing flow, resilient job execution, and clear system feedback for production incidents.</p>
         </article>
         <article class="card reveal">
-          <h3>Reliable generation</h3>
-          <p class="muted">Queue-backed processing with usage tracking and subscription boundaries.</p>
+          <h3>Policy Enforcement</h3>
+          <p class="muted">Usage, plan governance, and entitlement controls are enforced in backend logic, not only in UI.</p>
         </article>
         <article class="card reveal">
-          <h3>Founder-friendly controls</h3>
-          <p class="muted">Voice selection, translation behavior, and plan strategy out of the box.</p>
+          <h3>Security By Default</h3>
+          <p class="muted">API-key isolation, role-safe account actions, and clean data boundaries for multi-tenant growth.</p>
         </article>
       </div>
     </section>
 
     <section class="section reveal">
-      <h2>Starter pricing that scales</h2>
-      <p class="muted">Live plan data from your database — always in sync with backend pricing.</p>
-      <div class="pricing-strip">
-        @forelse($highlightPlans as $plan)
-          <article class="plan reveal">
-            <h4>{{ $plan['name'] }}</h4>
-            <div class="price">
-              @if($plan['price_monthly'] <= 0)
-                Free
-              @else
-                ${{ rtrim(rtrim(number_format($plan['price_monthly'], 2, '.', ''), '0'), '.') }}<span style="font-size:.9rem">/mo</span>
-              @endif
-            </div>
-            <p class="muted">{{ number_format($plan['monthly_minutes']) }} minutes · {{ number_format($plan['max_chars_per_request']) }} chars/request</p>
-          </article>
-        @empty
-          <article class="plan reveal">
-            <h4>Pricing unavailable</h4>
-            <p class="muted">No active plans found yet.</p>
-          </article>
-        @endforelse
+      <h2>Why This Feels Premium</h2>
+      <p class="muted">A high-confidence platform experience requires more than visuals. It requires system rigor end-to-end.</p>
+      <div class="premium-grid">
+        <article class="premium-card reveal">
+          <h3>Voice Fidelity Governance</h3>
+          <p class="muted">Arabic and English voice mapping is validated against approved catalogs to prevent label-to-voice drift in production.</p>
+          <span class="premium-metric">Catalog integrity</span>
+        </article>
+        <article class="premium-card reveal">
+          <h3>Fast Path Processing</h3>
+          <p class="muted">Long requests are routed for non-blocking processing and prioritized execution so user-facing flows remain responsive.</p>
+          <span class="premium-metric">Queue-aware routing</span>
+        </article>
+        <article class="premium-card reveal">
+          <h3>Commercial Plan Controls</h3>
+          <p class="muted">Entitlement checks cover request limits, overage policy, commercial usage rights, and processing class per plan.</p>
+          <span class="premium-metric">Policy enforcement</span>
+        </article>
+        <article class="premium-card reveal">
+          <h3>Extension UX Discipline</h3>
+          <p class="muted">Playback controls, selection handling, and status feedback are tuned for stable behavior in real browsing environments.</p>
+          <span class="premium-metric">User trust</span>
+        </article>
       </div>
       <div style="margin-top:.85rem">
-        <a class="btn primary" href="{{ route('pricing') }}">Open Full Pricing Page</a>
+        <a class="btn primary" href="{{ route('pricing') }}">Full Pricing</a>
       </div>
     </section>
   </main>
 
   <footer class="foot">
-    <div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div>
+    <div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div>
   </footer>
 
   <script>
@@ -250,3 +300,5 @@
   </script>
 </body>
 </html>
+
+

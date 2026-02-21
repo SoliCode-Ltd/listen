@@ -7,8 +7,50 @@ class VoiceCatalog
     public static function byLanguage(): array
     {
         $catalog = config('services.google_tts.voice_catalog', []);
+        $requireWaveNet = (bool) config('listen.voice.require_wavenet', true);
 
-        return is_array($catalog) ? $catalog : [];
+        if (! is_array($catalog)) {
+            return [];
+        }
+
+        $cleaned = [];
+        foreach ($catalog as $language => $voices) {
+            if (! is_array($voices)) {
+                continue;
+            }
+
+            $language = (string) $language;
+            $cleaned[$language] = [];
+            $seenKeys = [];
+            $seenNames = [];
+
+            foreach ($voices as $index => $voice) {
+                if (! is_array($voice) || empty($voice['name'])) {
+                    continue;
+                }
+
+                $name = (string) $voice['name'];
+                if (! self::matchesLanguagePrefix($name, $language)) {
+                    continue;
+                }
+
+                if ($requireWaveNet && ! self::isWaveNetVoiceName($name)) {
+                    continue;
+                }
+
+                $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
+                if (isset($seenKeys[$key]) || isset($seenNames[$name])) {
+                    continue;
+                }
+
+                $seenKeys[$key] = true;
+                $seenNames[$name] = true;
+                $voice['key'] = $key;
+                $cleaned[$language][] = $voice;
+            }
+        }
+
+        return $cleaned;
     }
 
     public static function forLanguage(string $language): array
@@ -175,9 +217,15 @@ class VoiceCatalog
 
     public static function defaultForLanguage(string $language): string
     {
+        $fallback = $language === 'ar' ? 'ar-XA-Wavenet-A' : 'en-US-Wavenet-F';
         $default = $language === 'ar'
-            ? (string) config('services.google_tts.voice_ar', 'ar-XA-Wavenet-D')
-            : (string) config('services.google_tts.voice_en', 'en-US-Wavenet-D');
+            ? (string) config('services.google_tts.voice_ar', $fallback)
+            : (string) config('services.google_tts.voice_en', $fallback);
+
+        $requireWaveNet = (bool) config('listen.voice.require_wavenet', true);
+        if ($requireWaveNet && ! self::isWaveNetVoiceName($default)) {
+            $default = $fallback;
+        }
 
         if (self::isAllowedForLanguage($default, $language)) {
             return $default;
@@ -185,6 +233,25 @@ class VoiceCatalog
 
         $names = self::namesForLanguage($language);
 
-        return $names[0] ?? $default;
+        return $names[0] ?? $fallback;
+    }
+
+    public static function isWaveNetVoiceName(?string $voiceName): bool
+    {
+        $voiceName = trim((string) $voiceName);
+
+        return $voiceName !== '' && str_contains(strtolower($voiceName), '-wavenet-');
+    }
+
+    private static function matchesLanguagePrefix(string $voiceName, string $language): bool
+    {
+        $language = strtolower(trim($language));
+        $voiceName = trim($voiceName);
+
+        return match ($language) {
+            'ar' => str_starts_with($voiceName, 'ar-'),
+            'en' => str_starts_with($voiceName, 'en-'),
+            default => true,
+        };
     }
 }

@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Enterprise Collaboration Illustration</title>
+  <desc id="desc">Two team members collaborating around a system screen in brand orange and purple colors.</desc>
+  <defs>
+    <linearGradient id="gOrange" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fb8308"/>
+      <stop offset="100%" stop-color="#e96b00"/>
+    </linearGradient>
+    <linearGradient id="gPurple" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7a2dd1"/>
+      <stop offset="100%" stop-color="#5906b2"/>
+    </linearGradient>
+    <linearGradient id="gScreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#6ccf97"/>
+      <stop offset="100%" stop-color="#4dae7d"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="0" y="0" width="1024" height="1024" fill="none"/>
+  <path d="M152 308c118-86 319-92 452 23" fill="none" stroke="#fb8308" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M820 308c30 8 51 30 60 60" fill="none" stroke="#fb8308" stroke-width="3.5" stroke-linecap="round"/>
+
+  <ellipse cx="518" cy="690" rx="330" ry="54" fill="#eadfcb"/>
+
+  <rect x="410" y="366" width="260" height="196" rx="26" fill="#efecf2" stroke="#4b2a6f" stroke-width="4"/>
+  <rect x="430" y="392" width="220" height="132" rx="18" fill="url(#gScreen)"/>
+  <rect x="500" y="565" width="80" height="32" rx="12" fill="#4b2a6f"/>
+  <rect x="454" y="598" width="172" height="22" rx="11" fill="#4b2a6f"/>
+  <circle cx="584" cy="442" r="28" fill="#6f30c0"/>
+  <path d="M572 442l10 11 16-20" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="462" y="414" width="66" height="6" rx="3" fill="#eef6f0"/>
+  <rect x="462" y="430" width="92" height="6" rx="3" fill="#eef6f0"/>
+  <rect x="462" y="446" width="74" height="6" rx="3" fill="#eef6f0"/>
+
+  <rect x="350" y="476" width="82" height="72" rx="20" fill="#fff9f0" stroke="#4b2a6f" stroke-width="4"/>
+  <path d="M371 529l12-15 12 15" fill="none" stroke="#fb8308" stroke-width="5" stroke-linecap="round"/>
+  <path d="M392 514h20" fill="none" stroke="#fb8308" stroke-width="5" stroke-linecap="round"/>
+  <rect x="622" y="476" width="82" height="72" rx="20" fill="#fff9f0" stroke="#4b2a6f" stroke-width="4"/>
+  <path d="M663 535c18-11 19-30 6-33-9-2-12 6-13 8-1-2-4-10-13-8-13 3-12 22 6 33l7 4 7-4z" fill="#fb8308"/>
+
+  <path d="M112 620c58-76 132-116 226-116 73 0 126 23 168 69v95H222c-68 0-110-15-110-48z" fill="url(#gOrange)"/>
+  <path d="M104 638c74-19 131 7 166 76" fill="none" stroke="#df6900" stroke-width="4" stroke-linecap="round"/>
+  <path d="M212 542c0-33 27-60 60-60h24c34 0 62 28 62 62v8h-146z" fill="#fb8308" stroke="#4b2a6f" stroke-width="4"/>
+  <path d="M253 535c2-18 16-33 34-33 14 0 25 8 31 21" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="280" cy="572" rx="27" ry="34" fill="#f3f1f7" stroke="#4b2a6f" stroke-width="4"/>
+  <circle cx="267" cy="570" r="4" fill="#4b2a6f"/>
+  <path d="M286 588c7 4 14 4 21 0" fill="none" stroke="#4b2a6f" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M344 640c18 0 31 13 31 30v76H215l-20-90 39-20 110 4z" fill="#fb8308" stroke="#4b2a6f" stroke-width="4"/>
+  <path d="M302 662l28 11" fill="none" stroke="#e36b00" stroke-width="4" stroke-linecap="round"/>
+
+  <path d="M688 515c17-14 42-22 69-22 95 0 170 71 177 178-47 0-87-17-121-53-22-24-36-38-68-38h-57z" fill="url(#gPurple)"/>
+  <ellipse cx="748" cy="575" rx="62" ry="62" fill="#7a2dd1" stroke="#4b2a6f" stroke-width="4"/>
+  <ellipse cx="723" cy="582" rx="28" ry="34" fill="#f3f1f7" stroke="#4b2a6f" stroke-width="4"/>
+  <circle cx="735" cy="580" r="4" fill="#4b2a6f"/>
+  <path d="M706 603c8 5 17 5 25 0" fill="none" stroke="#4b2a6f" stroke-width="3.5" stroke-linecap="round"/>
+  <path d="M676 742h240v-83c0-73-60-133-133-133h-35c-72 0-132 59-132 132v84z" fill="url(#gPurple)" stroke="#4b2a6f" stroke-width="4"/>
+
+  <path d="M591 295c18-5 33 4 37 20l6 24c4 16-4 32-20 37-16 4-31-4-36-20l-6-25c-5-15 4-31 19-36z" fill="#f3f1f7" stroke="#4b2a6f" stroke-width="4"/>
+  <path d="M910 334c15-4 29 5 33 20l5 21c4 15-4 30-18 34-15 4-29-4-33-19l-6-21c-3-15 5-30 19-35z" fill="#f3f1f7" stroke="#4b2a6f" stroke-width="4"/>
+</svg>

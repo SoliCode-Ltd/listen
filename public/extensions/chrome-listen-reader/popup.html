@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Listen Chrome</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="head">
+      <h1>Listen Chrome</h1>
+      <p>Select text anywhere and listen instantly.</p>
+    </header>
+
+    <p id="status" class="status"></p>
+
+    <section class="panel profile">
+      <div class="row-inline">
+        <div class="avatar" id="userAvatar">L</div>
+        <div>
+          <div class="name" id="userName">Connect your account</div>
+          <div class="small" id="userPlan">Plan: -</div>
+        </div>
+      </div>
+      <div class="usage-grid">
+        <div>
+          <div class="small" id="charsText">Characters: 0 / 0</div>
+          <div class="bar"><span id="charsBar"></span></div>
+        </div>
+        <div>
+          <div class="small" id="requestsText">Requests: 0 / 0</div>
+          <div class="bar"><span id="requestsBar"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel settings">
+      <label>API Key
+        <input id="apiKey" type="password" placeholder="lk_live_..." />
+      </label>
+
+      <div class="grid2">
+        <label>Language
+          <select id="targetLanguage">
+            <option value="ar">Arabic</option>
+            <option value="en">English</option>
+          </select>
+        </label>
+
+        <label>Source
+          <select id="sourceType">
+            <option value="message">Message</option>
+            <option value="email">Email</option>
+            <option value="file">File</option>
+          </select>
+        </label>
+      </div>
+
+      <label>Voice
+        <select id="voiceKey"></select>
+      </label>
+
+      <label class="row">
+        <input id="translate" type="checkbox" />
+        <span>Translate before speaking</span>
+      </label>
+
+      <label class="row">
+        <input id="autoPlay" type="checkbox" />
+        <span>Play voice in side panel</span>
+      </label>
+
+      <button id="saveBtn" class="btn">Save settings</button>
+      <button id="selectionBtn" class="btn primary">Read current selection</button>
+    </section>
+
+    <section class="panel">
+      <label>Quick text (optional)
+        <textarea id="quickText" rows="4" placeholder="Paste any text and click Read quick text"></textarea>
+      </label>
+      <button id="quickBtn" class="btn">Read quick text</button>
+    </section>
+  </main>
+
+  <script src="popup.js"></script>
+</body>
+</html>
+

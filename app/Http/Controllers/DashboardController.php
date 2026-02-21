@@ -8,6 +8,8 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Support\AudioUrl;
+use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use Illuminate\Http\Request;
@@ -33,23 +35,31 @@ class DashboardController extends Controller
             ->get();
 
         $stats = [
-            'queued' => (clone $baseQuery)->where('status', 'queued')->count(),
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
             'done' => (clone $baseQuery)->where('status', 'done')->count(),
             'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
             'total' => (clone $baseQuery)->count(),
         ];
 
         $activePlan = $this->resolveActivePlan($userId);
-        $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
-        $usagePercent = min(100, (int) round(($usage->total_minutes / $planMinutes) * 100));
+        $planChars = PlanUsageGuard::planChars($activePlan);
+        $planRequests = PlanUsageGuard::planRequests($activePlan);
+        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
+        $usageCharsPercent = min(100, (int) round(($usage->total_chars / $planChars) * 100));
+        $usageRequestsPercent = $requestsUnlimited
+            ? 100
+            : min(100, (int) round(($usage->total_requests / max(1, $planRequests)) * 100));
 
         return view('dashboard', [
             'usage' => $usage,
             'jobs' => $jobs,
             'stats' => $stats,
             'activePlan' => $activePlan,
-            'planMinutes' => $planMinutes,
-            'usagePercent' => $usagePercent,
+            'planChars' => $planChars,
+            'planRequests' => $requestsUnlimited ? null : $planRequests,
+            'requestsUnlimited' => $requestsUnlimited,
+            'usageCharsPercent' => $usageCharsPercent,
+            'usageRequestsPercent' => $usageRequestsPercent,
             'voiceCatalog' => VoiceCatalog::publicCatalog(),
             'voiceNameMap' => VoiceCatalog::mapByName(),
             'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar'),
@@ -61,11 +71,11 @@ class DashboardController extends Controller
     {
         $userId = (int) auth()->id();
         $activePlan = $this->resolveActivePlan($userId);
-        $maxChars = max(200, (int) ($activePlan?->max_chars_per_request ?? 600));
+        $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:'.$maxChars],
+            'content' => ['required', 'string', 'max:50000'],
             'source_type' => ['required', 'in:email,message,file'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
@@ -80,6 +90,11 @@ class DashboardController extends Controller
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         $estimate = UsageEstimator::estimate($text);
+        if ($estimate['chars'] > $maxChars) {
+            throw ValidationException::withMessages([
+                'content' => "Request exceeds plan per-request limit ({$maxChars} non-space characters).",
+            ]);
+        }
 
         $period = now()->format('Y-m');
         $counter = UsageCounter::firstOrCreate(
@@ -87,12 +102,7 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $planMinutes = max(1, (int) ($activePlan?->monthly_minutes ?? 10));
-        if (($counter->total_minutes + $estimate['minutes']) > $planMinutes) {
-            throw ValidationException::withMessages([
-                'content' => 'Monthly plan minutes exceeded. Please upgrade your plan to continue.',
-            ]);
-        }
+        PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
 
         $item = TextItem::create([
             'user_id' => $userId,
@@ -100,7 +110,7 @@ class DashboardController extends Controller
             'title' => $validated['title'] ?? null,
             'content' => $text,
             'language' => $sourceLanguage,
-            'status' => 'queued',
+            'status' => 'processing',
             'received_at' => now(),
         ]);
 
@@ -113,7 +123,7 @@ class DashboardController extends Controller
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimate['seconds'],
-            'status' => 'queued',
+            'status' => 'processing',
         ]);
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
@@ -121,9 +131,68 @@ class DashboardController extends Controller
         $counter->increment('total_chars', $estimate['chars']);
         $counter->increment('total_minutes', $estimate['minutes']);
 
-        GenerateAudioJob::dispatch($job->id);
+        $dispatchFailed = false;
+        try {
+            // Dashboard flow is intentionally synchronous for immediate UX.
+            GenerateAudioJob::dispatchSync($job->id);
+        } catch (\Throwable) {
+            $dispatchFailed = true;
+        }
 
-        return redirect()->route('dashboard')->with('ok', 'Queued successfully.');
+        if ($dispatchFailed) {
+            $this->releaseReservedUsage($counter, $estimate);
+        }
+
+        $job->refresh();
+        $counter->refresh();
+
+        $baseQuery = AudioGeneration::query()->where('user_id', $userId);
+        $stats = [
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
+            'done' => (clone $baseQuery)->where('status', 'done')->count(),
+            'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
+            'total' => (clone $baseQuery)->count(),
+        ];
+
+        $planChars = PlanUsageGuard::planChars($activePlan);
+        $planRequests = PlanUsageGuard::planRequests($activePlan);
+        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
+        $usageCharsPercent = min(100, (int) round(($counter->total_chars / $planChars) * 100));
+        $usageRequestsPercent = $requestsUnlimited
+            ? 100
+            : min(100, (int) round(($counter->total_requests / max(1, $planRequests)) * 100));
+        $voiceNameMap = VoiceCatalog::mapByName();
+
+        if ($request->expectsJson()) {
+            $isDone = $job->status === 'done';
+            $statusCode = $isDone ? 200 : 422;
+
+            return response()->json([
+                'ok' => $isDone,
+                'message' => $isDone
+                    ? 'Voice generated successfully.'
+                    : ($job->error_message ?: 'Voice generation failed. Please try again.'),
+                'job' => $this->buildJobPayload($job, $voiceNameMap),
+                'usage' => [
+                    'total_chars' => (int) $counter->total_chars,
+                    'total_minutes' => (int) $counter->total_minutes,
+                    'total_requests' => (int) $counter->total_requests,
+                    'plan_chars' => $planChars,
+                    'plan_requests' => $requestsUnlimited ? null : $planRequests,
+                    'requests_unlimited' => $requestsUnlimited,
+                    'chars_percent' => $usageCharsPercent,
+                    'requests_percent' => $usageRequestsPercent,
+                ],
+                'stats' => $stats,
+            ], $statusCode);
+        }
+
+        $isDone = $job->status === 'done';
+
+        return redirect()->route('dashboard')->with(
+            $isDone ? 'ok' : 'error',
+            $isDone ? 'Voice generated successfully.' : 'Voice generation failed. Check recent jobs for details.'
+        );
     }
 
     private function resolveActivePlan(int $userId): ?Plan
@@ -163,5 +232,35 @@ class DashboardController extends Controller
         }
 
         return $voiceName;
+    }
+
+    /**
+     * @param array{chars:int,minutes:int} $estimate
+     */
+    private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
+    {
+        $counter->refresh();
+
+        $counter->update([
+            'total_requests' => max(0, (int) $counter->total_requests - 1),
+            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
+            'total_minutes' => max(0, (int) $counter->total_minutes - (int) $estimate['minutes']),
+        ]);
+    }
+
+    private function buildJobPayload(AudioGeneration $job, array $voiceNameMap): array
+    {
+        return [
+            'id' => (int) $job->id,
+            'status' => (string) $job->status,
+            'source_language' => $job->source_language ?: '-',
+            'target_language' => (string) $job->target_language,
+            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice',
+            'translate' => (bool) $job->translate,
+            'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
+            'audio_url' => AudioUrl::fromPath($job->audio_path),
+            'error_message' => $job->error_message,
+            'created_human' => $job->created_at?->diffForHumans(),
+        ];
     }
 }

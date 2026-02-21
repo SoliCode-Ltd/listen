@@ -1,9 +1,10 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Login</title>
+  <title>Listen | Login</title>
+  <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -16,7 +17,9 @@
 
     .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
     .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900}
+    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
+    .brand-icon{width:1.2rem;height:1.2rem;display:block}
+    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
     .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
 
     .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
@@ -25,6 +28,11 @@
 
     .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.68rem .9rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer}
     .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
+    .theme-btn{padding:.58rem;min-width:2.4rem}
+    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
+    .theme-btn .sun{display:none}
+    html[data-theme="light"] .theme-btn .sun{display:block}
+    html[data-theme="light"] .theme-btn .moon{display:none}
 
     .mobile-controls{display:none;align-items:center;gap:.45rem}
     .mobile-menu{display:none;padding:0 0 1rem}
@@ -61,25 +69,38 @@
 <body>
   <header class="header">
     <div class="container nav">
-      <div class="brand">🎧 <span>Listen</span></div>
+      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
+        <span class="brand-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+        </span>
+        <span>Listen</span>
+      </a>
       <nav class="desktop-nav">
         <a href="{{ route('home') }}">Home</a>
         <a href="{{ route('demo.page') }}">Demo</a>
         <a href="{{ route('pricing') }}">Pricing</a>
+        <a href="{{ route('extension.page') }}">Chrome Extension</a>
       </nav>
       <div class="desktop-actions">
-        <button type="button" class="btn" id="themeToggleDesktop" aria-label="Toggle theme">🌓</button>
+        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
         <a class="btn" href="{{ route('register') }}">Create account</a>
       </div>
       <div class="mobile-controls">
-        <button type="button" class="btn" id="themeToggleMobile" aria-label="Toggle theme">🌓</button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">☰</button>
+        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
+        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
       </div>
     </div>
     <div class="container mobile-menu" id="mobileMenu">
       <a href="{{ route('home') }}">Home</a>
       <a href="{{ route('demo.page') }}">Demo</a>
       <a href="{{ route('pricing') }}">Pricing</a>
+      <a href="{{ route('extension.page') }}">Chrome Extension</a>
       <a href="{{ route('register') }}">Create account</a>
     </div>
   </header>
@@ -113,7 +134,7 @@
     </form>
   </main>
 
-  <footer class="foot"><div class="container">© {{ date('Y') }} Listen · Built by SoliCode.</div></footer>
+  <footer class="foot"><div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div></footer>
 
   <script>
     const setTheme = () => {
@@ -131,3 +152,5 @@
   </script>
 </body>
 </html>
+
+
