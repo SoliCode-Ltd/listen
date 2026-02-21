@@ -34,8 +34,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->name('dashboard.queue');
 
-    Route::get('/extension', [ExtensionController::class, 'show'])->name('extension.page');
-    Route::post('/extension/api-key/regenerate', [ExtensionController::class, 'regenerateApiKey'])->name('extension.key.regenerate');
-    Route::post('/extension/api-key/revoke', [ExtensionController::class, 'revokeApiKey'])->name('extension.key.revoke');
-    Route::get('/extension/download', [ExtensionController::class, 'download'])->name('extension.download');
+    Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
+    Route::post('/browsers-extension/api-key/regenerate', [ExtensionController::class, 'regenerateApiKey'])->name('browsers-extension.key.regenerate');
+    Route::post('/browsers-extension/api-key/revoke', [ExtensionController::class, 'revokeApiKey'])->name('browsers-extension.key.revoke');
+    Route::get('/browsers-extension/download', [ExtensionController::class, 'download'])->name('browsers-extension.download');
 });

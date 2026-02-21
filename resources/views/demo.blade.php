@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
@@ -8,109 +8,305 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  @include('components.styles')
   <style>
-    :root{--bg:#070910;--surface:#11182a;--surface2:#15213a;--line:#2b3a5d;--text:#f4f7ff;--muted:#9fb0d4;--a:#fb8308;--b:#5906b2;--shadow:0 16px 46px rgba(0,0,0,.30)}
-    html[data-theme="light"]{--bg:#eff3ff;--surface:#fff;--surface2:#f7f9ff;--line:#d8e2f1;--text:#121a2d;--muted:#5b6c89;--shadow:0 14px 34px rgba(35,56,97,.13)}
-    *{box-sizing:border-box}html,body{margin:0;padding:0;scroll-behavior:smooth}
-    body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 500px at 92% -20%,color-mix(in oklab,var(--b) 25%,transparent),transparent 60%),radial-gradient(900px 420px at -5% 0%,color-mix(in oklab,var(--a) 18%,transparent),transparent 58%),var(--bg);color:var(--text)}
-    .container{width:min(1240px,calc(100% - 1.35rem));margin:auto}
+    .bg-orb {
+      position: fixed;
+      z-index: -1;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(36px);
+      opacity: .25;
+      animation: float 10s ease-in-out infinite;
+    }
+    .bg-orb.a {
+      width: 16rem;
+      height: 16rem;
+      background: color-mix(in oklab, var(--a) 74%, white 26%);
+      left: -4rem;
+      top: 15vh;
+    }
+    .bg-orb.b {
+      width: 20rem;
+      height: 20rem;
+      background: color-mix(in oklab, var(--b) 75%, white 25%);
+      right: -4rem;
+      bottom: 8vh;
+      animation-delay: -3s;
+    }
 
-    .bg-orb{position:fixed;z-index:-1;pointer-events:none;border-radius:999px;filter:blur(36px);opacity:.25;animation:float 10s ease-in-out infinite}
-    .bg-orb.a{width:16rem;height:16rem;background:color-mix(in oklab,var(--a) 74%,white 26%);left:-4rem;top:15vh}
-    .bg-orb.b{width:20rem;height:20rem;background:color-mix(in oklab,var(--b) 75%,white 25%);right:-4rem;bottom:8vh;animation-delay:-3s}
+    .main-content {
+      padding: 2.5rem 0 3rem;
+    }
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr .9fr;
+      gap: 1.25rem;
+      align-items: center;
+    }
+    .page-card {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      transition: transform .22s ease, border-color .22s ease;
+    }
+    .page-card:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in oklab, var(--a) 45%, var(--line));
+    }
+    .eyebrow {
+      display: inline-block;
+      padding: .35rem .7rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      font-size: .75rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .page-card h1 {
+      margin: .7rem 0 .7rem;
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      line-height: 1.08;
+      letter-spacing: -.02em;
+    }
+    .hero-list {
+      display: grid;
+      gap: .5rem;
+      margin-top: .85rem;
+      color: var(--muted);
+      font-size: .95rem;
+    }
+    .sound-wave {
+      margin-top: 1rem;
+      display: flex;
+      align-items: flex-end;
+      gap: 4px;
+      height: 36px;
+    }
+    .sound-wave span {
+      display: block;
+      width: 4px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(180deg, var(--a), var(--b));
+      animation: wavePulse 1s ease-in-out infinite;
+      opacity: .9;
+    }
+    .sound-wave span:nth-child(2) { animation-delay: .08s; }
+    .sound-wave span:nth-child(3) { animation-delay: .16s; }
+    .sound-wave span:nth-child(4) { animation-delay: .24s; }
+    .sound-wave span:nth-child(5) { animation-delay: .32s; }
+    .sound-wave span:nth-child(6) { animation-delay: .40s; }
+    .sound-wave span:nth-child(7) { animation-delay: .48s; }
+    .sound-wave span:nth-child(8) { animation-delay: .56s; }
+    .sound-wave span:nth-child(9) { animation-delay: .64s; }
+    .sound-wave span:nth-child(10) { animation-delay: .72s; }
+    .sound-wave span:nth-child(11) { animation-delay: .80s; }
+    .sound-wave span:nth-child(12) { animation-delay: .88s; }
+    .sound-wave.dynamic span { animation-duration: .75s; }
+    @keyframes wavePulse {
+      0%, 100% { height: 6px; }
+      50% { height: 34px; }
+    }
 
-    .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-    .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
-    .brand-icon{width:1.2rem;height:1.2rem;display:block}
-    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
-    .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .7rem;
+      margin-top: .85rem;
+    }
+    .stat {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: .75rem;
+    }
+    .stat small {
+      color: var(--muted);
+      font-size: .8rem;
+    }
+    .stat b {
+      display: block;
+      font-size: 1.1rem;
+      margin-top: .2rem;
+    }
 
-    .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
-    .desktop-nav a,.mobile-menu a{text-decoration:none;color:var(--muted);font-weight:600;padding:.5rem .62rem;border-radius:.6rem}
-    .desktop-nav a:hover,.mobile-menu a:hover{color:var(--text);background:color-mix(in oklab,var(--surface) 85%,transparent)}
+    .lab {
+      padding: 1rem 0 2.5rem;
+    }
+    .lab-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.25rem;
+    }
+    .form-grid {
+      display: grid;
+      gap: 1rem;
+    }
+    .form-grid > div {
+      padding-inline: .1rem;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .8rem;
+    }
+    label {
+      display: block;
+      margin: 0 0 .45rem;
+      font-size: .92rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--text) 88%, var(--muted));
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: .9rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-size: .95rem;
+    }
+    textarea {
+      min-height: 170px;
+      resize: vertical;
+    }
 
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.7rem .92rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer;transition:transform .2s ease, box-shadow .2s ease}
-    .btn:hover{transform:translateY(-2px);box-shadow:0 10px 26px color-mix(in oklab,var(--b) 22%,transparent)}
-    .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
-    .theme-btn{padding:.58rem;min-width:2.4rem}
-    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
-    .theme-btn .sun{display:none}
-    html[data-theme="light"] .theme-btn .sun{display:block}
-    html[data-theme="light"] .theme-btn .moon{display:none}
+    .chips {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .chip {
+      padding: .45rem .7rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: .8rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all .2s ease;
+    }
+    .chip:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in oklab, var(--b) 45%, var(--line));
+    }
 
-    .user-chip{display:flex;align-items:center;gap:.5rem;padding:.34rem .5rem;border:1px solid var(--line);border-radius:999px;background:var(--surface)}
-    .user-avatar{width:1.9rem;height:1.9rem;border-radius:999px;display:grid;place-items:center;background:linear-gradient(135deg,color-mix(in oklab,var(--a) 36%,transparent),color-mix(in oklab,var(--b) 36%,transparent));font-size:.8rem;font-weight:800;color:#fff;overflow:hidden}
-    .user-avatar img{width:100%;height:100%;object-fit:cover}
-    .user-meta{display:grid;line-height:1.1}
-    .user-meta strong{font-size:.74rem}
-    .user-meta small{font-size:.66rem;color:var(--muted)}
+    .hint {
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .error-box {
+      margin-top: .7rem;
+      padding: .7rem;
+      border-radius: var(--radius);
+      border: 1px solid color-mix(in oklab, #ef4c78 48%, var(--line));
+      background: color-mix(in oklab, #ef4c78 13%, var(--surface));
+      color: color-mix(in oklab, #ef4c78 78%, var(--text));
+      font-size: .9rem;
+    }
+    .quota {
+      margin: .6rem .1rem .9rem;
+      padding: .85rem .95rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: color-mix(in oklab, var(--surface) 84%, transparent);
+    }
+    .quota-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .7rem;
+      margin-bottom: .5rem;
+    }
+    .quota-label {
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .quota-value {
+      font-size: .9rem;
+      font-weight: 700;
+    }
+    .quota-track {
+      height: 10px;
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+      background: color-mix(in oklab, var(--surface2) 85%, transparent);
+      overflow: hidden;
+    }
+    .quota-fill {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--a), var(--b));
+      transition: width .25s ease;
+    }
+    .quota-note {
+      margin-top: .5rem;
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    .quota-upgrade {
+      display: none;
+      margin-top: .7rem;
+      padding: .85rem .95rem;
+      border-radius: var(--radius);
+      border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line));
+      background: color-mix(in oklab, var(--a) 11%, var(--surface));
+    }
+    .quota-upgrade p {
+      margin: 0 0 .6rem;
+      color: var(--muted);
+      font-size: .88rem;
+    }
 
-    .mobile-controls{display:none;align-items:center;gap:.45rem}
-    .mobile-menu{display:none;padding:0 0 1rem}
-    .mobile-menu.open{display:grid;gap:.35rem}
-    .mobile-user{padding:.42rem .62rem;border-radius:.62rem;background:var(--surface);border:1px solid var(--line);font-size:.8rem;color:var(--muted)}
+    .audio-box {
+      margin-top: .8rem;
+      padding: .8rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .audio-box audio {
+      width: 100%;
+      height: 34px;
+    }
 
-    .hero{padding:2.4rem 0 1rem}
-    .hero-grid{display:grid;grid-template-columns:1.1fr .9fr;gap:1rem}
-    .card{background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1.1rem;box-shadow:var(--shadow);transition:transform .22s ease,border-color .22s ease}
-    .card:hover{transform:translateY(-3px);border-color:color-mix(in oklab,var(--a) 45%,var(--line) 55%)}
-    .eyebrow{display:inline-block;padding:.3rem .62rem;border-radius:999px;border:1px solid var(--line);font-size:.74rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
-    h1{margin:.65rem 0 .65rem;font-size:clamp(2rem,5vw,3.6rem);line-height:1.04;letter-spacing:-.03em}
-    .hero-list{display:grid;gap:.45rem;margin-top:.75rem;color:var(--muted)}
-    .sound-wave{margin-top:.9rem;display:flex;align-items:flex-end;gap:4px;height:36px}
-    .sound-wave span{display:block;width:4px;border-radius:999px;background:linear-gradient(180deg,var(--a),var(--b));animation:wavePulse 1s ease-in-out infinite;opacity:.9}
-    .sound-wave span:nth-child(2){animation-delay:.08s}.sound-wave span:nth-child(3){animation-delay:.16s}.sound-wave span:nth-child(4){animation-delay:.24s}.sound-wave span:nth-child(5){animation-delay:.32s}.sound-wave span:nth-child(6){animation-delay:.40s}.sound-wave span:nth-child(7){animation-delay:.48s}.sound-wave span:nth-child(8){animation-delay:.56s}.sound-wave span:nth-child(9){animation-delay:.64s}.sound-wave span:nth-child(10){animation-delay:.72s}.sound-wave span:nth-child(11){animation-delay:.80s}.sound-wave span:nth-child(12){animation-delay:.88s}
-    .sound-wave.dynamic span{animation-duration:.75s}
-    @keyframes wavePulse{0%,100%{height:6px}50%{height:34px}}
+    .reveal {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .reveal.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
-    .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;margin-top:.7rem}
-    .stat{background:var(--surface);border:1px solid var(--line);border-radius:.75rem;padding:.62rem}
-    .stat b{display:block;font-size:1.03rem}
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
 
-    .lab{padding:.85rem 0 2.4rem}
-    .lab-grid{display:grid;grid-template-columns:1fr;gap:1rem}
-    .form-grid{display:grid;gap:.9rem}
-    .form-grid > div{padding-inline:.1rem}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:.72rem}
-    label{display:block;margin:0 0 .42rem;font-size:.9rem;font-weight:600;color:color-mix(in oklab,var(--text) 88%,var(--muted) 12%)}
-    input,select,textarea{width:100%;padding:.84rem .9rem;border-radius:.8rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
-    textarea{min-height:170px;resize:vertical}
-
-    .chips{display:flex;gap:.42rem;flex-wrap:wrap}
-    .chip{padding:.4rem .62rem;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-size:.77rem;color:var(--muted);cursor:pointer;transition:all .2s ease}
-    .chip:hover{transform:translateY(-1px);border-color:color-mix(in oklab,var(--b) 45%,var(--line) 55%)}
-
-    .hint{font-size:.83rem;color:var(--muted)}
-    .error{margin-top:.62rem;padding:.65rem;border-radius:.68rem;border:1px solid color-mix(in oklab,#ef4c78 48%,var(--line) 52%);background:color-mix(in oklab,#ef4c78 13%,var(--surface) 87%);color:color-mix(in oklab,#ef4c78 78%,var(--text) 22%)}
-    .quota{margin:.55rem .1rem .8rem;padding:.76rem .82rem;border-radius:.75rem;border:1px solid var(--line);background:color-mix(in oklab,var(--surface) 84%,transparent)}
-    .quota-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.44rem}
-    .quota-label{font-size:.82rem;color:var(--muted)}
-    .quota-value{font-size:.86rem;font-weight:700;color:var(--text)}
-    .quota-track{height:10px;border-radius:999px;border:1px solid color-mix(in oklab,var(--line) 75%,transparent);background:color-mix(in oklab,var(--surface2) 85%,transparent);overflow:hidden}
-    .quota-fill{height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .25s ease}
-    .quota-note{margin-top:.42rem;font-size:.8rem;color:var(--muted)}
-    .quota-upgrade{display:none;margin-top:.62rem;padding:.75rem .82rem;border-radius:.74rem;border:1px solid color-mix(in oklab,var(--a) 45%,var(--line) 55%);background:color-mix(in oklab,var(--a) 11%,var(--surface) 89%)}
-    .quota-upgrade p{margin:0 0 .55rem;color:var(--muted);font-size:.86rem}
-
-    .audio{margin-top:.7rem;padding:.72rem;border:1px solid var(--line);border-radius:.75rem;background:var(--surface)}
-    .audio audio{width:100%;height:34px}
-
-
-    .reveal{opacity:0;transform:translateY(12px);transition:opacity .55s ease, transform .55s ease}
-    .reveal.show{opacity:1;transform:translateY(0)}
-
-    .foot{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
-
-    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-14px)}}
-    @media (max-width:960px){
-      .desktop-nav,.desktop-actions{display:none}
-      .mobile-controls{display:flex}
-      .hero{padding:1.45rem 0 .65rem}
-      .lab{padding:.55rem 0 1.7rem}
-      .hero-grid,.lab-grid,.two,.stats{grid-template-columns:1fr}
-      .card{padding:.95rem}
-      .sound-wave{margin-top:.7rem}
+    @media (max-width: 960px) {
+      .hero-grid,
+      .lab-grid,
+      .two-col,
+      .stats {
+        grid-template-columns: 1fr;
+      }
+      .main-content {
+        padding: 1.5rem 0 1rem;
+      }
+      .lab {
+        padding: .6rem 0 1.8rem;
+      }
+      .page-card {
+        padding: 1.1rem;
+      }
+      .sound-wave {
+        margin-top: .8rem;
+      }
     }
   </style>
   <script>
@@ -125,78 +321,15 @@
   <div class="bg-orb a"></div>
   <div class="bg-orb b"></div>
 
-  <header class="header reveal">
-    <div class="container nav">
-      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
-        <span class="brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
-        </span>
-        <span>Listen</span>
-      </a>
+  @include('components.header')
 
-      <nav class="desktop-nav">
-        <a href="{{ route('home') }}">Home</a>
-        <a href="{{ route('demo.page') }}">Demo</a>
-        <a href="{{ route('pricing') }}">Pricing</a>
-        <a href="{{ route('extension.page') }}">Chrome Extension</a>
-      </nav>
-
-      <div class="desktop-actions">
-        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
-          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
-        </button>
-        @auth
-          <div class="user-chip">
-            <div class="user-avatar">
-              @if(auth()->user()->google_avatar)
-                <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
-              @else
-                {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
-              @endif
-            </div>
-            <div class="user-meta">
-              <strong>{{ auth()->user()->name }}</strong>
-              <small>{{ auth()->user()->email }}</small>
-            </div>
-          </div>
-          <a class="btn primary" href="{{ route('dashboard') }}">Dashboard</a>
-        @else
-          <a class="btn" href="{{ route('login') }}">Login</a>
-          <a class="btn primary" href="{{ route('register') }}">Start Free</a>
-        @endauth
-      </div>
-
-      <div class="mobile-controls">
-        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
-          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
-        </button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
-      </div>
-    </div>
-    <div class="container mobile-menu" id="mobileMenu">
-      <a href="{{ route('home') }}">Home</a>
-      <a href="{{ route('demo.page') }}">Demo</a>
-      <a href="{{ route('pricing') }}">Pricing</a>
-      <a href="{{ route('extension.page') }}">Chrome Extension</a>
-      @auth
-        <div class="mobile-user">Logged in as {{ auth()->user()->name }}</div>
-        <a href="{{ route('dashboard') }}">Dashboard</a>
-      @else
-        <a href="{{ route('login') }}">Login</a>
-        <a href="{{ route('register') }}">Start Free</a>
-      @endauth
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="hero">
+  <main class="container main-content">
+    <section>
       <div class="hero-grid">
-        <article class="card reveal">
-          <!-- <span class="eyebrow">Live voice test studio</span> -->
-          <h1>Choose voice, language, and translation behavior - then preview instantly.</h1>
-          <p class="muted">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
+        <article class="page-card reveal">
+          <span class="eyebrow">Live voice test studio</span>
+          <h1>Choose voice, language, and translation - then preview instantly.</h1>
+          <p style="color: var(--muted); margin: 0;">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
           <div class="hero-list">
             <div>- Branded voice personas only</div>
             <div>- Clear translation behavior</div>
@@ -208,13 +341,13 @@
           </div>
         </article>
 
-        <aside class="card reveal">
-          <h3 style="margin:.1rem 0 .4rem">Voice coverage</h3>
+        <aside class="page-card reveal">
+          <h3 style="margin: .1rem 0 .5rem; font-size: 1.1rem;">Voice coverage</h3>
           <div class="stats">
-            <div class="stat"><small class="muted">Arabic voices</small><b>{{ count($voiceCatalog['ar'] ?? []) }}</b></div>
-            <div class="stat"><small class="muted">English voices</small><b>{{ count($voiceCatalog['en'] ?? []) }}</b></div>
-            <div class="stat"><small class="muted">Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Dai' }}</b></div>
-            <div class="stat"><small class="muted">English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Ember' }}</b></div>
+            <div class="stat"><small>Arabic voices</small><b>{{ count($voiceCatalog['ar'] ?? []) }}</b></div>
+            <div class="stat"><small>English voices</small><b>{{ count($voiceCatalog['en'] ?? []) }}</b></div>
+            <div class="stat"><small>Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Dai' }}</b></div>
+            <div class="stat"><small>English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Ember' }}</b></div>
           </div>
         </aside>
       </div>
@@ -222,9 +355,9 @@
 
     <section class="lab">
       <div class="lab-grid">
-        <section class="card reveal">
-          <h3 style="margin:.1rem 0 .65rem">Try your best demo flow</h3>
-          <p class="hint" style="margin:-.2rem 0 .45rem">Guest demo includes one-time starter credit. Create a free account for full starter capacity.</p>
+        <section class="page-card reveal">
+          <h3 style="margin: .1rem 0 .7rem; font-size: 1.1rem;">Try your best demo flow</h3>
+          <p class="hint" style="margin: -.2rem 0 .5rem;">Guest demo includes one-time starter credit. Create a free account for full starter capacity.</p>
           <div class="quota" id="quotaBox">
             <div class="quota-head">
               <span class="quota-label">Guest starter allowance</span>
@@ -249,7 +382,7 @@
               <button class="chip" type="button" data-sample="Hello, this is a bilingual test. مرحبا، هذا اختبار ثنائي اللغة.">Bilingual sample</button>
             </div>
 
-            <div class="two">
+            <div class="two-col">
               <div>
                 <label for="target_language">Target language</label>
                 <select id="target_language" name="target_language">
@@ -281,31 +414,28 @@
               <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected target language.</div>
             </div>
 
-            <div style="display:flex;gap:.55rem;flex-wrap:wrap">
-              <button class="btn primary" type="button" id="previewBtn">Generate Voice</button>
+            <div style="display: flex; gap: .6rem; flex-wrap: wrap;">
+              <button class="btn btn-primary" type="button" id="previewBtn">Generate Voice</button>
             </div>
           </form>
 
-          <div id="errorBox" class="error" style="display:none"></div>
+          <div id="errorBox" class="error-box" style="display: none;"></div>
           <div class="quota-upgrade" id="upgradeBox">
             <p id="upgradeText">Guest demo quota reached. Create a free account to unlock {{ number_format((int) $starterPlanChars) }} characters and continue instantly.</p>
-            <a class="btn primary" href="{{ route('register') }}">Create Free Account</a>
+            <a class="btn btn-primary" href="{{ route('register') }}">Create Free Account</a>
           </div>
 
-          <div class="audio" id="audioWrap" style="display:none">
+          <div class="audio-box" id="audioWrap" style="display: none;">
             <audio id="previewAudio" controls preload="none"></audio>
-            <div class="hint" id="audioMeta" style="margin-top:.5rem"></div>
+            <div class="hint" id="audioMeta" style="margin-top: .55rem;"></div>
           </div>
         </section>
-
       </div>
     </section>
   </main>
 
-  <footer class="foot">
-    <div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div>
-  </footer>
-
+  @include('components.footer')
+  @include('components.scripts')
   <script>
     const voiceCatalog = @json($voiceCatalog);
     const form = document.getElementById('demoForm');
@@ -380,10 +510,7 @@
 
     function renderQuota(quota) {
       if (!quota || typeof quota !== 'object') return;
-      currentQuota = {
-        ...currentQuota,
-        ...quota,
-      };
+      currentQuota = { ...currentQuota, ...quota };
       if (quotaValue) {
         quotaValue.textContent = `${formatNumber(currentQuota.remaining_chars)} / ${formatNumber(currentQuota.limit_chars)} chars left`;
       }
@@ -395,9 +522,7 @@
       }
       if (quotaBox) {
         const pending = countNonSpaceChars(textInput?.value || '');
-        if (pending > 0) {
-          quotaBox.title = `${formatNumber(pending)} chars selected`;
-        }
+        if (pending > 0) quotaBox.title = `${formatNumber(pending)} chars selected`;
       }
       setUpgradeVisible(Boolean(currentQuota.is_exhausted), `Guest demo quota reached (${formatNumber(currentQuota.limit_chars)} chars total). Create a free account to unlock ${formatNumber(starterPlanChars)} characters to start.`);
     }
@@ -416,15 +541,9 @@
         String(screen.colorDepth || ''),
         String(window.devicePixelRatio || ''),
       ].join('|');
-
-      if (!window.crypto?.subtle || !window.TextEncoder) {
-        return raw;
-      }
-
+      if (!window.crypto?.subtle || !window.TextEncoder) return raw;
       const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
-      return Array.from(new Uint8Array(digest))
-        .map((value) => value.toString(16).padStart(2, '0'))
-        .join('');
+      return Array.from(new Uint8Array(digest)).map((v) => v.toString(16).padStart(2, '0')).join('');
     }
 
     function updateTranslateHint() {
@@ -450,25 +569,19 @@
     function renderVoiceOptions() {
       const voices = getFilteredVoices();
       const current = voiceSelect.value;
-
       voiceSelect.innerHTML = '';
       if (!voices.length) {
         voiceSelect.innerHTML = '<option value="">No voices available</option>';
         return;
       }
-
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
         option.textContent = `${voice.label} - ${formatGender(voice.gender)}`;
         voiceSelect.appendChild(option);
       }
-
-      if (voices.some((v) => v.key === current)) {
-        voiceSelect.value = current;
-      } else {
-        voiceSelect.value = voices[0].key;
-      }
+      if (voices.some((v) => v.key === current)) voiceSelect.value = current;
+      else voiceSelect.value = voices[0].key;
     }
 
     async function callEndpoint(endpoint) {
@@ -476,19 +589,13 @@
       setUpgradeVisible(false);
       const fd = new FormData(form);
       const headers = { ...csrfHeaders };
-      if (clientFingerprint) {
-        headers['X-Listen-Fingerprint'] = clientFingerprint;
-      }
+      if (clientFingerprint) headers['X-Listen-Fingerprint'] = clientFingerprint;
       const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
       const data = await res.json().catch(() => ({}));
-
       if (!res.ok || data?.ok === false) {
-        const firstError = data?.errors && typeof data.errors === 'object'
-          ? Object.values(data.errors)[0]
-          : null;
+        const firstError = data?.errors && typeof data.errors === 'object' ? Object.values(data.errors)[0] : null;
         const firstErrorText = Array.isArray(firstError) ? String(firstError[0] || '') : '';
-        const message = String(data?.message || firstErrorText || 'Request failed');
-        throw new Error(message);
+        throw new Error(String(data?.message || firstErrorText || 'Request failed'));
       }
       return data;
     }
@@ -499,13 +606,11 @@
         const rawText = String(textInput?.value || '');
         const trimmed = rawText.trim();
         const selectedChars = countNonSpaceChars(trimmed);
-
         if (!trimmed) {
           hideAudioPreview();
           setError('The text field is required.');
           return;
         }
-
         if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
           hideAudioPreview();
           const message = `You selected ${formatNumber(selectedChars)} characters, but only ${formatNumber(currentQuota.remaining_chars)} are left in guest demo credit.`;
@@ -513,24 +618,19 @@
           setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
           return;
         }
-
         previewBtn.disabled = true;
         previewBtn.textContent = 'Generating...';
         hideAudioPreview();
-
         const data = await callEndpoint('{{ route('demo.preview') }}');
         renderQuota(data?.quota || null);
-
         if (!data?.audio_url) {
           hideAudioPreview();
           setError('Voice generation did not return audio. Please try again.');
           return;
         }
-
         audioWrap.style.display = 'block';
         previewAudio.src = data.audio_url;
         previewAudio.load();
-
         const label = data?.voice?.label || 'Selected voice';
         const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
         audioMeta.textContent = `Voice: ${label}${gender} - ${data.translate_note}`;
@@ -567,35 +667,7 @@
     updateTranslateHint();
     renderQuota(currentQuota);
 
-    buildFingerprint()
-      .then((fingerprint) => {
-        clientFingerprint = String(fingerprint || '').slice(0, 256);
-      })
-      .catch(() => {
-        clientFingerprint = '';
-      });
-
-    const observer = new IntersectionObserver((entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) entry.target.classList.add('show');
-      }
-    }, { threshold: 0.12 });
-    document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
-
-    const setTheme = () => {
-      const current = document.documentElement.getAttribute('data-theme') || 'dark';
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('listen_theme', next);
-    };
-    document.getElementById('themeToggleDesktop')?.addEventListener('click', setTheme);
-    document.getElementById('themeToggleMobile')?.addEventListener('click', setTheme);
-
-    const menuBtn = document.getElementById('mobileMenuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    menuBtn?.addEventListener('click', () => mobileMenu?.classList.toggle('open'));
+    buildFingerprint().then((fp) => { clientFingerprint = String(fp || '').slice(0, 256); }).catch(() => {});
   </script>
 </body>
 </html>
-
-

@@ -1,63 +1,157 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen | Register</title>
+  <title>Listen | Create Account</title>
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  @include('components.styles')
   <style>
-    :root{--bg:#070910;--surface:#11182a;--surface2:#15213a;--line:#2b3a5d;--text:#f4f7ff;--muted:#9fb0d4;--a:#fb8308;--b:#5906b2;--danger:#ee4a77}
-    html[data-theme="light"]{--bg:#eff3ff;--surface:#fff;--surface2:#f7f9ff;--line:#d8e2f1;--text:#121a2d;--muted:#5b6c89}
-    *{box-sizing:border-box}html,body{margin:0;padding:0;scroll-behavior:smooth}
-    body{font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 500px at 92% -20%,color-mix(in oklab,var(--b) 25%,transparent),transparent 60%),radial-gradient(900px 420px at -5% 0%,color-mix(in oklab,var(--a) 18%,transparent),transparent 58%),var(--bg);color:var(--text)}
-    .container{width:min(1200px,92%);margin:auto}
+    .auth-page {
+      min-height: calc(100vh - 180px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 0 3rem;
+    }
+    .auth-card {
+      width: min(480px, 100%);
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 2rem;
+      box-shadow: var(--shadow);
+    }
+    .auth-card h1 {
+      margin: 0 0 .35rem;
+      font-size: 1.6rem;
+    }
+    .auth-card .subtitle {
+      color: var(--muted);
+      margin: 0 0 1.25rem;
+      font-size: .95rem;
+    }
+    .google-btn {
+      width: 100%;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: .55rem;
+      padding: .8rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .95rem;
+      transition: all .2s ease;
+    }
+    .google-btn:hover {
+      transform: translateY(-1px);
+      border-color: color-mix(in oklab, var(--b) 35%, var(--line));
+    }
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      color: var(--muted);
+      font-size: .82rem;
+      margin: 1rem 0;
+    }
+    .divider::before,
+    .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--line);
+    }
+    .form-grid {
+      display: grid;
+      gap: .75rem;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .75rem;
+    }
+    label {
+      display: block;
+      font-size: .9rem;
+      color: color-mix(in oklab, var(--text) 86%, var(--muted));
+      margin-bottom: .35rem;
+    }
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: .75rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      color: var(--text);
+      font-size: .95rem;
+    }
+    input:focus {
+      outline: none;
+      border-color: var(--a);
+    }
+    .submit-btn {
+      width: 100%;
+      padding: .85rem;
+      border: 0;
+      border-radius: var(--radius);
+      font-weight: 700;
+      font-size: .95rem;
+      color: #fff;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      cursor: pointer;
+      transition: all .2s ease;
+    }
+    .submit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px color-mix(in oklab, var(--b) 30%, transparent);
+    }
+    .error-box {
+      margin-top: .6rem;
+      padding: .65rem .75rem;
+      background: color-mix(in oklab, var(--danger) 14%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--danger) 45%, var(--line));
+      border-radius: var(--radius);
+      color: color-mix(in oklab, var(--danger) 80%, var(--text));
+      font-size: .9rem;
+    }
+    .auth-footer {
+      margin-top: 1rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: .9rem;
+    }
+    .auth-footer a {
+      color: var(--text);
+      text-decoration: none;
+    }
+    .auth-footer a:hover {
+      text-decoration: underline;
+    }
 
-    .header{position:sticky;top:0;z-index:60;background:color-mix(in oklab,var(--bg) 82%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
-    .nav{min-height:76px;display:flex;align-items:center;justify-content:space-between;gap:.8rem}
-    .brand{display:flex;align-items:center;gap:.55rem;font-weight:900;text-decoration:none;color:var(--text)}
-    .brand-icon{width:1.2rem;height:1.2rem;display:block}
-    .brand-icon svg{width:100%;height:100%;display:block;fill:currentColor}
-    .brand span{background:linear-gradient(90deg,var(--a),var(--b));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .reveal {
+      opacity: 0;
+      transform: translateY(12px);
+      transition: opacity .5s ease, transform .5s ease;
+    }
+    .reveal.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
 
-    .desktop-nav,.desktop-actions{display:flex;align-items:center;gap:.55rem}
-    .desktop-nav a,.mobile-menu a{text-decoration:none;color:var(--muted);font-weight:600;padding:.5rem .62rem;border-radius:.6rem}
-    .desktop-nav a:hover,.mobile-menu a:hover{color:var(--text);background:color-mix(in oklab,var(--surface) 85%,transparent)}
-
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:.35rem;padding:.68rem .9rem;border-radius:.72rem;border:1px solid var(--line);background:var(--surface);color:var(--text);font-weight:700;text-decoration:none;cursor:pointer}
-    .btn.primary{border:0;background:linear-gradient(90deg,var(--a),var(--b));color:#fff}
-    .theme-btn{padding:.58rem;min-width:2.4rem}
-    .theme-btn .icon{width:1rem;height:1rem;stroke:currentColor;fill:none;stroke-width:1.9}
-    .theme-btn .sun{display:none}
-    html[data-theme="light"] .theme-btn .sun{display:block}
-    html[data-theme="light"] .theme-btn .moon{display:none}
-
-    .mobile-controls{display:none;align-items:center;gap:.45rem}
-    .mobile-menu{display:none;padding:0 0 1rem}
-    .mobile-menu.open{display:grid;gap:.35rem}
-
-    .auth-wrap{min-height:calc(100vh - 150px);display:grid;place-items:center;padding:2rem 0}
-    .card{width:min(520px,100%);background:linear-gradient(180deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:1rem;padding:1rem}
-    h1{margin:.2rem 0 .45rem}
-    .muted{color:var(--muted)}
-    label{font-size:.88rem;color:color-mix(in oklab,var(--text) 86%,var(--muted) 14%)}
-    input{width:100%;padding:.7rem;border-radius:.68rem;border:1px solid var(--line);background:var(--surface);color:var(--text)}
-    .grid{display:grid;gap:.62rem}
-    .two{display:grid;grid-template-columns:1fr 1fr;gap:.62rem}
-    .submit{width:100%;padding:.78rem;border:0;border-radius:.74rem;font-weight:800;color:#fff;background:linear-gradient(90deg,var(--a),var(--b));cursor:pointer}
-    .google-btn{width:100%;display:inline-flex;justify-content:center;align-items:center;gap:.5rem;padding:.74rem;border-radius:.74rem;border:1px solid var(--line);background:var(--surface);color:var(--text);text-decoration:none;font-weight:700}
-    .divider{display:flex;align-items:center;gap:.6rem;color:var(--muted);font-size:.8rem}
-    .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--line)}
-    .err{margin-top:.5rem;padding:.55rem .65rem;background:color-mix(in oklab,var(--danger) 14%,var(--surface) 86%);border:1px solid color-mix(in oklab,var(--danger) 45%,var(--line) 55%);border-radius:.65rem;color:color-mix(in oklab,var(--danger) 80%,var(--text) 20%);font-size:.9rem}
-
-    .foot{border-top:1px solid var(--line);padding:1rem 0 2rem;color:var(--muted)}
-
-    @media (max-width:960px){
-      .desktop-nav,.desktop-actions{display:none}
-      .mobile-controls{display:flex}
-      .two{grid-template-columns:1fr}
+    @media (max-width: 640px) {
+      .two-col {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
   <script>
@@ -69,97 +163,54 @@
   </script>
 </head>
 <body>
-  <header class="header">
-    <div class="container nav">
-      <a class="brand" href="{{ route('home') }}" aria-label="Listen home">
-        <span class="brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
-        </span>
-        <span>Listen</span>
-      </a>
-      <nav class="desktop-nav">
-        <a href="{{ route('home') }}">Home</a>
-        <a href="{{ route('demo.page') }}">Demo</a>
-        <a href="{{ route('pricing') }}">Pricing</a>
-        <a href="{{ route('extension.page') }}">Chrome Extension</a>
-      </nav>
-      <div class="desktop-actions">
-        <button type="button" class="btn theme-btn" id="themeToggleDesktop" aria-label="Toggle theme">
-          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
-        </button>
-        <a class="btn" href="{{ route('login') }}">Login</a>
-      </div>
-      <div class="mobile-controls">
-        <button type="button" class="btn theme-btn" id="themeToggleMobile" aria-label="Toggle theme">
-          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
-          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
-        </button>
-        <button type="button" class="btn" id="mobileMenuBtn" aria-label="Menu">Menu</button>
-      </div>
-    </div>
-    <div class="container mobile-menu" id="mobileMenu">
-      <a href="{{ route('home') }}">Home</a>
-      <a href="{{ route('demo.page') }}">Demo</a>
-      <a href="{{ route('pricing') }}">Pricing</a>
-      <a href="{{ route('extension.page') }}">Chrome Extension</a>
-      <a href="{{ route('login') }}">Login</a>
-    </div>
-  </header>
+  @include('components.header')
 
-  <main class="container auth-wrap">
-    <form class="card" method="POST" action="{{ route('register.submit') }}">
+  <main class="container auth-page">
+    <form class="auth-card reveal" method="POST" action="{{ route('register.submit') }}">
       @csrf
       <h1>Create your account</h1>
-      <p class="muted" style="margin:.1rem 0 .75rem">Start free and upgrade when usage grows.</p>
+      <p class="subtitle">Start free and upgrade when usage grows.</p>
 
-      <a class="google-btn" href="{{ route('auth.google.redirect') }}">G Sign up with Google</a>
-      <div class="divider" style="margin:.72rem 0">or create with email</div>
+      <a class="google-btn" href="{{ route('auth.google.redirect') }}">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Sign up with Google
+      </a>
 
-      <div class="grid">
+      <div class="divider">or create with email</div>
+
+      <div class="form-grid">
         <div>
-          <label>Name</label>
-          <input type="text" name="name" value="{{ old('name') }}" required>
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" value="{{ old('name') }}" required autocomplete="name">
         </div>
         <div>
-          <label>Email</label>
-          <input type="email" name="email" value="{{ old('email') }}" required>
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" value="{{ old('email') }}" required autocomplete="email">
         </div>
-        <div class="two">
+        <div class="two-col">
           <div>
-            <label>Password</label>
-            <input type="password" name="password" required>
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required autocomplete="new-password">
           </div>
           <div>
-            <label>Confirm password</label>
-            <input type="password" name="password_confirmation" required>
+            <label for="password_confirmation">Confirm password</label>
+            <input type="password" id="password_confirmation" name="password_confirmation" required autocomplete="new-password">
           </div>
         </div>
-        <button class="submit" type="submit">Create account</button>
+        <button class="submit-btn" type="submit">Create Account</button>
       </div>
 
-      @if($errors->any())<div class="err">{{ $errors->first() }}</div>@endif
-      <p class="muted" style="margin-top:.75rem">Already have an account? <a href="{{ route('login') }}" style="color:inherit">Login</a></p>
+      @if($errors->any())
+        <div class="error-box">{{ $errors->first() }}</div>
+      @endif
+
+      <p class="auth-footer">
+        Already have an account? <a href="{{ route('login') }}">Sign in</a>
+      </p>
     </form>
   </main>
 
-  <footer class="foot"><div class="container">&copy; {{ date('Y') }} Listen. Crafted by SoliCode Ltd.</div></footer>
-
-  <script>
-    const setTheme = () => {
-      const current = document.documentElement.getAttribute('data-theme') || 'dark';
-      const next = current === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('listen_theme', next);
-    };
-    document.getElementById('themeToggleDesktop')?.addEventListener('click', setTheme);
-    document.getElementById('themeToggleMobile')?.addEventListener('click', setTheme);
-
-    const menuBtn = document.getElementById('mobileMenuBtn');
-    const mobileMenu = document.getElementById('mobileMenu');
-    menuBtn?.addEventListener('click', () => mobileMenu?.classList.toggle('open'));
-  </script>
+  @include('components.footer')
+  @include('components.scripts')
 </body>
 </html>
-
-
