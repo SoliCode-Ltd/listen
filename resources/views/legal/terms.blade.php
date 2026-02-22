@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen | Terms of Service</title>
+  @include('components.seo', ['pageTitle' => 'Terms of Service', 'page' => 'terms'])
   <meta name="description" content="Terms of Service for Listen by SoliCode Ltd." />
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -159,7 +159,7 @@
 
       <section class="legal-section">
         <h2>6. Disclaimer and Liability Limits</h2>
-        <p>The service is provided on an “as available” basis. To the maximum extent allowed by law, SoliCode Ltd disclaims implied warranties and will not be liable for indirect, incidental, special, consequential, or punitive damages arising from use of the service.</p>
+        <p>The service is provided on an â€œas availableâ€ basis. To the maximum extent allowed by law, SoliCode Ltd disclaims implied warranties and will not be liable for indirect, incidental, special, consequential, or punitive damages arising from use of the service.</p>
       </section>
 
       <section class="legal-section">

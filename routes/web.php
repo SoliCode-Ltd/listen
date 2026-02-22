@@ -6,7 +6,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Route;
+use Spatie\Sitemap\Sitemap;
+use Spatie\Sitemap\Tags\Url;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
@@ -16,6 +19,27 @@ Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->name('media.file');
+
+// SEO: Sitemap
+Route::get('/sitemap.xml', function () {
+    $sitemap = Sitemap::create()
+        ->add(Url::create('/')->setPriority(1.0)->setChangeFrequency('daily'))
+        ->add(Url::create('/pricing')->setPriority(0.9)->setChangeFrequency('weekly'))
+        ->add(Url::create('/demo')->setPriority(0.8)->setChangeFrequency('weekly'))
+        ->add(Url::create('/login')->setPriority(0.5)->setChangeFrequency('monthly'))
+        ->add(Url::create('/register')->setPriority(0.6)->setChangeFrequency('monthly'))
+        ->add(Url::create('/privacy-policy')->setPriority(0.3)->setChangeFrequency('yearly'))
+        ->add(Url::create('/terms-of-service')->setPriority(0.3)->setChangeFrequency('yearly'))
+        ->add(Url::create('/cookie-policy')->setPriority(0.3)->setChangeFrequency('yearly'));
+
+    return $sitemap->toResponse(request());
+})->name('sitemap');
+
+// SEO: robots.txt
+Route::get('/robots.txt', function () {
+    $content = SiteSetting::get('robots_txt', "User-agent: *\nAllow: /\n\nSitemap: " . url('/sitemap.xml'));
+    return response($content, 200)->header('Content-Type', 'text/plain');
+})->name('robots');
 
 Route::middleware('guest')->group(function () {
     Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');

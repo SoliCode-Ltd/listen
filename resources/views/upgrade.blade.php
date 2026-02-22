@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen | Upgrade</title>
+  @include('components.seo', ['pageTitle' => 'Upgrade', 'page' => 'upgrade'])
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   @include('components.styles')
   <style>

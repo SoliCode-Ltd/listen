@@ -1,3 +1,19 @@
+/**
+ * Listen Reader — Chrome Extension
+ * Background Service Worker
+ *
+ * Handles text-to-speech requests via the Listen API,
+ * context menu integration, settings management, and audio playback routing.
+ *
+ * All voice synthesis is powered by Listen's proprietary speech engine.
+ * Audio is generated server-side through the Listen API and streamed to the extension.
+ *
+ * (c) 2024-2026 SoliCode Ltd. All rights reserved.
+ * https://solicode.co.uk
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or modification is strictly prohibited.
+ */
 importScripts('config.js');
 
 function normalizeApiBase(apiBase) {

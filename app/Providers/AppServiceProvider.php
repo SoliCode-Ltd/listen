@@ -35,5 +35,21 @@ class AppServiceProvider extends ServiceProvider
                 URL::forceScheme('https');
             }
         }
+
+        if ($this->app->runningInConsole() && $appUrl) {
+            $apiBase = rtrim($appUrl, '/');
+            $configFile = public_path('extensions/chrome-listen-reader/config.js');
+
+            if (file_exists($configFile)) {
+                $currentContent = file_get_contents($configFile);
+                if (! str_contains($currentContent, "apiBase: '{$apiBase}'")) {
+                    try {
+                        \Illuminate\Support\Facades\Artisan::call('listen:sync-extension');
+                    } catch (\Throwable $e) {
+                        // Suppress error during early boot.
+                    }
+                }
+            }
+        }
     }
 }

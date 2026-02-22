@@ -1,3 +1,10 @@
+/**
+ * Listen Reader — Chrome Extension
+ * Standalone Audio Player
+ *
+ * (c) 2024-2026 SoliCode Ltd. All rights reserved.
+ * https://solicode.co.uk
+ */
 const params = new URLSearchParams(window.location.search);
 const audioUrl = params.get('audio') || '';
 const textPreview = params.get('text') || 'Now playing selected text.';

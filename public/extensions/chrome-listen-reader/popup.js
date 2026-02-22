@@ -1,3 +1,19 @@
+/**
+ * Listen Reader — Chrome Extension
+ * Popup UI Controller
+ *
+ * Manages the extension popup interface: API key configuration,
+ * voice/language selection, profile display, and quick text input.
+ * Communicates with the background service worker for all operations.
+ *
+ * All voice synthesis is powered by Listen's proprietary speech engine.
+ *
+ * (c) 2024-2026 SoliCode Ltd. All rights reserved.
+ * https://solicode.co.uk
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or modification is strictly prohibited.
+ */
 const elements = {
   apiKey: document.getElementById('apiKey'),
   targetLanguage: document.getElementById('targetLanguage'),
@@ -238,7 +254,7 @@ async function loadLastStatus() {
   if (!message) return;
 
   const type = status?.type === 'ok' ? 'ok' : (status?.type === 'error' ? 'error' : '');
-  await requestBackground({ type: 'CLEAR_LAST_STATUS' }).catch(() => {});
+  await requestBackground({ type: 'CLEAR_LAST_STATUS' }).catch(() => { });
   if (type !== 'error') {
     return;
   }
@@ -261,16 +277,16 @@ async function bootstrap() {
     if (!String(settings.apiKey || '').trim()) {
       setProfileCard(null);
       setStatus('Set your API key to load account details.');
-      await loadLastStatus().catch(() => {});
+      await loadLastStatus().catch(() => { });
       return;
     }
 
     await refreshProfile();
     setStatus('');
-    await loadLastStatus().catch(() => {});
+    await loadLastStatus().catch(() => { });
   } catch (error) {
     setStatus(error.message || 'Unable to load settings.', 'error');
-    await loadLastStatus().catch(() => {});
+    await loadLastStatus().catch(() => { });
   }
 }
 
@@ -306,7 +322,7 @@ async function readSelection() {
       throw new Error(response?.message || 'Unable to read selected text.');
     }
 
-    await refreshProfile().catch(() => {});
+    await refreshProfile().catch(() => { });
     setStatus('Voice generated in side panel.', 'ok');
   } catch (error) {
     setStatus(error.message || 'Unable to read selected text.', 'error');
@@ -332,7 +348,7 @@ async function readQuickText() {
       throw new Error(response?.message || 'Voice generation failed.');
     }
 
-    await refreshProfile().catch(() => {});
+    await refreshProfile().catch(() => { });
     setStatus('Voice generated in side panel.', 'ok');
   } catch (error) {
     setStatus(error.message || 'Voice generation failed.', 'error');

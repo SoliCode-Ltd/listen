@@ -1,9 +1,9 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen | Browsers Extension</title>
+  @include('components.seo', ['pageTitle' => 'Browser Extension', 'page' => 'extension'])
   <meta name="description" content="Listen browser extensions for Chrome, Firefox, and Safari. Convert text to speech across the web." />
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -372,39 +372,57 @@
 
   <main class="container">
     <section class="hero reveal">
-      <h1>Browsers Extension</h1>
-      <p>Turn any text on the web into natural voice. Select, click, and listen across all your favorite websites.</p>
+      <h1>{{ $pageTitle }}</h1>
+      <p>{{ $pageSubtitle }}</p>
     </section>
 
+    @if(!empty($announcement))
+    <div class="msg {{ $announcementType === 'warning' ? 'err' : 'ok' }}" style="margin-bottom: 1.5rem; text-align: center;">
+      {{ $announcement }}
+    </div>
+    @endif
+
     <section class="browsers-grid">
-      <article class="browser-card available reveal">
+      <article class="browser-card {{ $chromeEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
           <img src="{{ asset('icons/chrome.png') }}" alt="Chrome" />
         </div>
-        <h3>Chrome</h3>
-        <p>Full support with context menu integration</p>
+        <h3>{{ $chromeCardTitle }}</h3>
+        <p>{{ $chromeCardSubtitle }}</p>
+        @if($chromeEnabled && $downloadEnabled)
         <a class="download-btn" href="{{ route('browsers-extension.download', ['v' => $extensionVersion]) }}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
           Download
         </a>
+        @else
+        <span class="coming-soon-badge">Coming Soon</span>
+        @endif
       </article>
 
-      <article class="browser-card coming-soon reveal">
+      <article class="browser-card {{ $firefoxEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
           <img src="{{ asset('icons/firefox.png') }}" alt="Firefox" />
         </div>
-        <h3>Mozilla Firefox</h3>
-        <p>WebExtension API support</p>
+        <h3>{{ $firefoxCardTitle }}</h3>
+        <p>{{ $firefoxCardSubtitle }}</p>
+        @if($firefoxEnabled)
+        <span class="coming-soon-badge">Available</span>
+        @else
         <span class="coming-soon-badge">Coming Soon</span>
+        @endif
       </article>
 
-      <article class="browser-card coming-soon reveal">
+      <article class="browser-card {{ $safariEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
           <img src="{{ asset('icons/safari.png') }}" alt="Safari" />
         </div>
-        <h3>Apple Safari</h3>
-        <p>Native Safari Web Extension</p>
+        <h3>{{ $safariCardTitle }}</h3>
+        <p>{{ $safariCardSubtitle }}</p>
+        @if($safariEnabled)
+        <span class="coming-soon-badge">Available</span>
+        @else
         <span class="coming-soon-badge">Coming Soon</span>
+        @endif
       </article>
     </section>
 
@@ -413,11 +431,11 @@
         <article class="page-card">
           <h2>Installation Guide</h2>
           <ol class="steps">
-            <li>Download the extension package using the button above.</li>
-            <li>Open <a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a> in your browser.</li>
-            <li>Enable <strong>Developer mode</strong> in the top right corner.</li>
-            <li>Click <code>Load unpacked</code> and select the extracted folder.</li>
-            <li>Pin the extension to your toolbar for quick access.</li>
+            <li>{{ $installStep1 }}</li>
+            <li>{!! str_contains($installStep2, 'chrome://extensions/') ? '<a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
+            <li>{{ $installStep3 }}</li>
+            <li>{{ $installStep4 }}</li>
+            <li>{{ $installStep5 }}</li>
           </ol>
           <p id="extensionsOpenHint" style="display: none; margin-top: .75rem; color: var(--muted); font-size: .88rem;"></p>
         </article>
@@ -440,24 +458,24 @@
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
         </svg>
-        <h3>One-Click Listening</h3>
-        <p>Select text anywhere and listen instantly with context menu integration.</p>
+        <h3>{{ $feature1Title }}</h3>
+        <p>{{ $feature1Desc }}</p>
       </article>
       <article class="feature-card">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
           <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
         </svg>
-        <h3>Secure by Design</h3>
-        <p>Your API key is stored locally and tied to your account with instant rotation.</p>
+        <h3>{{ $feature2Title }}</h3>
+        <p>{{ $feature2Desc }}</p>
       </article>
       <article class="feature-card">
         <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12,6 12,12 16,14"/>
         </svg>
-        <h3>Built for Speed</h3>
-        <p>Audio streams immediately with no waiting. Keep your workflow uninterrupted.</p>
+        <h3>{{ $feature3Title }}</h3>
+        <p>{{ $feature3Desc }}</p>
       </article>
     </section>
 

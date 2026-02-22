@@ -1,3 +1,19 @@
+/**
+ * Listen Reader — Chrome Extension
+ * Content Script
+ *
+ * Injected into web pages to provide text selection reading and
+ * an embedded side-panel audio player. Handles audio playback,
+ * progress tracking, speed control, and drag-to-reposition.
+ *
+ * All voice synthesis is powered by Listen's proprietary speech engine.
+ *
+ * (c) 2024-2026 SoliCode Ltd. All rights reserved.
+ * https://solicode.co.uk
+ *
+ * This software is proprietary and confidential.
+ * Unauthorized copying, distribution, or modification is strictly prohibited.
+ */
 (() => {
   if (window.__listenReaderContentLoaded) {
     return;

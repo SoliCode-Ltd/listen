@@ -1,3 +1,8 @@
+/**
+ * Listen Reader — Chrome Extension | Popup Styles
+ * (c) 2024-2026 SoliCode Ltd. All rights reserved.
+ * https://solicode.co.uk
+ */
 :root {
   --bg: #0d1524;
   --panel: #131f35;
@@ -10,7 +15,10 @@
   --error: #d9534f;
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   font: 13px/1.4 Inter, Segoe UI, Roboto, Arial, sans-serif;
@@ -100,11 +108,16 @@ label {
   color: var(--muted);
 }
 
-input, select, textarea, button {
+input,
+select,
+textarea,
+button {
   font: inherit;
 }
 
-input, select, textarea {
+input,
+select,
+textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -166,4 +179,3 @@ input, select, textarea {
   color: var(--error);
   border-color: rgba(217, 83, 79, 0.4);
 }
-

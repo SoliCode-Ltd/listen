@@ -455,6 +455,9 @@ class BillingController extends Controller
     }
 
     /**
+     * Display amount always comes from the local DB (admin-editable).
+     * Stripe API is only used for interval/currency metadata.
+     *
      * @return array<string, mixed>
      */
     private function resolvePriceMeta(string $priceId, bool $stripeReady, int $fallbackAmountCents, string $fallbackInterval): array
@@ -462,12 +465,13 @@ class BillingController extends Controller
         $currency = 'USD';
         $interval = $fallbackInterval;
         $intervalCount = 1;
+        // Always use the DB price — the admin dashboard is the source of truth.
         $amountCents = $fallbackAmountCents;
 
         if ($stripeReady && $priceId !== '') {
             $stripePrice = $this->fetchStripePrice($priceId);
             if ($stripePrice) {
-                $amountCents = (int) $stripePrice['amount_cents'];
+                // Only take interval/currency from Stripe, NOT the amount.
                 $currency = (string) $stripePrice['currency'];
                 $interval = (string) $stripePrice['interval'];
                 $intervalCount = (int) $stripePrice['interval_count'];

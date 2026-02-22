@@ -3,8 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen - Enterprise Voice Synthesis</title>
-  <meta name="description" content="Launch your voice SaaS with premium Arabic and English playback, polished UX, and production-ready architecture." />
+  @include('components.seo', ['pageTitle' => 'Enterprise Voice Synthesis', 'page' => 'home'])
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

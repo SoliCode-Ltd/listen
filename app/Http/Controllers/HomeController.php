@@ -469,7 +469,7 @@ class HomeController extends Controller
                 'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
                 'voice_tier' => $tier,
                 'voice_tier_label' => VoiceTier::label($tier),
-                'features' => is_array($plan->features) ? $plan->features : [],
+                'features' => self::resolveStructuredFeatures($plan, $tier),
             ];
         })->values();
 
@@ -481,6 +481,32 @@ class HomeController extends Controller
             $plan['is_popular'] = $popularSlug !== '' && $plan['slug'] === $popularSlug;
             return $plan;
         })->all();
+    }
+
+    /**
+     * Build structured features array for the pricing card.
+     * If features are already structured (with 'label' key), use them.
+     * Otherwise, auto-build defaults from plan attributes.
+     *
+     * @return array<int, array{label: string, value: string, icon: string}>
+     */
+    private static function resolveStructuredFeatures(Plan $plan, string $tier): array
+    {
+        $raw = is_array($plan->features) ? $plan->features : [];
+
+        // Check if features are already in structured format
+        if (!empty($raw) && isset($raw[0]) && is_array($raw[0]) && array_key_exists('label', $raw[0])) {
+            return $raw;
+        }
+
+        // Auto-build defaults from plan attributes
+        return [
+            ['label' => 'Requests', 'value' => (int) $plan->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $plan->monthly_requests), 'icon' => 'activity'],
+            ['label' => 'Max input', 'value' => number_format((int) $plan->max_chars_per_request) . ' chars', 'icon' => 'type'],
+            ['label' => 'Commercial use', 'value' => $plan->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
+            ['label' => 'Priority queue', 'value' => ($plan->processing_priority ?? 'standard') === 'high' ? 'High' : 'Standard', 'icon' => 'bolt'],
+            ['label' => 'Voice quality', 'value' => VoiceTier::label($tier), 'icon' => 'mic'],
+        ];
     }
 
     private function demoCharAllowance(Request $request): int

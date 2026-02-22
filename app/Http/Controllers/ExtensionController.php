@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Carbon;
@@ -18,8 +19,46 @@ class ExtensionController extends Controller
             'newApiKey' => $request->session()->pull('new_api_key'),
             'apiState' => $this->apiState($user),
             'extensionVersion' => $this->extensionVersion(),
+
+            // Page content from admin Extension Settings
+            'pageTitle' => SiteSetting::get('extension_page_title', 'Browsers Extension'),
+            'pageSubtitle' => SiteSetting::get('extension_page_subtitle', 'Turn any text on the web into natural voice. Select, click, and listen across all your favorite websites.'),
+
+            // Browser availability
+            'chromeEnabled' => SiteSetting::get('extension_chrome_enabled', '1') === '1',
+            'firefoxEnabled' => SiteSetting::get('extension_firefox_enabled', '0') === '1',
+            'safariEnabled' => SiteSetting::get('extension_safari_enabled', '0') === '1',
+
+            // Browser cards
+            'chromeCardTitle' => SiteSetting::get('extension_chrome_card_title', 'Chrome'),
+            'chromeCardSubtitle' => SiteSetting::get('extension_chrome_card_subtitle', 'Full support with context menu integration'),
+            'firefoxCardTitle' => SiteSetting::get('extension_firefox_card_title', 'Mozilla Firefox'),
+            'firefoxCardSubtitle' => SiteSetting::get('extension_firefox_card_subtitle', 'WebExtension API support'),
+            'safariCardTitle' => SiteSetting::get('extension_safari_card_title', 'Apple Safari'),
+            'safariCardSubtitle' => SiteSetting::get('extension_safari_card_subtitle', 'Native Safari Web Extension'),
+
+            // Feature cards
+            'feature1Title' => SiteSetting::get('extension_feature_1_title', 'One-Click Listening'),
+            'feature1Desc' => SiteSetting::get('extension_feature_1_desc', 'Select text anywhere and listen instantly with context menu integration.'),
+            'feature2Title' => SiteSetting::get('extension_feature_2_title', 'Secure by Design'),
+            'feature2Desc' => SiteSetting::get('extension_feature_2_desc', 'Your API key is stored locally and tied to your account with instant rotation.'),
+            'feature3Title' => SiteSetting::get('extension_feature_3_title', 'Built for Speed'),
+            'feature3Desc' => SiteSetting::get('extension_feature_3_desc', 'Audio streams immediately with no waiting. Keep your workflow uninterrupted.'),
+
+            // Installation steps
+            'installStep1' => SiteSetting::get('extension_install_step_1', 'Download the extension package using the button above.'),
+            'installStep2' => SiteSetting::get('extension_install_step_2', 'Open chrome://extensions/ in your browser.'),
+            'installStep3' => SiteSetting::get('extension_install_step_3', 'Enable Developer mode in the top right corner.'),
+            'installStep4' => SiteSetting::get('extension_install_step_4', 'Click Load unpacked and select the extracted folder.'),
+            'installStep5' => SiteSetting::get('extension_install_step_5', 'Pin the extension to your toolbar for quick access.'),
+
+            // Download & announcement
+            'downloadEnabled' => SiteSetting::get('extension_download_enabled', '1') === '1',
+            'announcement' => SiteSetting::get('extension_announcement', ''),
+            'announcementType' => SiteSetting::get('extension_announcement_type', 'info'),
         ]);
     }
+
 
     public function regenerateApiKey(Request $request)
     {
