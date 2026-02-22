@@ -9,3 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('listen:billing-sync')->everyFifteenMinutes();
+Schedule::command('listen:billing-reminders')->dailyAt('09:00');
+Schedule::command('listen:billing-enforce-grace')->hourly();

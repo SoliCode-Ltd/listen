@@ -36,7 +36,14 @@
       border-radius: var(--radius-lg);
       padding: 1.5rem;
       box-shadow: var(--shadow);
+      animation: fadeUp .22s ease both;
     }
+    .grid-layout .card:nth-child(2) { animation-delay: .07s; }
+    .status-item {
+      animation: fadeUp .2s ease both;
+    }
+    .status-grid .status-item:nth-child(2) { animation-delay: .03s; }
+    .status-grid .status-item:nth-child(3) { animation-delay: .06s; }
     .card-header {
       margin-bottom: 1rem;
       padding-bottom: .85rem;
@@ -145,6 +152,21 @@
       font-size: .82rem;
       color: var(--muted);
     }
+    .consent-box {
+      margin-top: .65rem;
+      padding: .72rem .78rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--surface2) 70%, var(--surface));
+      font-size: .82rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+    .consent-row {
+      margin-top: .45rem;
+      color: var(--text);
+      font-size: .84rem;
+    }
     .actions {
       margin-top: 1rem;
       display: flex;
@@ -154,6 +176,10 @@
     .actions .btn {
       flex: 1;
       justify-content: center;
+    }
+    .btn.is-loading {
+      opacity: .8;
+      pointer-events: none;
     }
     .message {
       margin-top: .85rem;
@@ -241,6 +267,10 @@
       width: 100%;
       justify-content: center;
     }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     @media (max-width: 980px) {
       .grid-layout {
         grid-template-columns: 1fr;
@@ -327,6 +357,10 @@
             @else
               <p class="card-hint" style="color: var(--danger);">Billing is not configured. Add Stripe keys to enable payments.</p>
             @endif
+            <div class="consent-box">
+              Subscriptions renew automatically using your payment card until you cancel.
+              <div class="consent-row">Your payment card will be used for the next billing cycles.</div>
+            </div>
           </div>
 
           <div class="actions">
@@ -360,16 +394,12 @@
             <dt>Billing Cycle</dt>
             <dd id="quoteCycle">-</dd>
           </div>
-          <div class="quote-row">
-            <dt>Price ID</dt>
-            <dd id="quotePriceId" style="font-size:.78rem;color:var(--muted);">-</dd>
-          </div>
         </div>
-
+<!--
         <div class="quick-links">
           <a class="btn" href="{{ route('pricing') }}">View All Plans</a>
           <a class="btn" href="{{ route('manage-subscription.page') }}">Subscription Details</a>
-        </div>
+        </div> -->
       </div>
     </div>
   </main>
@@ -394,7 +424,7 @@
     const quoteHint = document.getElementById('quoteHint');
     const quotePlan = document.getElementById('quotePlan');
     const quoteCycle = document.getElementById('quoteCycle');
-    const quotePriceId = document.getElementById('quotePriceId');
+    const subscribeBtnDefaultText = subscribeBtn ? subscribeBtn.textContent.trim() : 'Confirm & Pay';
 
     function setMessage(type, text) {
       messageBox.className = 'message';
@@ -402,6 +432,13 @@
       if (!text) return;
       messageBox.classList.add(type === 'error' ? 'error' : 'success');
       messageBox.textContent = text;
+    }
+
+    function setSubscribeButtonBusy(isBusy, text) {
+      if (!subscribeBtn) return;
+      subscribeBtn.disabled = isBusy || !stripe;
+      subscribeBtn.classList.toggle('is-loading', Boolean(isBusy));
+      subscribeBtn.textContent = text || subscribeBtnDefaultText;
     }
 
     async function post(url, payload = {}) {
@@ -470,7 +507,6 @@
         quoteAmount.textContent = '-';
         quotePlan.textContent = '-';
         quoteCycle.textContent = '-';
-        quotePriceId.textContent = '-';
         quoteHint.textContent = 'Select a plan to preview your charge.';
         return;
       }
@@ -478,7 +514,6 @@
       quoteAmount.textContent = String(selected.meta.amount_formatted || '-');
       quotePlan.textContent = String(selected.plan.name || selected.plan.slug || '-');
       quoteCycle.textContent = cycleLabel(selected.meta);
-      quotePriceId.textContent = String(selected.meta.price_id || '-');
       quoteHint.textContent = `You will be charged ${selected.meta.amount_formatted} (${cycleLabel(selected.meta)}).`;
     }
 
@@ -500,13 +535,8 @@
       return String(result.paymentMethod?.id || '');
     }
 
-    async function syncPlanAfterAction() {
-      await post('{{ route('billing.sync') }}');
-      window.location.href = '{{ route('manage-subscription.page') }}';
-    }
-
     subscribeBtn?.addEventListener('click', async () => {
-      subscribeBtn.disabled = true;
+      setSubscribeButtonBusy(true, 'Processing payment...');
       setMessage('', '');
 
       try {
@@ -517,11 +547,13 @@
 
         let paymentMethod = '';
         if (cardComplete) {
+          setSubscribeButtonBusy(true, 'Securing card...');
           paymentMethod = await collectCardPaymentMethod();
         } else if (!hasDefaultPaymentMethod) {
           throw new Error('Please enter your credit card details to continue.');
         }
 
+        setSubscribeButtonBusy(true, 'Finalizing subscription...');
         const response = await post('{{ route('billing.subscribe') }}', {
           plan: String(selected.plan.slug || ''),
           billing_cycle: String(selected.cycle || 'monthly'),
@@ -529,12 +561,14 @@
         });
 
         if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
+          setSubscribeButtonBusy(true, 'Waiting for bank confirmation...');
           const confirmation = await stripe.confirmCardPayment(String(response.data.client_secret));
           if (confirmation.error) {
             throw new Error(confirmation.error.message || 'Payment authentication failed.');
           }
 
-          await syncPlanAfterAction();
+          setMessage('ok', 'Payment confirmed. Redirecting to your subscription details...');
+          window.location.href = '{{ route('manage-subscription.page') }}';
           return;
         }
 
@@ -542,19 +576,19 @@
           throw new Error(response.data?.message || 'Upgrade failed.');
         }
 
-        setMessage('ok', response.data?.message || 'Subscription updated successfully.');
-        await syncPlanAfterAction();
+        setMessage('ok', response.data?.message || 'Subscription updated successfully. Redirecting...');
+        window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
         setMessage('error', error.message || 'Upgrade failed.');
       } finally {
-        subscribeBtn.disabled = !stripe;
+        setSubscribeButtonBusy(false, subscribeBtnDefaultText);
       }
     });
 
     planSelect?.addEventListener('change', renderChargePreview);
     cycleSelect?.addEventListener('change', renderChargePreview);
 
-    subscribeBtn.disabled = !stripe;
+    setSubscribeButtonBusy(false, subscribeBtnDefaultText);
     renderChargePreview();
   </script>
 </body>

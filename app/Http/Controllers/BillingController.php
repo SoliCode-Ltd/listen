@@ -27,9 +27,11 @@ class BillingController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        $this->billingSyncService->syncIfStale($user, true);
+        $this->billingSyncService->syncIfStale($user);
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $subscription = $this->currentDefaultSubscription($user);
+        $activePlan = $this->resolveConsistentActivePlan($activePlan, $subscription);
         $stripeKey = (string) config('services.stripe.key', '');
         $stripeSecret = (string) config('services.stripe.secret', '');
         $stripeReady = trim($stripeKey) !== '' && trim($stripeSecret) !== '';
@@ -55,13 +57,14 @@ class BillingController extends Controller
         $this->billingSyncService->syncIfStale($user, true);
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $subscription = $this->currentDefaultSubscription($user);
+        $activePlan = $this->resolveConsistentActivePlan($activePlan, $subscription);
         $stripeKey = (string) config('services.stripe.key', '');
         $stripeSecret = (string) config('services.stripe.secret', '');
         $stripeReady = trim($stripeKey) !== '' && trim($stripeSecret) !== '';
 
         $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
         $invoices = $this->loadInvoices($user, $stripeReady);
-        $subscription = $this->currentDefaultSubscription($user);
 
         $periodEnd = null;
         if ($subscription && $stripeReady && $user->hasStripeId()) {
@@ -86,8 +89,8 @@ class BillingController extends Controller
             'invoices' => $invoices,
             'hasActiveSubscription' => (bool) ($subscription?->valid() ?? false),
             'subscriptionStatus' => $this->subscriptionStatusLabel($subscription),
-            'subscriptionEndsAt' => $subscription?->ends_at?->toDateString(),
-            'subscriptionRenewsAt' => $periodEnd,
+            'subscriptionEndsAt' => $this->formatDateLabel($subscription?->ends_at?->toDateString()),
+            'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
             'upcomingCharge' => $this->resolveUpcomingCharge($subscription),
         ]);
     }
@@ -133,11 +136,16 @@ class BillingController extends Controller
                 if (! $subscription->hasPrice($priceId)) {
                     try {
                         $subscription->swap($priceId);
+                        if ($paymentMethod !== '') {
+                            $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+                        }
                     } catch (SubscriptionUpdateFailure $exception) {
                         // Incomplete / stale local records must be retired before recreating.
                         $this->retireStaleSubscription($subscription);
                         $this->createNewSubscription($user, $priceId, $paymentMethod);
                     }
+                } elseif ($paymentMethod !== '') {
+                    $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }
             } else {
                 if ($subscription) {
@@ -322,6 +330,25 @@ class BillingController extends Controller
         }
 
         $user->newSubscription('default', $priceId)->create($paymentMethod);
+    }
+
+    private function setSubscriptionPaymentMethod(User $user, BillingSubscription $subscription, string $paymentMethod): void
+    {
+        $paymentMethod = trim($paymentMethod);
+        if ($paymentMethod === '') {
+            return;
+        }
+
+        $this->assertCardPaymentMethod($paymentMethod);
+        $user->updateDefaultPaymentMethod($paymentMethod);
+        $stripeSubscriptionId = trim((string) $subscription->stripe_id);
+        if ($stripeSubscriptionId === '') {
+            return;
+        }
+
+        Cashier::stripe()->subscriptions->update($stripeSubscriptionId, [
+            'default_payment_method' => $paymentMethod,
+        ]);
     }
 
     private function currentDefaultSubscription(User $user): ?BillingSubscription
@@ -510,12 +537,15 @@ class BillingController extends Controller
         try {
             return collect($user->invoices())->map(function ($invoice) {
                 $stripeInvoice = $invoice->asStripeInvoice();
+                $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
+                $totalCents = (int) ($stripeInvoice->total ?? 0);
 
                 return [
                     'id' => (string) $invoice->id,
-                    'date' => $invoice->date()?->toDateString() ?: '-',
+                    'date' => $invoice->date()?->format('M j, Y') ?: '-',
                     'status' => strtoupper((string) ($stripeInvoice->status ?? 'paid')),
-                    'total' => (string) $invoice->total(),
+                    'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
+                    'purpose' => $this->resolveInvoicePurposeLabel($stripeInvoice),
                 ];
             })->values()->all();
         } catch (\Throwable $exception) {
@@ -565,11 +595,13 @@ class BillingController extends Controller
 
             $stripeInvoice = $upcoming->asStripeInvoice();
             $periodEndTs = (int) ($stripeInvoice->period_end ?? 0);
+            $currency = strtoupper((string) ($stripeInvoice->currency ?? $upcoming->currency() ?? 'USD'));
+            $totalCents = (int) ($stripeInvoice->total ?? 0);
 
             return [
-                'total' => (string) $upcoming->total(),
-                'currency' => strtoupper((string) $upcoming->currency()),
-                'date' => $periodEndTs > 0 ? Carbon::createFromTimestamp($periodEndTs)->toDateString() : null,
+                'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
+                'currency' => $currency,
+                'date' => $periodEndTs > 0 ? Carbon::createFromTimestamp($periodEndTs)->format('M j, Y') : null,
             ];
         } catch (\Throwable $exception) {
             Log::warning('Unable to load upcoming invoice for manage subscription page.', [
@@ -629,5 +661,112 @@ class BillingController extends Controller
 
             abort(422, 'Unable to download invoice PDF right now.');
         }
+    }
+
+    private function formatDateLabel(?string $date): ?string
+    {
+        $date = trim((string) $date);
+        if ($date === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($date)->format('M j, Y');
+        } catch (\Throwable) {
+            return $date;
+        }
+    }
+
+    private function formatInvoiceTotalLabel(int $amountCents, string $currency): string
+    {
+        $formatted = Cashier::formatAmount(abs($amountCents), strtolower(trim($currency) !== '' ? $currency : 'USD'));
+
+        if ($amountCents < 0) {
+            return 'Credit '.$formatted;
+        }
+
+        return $formatted;
+    }
+
+    private function resolveInvoicePurposeLabel(mixed $stripeInvoice): string
+    {
+        if (! is_object($stripeInvoice)) {
+            return 'Subscription';
+        }
+
+        $lines = $stripeInvoice->lines->data ?? [];
+        if (is_array($lines)) {
+            foreach ($lines as $line) {
+                $description = trim((string) ($line->description ?? ''));
+                if ($description !== '') {
+                    return $description;
+                }
+            }
+        }
+
+        $description = trim((string) ($stripeInvoice->description ?? ''));
+        if ($description !== '') {
+            return $description;
+        }
+
+        return 'Subscription';
+    }
+
+    private function resolveConsistentActivePlan(?Plan $activePlan, ?BillingSubscription $subscription): ?Plan
+    {
+        if (! $subscription || ! $subscription->valid()) {
+            return $activePlan;
+        }
+
+        $mappedPlan = $this->resolvePlanFromBillingSubscription($subscription);
+        if (! $mappedPlan) {
+            return $activePlan;
+        }
+
+        if (! $activePlan || (string) $activePlan->slug !== (string) $mappedPlan->slug) {
+            return $mappedPlan;
+        }
+
+        return $activePlan;
+    }
+
+    private function resolvePlanFromBillingSubscription(BillingSubscription $subscription): ?Plan
+    {
+        $priceId = trim((string) $subscription->stripe_price);
+
+        if ($priceId === '') {
+            $firstItem = $subscription->items()->latest('id')->first();
+            $priceId = trim((string) ($firstItem?->stripe_price ?? ''));
+        }
+
+        if ($priceId === '') {
+            return null;
+        }
+
+        $slug = $this->mapPriceIdToPlanSlug($priceId);
+        if ($slug === null) {
+            return null;
+        }
+
+        return Plan::query()->where('slug', $slug)->first();
+    }
+
+    private function mapPriceIdToPlanSlug(string $priceId): ?string
+    {
+        $priceId = trim($priceId);
+        if ($priceId === '') {
+            return null;
+        }
+
+        $prices = (array) config('services.stripe.prices', []);
+        foreach ($prices as $slug => $cycles) {
+            foreach ((array) $cycles as $configuredPriceId) {
+                if ($priceId === trim((string) $configuredPriceId)) {
+                    return (string) $slug;
+                }
+            }
+        }
+
+        return null;
     }
 }

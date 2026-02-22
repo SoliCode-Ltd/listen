@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\BillingLifecycleService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Stripe\Exception\SignatureVerificationException;
+use Stripe\Webhook;
+
+class StripeWebhookController extends Controller
+{
+    public function __invoke(Request $request, BillingLifecycleService $billingLifecycleService)
+    {
+        $payload = $request->getContent();
+        $signature = (string) $request->header('Stripe-Signature', '');
+        $secret = trim((string) config('services.stripe.webhook_secret', ''));
+
+        try {
+            if ($secret !== '') {
+                $event = Webhook::constructEvent($payload, $signature, $secret);
+            } else {
+                $event = json_decode($payload, false, 512, JSON_THROW_ON_ERROR);
+            }
+        } catch (SignatureVerificationException $exception) {
+            Log::warning('Stripe webhook signature verification failed.', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response('Invalid signature.', 400);
+        } catch (\Throwable $exception) {
+            Log::warning('Stripe webhook payload parse failed.', [
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response('Invalid payload.', 400);
+        }
+
+        $type = (string) ($event->type ?? '');
+        $customerId = trim((string) ($event->data->object->customer ?? ''));
+
+        try {
+            match ($type) {
+                'invoice.payment_failed' => $billingLifecycleService->handlePaymentFailed($customerId),
+                'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($customerId),
+                'customer.subscription.created',
+                'customer.subscription.updated',
+                'customer.subscription.deleted',
+                'customer.deleted' => $billingLifecycleService->syncUserByStripeCustomerId(
+                    $type === 'customer.deleted'
+                        ? trim((string) ($event->data->object->id ?? ''))
+                        : $customerId
+                ),
+                default => null,
+            };
+        } catch (\Throwable $exception) {
+            Log::warning('Stripe webhook business handling failed.', [
+                'type' => $type,
+                'customer_id' => $customerId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
+
+        return response('Webhook Handled', 200);
+    }
+}

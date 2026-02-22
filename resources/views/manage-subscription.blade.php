@@ -87,6 +87,16 @@
       padding: 1.5rem;
       box-shadow: var(--shadow);
     }
+    .status-item,
+    .card {
+      animation: fadeUp .24s ease both;
+    }
+    .status-grid .status-item:nth-child(2) { animation-delay: .03s; }
+    .status-grid .status-item:nth-child(3) { animation-delay: .06s; }
+    .status-grid .status-item:nth-child(4) { animation-delay: .09s; }
+    .grid-layout .card:nth-child(1) { animation-delay: .08s; }
+    .grid-layout .card:nth-child(2) { animation-delay: .12s; }
+    .invoices-card { animation-delay: .16s; }
     .card-header {
       margin-bottom: 1rem;
       padding-bottom: .85rem;
@@ -176,6 +186,10 @@
     .btn-danger:hover {
       background: color-mix(in oklab, var(--danger) 25%, var(--surface));
     }
+    .btn.is-loading {
+      opacity: .82;
+      pointer-events: none;
+    }
     .message {
       margin-top: .85rem;
       padding: .85rem 1rem;
@@ -254,6 +268,10 @@
     .empty-state p {
       margin: 0;
     }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
     @media (max-width: 980px) {
       .grid-layout {
         grid-template-columns: 1fr;
@@ -289,13 +307,19 @@
           $statusClass = 'active';
           $statusLower = strtolower((string) $subscriptionStatus);
           if (str_contains($statusLower, 'cancel')) $statusClass = 'canceled';
-          elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past_due')) $statusClass = 'pending';
+          elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past due') || str_contains($statusLower, 'past_due')) $statusClass = 'pending';
         @endphp
         <span class="status-badge {{ $statusClass }}">{{ $subscriptionStatus }}</span>
       </div>
       <div class="status-item">
-        <small>Next Charge</small>
-        <b>{{ $upcomingCharge['total'] ?? 'Not available' }}</b>
+        <small>Next Billing</small>
+        <b>
+          @if(!empty($upcomingCharge['total']))
+            {{ $upcomingCharge['total'] }}{{ !empty($upcomingCharge['date']) ? ' on '.$upcomingCharge['date'] : '' }}
+          @else
+            Not scheduled
+          @endif
+        </b>
       </div>
       <div class="status-item">
         <small>Saved Card</small>
@@ -321,18 +345,24 @@
             <dt>Voice Tier</dt>
             <dd>{{ $activeTierLabel }}</dd>
           </div>
-          <div class="detail-row">
-            <dt>Renews On</dt>
-            <dd>{{ $subscriptionRenewsAt ?: '-' }}</dd>
-          </div>
-          <div class="detail-row">
-            <dt>Ends At</dt>
-            <dd>{{ $subscriptionEndsAt ?: '-' }}</dd>
-          </div>
-          <div class="detail-row">
-            <dt>Upcoming Invoice</dt>
-            <dd>{{ $upcomingCharge['total'] ?? '-' }}</dd>
-          </div>
+          @if($subscriptionRenewsAt)
+            <div class="detail-row">
+              <dt>Renews On</dt>
+              <dd>{{ $subscriptionRenewsAt }}</dd>
+            </div>
+          @endif
+          @if($subscriptionEndsAt)
+            <div class="detail-row">
+              <dt>Access Ends On</dt>
+              <dd>{{ $subscriptionEndsAt }}</dd>
+            </div>
+          @endif
+          @if(!empty($upcomingCharge['total']))
+            <div class="detail-row">
+              <dt>Upcoming Invoice</dt>
+              <dd>{{ $upcomingCharge['total'] }}</dd>
+            </div>
+          @endif
         </div>
 
         <div class="actions">
@@ -388,6 +418,7 @@
               <tr>
                 <th>Date</th>
                 <th>Status</th>
+                <th>Paid For</th>
                 <th>Amount</th>
                 <th>Actions</th>
               </tr>
@@ -403,11 +434,11 @@
                 <tr>
                   <td>{{ $invoice['date'] }}</td>
                   <td><span class="invoice-status {{ $statusBadgeClass }}">{{ ucfirst($invStatus) }}</span></td>
+                  <td>{{ $invoice['purpose'] ?? 'Subscription' }}</td>
                   <td>{{ $invoice['total'] }}</td>
                   <td>
                     <div class="invoice-actions">
                       <a class="btn" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">View</a>
-                      <a class="btn" href="{{ route('billing.invoice.download', ['invoiceId' => $invoice['id']]) }}">PDF</a>
                     </div>
                   </td>
                 </tr>
@@ -435,6 +466,8 @@
     const updateCardBtn = document.getElementById('updateCardBtn');
     const cancelBtn = document.getElementById('cancelBtn');
     const cardError = document.getElementById('card-error');
+    const updateCardBtnDefaultText = updateCardBtn ? updateCardBtn.textContent.trim() : 'Update Saved Card';
+    const cancelBtnDefaultText = cancelBtn ? cancelBtn.textContent.trim() : 'Cancel Subscription';
 
     function setMessage(type, text) {
       messageBox.className = 'message';
@@ -442,6 +475,13 @@
       if (!text) return;
       messageBox.classList.add(type === 'error' ? 'error' : 'success');
       messageBox.textContent = text;
+    }
+
+    function setButtonBusy(button, isBusy, text, defaultText) {
+      if (!button) return;
+      button.disabled = Boolean(isBusy);
+      button.classList.toggle('is-loading', Boolean(isBusy));
+      button.textContent = isBusy ? text : defaultText;
     }
 
     async function post(url, payload = {}) {
@@ -502,7 +542,7 @@
     }
 
     updateCardBtn?.addEventListener('click', async () => {
-      updateCardBtn.disabled = true;
+      setButtonBusy(updateCardBtn, true, 'Updating card...', updateCardBtnDefaultText);
       setMessage('', '');
 
       try {
@@ -522,12 +562,12 @@
       } catch (error) {
         setMessage('error', error.message || 'Card update failed.');
       } finally {
-        updateCardBtn.disabled = false;
+        setButtonBusy(updateCardBtn, false, '', updateCardBtnDefaultText);
       }
     });
 
     cancelBtn?.addEventListener('click', async () => {
-      cancelBtn.disabled = true;
+      setButtonBusy(cancelBtn, true, 'Canceling...', cancelBtnDefaultText);
       setMessage('', '');
 
       try {
@@ -544,7 +584,7 @@
       } catch (error) {
         setMessage('error', error.message || 'Cancellation failed.');
       } finally {
-        cancelBtn.disabled = false;
+        setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
       }
     });
   </script>

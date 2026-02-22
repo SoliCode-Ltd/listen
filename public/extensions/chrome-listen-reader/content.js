@@ -9,9 +9,9 @@
 
   const SPEED_OPTIONS = [
     { label: '1x', playbackRate: 1.0 },
-    { label: '1.25x', playbackRate: 1.12 },
-    { label: '1.5x', playbackRate: 1.22 },
-    { label: '2x', playbackRate: 1.32 },
+    { label: '1.25x', playbackRate: 1.25 },
+    { label: '1.5x', playbackRate: 1.5 },
+    { label: '2x', playbackRate: 2.0 },
   ];
 
   const state = {
@@ -306,7 +306,7 @@
       return;
     }
 
-    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.9, 1.32);
+    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.9, 2.0);
 
     if ('preservesPitch' in state.audio) {
       state.audio.preservesPitch = true;

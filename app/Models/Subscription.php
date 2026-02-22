@@ -14,13 +14,24 @@ class Subscription extends Model
         'user_id',
         'plan_id',
         'status',
+        'billing_payment_state',
         'current_period_start',
         'current_period_end',
+        'billing_grace_ends_at',
+        'billing_reminder_7d_sent_at',
+        'billing_reminder_1d_sent_at',
+        'billing_failed_notice_sent_at',
+        'billing_downgraded_at',
     ];
 
     protected $casts = [
         'current_period_start' => 'datetime',
         'current_period_end' => 'datetime',
+        'billing_grace_ends_at' => 'datetime',
+        'billing_reminder_7d_sent_at' => 'datetime',
+        'billing_reminder_1d_sent_at' => 'datetime',
+        'billing_failed_notice_sent_at' => 'datetime',
+        'billing_downgraded_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

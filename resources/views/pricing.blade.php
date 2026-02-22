@@ -67,14 +67,31 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: .5rem;
+      gap: .6rem;
     }
     .billing-toggle {
       display: inline-flex;
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-full);
-      padding: .25rem;
+      padding: .22rem;
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+    }
+    .billing-indicator {
+      position: absolute;
+      top: .22rem;
+      left: .22rem;
+      width: calc(50% - .22rem);
+      height: calc(100% - .44rem);
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--a), var(--b));
+      transition: transform .18s ease;
+      z-index: 0;
+    }
+    .billing-toggle.yearly .billing-indicator {
+      transform: translateX(100%);
     }
     .billing-toggle button {
       border: none;
@@ -85,23 +102,28 @@
       cursor: pointer;
       font-weight: 600;
       font-size: .9rem;
-      transition: all .2s ease;
+      transition: color .18s ease;
+      position: relative;
+      z-index: 1;
     }
     .billing-toggle button:hover {
       color: var(--text);
     }
-    .billing-toggle button.active {
-      background: linear-gradient(135deg, var(--a), var(--b));
-      color: white;
-    }
+    .billing-toggle button.active { color: white; }
     .billing-savings {
-      font-size: .8rem;
-      color: var(--ok);
-      opacity: 0;
-      transition: opacity .2s ease;
+      font-size: .78rem;
+      color: color-mix(in oklab, var(--ok) 88%, var(--text));
+      background: color-mix(in oklab, var(--ok) 14%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--ok) 45%, var(--line));
+      padding: .24rem .62rem;
+      border-radius: var(--radius-full);
+      opacity: .85;
+      transform: translateY(-2px);
+      transition: opacity .18s ease, transform .18s ease;
     }
     .billing-savings.show {
       opacity: 1;
+      transform: translateY(0);
     }
 
     .plans-grid {
@@ -181,6 +203,7 @@
       font-size: 2.75rem;
       font-weight: 800;
       line-height: 1;
+      transition: transform .16s ease, opacity .16s ease;
     }
     .price-period {
       font-size: .95rem;
@@ -448,11 +471,12 @@
       <p class="lead">Start free and upgrade as you grow. All plans include Arabic and English voice synthesis with production-ready reliability.</p>
       
       <div class="billing-wrapper">
-        <div class="billing-toggle">
+        <div class="billing-toggle" id="billingToggle">
+          <span class="billing-indicator" aria-hidden="true"></span>
           <button id="monthlyBtn" class="active">Monthly</button>
           <button id="yearlyBtn">Yearly</button>
         </div>
-        <span class="billing-savings" id="billingSavings">Save 20% with annual billing</span>
+        <span class="billing-savings" id="billingSavings">Annual plan saves 20%</span>
       </div>
     </section>
 
@@ -467,19 +491,20 @@
         @php
           $isCurrent = $activePlanSlug === $plan['slug'];
           $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free';
-          $isFree = ($plan['price_monthly'] ?? 0) <= 0;
-          $monthlyPrice = max(0, $plan['price_monthly'] ?? 0);
-          $yearlyPrice = ($plan['price_yearly'] ?? 0) > 0 ? $plan['price_yearly'] : round($monthlyPrice * 12 * 0.8);
-          $yearlyMonthly = $yearlyPrice > 0 ? round($yearlyPrice / 12) : 0;
-          $savings = $monthlyPrice > 0 ? ($monthlyPrice * 12) - $yearlyPrice : 0;
+          $monthlyCents = max(0, (int) ($plan['price_monthly_cents'] ?? 0));
+          $yearlyCents = max(0, (int) ($plan['price_yearly_cents'] ?? 0));
+          if ($yearlyCents <= 0 && $monthlyCents > 0) {
+            $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
+          }
+          $isFree = $monthlyCents <= 0;
+          $savingsCents = $monthlyCents > 0 ? max(0, ($monthlyCents * 12) - $yearlyCents) : 0;
         @endphp
         <div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} reveal"
              data-plan-slug="{{ $plan['slug'] }}"
              data-is-free="{{ $isFree ? '1' : '0' }}"
-             data-monthly="{{ $monthlyPrice }}"
-             data-yearly-monthly="{{ $yearlyMonthly }}"
-             data-yearly-total="{{ $yearlyPrice }}"
-             data-savings="{{ $savings }}">
+             data-monthly-cents="{{ $monthlyCents }}"
+             data-yearly-cents="{{ $yearlyCents }}"
+             data-savings-cents="{{ $savingsCents }}">
           
           @if($plan['is_popular'] && !$isCurrent)
             <span class="popular-badge">Most Popular</span>
@@ -635,31 +660,41 @@
     (function() {
       var monthlyBtn = document.getElementById('monthlyBtn');
       var yearlyBtn = document.getElementById('yearlyBtn');
+      var billingToggle = document.getElementById('billingToggle');
       var billingSavings = document.getElementById('billingSavings');
       var planCards = document.querySelectorAll('.plan-card');
       var isYearly = false;
 
+      function formatUsd(cents) {
+        var dollars = (Number(cents || 0) / 100);
+        return dollars.toLocaleString('en-US', {
+          minimumFractionDigits: dollars % 1 === 0 ? 0 : 2,
+          maximumFractionDigits: 2
+        });
+      }
+
       function updatePrices() {
         planCards.forEach(function(card) {
           var isFree = card.getAttribute('data-is-free') === '1';
-          var monthlyPrice = parseInt(card.getAttribute('data-monthly'), 10) || 0;
-          var yearlyMonthly = parseInt(card.getAttribute('data-yearly-monthly'), 10) || 0;
-          var yearlyTotal = parseInt(card.getAttribute('data-yearly-total'), 10) || 0;
-          var savings = parseInt(card.getAttribute('data-savings'), 10) || 0;
+          var monthlyCents = parseInt(card.getAttribute('data-monthly-cents'), 10) || 0;
+          var yearlyCents = parseInt(card.getAttribute('data-yearly-cents'), 10) || 0;
+          var savingsCents = parseInt(card.getAttribute('data-savings-cents'), 10) || 0;
+          var yearlyMonthlyCents = yearlyCents > 0 ? Math.round(yearlyCents / 12) : 0;
 
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
+          if (!priceValue || !priceNote) return;
 
           if (isFree) {
             priceValue.textContent = '0';
             priceNote.textContent = 'Free forever';
             priceNote.className = 'price-note price-note-text';
           } else if (isYearly) {
-            priceValue.textContent = yearlyMonthly;
-            priceNote.textContent = 'Billed $' + yearlyTotal + '/year (save $' + savings + ')';
+            priceValue.textContent = formatUsd(yearlyMonthlyCents);
+            priceNote.textContent = 'Billed $' + formatUsd(yearlyCents) + '/year (save $' + formatUsd(savingsCents) + ')';
             priceNote.className = 'price-note price-note-text savings';
           } else {
-            priceValue.textContent = monthlyPrice;
+            priceValue.textContent = formatUsd(monthlyCents);
             priceNote.textContent = 'Billed monthly';
             priceNote.className = 'price-note price-note-text';
           }
@@ -671,6 +706,7 @@
         monthlyBtn.classList.toggle('active', !yearly);
         yearlyBtn.classList.toggle('active', yearly);
         billingSavings.classList.toggle('show', yearly);
+        billingToggle.classList.toggle('yearly', yearly);
         updatePrices();
       }
 

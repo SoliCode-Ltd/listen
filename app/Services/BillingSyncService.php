@@ -42,50 +42,75 @@ class BillingSyncService
         if ($user->stripe_id) {
             try {
                 $customer = Cashier::stripe()->customers->retrieve($user->stripe_id, []);
-                $stripeSubscription = $this->resolveRelevantStripeSubscription($user->stripe_id);
-
-                if ($stripeSubscription) {
-                    $selectedStatus = (string) ($stripeSubscription->status ?? '');
-                    $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
-                    $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
+                if ($this->isDeletedStripeCustomer($customer)) {
+                    $this->resetBillingStateForMissingCustomer($user);
                     $targetPlan = $freePlan;
+                    $periodEnd = now()->addMonth();
 
-                    if ($mappedPlan && in_array($selectedStatus, ['active', 'trialing', 'past_due'], true)) {
-                        $targetPlan = $mappedPlan;
-                        $periodEndTs = (int) ($stripeSubscription->current_period_end ?? 0);
-                        $periodEnd = $periodEndTs > 0
-                            ? Carbon::createFromTimestamp($periodEndTs)
-                            : now()->addMonth();
-                    }
-
-                    $this->persistBillingSubscription($user, $stripeSubscription);
+                    $user->forceFill([
+                        'stripe_id' => null,
+                        'pm_type' => null,
+                        'pm_last_four' => null,
+                    ])->save();
                 } else {
-                    $targetPlan = $freePlan;
-                    $billingSubscription = BillingSubscription::query()
-                        ->where('user_id', $user->id)
-                        ->where('type', 'default')
-                        ->latest('id')
-                        ->first();
+                    $stripeSubscription = $this->resolveRelevantStripeSubscription($user->stripe_id);
 
-                    if ($billingSubscription) {
-                        BillingSubscription::query()
+                    if ($stripeSubscription) {
+                        $selectedStatus = (string) ($stripeSubscription->status ?? '');
+                        $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
+                        $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
+                        $targetPlan = $freePlan;
+
+                        if ($mappedPlan && in_array($selectedStatus, ['active', 'trialing'], true)) {
+                            $targetPlan = $mappedPlan;
+                            $periodEndTs = (int) ($stripeSubscription->current_period_end ?? 0);
+                            $periodEnd = $periodEndTs > 0
+                                ? Carbon::createFromTimestamp($periodEndTs)
+                                : now()->addMonth();
+                        }
+
+                        $this->persistBillingSubscription($user, $stripeSubscription);
+                    } else {
+                        $targetPlan = $freePlan;
+                        $billingSubscription = BillingSubscription::query()
                             ->where('user_id', $user->id)
                             ->where('type', 'default')
-                            ->where('stripe_status', '!=', 'canceled')
-                            ->update([
-                                'stripe_status' => 'canceled',
-                                'ends_at' => now(),
-                            ]);
+                            ->latest('id')
+                            ->first();
+
+                        if ($billingSubscription) {
+                            BillingSubscription::query()
+                                ->where('user_id', $user->id)
+                                ->where('type', 'default')
+                                ->where('stripe_status', '!=', 'canceled')
+                                ->update([
+                                    'stripe_status' => 'canceled',
+                                    'ends_at' => now(),
+                                ]);
+                        }
                     }
+
+                    $defaultPaymentMethodId = $this->extractDefaultPaymentMethodIdFromCustomer($customer);
+                    $defaultPaymentMethod = $this->resolveCustomerDefaultPaymentMethod($defaultPaymentMethodId);
+
+                    $user->forceFill([
+                        'pm_type' => $defaultPaymentMethod['pm_type'],
+                        'pm_last_four' => $defaultPaymentMethod['pm_last_four'],
+                    ])->save();
+                }
+            } catch (ApiErrorException $exception) {
+                if ($this->isMissingStripeCustomerError($exception)) {
+                    $this->resetBillingStateForMissingCustomer($user);
+                    $targetPlan = $freePlan;
+                    $periodEnd = now()->addMonth();
+
+                    $user->forceFill([
+                        'stripe_id' => null,
+                        'pm_type' => null,
+                        'pm_last_four' => null,
+                    ])->save();
                 }
 
-                $defaultPaymentMethod = $this->resolveCustomerDefaultPaymentMethod($customer?->invoice_settings?->default_payment_method);
-
-                $user->forceFill([
-                    'pm_type' => $defaultPaymentMethod['pm_type'],
-                    'pm_last_four' => $defaultPaymentMethod['pm_last_four'],
-                ])->save();
-            } catch (ApiErrorException $exception) {
                 Log::warning('Billing sync failed when contacting Stripe API.', [
                     'user_id' => $user->id,
                     'stripe_id' => $user->stripe_id,
@@ -276,5 +301,53 @@ class BillingSyncService
         }
 
         return Carbon::createFromTimestamp($timestamp);
+    }
+
+    private function isMissingStripeCustomerError(ApiErrorException $exception): bool
+    {
+        $httpStatus = (int) ($exception->getHttpStatus() ?? 0);
+        $stripeCode = strtolower((string) ($exception->getStripeCode() ?? ''));
+        $message = strtolower(trim((string) $exception->getMessage()));
+
+        if ($httpStatus === 404 && str_contains($message, 'customer')) {
+            return true;
+        }
+
+        return $stripeCode === 'resource_missing' && str_contains($message, 'customer');
+    }
+
+    private function resetBillingStateForMissingCustomer(User $user): void
+    {
+        BillingSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'default')
+            ->where('stripe_status', '!=', 'canceled')
+            ->update([
+                'stripe_status' => 'canceled',
+                'ends_at' => now(),
+            ]);
+    }
+
+    private function isDeletedStripeCustomer(mixed $customer): bool
+    {
+        if (! is_object($customer)) {
+            return false;
+        }
+
+        return (bool) ($customer->deleted ?? false);
+    }
+
+    private function extractDefaultPaymentMethodIdFromCustomer(mixed $customer): mixed
+    {
+        if (! is_object($customer)) {
+            return null;
+        }
+
+        $invoiceSettings = $customer->invoice_settings ?? null;
+        if (! is_object($invoiceSettings)) {
+            return null;
+        }
+
+        return $invoiceSettings->default_payment_method ?? null;
     }
 }

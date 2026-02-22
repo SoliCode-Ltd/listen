@@ -213,7 +213,7 @@ async function readSelectionViaScript(tabId) {
 
       if (active instanceof HTMLInputElement) {
         const type = String(active.type || '').toLowerCase();
-        if (!['text', 'search', 'url', 'tel', 'password', 'email'].includes(type)) {
+        if (!['text', 'search', 'url', 'tel', 'email'].includes(type)) {
           return '';
         }
 
@@ -651,7 +651,6 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const tabId = typeof tab?.id === 'number' ? tab.id : null;
     const requestToken = tabId !== null ? nextPlaybackToken(tabId) : Date.now();
     await queueTextForPlayback(selected, {}, { tabId: tabId ?? undefined, requestToken });
-    await setLastStatus('Voice generated in side panel.', 'ok');
     flashBadge('OK', '#2bb673');
   } catch (error) {
     const message = String(error?.message || 'Voice generation failed.');
@@ -699,14 +698,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         message.overrides || {},
         { tabId, requestToken },
       );
-      await setLastStatus('Voice generated in side panel.', 'ok');
       flashBadge('OK', '#2bb673');
       return { ok: true, result };
     }
 
     if (message.type === 'READ_CURRENT_SELECTION') {
       const result = await readCurrentTabSelection(message.overrides || {});
-      await setLastStatus('Voice generated in side panel.', 'ok');
       flashBadge('OK', '#2bb673');
       return { ok: true, result };
     }

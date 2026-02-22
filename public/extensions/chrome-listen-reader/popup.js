@@ -241,6 +241,11 @@ async function loadLastStatus() {
   if (!message) return;
 
   const type = status?.type === 'ok' ? 'ok' : (status?.type === 'error' ? 'error' : '');
+  await requestBackground({ type: 'CLEAR_LAST_STATUS' }).catch(() => {});
+  if (type !== 'error') {
+    return;
+  }
+
   setStatus(message, type);
 }
 

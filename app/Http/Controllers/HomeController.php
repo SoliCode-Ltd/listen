@@ -443,15 +443,19 @@ class HomeController extends Controller
             ->get();
 
         $mapped = $plans->map(function (Plan $plan): array {
-            $monthly = round($plan->price_cents / 100, 2);
-            $yearly = round($monthly * 0.8, 2);
+            $monthlyCents = max(0, (int) $plan->price_cents);
+            $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
+            $monthly = round($monthlyCents / 100, 2);
+            $yearly = round($yearlyCents / 100, 2);
             $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
 
             return [
                 'slug' => $plan->slug,
                 'name' => $plan->name,
                 'price_monthly' => $monthly,
+                'price_monthly_cents' => $monthlyCents,
                 'price_yearly' => $yearly,
+                'price_yearly_cents' => $yearlyCents,
                 'monthly_minutes' => (int) $plan->monthly_minutes,
                 'monthly_chars' => (int) $plan->monthly_chars,
                 'monthly_requests' => (int) $plan->monthly_requests,

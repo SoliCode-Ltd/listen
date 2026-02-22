@@ -28,7 +28,7 @@ class MessageReaderController extends Controller
     public function profile(Request $request)
     {
         $user = $this->resolveApiUser($request);
-        $this->billingSyncService->syncIfStale($user, true);
+        $this->billingSyncService->syncIfStale($user);
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
