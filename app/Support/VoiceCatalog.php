@@ -2,153 +2,102 @@
 
 namespace App\Support;
 
+use App\Models\Voice;
+
 class VoiceCatalog
 {
-    public static function byLanguage(): array
+    /**
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public static function byLanguage(?string $tier = null): array
     {
-        $catalog = config('services.google_tts.voice_catalog', []);
-        $requireWaveNet = (bool) config('listen.voice.require_wavenet', true);
+        $voices = self::activeQuery($tier)->get();
+        $catalog = [];
 
-        if (! is_array($catalog)) {
-            return [];
+        foreach ($voices as $voice) {
+            $catalog[$voice->language] ??= [];
+            $catalog[$voice->language][] = self::toVoiceEntry($voice);
         }
 
-        $cleaned = [];
-        foreach ($catalog as $language => $voices) {
-            if (! is_array($voices)) {
-                continue;
-            }
-
-            $language = (string) $language;
-            $cleaned[$language] = [];
-            $seenKeys = [];
-            $seenNames = [];
-
-            foreach ($voices as $index => $voice) {
-                if (! is_array($voice) || empty($voice['name'])) {
-                    continue;
-                }
-
-                $name = (string) $voice['name'];
-                if (! self::matchesLanguagePrefix($name, $language)) {
-                    continue;
-                }
-
-                if ($requireWaveNet && ! self::isWaveNetVoiceName($name)) {
-                    continue;
-                }
-
-                $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
-                if (isset($seenKeys[$key]) || isset($seenNames[$name])) {
-                    continue;
-                }
-
-                $seenKeys[$key] = true;
-                $seenNames[$name] = true;
-                $voice['key'] = $key;
-                $cleaned[$language][] = $voice;
-            }
-        }
-
-        return $cleaned;
+        return $catalog;
     }
 
-    public static function forLanguage(string $language): array
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public static function forLanguage(string $language, ?string $tier = null): array
     {
-        $catalog = self::byLanguage();
-
-        return isset($catalog[$language]) && is_array($catalog[$language])
-            ? $catalog[$language]
-            : [];
+        return self::byLanguage($tier)[$language] ?? [];
     }
 
-    public static function allVoiceNames(): array
+    /**
+     * @return array<int, string>
+     */
+    public static function allVoiceNames(?string $tier = null): array
     {
-        $names = [];
-
-        foreach (self::byLanguage() as $voices) {
-            if (! is_array($voices)) {
-                continue;
-            }
-
-            foreach ($voices as $voice) {
-                if (is_array($voice) && ! empty($voice['name'])) {
-                    $names[] = (string) $voice['name'];
-                }
-            }
-        }
-
-        return array_values(array_unique($names));
+        return self::activeQuery($tier)
+            ->pluck('internal_voice_id')
+            ->all();
     }
 
-    public static function namesForLanguage(string $language): array
+    /**
+     * @return array<int, string>
+     */
+    public static function namesForLanguage(string $language, ?string $tier = null): array
     {
-        $names = [];
-
-        foreach (self::forLanguage($language) as $voice) {
-            if (is_array($voice) && ! empty($voice['name'])) {
-                $names[] = (string) $voice['name'];
-            }
-        }
-
-        return $names;
+        return self::activeQuery($tier)
+            ->where('language', $language)
+            ->pluck('internal_voice_id')
+            ->all();
     }
 
-    public static function mapByName(): array
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public static function mapByName(?string $tier = null): array
     {
         $map = [];
 
-        foreach (self::byLanguage() as $language => $voices) {
-            if (! is_array($voices)) {
-                continue;
-            }
-
-            foreach ($voices as $index => $voice) {
-                if (! is_array($voice) || empty($voice['name'])) {
-                    continue;
-                }
-
-                $name = (string) $voice['name'];
-                $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
-                $map[$name] = [
-                    'key' => $key,
-                    'name' => $name,
-                    'label' => (string) ($voice['label'] ?? $name),
-                    'gender' => (string) ($voice['gender'] ?? 'neutral'),
-                    'avatar' => (string) ($voice['avatar'] ?? 'profile'),
-                    'recommended' => (bool) ($voice['recommended'] ?? false),
-                    'language' => (string) $language,
-                ];
-            }
+        foreach (self::activeQuery($tier)->get() as $voice) {
+            $map[$voice->internal_voice_id] = self::toVoiceEntry($voice);
         }
 
         return $map;
     }
 
-    public static function publicCatalog(): array
+    /**
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    public static function publicCatalog(?string $tier = null): array
     {
         $catalog = [];
 
-        foreach (self::byLanguage() as $language => $voices) {
-            if (! is_array($voices)) {
-                continue;
-            }
-
-            $catalog[$language] = [];
-
-            foreach ($voices as $index => $voice) {
-                if (! is_array($voice) || empty($voice['name'])) {
-                    continue;
-                }
-
-                $catalog[$language][] = [
-                    'key' => (string) ($voice['key'] ?? ($language.'_'.($index + 1))),
-                    'label' => (string) ($voice['label'] ?? $voice['name']),
-                    'gender' => (string) ($voice['gender'] ?? 'neutral'),
-                    'avatar' => (string) ($voice['avatar'] ?? 'profile'),
-                    'recommended' => (bool) ($voice['recommended'] ?? false),
+        foreach (self::byLanguage($tier) as $language => $voices) {
+            $catalog[$language] = array_map(function (array $voice): array {
+                return [
+                    'key' => $voice['key'],
+                    'label' => $voice['label'],
+                    'gender' => $voice['gender'],
+                    'avatar' => $voice['avatar'],
+                    'recommended' => $voice['recommended'],
+                    'tier' => $voice['tier'],
+                    'tier_label' => VoiceTier::label((string) $voice['tier']),
                 ];
-            }
+            }, $voices);
+        }
+
+        return $catalog;
+    }
+
+    /**
+     * @return array<string, array<string, array<int, array<string, mixed>>>>
+     */
+    public static function publicCatalogByTier(): array
+    {
+        $catalog = [];
+
+        foreach (VoiceTier::all() as $tier) {
+            $catalog[$tier] = self::publicCatalog($tier);
         }
 
         return $catalog;
@@ -161,79 +110,84 @@ class VoiceCatalog
             return null;
         }
 
-        $map = self::mapByName();
-        $meta = $map[$voiceName] ?? null;
-        if (! is_array($meta)) {
+        $voice = self::activeQuery()->where('internal_voice_id', $voiceName)->first();
+        if (! $voice) {
             return null;
         }
 
+        $meta = self::toVoiceEntry($voice);
+
         return [
-            'key' => $meta['key'] ?? null,
-            'label' => $meta['label'] ?? null,
-            'gender' => $meta['gender'] ?? null,
-            'avatar' => $meta['avatar'] ?? 'profile',
-            'recommended' => (bool) ($meta['recommended'] ?? false),
-            'language' => $meta['language'] ?? null,
+            'key' => $meta['key'],
+            'label' => $meta['label'],
+            'gender' => $meta['gender'],
+            'avatar' => $meta['avatar'],
+            'recommended' => (bool) $meta['recommended'],
+            'language' => $meta['language'],
+            'tier' => $meta['tier'],
+            'tier_label' => VoiceTier::label((string) $meta['tier']),
         ];
     }
 
     public static function labelForName(?string $voiceName): string
     {
-        $meta = self::voiceMeta($voiceName);
-
-        return $meta['label'] ?? 'Default voice';
+        return self::voiceMeta($voiceName)['label'] ?? 'Default voice';
     }
 
-    public static function nameFromKeyForLanguage(string $language, ?string $voiceKey): ?string
+    public static function nameFromKeyForLanguage(string $language, ?string $voiceKey, ?string $tier = null): ?string
     {
-        $voiceKey = trim((string) $voiceKey);
-        if ($voiceKey === '') {
-            return null;
-        }
+        $voice = self::findByKeyForLanguage($voiceKey, $language, $tier);
 
-        foreach (self::forLanguage($language) as $index => $voice) {
-            if (! is_array($voice) || empty($voice['name'])) {
-                continue;
-            }
-
-            $key = (string) ($voice['key'] ?? ($language.'_'.($index + 1)));
-            if ($key === $voiceKey) {
-                return (string) $voice['name'];
-            }
-        }
-
-        return null;
+        return $voice?->internal_voice_id;
     }
 
-    public static function isAllowedForLanguage(?string $voiceName, string $language): bool
+    public static function isAllowedForLanguage(?string $voiceName, string $language, ?string $tier = null): bool
     {
         $voiceName = trim((string) $voiceName);
         if ($voiceName === '') {
             return true;
         }
 
-        return in_array($voiceName, self::namesForLanguage($language), true);
+        return self::activeQuery($tier)
+            ->where('language', $language)
+            ->where('internal_voice_id', $voiceName)
+            ->exists();
     }
 
-    public static function defaultForLanguage(string $language): string
+    public static function defaultForLanguage(string $language, ?string $tier = null): string
     {
-        $fallback = $language === 'ar' ? 'ar-XA-Wavenet-A' : 'en-US-Wavenet-F';
-        $default = $language === 'ar'
-            ? (string) config('services.google_tts.voice_ar', $fallback)
-            : (string) config('services.google_tts.voice_en', $fallback);
+        $language = strtolower(trim($language));
+        $normalizedTier = $tier !== null && $tier !== ''
+            ? VoiceTier::normalize($tier)
+            : null;
 
-        $requireWaveNet = (bool) config('listen.voice.require_wavenet', true);
-        if ($requireWaveNet && ! self::isWaveNetVoiceName($default)) {
-            $default = $fallback;
+        if ($normalizedTier !== null) {
+            $voice = self::activeQuery($normalizedTier)
+                ->where('language', $language)
+                ->orderBy('id')
+                ->first();
+
+            return $voice ? (string) $voice->internal_voice_id : '';
         }
 
-        if (self::isAllowedForLanguage($default, $language)) {
-            return $default;
+        $fallback = self::activeQuery()
+            ->where('language', $language)
+            ->orderBy('id')
+            ->first();
+
+        return $fallback ? (string) $fallback->internal_voice_id : '';
+    }
+
+    public static function tierForName(?string $voiceName): ?string
+    {
+        $voiceName = trim((string) $voiceName);
+        if ($voiceName === '') {
+            return null;
         }
 
-        $names = self::namesForLanguage($language);
-
-        return $names[0] ?? $fallback;
+        return self::activeQuery()
+            ->where('internal_voice_id', $voiceName)
+            ->value('tier');
     }
 
     public static function isWaveNetVoiceName(?string $voiceName): bool
@@ -243,15 +197,81 @@ class VoiceCatalog
         return $voiceName !== '' && str_contains(strtolower($voiceName), '-wavenet-');
     }
 
-    private static function matchesLanguagePrefix(string $voiceName, string $language): bool
+    public static function findByKeyForLanguage(?string $voiceKey, string $language, ?string $tier = null): ?Voice
     {
-        $language = strtolower(trim($language));
-        $voiceName = trim($voiceName);
+        $id = self::idFromKey($voiceKey);
+        if (! $id) {
+            return null;
+        }
 
-        return match ($language) {
-            'ar' => str_starts_with($voiceName, 'ar-'),
-            'en' => str_starts_with($voiceName, 'en-'),
-            default => true,
-        };
+        $query = self::activeQuery($tier)->where('id', $id)->where('language', $language);
+
+        return $query->first();
+    }
+
+    public static function keyFromId(int $id): string
+    {
+        return 'voice_'.$id;
+    }
+
+    private static function idFromKey(?string $key): ?int
+    {
+        $key = trim((string) $key);
+        if ($key === '') {
+            return null;
+        }
+
+        if (! preg_match('/^voice_(\d+)$/', $key, $matches)) {
+            return null;
+        }
+
+        $id = (int) ($matches[1] ?? 0);
+
+        return $id > 0 ? $id : null;
+    }
+
+    private static function activeQuery(?string $tier = null)
+    {
+        $query = Voice::query()->where('is_active', true);
+
+        if ($tier !== null && $tier !== '') {
+            $query->where('tier', VoiceTier::normalize($tier));
+        }
+
+        return $query
+            ->orderBy('language')
+            ->orderByRaw("CASE tier WHEN 'standard' THEN 1 WHEN 'hd' THEN 2 WHEN 'hd_plus' THEN 3 ELSE 99 END")
+            ->orderBy('display_name')
+            ->orderBy('id');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function toVoiceEntry(Voice $voice): array
+    {
+        return [
+            'id' => (int) $voice->id,
+            'key' => self::keyFromId((int) $voice->id),
+            'name' => (string) $voice->internal_voice_id,
+            'label' => (string) $voice->display_name,
+            'gender' => (string) $voice->gender,
+            'avatar' => self::avatarFor((string) $voice->gender, (string) $voice->language),
+            'recommended' => false,
+            'language' => (string) $voice->language,
+            'tier' => VoiceTier::normalize((string) $voice->tier),
+        ];
+    }
+
+    private static function avatarFor(string $gender, string $language): string
+    {
+        $gender = strtolower(trim($gender));
+        $language = strtolower(trim($language));
+
+        if ($gender === 'male') {
+            return $language === 'ar' ? 'male-ar' : 'male-en';
+        }
+
+        return $language === 'ar' ? 'female-ar' : 'female-en';
     }
 }

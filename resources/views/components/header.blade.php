@@ -78,6 +78,14 @@
               <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               Browsers Extension
             </a>
+            <a href="{{ route('billing.page') }}" class="dropdown-item">
+              <svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM3 10h18"/></svg>
+              Billing
+            </a>
+            <a href="{{ route('manage-subscription.page') }}" class="dropdown-item">
+              <svg viewBox="0 0 24 24"><path d="M12 2v6M6 8h12M4 12h16M7 16h10M9 20h6"/></svg>
+              Manage Subscription
+            </a>
             <a href="{{ route('pricing') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
               Pricing

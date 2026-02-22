@@ -341,7 +341,7 @@
             <div class="box"><small>Done</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
             <div class="box"><small>Failed</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
           </div>
-          <p style="color: var(--muted); margin-top: .85rem;">Arabic and English voices with male/female options are enabled.</p>
+          <p style="color: var(--muted); margin-top: .85rem;">Voice quality on this account: <strong>{{ $planTierLabel }}</strong>.</p>
         </aside>
       </div>
     </section>
@@ -406,6 +406,7 @@
       <aside class="page-card reveal sidebar-info">
         <h3>Plan + Voice Defaults</h3>
         <p>Current plan: {{ $activePlan?->name ?? 'Free' }}</p>
+        <p>Voice quality: {{ $planTierLabel }}</p>
         <p>Monthly characters: {{ number_format($planChars) }}</p>
         <p>Monthly requests: {{ $requestsUnlimited ? 'Unlimited' : $planRequests }}</p>
         <p>Overage: {{ ($activePlan?->allow_overage ?? false) ? ('$'.number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2).' per 1,000,000 chars') : 'Not allowed' }}</p>
@@ -416,8 +417,10 @@
         <p>Arabic default: {{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</p>
         <p>English default: {{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</p>
         <div class="sidebar-actions">
+          <a class="btn" href="{{ route('pricing') }}">Pricing & Plans</a>
+          <a class="btn" href="{{ route('billing.page') }}">Upgrade Plan</a>
+          <a class="btn" href="{{ route('manage-subscription.page') }}">Manage Subscription</a>
           <a class="btn" href="{{ route('browsers-extension.page') }}">Browser Extension</a>
-          <a class="btn" href="{{ route('pricing') }}">View Pricing</a>
         </div>
       </aside>
     </section>
@@ -519,6 +522,20 @@
       return text.charAt(0).toUpperCase() + text.slice(1);
     }
 
+    function sortVoices(list) {
+      const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+      return [...list].sort((a, b) => {
+        const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
+        const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
+        if (aRank !== bRank) return aRank - bRank;
+
+        const byLabel = String(a?.label || '').localeCompare(String(b?.label || ''), undefined, { sensitivity: 'base' });
+        if (byLabel !== 0) return byLabel;
+
+        return String(a?.key || '').localeCompare(String(b?.key || ''), undefined, { sensitivity: 'base' });
+      });
+    }
+
     function escapeHtml(value) {
       return String(value ?? '')
         .replace(/&/g, '&amp;')
@@ -537,7 +554,8 @@
 
     function renderVoiceOptions() {
       const lang = targetLanguage?.value || 'ar';
-      const voices = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
+      const raw = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
+      const voices = sortVoices(raw);
       const current = voiceSelect?.value || preferredVoiceKey || '';
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
@@ -545,7 +563,10 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        option.textContent = `${voice.label} - ${formatGender(voice.gender)}`;
+        const quality = String(voice?.tier_label || '').trim();
+        option.textContent = quality !== ''
+          ? `${voice.label} - ${formatGender(voice.gender)} - ${quality}`
+          : `${voice.label} - ${formatGender(voice.gender)}`;
         voiceSelect.appendChild(option);
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
@@ -568,7 +589,7 @@
         ? `${formatNumber(usage.total_requests)} / Unlimited requests`
         : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} requests`;
       if (usageCharsMeter) usageCharsMeter.style.width = `${Number(usage.chars_percent || 0)}%`;
-      if (usageRequestsMeter) usageRequestsMeter.style.width = requestsUnlimited ? '100%' : `${Number(usage.requests_percent || 0)}%`;
+      if (usageRequestsMeter) usageRequestsMeter.style.width = `${Number(usage.requests_percent || 0)}%`;
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
       if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
     }

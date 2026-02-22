@@ -16,7 +16,58 @@ const DEFAULT_SETTINGS = {
   autoPlay: true,
 };
 
+const LAST_STATUS_KEY = 'listen_last_status';
+const LAST_STATUS_TTL_MS = 1000 * 60 * 30;
 const tabPlaybackTokens = new Map();
+
+function setLastStatus(message, type = '') {
+  const text = String(message || '').trim();
+  const status = text ? {
+    message: text,
+    type: type === 'ok' ? 'ok' : (type === 'error' ? 'error' : ''),
+    at: Date.now(),
+  } : null;
+
+  return new Promise((resolve) => {
+    if (!status) {
+      chrome.storage.local.remove(LAST_STATUS_KEY, () => resolve(null));
+      return;
+    }
+
+    chrome.storage.local.set({ [LAST_STATUS_KEY]: status }, () => resolve(status));
+  });
+}
+
+function getLastStatus() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get([LAST_STATUS_KEY], (data) => {
+      const status = data?.[LAST_STATUS_KEY];
+      if (!status || typeof status !== 'object') {
+        resolve(null);
+        return;
+      }
+
+      const message = String(status.message || '').trim();
+      if (!message) {
+        resolve(null);
+        return;
+      }
+
+      const type = status.type === 'ok' ? 'ok' : (status.type === 'error' ? 'error' : '');
+      const at = Number(status.at || 0);
+      if (at > 0 && (Date.now() - at) > LAST_STATUS_TTL_MS) {
+        chrome.storage.local.remove(LAST_STATUS_KEY, () => resolve(null));
+        return;
+      }
+
+      resolve({
+        message,
+        type,
+        at: at || Date.now(),
+      });
+    });
+  });
+}
 
 function nextPlaybackToken(tabId) {
   if (typeof tabId !== 'number') {
@@ -235,6 +286,49 @@ function truncate(input, max = 140) {
   return text.slice(0, max - 3) + '...';
 }
 
+function extractApiErrorMessage(data, fallback = 'Request failed.') {
+  if (!data || typeof data !== 'object') {
+    return fallback;
+  }
+
+  const primaryMessage = String(data.message || '').trim();
+  const isGenericValidationMessage = primaryMessage.toLowerCase() === 'the given data was invalid.';
+
+  if (!isGenericValidationMessage) {
+    const direct = [data.message, data.error_message, data.error];
+    for (const value of direct) {
+      const message = String(value || '').trim();
+      if (message) {
+        return message;
+      }
+    }
+  }
+
+  const errors = data.errors;
+  if (errors && typeof errors === 'object') {
+    for (const value of Object.values(errors)) {
+      if (Array.isArray(value)) {
+        const first = value.find((entry) => String(entry || '').trim());
+        const message = String(first || '').trim();
+        if (message) {
+          return message;
+        }
+      }
+
+      const message = String(value || '').trim();
+      if (message) {
+        return message;
+      }
+    }
+  }
+
+  if (primaryMessage) {
+    return primaryMessage;
+  }
+
+  return fallback;
+}
+
 function normalizeSelectedText(input) {
   return String(input || '')
     .replace(/\s+/g, ' ')
@@ -343,7 +437,7 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(data?.message || 'Unable to check generation status.');
+      throw new Error(extractApiErrorMessage(data, 'Unable to check generation status.'));
     }
 
     const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
@@ -355,7 +449,7 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
     }
 
     if (match.status === 'failed') {
-      throw new Error(match.error_message || 'Voice generation failed.');
+      throw new Error(extractApiErrorMessage(match, 'Voice generation failed.'));
     }
   }
 
@@ -424,7 +518,7 @@ async function fetchProfile(overrides = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(data?.message || 'Could not load profile.');
+    throw new Error(extractApiErrorMessage(data, 'Could not load profile.'));
   }
 
   return data?.profile || null;
@@ -479,7 +573,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(data?.message || data?.error_message || 'Voice generation failed.');
+    throw new Error(extractApiErrorMessage(data, 'Voice generation failed.'));
   }
 
   if (data.audio_url) {
@@ -557,8 +651,11 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     const tabId = typeof tab?.id === 'number' ? tab.id : null;
     const requestToken = tabId !== null ? nextPlaybackToken(tabId) : Date.now();
     await queueTextForPlayback(selected, {}, { tabId: tabId ?? undefined, requestToken });
+    await setLastStatus('Voice generated in side panel.', 'ok');
     flashBadge('OK', '#2bb673');
-  } catch (_error) {
+  } catch (error) {
+    const message = String(error?.message || 'Voice generation failed.');
+    await setLastStatus(message, 'error');
     flashBadge('ERR', '#d9534f', 3000);
   }
 });
@@ -584,6 +681,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, profile };
     }
 
+    if (message.type === 'GET_LAST_STATUS') {
+      const status = await getLastStatus();
+      return { ok: true, status };
+    }
+
+    if (message.type === 'CLEAR_LAST_STATUS') {
+      await setLastStatus('', '');
+      return { ok: true };
+    }
+
     if (message.type === 'READ_TEXT') {
       const tabId = await getActiveTabId();
       const requestToken = nextPlaybackToken(tabId);
@@ -592,12 +699,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         message.overrides || {},
         { tabId, requestToken },
       );
+      await setLastStatus('Voice generated in side panel.', 'ok');
       flashBadge('OK', '#2bb673');
       return { ok: true, result };
     }
 
     if (message.type === 'READ_CURRENT_SELECTION') {
       const result = await readCurrentTabSelection(message.overrides || {});
+      await setLastStatus('Voice generated in side panel.', 'ok');
       flashBadge('OK', '#2bb673');
       return { ok: true, result };
     }
@@ -607,7 +716,8 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   respond()
     .then((payload) => sendResponse(payload))
-    .catch((error) => {
+    .catch(async (error) => {
+      await setLastStatus(String(error?.message || 'Unexpected error.'), 'error');
       flashBadge('ERR', '#d9534f', 3000);
       sendResponse({ ok: false, message: error?.message || 'Unexpected error.' });
     });

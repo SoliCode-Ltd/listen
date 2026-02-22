@@ -37,7 +37,7 @@ class ExtensionController extends Controller
         }
 
         return redirect()
-            ->route('extension.page')
+            ->route('browsers-extension.page')
             ->with('ok', 'A new API key was generated successfully.')
             ->with('new_api_key', $newApiKey);
     }
@@ -57,7 +57,7 @@ class ExtensionController extends Controller
         }
 
         return redirect()
-            ->route('extension.page')
+            ->route('browsers-extension.page')
             ->with('ok', 'API key revoked. Generate a new key to reconnect the extension.');
     }
 

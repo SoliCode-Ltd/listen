@@ -2,19 +2,29 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\DemoGuestUsage;
 use App\Models\Plan;
+use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
 
 class HomeController extends Controller
 {
+    public function __construct(
+        private readonly PlanAccessService $planAccessService,
+    ) {
+    }
+
     public function index()
     {
         $pricingPlans = $this->pricingPlans();
@@ -25,27 +35,49 @@ class HomeController extends Controller
         ]);
     }
 
-    public function pricingPage()
+    public function pricingPage(Request $request)
     {
+        $activePlanSlug = null;
+        if ($request->user()) {
+            $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $request->user()->id);
+            $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
+        }
+
         return view('pricing', [
             'pricingPlans' => $this->pricingPlans(),
+            'activePlanSlug' => $activePlanSlug,
         ]);
     }
 
     public function demoPage(Request $request)
     {
+        if ($response = $this->denyDemoForAuthenticatedUser($request)) {
+            return $response;
+        }
+
+        $defaultTier = VoiceTier::STANDARD;
+
         return view('demo', [
-            'voiceCatalog' => VoiceCatalog::publicCatalog(),
-            'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar')),
-            'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en')),
+            'voiceCatalog' => VoiceCatalog::publicCatalogByTier(),
+            'defaultTier' => $defaultTier,
+            'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar', $defaultTier)),
+            'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en', $defaultTier)),
             'demoQuota' => $this->demoQuotaSnapshot($request, true),
             'guestAllowanceChars' => $this->demoCharAllowance($request),
             'starterPlanChars' => max(1, (int) (Plan::query()->where('slug', 'free')->value('monthly_chars') ?? 30000)),
+            'demoTiers' => array_map(fn (string $tier) => [
+                'key' => $tier,
+                'label' => VoiceTier::label($tier),
+            ], VoiceTier::all()),
         ]);
     }
 
     public function demo(Request $request)
     {
+        if ($response = $this->denyDemoForAuthenticatedUser($request)) {
+            return $response;
+        }
+
         $maxChars = $this->demoCharAllowance($request);
 
         $validated = $request->validate([
@@ -53,11 +85,14 @@ class HomeController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
+            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
         ]);
 
+        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? VoiceTier::STANDARD));
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
+            $tier,
         );
 
         $text = trim($validated['text']);
@@ -69,7 +104,7 @@ class HomeController extends Controller
             ]);
         }
 
-        $quota = $this->enforceDemoPolicy($request, $estimate['chars'], false);
+        $quota = $this->enforceDemoPolicy($request, $estimate['chars'], false, false);
 
         return response()->json([
             'ok' => true,
@@ -81,6 +116,8 @@ class HomeController extends Controller
                 ? 'Text will be translated to the target language before audio generation.'
                 : 'Text will be spoken as-is without translation.',
             'voice' => VoiceCatalog::voiceMeta($voiceName),
+            'voice_tier' => $tier,
+            'voice_tier_label' => VoiceTier::label($tier),
             'estimated_chars' => $estimate['chars'],
             'estimated_seconds' => $estimate['seconds'],
             'estimated_minutes' => $estimate['minutes'],
@@ -93,6 +130,10 @@ class HomeController extends Controller
         TranslationService $translationService,
         TtsService $ttsService,
     ) {
+        if ($response = $this->denyDemoForAuthenticatedUser($request)) {
+            return $response;
+        }
+
         $maxChars = $this->demoCharAllowance($request);
 
         $validated = $request->validate([
@@ -100,11 +141,14 @@ class HomeController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
+            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
         ]);
 
+        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? VoiceTier::STANDARD));
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
+            $tier,
         );
 
         $text = trim($validated['text']);
@@ -116,17 +160,21 @@ class HomeController extends Controller
             ]);
         }
 
-        $quota = $this->enforceDemoPolicy($request, $estimate['chars'], true);
-
-        $textForSpeech = $translationService->maybeTranslate(
-            $text,
-            $sourceLanguage,
-            $validated['target_language'],
-            (bool) ($validated['translate'] ?? false),
-        );
+        $quotaReserved = false;
+        $quota = [];
 
         try {
-            $audio = $ttsService->synthesize($textForSpeech, $validated['target_language'], $voiceName);
+            $quota = $this->enforceDemoPolicy($request, $estimate['chars'], true, true);
+            $quotaReserved = true;
+
+            $textForSpeech = $translationService->maybeTranslate(
+                $text,
+                $sourceLanguage,
+                $validated['target_language'],
+                (bool) ($validated['translate'] ?? false),
+            );
+
+            $audio = $ttsService->synthesize($textForSpeech, $validated['target_language'], $voiceName, $tier);
             $estimate = UsageEstimator::estimate($textForSpeech);
 
             return response()->json([
@@ -138,24 +186,59 @@ class HomeController extends Controller
                     ? 'Text was translated to the target language before audio generation.'
                     : 'Text was spoken as-is without translation.',
                 'voice' => VoiceCatalog::voiceMeta($voiceName),
+                'voice_tier' => $tier,
+                'voice_tier_label' => VoiceTier::label($tier),
                 'audio_url' => AudioUrl::fromPath($audio['audio_path']),
                 'duration_seconds' => $audio['duration_seconds'] ?? $estimate['seconds'],
                 'estimated_chars' => $estimate['chars'],
                 'quota' => $quota,
             ]);
+        } catch (ValidationException $e) {
+            if ($quotaReserved) {
+                $quota = $this->rollbackDemoPolicy($request, $estimate['chars'], true);
+            }
+
+            $errors = $e->errors();
+            $firstError = '';
+            foreach ($errors as $messages) {
+                if (is_array($messages) && isset($messages[0]) && is_string($messages[0])) {
+                    $firstError = trim($messages[0]);
+                    if ($firstError !== '') {
+                        break;
+                    }
+                }
+            }
+
+            return response()->json([
+                'ok' => false,
+                'message' => $firstError !== '' ? $firstError : 'Request validation failed.',
+                'errors' => $errors,
+                'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
+            ], 422);
         } catch (\Throwable $e) {
+            if ($quotaReserved) {
+                $quota = $this->rollbackDemoPolicy($request, $estimate['chars'], true);
+            }
+
+            Log::error('Demo preview failed unexpectedly.', [
+                'target_language' => $validated['target_language'] ?? null,
+                'voice_tier' => $tier ?? null,
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+
             return response()->json([
                 'ok' => false,
                 'message' => 'Voice generation failed. Please try again in a moment.',
-                'error' => app()->environment('local') ? $e->getMessage() : null,
+                'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
             ], 422);
         }
     }
 
-    private function enforceDemoPolicy(Request $request, int $chars, bool $preview): array
+    private function enforceDemoPolicy(Request $request, int $chars, bool $preview, bool $commit = true): array
     {
         $isUser = (bool) $request->user();
-        [$identities] = $this->resolveDemoIdentities($request);
+        [$identities, $primaryIdentity] = $this->resolveDemoIdentities($request);
         $scope = $preview ? 'preview' : 'check';
         $maxPerMinute = max(1, (int) config("listen.demo.{$scope}.".($isUser ? 'user' : 'guest')."_rate_per_minute", 10));
 
@@ -179,10 +262,8 @@ class HomeController extends Controller
 
         if (! $isUser) {
             $lifetimeCap = $this->demoCharAllowance($request);
-            foreach ($identities as $identity) {
-                $lifetimeCharsKey = "demo:guest:lifetime:chars:{$identity}";
-                $usedChars = (int) Cache::get($lifetimeCharsKey, 0);
-
+            if (! $commit) {
+                $usedChars = $this->guestLifetimeUsedChars($identities);
                 if (($usedChars + $chars) > $lifetimeCap) {
                     throw ValidationException::withMessages([
                         'text' => $this->demoDailyCapReachedMessage($request),
@@ -209,14 +290,16 @@ class HomeController extends Controller
                     ]);
                 }
 
-                Cache::put($globalRequestKey, $globalUsedRequests + 1, now()->endOfDay());
-                Cache::put($globalCharKey, $globalUsedChars + $chars, now()->endOfDay());
+                if ($commit) {
+                    Cache::put($globalRequestKey, $globalUsedRequests + 1, now()->endOfDay());
+                    Cache::put($globalCharKey, $globalUsedChars + $chars, now()->endOfDay());
+                }
             }
 
-            foreach ($identities as $identity) {
-                $lifetimeCharsKey = "demo:guest:lifetime:chars:{$identity}";
-                $usedChars = (int) Cache::get($lifetimeCharsKey, 0);
-                Cache::put($lifetimeCharsKey, $usedChars + $chars, now()->addYears(10));
+            if ($commit) {
+                $writeIdentities = $this->writableGuestIdentities($identities, $primaryIdentity);
+
+                $this->reserveGuestLifetimeChars($request, $writeIdentities, $chars, $lifetimeCap);
             }
 
             return $this->demoQuotaSnapshot($request, $preview);
@@ -263,33 +346,83 @@ class HomeController extends Controller
                 ]);
             }
 
-            Cache::put($globalRequestKey, $globalUsedRequests + 1, now()->endOfDay());
-            Cache::put($globalCharKey, $globalUsedChars + $chars, now()->endOfDay());
+            if ($commit) {
+                Cache::put($globalRequestKey, $globalUsedRequests + 1, now()->endOfDay());
+                Cache::put($globalCharKey, $globalUsedChars + $chars, now()->endOfDay());
+            }
+        }
+
+        if ($commit) {
+            foreach ($identities as $identity) {
+                $dailyRequestKey = 'demo:req:'.now()->format('Ymd').':'.$scope.':'.$identity;
+                $dailyCharKey = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$identity;
+
+                $usedRequests = (int) Cache::get($dailyRequestKey, 0);
+                $usedChars = (int) Cache::get($dailyCharKey, 0);
+
+                Cache::put($dailyRequestKey, $usedRequests + 1, now()->endOfDay());
+                Cache::put($dailyCharKey, $usedChars + $chars, now()->endOfDay());
+            }
+        }
+
+        return $this->demoQuotaSnapshot($request, $preview);
+    }
+
+    private function rollbackDemoPolicy(Request $request, int $chars, bool $preview): array
+    {
+        $isUser = (bool) $request->user();
+        [$identities, $primaryIdentity] = $this->resolveDemoIdentities($request);
+        $scope = $preview ? 'preview' : 'check';
+
+        if ($preview) {
+            $globalRequestKey = 'demo:req:'.now()->format('Ymd').':preview:global';
+            $globalCharKey = 'demo:chars:'.now()->format('Ymd').':preview:global';
+            $this->decrementCacheCounter($globalRequestKey, 1, now()->endOfDay());
+            $this->decrementCacheCounter($globalCharKey, $chars, now()->endOfDay());
+        }
+
+        if (! $isUser) {
+            $writeIdentities = $this->writableGuestIdentities($identities, $primaryIdentity);
+
+            $this->decrementGuestLifetimeChars($writeIdentities, $chars);
+
+            return $this->demoQuotaSnapshot($request, $preview);
         }
 
         foreach ($identities as $identity) {
             $dailyRequestKey = 'demo:req:'.now()->format('Ymd').':'.$scope.':'.$identity;
             $dailyCharKey = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$identity;
 
-            $usedRequests = (int) Cache::get($dailyRequestKey, 0);
-            $usedChars = (int) Cache::get($dailyCharKey, 0);
-
-            Cache::put($dailyRequestKey, $usedRequests + 1, now()->endOfDay());
-            Cache::put($dailyCharKey, $usedChars + $chars, now()->endOfDay());
+            $this->decrementCacheCounter($dailyRequestKey, 1, now()->endOfDay());
+            $this->decrementCacheCounter($dailyCharKey, $chars, now()->endOfDay());
         }
 
         return $this->demoQuotaSnapshot($request, $preview);
     }
 
-    private function normalizeVoiceSelection(string $language, ?string $voiceKey): string
+    private function decrementCacheCounter(string $key, int $amount, \DateTimeInterface $ttl): void
+    {
+        $current = (int) Cache::get($key, 0);
+        $next = max(0, $current - max(0, $amount));
+        Cache::put($key, $next, $ttl);
+    }
+
+    private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
 
         if ($voiceKey === '') {
-            return VoiceCatalog::defaultForLanguage($language);
+            $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+            if ($defaultVoice === '') {
+                throw ValidationException::withMessages([
+                    'target_language' => 'Selected language is not available for this voice quality.',
+                ]);
+            }
+
+            return $defaultVoice;
         }
 
-        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey);
+        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
                 'voice_key' => 'Selected voice is not available for the chosen language.',
@@ -312,6 +445,7 @@ class HomeController extends Controller
         $mapped = $plans->map(function (Plan $plan): array {
             $monthly = round($plan->price_cents / 100, 2);
             $yearly = round($monthly * 0.8, 2);
+            $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
 
             return [
                 'slug' => $plan->slug,
@@ -329,6 +463,8 @@ class HomeController extends Controller
                     : null,
                 'commercial_use_allowed' => (bool) $plan->commercial_use_allowed,
                 'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
+                'voice_tier' => $tier,
+                'voice_tier_label' => VoiceTier::label($tier),
                 'features' => is_array($plan->features) ? $plan->features : [],
             ];
         })->values();
@@ -394,24 +530,44 @@ class HomeController extends Controller
             return [[$identity], $identity];
         }
 
-        $ip = trim((string) $request->ip());
         $ua = mb_substr(trim((string) $request->userAgent()), 0, 180);
         $acceptLanguage = mb_substr(trim((string) $request->header('Accept-Language', '')), 0, 64);
+        $secChUa = mb_substr(trim((string) $request->header('Sec-CH-UA', '')), 0, 180);
+        $secChUaPlatform = mb_substr(trim((string) $request->header('Sec-CH-UA-Platform', '')), 0, 80);
+        $secChUaMobile = mb_substr(trim((string) $request->header('Sec-CH-UA-Mobile', '')), 0, 20);
+        $ip = trim((string) $request->ip());
         $fingerprintRaw = trim((string) $request->header('X-Listen-Fingerprint', ''));
+        if ($fingerprintRaw === '') {
+            $fingerprintRaw = trim((string) $request->cookie('listen_demo_fp', ''));
+        }
 
         $fingerprintIdentity = $fingerprintRaw !== ''
             ? 'fp:'.hash('sha256', $fingerprintRaw)
             : null;
-        $ipIdentity = 'ip:'.hash('sha256', $ip);
-        $ipUaIdentity = 'ipua:'.hash('sha256', $ip.'|'.$ua.'|'.$acceptLanguage);
+        $deviceIdentity = 'dv:'.hash('sha256', implode('|', [
+            $ua,
+            $acceptLanguage,
+            $secChUa,
+            $secChUaPlatform,
+            $secChUaMobile,
+        ]));
+        $uaIdentity = 'ua:'.hash('sha256', implode('|', [
+            $ua,
+            $acceptLanguage,
+            $secChUa,
+            $secChUaPlatform,
+            $secChUaMobile,
+        ]));
+        $ipIdentity = $ip !== '' ? 'ip:'.hash('sha256', $ip) : null;
 
         $identities = array_values(array_unique(array_filter([
             $fingerprintIdentity,
-            $ipUaIdentity,
+            $deviceIdentity,
+            $uaIdentity,
             $ipIdentity,
         ])));
 
-        $primary = $fingerprintIdentity ?: $ipUaIdentity;
+        $primary = $fingerprintIdentity ?: $deviceIdentity;
 
         return [$identities, $primary];
     }
@@ -431,11 +587,7 @@ class HomeController extends Controller
             $key = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$primaryIdentity;
             $used = min($limit, max(0, (int) Cache::get($key, 0)));
         } else {
-            $used = 0;
-            foreach ($identities as $identity) {
-                $key = "demo:guest:lifetime:chars:{$identity}";
-                $used = max($used, (int) Cache::get($key, 0));
-            }
+            $used = $this->guestLifetimeUsedChars($identities);
             $used = min($limit, max(0, $used));
         }
 
@@ -448,5 +600,161 @@ class HomeController extends Controller
             'remaining_chars' => $remaining,
             'is_exhausted' => $remaining <= 0,
         ];
+    }
+
+    /**
+     * @param array<int, string> $identities
+     */
+    private function guestLifetimeUsedChars(array $identities): int
+    {
+        $identities = array_values(array_filter($identities, fn ($value) => trim((string) $value) !== ''));
+        if (empty($identities)) {
+            return 0;
+        }
+
+        return (int) (DemoGuestUsage::query()
+            ->whereIn('identity_hash', $identities)
+            ->max('used_chars') ?? 0);
+    }
+
+    /**
+     * Persist quota usage on stable, non-IP identities so full-page reloads
+     * see the same allowance without over-coupling unrelated visitors by IP.
+     *
+     * @param array<int, string> $identities
+     * @return array<int, string>
+     */
+    private function writableGuestIdentities(array $identities, string $primaryIdentity): array
+    {
+        $normalized = array_values(array_unique(array_filter(
+            array_map(static fn ($value) => trim((string) $value), $identities),
+            static fn (string $value) => $value !== ''
+        )));
+
+        $preferred = [];
+
+        if (trim($primaryIdentity) !== '' && ! str_starts_with($primaryIdentity, 'ip:')) {
+            $preferred[] = $primaryIdentity;
+        }
+
+        foreach ($normalized as $identity) {
+            if (str_starts_with($identity, 'ip:')) {
+                continue;
+            }
+
+            $preferred[] = $identity;
+        }
+
+        $preferred = array_values(array_unique($preferred));
+
+        if ($preferred !== []) {
+            return $preferred;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<int, string> $identities
+     */
+    private function reserveGuestLifetimeChars(Request $request, array $identities, int $chars, int $limit): void
+    {
+        $chars = max(0, $chars);
+        $identities = array_values(array_unique(array_filter($identities, fn ($value) => trim((string) $value) !== '')));
+
+        if ($chars <= 0 || empty($identities)) {
+            return;
+        }
+
+        DB::transaction(function () use ($request, $identities, $chars, $limit) {
+            $now = now();
+            $seedRows = array_map(static fn (string $identity): array => [
+                'identity_hash' => $identity,
+                'used_chars' => 0,
+                'last_seen_at' => $now,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $identities);
+
+            DemoGuestUsage::query()->upsert(
+                $seedRows,
+                ['identity_hash'],
+                ['last_seen_at', 'updated_at']
+            );
+
+            $rows = DemoGuestUsage::query()
+                ->whereIn('identity_hash', $identities)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('identity_hash');
+
+            $usedChars = 0;
+            foreach ($identities as $identity) {
+                $usedChars = max($usedChars, (int) ($rows[$identity]->used_chars ?? 0));
+            }
+
+            if (($usedChars + $chars) > $limit) {
+                throw ValidationException::withMessages([
+                    'text' => $this->demoDailyCapReachedMessage($request),
+                ]);
+            }
+
+            foreach ($identities as $identity) {
+                /** @var \App\Models\DemoGuestUsage|null $row */
+                $row = $rows[$identity] ?? null;
+                if (! $row) {
+                    continue;
+                }
+
+                $row->update([
+                    'used_chars' => max(0, (int) $row->used_chars + $chars),
+                    'last_seen_at' => $now,
+                ]);
+            }
+        }, 3);
+    }
+
+    /**
+     * @param array<int, string> $identities
+     */
+    private function decrementGuestLifetimeChars(array $identities, int $chars): void
+    {
+        $chars = max(0, $chars);
+        $identities = array_values(array_unique(array_filter($identities, fn ($value) => trim((string) $value) !== '')));
+
+        if ($chars <= 0 || empty($identities)) {
+            return;
+        }
+
+        DB::transaction(function () use ($identities, $chars) {
+            $rows = DemoGuestUsage::query()
+                ->whereIn('identity_hash', $identities)
+                ->lockForUpdate()
+                ->get();
+
+            $now = now();
+            foreach ($rows as $row) {
+                $row->update([
+                    'used_chars' => max(0, (int) $row->used_chars - $chars),
+                    'last_seen_at' => $now,
+                ]);
+            }
+        }, 3);
+    }
+
+    private function denyDemoForAuthenticatedUser(Request $request)
+    {
+        if (! $request->user()) {
+            return null;
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Demo is available for visitors only.',
+            ], 403);
+        }
+
+        return redirect()->route('dashboard');
     }
 }

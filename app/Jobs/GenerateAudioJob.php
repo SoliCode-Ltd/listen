@@ -49,6 +49,7 @@ class GenerateAudioJob implements ShouldQueue
                 $textForSpeech,
                 $generation->target_language,
                 $generation->voice_name,
+                (string) ($generation->voice_tier ?: 'standard'),
             );
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
@@ -77,7 +78,7 @@ class GenerateAudioJob implements ShouldQueue
         } catch (\Throwable $e) {
             $generation->update([
                 'status' => 'failed',
-                'error_message' => mb_substr($e->getMessage(), 0, 1000),
+                'error_message' => 'Voice generation failed. Please try again.',
             ]);
 
             if ($generation->text_item_id) {

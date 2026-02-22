@@ -4,19 +4,23 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
-use App\Models\Plan;
-use App\Models\Subscription;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
+    public function __construct(
+        private readonly PlanAccessService $planAccessService,
+    ) {}
+
     public function index()
     {
         $userId = (int) auth()->id();
@@ -41,13 +45,14 @@ class DashboardController extends Controller
             'total' => (clone $baseQuery)->count(),
         ];
 
-        $activePlan = $this->resolveActivePlan($userId);
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $planChars = PlanUsageGuard::planChars($activePlan);
         $planRequests = PlanUsageGuard::planRequests($activePlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
         $usageCharsPercent = min(100, (int) round(($usage->total_chars / $planChars) * 100));
         $usageRequestsPercent = $requestsUnlimited
-            ? 100
+            ? 0
             : min(100, (int) round(($usage->total_requests / max(1, $planRequests)) * 100));
 
         return view('dashboard', [
@@ -55,22 +60,25 @@ class DashboardController extends Controller
             'jobs' => $jobs,
             'stats' => $stats,
             'activePlan' => $activePlan,
+            'planTier' => $planTier,
+            'planTierLabel' => VoiceTier::label($planTier),
             'planChars' => $planChars,
             'planRequests' => $requestsUnlimited ? null : $planRequests,
             'requestsUnlimited' => $requestsUnlimited,
             'usageCharsPercent' => $usageCharsPercent,
             'usageRequestsPercent' => $usageRequestsPercent,
-            'voiceCatalog' => VoiceCatalog::publicCatalog(),
+            'voiceCatalog' => VoiceCatalog::publicCatalog($planTier),
             'voiceNameMap' => VoiceCatalog::mapByName(),
-            'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar'),
-            'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en'),
+            'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar', $planTier),
+            'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en', $planTier),
         ]);
     }
 
     public function queue(Request $request)
     {
         $userId = (int) auth()->id();
-        $activePlan = $this->resolveActivePlan($userId);
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
 
         $validated = $request->validate([
@@ -80,11 +88,18 @@ class DashboardController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
+            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
         ]);
+
+        $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
+        if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
+            return $this->rejectTierAccess($request);
+        }
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
+            $planTier,
         );
 
         $text = trim($validated['content']);
@@ -120,6 +135,7 @@ class DashboardController extends Controller
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
+            'voice_tier' => $planTier,
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimate['seconds'],
@@ -159,7 +175,7 @@ class DashboardController extends Controller
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
         $usageCharsPercent = min(100, (int) round(($counter->total_chars / $planChars) * 100));
         $usageRequestsPercent = $requestsUnlimited
-            ? 100
+            ? 0
             : min(100, (int) round(($counter->total_requests / max(1, $planRequests)) * 100));
         $voiceNameMap = VoiceCatalog::mapByName();
 
@@ -195,36 +211,22 @@ class DashboardController extends Controller
         );
     }
 
-    private function resolveActivePlan(int $userId): ?Plan
-    {
-        $subscription = Subscription::query()
-            ->where('user_id', $userId)
-            ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', now());
-            })
-            ->latest('id')
-            ->with('plan')
-            ->first();
-
-        if ($subscription?->plan) {
-            return $subscription->plan;
-        }
-
-        return Plan::query()->where('slug', 'free')->first()
-            ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
-    }
-
-    private function normalizeVoiceSelection(string $language, ?string $voiceKey): string
+    private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
 
         if ($voiceKey === '') {
-            return VoiceCatalog::defaultForLanguage($language);
+            $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+            if ($defaultVoice === '') {
+                throw ValidationException::withMessages([
+                    'target_language' => 'Selected language is not available for your current voice quality.',
+                ]);
+            }
+
+            return $defaultVoice;
         }
 
-        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey);
+        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
                 'voice_key' => 'Selected voice is not available for the chosen language.',
@@ -234,8 +236,22 @@ class DashboardController extends Controller
         return $voiceName;
     }
 
+    private function rejectTierAccess(Request $request)
+    {
+        $message = 'Upgrade your plan to unlock this voice quality.';
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $message,
+            ], 403);
+        }
+
+        abort(403, $message);
+    }
+
     /**
-     * @param array{chars:int,minutes:int} $estimate
+     * @param  array{chars:int,minutes:int}  $estimate
      */
     private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
     {
@@ -256,6 +272,7 @@ class DashboardController extends Controller
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
             'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice',
+            'voice_tier' => VoiceTier::label((string) ($job->voice_tier ?: VoiceTier::STANDARD)),
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
             'audio_url' => AudioUrl::fromPath($job->audio_path),

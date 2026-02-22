@@ -1,6 +1,6 @@
 # Listen (Laravel SaaS Voice Platform)
 
-Arabic-first AI voice app for messages/emails/files with translation + queued TTS.
+Arabic-first voice app for messages/emails/files with translation and queued audio generation.
 
 ## Live URLs
 - Landing: https://bot.solicode.me/listen/
@@ -13,20 +13,21 @@ Arabic-first AI voice app for messages/emails/files with translation + queued TT
 - Laravel 12
 - SQLite (`database/database.sqlite`)
 - Queue: database driver + worker
-- **Single TTS provider behind branded voice presets**
-- Translation fallback: Google `gtx` endpoint
-- Light/Dark themes on landing, demo lab, auth, and dashboard pages
+- Tiered voice quality (`Standard`, `HD`, `HD+`)
+- Light/Dark themes on landing, demo, auth, dashboard, billing, and upgrade pages
 
-## SaaS-Ready Features
-- Auth system (register/login/logout)
-- Auto-provisioned Free plan on registration
+## SaaS Features
+- Auth system (register/login/logout + social login)
+- Free plan auto-provisioning on registration
 - Plan enforcement:
   - `max_chars_per_request`
   - monthly character quota
   - monthly request quota
+  - voice quality tier lock by plan
 - Usage counters (`requests`, `chars`, `minutes`) by month
 - Queue-backed generation with job status tracking
 - Audio storage in `storage/app/public/audio`
+- Billing with on-site payment collection, invoices, and no-webhook sync polling
 
 ## Runtime Commands
 ```bash
@@ -45,34 +46,39 @@ Set in `.env`:
 ```env
 APP_URL=https://bot.solicode.me/listen
 
-# Protect API access if you expose API routes
+# API access
 LISTEN_API_KEY=your_generated_key_here
 
-# Google OAuth (Login with Gmail)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=https://bot.solicode.me/listen/auth/google/callback
+# Social login
+SOCIAL_CLIENT_ID=
+SOCIAL_CLIENT_SECRET=
+SOCIAL_REDIRECT_URI=https://bot.solicode.me/listen/auth/callback
 
-# Google Cloud TTS
-# Option A (simple): API key
-GOOGLE_TTS_API_KEY=
-# Option B (enterprise): service-account
-GOOGLE_TTS_CREDENTIALS_JSON=
-GOOGLE_TTS_CREDENTIALS_PATH=/absolute/path/to/service-account.json
-GOOGLE_TTS_VERIFY_SSL=true
-GOOGLE_TTS_VOICE_AR=ar-XA-Wavenet-A
-GOOGLE_TTS_VOICE_EN=en-US-Wavenet-F
-GOOGLE_TTS_AUDIO_ENCODING=MP3
-GOOGLE_TTS_SPEAKING_RATE=1.0
-GOOGLE_TTS_PITCH=0.0
-GOOGLE_TTS_TIMEOUT_SECONDS=30
-LISTEN_REQUIRE_WAVENET=true
+# Speech engine credentials
+SPEECH_API_KEY=
+SPEECH_CREDENTIALS_JSON=
+SPEECH_CREDENTIALS_PATH=/absolute/path/to/service-account.json
+SPEECH_VERIFY_SSL=true
+SPEECH_AUDIO_ENCODING=MP3
+SPEECH_SPEAKING_RATE=1.0
+SPEECH_PITCH=0.0
+SPEECH_TIMEOUT_SECONDS=30
+
+# Stripe billing
+STRIPE_KEY=
+STRIPE_SECRET=
+STRIPE_PRICE_CREATOR_MONTHLY=
+STRIPE_PRICE_CREATOR_YEARLY=
+STRIPE_PRICE_PRO_MONTHLY=
+STRIPE_PRICE_PRO_YEARLY=
+LISTEN_SUBSCRIPTION_SYNC_TTL_MINUTES=10
+
 LISTEN_AUDIO_PROCESSING=sync
+LISTEN_AUDIO_FORCE_ASYNC_CHARS=2500
 ```
 
 ## Notes
-- The app enforces WaveNet-only voice names for cost control and consistent quality.
-- Voice selection supports Arabic/English with branded male and female personas.
-- Demo Lab is isolated on `/demo` with animated preview UX plus daily request/character caps to control spend.
-- Unified responsive header/footer is shared visually across landing, demo, pricing, dashboard, and auth pages.
-- API routes can still be used server-to-server when secured with `LISTEN_API_KEY`.
+- Public demo supports `Standard`, `HD`, and `HD+` preview switching.
+- Authenticated generation is tier-locked by plan: `FREE -> Standard`, `CREATOR -> HD`, `PRO -> HD+`.
+- Voice labels are safe display names from DB mappings; internal voice IDs are not exposed.
+- API routes can be used server-to-server when secured with `LISTEN_API_KEY`.

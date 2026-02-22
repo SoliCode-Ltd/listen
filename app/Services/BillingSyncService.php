@@ -1,0 +1,280 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\BillingSubscription;
+use App\Models\Plan;
+use App\Models\User;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
+use Laravel\Cashier\Cashier;
+use Stripe\Exception\ApiErrorException;
+
+class BillingSyncService
+{
+    public function __construct(
+        private readonly PlanAccessService $planAccessService,
+    ) {}
+
+    public function syncIfStale(User $user, bool $force = false): void
+    {
+        $ttlMinutes = max(1, (int) config('listen.billing.subscription_sync_ttl_minutes', 10));
+        $lastCheckedAt = $user->subscription_status_checked_at;
+
+        if (! $force && $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes))) {
+            return;
+        }
+
+        $this->syncUser($user);
+    }
+
+    public function syncUser(User $user): void
+    {
+        $freePlan = $this->planAccessService->freePlan();
+        if (! $freePlan) {
+            return;
+        }
+
+        $currentPlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $targetPlan = $currentPlan ?: $freePlan;
+        $periodEnd = now()->addMonth();
+
+        if ($user->stripe_id) {
+            try {
+                $customer = Cashier::stripe()->customers->retrieve($user->stripe_id, []);
+                $stripeSubscription = $this->resolveRelevantStripeSubscription($user->stripe_id);
+
+                if ($stripeSubscription) {
+                    $selectedStatus = (string) ($stripeSubscription->status ?? '');
+                    $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
+                    $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
+                    $targetPlan = $freePlan;
+
+                    if ($mappedPlan && in_array($selectedStatus, ['active', 'trialing', 'past_due'], true)) {
+                        $targetPlan = $mappedPlan;
+                        $periodEndTs = (int) ($stripeSubscription->current_period_end ?? 0);
+                        $periodEnd = $periodEndTs > 0
+                            ? Carbon::createFromTimestamp($periodEndTs)
+                            : now()->addMonth();
+                    }
+
+                    $this->persistBillingSubscription($user, $stripeSubscription);
+                } else {
+                    $targetPlan = $freePlan;
+                    $billingSubscription = BillingSubscription::query()
+                        ->where('user_id', $user->id)
+                        ->where('type', 'default')
+                        ->latest('id')
+                        ->first();
+
+                    if ($billingSubscription) {
+                        BillingSubscription::query()
+                            ->where('user_id', $user->id)
+                            ->where('type', 'default')
+                            ->where('stripe_status', '!=', 'canceled')
+                            ->update([
+                                'stripe_status' => 'canceled',
+                                'ends_at' => now(),
+                            ]);
+                    }
+                }
+
+                $defaultPaymentMethod = $this->resolveCustomerDefaultPaymentMethod($customer?->invoice_settings?->default_payment_method);
+
+                $user->forceFill([
+                    'pm_type' => $defaultPaymentMethod['pm_type'],
+                    'pm_last_four' => $defaultPaymentMethod['pm_last_four'],
+                ])->save();
+            } catch (ApiErrorException $exception) {
+                Log::warning('Billing sync failed when contacting Stripe API.', [
+                    'user_id' => $user->id,
+                    'stripe_id' => $user->stripe_id,
+                    'error' => $exception->getMessage(),
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('Billing sync failed unexpectedly.', [
+                    'user_id' => $user->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+
+        $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd);
+
+        $user->forceFill([
+            'subscription_status_checked_at' => now(),
+        ])->save();
+    }
+
+    public function syncActiveSubscribers(): int
+    {
+        $count = 0;
+
+        User::query()
+            ->whereNotNull('stripe_id')
+            ->chunkById(100, function ($users) use (&$count) {
+                foreach ($users as $user) {
+                    try {
+                        $this->syncUser($user);
+                    } catch (\Throwable $exception) {
+                        Log::warning('Scheduled billing sync failed for user.', [
+                            'user_id' => $user->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+
+                    $count++;
+                }
+            });
+
+        return $count;
+    }
+
+    private function resolveRelevantStripeSubscription(string $stripeCustomerId): ?object
+    {
+        $subscriptions = Cashier::stripe()->subscriptions->all([
+            'customer' => $stripeCustomerId,
+            'status' => 'all',
+            'limit' => 20,
+            'expand' => ['data.items.data.price'],
+        ]);
+
+        $statusPriority = [
+            'active' => 1,
+            'trialing' => 2,
+            'past_due' => 3,
+            'unpaid' => 4,
+            'incomplete' => 5,
+            'incomplete_expired' => 6,
+            'canceled' => 7,
+        ];
+
+        $sorted = collect($subscriptions->data ?? [])
+            ->filter(fn ($sub) => $this->mappedPlanSlugForSubscription($sub) !== null)
+            ->sort(function ($left, $right) use ($statusPriority) {
+                $leftPriority = $statusPriority[(string) ($left->status ?? '')] ?? 99;
+                $rightPriority = $statusPriority[(string) ($right->status ?? '')] ?? 99;
+
+                if ($leftPriority !== $rightPriority) {
+                    return $leftPriority <=> $rightPriority;
+                }
+
+                return (int) ($right->created ?? 0) <=> (int) ($left->created ?? 0);
+            })
+            ->values();
+
+        return $sorted->first();
+    }
+
+    private function persistBillingSubscription(User $user, object $stripeSubscription): void
+    {
+        $stripeItems = collect($stripeSubscription->items->data ?? []);
+        $primaryItem = $stripeItems->first();
+        $primaryPrice = (string) ($primaryItem?->price?->id ?? '');
+
+        $subscription = BillingSubscription::query()->updateOrCreate(
+            ['stripe_id' => (string) $stripeSubscription->id],
+            [
+                'user_id' => $user->id,
+                'type' => 'default',
+                'stripe_id' => (string) $stripeSubscription->id,
+                'stripe_status' => (string) ($stripeSubscription->status ?? 'incomplete'),
+                'stripe_price' => $primaryPrice !== '' ? $primaryPrice : null,
+                'quantity' => (int) ($primaryItem?->quantity ?? 1),
+                'trial_ends_at' => $this->timestampToDateTime((int) ($stripeSubscription->trial_end ?? 0)),
+                'ends_at' => $this->timestampToDateTime((int) ($stripeSubscription->ended_at ?? $stripeSubscription->cancel_at ?? 0)),
+            ]
+        );
+
+        $seenItemIds = [];
+        foreach ($stripeItems as $item) {
+            $stripeItemId = (string) ($item->id ?? '');
+            if ($stripeItemId === '') {
+                continue;
+            }
+
+            $seenItemIds[] = $stripeItemId;
+
+            $subscription->items()->updateOrCreate(
+                ['stripe_id' => $stripeItemId],
+                [
+                    'stripe_product' => (string) ($item->price->product ?? ''),
+                    'stripe_price' => (string) ($item->price->id ?? ''),
+                    'quantity' => (int) ($item->quantity ?? 1),
+                ]
+            );
+        }
+
+        if (! empty($seenItemIds)) {
+            $subscription->items()->whereNotIn('stripe_id', $seenItemIds)->delete();
+        }
+    }
+
+    private function mappedPlanSlugForSubscription(object $stripeSubscription): ?string
+    {
+        $knownPriceToSlug = $this->knownPriceToSlugMap();
+        $items = collect($stripeSubscription->items->data ?? []);
+
+        foreach ($items as $item) {
+            $priceId = (string) ($item->price->id ?? '');
+            if ($priceId !== '' && isset($knownPriceToSlug[$priceId])) {
+                return $knownPriceToSlug[$priceId];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function knownPriceToSlugMap(): array
+    {
+        $map = [];
+        $prices = config('services.stripe.prices', []);
+
+        foreach ((array) $prices as $slug => $cycles) {
+            foreach ((array) $cycles as $priceId) {
+                $priceId = trim((string) $priceId);
+                if ($priceId !== '') {
+                    $map[$priceId] = (string) $slug;
+                }
+            }
+        }
+
+        return $map;
+    }
+
+    /**
+     * @return array{pm_type:?string,pm_last_four:?string}
+     */
+    private function resolveCustomerDefaultPaymentMethod(mixed $paymentMethod): array
+    {
+        if (! is_string($paymentMethod) || trim($paymentMethod) === '') {
+            return ['pm_type' => null, 'pm_last_four' => null];
+        }
+
+        try {
+            $pm = Cashier::stripe()->paymentMethods->retrieve($paymentMethod, []);
+        } catch (\Throwable) {
+            return ['pm_type' => null, 'pm_last_four' => null];
+        }
+
+        $cardType = is_object($pm->card ?? null) ? (string) ($pm->card->brand ?? 'card') : 'card';
+        $cardLast4 = is_object($pm->card ?? null) ? (string) ($pm->card->last4 ?? '') : '';
+
+        return [
+            'pm_type' => $cardType !== '' ? $cardType : null,
+            'pm_last_four' => $cardLast4 !== '' ? $cardLast4 : null,
+        ];
+    }
+
+    private function timestampToDateTime(int $timestamp): ?Carbon
+    {
+        if ($timestamp <= 0) {
+            return null;
+        }
+
+        return Carbon::createFromTimestamp($timestamp);
+    }
+}

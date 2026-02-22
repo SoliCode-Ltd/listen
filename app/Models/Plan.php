@@ -22,6 +22,7 @@ class Plan extends Model
         'overage_price_per_million_cents',
         'commercial_use_allowed',
         'processing_priority',
+        'voice_tier',
         'features',
         'is_active',
     ];

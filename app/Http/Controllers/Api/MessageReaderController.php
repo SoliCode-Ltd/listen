@@ -5,38 +5,45 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
-use App\Models\Plan;
-use App\Models\Subscription;
-use App\Models\TextItem;
-use App\Models\User;
 use App\Models\UsageCounter;
+use App\Models\User;
+use App\Services\BillingSyncService;
+use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 
 class MessageReaderController extends Controller
 {
+    public function __construct(
+        private readonly PlanAccessService $planAccessService,
+        private readonly BillingSyncService $billingSyncService,
+    ) {}
+
     public function profile(Request $request)
     {
-        $userId = $this->resolveApiUserId($request);
-        $user = User::query()->findOrFail($userId, ['id', 'name', 'email']);
-        $activePlan = $this->resolveActivePlan($userId);
+        $user = $this->resolveApiUser($request);
+        $this->billingSyncService->syncIfStale($user, true);
+
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
 
         $period = now()->format('Y-m');
         $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
+            ['user_id' => $user->id, 'period_ym' => $period],
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
         $planChars = PlanUsageGuard::planChars($activePlan);
         $planRequests = PlanUsageGuard::planRequests($activePlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
-        $defaultAr = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar'));
-        $defaultEn = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en'));
+        $defaultAr = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar', $planTier));
+        $defaultEn = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en', $planTier));
 
         return response()->json([
             'ok' => true,
@@ -46,8 +53,10 @@ class MessageReaderController extends Controller
                     'email' => (string) $user->email,
                 ],
                 'plan' => [
-                    'name' => (string) ($activePlan?->name ?? 'Free'),
+                    'name' => (string) ($activePlan?->name ?? 'FREE'),
                     'slug' => (string) ($activePlan?->slug ?? 'free'),
+                    'voice_tier' => $planTier,
+                    'voice_tier_label' => VoiceTier::label($planTier),
                     'max_chars_per_request' => PlanUsageGuard::maxCharsPerRequest($activePlan),
                     'allow_overage' => PlanUsageGuard::allowsOverage($activePlan),
                     'overage_price_per_million_cents' => $activePlan?->overage_price_per_million_cents !== null
@@ -67,11 +76,11 @@ class MessageReaderController extends Controller
                     'requests_unlimited' => $requestsUnlimited,
                     'chars_percent' => min(100, (int) round(((int) $counter->total_chars / max(1, $planChars)) * 100)),
                     'requests_percent' => $requestsUnlimited
-                        ? 100
+                        ? 0
                         : min(100, (int) round(((int) $counter->total_requests / max(1, $planRequests)) * 100)),
                 ],
                 'voices' => [
-                    'catalog' => VoiceCatalog::publicCatalog(),
+                    'catalog' => VoiceCatalog::publicCatalog($planTier),
                     'defaults' => [
                         'ar' => $defaultAr['key'] ?? null,
                         'en' => $defaultEn['key'] ?? null,
@@ -83,8 +92,11 @@ class MessageReaderController extends Controller
 
     public function queue(Request $request)
     {
-        $userId = $this->resolveApiUserId($request);
-        $activePlan = $this->resolveActivePlan($userId);
+        $user = $this->resolveApiUser($request);
+        $this->billingSyncService->syncIfStale($user);
+
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
         $processingMode = strtolower((string) config('listen.audio.processing', 'sync'));
 
@@ -95,13 +107,23 @@ class MessageReaderController extends Controller
             'source_type' => ['required', 'in:email,message,file'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
+            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
             'translate' => ['nullable', 'boolean'],
         ]);
+
+        $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
+        if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Upgrade your plan to unlock this voice quality.',
+            ], 403);
+        }
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
             $validated['voice_name'] ?? null,
+            $planTier,
         );
 
         $text = trim($validated['content']);
@@ -120,14 +142,14 @@ class MessageReaderController extends Controller
 
         $period = now()->format('Y-m');
         $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
+            ['user_id' => $user->id, 'period_ym' => $period],
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
         PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
 
-        $item = TextItem::create([
-            'user_id' => $userId,
+        $item = \App\Models\TextItem::create([
+            'user_id' => $user->id,
             'source_type' => $validated['source_type'],
             'title' => $validated['title'] ?? null,
             'content' => $text,
@@ -137,11 +159,12 @@ class MessageReaderController extends Controller
         ]);
 
         $job = AudioGeneration::create([
-            'user_id' => $userId,
+            'user_id' => $user->id,
             'text_item_id' => $item->id,
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
+            'voice_tier' => $planTier,
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimate['seconds'],
@@ -185,6 +208,8 @@ class MessageReaderController extends Controller
             'item_id' => $item->id,
             'status' => $job->status,
             'voice' => VoiceCatalog::voiceMeta($voiceName),
+            'voice_tier' => $planTier,
+            'voice_tier_label' => VoiceTier::label($planTier),
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'estimated_chars' => $estimate['chars'],
@@ -195,11 +220,13 @@ class MessageReaderController extends Controller
 
     public function list(Request $request)
     {
-        $userId = $this->resolveApiUserId($request);
+        $user = $this->resolveApiUser($request);
+        $this->billingSyncService->syncIfStale($user);
+
         $limit = min(100, max(1, (int) $request->integer('limit', 25)));
 
         $jobs = AudioGeneration::query()
-            ->where('user_id', $userId)
+            ->where('user_id', $user->id)
             ->latest()
             ->limit($limit)
             ->get([
@@ -207,6 +234,7 @@ class MessageReaderController extends Controller
                 'source_language',
                 'target_language',
                 'voice_name',
+                'voice_tier',
                 'translate',
                 'status',
                 'duration_seconds',
@@ -220,6 +248,7 @@ class MessageReaderController extends Controller
                     'source_language' => $job->source_language,
                     'target_language' => $job->target_language,
                     'voice' => VoiceCatalog::voiceMeta($job->voice_name),
+                    'voice_tier' => VoiceTier::label((string) ($job->voice_tier ?: VoiceTier::STANDARD)),
                     'translate' => $job->translate,
                     'status' => $job->status,
                     'duration_seconds' => $job->duration_seconds,
@@ -236,10 +265,10 @@ class MessageReaderController extends Controller
         ]);
     }
 
-    private function resolveApiUserId(Request $request): int
+    private function resolveApiUser(Request $request): User
     {
         if (Auth::check()) {
-            return (int) Auth::id();
+            return $request->user();
         }
 
         $provided = $request->header('X-Listen-Key')
@@ -256,20 +285,20 @@ class MessageReaderController extends Controller
             ->first();
 
         if ($user) {
-            return (int) $user->id;
+            return $user;
         }
 
         // Backward-compatible emergency key for server-to-server integrations.
         $legacyApiKey = trim((string) env('LISTEN_API_KEY', ''));
         if ($legacyApiKey !== '' && hash_equals($legacyApiKey, $provided)) {
-            return 1;
+            return User::query()->findOrFail(1);
         }
 
         abort(401, 'Invalid API key.');
     }
 
     /**
-     * @param array{chars:int,minutes:int} $estimate
+     * @param  array{chars:int,minutes:int}  $estimate
      */
     private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
     {
@@ -282,34 +311,13 @@ class MessageReaderController extends Controller
         ]);
     }
 
-    private function resolveActivePlan(int $userId): ?Plan
-    {
-        $subscription = Subscription::query()
-            ->where('user_id', $userId)
-            ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', now());
-            })
-            ->latest('id')
-            ->with('plan')
-            ->first();
-
-        if ($subscription?->plan) {
-            return $subscription->plan;
-        }
-
-        return Plan::query()->where('slug', 'free')->first()
-            ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
-    }
-
-    private function normalizeVoiceSelection(string $language, ?string $voiceKey, ?string $voiceName): string
+    private function normalizeVoiceSelection(string $language, ?string $voiceKey, ?string $voiceName, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
         $voiceName = trim((string) $voiceName);
 
         if ($voiceKey !== '') {
-            $mapped = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey);
+            $mapped = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
             if (! $mapped) {
                 throw ValidationException::withMessages([
                     'voice_key' => 'Selected voice is not available for the chosen language.',
@@ -320,7 +328,7 @@ class MessageReaderController extends Controller
         }
 
         if ($voiceName !== '') {
-            if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language)) {
+            if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language, $tier)) {
                 throw ValidationException::withMessages([
                     'voice_name' => 'Selected voice is not available for the chosen language.',
                 ]);
@@ -329,6 +337,13 @@ class MessageReaderController extends Controller
             return $voiceName;
         }
 
-        return VoiceCatalog::defaultForLanguage($language);
+        $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+        if ($defaultVoice === '') {
+            throw ValidationException::withMessages([
+                'target_language' => 'Selected language is not available for your current voice quality.',
+            ]);
+        }
+
+        return $defaultVoice;
     }
 }

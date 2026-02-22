@@ -15,6 +15,7 @@ class AudioGeneration extends Model
         'input_text',
         'source_language',
         'target_language',
+        'voice_tier',
         'voice_name',
         'translate',
         'audio_path',

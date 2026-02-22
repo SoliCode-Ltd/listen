@@ -8,11 +8,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Cashier\Billable;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
-    use HasFactory, Notifiable;
+    use Billable, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -28,6 +29,7 @@ class User extends Authenticatable
         'api_key_hash',
         'api_key_last4',
         'api_key_created_at',
+        'subscription_status_checked_at',
     ];
 
     /**
@@ -41,7 +43,7 @@ class User extends Authenticatable
         'api_key_hash',
     ];
 
-    public function subscriptions(): HasMany
+    public function planSubscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
     }
@@ -62,6 +64,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'api_key_created_at' => 'datetime',
+            'subscription_status_checked_at' => 'datetime',
         ];
     }
 

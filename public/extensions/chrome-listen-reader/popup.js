@@ -21,22 +21,22 @@ const elements = {
 
 const fallbackCatalog = {
   ar: [
-    { key: 'dai', label: 'Dai', gender: 'female' },
-    { key: 'rami', label: 'Rami', gender: 'male' },
-    { key: 'maha', label: 'Maha', gender: 'female' },
-    { key: 'kareem', label: 'Kareem', gender: 'male' },
+    { key: 'voice_ar_f_1', label: 'Sara', gender: 'female' },
+    { key: 'voice_ar_f_2', label: 'Mariam', gender: 'female' },
+    { key: 'voice_ar_m_1', label: 'Omar', gender: 'male' },
+    { key: 'voice_ar_m_2', label: 'Ahmed', gender: 'male' },
   ],
   en: [
-    { key: 'ember', label: 'Ember', gender: 'female' },
-    { key: 'cade', label: 'Cade', gender: 'male' },
-    { key: 'vexa', label: 'Vexa', gender: 'female' },
-    { key: 'lyric', label: 'Lyric', gender: 'female' },
-    { key: 'orbit', label: 'Orbit', gender: 'male' },
-    { key: 'quill', label: 'Quill', gender: 'male' },
+    { key: 'voice_en_f_1', label: 'Emma', gender: 'female' },
+    { key: 'voice_en_f_2', label: 'Olivia', gender: 'female' },
+    { key: 'voice_en_m_1', label: 'Liam', gender: 'male' },
+    { key: 'voice_en_m_2', label: 'Noah', gender: 'male' },
   ],
 };
 
 let profileData = null;
+let apiKeyVerifyTimer = null;
+let lastVerifiedApiKey = '';
 
 function setStatus(message, type = '') {
   elements.status.textContent = message || '';
@@ -104,9 +104,24 @@ function formatGender(gender) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+function sortVoices(list) {
+  const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+  return [...list].sort((a, b) => {
+    const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
+    const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
+    if (aRank !== bRank) return aRank - bRank;
+
+    const byLabel = String(a?.label || '').localeCompare(String(b?.label || ''), undefined, { sensitivity: 'base' });
+    if (byLabel !== 0) return byLabel;
+
+    return String(a?.key || '').localeCompare(String(b?.key || ''), undefined, { sensitivity: 'base' });
+  });
+}
+
 function renderVoiceOptions(preferredKey = '') {
   const language = elements.targetLanguage.value === 'en' ? 'en' : 'ar';
-  const list = Array.isArray(voiceCatalog()?.[language]) ? voiceCatalog()[language] : [];
+  const raw = Array.isArray(voiceCatalog()?.[language]) ? voiceCatalog()[language] : [];
+  const list = sortVoices(raw);
   const fallbackDefault = defaults()?.[language] || '';
   const current = preferredKey || elements.voiceKey.value || fallbackDefault;
 
@@ -121,9 +136,11 @@ function renderVoiceOptions(preferredKey = '') {
   for (const voice of list) {
     const option = document.createElement('option');
     option.value = String(voice?.key || '');
-    option.textContent = formatGender(voice?.gender)
+    const quality = String(voice?.tier_label || '').trim();
+    const baseLabel = formatGender(voice?.gender)
       ? `${voice.label} - ${formatGender(voice.gender)}`
       : String(voice?.label || voice?.key || 'Voice');
+    option.textContent = quality ? `${baseLabel} - ${quality}` : baseLabel;
     elements.voiceKey.appendChild(option);
   }
 
@@ -137,21 +154,20 @@ function renderVoiceOptions(preferredKey = '') {
 function setProfileCard(profile = null) {
   const name = String(profile?.user?.name || 'Connect your account');
   const plan = String(profile?.plan?.name || '-');
+  const voiceTierLabel = String(profile?.plan?.voice_tier_label || '').trim();
   const usage = profile?.usage || {};
   const requestsUnlimited = Boolean(usage?.requests_unlimited);
 
   const initial = name.trim().charAt(0).toUpperCase() || 'L';
   elements.userAvatar.textContent = initial;
   elements.userName.textContent = name;
-  elements.userPlan.textContent = `Plan: ${plan}`;
+  elements.userPlan.textContent = voiceTierLabel ? `Plan: ${plan} (${voiceTierLabel})` : `Plan: ${plan}`;
   elements.charsText.textContent = `Characters: ${Number(usage.total_chars || 0).toLocaleString()} / ${Number(usage.plan_chars || 0).toLocaleString()}`;
   elements.requestsText.textContent = requestsUnlimited
     ? `Requests: ${Number(usage.total_requests || 0).toLocaleString()} / Unlimited`
     : `Requests: ${Number(usage.total_requests || 0).toLocaleString()} / ${Number(usage.plan_requests || 0).toLocaleString()}`;
   elements.charsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.chars_percent || 0)))}%`;
-  elements.requestsBar.style.width = requestsUnlimited
-    ? '100%'
-    : `${Math.max(0, Math.min(100, Number(usage.requests_percent || 0)))}%`;
+  elements.requestsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.requests_percent || 0)))}%`;
 }
 
 async function refreshProfile() {
@@ -169,6 +185,65 @@ async function refreshProfile() {
   renderVoiceOptions(elements.voiceKey.value);
 }
 
+async function persistSettingsSilently() {
+  const response = await requestBackground({
+    type: 'SAVE_SETTINGS',
+    settings: readSettingsFromForm(),
+  });
+
+  if (!response?.ok) {
+    throw new Error(response?.message || 'Could not save settings.');
+  }
+}
+
+function scheduleApiKeyVerify() {
+  if (apiKeyVerifyTimer) {
+    clearTimeout(apiKeyVerifyTimer);
+    apiKeyVerifyTimer = null;
+  }
+
+  const apiKey = String(elements.apiKey.value || '').trim();
+  if (!apiKey) {
+    profileData = null;
+    lastVerifiedApiKey = '';
+    setProfileCard(null);
+    setStatus('Set your API key to load account details.');
+    return;
+  }
+
+  if (apiKey.length < 20) {
+    return;
+  }
+
+  apiKeyVerifyTimer = setTimeout(async () => {
+    const currentApiKey = String(elements.apiKey.value || '').trim();
+    if (!currentApiKey || currentApiKey === lastVerifiedApiKey) {
+      return;
+    }
+
+    try {
+      await refreshProfile();
+      await persistSettingsSilently();
+      lastVerifiedApiKey = currentApiKey;
+      setStatus('API key verified.', 'ok');
+    } catch (_error) {
+      // Keep typing flow smooth; explicit actions still show hard errors.
+    }
+  }, 320);
+}
+
+async function loadLastStatus() {
+  const response = await requestBackground({ type: 'GET_LAST_STATUS' });
+  if (!response?.ok) return;
+
+  const status = response?.status;
+  const message = String(status?.message || '').trim();
+  if (!message) return;
+
+  const type = status?.type === 'ok' ? 'ok' : (status?.type === 'error' ? 'error' : '');
+  setStatus(message, type);
+}
+
 async function bootstrap() {
   setStatus('');
   try {
@@ -179,17 +254,21 @@ async function bootstrap() {
 
     const settings = response.settings || {};
     writeSettingsToForm(settings);
+    lastVerifiedApiKey = String(settings.apiKey || '').trim();
 
     if (!String(settings.apiKey || '').trim()) {
       setProfileCard(null);
       setStatus('Set your API key to load account details.');
+      await loadLastStatus().catch(() => {});
       return;
     }
 
     await refreshProfile();
     setStatus('');
+    await loadLastStatus().catch(() => {});
   } catch (error) {
     setStatus(error.message || 'Unable to load settings.', 'error');
+    await loadLastStatus().catch(() => {});
   }
 }
 
@@ -207,6 +286,7 @@ async function saveSettings() {
 
     writeSettingsToForm(response.settings || {});
     await refreshProfile();
+    lastVerifiedApiKey = String((response.settings || {}).apiKey || '').trim();
     setStatus('Settings saved.', 'ok');
   } catch (error) {
     setStatus(error.message || 'Save failed.', 'error');
@@ -261,8 +341,13 @@ elements.targetLanguage.addEventListener('change', () => {
   renderVoiceOptions(elements.voiceKey.value);
 });
 
+elements.apiKey.addEventListener('input', scheduleApiKeyVerify);
 elements.apiKey.addEventListener('change', async () => {
-  if (!String(elements.apiKey.value || '').trim()) {
+  const apiKey = String(elements.apiKey.value || '').trim();
+
+  if (!apiKey) {
+    profileData = null;
+    lastVerifiedApiKey = '';
     setProfileCard(null);
     setStatus('Set your API key to load account details.');
     return;
@@ -270,9 +355,11 @@ elements.apiKey.addEventListener('change', async () => {
 
   try {
     await refreshProfile();
+    await persistSettingsSilently();
+    lastVerifiedApiKey = apiKey;
     setStatus('API key verified.', 'ok');
-  } catch (_error) {
-    // Keep silent while typing; explicit actions show errors.
+  } catch (error) {
+    setStatus(error.message || 'Invalid API key.', 'error');
   }
 });
 

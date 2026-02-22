@@ -18,6 +18,7 @@ class TtsService
         string $text,
         string $targetLanguage,
         ?string $voiceName = null,
+        string $tier = 'standard',
         bool $preferFast = false,
     ): array {
         $text = trim($text);
@@ -26,8 +27,8 @@ class TtsService
         }
 
         $mode = $preferFast ? 'fast' : 'quality';
-        $voice = $this->resolveVoiceName($targetLanguage, $voiceName);
-        $hash = sha1($mode.'|'.$targetLanguage.'|'.$voice.'|'.$text);
+        $voice = $this->resolveVoiceName($targetLanguage, $voiceName, $tier);
+        $hash = sha1($mode.'|'.$targetLanguage.'|'.$tier.'|'.$voice.'|'.$text);
 
         if ($cached = $this->findCachedAudio($hash, $targetLanguage)) {
             return [
@@ -43,7 +44,7 @@ class TtsService
         return [
             'audio_path' => $cachedPath,
             'duration_seconds' => $generated['duration_seconds'] ?? $this->estimateDurationSeconds($text),
-            'provider' => $generated['provider'] ?? 'google-cloud-tts',
+            'provider' => $generated['provider'] ?? 'tts-engine',
         ];
     }
 
@@ -77,7 +78,7 @@ class TtsService
                     ->withOptions(['verify' => $verify])
                     ->post($endpoint.$separator.'key='.$apiKey, $payload),
                 $verifySsl,
-                'Google TTS API request',
+                'Speech API request',
             );
         } else {
             $response = $this->sendWithSslFallback(
@@ -86,23 +87,23 @@ class TtsService
                     ->withToken($this->getGoogleAccessToken())
                     ->post($endpoint, $payload),
                 $verifySsl,
-                'Google TTS OAuth request',
+                'Speech OAuth request',
             );
         }
 
         if (! $response->ok()) {
-            throw new \RuntimeException('Google TTS request failed: '.$response->body());
+            throw new \RuntimeException('Speech request failed: '.$response->body());
         }
 
         $json = $response->json();
         $audioContent = is_array($json) ? ($json['audioContent'] ?? null) : null;
         if (! is_string($audioContent) || $audioContent === '') {
-            throw new \RuntimeException('Google TTS returned empty audio payload.');
+            throw new \RuntimeException('Speech service returned empty audio payload.');
         }
 
         $binary = base64_decode($audioContent, true);
         if ($binary === false || $binary === '') {
-            throw new \RuntimeException('Failed to decode Google TTS audio payload.');
+            throw new \RuntimeException('Failed to decode speech audio payload.');
         }
 
         $filename = 'audio/'.now()->format('Ymd_His').'_'.Str::random(12).'.mp3';
@@ -117,7 +118,7 @@ class TtsService
         return [
             'audio_path' => $filename,
             'duration_seconds' => $this->estimateDurationSeconds($text),
-            'provider' => 'google-cloud-tts',
+            'provider' => 'tts-engine',
         ];
     }
 
@@ -128,7 +129,7 @@ class TtsService
         $privateKey = (string) ($credentials['private_key'] ?? '');
 
         if ($clientEmail === '' || $privateKey === '') {
-            throw new \RuntimeException('Missing Google TTS service-account credentials.');
+            throw new \RuntimeException('Missing speech service credentials.');
         }
 
         $cacheKey = 'listen:google_tts_token:'.sha1($clientEmail);
@@ -155,7 +156,7 @@ class TtsService
             $signature = '';
             $ok = openssl_sign($unsigned, $signature, $privateKey, OPENSSL_ALGO_SHA256);
             if (! $ok) {
-                throw new \RuntimeException('Unable to sign Google OAuth JWT assertion.');
+                throw new \RuntimeException('Unable to sign OAuth JWT assertion.');
             }
 
             $assertion = $unsigned.'.'.$this->base64UrlEncode($signature);
@@ -169,16 +170,16 @@ class TtsService
                         'assertion' => $assertion,
                     ]),
                 $verifySsl,
-                'Google OAuth token request',
+                'OAuth token request',
             );
 
             if (! $response->ok()) {
-                throw new \RuntimeException('Failed fetching Google OAuth token: '.$response->body());
+                throw new \RuntimeException('Failed fetching OAuth token: '.$response->body());
             }
 
             $token = $response->json('access_token');
             if (! is_string($token) || $token === '') {
-                throw new \RuntimeException('Google OAuth token response missing access_token.');
+                throw new \RuntimeException('OAuth token response missing access_token.');
             }
 
             return $token;
@@ -204,25 +205,26 @@ class TtsService
             }
         }
 
-        throw new \RuntimeException('Google TTS credentials are not configured. Set GOOGLE_TTS_CREDENTIALS_JSON or GOOGLE_TTS_CREDENTIALS_PATH.');
+        throw new \RuntimeException('Speech service credentials are not configured.');
     }
 
-    private function resolveVoiceName(string $targetLanguage, ?string $voiceName): string
+    private function resolveVoiceName(string $targetLanguage, ?string $voiceName, string $tier): string
     {
         $voiceName = trim((string) $voiceName);
 
         if (
             $voiceName !== ''
-            && VoiceCatalog::isAllowedForLanguage($voiceName, $targetLanguage)
-            && (
-                ! config('listen.voice.require_wavenet', true)
-                || VoiceCatalog::isWaveNetVoiceName($voiceName)
-            )
+            && VoiceCatalog::isAllowedForLanguage($voiceName, $targetLanguage, $tier)
         ) {
             return $voiceName;
         }
 
-        return VoiceCatalog::defaultForLanguage($targetLanguage);
+        $defaultVoice = VoiceCatalog::defaultForLanguage($targetLanguage, $tier);
+        if ($defaultVoice === '') {
+            throw new \RuntimeException('No voice is available for the selected language and voice quality.');
+        }
+
+        return $defaultVoice;
     }
 
     private function resolveSsmlGender(string $voiceName): string

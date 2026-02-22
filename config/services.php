@@ -43,34 +43,33 @@ return [
     ],
 
     'google_tts' => [
-        'endpoint' => env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize'),
-        'api_key' => env('GOOGLE_TTS_API_KEY', ''),
-        'token_uri' => env('GOOGLE_TTS_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
-        'credentials_json' => env('GOOGLE_TTS_CREDENTIALS_JSON', ''),
-        'credentials_path' => env('GOOGLE_TTS_CREDENTIALS_PATH', ''),
-        'verify_ssl' => env('GOOGLE_TTS_VERIFY_SSL', true),
-        'voice_ar' => env('GOOGLE_TTS_VOICE_AR', 'ar-XA-Wavenet-A'),
-        'voice_en' => env('GOOGLE_TTS_VOICE_EN', 'en-US-Wavenet-F'),
-        'voice_catalog' => [
-            'ar' => [
-                ['key' => 'dai', 'name' => 'ar-XA-Wavenet-A', 'label' => 'Dai', 'gender' => 'female', 'avatar' => 'female-a', 'recommended' => true],
-                ['key' => 'rami', 'name' => 'ar-XA-Wavenet-B', 'label' => 'Rami', 'gender' => 'male', 'avatar' => 'male-a', 'recommended' => false],
-                ['key' => 'maha', 'name' => 'ar-XA-Wavenet-D', 'label' => 'Maha', 'gender' => 'female', 'avatar' => 'female-b', 'recommended' => false],
-                ['key' => 'kareem', 'name' => 'ar-XA-Wavenet-C', 'label' => 'Kareem', 'gender' => 'male', 'avatar' => 'male-b', 'recommended' => false],
+        'endpoint' => env('SPEECH_TTS_ENDPOINT', env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize')),
+        'api_key' => env('SPEECH_TTS_API_KEY', env('GOOGLE_TTS_API_KEY', '')),
+        'token_uri' => env('SPEECH_TTS_TOKEN_URI', env('GOOGLE_TTS_TOKEN_URI', 'https://oauth2.googleapis.com/token')),
+        'credentials_json' => env('SPEECH_TTS_CREDENTIALS_JSON', env('GOOGLE_TTS_CREDENTIALS_JSON', '')),
+        'credentials_path' => env('SPEECH_TTS_CREDENTIALS_PATH', env('GOOGLE_TTS_CREDENTIALS_PATH', '')),
+        'verify_ssl' => env('SPEECH_TTS_VERIFY_SSL', env('GOOGLE_TTS_VERIFY_SSL', true)),
+        'voice_catalog' => [],
+        'audio_encoding' => env('SPEECH_TTS_AUDIO_ENCODING', env('GOOGLE_TTS_AUDIO_ENCODING', 'MP3')),
+        'speaking_rate' => (float) env('SPEECH_TTS_SPEAKING_RATE', env('GOOGLE_TTS_SPEAKING_RATE', 1.0)),
+        'pitch' => (float) env('SPEECH_TTS_PITCH', env('GOOGLE_TTS_PITCH', 0.0)),
+        'timeout_seconds' => (int) env('SPEECH_TTS_TIMEOUT_SECONDS', env('GOOGLE_TTS_TIMEOUT_SECONDS', 30)),
+    ],
+
+    'stripe' => [
+        'model' => App\Models\User::class,
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'prices' => [
+            'creator' => [
+                'monthly' => env('STRIPE_PRICE_CREATOR_MONTHLY'),
+                'yearly' => env('STRIPE_PRICE_CREATOR_YEARLY'),
             ],
-            'en' => [
-                ['key' => 'ember', 'name' => 'en-US-Wavenet-F', 'label' => 'Ember', 'gender' => 'female', 'avatar' => 'female-c', 'recommended' => true],
-                ['key' => 'cade', 'name' => 'en-US-Wavenet-D', 'label' => 'Cade', 'gender' => 'male', 'avatar' => 'male-c', 'recommended' => true],
-                ['key' => 'vexa', 'name' => 'en-US-Wavenet-H', 'label' => 'Vexa', 'gender' => 'female', 'avatar' => 'female-d', 'recommended' => false],
-                ['key' => 'lyric', 'name' => 'en-US-Wavenet-C', 'label' => 'Lyric', 'gender' => 'female', 'avatar' => 'female-e', 'recommended' => false],
-                ['key' => 'orbit', 'name' => 'en-US-Wavenet-I', 'label' => 'Orbit', 'gender' => 'male', 'avatar' => 'male-d', 'recommended' => false],
-                ['key' => 'quill', 'name' => 'en-US-Wavenet-J', 'label' => 'Quill', 'gender' => 'male', 'avatar' => 'male-e', 'recommended' => false],
+            'pro' => [
+                'monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
+                'yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
             ],
         ],
-        'audio_encoding' => env('GOOGLE_TTS_AUDIO_ENCODING', 'MP3'),
-        'speaking_rate' => (float) env('GOOGLE_TTS_SPEAKING_RATE', 1.0),
-        'pitch' => (float) env('GOOGLE_TTS_PITCH', 0.0),
-        'timeout_seconds' => (int) env('GOOGLE_TTS_TIMEOUT_SECONDS', 30),
     ],
 
 ];

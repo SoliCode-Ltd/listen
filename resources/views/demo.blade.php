@@ -153,6 +153,9 @@
       grid-template-columns: 1fr 1fr;
       gap: .8rem;
     }
+    .demo-controls {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
     label {
       display: block;
       margin: 0 0 .45rem;
@@ -292,6 +295,7 @@
       .hero-grid,
       .lab-grid,
       .two-col,
+      .demo-controls,
       .stats {
         grid-template-columns: 1fr;
       }
@@ -333,6 +337,7 @@
           <div class="hero-list">
             <div>- Branded voice personas only</div>
             <div>- Clear translation behavior</div>
+            <div>- Quality switch (Standard / HD / HD+)</div>
             <div>- Instant audio preview</div>
           </div>
           <div class="sound-wave" id="heroWave" aria-hidden="true">
@@ -344,10 +349,10 @@
         <aside class="page-card reveal">
           <h3 style="margin: .1rem 0 .5rem; font-size: 1.1rem;">Voice coverage</h3>
           <div class="stats">
-            <div class="stat"><small>Arabic voices</small><b>{{ count($voiceCatalog['ar'] ?? []) }}</b></div>
-            <div class="stat"><small>English voices</small><b>{{ count($voiceCatalog['en'] ?? []) }}</b></div>
-            <div class="stat"><small>Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Dai' }}</b></div>
-            <div class="stat"><small>English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Ember' }}</b></div>
+            <div class="stat"><small>Arabic voices</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['ar'] ?? [])) }}</b></div>
+            <div class="stat"><small>English voices</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['en'] ?? [])) }}</b></div>
+            <div class="stat"><small>Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Sara' }}</b></div>
+            <div class="stat"><small>English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Emma' }}</b></div>
           </div>
         </aside>
       </div>
@@ -378,11 +383,21 @@
 
             <div class="chips">
               <button class="chip" type="button" data-sample="Welcome to our platform. We build software that sounds as good as it works.">English sample</button>
-              <button class="chip" type="button" data-sample="مرحبا بك في منصتنا. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
-              <button class="chip" type="button" data-sample="Hello, this is a bilingual test. مرحبا، هذا اختبار ثنائي اللغة.">Bilingual sample</button>
+              <button class="chip" type="button" data-sample="Marhaban bik fi manassatina. Nahnu nabni barmajiyat ihtirafiya bijawda alamia.">Arabic sample (Latin)</button>
+              <button class="chip" type="button" data-sample="Hello, this is a bilingual test. Marhaban, hatha ikhtibar thunaei allugha.">Bilingual sample (Latin)</button>
             </div>
 
-            <div class="two-col">
+            <div class="two-col demo-controls">
+              <div>
+                <label for="voice_tier">Voice quality</label>
+                <select id="voice_tier" name="voice_tier">
+                  @foreach($demoTiers as $tier)
+                    <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>
+                      {{ $tier['label'] }}
+                    </option>
+                  @endforeach
+                </select>
+              </div>
               <div>
                 <label for="target_language">Target language</label>
                 <select id="target_language" name="target_language">
@@ -437,8 +452,9 @@
   @include('components.footer')
   @include('components.scripts')
   <script>
-    const voiceCatalog = @json($voiceCatalog);
+    const voiceCatalogByTier = @json($voiceCatalog);
     const form = document.getElementById('demoForm');
+    const voiceTier = document.getElementById('voice_tier');
     const targetLanguage = document.getElementById('target_language');
     const voiceGender = document.getElementById('voice_gender');
     const voiceSelect = document.getElementById('voice_key');
@@ -472,6 +488,7 @@
       is_exhausted: Boolean(demoQuota?.is_exhausted),
     };
     let clientFingerprint = '';
+    let fingerprintPromise = null;
 
     function formatNumber(value) {
       return new Intl.NumberFormat().format(Number(value || 0));
@@ -546,6 +563,26 @@
       return Array.from(new Uint8Array(digest)).map((v) => v.toString(16).padStart(2, '0')).join('');
     }
 
+    async function ensureFingerprint() {
+      if (clientFingerprint) return clientFingerprint;
+      if (!fingerprintPromise) {
+        fingerprintPromise = buildFingerprint()
+          .then((fp) => {
+            clientFingerprint = String(fp || '').slice(0, 256);
+            if (clientFingerprint) {
+              document.cookie = `listen_demo_fp=${encodeURIComponent(clientFingerprint)}; Max-Age=31536000; Path=/; SameSite=Lax`;
+            }
+            return clientFingerprint;
+          })
+          .catch(() => {
+            clientFingerprint = '';
+            return '';
+          });
+      }
+
+      return fingerprintPromise;
+    }
+
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1'
@@ -554,16 +591,33 @@
     }
 
     function getFilteredVoices() {
+      const tier = voiceTier?.value || 'standard';
       const lang = targetLanguage.value;
       const gender = voiceGender.value;
-      const list = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
-      return list.filter((voice) => gender === 'all' ? true : voice.gender === gender);
+      const byTier = voiceCatalogByTier?.[tier] || {};
+      const list = Array.isArray(byTier?.[lang]) ? byTier[lang] : [];
+      const filtered = list.filter((voice) => gender === 'all' ? true : voice.gender === gender);
+      return sortVoices(filtered);
     }
 
     function formatGender(value) {
       const text = String(value || '').trim().toLowerCase();
       if (!text) return 'Any';
       return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function sortVoices(list) {
+      const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+      return [...list].sort((a, b) => {
+        const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
+        const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
+        if (aRank !== bRank) return aRank - bRank;
+
+        const byLabel = String(a?.label || '').localeCompare(String(b?.label || ''), undefined, { sensitivity: 'base' });
+        if (byLabel !== 0) return byLabel;
+
+        return String(a?.key || '').localeCompare(String(b?.key || ''), undefined, { sensitivity: 'base' });
+      });
     }
 
     function renderVoiceOptions() {
@@ -589,13 +643,16 @@
       setUpgradeVisible(false);
       const fd = new FormData(form);
       const headers = { ...csrfHeaders };
+      await ensureFingerprint();
       if (clientFingerprint) headers['X-Listen-Fingerprint'] = clientFingerprint;
       const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok === false) {
         const firstError = data?.errors && typeof data.errors === 'object' ? Object.values(data.errors)[0] : null;
         const firstErrorText = Array.isArray(firstError) ? String(firstError[0] || '') : '';
-        throw new Error(String(data?.message || firstErrorText || 'Request failed'));
+        const error = new Error(String(data?.message || firstErrorText || 'Request failed'));
+        error.payload = data;
+        throw error;
       }
       return data;
     }
@@ -633,10 +690,14 @@
         previewAudio.load();
         const label = data?.voice?.label || 'Selected voice';
         const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
-        audioMeta.textContent = `Voice: ${label}${gender} - ${data.translate_note}`;
+        const quality = data?.voice_tier_label ? ` - ${data.voice_tier_label}` : '';
+        audioMeta.textContent = `Voice: ${label}${gender}${quality} - ${data.translate_note}`;
       } catch (err) {
         hideAudioPreview();
         const message = String(err?.message || 'Preview failed. Try another text or voice.');
+        if (err?.payload?.quota) {
+          renderQuota(err.payload.quota);
+        }
         setError(message);
         if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
           setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
@@ -655,6 +716,7 @@
       });
     });
 
+    voiceTier?.addEventListener('change', renderVoiceOptions);
     targetLanguage?.addEventListener('change', renderVoiceOptions);
     voiceGender?.addEventListener('change', renderVoiceOptions);
     translateSelect?.addEventListener('change', updateTranslateHint);
@@ -667,7 +729,8 @@
     updateTranslateHint();
     renderQuota(currentQuota);
 
-    buildFingerprint().then((fp) => { clientFingerprint = String(fp || '').slice(0, 256); }).catch(() => {});
+    ensureFingerprint().catch(() => {});
   </script>
 </body>
 </html>
+

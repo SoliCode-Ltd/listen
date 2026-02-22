@@ -10,7 +10,11 @@ return [
     ],
 
     'voice' => [
-        'require_wavenet' => (bool) env('LISTEN_REQUIRE_WAVENET', true),
+        'default_tier' => env('LISTEN_DEFAULT_VOICE_TIER', 'standard'),
+    ],
+
+    'billing' => [
+        'subscription_sync_ttl_minutes' => (int) env('LISTEN_SUBSCRIPTION_SYNC_TTL_MINUTES', 10),
     ],
 
     'demo' => [
@@ -25,8 +29,8 @@ return [
             'user_daily_chars' => (int) env('DEMO_CHECK_USER_DAILY_CHARS', 200000),
         ],
         'preview' => [
-            'guest_rate_per_minute' => (int) env('DEMO_PREVIEW_GUEST_RATE_PER_MINUTE', 3),
-            'user_rate_per_minute' => (int) env('DEMO_PREVIEW_USER_RATE_PER_MINUTE', 12),
+            'guest_rate_per_minute' => (int) env('DEMO_PREVIEW_GUEST_RATE_PER_MINUTE', 30),
+            'user_rate_per_minute' => (int) env('DEMO_PREVIEW_USER_RATE_PER_MINUTE', 120),
             'guest_daily_requests' => (int) env('DEMO_PREVIEW_GUEST_DAILY_REQUESTS', 12),
             'user_daily_requests' => (int) env('DEMO_PREVIEW_USER_DAILY_REQUESTS', 150),
             'guest_daily_chars' => (int) env('DEMO_PREVIEW_GUEST_DAILY_CHARS', 300),

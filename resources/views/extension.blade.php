@@ -382,7 +382,7 @@
         <div class="browser-icon">
           <img src="{{ asset('icons/chrome.png') }}" alt="Chrome" />
         </div>
-        <h3>Google Chrome</h3>
+        <h3>Chrome</h3>
         <p>Full support with context menu integration</p>
         <a class="download-btn" href="{{ route('browsers-extension.download', ['v' => $extensionVersion]) }}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>

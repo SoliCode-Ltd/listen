@@ -4,220 +4,408 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Listen | Pricing</title>
-  <meta name="description" content="Simple, scalable pricing for Listen voice SaaS." />
   <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   @include('components.styles')
   <style>
-    .hero {
-      padding: 4rem 0 2rem;
+    .bg-orb {
+      position: fixed;
+      z-index: -1;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(36px);
+      opacity: .25;
+      animation: float 10s ease-in-out infinite;
+    }
+    .bg-orb.a {
+      width: 16rem;
+      height: 16rem;
+      background: color-mix(in oklab, var(--a) 74%, white 26%);
+      left: -4rem;
+      top: 15vh;
+    }
+    .bg-orb.b {
+      width: 20rem;
+      height: 20rem;
+      background: color-mix(in oklab, var(--b) 75%, white 25%);
+      right: -4rem;
+      bottom: 8vh;
+      animation-delay: -3s;
+    }
+
+    .page-hero {
       text-align: center;
+      padding: 3.5rem 1rem 2rem;
     }
     .eyebrow {
       display: inline-block;
-      padding: .4rem .85rem;
+      padding: .35rem .7rem;
       border-radius: var(--radius-full);
       border: 1px solid var(--line);
-      font-size: .78rem;
+      font-size: .75rem;
       color: var(--muted);
       letter-spacing: .1em;
       text-transform: uppercase;
-      margin-bottom: 1rem;
+      margin-bottom: .75rem;
     }
-    .hero h1 {
+    .page-hero h1 {
       margin: 0 0 .75rem;
-      font-size: clamp(2rem, 5.5vw, 4rem);
-      line-height: 1.05;
-      letter-spacing: -.03em;
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      letter-spacing: -.02em;
     }
-    .hero-copy {
-      max-width: 68ch;
-      margin: 0 auto;
+    .page-hero .lead {
       color: var(--muted);
+      max-width: 48ch;
+      margin: 0 auto 1.5rem;
       font-size: 1.05rem;
       line-height: 1.6;
     }
 
-    .toggle-wrap {
+    .billing-wrapper {
       display: flex;
-      justify-content: center;
-      margin: 1.5rem 0 2.5rem;
+      flex-direction: column;
+      align-items: center;
+      gap: .5rem;
     }
     .billing-toggle {
       display: inline-flex;
-      align-items: center;
-      background: linear-gradient(145deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-full);
-      padding: .3rem;
-      box-shadow: var(--shadow);
+      padding: .25rem;
     }
     .billing-toggle button {
-      border: 0;
+      border: none;
       background: transparent;
       color: var(--muted);
-      font-weight: 700;
-      padding: .5rem 1rem;
+      padding: .55rem 1.1rem;
       border-radius: var(--radius-full);
       cursor: pointer;
+      font-weight: 600;
       font-size: .9rem;
       transition: all .2s ease;
     }
+    .billing-toggle button:hover {
+      color: var(--text);
+    }
     .billing-toggle button.active {
       background: linear-gradient(135deg, var(--a), var(--b));
-      color: #fff;
+      color: white;
+    }
+    .billing-savings {
+      font-size: .8rem;
+      color: var(--ok);
+      opacity: 0;
+      transition: opacity .2s ease;
+    }
+    .billing-savings.show {
+      opacity: 1;
     }
 
-    .plans {
+    .plans-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 1.25rem;
+      margin: 2.5rem 0 3rem;
     }
-    .plan {
-      background: linear-gradient(160deg, var(--surface2), var(--surface));
+    .plan-card {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.75rem;
       box-shadow: var(--shadow);
+      transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
       position: relative;
-      overflow: hidden;
-      transition: transform .28s ease, border-color .28s ease;
+      display: flex;
+      flex-direction: column;
     }
-    .plan::after {
-      content: "";
-      position: absolute;
-      inset: auto -20% -55% -20%;
-      height: 58%;
-      background: radial-gradient(ellipse at center, color-mix(in oklab, var(--b) 24%, transparent), transparent 70%);
-      opacity: .45;
-      pointer-events: none;
-    }
-    .plan:hover {
+    .plan-card:hover {
       transform: translateY(-6px);
-      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 20px 40px rgba(0,0,0,.25);
     }
-    .plan.popular {
-      border-color: color-mix(in oklab, var(--a) 50%, var(--b));
+    .plan-card.popular {
+      border-color: var(--a);
+      box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 20%, transparent);
     }
-    .badge {
+    .plan-card.popular:hover {
+      box-shadow: 0 20px 40px color-mix(in oklab, var(--a) 25%, transparent);
+    }
+    .popular-badge {
       position: absolute;
-      top: 1rem;
-      right: 1rem;
-      font-size: .74rem;
+      top: -.65rem;
+      left: 50%;
+      transform: translateX(-50%);
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: white;
+      font-size: .7rem;
       font-weight: 700;
-      border: 1px solid color-mix(in oklab, var(--a) 55%, var(--line));
-      background: color-mix(in oklab, var(--a) 16%, var(--surface));
-      color: color-mix(in oklab, var(--a) 82%, var(--text));
-      padding: .28rem .6rem;
+      padding: .3rem .85rem;
       border-radius: var(--radius-full);
-      z-index: 1;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      white-space: nowrap;
     }
-    .plan-head h2 {
-      margin: .15rem 0 .25rem;
-      font-size: 1.3rem;
+
+    .plan-header {
+      margin-bottom: .5rem;
     }
-    .plan-head p {
-      margin: 0 0 .5rem;
+    .plan-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0 0 .3rem;
+    }
+    .plan-desc {
       color: var(--muted);
-      font-size: .9rem;
+      font-size: .85rem;
+      margin: 0;
+      line-height: 1.5;
+    }
+
+    .plan-pricing {
+      margin: 1.25rem 0;
+      min-height: 72px;
     }
     .price-row {
       display: flex;
-      align-items: flex-end;
-      gap: .4rem;
-      margin: .5rem 0 .25rem;
+      align-items: baseline;
+      gap: .15rem;
     }
-    .price {
-      font-size: 2.5rem;
-      font-weight: 900;
+    .price-currency {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .price-amount {
+      font-size: 2.75rem;
+      font-weight: 800;
       line-height: 1;
     }
-    .price-sub {
-      font-size: .9rem;
+    .price-period {
+      font-size: .95rem;
       color: var(--muted);
-      padding-bottom: .3rem;
+      font-weight: 500;
+      margin-left: .1rem;
     }
-    .included {
-      font-size: .88rem;
+    .price-note {
+      font-size: .8rem;
       color: var(--muted);
-      margin: .2rem 0 1rem;
+      margin-top: .35rem;
+      min-height: 1.2em;
     }
-    .spec-table {
-      display: grid;
-      gap: .6rem;
+    .price-note.savings {
+      color: var(--ok);
     }
-    .spec-row {
+
+    .plan-quota {
+      display: inline-block;
+      padding: .4rem .75rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      font-size: .82rem;
+      color: var(--text);
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      background: var(--surface);
+    }
+
+    .plan-features {
+      list-style: none;
+      padding: 0;
+      margin: 0 0 1.5rem;
+      flex: 1;
+    }
+    .plan-features li {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
-      padding: .65rem .75rem;
-      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
-      border-radius: var(--radius);
-      background: color-mix(in oklab, var(--surface) 88%, transparent);
-    }
-    .spec-row dt {
-      font-size: .82rem;
-      color: var(--muted);
-    }
-    .spec-row dd {
-      margin: 0;
+      padding: .6rem 0;
+      border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
       font-size: .88rem;
-      font-weight: 700;
-      color: var(--text);
+    }
+    .plan-features li:first-child {
+      padding-top: 0;
+    }
+    .plan-features li:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .feature-label {
+      color: var(--muted);
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .feature-label svg {
+      width: .9rem;
+      height: .9rem;
+      stroke: var(--muted);
+      fill: none;
+      stroke-width: 2;
+      flex-shrink: 0;
+    }
+    .feature-value {
+      font-weight: 600;
       text-align: right;
     }
-    .plan-actions {
-      margin-top: 1.25rem;
-      position: relative;
-      z-index: 1;
+
+    .plan-action {
+      margin-top: auto;
+    }
+    .plan-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: .85rem 1rem;
+      border-radius: var(--radius);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: .92rem;
+      transition: all .2s ease;
+      border: none;
+      cursor: pointer;
+    }
+    .plan-btn.btn-primary {
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: white;
+    }
+    .plan-btn.btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px color-mix(in oklab, var(--b) 30%, transparent);
+    }
+    .plan-btn.btn-disabled {
+      background: var(--surface2);
+      color: var(--muted);
+      cursor: not-allowed;
     }
 
-    .faq {
-      margin-top: 3rem;
+    .features-section {
+      padding: 2.5rem 0;
+    }
+    .section-title {
+      text-align: center;
+      margin: 0 0 .5rem;
+      font-size: clamp(1.5rem, 3vw, 2rem);
+    }
+    .section-subtitle {
+      text-align: center;
+      color: var(--muted);
+      margin: 0 0 2rem;
+      font-size: 1rem;
+    }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .feature-card {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      transition: transform .25s ease, border-color .25s ease;
+    }
+    .feature-card:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in oklab, var(--a) 45%, var(--line));
+    }
+    .feature-icon {
+      width: 2.5rem;
+      height: 2.5rem;
+      margin-bottom: 1rem;
+      color: var(--a);
+    }
+    .feature-card h3 {
+      font-size: 1.05rem;
+      margin: 0 0 .5rem;
+    }
+    .feature-card p {
+      color: var(--muted);
+      font-size: .88rem;
+      margin: 0;
+      line-height: 1.55;
+    }
+
+    .faq-section {
+      padding: 2.5rem 0;
+    }
+    .faq-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1rem;
     }
-    .faq .card {
-      background: var(--surface);
+    .faq-item {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      padding: 1.25rem;
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      transition: transform .25s ease, border-color .25s ease;
     }
-    .faq h3 {
-      margin: 0 0 .45rem;
-      font-size: 1.05rem;
+    .faq-item:hover {
+      transform: translateY(-2px);
+      border-color: color-mix(in oklab, var(--a) 40%, var(--line));
     }
-    .faq p {
-      margin: 0;
+    .faq-item h3 {
+      font-size: 1rem;
+      margin: 0 0 .6rem;
+      font-weight: 600;
+    }
+    .faq-item p {
       color: var(--muted);
-      font-size: .92rem;
+      font-size: .88rem;
+      margin: 0;
       line-height: 1.55;
     }
 
-    .cta {
-      margin-top: 2.5rem;
-      margin-bottom: 3rem;
+    .cta-section {
       text-align: center;
-      padding: 2rem;
+      padding: 3rem 2rem;
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      background: linear-gradient(145deg, var(--surface2), var(--surface));
+      margin: 2rem 0 3rem;
+      box-shadow: var(--shadow);
     }
-    .cta h2 {
-      margin: 0 0 .5rem;
+    .cta-section h2 {
+      margin: 0 0 .6rem;
+      font-size: clamp(1.5rem, 3vw, 2rem);
     }
-    .cta p {
+    .cta-section p {
       color: var(--muted);
-      margin: 0 0 1rem;
+      margin: 0 0 1.5rem;
+      font-size: 1rem;
+    }
+    .cta-badges {
+      display: flex;
+      justify-content: center;
+      gap: 1.75rem;
+      margin-top: 1.5rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--line);
+      flex-wrap: wrap;
+    }
+    .cta-badge {
+      color: var(--muted);
+      font-size: .85rem;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .cta-badge svg {
+      width: 1rem;
+      height: 1rem;
+      stroke: var(--ok);
+      stroke-width: 2.5;
+      fill: none;
     }
 
     .reveal {
       opacity: 0;
-      transform: translateY(14px);
+      transform: translateY(16px);
       transition: opacity .5s ease, transform .5s ease;
     }
     .reveal.show {
@@ -225,169 +413,286 @@
       transform: translateY(0);
     }
 
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+
     @media (max-width: 960px) {
-      .faq {
+      .plans-grid {
+        grid-template-columns: 1fr;
+        max-width: 420px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .features-grid,
+      .faq-grid {
         grid-template-columns: 1fr;
       }
-      .hero {
-        padding: 2.5rem 0 1.5rem;
+      .page-hero {
+        padding: 2.5rem 1rem 1.5rem;
       }
     }
   </style>
-  <script>
-    (() => {
-      const saved = localStorage.getItem('listen_theme');
-      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-      document.documentElement.setAttribute('data-theme', saved || (prefersLight ? 'light' : 'dark'));
-    })();
-  </script>
 </head>
 <body>
+  <div class="bg-orb a"></div>
+  <div class="bg-orb b"></div>
+
   @include('components.header')
 
   <main class="container">
-    <section class="hero reveal">
-      <span class="eyebrow">Enterprise-ready plans</span>
-      <h1>Pricing built for production workloads.</h1>
-      <p class="hero-copy">From early validation to high-volume deployment, every plan includes strict entitlement enforcement, predictable usage economics, and bilingual voice coverage.</p>
-      <div class="toggle-wrap">
+    <section class="page-hero reveal">
+      <span class="eyebrow">Flexible pricing</span>
+      <h1>Scale your voice product with confidence</h1>
+      <p class="lead">Start free and upgrade as you grow. All plans include Arabic and English voice synthesis with production-ready reliability.</p>
+      
+      <div class="billing-wrapper">
         <div class="billing-toggle">
-          <button id="monthlyBtn" class="active" type="button">Monthly</button>
-          <button id="yearlyBtn" type="button">Yearly - save 20%</button>
+          <button id="monthlyBtn" class="active">Monthly</button>
+          <button id="yearlyBtn">Yearly</button>
         </div>
+        <span class="billing-savings" id="billingSavings">Save 20% with annual billing</span>
       </div>
     </section>
 
-    <section class="plans">
-      @forelse($pricingPlans as $plan)
-        <article class="plan reveal {{ $plan['is_popular'] ? 'popular' : '' }}" data-month="{{ number_format($plan['price_monthly'], 2, '.', '') }}" data-year="{{ number_format($plan['price_yearly'], 2, '.', '') }}">
-          @if($plan['is_popular'])
-            <span class="badge">Most Popular</span>
+    <section class="plans-grid">
+      @php
+        $planSlugs = collect($pricingPlans)->pluck('slug')->values();
+        $currentPlanIndex = $planSlugs->search($activePlanSlug);
+        if ($currentPlanIndex === false) $currentPlanIndex = 0;
+      @endphp
+      
+      @foreach($pricingPlans as $index => $plan)
+        @php
+          $isCurrent = $activePlanSlug === $plan['slug'];
+          $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free';
+          $isFree = ($plan['price_monthly'] ?? 0) <= 0;
+          $monthlyPrice = max(0, $plan['price_monthly'] ?? 0);
+          $yearlyPrice = ($plan['price_yearly'] ?? 0) > 0 ? $plan['price_yearly'] : round($monthlyPrice * 12 * 0.8);
+          $yearlyMonthly = $yearlyPrice > 0 ? round($yearlyPrice / 12) : 0;
+          $savings = $monthlyPrice > 0 ? ($monthlyPrice * 12) - $yearlyPrice : 0;
+        @endphp
+        <div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} reveal"
+             data-plan-slug="{{ $plan['slug'] }}"
+             data-is-free="{{ $isFree ? '1' : '0' }}"
+             data-monthly="{{ $monthlyPrice }}"
+             data-yearly-monthly="{{ $yearlyMonthly }}"
+             data-yearly-total="{{ $yearlyPrice }}"
+             data-savings="{{ $savings }}">
+          
+          @if($plan['is_popular'] && !$isCurrent)
+            <span class="popular-badge">Most Popular</span>
           @endif
-          <header class="plan-head">
-            <h2>{{ $plan['name'] }}</h2>
-            <p>{{ $plan['slug'] === 'free' ? 'Ideal for evaluation and internal testing' : 'Built for client-facing delivery and scale' }}</p>
-          </header>
-          <div class="price-row">
-            <div class="price">
-              @if($plan['price_monthly'] <= 0)
-                $0
-              @else
-                $<span class="price-value">{{ rtrim(rtrim(number_format($plan['price_monthly'], 2, '.', ''), '0'), '.') }}</span>
-              @endif
-            </div>
-            @if($plan['price_monthly'] > 0)
-              <div class="price-sub">per month</div>
-            @endif
+
+          <div class="plan-header">
+            <h2 class="plan-name">{{ $plan['name'] }}</h2>
+            <p class="plan-desc">{{ $plan['slug'] === 'free' ? 'Perfect for testing and exploration' : 'Built for production workloads' }}</p>
           </div>
-          <p class="included">{{ number_format($plan['monthly_chars']) }} characters included each month</p>
-          <dl class="spec-table">
-            <div class="spec-row">
-              <dt>Requests</dt>
-              <dd>{{ $plan['requests_unlimited'] ? 'Unlimited' : number_format($plan['monthly_requests']).' / month' }}</dd>
+          
+          <div class="plan-pricing">
+            <div class="price-row">
+              <span class="price-currency">$</span>
+              <span class="price-amount price-value">0</span>
+              <span class="price-period">/mo</span>
             </div>
-            <div class="spec-row">
-              <dt>Max Input</dt>
-              <dd>{{ number_format($plan['max_chars_per_request']) }} chars / request</dd>
-            </div>
-            <div class="spec-row">
-              <dt>Overage</dt>
-              <dd>{{ $plan['allow_overage'] ? ('$'.number_format(((int) ($plan['overage_price_per_million_cents'] ?? 0)) / 100, 2).' / 1M chars') : 'No overage' }}</dd>
-            </div>
-            <div class="spec-row">
-              <dt>Commercial Use</dt>
-              <dd>{{ $plan['commercial_use_allowed'] ? 'Allowed' : 'Not allowed' }}</dd>
-            </div>
-            <div class="spec-row">
-              <dt>Processing</dt>
-              <dd>
-                @if($plan['slug'] === 'free')
-                  Standard speed
-                @elseif(strtolower((string) $plan['processing_priority']) === 'high')
-                  High priority processing
-                @else
-                  Standard priority
-                @endif
-              </dd>
-            </div>
-          </dl>
-          @if($plan['slug'] === 'free')
-            <div class="plan-actions">
-              @auth
-                <a class="btn {{ $plan['is_popular'] ? 'btn-primary' : '' }}" href="{{ route('dashboard') }}">Use Free Plan</a>
+            <div class="price-note price-note-text"></div>
+          </div>
+          
+          <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} characters/month</div>
+          
+          <ul class="plan-features">
+            <li>
+              <span class="feature-label">
+                <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Requests
+              </span>
+              <span class="feature-value">{{ $plan['requests_unlimited'] ? 'Unlimited' : number_format($plan['monthly_requests']) }}</span>
+            </li>
+            <li>
+              <span class="feature-label">
+                <svg viewBox="0 0 24 24"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
+                Max input
+              </span>
+              <span class="feature-value">{{ number_format($plan['max_chars_per_request']) }} chars</span>
+            </li>
+            <li>
+              <span class="feature-label">
+                <svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                Commercial use
+              </span>
+              <span class="feature-value">{{ $plan['commercial_use_allowed'] ? 'Allowed' : 'Personal only' }}</span>
+            </li>
+            <li>
+              <span class="feature-label">
+                <svg viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                Priority queue
+              </span>
+              <span class="feature-value">{{ $plan['slug'] === 'free' ? 'Standard' : 'High' }}</span>
+            </li>
+            <li>
+              <span class="feature-label">
+                <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                Voice quality
+              </span>
+              <span class="feature-value">{{ $plan['voice_tier_label'] }}</span>
+            </li>
+          </ul>
+          
+          <div class="plan-action">
+            @auth
+              @if($isCurrent)
+                <span class="plan-btn btn-disabled">Current plan</span>
+              @elseif($isLower || $plan['slug'] === 'free')
+                <span class="plan-btn btn-disabled">Downgrade</span>
               @else
-                <a class="btn {{ $plan['is_popular'] ? 'btn-primary' : '' }}" href="{{ route('register') }}">Create Free Account</a>
-              @endauth
-            </div>
-          @endif
-        </article>
-      @empty
-        <article class="plan reveal">
-          <h2 style="margin: .1rem 0 .2rem; font-size: 1.15rem;">No plans found</h2>
-          <p style="color: var(--muted);">Please seed plans in the database.</p>
-        </article>
-      @endforelse
+                <a class="plan-btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">Upgrade now</a>
+              @endif
+            @else
+              <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? 'Start free' : 'Get started' }}</a>
+            @endauth
+          </div>
+        </div>
+      @endforeach
     </section>
 
-    <section class="faq reveal">
-      <article class="card">
-        <h3>Can I change plan any time?</h3>
-        <p>Yes. Upgrade instantly, downgrade at next billing cycle.</p>
-      </article>
-      <article class="card">
-        <h3>What happens if I hit limits?</h3>
-        <p>You can upgrade immediately or wait for monthly reset.</p>
-      </article>
-      <article class="card">
-        <h3>Do you support both Arabic and English?</h3>
-        <p>Yes - all paid plans include both language families.</p>
-      </article>
-      <article class="card">
-        <h3>Can I start with a free account?</h3>
-        <p>Absolutely. You can register free and move up when usage grows.</p>
-      </article>
+    <section class="features-section">
+      <h2 class="section-title reveal">What's included in every plan</h2>
+      <p class="section-subtitle reveal">Core features available across all tiers</p>
+      <div class="features-grid">
+        <article class="feature-card reveal">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+            <line x1="12" y1="19" x2="12" y2="23"/>
+            <line x1="8" y1="23" x2="16" y2="23"/>
+          </svg>
+          <h3>Bilingual voice synthesis</h3>
+          <p>Native Arabic and English voices with accurate pronunciation and natural prosody across all quality tiers.</p>
+        </article>
+        <article class="feature-card reveal">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            <line x1="11" y1="8" x2="11" y2="14"/>
+            <line x1="8" y1="11" x2="14" y2="11"/>
+          </svg>
+          <h3>Real-time translation</h3>
+          <p>Translate text before synthesis. Arabic to English, English to Arabic, or speak text as-is without translation.</p>
+        </article>
+        <article class="feature-card reveal">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
+            <line x1="12" y1="18" x2="12.01" y2="18"/>
+          </svg>
+          <h3>Browser extension</h3>
+          <p>Chrome extension for instant text-to-speech across any website. Select text, right-click, and listen.</p>
+        </article>
+      </div>
     </section>
 
-    <section class="cta reveal">
-      <h2>Ready to grow fast?</h2>
-      <p>Start free, then move up as your usage scales.</p>
+    <section class="faq-section">
+      <h2 class="section-title reveal">Frequently asked questions</h2>
+      <div class="faq-grid">
+        <article class="faq-item reveal">
+          <h3>Can I switch plans anytime?</h3>
+          <p>Yes. Upgrades take effect immediately with prorated billing. Downgrades apply at your next billing cycle.</p>
+        </article>
+        <article class="faq-item reveal">
+          <h3>What happens when I hit my limit?</h3>
+          <p>You'll receive a notification. Upgrade instantly to continue, or wait for your monthly reset. No surprise charges.</p>
+        </article>
+        <article class="faq-item reveal">
+          <h3>Do you support Arabic dialects?</h3>
+          <p>Modern Standard Arabic with natural pronunciation. Our voices handle transliterated Arabic input gracefully.</p>
+        </article>
+        <article class="faq-item reveal">
+          <h3>Is there a free trial?</h3>
+          <p>The Free plan is yours forever. No credit card required. Upgrade when you're ready for production use.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="cta-section reveal">
+      <h2>Ready to build with Listen?</h2>
+      <p>Start with our free tier. No credit card required.</p>
       @auth
-        <a class="btn btn-primary" href="{{ route('dashboard') }}">Dashboard</a>
+        <a class="btn btn-primary" href="{{ route('dashboard') }}">Go to dashboard</a>
       @else
-        <a class="btn btn-primary" href="{{ route('register') }}">Create Your Account</a>
+        <a class="btn btn-primary" href="{{ route('register') }}">Create free account</a>
       @endauth
+      <div class="cta-badges">
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>No credit card</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Cancel anytime</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Secure billing</span>
+      </div>
     </section>
   </main>
 
   @include('components.footer')
   @include('components.scripts')
   <script>
-    const monthlyBtn = document.getElementById('monthlyBtn');
-    const yearlyBtn = document.getElementById('yearlyBtn');
-    const plans = Array.from(document.querySelectorAll('.plan'));
+    (function() {
+      var monthlyBtn = document.getElementById('monthlyBtn');
+      var yearlyBtn = document.getElementById('yearlyBtn');
+      var billingSavings = document.getElementById('billingSavings');
+      var planCards = document.querySelectorAll('.plan-card');
+      var isYearly = false;
 
-    function formatPrice(v) {
-      const n = Number(v || 0);
-      return n % 1 === 0 ? String(n) : n.toFixed(2).replace(/\.00$/, '');
-    }
+      function updatePrices() {
+        planCards.forEach(function(card) {
+          var isFree = card.getAttribute('data-is-free') === '1';
+          var monthlyPrice = parseInt(card.getAttribute('data-monthly'), 10) || 0;
+          var yearlyMonthly = parseInt(card.getAttribute('data-yearly-monthly'), 10) || 0;
+          var yearlyTotal = parseInt(card.getAttribute('data-yearly-total'), 10) || 0;
+          var savings = parseInt(card.getAttribute('data-savings'), 10) || 0;
 
-    function setBilling(mode) {
-      const isYearly = mode === 'yearly';
-      monthlyBtn?.classList.toggle('active', !isYearly);
-      yearlyBtn?.classList.toggle('active', isYearly);
+          var priceValue = card.querySelector('.price-value');
+          var priceNote = card.querySelector('.price-note-text');
 
-      plans.forEach((plan) => {
-        const priceEl = plan.querySelector('.price-value');
-        if (!priceEl) return;
-        const value = isYearly ? plan.dataset.year : plan.dataset.month;
-        priceEl.textContent = formatPrice(value);
-        const sub = plan.querySelector('.price-sub');
-        if (sub) sub.textContent = isYearly ? 'per month (annual billing)' : 'per month';
-      });
-    }
+          if (isFree) {
+            priceValue.textContent = '0';
+            priceNote.textContent = 'Free forever';
+            priceNote.className = 'price-note price-note-text';
+          } else if (isYearly) {
+            priceValue.textContent = yearlyMonthly;
+            priceNote.textContent = 'Billed $' + yearlyTotal + '/year (save $' + savings + ')';
+            priceNote.className = 'price-note price-note-text savings';
+          } else {
+            priceValue.textContent = monthlyPrice;
+            priceNote.textContent = 'Billed monthly';
+            priceNote.className = 'price-note price-note-text';
+          }
+        });
+      }
 
-    monthlyBtn?.addEventListener('click', () => setBilling('monthly'));
-    yearlyBtn?.addEventListener('click', () => setBilling('yearly'));
+      function setBillingMode(yearly) {
+        isYearly = yearly;
+        monthlyBtn.classList.toggle('active', !yearly);
+        yearlyBtn.classList.toggle('active', yearly);
+        billingSavings.classList.toggle('show', yearly);
+        updatePrices();
+      }
+
+      monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
+      yearlyBtn.addEventListener('click', function() { setBillingMode(true); });
+
+      updatePrices();
+
+      var revealElements = document.querySelectorAll('.reveal');
+      var revealObserver = new IntersectionObserver(function(entries) {
+        entries.forEach(function(entry, index) {
+          if (entry.isIntersecting) {
+            setTimeout(function() {
+              entry.target.classList.add('show');
+            }, index * 60);
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1 });
+
+      revealElements.forEach(function(el) { revealObserver.observe(el); });
+    })();
   </script>
 </body>
 </html>

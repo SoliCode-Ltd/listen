@@ -2,9 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Plan;
-use App\Models\Subscription;
 use App\Models\User;
+use App\Services\PlanAccessService;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -16,6 +15,11 @@ use Laravel\Socialite\Two\InvalidStateException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private readonly PlanAccessService $planAccessService,
+    ) {
+    }
+
     public function showLogin()
     {
         return view('auth.login');
@@ -74,7 +78,7 @@ class AuthController extends Controller
     {
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             return redirect()->route('login')->withErrors([
-                'email' => 'Google login is not configured yet. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET.',
+                'email' => 'Social login is not configured yet. Add OAuth client credentials.',
             ]);
         }
 
@@ -89,23 +93,23 @@ class AuthController extends Controller
             $googleUser = $this->googleProvider()->user();
         } catch (InvalidStateException) {
             return redirect()->route('login')->withErrors([
-                'email' => 'Google login session expired. Please try again.',
+                'email' => 'Social login session expired. Please try again.',
             ]);
         } catch (\Throwable $exception) {
-            Log::warning('Google OAuth callback failed.', [
+            Log::warning('Social OAuth callback failed.', [
                 'message' => $exception->getMessage(),
                 'exception' => get_class($exception),
             ]);
 
             return redirect()->route('login')->withErrors([
-                'email' => 'Google login failed. Please try again.',
+                'email' => 'Social login failed. Please try again.',
             ]);
         }
 
         $email = trim((string) $googleUser->getEmail());
         if ($email === '') {
             return redirect()->route('login')->withErrors([
-                'email' => 'Google account did not return an email address.',
+                'email' => 'Social account did not return an email address.',
             ]);
         }
 
@@ -155,27 +159,7 @@ class AuthController extends Controller
 
     private function attachFreePlanIfMissing(User $user): void
     {
-        $hasActive = Subscription::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->exists();
-
-        if ($hasActive) {
-            return;
-        }
-
-        $freePlan = Plan::query()->where('slug', 'free')->first();
-        if (! $freePlan) {
-            return;
-        }
-
-        Subscription::create([
-            'user_id' => $user->id,
-            'plan_id' => $freePlan->id,
-            'status' => 'active',
-            'current_period_start' => now(),
-            'current_period_end' => now()->addMonth(),
-        ]);
+        $this->planAccessService->ensureFreePlanForUser($user);
     }
 
     private function googleProvider()
