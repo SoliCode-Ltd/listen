@@ -28,7 +28,16 @@ html[data-theme="light"] {
 }
 
 * { box-sizing: border-box; }
-html, body { margin: 0; padding: 0; scroll-behavior: smooth; }
+html, body {
+  margin: 0;
+  padding: 0;
+  scroll-behavior: smooth;
+  max-width: 100%;
+}
+html.mobile-menu-open,
+body.mobile-menu-open {
+  overflow: hidden;
+}
 body {
   font-family: Inter, system-ui, -apple-system, sans-serif;
   background: radial-gradient(1200px 500px at 92% -20%, color-mix(in oklab,var(--b) 25%,transparent), transparent 60%),
@@ -36,9 +45,15 @@ body {
               var(--bg);
   color: var(--text);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .container { width: min(1200px, 92%); margin: 0 auto; }
+
+img, svg, video, canvas, iframe {
+  max-width: 100%;
+  height: auto;
+}
 
 /* ===== HEADER STYLES ===== */
 .app-header {
@@ -272,6 +287,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   top: calc(100% + .5rem);
   right: 0;
   width: 240px;
+  max-width: calc(100vw - 1rem);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -380,10 +396,16 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   width: 2.5rem;
   height: 2.5rem;
   padding: 0;
-  border: none;
-  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
   cursor: pointer;
   position: relative;
+  transition: all .2s ease;
+}
+
+.mobile-toggle:hover {
+  background: color-mix(in oklab, var(--surface2) 80%, transparent);
 }
 
 .hamburger,
@@ -426,19 +448,31 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   left: 0;
   right: 0;
   bottom: 0;
-  background: color-mix(in oklab, var(--bg) 95%, transparent);
+  background: color-mix(in oklab, var(--bg) 97%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  z-index: 99;
+  z-index: 120;
+  min-height: calc(100dvh - 72px);
   overflow-y: auto;
   opacity: 0;
   visibility: hidden;
+  pointer-events: none;
   transition: all .3s ease;
 }
 
 .mobile-nav.open {
+  display: block;
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+}
+
+/* Fallback: if JS updates aria-expanded but open class is missed, still show menu */
+.mobile-toggle[aria-expanded="true"] + .mobile-nav {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
 .mobile-nav-inner {
@@ -676,6 +710,16 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
     display: none;
   }
 
+  .header-inner {
+    justify-content: flex-start;
+    gap: .5rem;
+  }
+
+  .header-actions {
+    margin-left: auto;
+    gap: .45rem;
+  }
+
   .mobile-toggle {
     display: flex;
     align-items: center;
@@ -688,8 +732,14 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 }
 
 @media (max-width: 640px) {
+  .container {
+    width: min(1200px, 94%);
+  }
+
   .header-inner {
     min-height: 64px;
+    width: min(1400px, 96%);
+    padding: 0 .25rem;
   }
 
   .footer-links {
@@ -704,13 +754,14 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 
   .mobile-nav {
     top: 64px;
+    min-height: calc(100dvh - 64px);
   }
 }
 
 /* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .app-header,

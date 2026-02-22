@@ -466,10 +466,10 @@
 
   <main class="container">
     <section class="page-hero reveal">
-      <span class="eyebrow">Flexible pricing</span>
+      <!-- <span class="eyebrow">Flexible pricing</span> -->
       <h1>Scale your voice product with confidence</h1>
       <p class="lead">Start free and upgrade as you grow. All plans include Arabic and English voice synthesis with production-ready reliability.</p>
-      
+
       <div class="billing-wrapper">
         <div class="billing-toggle" id="billingToggle">
           <span class="billing-indicator" aria-hidden="true"></span>
@@ -486,7 +486,7 @@
         $currentPlanIndex = $planSlugs->search($activePlanSlug);
         if ($currentPlanIndex === false) $currentPlanIndex = 0;
       @endphp
-      
+
       @foreach($pricingPlans as $index => $plan)
         @php
           $isCurrent = $activePlanSlug === $plan['slug'];
@@ -505,7 +505,7 @@
              data-monthly-cents="{{ $monthlyCents }}"
              data-yearly-cents="{{ $yearlyCents }}"
              data-savings-cents="{{ $savingsCents }}">
-          
+
           @if($plan['is_popular'] && !$isCurrent)
             <span class="popular-badge">Most Popular</span>
           @endif
@@ -514,7 +514,7 @@
             <h2 class="plan-name">{{ $plan['name'] }}</h2>
             <p class="plan-desc">{{ $plan['slug'] === 'free' ? 'Perfect for testing and exploration' : 'Built for production workloads' }}</p>
           </div>
-          
+
           <div class="plan-pricing">
             <div class="price-row">
               <span class="price-currency">$</span>
@@ -523,9 +523,9 @@
             </div>
             <div class="price-note price-note-text"></div>
           </div>
-          
+
           <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} characters/month</div>
-          
+
           <ul class="plan-features">
             <li>
               <span class="feature-label">
@@ -563,7 +563,7 @@
               <span class="feature-value">{{ $plan['voice_tier_label'] }}</span>
             </li>
           </ul>
-          
+
           <div class="plan-action">
             @auth
               @if($isCurrent)

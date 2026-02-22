@@ -84,7 +84,6 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'content' => ['required', 'string', 'max:50000'],
-            'source_type' => ['required', 'in:email,message,file'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -121,7 +120,7 @@ class DashboardController extends Controller
 
         $item = TextItem::create([
             'user_id' => $userId,
-            'source_type' => $validated['source_type'],
+            'source_type' => 'message',
             'title' => $validated['title'] ?? null,
             'content' => $text,
             'language' => $sourceLanguage,

@@ -9,9 +9,10 @@
 
   const SPEED_OPTIONS = [
     { label: '1x', playbackRate: 1.0 },
-    { label: '1.25x', playbackRate: 1.25 },
-    { label: '1.5x', playbackRate: 1.5 },
-    { label: '2x', playbackRate: 2.0 },
+    // Keep labels familiar, but tune effective rates for clarity.
+    { label: '1.25x', playbackRate: 1.08 },
+    { label: '1.5x', playbackRate: 1.16 },
+    { label: '2x', playbackRate: 1.28 },
   ];
 
   const state = {
@@ -23,6 +24,14 @@
     progressTimer: null,
     waveTimer: null,
     activeRequestToken: 0,
+    appliedRequestToken: 0,
+    playbackSession: 0,
+    audioInstanceId: 0,
+    dragPointerId: null,
+    dragOffsetX: 0,
+    dragOffsetY: 0,
+    hasCustomPosition: false,
+    resizeBound: false,
   };
 
   function clamp(value, min, max) {
@@ -34,6 +43,34 @@
     const min = Math.floor(safe / 60);
     const sec = Math.floor(safe % 60);
     return `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+
+  function pinPanelToViewport(panel, left, top) {
+    if (!(panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const margin = 6;
+    const rect = panel.getBoundingClientRect();
+    const maxLeft = Math.max(margin, window.innerWidth - rect.width - margin);
+    const maxTop = Math.max(margin, window.innerHeight - rect.height - margin);
+    const nextLeft = clamp(Number(left || 0), margin, maxLeft);
+    const nextTop = clamp(Number(top || 0), margin, maxTop);
+
+    panel.style.left = `${nextLeft}px`;
+    panel.style.top = `${nextTop}px`;
+    panel.style.right = 'auto';
+    panel.style.transform = 'none';
+    state.hasCustomPosition = true;
+  }
+
+  function keepPanelInViewport() {
+    if (!state.hasCustomPosition || !(state.panel instanceof HTMLElement)) {
+      return;
+    }
+
+    const rect = state.panel.getBoundingClientRect();
+    pinPanelToViewport(state.panel, rect.left, rect.top);
   }
 
   function injectStyle() {
@@ -76,6 +113,11 @@
         padding: 11px 12px 10px;
         border-bottom: 1px solid rgba(146, 168, 205, 0.2);
         background: linear-gradient(90deg, rgba(251, 131, 8, 0.15), rgba(89, 6, 178, 0.22));
+        cursor: grab;
+        touch-action: none;
+      }
+      #${PANEL_ID} .listen-head.dragging {
+        cursor: grabbing;
       }
       #${PANEL_ID} .listen-brand {
         font-size: 13px;
@@ -301,12 +343,17 @@
     }, 120);
   }
 
+  function nextPlaybackSession() {
+    state.playbackSession = Number(state.playbackSession || 0) + 1;
+    return state.playbackSession;
+  }
+
   function applyPlaybackRate() {
     if (!state.audio) {
       return;
     }
 
-    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.9, 2.0);
+    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.9, 1.4);
 
     if ('preservesPitch' in state.audio) {
       state.audio.preservesPitch = true;
@@ -318,6 +365,7 @@
       state.audio.mozPreservesPitch = true;
     }
 
+    state.audio.defaultPlaybackRate = preferred;
     state.audio.playbackRate = preferred;
   }
 
@@ -329,33 +377,90 @@
     updateTimeUi();
   }
 
+  function createAudioElement() {
+    const audio = new Audio();
+    const audioId = Number(state.audioInstanceId || 0) + 1;
+    state.audioInstanceId = audioId;
+    audio.preload = 'auto';
+
+    audio.addEventListener('ended', () => {
+      if (audio !== state.audio || audioId !== state.audioInstanceId) {
+        return;
+      }
+      onPlaybackEnded();
+    });
+    audio.addEventListener('loadedmetadata', () => {
+      if (audio !== state.audio || audioId !== state.audioInstanceId) {
+        return;
+      }
+      applyPlaybackRate();
+      updateTimeUi();
+    });
+    audio.addEventListener('play', () => {
+      if (audio !== state.audio || audioId !== state.audioInstanceId) {
+        return;
+      }
+      applyPlaybackRate();
+    });
+    audio.addEventListener('ratechange', () => {
+      if (audio !== state.audio || audioId !== state.audioInstanceId) {
+        return;
+      }
+      updateSpeedButton();
+    });
+
+    return audio;
+  }
+
+  function flushAudioElement() {
+    if (!state.audio) {
+      return;
+    }
+
+    nextPlaybackSession();
+    const audio = state.audio;
+    state.audio = null;
+
+    try {
+      audio.pause();
+    } catch (_error) {
+      // Ignore media pause errors on restricted pages.
+    }
+
+    try {
+      audio.currentTime = 0;
+    } catch (_error) {
+      // Ignore seek errors on detached media elements.
+    }
+
+    try {
+      audio.removeAttribute('src');
+      audio.load();
+    } catch (_error) {
+      // Ignore cleanup errors; element is no longer active in state.
+    }
+  }
+
   function ensureAudioElement() {
     if (state.audio) {
       return state.audio;
     }
 
-    const audio = new Audio();
-    audio.preload = 'auto';
-
-    audio.addEventListener('ended', () => onPlaybackEnded());
-    audio.addEventListener('loadedmetadata', () => {
-      applyPlaybackRate();
-      updateTimeUi();
-    });
-    audio.addEventListener('play', () => {
-      applyPlaybackRate();
-    });
-    audio.addEventListener('ratechange', () => {
-      updateSpeedButton();
-    });
-
-    state.audio = audio;
-    return audio;
+    state.audio = createAudioElement();
+    return state.audio;
   }
 
-  function pausePlayback() {
+  function pausePlayback({ resetPosition = false } = {}) {
     const audio = ensureAudioElement();
+    nextPlaybackSession();
     audio.pause();
+    if (resetPosition) {
+      try {
+        audio.currentTime = 0;
+      } catch (_error) {
+        // Ignore media seek errors in pages with unusual media policies.
+      }
+    }
     state.isPlaying = false;
     stopProgressTimer();
     runWave(false);
@@ -369,21 +474,34 @@
       return;
     }
 
+    const playbackSession = Number(state.playbackSession || 0);
     if (offsetSeconds !== null && Number.isFinite(offsetSeconds)) {
       const duration = getDuration();
       audio.currentTime = clamp(Number(offsetSeconds), 0, duration || Number(offsetSeconds));
+    } else {
+      const duration = getDuration();
+      const current = getCurrentOffset();
+      if (duration > 0 && current >= Math.max(0, duration - 0.05)) {
+        audio.currentTime = 0;
+      }
     }
 
     applyPlaybackRate();
 
     try {
       await audio.play();
+      if (playbackSession !== Number(state.playbackSession || 0)) {
+        return;
+      }
       state.isPlaying = true;
       updatePlayButton();
       runWave(true);
       startProgressTimer();
       updateTimeUi();
     } catch (_error) {
+      if (playbackSession !== Number(state.playbackSession || 0)) {
+        return;
+      }
       state.isPlaying = false;
       updatePlayButton();
       runWave(false);
@@ -439,6 +557,8 @@
       return;
     }
 
+    pausePlayback({ resetPosition: true });
+    flushAudioElement();
     const audio = ensureAudioElement();
 
     if (state.objectUrl) {
@@ -502,6 +622,7 @@
     state.panel = panel;
 
     const closeBtn = panel.querySelector('[data-role="close"]');
+    const headEl = panel.querySelector('.listen-head');
     const playBtn = panel.querySelector('[data-role="play"]');
     const speedBtn = panel.querySelector('[data-role="speed"]');
     const downloadEl = panel.querySelector('[data-role="download"]');
@@ -548,7 +669,74 @@
       });
     }
 
+    if (headEl instanceof HTMLElement) {
+      headEl.addEventListener('pointerdown', (event) => {
+        const isPrimaryPointer = event.pointerType !== 'mouse' || event.button === 0;
+        if (!isPrimaryPointer) {
+          return;
+        }
+
+        if (closeBtn instanceof HTMLElement && closeBtn.contains(event.target)) {
+          return;
+        }
+
+        const rect = panel.getBoundingClientRect();
+        pinPanelToViewport(panel, rect.left, rect.top);
+
+        const pinnedRect = panel.getBoundingClientRect();
+        state.dragPointerId = event.pointerId;
+        state.dragOffsetX = event.clientX - pinnedRect.left;
+        state.dragOffsetY = event.clientY - pinnedRect.top;
+        headEl.classList.add('dragging');
+
+        if (headEl.setPointerCapture) {
+          try {
+            headEl.setPointerCapture(event.pointerId);
+          } catch (_error) {
+            // Ignore if pointer capture is unavailable in this page context.
+          }
+        }
+
+        event.preventDefault();
+      });
+
+      headEl.addEventListener('pointermove', (event) => {
+        if (state.dragPointerId !== event.pointerId) {
+          return;
+        }
+
+        const nextLeft = event.clientX - state.dragOffsetX;
+        const nextTop = event.clientY - state.dragOffsetY;
+        pinPanelToViewport(panel, nextLeft, nextTop);
+        event.preventDefault();
+      });
+
+      const finishDrag = (event) => {
+        if (state.dragPointerId !== event.pointerId) {
+          return;
+        }
+
+        state.dragPointerId = null;
+        headEl.classList.remove('dragging');
+
+        if (headEl.releasePointerCapture) {
+          try {
+            headEl.releasePointerCapture(event.pointerId);
+          } catch (_error) {
+            // Ignore release failures.
+          }
+        }
+      };
+
+      headEl.addEventListener('pointerup', finishDrag);
+      headEl.addEventListener('pointercancel', finishDrag);
+    }
+
     document.documentElement.appendChild(panel);
+    if (!state.resizeBound) {
+      window.addEventListener('resize', () => keepPanelInViewport(), { passive: true });
+      state.resizeBound = true;
+    }
     ensureAudioElement();
     updatePlayButton();
     updateSpeedButton();
@@ -560,10 +748,14 @@
     const panel = ensurePanel();
     const token = Number(payload?.requestToken || 0);
     if (Number.isFinite(token) && token > 0) {
+      if (token <= state.appliedRequestToken) {
+        return;
+      }
       if (token < state.activeRequestToken) {
         return;
       }
       state.activeRequestToken = token;
+      state.appliedRequestToken = token;
     }
 
     const voiceEl = panel.querySelector('[data-role="voice"]');

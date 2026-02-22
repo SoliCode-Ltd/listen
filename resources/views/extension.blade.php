@@ -363,8 +363,7 @@
   <script>
     (function() {
       var saved = localStorage.getItem('listen_theme');
-      var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-      document.documentElement.setAttribute('data-theme', saved || (prefersLight ? 'light' : 'dark'));
+      document.documentElement.setAttribute('data-theme', saved || 'dark');
     })();
   </script>
 </head>
@@ -428,8 +427,8 @@
           <ol class="steps">
             <li>Click the extension icon and paste your API key.</li>
             <li>Select any text on a webpage.</li>
-            <li>Right-click and choose <strong>Listen selected text</strong>.</li>
-            <li>Audio plays directly in the extension popup.</li>
+            <li>Right-click and choose <strong>Listen Selected Text</strong>.</li>
+            <li>Audio opens in the side player on the current tab.</li>
             <li>Adjust voice and language settings anytime.</li>
           </ol>
         </article>

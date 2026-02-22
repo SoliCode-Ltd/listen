@@ -16,6 +16,12 @@ class StripeWebhookController extends Controller
         $signature = (string) $request->header('Stripe-Signature', '');
         $secret = trim((string) config('services.stripe.webhook_secret', ''));
 
+        if ($secret === '' && ! app()->environment(['local', 'testing'])) {
+            Log::error('Stripe webhook secret is missing in a non-local environment.');
+
+            return response('Webhook secret is not configured.', 503);
+        }
+
         try {
             if ($secret !== '') {
                 $event = Webhook::constructEvent($payload, $signature, $secret);

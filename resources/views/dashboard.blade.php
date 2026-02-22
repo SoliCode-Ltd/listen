@@ -288,12 +288,41 @@
         grid-template-columns: 1fr;
       }
     }
+    @media (max-width: 640px) {
+      .main-content {
+        padding: 1rem 0 2rem;
+      }
+      .page-card {
+        padding: 1rem;
+      }
+      .page-card h1 {
+        font-size: 1.3rem;
+      }
+      .meter-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .2rem;
+      }
+      audio {
+        width: 180px;
+        max-width: 180px;
+      }
+      th, td {
+        white-space: nowrap;
+      }
+      .sidebar-actions .btn {
+        flex: 1 1 100%;
+        justify-content: center;
+      }
+      .pagination {
+        justify-content: flex-start;
+      }
+    }
   </style>
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
-      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-      document.documentElement.setAttribute('data-theme', saved || (prefersLight ? 'light' : 'dark'));
+      document.documentElement.setAttribute('data-theme', saved || 'dark');
     })();
   </script>
 </head>
@@ -356,19 +385,9 @@
 
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
-          <div class="two-col">
-            <div>
-              <label>Title (optional)</label>
-              <input name="title" value="{{ old('title') }}" placeholder="Notification summary" />
-            </div>
-            <div>
-              <label>Source type</label>
-              <select name="source_type">
-                <option value="email">Email</option>
-                <option value="message">Message</option>
-                <option value="file">File</option>
-              </select>
-            </div>
+          <div>
+            <label>Title (optional)</label>
+            <input name="title" value="{{ old('title') }}" placeholder="Notification summary" />
           </div>
 
           <div>

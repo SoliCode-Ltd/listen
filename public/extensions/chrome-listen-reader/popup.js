@@ -1,7 +1,6 @@
 const elements = {
   apiKey: document.getElementById('apiKey'),
   targetLanguage: document.getElementById('targetLanguage'),
-  sourceType: document.getElementById('sourceType'),
   voiceKey: document.getElementById('voiceKey'),
   translate: document.getElementById('translate'),
   autoPlay: document.getElementById('autoPlay'),
@@ -63,7 +62,6 @@ function readSettingsFromForm() {
   return {
     apiKey: elements.apiKey.value,
     targetLanguage: elements.targetLanguage.value,
-    sourceType: elements.sourceType.value,
     voiceKey: elements.voiceKey.value,
     translate: elements.translate.checked,
     autoPlay: elements.autoPlay.checked,
@@ -73,7 +71,6 @@ function readSettingsFromForm() {
 function writeSettingsToForm(settings = {}) {
   elements.apiKey.value = settings.apiKey || '';
   elements.targetLanguage.value = settings.targetLanguage === 'en' ? 'en' : 'ar';
-  elements.sourceType.value = ['email', 'message', 'file'].includes(settings.sourceType) ? settings.sourceType : 'message';
   elements.translate.checked = settings.translate !== false;
   elements.autoPlay.checked = settings.autoPlay !== false;
   renderVoiceOptions(settings.voiceKey || '');

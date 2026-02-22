@@ -198,6 +198,7 @@
     }
 
     .hint {
+        padding:0.5rem 0 0 0;
       font-size: .85rem;
       color: var(--muted);
     }
@@ -316,8 +317,7 @@
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
-      const prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
-      document.documentElement.setAttribute('data-theme', saved || (prefersLight ? 'light' : 'dark'));
+      document.documentElement.setAttribute('data-theme', saved || 'dark');
     })();
   </script>
 </head>
@@ -331,7 +331,7 @@
     <section>
       <div class="hero-grid">
         <article class="page-card reveal">
-          <span class="eyebrow">Live voice test studio</span>
+          <!-- <span class="eyebrow">Live voice test studio</span> -->
           <h1>Choose voice, language, and translation - then preview instantly.</h1>
           <p style="color: var(--muted); margin: 0;">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
           <div class="hero-list">
@@ -383,8 +383,7 @@
 
             <div class="chips">
               <button class="chip" type="button" data-sample="Welcome to our platform. We build software that sounds as good as it works.">English sample</button>
-              <button class="chip" type="button" data-sample="Marhaban bik fi manassatina. Nahnu nabni barmajiyat ihtirafiya bijawda alamia.">Arabic sample (Latin)</button>
-              <button class="chip" type="button" data-sample="Hello, this is a bilingual test. Marhaban, hatha ikhtibar thunaei allugha.">Bilingual sample (Latin)</button>
+              <button class="chip" type="button" data-sample="مرحبًا بك في منصتنا. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
             </div>
 
             <div class="two-col demo-controls">
@@ -733,4 +732,3 @@
   </script>
 </body>
 </html>
-

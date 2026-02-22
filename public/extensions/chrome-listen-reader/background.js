@@ -11,8 +11,7 @@ const DEFAULT_SETTINGS = {
   apiKey: '',
   targetLanguage: 'ar',
   voiceKey: '',
-  translate: false,
-  sourceType: 'message',
+  translate: true,
   autoPlay: true,
 };
 
@@ -70,12 +69,16 @@ function getLastStatus() {
 }
 
 function nextPlaybackToken(tabId) {
+  const nowToken = Date.now();
+
   if (typeof tabId !== 'number') {
-    return Date.now();
+    return nowToken;
   }
 
   const current = Number(tabPlaybackTokens.get(tabId) || 0);
-  const next = current + 1;
+  // Use wall-clock based monotonic tokens so content scripts can
+  // safely reject stale messages even if the service worker restarts.
+  const next = Math.max(nowToken, current + 1);
   tabPlaybackTokens.set(tabId, next);
   return next;
 }
@@ -339,7 +342,7 @@ function createContextMenu() {
   chrome.contextMenus.removeAll(() => {
     chrome.contextMenus.create({
       id: 'listen-read-selection',
-      title: 'Listen selected text',
+      title: 'Listen Selected Text',
       contexts: ['selection'],
     });
   });
@@ -381,7 +384,6 @@ function saveSettings(settings) {
   payload.apiBase = normalizeApiBase(payload.apiBase || PACKAGED_API_BASE);
   payload.apiKey = String(payload.apiKey || '').trim();
   payload.targetLanguage = payload.targetLanguage === 'en' ? 'en' : 'ar';
-  payload.sourceType = ['email', 'message', 'file'].includes(payload.sourceType) ? payload.sourceType : 'message';
   payload.translate = Boolean(payload.translate);
   payload.voiceKey = String(payload.voiceKey || '').trim();
   payload.autoPlay = payload.autoPlay !== false;
@@ -424,8 +426,8 @@ async function fetchAudioPacket(audioUrl) {
 }
 
 async function pollJobUntilReady(apiBase, apiKey, jobId) {
-  for (let i = 0; i < 18; i += 1) {
-    await sleep(i < 5 ? 1200 : 2200);
+  for (let i = 0; i < 28; i += 1) {
+    await sleep(i < 8 ? 700 : 1300);
 
     const response = await fetch(`${apiBase}/api/reader/jobs?limit=40`, {
       method: 'GET',
@@ -550,8 +552,11 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     title: truncate(selectedText, 80),
     content: selectedText,
     target_language: targetLanguage,
-    source_type: ['email', 'message', 'file'].includes(settings.sourceType) ? settings.sourceType : 'message',
+    source_type: 'message',
     translate: shouldTranslate,
+    // Ask backend to stay synchronous for extension playback whenever possible.
+    // This avoids queue/poll delays for long selections in sync processing mode.
+    prefer_sync: true,
   };
 
   const voiceKey = targetLanguage === selectedTargetLanguage

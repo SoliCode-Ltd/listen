@@ -37,12 +37,12 @@
     }
 
     .hero {
-      padding: 4.5rem 0 3rem;
+      padding: 4rem 0 3rem;
     }
     .hero-grid {
       display: grid;
       grid-template-columns: 1.1fr .9fr;
-      gap: 2rem;
+      gap: 1.75rem;
       align-items: center;
     }
     .eyebrow {
@@ -220,16 +220,45 @@
         grid-template-columns: 1fr;
       }
       .hero {
-        padding: 2.5rem 0 2rem;
+        padding: 1.6rem 0 2rem;
+      }
+      .hero-grid {
+        gap: 1.1rem;
+      }
+      .hero h1 {
+        font-size: clamp(2rem, 10vw, 2.85rem);
+        margin-bottom: .85rem;
+      }
+      .lead {
+        margin-bottom: 1.2rem;
+        font-size: 1rem;
       }
       .section {
         padding: 2.5rem 0;
       }
       .hero-art {
-        order: -1;
+        margin-top: .35rem;
+      }
+      .hero-art::before {
+        width: min(360px, 88%);
+        opacity: .38;
       }
       .hero-art img {
-        max-width: 320px;
+        max-width: min(370px, 92vw);
+        animation: none;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .hero {
+        padding: 1.1rem 0 1.6rem;
+      }
+      .hero-cta {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      .hero-cta .btn {
+        width: 100%;
       }
     }
   </style>
@@ -244,7 +273,7 @@
     <section class="hero">
       <div class="hero-grid">
         <div class="reveal">
-          <span class="eyebrow">Enterprise Voice Platform</span>
+          <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
           <h1>Build voice experiences users love.</h1>
           <p class="lead">Listen helps you launch and scale a modern voice product with polished UX, premium voice presets, bilingual support, and production-ready architecture.</p>
           <div class="hero-cta">

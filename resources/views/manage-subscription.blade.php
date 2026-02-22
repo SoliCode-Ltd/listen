@@ -155,6 +155,19 @@
       height: 1rem;
       fill: currentColor;
     }
+    .stripe-label .card-icon {
+      width: 1.08rem;
+      height: 1.08rem;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .stripe-label .card-icon svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      fill: none;
+      stroke: none;
+    }
     #card-element {
       padding: .85rem;
       border: 1px solid var(--line);
@@ -281,8 +294,30 @@
       }
     }
     @media (max-width: 640px) {
+      .main-content {
+        padding: 1rem 0 2rem;
+      }
+      .page-header h1 {
+        font-size: 1.45rem;
+      }
+      .card {
+        padding: 1rem;
+      }
       .status-grid {
         grid-template-columns: 1fr;
+      }
+      .detail-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .2rem;
+      }
+      .actions .btn {
+        flex: 1 1 100%;
+        justify-content: center;
+      }
+      .invoice-table th,
+      .invoice-table td {
+        white-space: nowrap;
       }
     }
   </style>
@@ -381,10 +416,21 @@
 
         <div class="stripe-container">
           <div class="stripe-label">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect>
-              <line x1="1" y1="10" x2="23" y2="10"></line>
-            </svg>
+            <span class="card-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24">
+                <defs>
+                  <linearGradient id="manageCardGradient" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+                    <stop offset="0%" stop-color="#3B82F6"></stop>
+                    <stop offset="50%" stop-color="#8B5CF6"></stop>
+                    <stop offset="100%" stop-color="#F97316"></stop>
+                  </linearGradient>
+                </defs>
+                <rect x="2" y="4" width="20" height="16" rx="4" fill="url(#manageCardGradient)"></rect>
+                <rect x="2" y="8" width="20" height="2" fill="rgba(255,255,255,.75)"></rect>
+                <rect x="5" y="13" width="4.8" height="3.4" rx="1" fill="rgba(255,255,255,.92)"></rect>
+                <rect x="11.5" y="14.2" width="7.3" height="1.1" rx=".55" fill="rgba(255,255,255,.88)"></rect>
+              </svg>
+            </span>
             Credit or Debit Card
           </div>
           <div id="card-element"></div>
@@ -468,6 +514,30 @@
     const cardError = document.getElementById('card-error');
     const updateCardBtnDefaultText = updateCardBtn ? updateCardBtn.textContent.trim() : 'Update Saved Card';
     const cancelBtnDefaultText = cancelBtn ? cancelBtn.textContent.trim() : 'Cancel Subscription';
+    const LIGHT_CARD_STYLE = {
+      base: {
+        color: '#13213d',
+        iconColor: '#2e4f8f',
+        fontSize: '15px',
+        '::placeholder': { color: '#7a8da8' },
+      },
+      invalid: { color: '#c1244f', iconColor: '#c1244f' },
+    };
+    const DARK_CARD_STYLE = {
+      base: {
+        color: '#f5f7ff',
+        iconColor: '#9fb0d4',
+        fontSize: '15px',
+        '::placeholder': { color: '#8f9bbb' },
+      },
+      invalid: { color: '#ff7a9a', iconColor: '#ff7a9a' },
+    };
+
+    function resolveCardStyle() {
+      return document.documentElement.getAttribute('data-theme') === 'light'
+        ? LIGHT_CARD_STYLE
+        : DARK_CARD_STYLE;
+    }
 
     function setMessage(type, text) {
       messageBox.className = 'message';
@@ -505,14 +575,7 @@
     const card = elements
       ? elements.create('card', {
           hidePostalCode: true,
-          style: {
-            base: {
-              color: '#f5f7ff',
-              fontSize: '15px',
-              '::placeholder': { color: '#8f9bbb' },
-            },
-            invalid: { color: '#ff7a9a' },
-          },
+          style: resolveCardStyle(),
         })
       : null;
 
@@ -522,6 +585,20 @@
       cardComplete = Boolean(event.complete);
       cardError.textContent = event.error?.message || '';
     });
+
+    if (card && 'MutationObserver' in window) {
+      let currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+      const observer = new MutationObserver(() => {
+        const nextTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        if (nextTheme === currentTheme) return;
+        currentTheme = nextTheme;
+        card.update({ style: resolveCardStyle() });
+      });
+      observer.observe(document.documentElement, {
+        attributes: true,
+        attributeFilter: ['data-theme'],
+      });
+    }
 
     async function collectCardPaymentMethod() {
       if (!stripe || !card) throw new Error('Stripe is not configured.');

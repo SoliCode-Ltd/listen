@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
+Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
+Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
+Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->name('media.file');

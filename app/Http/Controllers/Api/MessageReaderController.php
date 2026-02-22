@@ -104,11 +104,11 @@ class MessageReaderController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'content' => ['required', 'string', 'max:50000'],
             'target_language' => ['required', 'in:ar,en'],
-            'source_type' => ['required', 'in:email,message,file'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
             'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
             'translate' => ['nullable', 'boolean'],
+            'prefer_sync' => ['nullable', 'boolean'],
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
@@ -136,8 +136,14 @@ class MessageReaderController extends Controller
         }
 
         $forceAsyncChars = max(0, (int) config('listen.audio.force_async_chars', 2500));
+        $preferSync = (bool) ($validated['prefer_sync'] ?? false);
         $runAsync = $processingMode === 'queue'
-            || ($processingMode === 'sync' && $forceAsyncChars > 0 && $estimate['chars'] >= $forceAsyncChars);
+            || (
+                ! $preferSync
+                && $processingMode === 'sync'
+                && $forceAsyncChars > 0
+                && $estimate['chars'] >= $forceAsyncChars
+            );
         $initialStatus = $runAsync ? 'queued' : 'processing';
 
         $period = now()->format('Y-m');
@@ -150,7 +156,7 @@ class MessageReaderController extends Controller
 
         $item = \App\Models\TextItem::create([
             'user_id' => $user->id,
-            'source_type' => $validated['source_type'],
+            'source_type' => 'message',
             'title' => $validated['title'] ?? null,
             'content' => $text,
             'language' => $sourceLanguage,
