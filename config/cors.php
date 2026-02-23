@@ -9,7 +9,7 @@ if (is_string($appUrlHost) && $appUrlHost !== '' && is_string($appUrlDomain) && 
 }
 
 return [
-    'paths' => ['api/*'],
+    'paths' => ['api/*', 'media/*', 'storage/*'],
 
     'allowed_methods' => ['*'],
 

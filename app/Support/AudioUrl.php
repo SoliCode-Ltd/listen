@@ -2,20 +2,17 @@
 
 namespace App\Support;
 
-use Illuminate\Support\Facades\Storage;
-
 class AudioUrl
 {
+    /**
+     * Always route through the /media/ endpoint so that CORS headers
+     * are set by PHP (required for the Chrome extension to fetch audio).
+     */
     public static function fromPath(?string $audioPath): ?string
     {
         $audioPath = ltrim(trim((string) $audioPath), '/');
         if ($audioPath === '') {
             return null;
-        }
-
-        $publicMirrorPath = public_path('storage/'.$audioPath);
-        if (is_file($publicMirrorPath)) {
-            return Storage::disk('public')->url($audioPath);
         }
 
         return route('media.file', ['path' => $audioPath]);
