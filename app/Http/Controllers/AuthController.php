@@ -44,7 +44,12 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        if (str_contains($intended, '/admin') && ! Auth::user()->is_admin) {
+            $intended = route('dashboard');
+        }
+
+        return redirect()->to($intended);
     }
 
     public function showRegister()
@@ -145,7 +150,12 @@ class AuthController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard'));
+        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        if (str_contains($intended, '/admin') && ! $user->is_admin) {
+            $intended = route('dashboard');
+        }
+
+        return redirect()->to($intended);
     }
 
     public function logout(Request $request)

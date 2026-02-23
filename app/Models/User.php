@@ -33,6 +33,7 @@ class User extends Authenticatable implements FilamentUser
         'api_key_created_at',
         'subscription_status_checked_at',
         'is_admin',
+        'email_verified_at',
     ];
 
     /**
