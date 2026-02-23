@@ -7,6 +7,7 @@
     ['route' => 'browsers-extension.page', 'label' => 'Browsers Extension', 'guest' => false],
   ];
   $authNavLinks = [
+    ['route' => 'home', 'label' => 'Home', 'guest' => false],
     ['route' => 'dashboard', 'label' => 'Dashboard', 'guest' => false],
     ['route' => 'pricing', 'label' => 'Pricing', 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => 'Browsers Extension', 'guest' => false],

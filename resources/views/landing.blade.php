@@ -260,6 +260,135 @@
         width: 100%;
       }
     }
+
+    /* TTS Illustration CSS */
+    .tts-illustration {
+      position: relative;
+      width: 100%;
+      max-width: 500px;
+      aspect-ratio: 4 / 3;
+      margin: 0 auto;
+      perspective: 1000px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .tts-card {
+      position: relative;
+      width: 85%;
+      height: 70%;
+      border-radius: 1.5rem;
+      background: linear-gradient(145deg, color-mix(in oklab, var(--a) 15%, transparent), color-mix(in oklab, var(--surface) 50%, transparent));
+      border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
+      box-shadow: 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 1px color-mix(in oklab, var(--text) 15%, transparent);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      transform: rotateY(-15deg) rotateX(10deg);
+      transform-style: preserve-3d;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .tts-header {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      display: flex;
+      gap: 8px;
+    }
+
+    .tts-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: color-mix(in oklab, var(--text) 20%, transparent);
+    }
+    .tts-dot:nth-child(1) { background: color-mix(in oklab, var(--a) 80%, transparent); }
+    .tts-dot:nth-child(2) { background: color-mix(in oklab, var(--b) 80%, transparent); }
+
+    .tts-body {
+      flex: 1;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+      position: relative;
+    }
+
+    /* Simulating Typing Text */
+    .tts-typing-text {
+      font-family: var(--font-mono, monospace);
+      font-size: 1.05rem;
+      font-weight: 500;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      border-right: 2px solid var(--a);
+      display: inline-block;
+      align-self: flex-start;
+      width: max-content;
+      animation: blink-caret .75s step-end infinite;
+      min-height: 1.5em;
+    }
+
+    /* High-End Sound Wave Animation */
+    .tts-audio-wave {
+      position: absolute;
+      bottom: 2.2rem;
+      left: 1.5rem;
+      right: 1.5rem;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+    }
+
+    .tts-bar {
+      width: 4px;
+      border-radius: 4px;
+      height: var(--h, 20%);
+      background: linear-gradient(180deg, var(--a), var(--b));
+      box-shadow: 0 0 12px color-mix(in oklab, var(--a) 40%, transparent);
+      animation: premium-wave var(--d, 1s) ease-in-out var(--del, 0s) infinite alternate;
+      transform-origin: center;
+      will-change: transform;
+    }
+
+    @keyframes premium-wave {
+      0% { 
+        transform: scaleY(0.15); 
+        opacity: 0.2; 
+        filter: brightness(0.8);
+      }
+      100% { 
+        transform: scaleY(1); 
+        opacity: 1; 
+        box-shadow: 0 0 16px var(--a), 0 0 24px color-mix(in oklab, var(--b) 50%, transparent);
+        filter: brightness(1.2);
+      }
+    }
+
+    .tts-glowing-orb {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 150px;
+      height: 150px;
+      background: var(--a);
+      border-radius: 50%;
+      filter: blur(60px);
+      transform: translate(-50%, -50%) translateZ(-50px);
+      opacity: 0.4;
+      animation: pulse-glow 4s ease-in-out infinite alternate;
+    }
+
+    @keyframes pulse-glow {
+      0% { opacity: 0.3; transform: translate(-50%, -50%) translateZ(-50px) scale(0.8); }
+      100% { opacity: 0.6; transform: translate(-50%, -50%) translateZ(-50px) scale(1.2); }
+    }
   </style>
 </head>
 <body>
@@ -273,8 +402,8 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
-          <h1>Turn any text into <span class="text-gradient-accent">human audio</span> instantly.</h1>
-          <p class="lead">LListen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
+          <h1>Turn any text into <span class="brand-text">human studio</span> instantly.</h1>
+          <p class="lead">Listen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
           <div class="hero-cta">
             @guest
               <a class="btn btn-primary" href="{{ route('demo.page') }}">Try Demo</a>
@@ -287,7 +416,53 @@
         </div>
 
         <aside class="hero-art reveal">
-          <img src="{{ asset('icons/listen-galaxy2.png') }}" alt="Listen voice platform illustration" />
+          <div class="tts-illustration">
+            <div class="tts-glowing-orb"></div>
+            <div class="tts-card">
+              <div class="tts-header">
+                <div class="tts-dot"></div>
+                <div class="tts-dot"></div>
+                <div class="tts-dot"></div>
+              </div>
+              <div class="tts-body">
+                <div class="tts-typing-text"></div>
+                <div class="tts-audio-wave">
+                  <div class="tts-bar" style="--h: 12%; --d: 1.0s; --del: -0.1s;"></div>
+                  <div class="tts-bar" style="--h: 15%; --d: 0.8s; --del: -0.5s;"></div>
+                  <div class="tts-bar" style="--h: 22%; --d: 1.1s; --del: -0.2s;"></div>
+                  <div class="tts-bar" style="--h: 35%; --d: 0.9s; --del: -0.8s;"></div>
+                  <div class="tts-bar" style="--h: 55%; --d: 1.2s; --del: -0.4s;"></div>
+                  <div class="tts-bar" style="--h: 80%; --d: 0.8s; --del: -0.7s;"></div>
+                  <div class="tts-bar" style="--h: 100%; --d: 1.0s; --del: -0.1s;"></div>
+                  <div class="tts-bar" style="--h: 85%; --d: 0.9s; --del: -0.9s;"></div>
+                  <div class="tts-bar" style="--h: 65%; --d: 1.1s; --del: -0.3s;"></div>
+                  <div class="tts-bar" style="--h: 45%; --d: 0.8s; --del: -0.6s;"></div>
+                  <div class="tts-bar" style="--h: 38%; --d: 1.0s; --del: -0.2s;"></div>
+                  <div class="tts-bar" style="--h: 50%; --d: 0.9s; --del: -0.8s;"></div>
+                  <div class="tts-bar" style="--h: 75%; --d: 1.1s; --del: -0.5s;"></div>
+                  <div class="tts-bar" style="--h: 95%; --d: 0.8s; --del: -0.1s;"></div>
+                  <div class="tts-bar" style="--h: 88%; --d: 1.0s; --del: -0.4s;"></div>
+                  <div class="tts-bar" style="--h: 70%; --d: 1.2s; --del: -0.9s;"></div>
+                  <div class="tts-bar" style="--h: 50%; --d: 0.9s; --del: -0.3s;"></div>
+                  <div class="tts-bar" style="--h: 40%; --d: 1.1s; --del: -0.7s;"></div>
+                  <div class="tts-bar" style="--h: 55%; --d: 0.8s; --del: -0.2s;"></div>
+                  <div class="tts-bar" style="--h: 70%; --d: 1.0s; --del: -0.6s;"></div>
+                  <div class="tts-bar" style="--h: 90%; --d: 0.9s; --del: -0.8s;"></div>
+                  <div class="tts-bar" style="--h: 75%; --d: 1.1s; --del: -0.1s;"></div>
+                  <div class="tts-bar" style="--h: 60%; --d: 0.8s; --del: -0.5s;"></div>
+                  <div class="tts-bar" style="--h: 45%; --d: 1.0s; --del: -0.9s;"></div>
+                  <div class="tts-bar" style="--h: 35%; --d: 1.2s; --del: -0.4s;"></div>
+                  <div class="tts-bar" style="--h: 28%; --d: 0.9s; --del: -0.7s;"></div>
+                  <div class="tts-bar" style="--h: 22%; --d: 1.1s; --del: -0.3s;"></div>
+                  <div class="tts-bar" style="--h: 18%; --d: 0.8s; --del: -0.6s;"></div>
+                  <div class="tts-bar" style="--h: 15%; --d: 1.0s; --del: -0.2s;"></div>
+                  <div class="tts-bar" style="--h: 12%; --d: 0.9s; --del: -0.8s;"></div>
+                  <div class="tts-bar" style="--h: 10%; --d: 1.1s; --del: -0.5s;"></div>
+                  <div class="tts-bar" style="--h: 8%; --d: 0.8s; --del: -0.1s;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </aside>
       </div>
     </section>
@@ -351,5 +526,47 @@
 
   @include('components.footer')
   @include('components.scripts')
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const texts = [
+        "Processing text input...",
+        "Applying voice characteristics...",
+        "Enhancing speech naturalness...",
+        "Finalizing crystal-clear audio..."
+      ];
+      let textIndex = 0;
+      let charIndex = 0;
+      let isDeleting = false;
+      const el = document.querySelector('.tts-typing-text');
+      
+      if(!el) return;
+
+      function type() {
+        const current = texts[textIndex];
+        if (isDeleting) {
+          el.textContent = current.substring(0, charIndex - 1);
+          charIndex--;
+        } else {
+          el.textContent = current.substring(0, charIndex + 1);
+          charIndex++;
+        }
+
+        let speed = isDeleting ? 30 : 50;
+
+        if (!isDeleting && charIndex === current.length) {
+          speed = 2000;
+          isDeleting = true;
+        } else if (isDeleting && charIndex === 0) {
+          isDeleting = false;
+          textIndex = (textIndex + 1) % texts.length;
+          speed = 500;
+        }
+
+        setTimeout(type, speed);
+      }
+      
+      type();
+    });
+  </script>
 </body>
 </html>

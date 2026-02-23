@@ -3,16 +3,19 @@
  * (c) 2024-2026 SoliCode Ltd. All rights reserved.
  * https://solicode.co.uk
  */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+
 :root {
-  --bg: #0d1524;
-  --panel: #131f35;
-  --line: #2b3b5a;
-  --text: #f2f6ff;
-  --muted: #9eb0d0;
-  --primaryA: #fb8308;
-  --primaryB: #5906b2;
+  --bg: #070910;
+  --panel: #11182a;
+  --line: #2b3a5d;
+  --text: #f4f7ff;
+  --muted: #9fb0d4;
+  --primaryA: #FF4433;
+  --primaryB: #8A2BE2;
   --ok: #2bb673;
   --error: #d9534f;
+  --radius: 12px;
 }
 
 * {
@@ -21,21 +24,30 @@
 
 body {
   margin: 0;
-  font: 13px/1.4 Inter, Segoe UI, Roboto, Arial, sans-serif;
-  background: radial-gradient(500px 220px at 90% -10%, rgba(89, 6, 178, 0.24), transparent 60%), var(--bg);
+  font: 13px/1.4 'Inter', Segoe UI, sans-serif;
+  background: radial-gradient(400px 300px at 90% -10%, rgba(138, 43, 226, 0.15), transparent 60%),
+    radial-gradient(300px 200px at -10% -10%, rgba(255, 68, 51, 0.12), transparent 60%),
+    var(--bg);
   color: var(--text);
   min-width: 390px;
 }
 
 .app {
-  padding: 12px;
+  padding: 16px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
 }
 
 .head h1 {
   margin: 0;
-  font-size: 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .head p {
@@ -44,12 +56,13 @@ body {
 }
 
 .panel {
-  background: linear-gradient(180deg, #1a2740, var(--panel));
+  background: color-mix(in oklab, var(--panel) 90%, transparent);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
+  border-radius: var(--radius);
+  padding: 12px;
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .profile {
@@ -59,18 +72,19 @@ body {
 .row-inline {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .avatar {
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 999px;
   display: grid;
   place-items: center;
   font-weight: 700;
   color: #fff;
   background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
+  box-shadow: 0 2px 8px rgba(255, 68, 51, 0.3);
 }
 
 .name {
@@ -90,8 +104,8 @@ body {
 .bar {
   height: 8px;
   border: 1px solid var(--line);
-  border-radius: 999px;
-  background: #0d172a;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 
@@ -100,6 +114,7 @@ body {
   height: 100%;
   width: 0;
   background: linear-gradient(90deg, var(--primaryA), var(--primaryB));
+  border-radius: 99px;
 }
 
 label {
@@ -121,9 +136,22 @@ textarea {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 8px;
-  background: #0f182a;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.15);
   color: var(--text);
+  transition: border-color 0.2s;
+}
+
+select option {
+  background: var(--panel);
+  color: var(--text);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--primaryB);
 }
 
 .grid2 {
@@ -139,22 +167,39 @@ textarea {
   color: var(--text);
 }
 
-.row input {
-  width: auto;
+.row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primaryB);
+  cursor: pointer;
 }
 
 .btn {
   border: 1px solid var(--line);
-  background: #122038;
+  background: rgba(255, 255, 255, 0.05);
   color: var(--text);
-  border-radius: 8px;
-  padding: 8px;
+  border-radius: 99px;
+  padding: 10px;
   cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-1px);
 }
 
 .btn.primary {
   border: 0;
-  background: linear-gradient(90deg, var(--primaryA), var(--primaryB));
+  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(255, 68, 51, 0.25);
+}
+
+.btn.primary:hover {
+  box-shadow: 0 8px 24px rgba(255, 68, 51, 0.4);
+  transform: translateY(-1px);
 }
 
 .status {

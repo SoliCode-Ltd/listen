@@ -31,6 +31,10 @@ html[data-theme="light"] {
   --muted: #5b6c89;
   --shadow: 0 14px 34px rgba(35,56,97,.13);
   --shadow-sm: 0 2px 8px rgba(35,56,97,.08);
+  /* Make the mesh gradients much softer in light mode for a sleek look */
+  --a: #ff786b;
+  --b: #a461e8;
+  --brand-accent-glow: rgba(255, 68, 51, 0.15);
 }
 
 * { box-sizing: border-box; }
@@ -77,7 +81,7 @@ h1 {
 
 /* Recolor the hero graphic to match the new vibrant brand palette (#FF4433, #8A2BE2) */
 .hero-art img {
-  filter: hue-rotate(-20deg) saturate(1.15) brightness(1.05);
+  /* Removed hue shift as new graphic matches native palette */
 }
 
 /* ===== HEADER STYLES ===== */
@@ -133,6 +137,10 @@ h1 {
   color: transparent;
 }
 
+.text-gradient-accent {
+  color: var(--brand-accent);
+}
+
 /* Desktop Navigation */
 .desktop-nav {
   display: flex;
@@ -174,41 +182,46 @@ h1 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: .4rem;
-  padding: .55rem 1rem;
-  border-radius: var(--radius);
-  font-size: .88rem;
+  font-family: var(--font-body);
   font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-  transition: all .2s ease;
+  font-size: 0.95rem;
+  padding: 0.85rem 1.8rem;
+  border-radius: 99px;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
   color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  text-decoration: none;
+  line-height: Math(1.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px color-mix(in oklab, var(--line) 40%, transparent);
 }
 
 .btn-primary {
   background: linear-gradient(135deg, var(--a), var(--b));
   border: none;
   color: #fff;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--a) 25%, transparent);
 }
 
 .btn-primary:hover {
-  box-shadow: 0 8px 24px color-mix(in oklab, var(--b) 35%, transparent);
+  box-shadow: 0 12px 32px color-mix(in oklab, var(--a) 45%, transparent), 0 0 0 2px color-mix(in oklab, var(--b) 30%, transparent);
 }
 
 .btn-ghost {
   background: transparent;
   border-color: transparent;
+  color: var(--text);
 }
 
 .btn-ghost:hover {
-  background: color-mix(in oklab, var(--surface) 50%, transparent);
+  box-shadow: 0 12px 24px color-mix(in oklab, var(--line) 40%, transparent);
 }
 
 .btn-icon {
@@ -228,13 +241,14 @@ h1 {
 
 .btn-icon:hover {
   background: color-mix(in oklab, var(--surface2) 80%, transparent);
+  color: var(--text);
 }
 
 .btn-icon .icon {
   width: 1.05rem;
   height: 1.05rem;
   stroke: currentColor;
-  fill: none;
+  fill: currentColor;
   stroke-width: 2;
 }
 
@@ -313,10 +327,12 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   right: 0;
   width: 240px;
   max-width: calc(100vw - 1rem);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.5), inset 0 1px 1px color-mix(in oklab, var(--text) 5%, transparent);
   opacity: 0;
   visibility: hidden;
   transform: translateY(-8px);
@@ -335,7 +351,8 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   align-items: center;
   gap: .75rem;
   padding: .85rem 1rem;
-  background: linear-gradient(180deg, var(--surface2), var(--surface));
+  background: color-mix(in oklab, var(--surface2) 50%, transparent);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
 }
 
 .dropdown-avatar {

@@ -443,7 +443,7 @@
         <article class="page-card">
           <h2>How to Use</h2>
           <ol class="steps">
-            <li>Click the extension icon and paste your API key.</li>
+            <li>Click the extension icon and paste your <a href="#api-management" class="brand-text" style="text-decoration: underline; font-weight: 700;">API key</a>.</li>
             <li>Select any text on a webpage.</li>
             <li>Right-click and choose <strong>Listen Selected Text</strong>.</li>
             <li>Audio opens in the side player on the current tab.</li>
@@ -479,7 +479,7 @@
       </article>
     </section>
 
-    <section class="api-section reveal">
+    <section id="api-management" class="api-section reveal">
       <article class="api-card">
         <div class="api-header">
           <div>
@@ -642,23 +642,24 @@
 
     var extensionsLink = document.getElementById('extensionsLink');
     var extensionsOpenHint = document.getElementById('extensionsOpenHint');
-    extensionsLink.addEventListener('click', async function(event) {
-      event.preventDefault();
-      var target = 'chrome://extensions/';
-      var opened = window.open(target, '_blank', 'noopener,noreferrer');
-      if (opened) {
-        if (extensionsOpenHint) extensionsOpenHint.style.display = 'none';
-        return;
-      }
-      if (!extensionsOpenHint) return;
-      try {
-        await navigator.clipboard.writeText(target);
-        extensionsOpenHint.textContent = 'Chrome blocked direct opening. We copied chrome://extensions/ to your clipboard.';
-      } catch (err) {
-        extensionsOpenHint.textContent = 'Chrome blocked direct opening. Copy chrome://extensions/ and paste it in the address bar.';
-      }
-      extensionsOpenHint.style.display = 'block';
-    });
+    if (extensionsLink) {
+      extensionsLink.addEventListener('click', async function(event) {
+        event.preventDefault();
+        var target = 'chrome://extensions/';
+        
+        // Browsers block websites from navigating to chrome:// URLs for security.
+        // The fallback is to copy it to their clipboard.
+        if (extensionsOpenHint) {
+          try {
+            await navigator.clipboard.writeText(target);
+            extensionsOpenHint.innerHTML = 'Chrome blocks direct links to its settings. We copied <strong>chrome://extensions/</strong> to your clipboard. Paste it in a new tab.';
+          } catch (err) {
+            extensionsOpenHint.innerHTML = 'Chrome blocks direct links to its settings. Please copy <strong>chrome://extensions/</strong> and paste it in your browser address bar.';
+          }
+          extensionsOpenHint.style.display = 'block';
+        }
+      });
+    }
   </script>
 </body>
 </html>
