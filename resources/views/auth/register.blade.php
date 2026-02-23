@@ -1,5 +1,5 @@
 ﻿<!doctype html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -157,7 +157,7 @@
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
-      document.documentElement.setAttribute('data-theme', saved || 'dark');
+      document.documentElement.setAttribute('data-theme', saved || document.documentElement.getAttribute('data-theme') || 'dark');
     })();
   </script>
 </head>

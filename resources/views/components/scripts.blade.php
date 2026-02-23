@@ -14,10 +14,11 @@
     } catch (e) {}
   }
 
+  var serverDefault = document.documentElement.getAttribute('data-theme') || 'dark';
   var savedTheme = safeGetTheme();
   document.documentElement.setAttribute(
     'data-theme',
-    savedTheme || document.documentElement.getAttribute('data-theme') || 'dark'
+    savedTheme || serverDefault
   );
 
   function initThemeToggle() {

@@ -31,8 +31,9 @@ class EnvEditor extends Page implements HasForms
 
     public function mount(): void
     {
-        if (app()->environment('production')) {
-            abort(403, 'Env editor is disabled in production.');
+        // Only admins can access the env editor
+        if (!auth()->user()?->is_admin) {
+            abort(403, 'Only admins can access the environment editor.');
         }
 
         $envContent = $this->parseEnv();
@@ -68,9 +69,9 @@ class EnvEditor extends Page implements HasForms
 
     public function save(): void
     {
-        if (app()->environment('production')) {
+        if (!auth()->user()?->is_admin) {
             Notification::make()
-                ->title('Editing disabled in production')
+                ->title('Only admins can edit environment variables')
                 ->danger()
                 ->send();
             return;

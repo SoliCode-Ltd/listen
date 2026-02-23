@@ -46,10 +46,16 @@ class SiteSetting extends Model
     }
 
     /**
-     * Flush cache for a group.
+     * Flush cache for a group — including each individual key.
      */
     public static function flushGroupCache(string $group): void
     {
+        // Clear all individual key caches for this group
+        $keys = static::where('group', $group)->pluck('key');
+        foreach ($keys as $key) {
+            Cache::forget("site_setting.{$key}");
+        }
+
         Cache::forget("site_settings_group.{$group}");
     }
 }

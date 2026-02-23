@@ -8,10 +8,19 @@ class SeoHelper
 {
     /**
      * Get the full meta title for a page.
+     * If a per-page title override exists in the DB, it takes precedence.
      */
-    public static function title(string $pageTitle = ''): string
+    public static function title(string $pageTitle = '', string $page = ''): string
     {
         $template = SiteSetting::get('meta_title_template', '%page_title% | Listen');
+
+        // Check for per-page title override from admin dashboard
+        if ($page) {
+            $override = SiteSetting::get("seo_{$page}_title");
+            if (!empty($override)) {
+                $pageTitle = $override;
+            }
+        }
 
         if (empty($pageTitle)) {
             return str_replace('%page_title% | ', '', $template);
@@ -57,7 +66,7 @@ class SeoHelper
      */
     public static function ogTags(string $pageTitle = '', string $page = ''): string
     {
-        $title = self::title($pageTitle);
+        $title = self::title($pageTitle, $page);
         $description = self::description($page);
         $image = SiteSetting::get('og_image_url', '');
         $url = request()->url();
@@ -81,7 +90,7 @@ class SeoHelper
     public static function twitterCard(string $pageTitle = '', string $page = ''): string
     {
         $cardType = SiteSetting::get('twitter_card_type', 'summary_large_image');
-        $title = self::title($pageTitle);
+        $title = self::title($pageTitle, $page);
         $description = self::description($page);
         $handle = SiteSetting::get('twitter_handle', '');
         $image = SiteSetting::get('og_image_url', '');
@@ -142,6 +151,19 @@ class SeoHelper
         ];
 
         return '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . '</script>';
+    }
+
+    /**
+     * Get the default theme value for the data-theme attribute.
+     */
+    public static function defaultTheme(): string
+    {
+        $theme = SiteSetting::get('default_theme', 'dark');
+        return match ($theme) {
+            'light' => 'light',
+            'dark' => 'dark',
+            default => 'dark', // system = default to dark, JS will override if needed
+        };
     }
 
     /**
