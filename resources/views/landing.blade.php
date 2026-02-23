@@ -333,42 +333,47 @@
       min-height: 1.5em;
     }
 
-    /* High-End Sound Wave Animation */
+    /* Dynamic 12-bar Sound Wave Animation */
     .tts-audio-wave {
       position: absolute;
-      bottom: 2.2rem;
-      left: 1.5rem;
-      right: 1.5rem;
-      height: 64px;
+      bottom: 3.5rem;
+      left: 50%;
+      transform: translateX(-50%);
       display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 3px;
+      align-items: flex-end;
+      gap: 6px;
+      height: 64px;
+      padding: 0 1rem;
     }
 
     .tts-bar {
-      width: 4px;
-      border-radius: 4px;
-      height: var(--h, 20%);
+      width: 8px;
+      border-radius: var(--radius-full);
       background: linear-gradient(180deg, var(--a), var(--b));
-      box-shadow: 0 0 12px color-mix(in oklab, var(--a) 40%, transparent);
-      animation: premium-wave var(--d, 1s) ease-in-out var(--del, 0s) infinite alternate;
-      transform-origin: center;
-      will-change: transform;
+      animation: heroWavePulse 1.2s ease-in-out infinite;
+      opacity: 0.9;
     }
+    .tts-bar:nth-child(2) { animation-delay: .1s; }
+    .tts-bar:nth-child(3) { animation-delay: .2s; }
+    .tts-bar:nth-child(4) { animation-delay: .3s; }
+    .tts-bar:nth-child(5) { animation-delay: .4s; }
+    .tts-bar:nth-child(6) { animation-delay: .5s; }
+    .tts-bar:nth-child(7) { animation-delay: .6s; }
+    .tts-bar:nth-child(8) { animation-delay: .7s; }
+    .tts-bar:nth-child(9) { animation-delay: .8s; }
+    .tts-bar:nth-child(10) { animation-delay: .9s; }
+    .tts-bar:nth-child(11) { animation-delay: 1.0s; }
+    .tts-bar:nth-child(12) { animation-delay: 1.1s; }
+    .tts-bar:nth-child(13) { animation-delay: 1.2s; }
+    .tts-bar:nth-child(14) { animation-delay: 1.3s; }
+    .tts-bar:nth-child(15) { animation-delay: 1.4s; }
+    .tts-bar:nth-child(16) { animation-delay: 1.5s; }
+    .tts-bar:nth-child(17) { animation-delay: 1.6s; }
+    .tts-bar:nth-child(18) { animation-delay: 1.7s; }
 
-    @keyframes premium-wave {
-      0% { 
-        transform: scaleY(0.15); 
-        opacity: 0.2; 
-        filter: brightness(0.8);
-      }
-      100% { 
-        transform: scaleY(1); 
-        opacity: 1; 
-        box-shadow: 0 0 16px var(--a), 0 0 24px color-mix(in oklab, var(--b) 50%, transparent);
-        filter: brightness(1.2);
-      }
+    @keyframes heroWavePulse {
+      0%, 100% { height: 12px; }
+      50% { height: 60px; }
     }
 
     .tts-glowing-orb {
@@ -402,7 +407,7 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
-          <h1>Turn any text into <span class="brand-text">human studio</span> instantly.</h1>
+          <h1>Turn any text into <span class="brand-text">human audio</span> instantly.</h1>
           <p class="lead">Listen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
           <div class="hero-cta">
             @guest
@@ -427,38 +432,9 @@
               <div class="tts-body">
                 <div class="tts-typing-text"></div>
                 <div class="tts-audio-wave">
-                  <div class="tts-bar" style="--h: 12%; --d: 1.0s; --del: -0.1s;"></div>
-                  <div class="tts-bar" style="--h: 15%; --d: 0.8s; --del: -0.5s;"></div>
-                  <div class="tts-bar" style="--h: 22%; --d: 1.1s; --del: -0.2s;"></div>
-                  <div class="tts-bar" style="--h: 35%; --d: 0.9s; --del: -0.8s;"></div>
-                  <div class="tts-bar" style="--h: 55%; --d: 1.2s; --del: -0.4s;"></div>
-                  <div class="tts-bar" style="--h: 80%; --d: 0.8s; --del: -0.7s;"></div>
-                  <div class="tts-bar" style="--h: 100%; --d: 1.0s; --del: -0.1s;"></div>
-                  <div class="tts-bar" style="--h: 85%; --d: 0.9s; --del: -0.9s;"></div>
-                  <div class="tts-bar" style="--h: 65%; --d: 1.1s; --del: -0.3s;"></div>
-                  <div class="tts-bar" style="--h: 45%; --d: 0.8s; --del: -0.6s;"></div>
-                  <div class="tts-bar" style="--h: 38%; --d: 1.0s; --del: -0.2s;"></div>
-                  <div class="tts-bar" style="--h: 50%; --d: 0.9s; --del: -0.8s;"></div>
-                  <div class="tts-bar" style="--h: 75%; --d: 1.1s; --del: -0.5s;"></div>
-                  <div class="tts-bar" style="--h: 95%; --d: 0.8s; --del: -0.1s;"></div>
-                  <div class="tts-bar" style="--h: 88%; --d: 1.0s; --del: -0.4s;"></div>
-                  <div class="tts-bar" style="--h: 70%; --d: 1.2s; --del: -0.9s;"></div>
-                  <div class="tts-bar" style="--h: 50%; --d: 0.9s; --del: -0.3s;"></div>
-                  <div class="tts-bar" style="--h: 40%; --d: 1.1s; --del: -0.7s;"></div>
-                  <div class="tts-bar" style="--h: 55%; --d: 0.8s; --del: -0.2s;"></div>
-                  <div class="tts-bar" style="--h: 70%; --d: 1.0s; --del: -0.6s;"></div>
-                  <div class="tts-bar" style="--h: 90%; --d: 0.9s; --del: -0.8s;"></div>
-                  <div class="tts-bar" style="--h: 75%; --d: 1.1s; --del: -0.1s;"></div>
-                  <div class="tts-bar" style="--h: 60%; --d: 0.8s; --del: -0.5s;"></div>
-                  <div class="tts-bar" style="--h: 45%; --d: 1.0s; --del: -0.9s;"></div>
-                  <div class="tts-bar" style="--h: 35%; --d: 1.2s; --del: -0.4s;"></div>
-                  <div class="tts-bar" style="--h: 28%; --d: 0.9s; --del: -0.7s;"></div>
-                  <div class="tts-bar" style="--h: 22%; --d: 1.1s; --del: -0.3s;"></div>
-                  <div class="tts-bar" style="--h: 18%; --d: 0.8s; --del: -0.6s;"></div>
-                  <div class="tts-bar" style="--h: 15%; --d: 1.0s; --del: -0.2s;"></div>
-                  <div class="tts-bar" style="--h: 12%; --d: 0.9s; --del: -0.8s;"></div>
-                  <div class="tts-bar" style="--h: 10%; --d: 1.1s; --del: -0.5s;"></div>
-                  <div class="tts-bar" style="--h: 8%; --d: 0.8s; --del: -0.1s;"></div>
+                  <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
+                  <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
+                  <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
                 </div>
               </div>
             </div>
