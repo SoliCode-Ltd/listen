@@ -1,13 +1,19 @@
 <style id="listen-shared-styles">
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+
 :root {
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'Inter', sans-serif;
   --bg: #070910;
   --surface: #11182a;
   --surface2: #15213a;
   --line: #2b3a5d;
   --text: #f4f7ff;
   --muted: #9fb0d4;
-  --a: #fb8308;
-  --b: #5906b2;
+  --a: #FF4433;
+  --b: #8A2BE2;
+  --brand-accent: #FF4433;
+  --brand-accent-glow: rgba(255, 68, 51, 0.4);
   --ok: #32c58d;
   --danger: #ee4a77;
   --shadow: 0 16px 46px rgba(0,0,0,.30);
@@ -39,7 +45,7 @@ body.mobile-menu-open {
   overflow: hidden;
 }
 body {
-  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   background: radial-gradient(1200px 500px at 92% -20%, color-mix(in oklab,var(--b) 25%,transparent), transparent 60%),
               radial-gradient(900px 420px at -5% 0%, color-mix(in oklab,var(--a) 18%,transparent), transparent 58%),
               var(--bg);
@@ -53,6 +59,25 @@ body {
 img, svg, video, canvas, iframe {
   max-width: 100%;
   height: auto;
+}
+
+h1, h2, h3, h4, h5, h6, .font-display {
+  font-family: var(--font-display);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+}
+
+h1 {
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1.05;
+}
+
+/* Recolor the hero graphic to match the new vibrant brand palette (#FF4433, #8A2BE2) */
+.hero-art img {
+  filter: hue-rotate(-20deg) saturate(1.15) brightness(1.05);
 }
 
 /* ===== HEADER STYLES ===== */
@@ -769,3 +794,4 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   animation: fadeIn .4s ease forwards;
 }
 </style>
+

@@ -273,8 +273,8 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
-          <h1>Build voice experiences users love.</h1>
-          <p class="lead">Listen helps you launch and scale a modern voice product with polished UX, premium voice presets, bilingual support, and production-ready architecture.</p>
+          <h1>Turn any text into <span class="text-gradient-accent">human audio</span> instantly.</h1>
+          <p class="lead">LListen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
           <div class="hero-cta">
             @guest
               <a class="btn btn-primary" href="{{ route('demo.page') }}">Try Demo</a>
