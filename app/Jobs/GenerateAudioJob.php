@@ -96,15 +96,25 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        $reserved = $this->reservedUsage($generation);
+        $generation->update([
+            'status' => 'failed',
+            'error_message' => 'Voice generation failed. Please try again.',
+        ]);
 
-        $this->applyUsageDelta(
-            (int) $generation->user_id,
-            $this->usagePeriod($generation),
-            -1,
-            -$reserved['chars'],
-            -$reserved['minutes'],
-        );
+        // Only release usage for async (queued) jobs.
+        // For sync dispatches, the controller handles the refund
+        // after checking job status — avoiding double-refund.
+        if ($this->connection !== 'sync') {
+            $reserved = $this->reservedUsage($generation);
+
+            $this->applyUsageDelta(
+                (int) $generation->user_id,
+                $this->usagePeriod($generation),
+                -1,
+                -$reserved['chars'],
+                -$reserved['minutes'],
+            );
+        }
 
         if ($generation->text_item_id) {
             TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);

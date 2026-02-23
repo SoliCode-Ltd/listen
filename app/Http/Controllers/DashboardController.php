@@ -146,20 +146,22 @@ class DashboardController extends Controller
         $counter->increment('total_chars', $estimate['chars']);
         $counter->increment('total_minutes', $estimate['minutes']);
 
-        $dispatchFailed = false;
         try {
             // Dashboard flow is intentionally synchronous for immediate UX.
             GenerateAudioJob::dispatchSync($job->id);
         } catch (\Throwable) {
-            $dispatchFailed = true;
-        }
-
-        if ($dispatchFailed) {
-            $this->releaseReservedUsage($counter, $estimate);
+            // Job failed — status will be checked below.
         }
 
         $job->refresh();
         $counter->refresh();
+
+        // Always refund usage when the job actually failed,
+        // regardless of whether the exception propagated.
+        if ($job->status === 'failed') {
+            $this->releaseReservedUsage($counter, $estimate);
+            $counter->refresh();
+        }
 
         $baseQuery = AudioGeneration::query()->where('user_id', $userId);
         $stats = [

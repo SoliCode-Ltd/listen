@@ -183,18 +183,19 @@ class MessageReaderController extends Controller
         $counter->increment('total_minutes', $estimate['minutes']);
 
         if (! $runAsync) {
-            $dispatchFailed = false;
             try {
                 GenerateAudioJob::dispatchSync($job->id);
             } catch (\Throwable) {
-                $dispatchFailed = true;
-            }
-
-            if ($dispatchFailed) {
-                $this->releaseReservedUsage($counter, $estimate);
+                // Job failed — status will be checked below.
             }
 
             $job->refresh();
+
+            // Always refund usage when the job actually failed,
+            // regardless of whether the exception propagated.
+            if ($job->status === 'failed') {
+                $this->releaseReservedUsage($counter, $estimate);
+            }
         } else {
             $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
                 ? 'high'
