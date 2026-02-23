@@ -21,6 +21,10 @@ function normalizeApiBase(apiBase) {
 }
 
 const PACKAGED_API_BASE = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.apiBase || '');
+const PACKAGED_CONFIG_URL = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.configUrl || '');
+const REMOTE_CONFIG_ALARM = 'listen_remote_config_refresh';
+const REMOTE_CONFIG_CACHE_KEY = 'listen_remote_config_cache';
+const REMOTE_CONFIG_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
 
 const DEFAULT_SETTINGS = {
   apiBase: PACKAGED_API_BASE,
@@ -30,6 +34,68 @@ const DEFAULT_SETTINGS = {
   translate: true,
   autoPlay: true,
 };
+
+/**
+ * Fetch the extension config from the remote server.
+ * This allows the extension to auto-discover domain changes
+ * without requiring a new extension build or manual user action.
+ */
+async function refreshRemoteConfig() {
+  try {
+    const settings = await getSettings();
+    const configUrl = PACKAGED_CONFIG_URL || normalizeApiBase(settings.apiBase);
+    if (!configUrl) return;
+
+    const endpoint = `${configUrl}/api/extension/config`;
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) return;
+
+    const data = await response.json().catch(() => null);
+    if (!data?.ok || !data?.config) return;
+
+    const remoteApiBase = normalizeApiBase(data.config.apiBase);
+    if (!remoteApiBase) return;
+
+    // Cache the remote config
+    await new Promise((resolve) => {
+      chrome.storage.local.set({
+        [REMOTE_CONFIG_CACHE_KEY]: {
+          apiBase: remoteApiBase,
+          brandName: data.config.brandName || '',
+          version: data.config.version || '',
+          fetchedAt: Date.now(),
+        },
+      }, resolve);
+    });
+
+    // If the remote server reports a different apiBase, update stored settings.
+    // This enables seamless domain migration.
+    const currentApiBase = normalizeApiBase(settings.apiBase);
+    if (remoteApiBase && remoteApiBase !== currentApiBase) {
+      await saveSettings({ ...settings, apiBase: remoteApiBase });
+    }
+  } catch (_error) {
+    // Silently ignore — extension continues working with last known config.
+  }
+}
+
+function scheduleRemoteConfigRefresh() {
+  if (typeof chrome.alarms !== 'undefined') {
+    chrome.alarms.create(REMOTE_CONFIG_ALARM, { periodInMinutes: 360 });
+  }
+}
+
+if (typeof chrome.alarms !== 'undefined') {
+  chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === REMOTE_CONFIG_ALARM) {
+      refreshRemoteConfig();
+    }
+  });
+}
 
 const LAST_STATUS_KEY = 'listen_last_status';
 const LAST_STATUS_TTL_MS = 1000 * 60 * 30;
@@ -366,10 +432,14 @@ function createContextMenu() {
 
 chrome.runtime.onInstalled.addListener(() => {
   createContextMenu();
+  scheduleRemoteConfigRefresh();
+  refreshRemoteConfig();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   createContextMenu();
+  scheduleRemoteConfigRefresh();
+  refreshRemoteConfig();
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {

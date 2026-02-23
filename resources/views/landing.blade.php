@@ -407,7 +407,7 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
-          <h1>Turn any text into <span class="brand-text">human audio</span> instantly.</h1>
+          <h1>Turn any text into <span class="brand-text">human voice</span> instantly.</h1>
           <p class="lead">Listen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
           <div class="hero-cta">
             @guest

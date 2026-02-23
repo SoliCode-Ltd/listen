@@ -432,7 +432,7 @@
           <h2>Installation Guide</h2>
           <ol class="steps">
             <li>{{ $installStep1 }}</li>
-            <li>{!! str_contains($installStep2, 'chrome://extensions/') ? '<a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
+            <li>{!! str_contains($installStep2, 'chrome://extensions/') ? 'Open<a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
             <li>{{ $installStep3 }}</li>
             <li>{{ $installStep4 }}</li>
             <li>{{ $installStep5 }}</li>
@@ -443,11 +443,11 @@
         <article class="page-card">
           <h2>How to Use</h2>
           <ol class="steps">
-            <li>Click the extension icon and paste your <a href="#api-management" class="brand-text" style="text-decoration: underline; font-weight: 700;">API key</a>.</li>
-            <li>Select any text on a webpage.</li>
-            <li>Right-click and choose <strong>Listen Selected Text</strong>.</li>
-            <li>Audio opens in the side player on the current tab.</li>
-            <li>Adjust voice and language settings anytime.</li>
+            <li>{!! str_replace('API key', '<a href="#api-management" class="brand-text" style="text-decoration: underline; font-weight: 700;">API key</a>', e($howToUseStep1)) !!}</li>
+            <li>{{ $howToUseStep2 }}</li>
+            <li>{!! str_replace('Listen Selected Text', '<strong>Listen Selected Text</strong>', e($howToUseStep3)) !!}</li>
+            <li>{{ $howToUseStep4 }}</li>
+            <li>{{ $howToUseStep5 }}</li>
           </ol>
         </article>
       </div>

@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SiteSetting;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -32,7 +33,10 @@ class ListenSyncExtensionCommand extends Command
             return self::FAILURE;
         }
 
-        $apiBase = rtrim($appUrl, '/');
+        $customApiBase = trim((string) SiteSetting::get('extension_custom_api_base', ''));
+        $apiBase = $customApiBase !== '' ? $customApiBase : rtrim($appUrl, '/');
+        $configUrl = trim((string) SiteSetting::get('extension_remote_config_url', ''));
+
         $configFile = public_path('extensions/chrome-listen-reader/config.js');
 
         if (! File::exists($configFile)) {
@@ -40,18 +44,13 @@ class ListenSyncExtensionCommand extends Command
             return self::FAILURE;
         }
 
-        $content = <<<JS
-/**
- * Listen Reader — Chrome Extension
- * Configuration
- *
- * (c) 2024-2026 SoliCode Ltd. All rights reserved.
- * https://solicode.co.uk
- */
-self.LISTEN_EXTENSION_CONFIG = Object.assign({}, self.LISTEN_EXTENSION_CONFIG || {}, {
-  apiBase: '{$apiBase}',
-});
-JS;
+        $content = "/**\n * Listen Reader — Chrome Extension\n * Configuration\n *\n * (c) 2024-2026 SoliCode Ltd. All rights reserved.\n * https://solicode.co.uk\n */\n";
+        $content .= 'self.LISTEN_EXTENSION_CONFIG = Object.assign({}, self.LISTEN_EXTENSION_CONFIG || {}, ';
+        $content .= json_encode([
+            'apiBase' => $apiBase,
+            'configUrl' => $configUrl ?: $apiBase,
+        ], JSON_UNESCAPED_SLASHES);
+        $content .= ");\n";
 
         File::put($configFile, $content);
 

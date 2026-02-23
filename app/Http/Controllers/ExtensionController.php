@@ -52,6 +52,14 @@ class ExtensionController extends Controller
             'installStep4' => SiteSetting::get('extension_install_step_4', 'Click Load unpacked and select the extracted folder.'),
             'installStep5' => SiteSetting::get('extension_install_step_5', 'Pin the extension to your toolbar for quick access.'),
 
+            // How to Use steps
+            'howToUseStep1' => SiteSetting::get('extension_how_to_use_step_1', 'Click the extension icon and paste your API key.'),
+            'howToUseStep2' => SiteSetting::get('extension_how_to_use_step_2', 'Select any text on a webpage.'),
+            'howToUseStep3' => SiteSetting::get('extension_how_to_use_step_3', 'Right-click and choose Listen Selected Text.'),
+            'howToUseStep4' => SiteSetting::get('extension_how_to_use_step_4', 'Audio opens in the side player on the current tab.'),
+            'howToUseStep5' => SiteSetting::get('extension_how_to_use_step_5', 'Adjust voice and language settings anytime.'),
+
+
             // Download & announcement
             'downloadEnabled' => SiteSetting::get('extension_download_enabled', '1') === '1',
             'announcement' => SiteSetting::get('extension_announcement', ''),
@@ -120,11 +128,31 @@ class ExtensionController extends Controller
             throw new \RuntimeException('Unable to prepare extension package.');
         }
 
-        $apiBase = rtrim($request->root(), '/');
-        File::put(
-            $buildDir.'/config.js',
-            "self.LISTEN_EXTENSION_CONFIG = Object.assign({}, self.LISTEN_EXTENSION_CONFIG || {}, { apiBase: ".json_encode($apiBase).", });\n"
-        );
+        $customApiBase = trim((string) SiteSetting::get('extension_custom_api_base', ''));
+        $apiBase = $customApiBase !== '' ? $customApiBase : rtrim($request->root(), '/');
+        $configUrl = trim((string) SiteSetting::get('extension_remote_config_url', ''));
+
+        $configJs = "/**\n * Listen Reader — Chrome Extension\n * Configuration\n *\n * (c) 2024-2026 SoliCode Ltd. All rights reserved.\n * https://solicode.co.uk\n */\n";
+        $configJs .= 'self.LISTEN_EXTENSION_CONFIG = Object.assign({}, self.LISTEN_EXTENSION_CONFIG || {}, ';
+        $configJs .= json_encode([
+            'apiBase' => $apiBase,
+            'configUrl' => $configUrl ?: $apiBase,
+        ], JSON_UNESCAPED_SLASHES);
+        $configJs .= ");\n";
+
+        File::put($buildDir.'/config.js', $configJs);
+
+        // Update manifest with admin-configured name/description/version
+        $manifestPath = $buildDir.'/manifest.json';
+        if (File::exists($manifestPath)) {
+            $manifest = json_decode(File::get($manifestPath), true);
+            if (is_array($manifest)) {
+                $manifest['name'] = SiteSetting::get('extension_chrome_name', $manifest['name'] ?? 'Listen Reader');
+                $manifest['description'] = SiteSetting::get('extension_chrome_description', $manifest['description'] ?? '');
+                $manifest['version'] = SiteSetting::get('extension_chrome_version', $manifest['version'] ?? '1.0.0');
+                File::put($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            }
+        }
 
         $zipPath = $targetDir.'/listen-chrome-extension.zip';
         $this->buildZip($buildDir, $zipPath, 'listen-chrome-extension');

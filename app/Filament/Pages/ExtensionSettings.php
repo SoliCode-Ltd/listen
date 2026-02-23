@@ -80,6 +80,7 @@ class ExtensionSettings extends Page implements HasForms
             // Download settings
             'extension_download_enabled' => SiteSetting::get('extension_download_enabled', '1'),
             'extension_custom_api_base' => SiteSetting::get('extension_custom_api_base', ''),
+            'extension_remote_config_url' => SiteSetting::get('extension_remote_config_url', ''),
 
             // Announcement
             'extension_announcement' => SiteSetting::get('extension_announcement', ''),
@@ -91,6 +92,13 @@ class ExtensionSettings extends Page implements HasForms
             'extension_install_step_3' => SiteSetting::get('extension_install_step_3', 'Enable Developer mode in the top right corner.'),
             'extension_install_step_4' => SiteSetting::get('extension_install_step_4', 'Click Load unpacked and select the extracted folder.'),
             'extension_install_step_5' => SiteSetting::get('extension_install_step_5', 'Pin the extension to your toolbar for quick access.'),
+
+            // How to Use guide
+            'extension_how_to_use_step_1' => SiteSetting::get('extension_how_to_use_step_1', 'Click the extension icon and paste your API key.'),
+            'extension_how_to_use_step_2' => SiteSetting::get('extension_how_to_use_step_2', 'Select any text on a webpage.'),
+            'extension_how_to_use_step_3' => SiteSetting::get('extension_how_to_use_step_3', 'Right-click and choose Listen Selected Text.'),
+            'extension_how_to_use_step_4' => SiteSetting::get('extension_how_to_use_step_4', 'Audio opens in the side player on the current tab.'),
+            'extension_how_to_use_step_5' => SiteSetting::get('extension_how_to_use_step_5', 'Adjust voice and language settings anytime.'),
         ]);
     }
 
@@ -228,6 +236,15 @@ class ExtensionSettings extends Page implements HasForms
                                         Forms\Components\TextInput::make('extension_install_step_4')->label('Step 4'),
                                         Forms\Components\TextInput::make('extension_install_step_5')->label('Step 5'),
                                     ]),
+                                Forms\Components\Section::make('How to Use Steps')
+                                    ->description('Customize the how to use guide shown to users.')
+                                    ->schema([
+                                        Forms\Components\TextInput::make('extension_how_to_use_step_1')->label('Step 1'),
+                                        Forms\Components\TextInput::make('extension_how_to_use_step_2')->label('Step 2'),
+                                        Forms\Components\TextInput::make('extension_how_to_use_step_3')->label('Step 3'),
+                                        Forms\Components\TextInput::make('extension_how_to_use_step_4')->label('Step 4'),
+                                        Forms\Components\TextInput::make('extension_how_to_use_step_5')->label('Step 5'),
+                                    ]),
                             ]),
                         Forms\Components\Tabs\Tab::make('Behaviour')
                             ->icon('heroicon-o-cog-6-tooth')
@@ -268,9 +285,16 @@ class ExtensionSettings extends Page implements HasForms
                                         Forms\Components\Toggle::make('extension_download_enabled')
                                             ->label('Allow Extension Download'),
                                         Forms\Components\TextInput::make('extension_custom_api_base')
-                                            ->label('Custom API Base URL')
+                                            ->label('Production API Base URL')
                                             ->url()
-                                            ->placeholder(config('app.url')),
+                                            ->placeholder(config('app.url'))
+                                            ->helperText('The base URL stamped into the extension on download. Leave empty to use APP_URL.'),
+                                        Forms\Components\TextInput::make('extension_remote_config_url')
+                                            ->label('Remote Config URL (for domain migration)')
+                                            ->url()
+                                            ->placeholder('https://stable-domain.com')
+                                            ->helperText('A stable URL the extension checks periodically to discover API base changes. Enables seamless domain migration. Falls back to API Base URL if empty.')
+                                            ->columnSpanFull(),
                                     ]),
                                 Forms\Components\Section::make('Announcement Banner')
                                     ->description('Show a banner on the extension page.')
