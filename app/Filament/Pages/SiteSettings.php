@@ -72,12 +72,16 @@ class SiteSettings extends Page implements HasForms
                             ->required(),
                         Forms\Components\FileUpload::make('logo_url')
                             ->label('Site Logo')
-                            ->image()
+                            ->acceptedFileTypes([
+                                'image/png',
+                                'image/jpeg',
+                                'image/webp',
+                                'image/svg+xml',
+                            ])
+                            ->maxSize(4096)
                             ->directory('settings')
                             ->disk('public')
-                            ->imageResizeMode('contain')
-                            ->imageResizeTargetHeight('128')
-                            ->helperText('Upload a logo image (PNG/SVG recommended).'),
+                            ->helperText('Upload logo as PNG, JPG, WEBP, or SVG (up to 4 MB).'),
                         Forms\Components\FileUpload::make('favicon_url')
                             ->label('Site Favicon')
                             ->acceptedFileTypes([

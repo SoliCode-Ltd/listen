@@ -11,8 +11,8 @@ return [
     |
     */
     'temporary_file_upload' => [
-        'disk' => env('LIVEWIRE_TEMP_DISK', 'public'),
+        'disk' => env('LIVEWIRE_TEMP_DISK', 'livewire-tmp'),
         'directory' => env('LIVEWIRE_TEMP_DIRECTORY', 'livewire-tmp'),
+        'rules' => ['file', 'max:5120'],
     ],
 ];
-
