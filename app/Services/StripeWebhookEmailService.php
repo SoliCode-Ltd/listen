@@ -72,13 +72,9 @@ class StripeWebhookEmailService
     private function handleInvoicePaid(object $invoice): void
     {
         $billingReason = strtolower((string) ($invoice->billing_reason ?? ''));
-        if ($billingReason === 'subscription_create') {
-            // Initial purchase is handled by customer.subscription.created.
-            return;
-        }
-
         $customerId = trim((string) ($invoice->customer ?? ''));
-        $user = $this->findUser($customerId);
+        $customerEmail = trim((string) ($invoice->customer_email ?? ''));
+        $user = $this->findUser($customerId, $customerEmail);
 
         if (! $user) {
             return;
@@ -91,10 +87,11 @@ class StripeWebhookEmailService
 
         $priceId = $this->extractPriceIdFromInvoice($invoice);
         $planLabel = $this->planLabelFromPriceId($priceId);
+        $isInitialPurchase = $billingReason === 'subscription_create';
 
-        $subject = 'Subscription payment received';
+        $subject = $isInitialPurchase ? 'Subscription activated' : 'Subscription payment received';
         $body = "Hi {$this->displayName($user)},\n\n"
-            ."Your subscription payment was successful.\n"
+            .($isInitialPurchase ? "Your subscription is now active.\n" : "Your subscription payment was successful.\n")
             ."Plan: {$planLabel}\n"
             ."Amount: {$amount}\n\n"
             ."Thanks,\nListen";

@@ -465,7 +465,7 @@
                 <th>Status</th>
                 <th>Paid For</th>
                 <th>Amount</th>
-                <th>Actions</th>
+                <th>Payment Details</th>
               </tr>
             </thead>
             <tbody>
