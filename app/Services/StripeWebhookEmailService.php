@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -24,10 +25,12 @@ class StripeWebhookEmailService
 
         match ($type) {
             'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
+            'customer.subscription.created' => $this->handleSubscriptionCreated($object),
             'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
-            'invoice.payment_failed' => $this->handleInvoicePaymentFailed($object),
             'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
             'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
+            'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
+            'customer.deleted' => $this->handleCustomerDeleted($object),
             'charge.refunded' => $this->handleChargeRefunded($object),
             default => null,
         };
@@ -70,7 +73,7 @@ class StripeWebhookEmailService
     {
         $billingReason = strtolower((string) ($invoice->billing_reason ?? ''));
         if ($billingReason === 'subscription_create') {
-            // Initial purchase already covered by checkout.session.completed.
+            // Initial purchase is handled by customer.subscription.created.
             return;
         }
 
@@ -99,30 +102,31 @@ class StripeWebhookEmailService
         $this->sendMail($user, $subject, $body);
     }
 
-    private function handleInvoicePaymentFailed(object $invoice): void
+    private function handleSubscriptionCreated(object $subscription): void
     {
-        $customerId = trim((string) ($invoice->customer ?? ''));
+        $customerId = trim((string) ($subscription->customer ?? ''));
         $user = $this->findUser($customerId);
 
         if (! $user) {
             return;
         }
 
-        $amount = $this->formatAmount(
-            isset($invoice->amount_due) ? (int) $invoice->amount_due : (isset($invoice->total) ? (int) $invoice->total : null),
-            (string) ($invoice->currency ?? 'usd')
-        );
+        $status = strtolower((string) ($subscription->status ?? ''));
+        if ($status === 'incomplete' || $status === 'incomplete_expired') {
+            return;
+        }
 
-        $nextAttempt = isset($invoice->next_payment_attempt) && (int) $invoice->next_payment_attempt > 0
-            ? now()->setTimestamp((int) $invoice->next_payment_attempt)->format('M j, Y g:i A')
+        $planLabel = $this->planLabelFromPriceId($this->extractPriceIdFromSubscription($subscription));
+        $periodEnd = isset($subscription->current_period_end) && (int) $subscription->current_period_end > 0
+            ? now()->setTimestamp((int) $subscription->current_period_end)->format('M j, Y')
             : 'N/A';
 
-        $subject = 'Payment failed - update required';
+        $subject = 'Subscription activated';
         $body = "Hi {$this->displayName($user)},\n\n"
-            ."We could not process your subscription payment.\n"
-            ."Amount due: {$amount}\n"
-            ."Next attempt: {$nextAttempt}\n\n"
-            ."Please update your payment method to avoid interruption.\n\n"
+            ."Your subscription is now active.\n"
+            ."Plan: {$planLabel}\n"
+            ."Status: {$status}\n"
+            ."Current period ends: {$periodEnd}\n\n"
             ."Thanks,\nListen";
 
         $this->sendMail($user, $subject, $body);
@@ -147,18 +151,53 @@ class StripeWebhookEmailService
         }
 
         $status = strtolower((string) ($subscription->status ?? ''));
+        $previousStatus = $changedStatus ? strtolower((string) ($previousAttributes->status ?? '')) : '';
         $cancelAtPeriodEnd = (bool) ($subscription->cancel_at_period_end ?? false);
         $periodEnd = isset($subscription->current_period_end) && (int) $subscription->current_period_end > 0
             ? now()->setTimestamp((int) $subscription->current_period_end)->format('M j, Y')
             : 'N/A';
         $planLabel = $this->planLabelFromPriceId($this->extractPriceIdFromSubscription($subscription));
 
-        if ($cancelAtPeriodEnd) {
+        if (
+            $changedStatus
+            && in_array($previousStatus, ['incomplete', 'incomplete_expired'], true)
+            && in_array($status, ['active', 'trialing'], true)
+            && ! $changedItems
+            && ! $changedCancelAtPeriodEnd
+        ) {
+            $subject = 'Subscription activated';
+            $body = "Hi {$this->displayName($user)},\n\n"
+                ."Your subscription is now active.\n"
+                ."Plan: {$planLabel}\n"
+                ."Status: {$status}\n"
+                ."Current period ends: {$periodEnd}\n\n"
+                ."Thanks,\nListen";
+            $this->sendMail($user, $subject, $body);
+            return;
+        }
+
+        // Payment failure and grace period messaging are handled by BillingLifecycleService.
+        if ($changedStatus && in_array($status, ['past_due', 'unpaid'], true) && ! $changedItems && ! $changedCancelAtPeriodEnd) {
+            return;
+        }
+
+        if ($changedCancelAtPeriodEnd && $cancelAtPeriodEnd) {
             $subject = 'Cancellation scheduled';
             $body = "Hi {$this->displayName($user)},\n\n"
                 ."Your subscription is set to cancel at the end of the current period.\n"
                 ."Plan: {$planLabel}\n"
                 ."Access ends on: {$periodEnd}\n\n"
+                ."Thanks,\nListen";
+            $this->sendMail($user, $subject, $body);
+            return;
+        }
+
+        if ($changedCancelAtPeriodEnd && ! $cancelAtPeriodEnd) {
+            $subject = 'Cancellation removed';
+            $body = "Hi {$this->displayName($user)},\n\n"
+                ."Your scheduled cancellation was removed.\n"
+                ."Plan: {$planLabel}\n"
+                ."Status: {$status}\n\n"
                 ."Thanks,\nListen";
             $this->sendMail($user, $subject, $body);
             return;
@@ -194,6 +233,15 @@ class StripeWebhookEmailService
             return;
         }
 
+        $localSubscription = Subscription::query()
+            ->where('user_id', $user->id)
+            ->latest('id')
+            ->first();
+
+        if ($localSubscription?->billing_downgraded_at && $localSubscription->billing_downgraded_at->gt(now()->subHours(6))) {
+            return;
+        }
+
         $planLabel = $this->planLabelFromPriceId($this->extractPriceIdFromSubscription($subscription));
 
         $subject = 'Subscription canceled';
@@ -201,6 +249,48 @@ class StripeWebhookEmailService
             ."Your subscription has been canceled.\n"
             ."Plan: {$planLabel}\n\n"
             ."You can resubscribe at any time from your billing page.\n\n"
+            ."Thanks,\nListen";
+
+        $this->sendMail($user, $subject, $body);
+    }
+
+    private function handleTrialWillEnd(object $subscription): void
+    {
+        $customerId = trim((string) ($subscription->customer ?? ''));
+        $user = $this->findUser($customerId);
+
+        if (! $user) {
+            return;
+        }
+
+        $planLabel = $this->planLabelFromPriceId($this->extractPriceIdFromSubscription($subscription));
+        $trialEnd = isset($subscription->trial_end) && (int) $subscription->trial_end > 0
+            ? now()->setTimestamp((int) $subscription->trial_end)->format('M j, Y')
+            : 'soon';
+
+        $subject = 'Trial ending soon';
+        $body = "Hi {$this->displayName($user)},\n\n"
+            ."Your {$planLabel} trial ends on {$trialEnd}.\n"
+            ."To keep access uninterrupted, make sure your payment method is ready in Billing.\n\n"
+            ."Thanks,\nListen";
+
+        $this->sendMail($user, $subject, $body);
+    }
+
+    private function handleCustomerDeleted(object $customer): void
+    {
+        $customerId = trim((string) ($customer->id ?? ''));
+        $customerEmail = trim((string) ($customer->email ?? ''));
+        $user = $this->findUser($customerId, $customerEmail);
+
+        if (! $user) {
+            return;
+        }
+
+        $subject = 'Billing profile removed';
+        $body = "Hi {$this->displayName($user)},\n\n"
+            ."Your Stripe customer profile was removed.\n"
+            ."If this was not expected, contact support and we can help restore billing access.\n\n"
             ."Thanks,\nListen";
 
         $this->sendMail($user, $subject, $body);
@@ -342,4 +432,3 @@ class StripeWebhookEmailService
         return trim((string) $user->name) !== '' ? (string) $user->name : 'there';
     }
 }
-
