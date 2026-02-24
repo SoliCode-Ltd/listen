@@ -142,20 +142,6 @@
   <div class="mobile-nav" id="mobileNav" aria-hidden="true">
     <nav class="mobile-nav-inner">
       @auth
-        @foreach($authNavLinks as $link)
-          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endforeach
-      @else
-        @foreach($navLinks as $link)
-          @if(!$link['guest'] || !auth()->check())
-            <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-          @endif
-        @endforeach
-      @endauth
-
-      <div class="mobile-nav-divider"></div>
-
-      @auth
         <div class="mobile-user">
           <div class="mobile-user-avatar">
             @if(auth()->user()->google_avatar)
@@ -169,14 +155,24 @@
             <span>{{ auth()->user()->email }}</span>
           </div>
         </div>
+        <div class="mobile-nav-divider"></div>
+        @foreach($authNavLinks as $link)
+          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+        @endforeach
         @if(auth()->user()->is_admin)
-        <a href="{{ url('/admin') }}" class="mobile-nav-link">⚙️ Admin Dashboard</a>
+        <a href="{{ url('/admin') }}" class="mobile-nav-link">Admin Dashboard</a>
         @endif
         <form method="POST" action="{{ route('logout') }}">
           @csrf
           <button type="submit" class="mobile-nav-link logout">Sign out</button>
         </form>
       @else
+        @foreach($navLinks as $link)
+          @if(!$link['guest'] || !auth()->check())
+            <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+          @endif
+        @endforeach
+        <div class="mobile-nav-divider"></div>
         <a href="{{ route('login') }}" class="mobile-nav-link">Sign in</a>
         <a href="{{ route('register') }}" class="btn btn-primary mobile-cta">Get Started Free</a>
       @endauth

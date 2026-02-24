@@ -44,9 +44,14 @@ html, body {
   scroll-behavior: smooth;
   max-width: 100%;
 }
-html.mobile-menu-open,
+html.mobile-menu-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
 body.mobile-menu-open {
   overflow: hidden;
+  overscroll-behavior: none;
+  height: 100dvh;
 }
 body {
   font-family: var(--font-body);
@@ -491,11 +496,13 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   right: 0;
   bottom: 0;
   background: color-mix(in oklab, var(--bg) 97%, transparent);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
   z-index: 120;
   min-height: calc(100dvh - 72px);
   overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -811,4 +818,3 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   animation: fadeIn .4s ease forwards;
 }
 </style>
-

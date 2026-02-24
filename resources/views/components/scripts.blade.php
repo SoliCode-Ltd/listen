@@ -68,18 +68,15 @@
     function setMobileMenuState(isOpen) {
       if (isOpen) {
         mobileNav.classList.add('open');
-      } else {
-        mobileNav.classList.remove('open');
-      }
-      mobileToggle.setAttribute('aria-expanded', String(isOpen));
-      mobileNav.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
-      if (isOpen) {
         document.documentElement.classList.add('mobile-menu-open');
         document.body.classList.add('mobile-menu-open');
       } else {
+        mobileNav.classList.remove('open');
         document.documentElement.classList.remove('mobile-menu-open');
         document.body.classList.remove('mobile-menu-open');
       }
+      mobileToggle.setAttribute('aria-expanded', String(isOpen));
+      mobileNav.setAttribute('aria-hidden', isOpen ? 'false' : 'true');
     }
 
     function closeMobileMenu(focusToggle) {
