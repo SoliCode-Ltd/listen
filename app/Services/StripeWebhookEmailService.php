@@ -11,8 +11,6 @@ use Laravel\Cashier\Cashier;
 
 class StripeWebhookEmailService
 {
-    private const EMAIL_SIGNATURE = 'Listen Studio Team';
-
     public function sendForEvent(object $event): void
     {
         if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
@@ -81,14 +79,16 @@ class StripeWebhookEmailService
         ];
 
         $subject = 'Purchase confirmed';
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
+            $subject,
             ['Your purchase was successful and is now active.'],
             $details,
-            'You can manage billing any time at '.$this->manageBillingUrl()
+            $this->manageBillingUrl(),
+            'Manage Billing'
         );
 
-        $this->sendMail($user, $subject, $body);
+        $this->sendMail($user, $subject, $html);
     }
 
     private function handleInvoicePaid(object $invoice): void
@@ -133,21 +133,23 @@ class StripeWebhookEmailService
             'Billing Reason' => $this->normalizeBillingReason($billingReason),
             'Renewal Date' => $periodEnd,
             'Invoice Number' => $invoiceNumber,
-            'Invoice ID' => $invoiceId,
-            'Stripe Subscription ID' => $subscriptionId,
+            // 'Invoice ID' => $invoiceId,
+            // 'Stripe Subscription ID' => $subscriptionId,
             'Stripe Customer ID' => $customerId,
             'Paid At' => $this->formatUnixTimestamp(isset($invoice->status_transitions->paid_at) ? (int) $invoice->status_transitions->paid_at : null, true),
         ];
 
         $subject = $isInitialPurchase ? 'Subscription activated' : 'Subscription payment received';
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
+            $subject,
             [$isInitialPurchase ? 'Your subscription is now active.' : 'Your subscription payment was successful.'],
             $details,
-            $invoiceUrl !== '' ? 'Invoice: '.$invoiceUrl : 'Manage billing: '.$this->manageBillingUrl()
+            $invoiceUrl !== '' ? $invoiceUrl : $this->manageBillingUrl(),
+            $invoiceUrl !== '' ? 'View Invoice' : 'Manage Billing'
         );
 
-        $this->sendMail($user, $subject, $body);
+        $this->sendMail($user, $subject, $html);
     }
 
     private function handleSubscriptionCreated(object $subscription): void
@@ -184,14 +186,16 @@ class StripeWebhookEmailService
         ];
 
         $subject = $status === 'trialing' ? 'Trial started' : 'Subscription activated';
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
+            $subject,
             [$status === 'trialing' ? 'Your trial has started.' : 'Your subscription is now active.'],
             $details,
-            'Manage billing: '.$this->manageBillingUrl()
+            $this->manageBillingUrl(),
+            'Manage Billing'
         );
 
-        $this->sendMail($user, $subject, $body);
+        $this->sendMail($user, $subject, $html);
     }
 
     private function handleSubscriptionUpdated(object $subscription, mixed $previousAttributes): void
@@ -237,13 +241,15 @@ class StripeWebhookEmailService
                     'Stripe Subscription ID' => $subscriptionId,
                     'Stripe Customer ID' => $customerId,
                 ];
-                $body = $this->composeBody(
+                $html = $this->renderEmail(
                     $user,
+                    'Trial started',
                     ['Your trial has started.'],
                     $details,
-                    'Manage billing: '.$this->manageBillingUrl()
+                    $this->manageBillingUrl(),
+                    'Manage Billing'
                 );
-                $this->sendMail($user, 'Trial started', $body);
+                $this->sendMail($user, 'Trial started', $html);
             }
 
             return;
@@ -266,13 +272,15 @@ class StripeWebhookEmailService
                 'Stripe Subscription ID' => $subscriptionId,
                 'Stripe Customer ID' => $customerId,
             ];
-            $body = $this->composeBody(
+            $html = $this->renderEmail(
                 $user,
+                'Cancellation scheduled',
                 ['Your subscription is set to cancel at the end of the current period.'],
                 $details,
-                'Manage billing: '.$this->manageBillingUrl()
+                $this->manageBillingUrl(),
+                'Manage Billing'
             );
-            $this->sendMail($user, 'Cancellation scheduled', $body);
+            $this->sendMail($user, 'Cancellation scheduled', $html);
 
             return;
         }
@@ -288,13 +296,15 @@ class StripeWebhookEmailService
                 'Stripe Subscription ID' => $subscriptionId,
                 'Stripe Customer ID' => $customerId,
             ];
-            $body = $this->composeBody(
+            $html = $this->renderEmail(
                 $user,
+                'Cancellation removed',
                 ['Your scheduled cancellation was removed.'],
                 $details,
-                'Manage billing: '.$this->manageBillingUrl()
+                $this->manageBillingUrl(),
+                'Manage Billing'
             );
-            $this->sendMail($user, 'Cancellation removed', $body);
+            $this->sendMail($user, 'Cancellation removed', $html);
 
             return;
         }
@@ -311,13 +321,15 @@ class StripeWebhookEmailService
                 'Stripe Subscription ID' => $subscriptionId,
                 'Stripe Customer ID' => $customerId,
             ];
-            $body = $this->composeBody(
+            $html = $this->renderEmail(
                 $user,
+                'Subscription updated',
                 ['Your subscription plan has been updated.'],
                 $details,
-                'Manage billing: '.$this->manageBillingUrl()
+                $this->manageBillingUrl(),
+                'Manage Billing'
             );
-            $this->sendMail($user, 'Subscription updated', $body);
+            $this->sendMail($user, 'Subscription updated', $html);
 
             return;
         }
@@ -335,13 +347,15 @@ class StripeWebhookEmailService
                 'Stripe Subscription ID' => $subscriptionId,
                 'Stripe Customer ID' => $customerId,
             ];
-            $body = $this->composeBody(
+            $html = $this->renderEmail(
                 $user,
+                'Subscription status updated',
                 ['Your subscription status has changed.'],
                 $details,
-                'Manage billing: '.$this->manageBillingUrl()
+                $this->manageBillingUrl(),
+                'Manage Billing'
             );
-            $this->sendMail($user, 'Subscription status updated', $body);
+            $this->sendMail($user, 'Subscription status updated', $html);
         }
     }
 
@@ -381,14 +395,16 @@ class StripeWebhookEmailService
             'Stripe Customer ID' => $customerId,
         ];
 
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
+            'Subscription canceled',
             ['Your subscription has been canceled.'],
             $details,
-            'You can resubscribe any time from '.$this->manageBillingUrl()
+            $this->manageBillingUrl(),
+            'Resubscribe Now'
         );
 
-        $this->sendMail($user, 'Subscription canceled', $body);
+        $this->sendMail($user, 'Subscription canceled', $html);
     }
 
     private function handleTrialWillEnd(object $subscription): void
@@ -418,14 +434,16 @@ class StripeWebhookEmailService
             'Stripe Customer ID' => $customerId,
         ];
 
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
-            ["Your {$planLabel} trial ends soon."],
+            'Trial ending soon',
+            ["Your {$planLabel} trial ends soon.", 'To avoid interruption, update billing details at '.$this->manageBillingUrl()],
             $details,
-            'To avoid interruption, update billing details at '.$this->manageBillingUrl()
+            $this->manageBillingUrl(),
+            'Update Billing'
         );
 
-        $this->sendMail($user, 'Trial ending soon', $body);
+        $this->sendMail($user, 'Trial ending soon', $html);
     }
 
     private function handleCustomerDeleted(object $customer): void
@@ -448,14 +466,14 @@ class StripeWebhookEmailService
             'Removed At' => now()->format('M j, Y g:i A'),
         ];
 
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
-            ['Your Stripe customer profile was removed.'],
-            $details,
-            'If this was not expected, contact support and we will help restore billing access.'
+            'Billing profile removed',
+            ['Your Stripe customer profile was removed.', 'If this was not expected, contact support and we will help restore billing access.'],
+            $details
         );
 
-        $this->sendMail($user, 'Billing profile removed', $body);
+        $this->sendMail($user, 'Billing profile removed', $html);
     }
 
     private function handleChargeRefunded(object $charge): void
@@ -484,17 +502,17 @@ class StripeWebhookEmailService
             'Refunded At' => $this->formatUnixTimestamp(isset($charge->created) ? (int) $charge->created : null, true),
         ];
 
-        $body = $this->composeBody(
+        $html = $this->renderEmail(
             $user,
-            ['A refund has been processed for your recent charge.'],
-            $details,
-            'If you have any questions, reply to this email and our team will help.'
+            'Refund processed',
+            ['A refund has been processed for your recent charge.', 'If you have any questions, reply to this email and our team will help.'],
+            $details
         );
 
-        $this->sendMail($user, 'Refund processed', $body);
+        $this->sendMail($user, 'Refund processed', $html);
     }
 
-    private function sendMail(User $user, string $subject, string $body): void
+    private function sendMail(User $user, string $subject, string $html): void
     {
         $email = trim((string) $user->email);
         if ($email === '') {
@@ -502,7 +520,7 @@ class StripeWebhookEmailService
         }
 
         try {
-            Mail::raw($body, function ($message) use ($user, $subject): void {
+            Mail::html($html, function ($message) use ($user, $subject): void {
                 $message->to($user->email, $user->name ?: null)->subject($subject);
             });
         } catch (\Throwable $exception) {
@@ -686,20 +704,8 @@ class StripeWebhookEmailService
      * @param  array<int, string>  $summaryLines
      * @param  array<string, string|null>  $details
      */
-    private function composeBody(User $user, array $summaryLines, array $details = [], ?string $actionLine = null): string
+    private function renderEmail(User $user, string $subject, array $summaryLines, array $details = [], ?string $actionUrl = null, ?string $actionText = null): string
     {
-        $lines = [
-            'Hi '.$this->displayName($user).',',
-            '',
-        ];
-
-        foreach ($summaryLines as $line) {
-            $line = trim((string) $line);
-            if ($line !== '') {
-                $lines[] = $line;
-            }
-        }
-
         $filtered = [];
         foreach ($details as $label => $value) {
             $value = trim((string) $value);
@@ -708,24 +714,14 @@ class StripeWebhookEmailService
             }
         }
 
-        if ($filtered !== []) {
-            $lines[] = '';
-            $lines[] = 'Details:';
-            foreach ($filtered as $label => $value) {
-                $lines[] = "- {$label}: {$value}";
-            }
-        }
-
-        if ($actionLine !== null && trim($actionLine) !== '') {
-            $lines[] = '';
-            $lines[] = trim($actionLine);
-        }
-
-        $lines[] = '';
-        $lines[] = 'Thanks,';
-        $lines[] = self::EMAIL_SIGNATURE;
-
-        return implode("\n", $lines);
+        return view('emails.stripe-billing', [
+            'subject' => $subject,
+            'user' => $user,
+            'summaryLines' => $summaryLines,
+            'details' => $filtered,
+            'actionUrl' => $actionUrl,
+            'actionText' => $actionText,
+        ])->render();
     }
 
     private function formatAmount(?int $amountCents, ?string $currency): string
