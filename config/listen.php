@@ -16,6 +16,7 @@ return [
     'billing' => [
         'subscription_sync_ttl_minutes' => (int) env('LISTEN_SUBSCRIPTION_SYNC_TTL_MINUTES', 10),
         'grace_days' => (int) env('LISTEN_BILLING_GRACE_DAYS', 7),
+        'webhook_email_enabled' => (bool) env('LISTEN_BILLING_WEBHOOK_EMAILS', true),
         'pre_renewal_reminder_days' => [
             7,
             1,

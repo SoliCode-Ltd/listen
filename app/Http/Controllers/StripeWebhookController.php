@@ -3,14 +3,20 @@
 namespace App\Http\Controllers;
 
 use App\Services\BillingLifecycleService;
+use App\Services\StripeWebhookEmailService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Stripe\Exception\SignatureVerificationException;
 use Stripe\Webhook;
 
 class StripeWebhookController extends Controller
 {
-    public function __invoke(Request $request, BillingLifecycleService $billingLifecycleService)
+    public function __invoke(
+        Request $request,
+        BillingLifecycleService $billingLifecycleService,
+        StripeWebhookEmailService $stripeWebhookEmailService
+    )
     {
         $payload = $request->getContent();
         $signature = (string) $request->header('Stripe-Signature', '');
@@ -43,10 +49,21 @@ class StripeWebhookController extends Controller
         }
 
         $type = (string) ($event->type ?? '');
+        $eventId = trim((string) ($event->id ?? ''));
+        $eventCacheKey = $eventId !== '' ? "stripe_webhook_event_processed:{$eventId}" : null;
+
+        if ($eventCacheKey !== null) {
+            $wasAdded = Cache::add($eventCacheKey, now()->timestamp, now()->addDays(14));
+            if (! $wasAdded) {
+                return response('Webhook already handled', 200);
+            }
+        }
+
         $customerId = trim((string) ($event->data->object->customer ?? ''));
 
         try {
             match ($type) {
+                'checkout.session.completed' => $billingLifecycleService->syncUserByStripeCustomerId($customerId),
                 'invoice.payment_failed' => $billingLifecycleService->handlePaymentFailed($customerId),
                 'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($customerId),
                 'customer.subscription.created',
@@ -59,12 +76,21 @@ class StripeWebhookController extends Controller
                 ),
                 default => null,
             };
+
+            $stripeWebhookEmailService->sendForEvent($event);
         } catch (\Throwable $exception) {
+            if ($eventCacheKey !== null) {
+                Cache::forget($eventCacheKey);
+            }
+
             Log::warning('Stripe webhook business handling failed.', [
+                'event_id' => $eventId,
                 'type' => $type,
                 'customer_id' => $customerId,
                 'error' => $exception->getMessage(),
             ]);
+
+            return response('Webhook processing failed.', 500);
         }
 
         return response('Webhook Handled', 200);
