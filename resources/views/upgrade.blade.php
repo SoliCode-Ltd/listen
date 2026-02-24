@@ -1,10 +1,9 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   @include('components.seo', ['pageTitle' => 'Upgrade', 'page' => 'upgrade'])
-  <link rel="icon" type="image/svg+xml" href="{{ asset('icons/headphones.svg') }}" />
   @include('components.styles')
   <style>
     .main { padding: 1.8rem 0 3rem; }

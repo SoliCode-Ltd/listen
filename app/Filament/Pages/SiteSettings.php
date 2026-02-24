@@ -70,14 +70,23 @@ class SiteSettings extends Page implements HasForms
                                 'system' => '💻 System Default',
                             ])
                             ->required(),
-                        Forms\Components\TextInput::make('logo_url')
-                            ->label('Logo URL')
-                            ->url()
-                            ->maxLength(500),
-                        Forms\Components\TextInput::make('favicon_url')
-                            ->label('Favicon URL')
-                            ->url()
-                            ->maxLength(500),
+                        Forms\Components\FileUpload::make('logo_url')
+                            ->label('Site Logo')
+                            ->image()
+                            ->directory('settings')
+                            ->disk('public')
+                            ->imageResizeMode('contain')
+                            ->imageResizeTargetHeight('128')
+                            ->helperText('Upload a logo image (PNG/SVG recommended).'),
+                        Forms\Components\FileUpload::make('favicon_url')
+                            ->label('Site Favicon')
+                            ->image()
+                            ->directory('settings')
+                            ->disk('public')
+                            ->imageResizeMode('cover')
+                            ->imageResizeTargetWidth('64')
+                            ->imageResizeTargetHeight('64')
+                            ->helperText('Upload a favicon (PNG/ICO recommended).'),
                     ]),
                 Forms\Components\Section::make('Custom CSS')
                     ->collapsible()
