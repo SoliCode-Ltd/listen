@@ -219,6 +219,7 @@
       }
       .hero {
         padding: 1.6rem 0 2rem;
+        text-align: center;
       }
       .hero-grid {
         gap: 1.1rem;
@@ -230,6 +231,11 @@
       .lead {
         margin-bottom: 1.2rem;
         font-size: 1rem;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .hero-cta {
+        justify-content: center;
       }
       .section {
         padding: 2.5rem 0;
@@ -319,15 +325,17 @@
     /* Simulating Typing Text */
     .tts-typing-text {
       font-family: var(--font-mono, monospace);
-      font-size: 1.05rem;
+      font-size: clamp(0.7rem, 3.2vw, 1.05rem);
       font-weight: 500;
       color: var(--text);
-      white-space: nowrap;
+      white-space: pre-wrap;
+      word-break: break-word;
       overflow: hidden;
       border-right: 2px solid var(--a);
       display: inline-block;
-      align-self: flex-start;
+      align-self: center;
       width: max-content;
+      max-width: 100%;
       animation: blink-caret .75s step-end infinite;
       min-height: 1.5em;
     }
@@ -392,6 +400,20 @@
     @keyframes pulse-glow {
       0% { opacity: 0.3; transform: translate(-50%, -50%) translateZ(-50px) scale(0.8); }
       100% { opacity: 0.6; transform: translate(-50%, -50%) translateZ(-50px) scale(1.2); }
+    }
+
+    @media (max-width: 640px) {
+      .tts-body {
+        padding: 1.25rem 1rem;
+      }
+      .tts-audio-wave {
+        bottom: 1.5rem;
+        gap: 4px;
+        height: 50px;
+      }
+      .tts-bar {
+        width: 6px;
+      }
     }
   </style>
 </head>
