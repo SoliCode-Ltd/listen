@@ -221,6 +221,12 @@
       background: color-mix(in oklab, var(--danger) 12%, var(--surface));
       color: color-mix(in oklab, var(--danger) 85%, var(--text));
     }
+    .message.info {
+      display: block;
+      border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line));
+      background: color-mix(in oklab, var(--a) 12%, var(--surface));
+      color: color-mix(in oklab, var(--a) 85%, var(--text));
+    }
     .invoices-card {
       margin-top: 1rem;
     }
@@ -329,6 +335,11 @@
       <h1>Manage Subscription</h1>
       <p>View subscription details, update payment methods, and access invoice history.</p>
     </div>
+    @if($billingProfileRemoved)
+      <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
+        Your Stripe billing profile was removed. This account is now on the Free plan and has no active subscription.
+      </div>
+    @endif
 
     <div class="status-grid">
       <div class="status-item">
@@ -341,7 +352,7 @@
           $statusClass = 'active';
           $statusLower = strtolower((string) $subscriptionStatus);
           if (str_contains($statusLower, 'cancel')) $statusClass = 'canceled';
-          elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past due') || str_contains($statusLower, 'past_due')) $statusClass = 'pending';
+          elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past due') || str_contains($statusLower, 'past_due') || str_contains($statusLower, 'no subscription')) $statusClass = 'pending';
         @endphp
         <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatus }}</span>
       </div>
@@ -484,7 +495,7 @@
                   <td>{{ $invoice['total'] }}</td>
                   <td>
                     <div class="invoice-actions">
-                      <a class="btn" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">View</a>
+                      <a class="btn" target="_blank" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">View</a>
                     </div>
                   </td>
                 </tr>

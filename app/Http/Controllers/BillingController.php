@@ -82,6 +82,11 @@ class BillingController extends Controller
             }
         }
 
+        $hasStripeCustomer = $user->hasStripeId();
+        $billingProfileRemoved = ! $hasStripeCustomer
+            && (bool) ($subscription?->id)
+            && trim((string) ($subscription?->stripe_id ?? '')) !== '';
+
         return view('manage-subscription', [
             'activePlan' => $activePlan,
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
@@ -92,8 +97,9 @@ class BillingController extends Controller
             'hasActiveSubscription' => (bool) ($subscription?->valid() ?? false),
             'hasCancelableSubscription' => (bool) ($subscription?->valid() ?? false) && ! ($subscription?->onGracePeriod() ?? false),
             'isCancellationScheduled' => (bool) ($subscription?->onGracePeriod() ?? false),
-            'subscriptionStatus' => $this->subscriptionStatusLabel($subscription),
-            'subscriptionEndsAt' => $this->formatDateLabel($subscription?->ends_at?->toDateString()),
+            'billingProfileRemoved' => $billingProfileRemoved,
+            'subscriptionStatus' => $this->subscriptionStatusLabel($subscription, $hasStripeCustomer),
+            'subscriptionEndsAt' => $this->formatDateLabel(($subscription?->onGracePeriod() ?? false) ? $subscription?->ends_at?->toDateString() : null),
             'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
             'upcomingCharge' => $this->resolveUpcomingCharge($subscription),
         ]);
@@ -624,14 +630,22 @@ class BillingController extends Controller
         }
     }
 
-    private function subscriptionStatusLabel(?BillingSubscription $subscription): string
+    private function subscriptionStatusLabel(?BillingSubscription $subscription, bool $hasStripeCustomer = true): string
     {
         if (! $subscription) {
             return 'No subscription';
         }
 
+        if ($subscription->ended()) {
+            return 'No subscription';
+        }
+
         if ($subscription->onGracePeriod()) {
             return 'Cancellation scheduled';
+        }
+
+        if (! $hasStripeCustomer && ! $subscription->valid()) {
+            return 'No subscription';
         }
 
         return match (strtolower((string) $subscription->stripe_status)) {
