@@ -6,11 +6,14 @@ use App\Models\BillingSubscription;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class BillingLifecycleService
 {
+    private const EMAIL_SIGNATURE = 'Listen Studio Team';
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BillingSyncService $billingSyncService,
@@ -49,16 +52,30 @@ class BillingLifecycleService
 
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
                     $planName = (string) ($subscription->plan?->name ?? 'your plan');
+                    $displayName = $this->displayName($user);
 
                     $subject = $day === 1
                         ? 'Your subscription renews tomorrow'
                         : 'Your subscription renews in '.$day.' days';
-                    $body = "Hi {$user->name},\n\n".
-                        "{$planName} renews on {$periodEnd}.\n".
-                        "To avoid interruption, make sure your payment method is up to date in Manage Subscription.\n\n".
-                        "Thanks,\nListen";
+                    $body = $this->composeBody(
+                        $displayName,
+                        ["{$planName} renews on {$periodEnd}."],
+                        [
+                            'Plan' => $planName,
+                            'Renewal Date' => $periodEnd,
+                            'Days Remaining' => (string) $day,
+                            'Subscription Status' => ucfirst((string) ($subscription->status ?? 'active')),
+                        ],
+                        'To avoid interruption, update your payment method at '.$this->manageBillingUrl()
+                    );
 
-                    $this->sendMail($user, $subject, $body);
+                    $this->sendMail(
+                        $user,
+                        $subject,
+                        $body,
+                        "renewal-reminder:{$subscription->id}:{$day}:{$periodEnd}",
+                        24 * 14
+                    );
 
                     $subscription->forceFill([
                         'billing_reminder_7d_sent_at' => $day === 7 ? now() : $subscription->billing_reminder_7d_sent_at,
@@ -98,14 +115,25 @@ class BillingLifecycleService
         }
 
         $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'now';
+        $graceEnds = $graceEndsAt->format('M j, Y');
+        $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
         $subject = 'Payment failed - action required';
-        $body = "Hi {$user->name},\n\n".
-            "We could not process your renewal around {$periodEnd}.\n".
-            "Please update your payment method within {$graceDays} days to keep your paid access.\n".
-            "After that, your Stripe subscription will be canceled automatically.\n\n".
-            "Thanks,\nListen";
+        $body = $this->composeBody(
+            $this->displayName($user),
+            [
+                "We could not process your renewal around {$periodEnd}.",
+                "Please update your payment method within {$graceDays} days to keep paid access.",
+            ],
+            [
+                'Plan' => $planName,
+                'Renewal Date' => $periodEnd,
+                'Grace Period Ends' => $graceEnds,
+                'Payment State' => 'Past due',
+            ],
+            'Update your payment method at '.$this->manageBillingUrl()
+        );
 
-        $this->sendMail($user, $subject, $body);
+        $this->sendMail($user, $subject, $body, "payment-failed:{$subscription->id}:{$graceEnds}", 24 * 14);
 
         $subscription->forceFill([
             'billing_failed_notice_sent_at' => now(),
@@ -162,10 +190,24 @@ class BillingLifecycleService
                         'billing_downgraded_at' => now(),
                     ])->save();
 
+                    $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
+                    $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
                     $this->sendMail(
                         $user,
                         'Your subscription was canceled',
-                        "Hi {$user->name},\n\nYour grace period ended without successful payment, so your Stripe subscription was canceled.\nYou can upgrade again anytime from Billing.\n\nThanks,\nListen"
+                        $this->composeBody(
+                            $this->displayName($user),
+                            ['Your grace period ended without a successful payment, so the subscription was canceled.'],
+                            [
+                                'Plan' => $planName,
+                                'Grace Period Ended' => $graceEndedAt,
+                                'Canceled At' => now()->format('M j, Y g:i A'),
+                                'Payment State' => 'Canceled',
+                            ],
+                            'You can upgrade again any time from '.$this->manageBillingUrl()
+                        ),
+                        "grace-cancel:{$user->id}:{$graceEndedAt}",
+                        24 * 30
                     );
 
                     $this->billingSyncService->syncIfStale($user, true);
@@ -214,9 +256,13 @@ class BillingLifecycleService
         return User::query()->where('stripe_id', $stripeCustomerId)->first();
     }
 
-    private function sendMail(User $user, string $subject, string $body): void
+    private function sendMail(User $user, string $subject, string $body, ?string $dedupeKey = null, int $ttlHours = 72): void
     {
         if (! $user->email) {
+            return;
+        }
+
+        if ($dedupeKey !== null && $this->shouldSkipEmail($dedupeKey, $ttlHours)) {
             return;
         }
 
@@ -258,5 +304,68 @@ class BillingLifecycleService
 
             return false;
         }
+    }
+
+    private function shouldSkipEmail(string $key, int $ttlHours = 72): bool
+    {
+        $cacheKey = 'billing_lifecycle_email:'.sha1($key);
+
+        return ! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)));
+    }
+
+    /**
+     * @param  array<int, string>  $summaryLines
+     * @param  array<string, string|null>  $details
+     */
+    private function composeBody(string $displayName, array $summaryLines, array $details = [], ?string $actionLine = null): string
+    {
+        $lines = [
+            'Hi '.$displayName.',',
+            '',
+        ];
+
+        foreach ($summaryLines as $line) {
+            $line = trim((string) $line);
+            if ($line !== '') {
+                $lines[] = $line;
+            }
+        }
+
+        $filtered = [];
+        foreach ($details as $label => $value) {
+            $value = trim((string) $value);
+            if ($value !== '' && $value !== 'N/A') {
+                $filtered[$label] = $value;
+            }
+        }
+
+        if ($filtered !== []) {
+            $lines[] = '';
+            $lines[] = 'Details:';
+            foreach ($filtered as $label => $value) {
+                $lines[] = "- {$label}: {$value}";
+            }
+        }
+
+        if ($actionLine !== null && trim($actionLine) !== '') {
+            $lines[] = '';
+            $lines[] = trim($actionLine);
+        }
+
+        $lines[] = '';
+        $lines[] = 'Thanks,';
+        $lines[] = self::EMAIL_SIGNATURE;
+
+        return implode("\n", $lines);
+    }
+
+    private function displayName(User $user): string
+    {
+        return trim((string) $user->name) !== '' ? (string) $user->name : 'there';
+    }
+
+    private function manageBillingUrl(): string
+    {
+        return rtrim((string) config('app.url', ''), '/').'/manage-subscription';
     }
 }
