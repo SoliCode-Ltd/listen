@@ -65,9 +65,9 @@ class SiteSettings extends Page implements HasForms
                         Forms\Components\Select::make('default_theme')
                             ->label('Default Theme')
                             ->options([
-                                'light' => '☀️ Light',
-                                'dark' => '🌙 Dark',
-                                'system' => '💻 System Default',
+                                'light' => 'Light',
+                                'dark' => 'Dark',
+                                'system' => 'System Default',
                             ])
                             ->required(),
                         Forms\Components\FileUpload::make('logo_url')
@@ -80,13 +80,16 @@ class SiteSettings extends Page implements HasForms
                             ->helperText('Upload a logo image (PNG/SVG recommended).'),
                         Forms\Components\FileUpload::make('favicon_url')
                             ->label('Site Favicon')
-                            ->image()
+                            ->acceptedFileTypes([
+                                'image/png',
+                                'image/x-icon',
+                                'image/vnd.microsoft.icon',
+                                'image/svg+xml',
+                            ])
+                            ->maxSize(2048)
                             ->directory('settings')
                             ->disk('public')
-                            ->imageResizeMode('cover')
-                            ->imageResizeTargetWidth('64')
-                            ->imageResizeTargetHeight('64')
-                            ->helperText('Upload a favicon (PNG/ICO recommended).'),
+                            ->helperText('Upload favicon as PNG, ICO, or SVG (up to 2 MB).'),
                     ]),
                 Forms\Components\Section::make('Custom CSS')
                     ->collapsible()

@@ -1,4 +1,18 @@
 @php
+  use Illuminate\Support\Facades\Storage;
+
+  $siteName = \App\Models\SiteSetting::get('site_name', 'Listen');
+  $logoPath = trim((string) \App\Models\SiteSetting::get('logo_url', ''));
+  $logoUrl = null;
+
+  if ($logoPath !== '') {
+    if (filter_var($logoPath, FILTER_VALIDATE_URL)) {
+      $logoUrl = $logoPath;
+    } elseif (Storage::disk('public')->exists($logoPath)) {
+      $logoUrl = Storage::disk('public')->url($logoPath);
+    }
+  }
+
   $currentRoute = Route::currentRouteName() ?? '';
   $navLinks = [
     ['route' => 'home', 'label' => 'Home', 'guest' => false],
@@ -16,14 +30,14 @@
 
 <header class="app-header">
   <div class="header-inner">
-    <a class="brand" href="{{ route('home') }}" aria-label="{{ \App\Models\SiteSetting::get('site_name', 'Listen') }} home">
-      @if(\App\Models\SiteSetting::get('logo_url'))
-        <img src="{{ \Illuminate\Support\Facades\Storage::disk('public')->url(\App\Models\SiteSetting::get('logo_url')) }}" alt="{{ \App\Models\SiteSetting::get('site_name', 'Listen') }}" style="max-height: 40px; width: auto;" />
+    <a class="brand" href="{{ route('home') }}" aria-label="{{ $siteName }} home">
+      @if($logoUrl)
+        <img src="{{ $logoUrl }}" alt="{{ $siteName }}" style="max-height: 40px; width: auto;" />
       @else
         <span class="brand-icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
         </span>
-        <span class="brand-text">{{ \App\Models\SiteSetting::get('site_name', 'Listen') }}</span>
+        <span class="brand-text">{{ $siteName }}</span>
       @endif
     </a>
 
