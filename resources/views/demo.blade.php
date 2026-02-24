@@ -153,7 +153,9 @@
       gap: .8rem;
     }
     .demo-controls {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: .8rem;
     }
     label {
       display: block;
@@ -170,6 +172,27 @@
       background: var(--surface);
       color: var(--text);
       font-size: .95rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--b);
+      box-shadow: 0 0 0 3px var(--brand-accent-glow);
+    }
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fb0d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 1.1em;
+      padding-right: 2.8rem;
+      cursor: pointer;
+    }
+    select:hover {
+      border-color: color-mix(in oklab, var(--b) 40%, var(--line));
+    }
+    html[data-theme="light"] select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6c89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     }
     textarea {
       min-height: 170px;
@@ -411,18 +434,17 @@
                   <option value="male">Male</option>
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label for="voice_key">Speaker</label>
-              <select id="voice_key" name="voice_key"></select>
+              <div>
+                <label for="voice_key">Speaker</label>
+                <select id="voice_key" name="voice_key"></select>
+              </div>
             </div>
 
             <div>
               <div class="setting-card" style="margin-top: .5rem;">
                 <div class="setting-info">
                   <label for="translateToggle">Translate before speaking</label>
-                  <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected voice language.</div>
+                  <div class="hint" id="translateHint">Text is translated first, then spoken in the selected voice language.</div>
                 </div>
                 <label class="toggle-switch" aria-label="Translate before speaking">
                   <input type="checkbox" id="translateToggle" checked>
@@ -614,8 +636,8 @@
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Enabled: text is translated first, then spoken in the selected voice language.'
-        : 'Disabled: original text is spoken directly without translation.';
+        ? 'Text is translated first, then spoken in the selected voice language.'
+        : 'Original text is spoken directly without translation.';
     }
 
     function getFilteredVoices() {

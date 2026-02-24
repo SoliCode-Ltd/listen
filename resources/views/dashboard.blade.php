@@ -137,6 +137,23 @@
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--a);
+      box-shadow: 0 0 0 3px var(--brand-accent-glow);
+    }
+    select {
+      appearance: none;
+      -webkit-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fb0d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: right 1rem center;
+      background-size: 1.1em;
+      padding-right: 2.8rem;
+      cursor: pointer;
+    }
+    select:hover {
+      border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+    }
+    html[data-theme="light"] select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6c89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     }
 
     .note {
@@ -213,10 +230,39 @@
       font-size: .9rem;
       color: var(--muted);
     }
+    .info-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      margin-bottom: 1.25rem;
+      background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 0 .85rem;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .8rem 0;
+      border-bottom: 1px dashed color-mix(in oklab, var(--line) 60%, transparent);
+      font-size: .88rem;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      color: var(--muted);
+    }
+    .info-value {
+      color: var(--text);
+      font-weight: 600;
+      text-align: right;
+    }
     .sidebar-info hr {
       border: 0;
       border-top: 1px solid var(--line);
-      margin: 1rem 0;
+      margin: 1.25rem 0;
     }
     .sidebar-actions {
       display: flex;
@@ -441,7 +487,7 @@
             <div class="setting-card" style="margin-top: .5rem;">
               <div class="setting-info">
                 <label for="translateToggle">Translate before speaking</label>
-                <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in selected voice language.</div>
+                <div class="hint" id="translateHint">Text is translated first, then spoken in selected voice language.</div>
               </div>
               <label class="toggle-switch" aria-label="Translate before speaking">
                 <input type="checkbox" id="translateToggle" {{ old('translate', '1') ? 'checked' : '' }}>
@@ -456,23 +502,34 @@
       </article>
 
       <aside class="page-card reveal sidebar-info">
-        <h3>Plan + Speaker Defaults</h3>
-        <p>Current plan: {{ $activePlan?->name ?? 'Free' }}</p>
-        <p>Voice quality: {{ $planTierLabel }}</p>
-        <p>Monthly characters: {{ number_format($planChars) }}</p>
-        <p>Monthly requests: {{ $requestsUnlimited ? 'Unlimited' : $planRequests }}</p>
-        <p>Overage: {{ ($activePlan?->allow_overage ?? false) ? ('$'.number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2).' per 1,000,000 chars') : 'Not allowed' }}</p>
-        <p>Commercial use: {{ ($activePlan?->commercial_use_allowed ?? false) ? 'Allowed' : 'Not allowed' }}</p>
-        <p>Processing: {{ ucfirst((string) ($activePlan?->processing_priority ?? 'standard')) }} priority</p>
-        <p>Max chars/request: {{ $activePlan?->max_chars_per_request ?? 600 }}</p>
-        <hr>
-        <p>Arabic default: {{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</p>
-        <p>English default: {{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</p>
+        <h3 style="margin-top:0;">Plan & Defaults</h3>
+        
+        <div class="info-list">
+          <div class="info-row"><span class="info-label">Current plan</span><span class="info-value"><span class="status done">{{ strtoupper($activePlan?->name ?? 'Free') }}</span></span></div>
+          <div class="info-row"><span class="info-label">Voice quality</span><span class="info-value">{{ $planTierLabel }}</span></div>
+          <div class="info-row"><span class="info-label">Monthly chars</span><span class="info-value">{{ number_format($planChars) }}</span></div>
+          <div class="info-row"><span class="info-label">Monthly reqs</span><span class="info-value">{{ $requestsUnlimited ? 'Unlimited' : $planRequests }}</span></div>
+          <div class="info-row"><span class="info-label">Max chars/req</span><span class="info-value">{{ $activePlan?->max_chars_per_request ?? 600 }}</span></div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-row"><span class="info-label">Overage</span><span class="info-value">{{ ($activePlan?->allow_overage ?? false) ? ('$'.number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2).' / 1M') : 'No' }}</span></div>
+          <div class="info-row"><span class="info-label">Commercial use</span><span class="info-value">{{ ($activePlan?->commercial_use_allowed ?? false) ? 'Yes' : 'No' }}</span></div>
+          <div class="info-row"><span class="info-label">Processing</span><span class="info-value">{{ ucfirst((string) ($activePlan?->processing_priority ?? 'standard')) }}</span></div>
+        </div>
+
+        <div class="info-list">
+          <div class="info-row"><span class="info-label">Arabic default</span><span class="info-value">{{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</span></div>
+          <div class="info-row"><span class="info-label">English default</span><span class="info-value">{{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</span></div>
+        </div>
+
         <div class="sidebar-actions">
-          <a class="btn" href="{{ route('pricing') }}">Pricing & Plans</a>
-          <a class="btn" href="{{ route('billing.page') }}">Upgrade Plan</a>
-          <a class="btn" href="{{ route('manage-subscription.page') }}">Manage Subscription</a>
-          <a class="btn" href="{{ route('browsers-extension.page') }}">Browser Extension</a>
+          <a class="btn" href="{{ route('pricing') }}" style="flex:1;">Pricing & Plans</a>
+          <a class="btn btn-primary" href="{{ route('billing.page') }}" style="flex:1;">Upgrade Plan</a>
+        </div>
+        <div class="sidebar-actions" style="margin-top: .6rem;">
+          <a class="btn" href="{{ route('manage-subscription.page') }}" style="flex:1;">Manage Subscription</a>
+          <a class="btn" href="{{ route('browsers-extension.page') }}" style="flex:1;">Browser Extension</a>
         </div>
       </aside>
     </section>
@@ -704,8 +761,8 @@
     function updateTranslateHint() {
       if (!translateSelect || !translateHint) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Enabled: text is translated first, then spoken in selected voice language.'
-        : 'Disabled: original text is spoken directly without translation.';
+        ? 'Text is translated first, then spoken in selected voice language.'
+        : 'Original text is spoken directly without translation.';
     }
 
     function updateUsagePanel(usage) {
