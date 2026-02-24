@@ -381,7 +381,7 @@
             </div>
 
             <div class="chips">
-              <button class="chip" type="button" data-sample="Welcome to our platform. We build software that sounds as good as it works.">English sample</button>
+              <button class="chip" type="button" data-sample="Welcome to our platform. We build professional software with world-class quality.">English sample</button>
               <button class="chip" type="button" data-sample="مرحبًا بك في منصتنا. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
             </div>
 
