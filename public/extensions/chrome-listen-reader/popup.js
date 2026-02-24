@@ -19,6 +19,7 @@ const elements = {
   targetLanguage: document.getElementById('targetLanguage'),
   voiceKey: document.getElementById('voiceKey'),
   translate: document.getElementById('translate'),
+  translateLabel: document.getElementById('translateLabel'),
   autoPlay: document.getElementById('autoPlay'),
   quickText: document.getElementById('quickText'),
   saveBtn: document.getElementById('saveBtn'),
@@ -84,11 +85,31 @@ function readSettingsFromForm() {
   };
 }
 
+function normalizeLanguage(value) {
+  return value === 'en' ? 'en' : 'ar';
+}
+
+function translateDirectionLabel(language) {
+  return language === 'en'
+    ? 'Translate Arabic to English speaking'
+    : 'Translate English to Arabic speaking';
+}
+
+function updateTranslateLabel() {
+  if (!(elements.translateLabel instanceof HTMLElement)) {
+    return;
+  }
+
+  const language = normalizeLanguage(elements.targetLanguage.value);
+  elements.translateLabel.textContent = translateDirectionLabel(language);
+}
+
 function writeSettingsToForm(settings = {}) {
   elements.apiKey.value = settings.apiKey || '';
-  elements.targetLanguage.value = settings.targetLanguage === 'en' ? 'en' : 'ar';
+  elements.targetLanguage.value = normalizeLanguage(settings.targetLanguage);
   elements.translate.checked = settings.translate !== false;
   elements.autoPlay.checked = settings.autoPlay !== false;
+  updateTranslateLabel();
   renderVoiceOptions(settings.voiceKey || '');
 }
 
@@ -272,6 +293,7 @@ async function bootstrap() {
 
     const settings = response.settings || {};
     writeSettingsToForm(settings);
+    await syncLanguageToCurrentSelection().catch(() => { });
     lastVerifiedApiKey = String(settings.apiKey || '').trim();
 
     if (!String(settings.apiKey || '').trim()) {
@@ -314,6 +336,8 @@ async function saveSettings() {
 async function readSelection() {
   setStatus('Reading selected text...');
   try {
+    await syncLanguageToCurrentSelection().catch(() => { });
+
     const response = await requestBackground({
       type: 'READ_CURRENT_SELECTION',
       overrides: readSettingsFromForm(),
@@ -355,8 +379,50 @@ async function readQuickText() {
   }
 }
 
+async function getCurrentSelectionLanguage() {
+  const response = await requestBackground({ type: 'DETECT_CURRENT_SELECTION_LANGUAGE' });
+  if (!response?.ok || !response?.detection?.hasSelection) {
+    return null;
+  }
+
+  const language = normalizeLanguage(response?.detection?.language);
+  return language;
+}
+
+async function syncLanguageToCurrentSelection() {
+  if (elements.translate.checked) {
+    return false;
+  }
+
+  const selectionLanguage = await getCurrentSelectionLanguage();
+  if (!selectionLanguage) {
+    return false;
+  }
+
+  const currentLanguage = normalizeLanguage(elements.targetLanguage.value);
+  if (currentLanguage === selectionLanguage) {
+    return false;
+  }
+
+  elements.targetLanguage.value = selectionLanguage;
+  updateTranslateLabel();
+  renderVoiceOptions('');
+  await persistSettingsSilently();
+  return true;
+}
+
 elements.targetLanguage.addEventListener('change', () => {
+  updateTranslateLabel();
   renderVoiceOptions(elements.voiceKey.value);
+  if (!elements.translate.checked) {
+    syncLanguageToCurrentSelection().catch(() => { });
+  }
+});
+
+elements.translate.addEventListener('change', () => {
+  if (!elements.translate.checked) {
+    syncLanguageToCurrentSelection().catch(() => { });
+  }
 });
 
 elements.apiKey.addEventListener('input', scheduleApiKeyVerify);
@@ -386,4 +452,3 @@ elements.selectionBtn.addEventListener('click', readSelection);
 elements.quickBtn.addEventListener('click', readQuickText);
 
 bootstrap();
-

@@ -732,6 +732,32 @@ async function readCurrentTabSelection(overrides = {}) {
   return queueTextForPlayback(selectedText, overrides, { tabId: tab.id, requestToken });
 }
 
+async function detectCurrentSelectionLanguage() {
+  const tab = await getActiveTab();
+  if (isUnsupportedTabUrl(tab.url)) {
+    return {
+      hasSelection: false,
+      language: null,
+      text: '',
+    };
+  }
+
+  const selectedText = await readSelectionFromTab(tab.id);
+  if (!selectedText) {
+    return {
+      hasSelection: false,
+      language: null,
+      text: '',
+    };
+  }
+
+  return {
+    hasSelection: true,
+    language: detectLanguage(selectedText),
+    text: selectedText,
+  };
+}
+
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId !== 'listen-read-selection') {
     return;
@@ -797,6 +823,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const result = await readCurrentTabSelection(message.overrides || {});
       flashBadge('OK', '#2bb673');
       return { ok: true, result };
+    }
+
+    if (message.type === 'DETECT_CURRENT_SELECTION_LANGUAGE') {
+      const detection = await detectCurrentSelectionLanguage();
+      return { ok: true, detection };
     }
 
     return { ok: false, message: 'Unsupported action.' };
