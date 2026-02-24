@@ -56,7 +56,7 @@
     </nav>
 
     <div class="header-actions">
-      <button type="button" class="btn-icon theme-toggle" id="themeToggle" aria-label="Toggle theme">
+      <button type="button" class="btn-icon theme-toggle" id="themeToggle" data-theme-toggle aria-label="Toggle theme">
         <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
         <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
       </button>
@@ -139,43 +139,67 @@
     </button>
   </div>
 
-  <div class="mobile-nav" id="mobileNav" aria-hidden="true">
-    <nav class="mobile-nav-inner">
-      @auth
-        <div class="mobile-user">
-          <div class="mobile-user-avatar">
-            @if(auth()->user()->google_avatar)
-              <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
-            @else
-              {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
-            @endif
-          </div>
-          <div class="mobile-user-info">
-            <strong>{{ auth()->user()->name }}</strong>
-            <span>{{ auth()->user()->email }}</span>
-          </div>
-        </div>
-        <div class="mobile-nav-divider"></div>
-        @foreach($authNavLinks as $link)
-          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-        @endforeach
-        @if(auth()->user()->is_admin)
-        <a href="{{ url('/admin') }}" class="mobile-nav-link">Admin Dashboard</a>
-        @endif
-        <form method="POST" action="{{ route('logout') }}">
-          @csrf
-          <button type="submit" class="mobile-nav-link logout">Sign out</button>
-        </form>
-      @else
-        @foreach($navLinks as $link)
-          @if(!$link['guest'] || !auth()->check())
-            <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
-          @endif
-        @endforeach
-        <div class="mobile-nav-divider"></div>
-        <a href="{{ route('login') }}" class="mobile-nav-link">Sign in</a>
-        <a href="{{ route('register') }}" class="btn btn-primary mobile-cta">Get Started Free</a>
-      @endauth
-    </nav>
-  </div>
 </header>
+
+<div class="mobile-nav" id="mobileNav" aria-hidden="true">
+  <nav class="mobile-nav-inner">
+    <div class="mobile-nav-top">
+      <a class="mobile-nav-brand" href="{{ route('home') }}" aria-label="{{ $siteName }} home">
+        @if($logoUrl)
+          <img src="{{ $logoUrl }}" alt="{{ $siteName }}" />
+        @else
+          <span class="brand-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+          </span>
+          <span class="brand-text">{{ $siteName }}</span>
+        @endif
+      </a>
+      <div class="mobile-nav-tools">
+        <button type="button" class="btn-icon theme-toggle" data-theme-toggle data-mobile-menu-stay-open aria-label="Toggle theme">
+          <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
+          <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>
+        </button>
+        <button type="button" class="btn-icon mobile-close" id="mobileMenuClose" aria-label="Close menu">
+          <svg class="close-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6l-12 12"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="mobile-nav-divider"></div>
+
+    @auth
+      <div class="mobile-user">
+        <div class="mobile-user-avatar">
+          @if(auth()->user()->google_avatar)
+            <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
+          @else
+            {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+          @endif
+        </div>
+        <div class="mobile-user-info">
+          <strong>{{ auth()->user()->name }}</strong>
+          <span>{{ auth()->user()->email }}</span>
+        </div>
+      </div>
+      <div class="mobile-nav-divider"></div>
+      @foreach($authNavLinks as $link)
+        <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+      @endforeach
+      @if(auth()->user()->is_admin)
+      <a href="{{ url('/admin') }}" class="mobile-nav-link">Admin Dashboard</a>
+      @endif
+      <form method="POST" action="{{ route('logout') }}">
+        @csrf
+        <button type="submit" class="mobile-nav-link logout">Sign out</button>
+      </form>
+    @else
+      @foreach($navLinks as $link)
+        @if(!$link['guest'] || !auth()->check())
+          <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
+        @endif
+      @endforeach
+      <div class="mobile-nav-divider"></div>
+      <a href="{{ route('login') }}" class="mobile-nav-link">Sign in</a>
+      <a href="{{ route('register') }}" class="btn btn-primary mobile-cta">Get Started Free</a>
+    @endauth
+  </nav>
+</div>

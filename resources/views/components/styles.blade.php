@@ -41,17 +41,11 @@ html[data-theme="light"] {
 html, body {
   margin: 0;
   padding: 0;
-  scroll-behavior: smooth;
   max-width: 100%;
 }
-html.mobile-menu-open {
-  overflow: hidden;
-  overscroll-behavior: none;
-}
+html.mobile-menu-open,
 body.mobile-menu-open {
   overflow: hidden;
-  overscroll-behavior: none;
-  height: 100dvh;
 }
 body {
   font-family: var(--font-body);
@@ -491,22 +485,22 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 .mobile-nav {
   display: none;
   position: fixed;
-  top: 72px;
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: color-mix(in oklab, var(--bg) 97%, transparent);
+  background: var(--bg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
-  z-index: 120;
-  min-height: calc(100dvh - 72px);
+  z-index: 130;
+  min-height: 100dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
-  transition: all .3s ease;
+  transition: opacity .2s ease, visibility .2s ease;
 }
 
 .mobile-nav.open {
@@ -516,19 +510,53 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   pointer-events: auto;
 }
 
-/* Fallback: if JS updates aria-expanded but open class is missed, still show menu */
-.mobile-toggle[aria-expanded="true"] + .mobile-nav {
-  display: block;
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-}
-
 .mobile-nav-inner {
   display: flex;
   flex-direction: column;
-  padding: 1rem;
+  padding: .75rem 1rem 1rem;
+  padding-top: calc(env(safe-area-inset-top) + .75rem);
   gap: .25rem;
+}
+
+.mobile-nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: .35rem;
+  background: var(--bg);
+}
+
+.mobile-nav-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.mobile-nav-brand img {
+  max-height: 32px;
+  width: auto;
+}
+
+.mobile-nav-tools {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+
+.mobile-close .close-icon {
+  width: 1.05rem;
+  height: 1.05rem;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
 }
 
 .mobile-nav-link {
@@ -598,6 +626,31 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 .mobile-cta {
   margin-top: .5rem;
   justify-content: center;
+}
+
+button.mobile-nav-link {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+form:has(button.mobile-nav-link) {
+  width: 100%;
+  margin: 0;
+}
+
+.mobile-nav-link.logout {
+  color: var(--danger);
+  background: color-mix(in oklab, var(--danger) 10%, transparent);
+  border: 1px solid color-mix(in oklab, var(--danger) 20%, transparent);
+}
+
+.mobile-nav-link.logout:hover {
+  background: color-mix(in oklab, var(--danger) 15%, transparent);
+  color: var(--danger);
 }
 
 /* ===== FOOTER STYLES ===== */
@@ -775,8 +828,10 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
     justify-content: center;
   }
 
-  .mobile-nav {
-    display: block;
+  .app-header {
+    background: var(--bg);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 }
 
@@ -801,10 +856,6 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
     text-align: center;
   }
 
-  .mobile-nav {
-    top: 64px;
-    min-height: calc(100dvh - 64px);
-  }
 }
 
 /* ===== ANIMATIONS ===== */
