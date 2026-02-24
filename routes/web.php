@@ -64,6 +64,7 @@ Route::middleware(['auth', 'subscription.sync'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
     Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->name('dashboard.queue');
+    Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
 
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
     Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');

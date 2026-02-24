@@ -182,10 +182,10 @@
        font-size: .9rem;
      }
     th, td {
-      padding: .65rem;
+      padding: .85rem .65rem;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
       text-align: left;
-      vertical-align: top;
+      vertical-align: middle;
     }
     th {
       color: color-mix(in oklab, var(--text) 85%, var(--muted));
@@ -262,6 +262,20 @@
       border-color: transparent;
       color: #fff;
     }
+    .job-delete-btn {
+      min-width: auto;
+      height: 1.95rem;
+      padding: 0 .7rem;
+      font-size: .8rem;
+      color: color-mix(in oklab, var(--danger) 85%, var(--text));
+      border-color: color-mix(in oklab, var(--danger) 35%, var(--line));
+      background: color-mix(in oklab, var(--danger) 8%, var(--surface));
+    }
+    .job-delete-btn:hover:not(:disabled) {
+      color: color-mix(in oklab, var(--danger) 92%, var(--text));
+      border-color: color-mix(in oklab, var(--danger) 55%, var(--line));
+      background: color-mix(in oklab, var(--danger) 12%, var(--surface));
+    }
     .pagination-info {
       font-size: .82rem;
       color: var(--muted);
@@ -276,6 +290,21 @@
     .reveal.show {
       opacity: 1;
       transform: translateY(0);
+    }
+
+    @keyframes rowSlideIn {
+      from { opacity: 0; transform: translateY(-15px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes rowHighlight {
+      0% { background-color: color-mix(in oklab, var(--a) 20%, transparent); }
+      100% { background-color: transparent; }
+    }
+    .new-job-row {
+      animation: rowSlideIn 1.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .new-job-row td {
+      animation: rowHighlight 3.5s ease-out forwards;
     }
 
     @media (max-width: 980px) {
@@ -448,22 +477,23 @@
       </aside>
     </section>
 
-    <section class="page-card table-card reveal">
+    <section id="recentJobsSection" class="page-card table-card reveal">
       <div class="table-header">
-        <h2>Recent jobs</h2>
+        <h2>Recent Voices</h2>
         <span class="jobs-count" id="jobsCount"></span>
       </div>
       <div style="overflow-x: auto;">
         <table>
           <thead>
             <tr>
-              <th>ID</th><th>Status</th><th>Flow</th><th>Speaker</th><th>Translate</th><th>Est.</th><th>Audio</th><th>Created</th>
+              <th>ID</th><th>Title</th><th>Status</th><th>Flow</th><th>Speaker</th><th>Translate</th><th>Audio</th><th>Created</th><th>Actions</th>
             </tr>
           </thead>
           <tbody id="jobsTableBody">
             @forelse($jobs as $job)
               <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
                 'id' => $job->id,
+                'title' => $job->textItem?->title,
                 'status' => $job->status,
                 'source_language' => $job->source_language,
                 'target_language' => $job->target_language,
@@ -475,11 +505,11 @@
                 'created_human' => $job->created_at?->diffForHumans(),
               ]) }}">
                 <td>#{{ $job->id }}</td>
+                <td>{{ $job->textItem?->title ?: '-' }}</td>
                 <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
                 <td>{{ $job->source_language ?? '-' }} -> {{ $job->target_language }}</td>
                 <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker' }}</td>
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
-                <td>{{ $job->duration_seconds ? $job->duration_seconds.'s' : '-' }}</td>
                 <td>
                   @if($job->audio_path)
                     <audio controls preload="none" src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"></audio>
@@ -490,9 +520,19 @@
                   @endif
                 </td>
                 <td>{{ $job->created_at?->diffForHumans() }}</td>
+                <td>
+                  <button
+                    type="button"
+                    class="pagination-btn job-delete-btn"
+                    data-action="delete-job"
+                    data-job-id="{{ $job->id }}"
+                  >
+                    Delete
+                  </button>
+                </td>
               </tr>
             @empty
-              <tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">No jobs yet.</td></tr>
+              <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">No jobs yet.</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -507,6 +547,7 @@
     const voiceCatalog = @json($voiceCatalog);
     const oldVoice = @json(old('voice_key'));
     const queueUrl = '{{ route('dashboard.queue') }}';
+    const deleteJobBaseUrl = '{{ url('/dashboard/jobs') }}';
     const csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
@@ -692,11 +733,11 @@
       const status = String(job?.status || 'processing').toLowerCase();
       const statusClass = ['queued', 'processing', 'done', 'failed'].includes(status) ? status : 'processing';
       const statusLabel = statusClass.toUpperCase();
+      const title = escapeHtml(job?.title || '-');
       const sourceLanguage = escapeHtml(job?.source_language || '-');
       const targetLanguageValue = escapeHtml(job?.target_language || '-');
       const voiceLabel = escapeHtml(job?.voice_label || 'Default speaker');
       const translateLabel = job?.translate ? 'Yes' : 'No';
-      const duration = job?.duration_seconds ? `${Number(job.duration_seconds)}s` : '-';
       const created = escapeHtml(job?.created_human || 'just now');
       const errorMessage = escapeHtml(job?.error_message || 'Generation failed');
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
@@ -707,13 +748,14 @@
 
       return '<tr data-job-id="' + Number(job?.id || 0) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
         '<td>#' + Number(job?.id || 0) + '</td>' +
+        '<td>' + title + '</td>' +
         '<td><span class="status ' + statusClass + '">' + statusLabel + '</span></td>' +
         '<td>' + sourceLanguage + ' -> ' + targetLanguageValue + '</td>' +
         '<td>' + voiceLabel + '</td>' +
         '<td>' + translateLabel + '</td>' +
-        '<td>' + duration + '</td>' +
         '<td>' + audioCell + '</td>' +
         '<td>' + created + '</td>' +
+        '<td><button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">Delete</button></td>' +
       '</tr>';
     }
 
@@ -730,15 +772,15 @@
 
     function renderJobsPage() {
       if (!jobsTableBody) return;
-      const total = allJobs.length;
-      const totalPages = Math.ceil(total / jobsPerPage) || 1;
+      const totalLoaded = allJobs.length;
+      const totalPages = Math.ceil(totalLoaded / jobsPerPage) || 1;
       const start = (jobsCurrentPage - 1) * jobsPerPage;
       const end = start + jobsPerPage;
       const pageJobs = allJobs.slice(start, end);
 
       jobsTableBody.innerHTML = '';
       if (pageJobs.length === 0) {
-        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">No jobs yet.</td></tr>';
+        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">No jobs yet.</td></tr>';
       } else {
         pageJobs.forEach(function(job) {
           jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job));
@@ -746,7 +788,13 @@
       }
 
       if (jobsCount) {
-        jobsCount.textContent = 'Showing ' + (start + 1) + '-' + Math.min(end, total) + ' of ' + total + ' jobs';
+        if (totalLoaded === 0) {
+          jobsCount.textContent = 'Showing 0 of 0 Voices';
+        } else {
+          const showingFrom = start + 1;
+          const showingTo = Math.min(end, totalLoaded);
+          jobsCount.textContent = 'Showing ' + showingFrom + '-' + showingTo + ' of ' + formatNumber(totalLoaded) + ' Voices';
+        }
       }
       renderPagination(totalPages);
     }
@@ -793,20 +841,81 @@
       if (emptyRow) emptyRow.remove();
 
       const existingIndex = allJobs.findIndex(function(j) { return j.id === job.id; });
+      let isNew = false;
       if (existingIndex !== -1) {
         allJobs[existingIndex] = job;
       } else {
         allJobs.unshift(job);
+        isNew = true;
       }
 
       jobsCurrentPage = 1;
       renderJobsPage();
+
+      if (isNew) {
+        setTimeout(function() {
+          const firstRow = jobsTableBody.querySelector('tr[data-job-id="' + job.id + '"]');
+          if (firstRow) {
+            firstRow.classList.add('new-job-row');
+            firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 10);
+      }
+    }
+
+    async function deleteJob(jobId, triggerBtn) {
+      const parsedJobId = Number(jobId || 0);
+      if (!parsedJobId) return;
+
+      if (!window.confirm('Delete this generated voice from your jobs table?')) {
+        return;
+      }
+
+      if (triggerBtn instanceof HTMLButtonElement) {
+        triggerBtn.disabled = true;
+      }
+
+      let data = null;
+      try {
+        const response = await fetch(`${deleteJobBaseUrl}/${parsedJobId}`, {
+          method: 'DELETE',
+          headers: {
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+
+        data = await response.json().catch(() => ({}));
+        if (!response.ok || data?.ok === false) {
+          throw new Error(extractErrorMessage(data, 'Unable to delete this voice.'));
+        }
+
+        const deletedId = Number(data?.deleted_id || parsedJobId);
+        allJobs = allJobs.filter((job) => Number(job?.id || 0) !== deletedId);
+        if (data?.stats) updateStats(data.stats);
+        const totalPages = Math.ceil(allJobs.length / jobsPerPage) || 1;
+        jobsCurrentPage = Math.min(jobsCurrentPage, totalPages);
+        renderJobsPage();
+        showFormMessage(null, '');
+      } catch (error) {
+        showFormMessage('error', extractErrorMessage(data, error?.message || 'Unable to delete this voice.'));
+      } finally {
+        if (triggerBtn instanceof HTMLButtonElement) {
+          triggerBtn.disabled = false;
+        }
+      }
     }
 
     jobsPagination?.addEventListener('click', function(e) {
       const btn = e.target.closest('.pagination-btn');
       if (!btn || btn.disabled) return;
       goToPage(btn.getAttribute('data-page'));
+    });
+    jobsTableBody?.addEventListener('click', function(e) {
+      const deleteBtn = e.target.closest('[data-action="delete-job"]');
+      if (!deleteBtn || deleteBtn.disabled) return;
+      deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn);
     });
 
     function extractErrorMessage(data, fallback = 'Voice generation failed. Please try again.') {

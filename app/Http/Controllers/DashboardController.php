@@ -34,8 +34,8 @@ class DashboardController extends Controller
         $baseQuery = AudioGeneration::query()->where('user_id', $userId);
 
         $jobs = (clone $baseQuery)
+            ->with(['textItem:id,title'])
             ->latest()
-            ->limit(20)
             ->get();
 
         $stats = [
@@ -212,6 +212,35 @@ class DashboardController extends Controller
         );
     }
 
+    public function destroy(Request $request, AudioGeneration $job)
+    {
+        $userId = (int) auth()->id();
+        if ((int) $job->user_id !== $userId) {
+            abort(404);
+        }
+
+        $deletedId = (int) $job->id;
+        $job->delete();
+
+        $baseQuery = AudioGeneration::query()->where('user_id', $userId);
+        $stats = [
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
+            'done' => (clone $baseQuery)->where('status', 'done')->count(),
+            'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
+            'total' => (clone $baseQuery)->count(),
+        ];
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'deleted_id' => $deletedId,
+                'message' => 'Voice deleted successfully.',
+                'stats' => $stats,
+            ]);
+        }
+
+        return redirect()->route('dashboard')->with('ok', 'Voice deleted successfully.');
+    }
+
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
@@ -267,8 +296,11 @@ class DashboardController extends Controller
 
     private function buildJobPayload(AudioGeneration $job, array $voiceNameMap): array
     {
+        $job->loadMissing('textItem:id,title');
+
         return [
             'id' => (int) $job->id,
+            'title' => (string) ($job->textItem?->title ?? ''),
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
