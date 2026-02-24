@@ -419,12 +419,17 @@
             </div>
 
             <div>
-              <label for="translate">Translate before speaking</label>
-              <select id="translate" name="translate">
-                <option value="1">Yes - translate text first</option>
-                <option value="0">No - keep text as-is</option>
-              </select>
-              <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected voice language.</div>
+              <div class="setting-card" style="margin-top: .5rem;">
+                <div class="setting-info">
+                  <label for="translateToggle">Translate before speaking</label>
+                  <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected voice language.</div>
+                </div>
+                <label class="toggle-switch" aria-label="Translate before speaking">
+                  <input type="checkbox" id="translateToggle" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+                <input type="hidden" name="translate" id="translate" value="1">
+              </div>
             </div>
 
             <div style="display: flex; gap: .6rem; flex-wrap: wrap;">
@@ -467,6 +472,7 @@
     const upgradeBox = document.getElementById('upgradeBox');
     const upgradeText = document.getElementById('upgradeText');
     const translateSelect = document.getElementById('translate');
+    const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
     const heroWave = document.getElementById('heroWave');
     const textInput = document.getElementById('text');
@@ -485,6 +491,8 @@
       used_chars: Number(demoQuota?.used_chars || 0),
       is_exhausted: Boolean(demoQuota?.is_exhausted),
     };
+    let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
+    const preferredVoiceKeyByLanguage = { ar: '', en: '' };
     let clientFingerprint = '';
     let fingerprintPromise = null;
 
@@ -494,6 +502,28 @@
 
     function countNonSpaceChars(value) {
       return String(value || '').replace(/\s+/g, '').length;
+    }
+
+    function normalizeLanguage(value) {
+      return value === 'en' ? 'en' : 'ar';
+    }
+
+    function oppositeLanguage(value) {
+      return normalizeLanguage(value) === 'en' ? 'ar' : 'en';
+    }
+
+    function detectSourceLanguage(value) {
+      return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en';
+    }
+
+    function isTranslateEnabled() {
+      return String(translateSelect?.value || '1') === '1';
+    }
+
+    function rememberCurrentVoiceSelection(language = normalizeLanguage(targetLanguage?.value)) {
+      const selectedVoiceKey = String(voiceSelect?.value || '').trim();
+      if (!selectedVoiceKey) return;
+      preferredVoiceKeyByLanguage[normalizeLanguage(language)] = selectedVoiceKey;
     }
 
     function hideAudioPreview() {
@@ -619,11 +649,15 @@
     }
 
     function renderVoiceOptions() {
+      if (!voiceSelect || !targetLanguage) return;
       const voices = getFilteredVoices();
-      const current = voiceSelect.value;
+      const lang = normalizeLanguage(targetLanguage.value);
+      const remembered = String(preferredVoiceKeyByLanguage[lang] || '').trim();
+      const current = String(remembered || '').trim();
       voiceSelect.innerHTML = '';
       if (!voices.length) {
         voiceSelect.innerHTML = '<option value="">No speakers available</option>';
+        preferredVoiceKeyByLanguage[lang] = '';
         return;
       }
       for (const voice of voices) {
@@ -634,6 +668,40 @@
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
       else voiceSelect.value = voices[0].key;
+      preferredVoiceKeyByLanguage[lang] = String(voiceSelect.value || '').trim();
+    }
+
+    function syncLanguageToCurrentTextWhenTranslationOff(fallbackLanguage = null) {
+      if (!targetLanguage || !textInput || isTranslateEnabled()) return false;
+      const text = String(textInput.value || '').trim();
+      if (!text) {
+        const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null;
+        if (!fallback) return false;
+        const currentLanguage = normalizeLanguage(targetLanguage.value);
+        if (currentLanguage === fallback) return false;
+        rememberCurrentVoiceSelection(currentLanguage);
+        targetLanguage.value = fallback;
+        renderVoiceOptions();
+        return true;
+      }
+      const sourceLanguage = detectSourceLanguage(text);
+      const currentLanguage = normalizeLanguage(targetLanguage.value);
+      if (sourceLanguage === currentLanguage) return false;
+      rememberCurrentVoiceSelection(currentLanguage);
+      targetLanguage.value = sourceLanguage;
+      renderVoiceOptions();
+      return true;
+    }
+
+    function restorePreferredTranslationLanguage() {
+      if (!targetLanguage || !isTranslateEnabled()) return false;
+      const currentLanguage = normalizeLanguage(targetLanguage.value);
+      const desiredLanguage = normalizeLanguage(preferredTranslateLanguage);
+      if (currentLanguage === desiredLanguage) return false;
+      rememberCurrentVoiceSelection(currentLanguage);
+      targetLanguage.value = desiredLanguage;
+      renderVoiceOptions();
+      return true;
     }
 
     async function callEndpoint(endpoint) {
@@ -658,6 +726,10 @@
     previewBtn?.addEventListener('click', async () => {
       heroWave?.classList.add('dynamic');
       try {
+        if (!isTranslateEnabled()) {
+          syncLanguageToCurrentTextWhenTranslationOff();
+        }
+
         const rawText = String(textInput?.value || '');
         const trimmed = rawText.trim();
         const selectedChars = countNonSpaceChars(trimmed);
@@ -715,14 +787,37 @@
     });
 
     voiceTier?.addEventListener('change', renderVoiceOptions);
-    targetLanguage?.addEventListener('change', renderVoiceOptions);
+    targetLanguage?.addEventListener('change', () => {
+      if (isTranslateEnabled()) {
+        preferredTranslateLanguage = normalizeLanguage(targetLanguage.value);
+      }
+      renderVoiceOptions();
+    });
     voiceGender?.addEventListener('change', renderVoiceOptions);
-    translateSelect?.addEventListener('change', updateTranslateHint);
+    voiceSelect?.addEventListener('change', () => {
+      rememberCurrentVoiceSelection();
+    });
+    translateToggle?.addEventListener('change', () => {
+      if (translateSelect) translateSelect.value = translateToggle.checked ? '1' : '0';
+      if (translateToggle.checked) {
+        restorePreferredTranslationLanguage();
+      } else {
+        preferredTranslateLanguage = normalizeLanguage(targetLanguage?.value);
+        syncLanguageToCurrentTextWhenTranslationOff(oppositeLanguage(preferredTranslateLanguage));
+      }
+      updateTranslateHint();
+    });
     textInput?.addEventListener('input', () => {
       if (currentQuota.remaining_chars <= 0) {
         setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
       }
     });
+    if (translateToggle && translateSelect) {
+      translateToggle.checked = translateSelect.value === '1';
+    }
+    if (!isTranslateEnabled()) {
+      preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
+    }
     renderVoiceOptions();
     updateTranslateHint();
     renderQuota(currentQuota);

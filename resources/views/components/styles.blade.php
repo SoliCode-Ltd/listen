@@ -805,6 +805,88 @@ form:has(button.mobile-nav-link) {
   }
 }
 
+/* ===== SETTINGS CARD & TOGGLE ===== */
+.setting-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.25rem;
+  background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: all .25s ease;
+}
+.setting-card:hover {
+  border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+  background: color-mix(in oklab, var(--surface2) 50%, var(--surface));
+}
+@media (max-width: 640px) {
+  .setting-card {
+    padding: .95rem 1.15rem;
+  }
+}
+.setting-info {
+  flex: 1;
+}
+.setting-info label {
+  display: block;
+  margin: 0 0 .2rem 0;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.setting-info .hint {
+  margin: 0;
+  padding: 0;
+  font-size: .85rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--line);
+  transition: .3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  border-radius: 24px;
+}
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #fff;
+  transition: .3s cubic-bezier(0.4, 0.0, 0.2, 1);
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+}
+.toggle-switch input:checked + .toggle-slider {
+  background: linear-gradient(135deg, var(--a), var(--b));
+}
+.toggle-switch input:focus-visible + .toggle-slider {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
 @media (max-width: 960px) {
   .desktop-nav,
   .header-actions .auth-buttons,

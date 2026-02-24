@@ -20,6 +20,10 @@ function normalizeApiBase(apiBase) {
   return String(apiBase || '').trim().replace(/\/+$/, '');
 }
 
+function normalizeLanguage(value) {
+  return value === 'en' ? 'en' : 'ar';
+}
+
 const PACKAGED_API_BASE = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.apiBase || '');
 const PACKAGED_CONFIG_URL = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.configUrl || '');
 const REMOTE_CONFIG_ALARM = 'listen_remote_config_refresh';
@@ -30,7 +34,9 @@ const DEFAULT_SETTINGS = {
   apiBase: PACKAGED_API_BASE,
   apiKey: '',
   targetLanguage: 'ar',
+  translationTargetLanguage: 'ar',
   voiceKey: '',
+  voiceKeyByLanguage: { ar: '', en: '' },
   translate: true,
   autoPlay: true,
 };
@@ -100,6 +106,7 @@ if (typeof chrome.alarms !== 'undefined') {
 const LAST_STATUS_KEY = 'listen_last_status';
 const LAST_STATUS_TTL_MS = 1000 * 60 * 30;
 const tabPlaybackTokens = new Map();
+let contextMenuInitPromise = null;
 
 function setLastStatus(message, type = '') {
   const text = String(message || '').trim();
@@ -421,23 +428,51 @@ function normalizeSelectedText(input) {
 }
 
 function createContextMenu() {
-  chrome.contextMenus.removeAll(() => {
-    chrome.contextMenus.create({
-      id: 'listen-read-selection',
-      title: 'Listen Selected Text',
-      contexts: ['selection'],
+  if (contextMenuInitPromise) {
+    return contextMenuInitPromise;
+  }
+
+  contextMenuInitPromise = new Promise((resolve) => {
+    chrome.contextMenus.removeAll(() => {
+      // Intentionally ignore removeAll errors (e.g., transient startup state).
+      chrome.contextMenus.create({
+        id: 'listen-read-selection',
+        title: 'Listen Selected Text',
+        contexts: ['selection'],
+      }, () => {
+        const createError = chrome.runtime.lastError;
+        if (!createError) {
+          resolve();
+          return;
+        }
+
+        // Avoid noisy "duplicate id" failures when startup hooks race.
+        if (String(createError.message || '').toLowerCase().includes('duplicate id')) {
+          chrome.contextMenus.update('listen-read-selection', {
+            title: 'Listen Selected Text',
+            contexts: ['selection'],
+          }, () => resolve());
+          return;
+        }
+
+        resolve();
+      });
     });
+  }).finally(() => {
+    contextMenuInitPromise = null;
   });
+
+  return contextMenuInitPromise;
 }
 
 chrome.runtime.onInstalled.addListener(() => {
-  createContextMenu();
+  createContextMenu().catch(() => { });
   scheduleRemoteConfigRefresh();
   refreshRemoteConfig();
 });
 
 chrome.runtime.onStartup.addListener(() => {
-  createContextMenu();
+  createContextMenu().catch(() => { });
   scheduleRemoteConfigRefresh();
   refreshRemoteConfig();
 });
@@ -451,11 +486,32 @@ function getSettings() {
     chrome.storage.sync.get(DEFAULT_SETTINGS, (stored) => {
       const storedApiBase = normalizeApiBase(stored?.apiBase);
       const apiBase = storedApiBase || PACKAGED_API_BASE;
+      const targetLanguage = normalizeLanguage(stored?.targetLanguage);
+      const savedPreferred = String(stored?.translationTargetLanguage || '').trim();
+      const translationTargetLanguage = (savedPreferred === 'en' || savedPreferred === 'ar')
+        ? savedPreferred
+        : (stored?.translate === false ? (targetLanguage === 'en' ? 'ar' : 'en') : targetLanguage);
+      const storedVoiceKey = String(stored?.voiceKey || '').trim();
+      const map = stored?.voiceKeyByLanguage && typeof stored.voiceKeyByLanguage === 'object'
+        ? stored.voiceKeyByLanguage
+        : {};
+      const voiceKeyByLanguage = {
+        ar: String(map.ar || '').trim(),
+        en: String(map.en || '').trim(),
+      };
+      if (!voiceKeyByLanguage[targetLanguage] && storedVoiceKey) {
+        voiceKeyByLanguage[targetLanguage] = storedVoiceKey;
+      }
+      const voiceKey = String(voiceKeyByLanguage[targetLanguage] || storedVoiceKey || '').trim();
 
       resolve({
         ...DEFAULT_SETTINGS,
         ...stored,
         apiBase,
+        targetLanguage,
+        translationTargetLanguage,
+        voiceKeyByLanguage,
+        voiceKey,
       });
     });
   });
@@ -469,9 +525,23 @@ function saveSettings(settings) {
 
   payload.apiBase = normalizeApiBase(payload.apiBase || PACKAGED_API_BASE);
   payload.apiKey = String(payload.apiKey || '').trim();
-  payload.targetLanguage = payload.targetLanguage === 'en' ? 'en' : 'ar';
+  payload.targetLanguage = normalizeLanguage(payload.targetLanguage);
+  payload.translationTargetLanguage = normalizeLanguage(
+    payload.translationTargetLanguage || payload.targetLanguage,
+  );
+  const map = payload.voiceKeyByLanguage && typeof payload.voiceKeyByLanguage === 'object'
+    ? payload.voiceKeyByLanguage
+    : {};
+  payload.voiceKeyByLanguage = {
+    ar: String(map.ar || '').trim(),
+    en: String(map.en || '').trim(),
+  };
   payload.translate = Boolean(payload.translate);
   payload.voiceKey = String(payload.voiceKey || '').trim();
+  if (payload.voiceKey && !payload.voiceKeyByLanguage[payload.targetLanguage]) {
+    payload.voiceKeyByLanguage[payload.targetLanguage] = payload.voiceKey;
+  }
+  payload.voiceKey = String(payload.voiceKeyByLanguage[payload.targetLanguage] || payload.voiceKey || '').trim();
   payload.autoPlay = payload.autoPlay !== false;
 
   return new Promise((resolve) => {
@@ -629,10 +699,18 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     throw new Error('Set API Key in extension settings.');
   }
 
-  const selectedTargetLanguage = settings.targetLanguage === 'en' ? 'en' : 'ar';
+  const selectedTargetLanguage = settings.translate !== false
+    ? normalizeLanguage(settings.translationTargetLanguage || settings.targetLanguage)
+    : normalizeLanguage(settings.targetLanguage);
   const sourceLanguage = detectLanguage(selectedText);
   const shouldTranslate = settings.translate !== false && sourceLanguage !== selectedTargetLanguage;
   const targetLanguage = shouldTranslate ? selectedTargetLanguage : sourceLanguage;
+  const voiceMap = settings.voiceKeyByLanguage && typeof settings.voiceKeyByLanguage === 'object'
+    ? settings.voiceKeyByLanguage
+    : {};
+  const selectedVoiceForTarget = String(
+    voiceMap[selectedTargetLanguage] || settings.voiceKey || '',
+  ).trim();
 
   const payload = {
     title: truncate(selectedText, 80),
@@ -645,9 +723,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     prefer_sync: true,
   };
 
-  const voiceKey = targetLanguage === selectedTargetLanguage
-    ? String(settings.voiceKey || '').trim()
-    : '';
+  const voiceKey = targetLanguage === selectedTargetLanguage ? selectedVoiceForTarget : '';
   if (voiceKey) {
     payload.voice_key = voiceKey;
   }

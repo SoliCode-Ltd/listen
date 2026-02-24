@@ -398,8 +398,8 @@
             <div>
               <label>Voice Language</label>
               <select name="target_language" id="target_language">
-                <option value="ar">Arabic</option>
-                <option value="en">English</option>
+                <option value="ar" {{ old('target_language', 'ar') === 'ar' ? 'selected' : '' }}>Arabic</option>
+                <option value="en" {{ old('target_language', 'ar') === 'en' ? 'selected' : '' }}>English</option>
               </select>
             </div>
             <div>
@@ -409,12 +409,17 @@
           </div>
 
           <div>
-            <label>Translate before speaking</label>
-            <select name="translate" id="translateSelect">
-              <option value="1">Yes - translate text first</option>
-              <option value="0">No - keep text as-is</option>
-            </select>
-            <small style="color: var(--muted);" id="translateHint">Enabled: text is translated first, then spoken in selected voice language.</small>
+            <div class="setting-card" style="margin-top: .5rem;">
+              <div class="setting-info">
+                <label for="translateToggle">Translate before speaking</label>
+                <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in selected voice language.</div>
+              </div>
+              <label class="toggle-switch" aria-label="Translate before speaking">
+                <input type="checkbox" id="translateToggle" {{ old('translate', '1') ? 'checked' : '' }}>
+                <span class="toggle-slider"></span>
+              </label>
+              <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate', '1') ? '1' : '0' }}">
+            </div>
           </div>
 
           <button class="btn btn-primary" id="generateBtn" type="submit">Generate Voice Now</button>
@@ -509,7 +514,9 @@
     const generateBtn = document.getElementById('generateBtn');
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_key');
+    const contentInput = voiceForm?.querySelector('textarea[name="content"]') || null;
     const translateSelect = document.getElementById('translateSelect');
+    const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
     const jobsTableBody = document.getElementById('jobsTableBody');
     const usageCharsText = document.getElementById('usageCharsText');
@@ -525,13 +532,36 @@
     const jobsCount = document.getElementById('jobsCount');
     const jobsPagination = document.getElementById('jobsPagination');
 
-    let preferredVoiceKey = oldVoice || '';
+    let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
+    const preferredVoiceKeyByLanguage = { ar: '', en: '' };
     let allJobs = [];
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
 
     function formatNumber(value) {
       return new Intl.NumberFormat().format(Number(value || 0));
+    }
+
+    function normalizeLanguage(value) {
+      return value === 'en' ? 'en' : 'ar';
+    }
+
+    function oppositeLanguage(value) {
+      return normalizeLanguage(value) === 'en' ? 'ar' : 'en';
+    }
+
+    function detectSourceLanguage(value) {
+      return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en';
+    }
+
+    function isTranslateEnabled() {
+      return String(translateSelect?.value || '1') === '1';
+    }
+
+    function rememberCurrentVoiceSelection(language = normalizeLanguage(targetLanguage?.value)) {
+      const selectedVoiceKey = String(voiceSelect?.value || '').trim();
+      if (!selectedVoiceKey) return;
+      preferredVoiceKeyByLanguage[normalizeLanguage(language)] = selectedVoiceKey;
     }
 
     function formatGender(value) {
@@ -571,13 +601,18 @@
     }
 
     function renderVoiceOptions() {
-      const lang = targetLanguage?.value || 'ar';
+      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
       const raw = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
       const voices = sortVoices(raw);
-      const current = voiceSelect?.value || preferredVoiceKey || '';
+      const remembered = String(preferredVoiceKeyByLanguage[lang] || '').trim();
+      const current = String(remembered || '').trim();
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
-      if (!voices.length) { voiceSelect.innerHTML = '<option value="">No speakers available</option>'; return; }
+      if (!voices.length) {
+        voiceSelect.innerHTML = '<option value="">No speakers available</option>';
+        preferredVoiceKeyByLanguage[lang] = '';
+        return;
+      }
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
@@ -589,7 +624,40 @@
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
       else voiceSelect.value = voices[0].key;
-      preferredVoiceKey = voiceSelect.value;
+      preferredVoiceKeyByLanguage[lang] = String(voiceSelect.value || '').trim();
+    }
+
+    function syncLanguageToCurrentTextWhenTranslationOff(fallbackLanguage = null) {
+      if (!targetLanguage || !contentInput || isTranslateEnabled()) return false;
+      const text = String(contentInput.value || '').trim();
+      if (!text) {
+        const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null;
+        if (!fallback) return false;
+        const currentLanguage = normalizeLanguage(targetLanguage.value);
+        if (currentLanguage === fallback) return false;
+        rememberCurrentVoiceSelection(currentLanguage);
+        targetLanguage.value = fallback;
+        renderVoiceOptions();
+        return true;
+      }
+      const sourceLanguage = detectSourceLanguage(text);
+      const currentLanguage = normalizeLanguage(targetLanguage.value);
+      if (sourceLanguage === currentLanguage) return false;
+      rememberCurrentVoiceSelection(currentLanguage);
+      targetLanguage.value = sourceLanguage;
+      renderVoiceOptions();
+      return true;
+    }
+
+    function restorePreferredTranslationLanguage() {
+      if (!targetLanguage || !isTranslateEnabled()) return false;
+      const currentLanguage = normalizeLanguage(targetLanguage.value);
+      const desiredLanguage = normalizeLanguage(preferredTranslateLanguage);
+      if (currentLanguage === desiredLanguage) return false;
+      rememberCurrentVoiceSelection(currentLanguage);
+      targetLanguage.value = desiredLanguage;
+      renderVoiceOptions();
+      return true;
     }
 
     function updateTranslateHint() {
@@ -755,6 +823,12 @@
     async function submitVoiceForm(event) {
       event.preventDefault();
       if (!voiceForm || !generateBtn) return;
+      if (translateToggle && translateSelect) {
+        translateSelect.value = translateToggle.checked ? '1' : '0';
+      }
+      if (!isTranslateEnabled()) {
+        syncLanguageToCurrentTextWhenTranslationOff();
+      }
       showFormMessage(null, '');
       const defaultText = generateBtn.textContent || 'Generate Voice Now';
       generateBtn.disabled = true;
@@ -784,10 +858,36 @@
       }
     }
 
-    targetLanguage?.addEventListener('change', renderVoiceOptions);
-    voiceSelect?.addEventListener('change', function() { preferredVoiceKey = voiceSelect.value; });
-    translateSelect?.addEventListener('change', updateTranslateHint);
+    targetLanguage?.addEventListener('change', function() {
+      if (isTranslateEnabled()) {
+        preferredTranslateLanguage = normalizeLanguage(targetLanguage.value);
+      }
+      renderVoiceOptions();
+    });
+    voiceSelect?.addEventListener('change', function() {
+      rememberCurrentVoiceSelection();
+    });
+    translateToggle?.addEventListener('change', function() {
+      if (translateSelect) translateSelect.value = translateToggle.checked ? '1' : '0';
+      if (translateToggle.checked) {
+        restorePreferredTranslationLanguage();
+      } else {
+        preferredTranslateLanguage = normalizeLanguage(targetLanguage?.value);
+        syncLanguageToCurrentTextWhenTranslationOff(oppositeLanguage(preferredTranslateLanguage));
+      }
+      updateTranslateHint();
+    });
     voiceForm?.addEventListener('submit', submitVoiceForm);
+
+    if (oldVoice) {
+      preferredVoiceKeyByLanguage[normalizeLanguage(targetLanguage?.value)] = String(oldVoice || '').trim();
+    }
+    if (translateToggle && translateSelect) {
+      translateToggle.checked = translateSelect.value === '1';
+    }
+    if (!isTranslateEnabled()) {
+      preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
+    }
     renderVoiceOptions();
     updateTranslateHint();
     loadJobsFromTable();

@@ -53,6 +53,8 @@ const fallbackCatalog = {
 let profileData = null;
 let apiKeyVerifyTimer = null;
 let lastVerifiedApiKey = '';
+let preferredTranslateLanguage = 'ar';
+const preferredVoiceKeyByLanguage = { ar: '', en: '' };
 
 function setStatus(message, type = '') {
   elements.status.textContent = message || '';
@@ -76,10 +78,25 @@ function requestBackground(message) {
 }
 
 function readSettingsFromForm() {
+  const targetLanguage = normalizeLanguage(elements.targetLanguage.value);
+  if (elements.translate.checked) {
+    preferredTranslateLanguage = targetLanguage;
+  }
+
+  const selectedVoiceKey = String(elements.voiceKey.value || '').trim();
+  if (selectedVoiceKey) {
+    preferredVoiceKeyByLanguage[targetLanguage] = selectedVoiceKey;
+  }
+
   return {
     apiKey: elements.apiKey.value,
-    targetLanguage: elements.targetLanguage.value,
-    voiceKey: elements.voiceKey.value,
+    targetLanguage,
+    translationTargetLanguage: preferredTranslateLanguage,
+    voiceKey: preferredVoiceKeyByLanguage[targetLanguage] || selectedVoiceKey,
+    voiceKeyByLanguage: {
+      ar: String(preferredVoiceKeyByLanguage.ar || '').trim(),
+      en: String(preferredVoiceKeyByLanguage.en || '').trim(),
+    },
     translate: elements.translate.checked,
     autoPlay: elements.autoPlay.checked,
   };
@@ -87,6 +104,52 @@ function readSettingsFromForm() {
 
 function normalizeLanguage(value) {
   return value === 'en' ? 'en' : 'ar';
+}
+
+function oppositeLanguage(value) {
+  return normalizeLanguage(value) === 'en' ? 'ar' : 'en';
+}
+
+function resolvePreferredTranslateLanguage(settings = {}) {
+  const savedPreferred = String(settings.translationTargetLanguage || '').trim();
+  if (savedPreferred === 'en' || savedPreferred === 'ar') {
+    return savedPreferred;
+  }
+
+  const savedTarget = normalizeLanguage(settings.targetLanguage);
+  if (settings.translate === false) {
+    // Migration-safe fallback: in non-translation mode target usually mirrors source language.
+    return oppositeLanguage(savedTarget);
+  }
+
+  return savedTarget;
+}
+
+function resolveVoiceKeyByLanguage(settings = {}) {
+  const map = settings.voiceKeyByLanguage && typeof settings.voiceKeyByLanguage === 'object'
+    ? settings.voiceKeyByLanguage
+    : {};
+  const currentLanguage = normalizeLanguage(settings.targetLanguage);
+  const fallbackVoice = String(settings.voiceKey || '').trim();
+  const resolved = {
+    ar: String(map.ar || '').trim(),
+    en: String(map.en || '').trim(),
+  };
+
+  if (!resolved[currentLanguage] && fallbackVoice) {
+    resolved[currentLanguage] = fallbackVoice;
+  }
+
+  return resolved;
+}
+
+function rememberCurrentVoiceSelection(language = normalizeLanguage(elements.targetLanguage.value)) {
+  const selectedVoiceKey = String(elements.voiceKey.value || '').trim();
+  if (!selectedVoiceKey) {
+    return;
+  }
+
+  preferredVoiceKeyByLanguage[normalizeLanguage(language)] = selectedVoiceKey;
 }
 
 function translateDirectionLabel(language) {
@@ -105,12 +168,19 @@ function updateTranslateLabel() {
 }
 
 function writeSettingsToForm(settings = {}) {
+  const translateEnabled = settings.translate !== false;
+  const targetLanguage = normalizeLanguage(settings.targetLanguage);
+  preferredTranslateLanguage = resolvePreferredTranslateLanguage(settings);
+  const voiceKeys = resolveVoiceKeyByLanguage(settings);
+  preferredVoiceKeyByLanguage.ar = voiceKeys.ar;
+  preferredVoiceKeyByLanguage.en = voiceKeys.en;
+
   elements.apiKey.value = settings.apiKey || '';
-  elements.targetLanguage.value = normalizeLanguage(settings.targetLanguage);
-  elements.translate.checked = settings.translate !== false;
+  elements.targetLanguage.value = translateEnabled ? preferredTranslateLanguage : targetLanguage;
+  elements.translate.checked = translateEnabled;
   elements.autoPlay.checked = settings.autoPlay !== false;
   updateTranslateLabel();
-  renderVoiceOptions(settings.voiceKey || '');
+  renderVoiceOptions(voiceKeys[normalizeLanguage(elements.targetLanguage.value)] || settings.voiceKey || '');
 }
 
 function voiceCatalog() {
@@ -157,7 +227,8 @@ function renderVoiceOptions(preferredKey = '') {
   const raw = Array.isArray(voiceCatalog()?.[language]) ? voiceCatalog()[language] : [];
   const list = sortVoices(raw);
   const fallbackDefault = defaults()?.[language] || '';
-  const current = preferredKey || elements.voiceKey.value || fallbackDefault;
+  const remembered = String(preferredVoiceKeyByLanguage[language] || '').trim();
+  const current = String(preferredKey || remembered || fallbackDefault || '').trim();
 
   elements.voiceKey.innerHTML = '';
 
@@ -182,6 +253,13 @@ function renderVoiceOptions(preferredKey = '') {
     elements.voiceKey.value = current;
   } else {
     elements.voiceKey.value = '';
+  }
+
+  const selectedVoiceKey = String(elements.voiceKey.value || '').trim();
+  if (selectedVoiceKey) {
+    preferredVoiceKeyByLanguage[language] = selectedVoiceKey;
+  } else if (list.some((voice) => String(voice?.key || '') === String(fallbackDefault || ''))) {
+    preferredVoiceKeyByLanguage[language] = String(fallbackDefault || '').trim();
   }
 }
 
@@ -389,14 +467,25 @@ async function getCurrentSelectionLanguage() {
   return language;
 }
 
-async function syncLanguageToCurrentSelection() {
+async function syncLanguageToCurrentSelection(fallbackLanguage = null) {
   if (elements.translate.checked) {
     return false;
   }
 
   const selectionLanguage = await getCurrentSelectionLanguage();
   if (!selectionLanguage) {
-    return false;
+    const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null;
+    if (!fallback) return false;
+
+    const currentLanguage = normalizeLanguage(elements.targetLanguage.value);
+    if (currentLanguage === fallback) return false;
+
+    rememberCurrentVoiceSelection(currentLanguage);
+    elements.targetLanguage.value = fallback;
+    updateTranslateLabel();
+    renderVoiceOptions('');
+    await persistSettingsSilently();
+    return true;
   }
 
   const currentLanguage = normalizeLanguage(elements.targetLanguage.value);
@@ -404,6 +493,7 @@ async function syncLanguageToCurrentSelection() {
     return false;
   }
 
+  rememberCurrentVoiceSelection(currentLanguage);
   elements.targetLanguage.value = selectionLanguage;
   updateTranslateLabel();
   renderVoiceOptions('');
@@ -411,18 +501,69 @@ async function syncLanguageToCurrentSelection() {
   return true;
 }
 
-elements.targetLanguage.addEventListener('change', () => {
-  updateTranslateLabel();
-  renderVoiceOptions(elements.voiceKey.value);
+async function restorePreferredTranslationLanguage() {
   if (!elements.translate.checked) {
-    syncLanguageToCurrentSelection().catch(() => { });
+    return false;
   }
+
+  const currentLanguage = normalizeLanguage(elements.targetLanguage.value);
+  const desiredLanguage = normalizeLanguage(preferredTranslateLanguage);
+  if (currentLanguage === desiredLanguage) {
+    return false;
+  }
+
+  rememberCurrentVoiceSelection(currentLanguage);
+  elements.targetLanguage.value = desiredLanguage;
+  updateTranslateLabel();
+  renderVoiceOptions('');
+  await persistSettingsSilently();
+  return true;
+}
+
+elements.targetLanguage.addEventListener('change', () => {
+  if (elements.translate.checked) {
+    preferredTranslateLanguage = normalizeLanguage(elements.targetLanguage.value);
+  }
+
+  updateTranslateLabel();
+  renderVoiceOptions('');
+  if (!elements.translate.checked) {
+    syncLanguageToCurrentSelection()
+      .then((changed) => {
+        if (!changed) return persistSettingsSilently();
+        return null;
+      })
+      .catch(() => { });
+    return;
+  }
+
+  persistSettingsSilently().catch(() => { });
 });
 
 elements.translate.addEventListener('change', () => {
-  if (!elements.translate.checked) {
-    syncLanguageToCurrentSelection().catch(() => { });
+  if (elements.translate.checked) {
+    restorePreferredTranslationLanguage()
+      .then((changed) => {
+        if (!changed) return persistSettingsSilently();
+        return null;
+      })
+      .catch(() => { });
+    return;
   }
+
+  rememberCurrentVoiceSelection(normalizeLanguage(elements.targetLanguage.value));
+  preferredTranslateLanguage = normalizeLanguage(elements.targetLanguage.value);
+  syncLanguageToCurrentSelection(oppositeLanguage(preferredTranslateLanguage))
+    .then((changed) => {
+      if (!changed) return persistSettingsSilently();
+      return null;
+    })
+    .catch(() => { });
+});
+
+elements.voiceKey.addEventListener('change', () => {
+  rememberCurrentVoiceSelection();
+  persistSettingsSilently().catch(() => { });
 });
 
 elements.apiKey.addEventListener('input', scheduleApiKeyVerify);
