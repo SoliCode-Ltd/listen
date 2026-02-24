@@ -18,9 +18,13 @@
         .main { max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05); overflow: hidden; }
         
         /* Header */
-        .header { background: linear-gradient(135deg, #FF4433 0%, #E63522 100%); padding: 40px 30px; text-align: center; }
-        .header-logo { font-family: 'Outfit', -apple-system, sans-serif; font-size: 32px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .header-subtitle { color: rgba(255, 255, 255, 0.85); font-size: 14px; font-weight: 500; margin-top: 5px; text-transform: uppercase; letter-spacing: 1px; }
+        .header { background: linear-gradient(135deg, #FF4433 0%, #8A2BE2 100%); padding: 40px 30px; text-align: center; }
+        .header-logo-container { display: inline-block; }
+        .header-logo { display: table; margin: 0 auto; }
+        .header-icon { display: table-cell; vertical-align: middle; padding-right: 12px; }
+        .header-icon svg { width: 36px; height: 36px; fill: #ffffff; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1)); }
+        .header-text { display: table-cell; vertical-align: middle; font-family: 'Outfit', -apple-system, sans-serif; font-size: 32px; font-weight: 800; color: #ffffff; letter-spacing: -0.5px; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-subtitle { color: rgba(255, 255, 255, 0.85); font-size: 14px; font-weight: 500; margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; clear: both; }
         
         /* Content */
         .content { padding: 40px 35px; text-align: left; }
@@ -40,8 +44,8 @@
         
         /* Action Button */
         .action-area { text-align: center; margin: 40px 0 20px 0; }
-        .action-button { display: inline-block; background-color: #FF4433; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 9999px; font-weight: 600; font-size: 16px; letter-spacing: 0.3px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(255, 68, 51, 0.25); text-align: center; }
-        .action-button:hover { background-color: #e63522; box-shadow: 0 6px 16px rgba(255, 68, 51, 0.35); transform: translateY(-1px); }
+        .action-button { display: inline-block; background: linear-gradient(135deg, #FF4433 0%, #8A2BE2 100%); color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 9999px; font-weight: 600; font-size: 16px; letter-spacing: 0.3px; transition: all 0.2s ease; box-shadow: 0 4px 12px rgba(138, 43, 226, 0.25); text-align: center; border: none; }
+        .action-button:hover { box-shadow: 0 6px 16px rgba(138, 43, 226, 0.35); transform: translateY(-1px); }
         .action-button span { color: #ffffff !important; text-decoration: none !important; }
 
         /* Signoff */
@@ -51,7 +55,11 @@
         /* Footer */
         .footer { background-color: #f9fafb; padding: 32px 35px; text-align: center; border-top: 1px solid #f3f4f6; }
         .footer p { margin: 6px 0; font-size: 13px; color: #9ca3af; line-height: 1.5; }
-        .footer-brand { font-family: 'Outfit', -apple-system, sans-serif; font-weight: 700; color: #d1d5db; font-size: 20px; margin-top: 20px; letter-spacing: 0.5px; }
+        .footer-brand { margin-top: 24px; padding-top: 20px; border-top: 1px solid #f3f4f6; }
+        .footer-brand-inner { display: table; margin: 0 auto; }
+        .footer-brand-icon { display: table-cell; vertical-align: middle; padding-right: 8px; }
+        .footer-brand-icon svg { width: 22px; height: 22px; fill: #d1d5db; }
+        .footer-brand-text { display: table-cell; vertical-align: middle; font-family: 'Outfit', -apple-system, sans-serif; font-weight: 700; color: #d1d5db; font-size: 18px; letter-spacing: 0.5px; }
 
         /* Mobile Adjustments */
         @media screen and (max-width: 600px) {
@@ -70,7 +78,14 @@
         <div class="main">
             <!-- Header -->
             <div class="header">
-                <div class="header-logo">LISTEN</div>
+                <div class="header-logo-container">
+                    <div class="header-logo">
+                        <div class="header-icon">
+                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+                        </div>
+                        <div class="header-text">LISTEN STUDIO</div>
+                    </div>
+                </div>
                 <div class="header-subtitle">Billing Update</div>
             </div>
             
@@ -108,7 +123,7 @@
 
                 <div class="signoff">
                     Thanks,<br>
-                    <strong>The Listen Studio Team</strong>
+                    <strong>Listen Studio Team</strong>
                 </div>
             </div>
             
@@ -121,7 +136,14 @@
                     <a href="{{ $actionUrl }}" style="color: #6b7280; text-decoration: underline;">{{ $actionUrl }}</a>
                 </p>
                 @endif
-                <div class="footer-brand">LISTEN</div>
+                <div class="footer-brand">
+                    <div class="footer-brand-inner">
+                        <div class="footer-brand-icon">
+                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+                        </div>
+                        <div class="footer-brand-text">LISTEN STUDIO</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>

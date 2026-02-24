@@ -343,7 +343,7 @@
           if (str_contains($statusLower, 'cancel')) $statusClass = 'canceled';
           elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past due') || str_contains($statusLower, 'past_due')) $statusClass = 'pending';
         @endphp
-        <span class="status-badge {{ $statusClass }}">{{ $subscriptionStatus }}</span>
+        <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatus }}</span>
       </div>
       <div class="status-item">
         <small>Next Billing</small>
@@ -379,8 +379,8 @@
             <dt>Voice Tier</dt>
             <dd>{{ $activeTierLabel }}</dd>
           </div>
-          @if($subscriptionRenewsAt)
-            <div class="detail-row">
+          @if($subscriptionRenewsAt && ! $isCancellationScheduled)
+            <div class="detail-row" id="renewsOnRow">
               <dt>Renews On</dt>
               <dd>{{ $subscriptionRenewsAt }}</dd>
             </div>
@@ -401,10 +401,11 @@
 
         <div class="actions">
           <a class="btn btn-primary" href="{{ route('billing.page') }}">Change Plan</a>
-          @if($hasActiveSubscription)
+          @if($hasCancelableSubscription)
             <button class="btn btn-danger" id="cancelBtn" type="button">Cancel Subscription</button>
           @endif
         </div>
+        <div id="subscriptionMessage" class="message"></div>
       </div>
 
       <div class="card">
@@ -446,7 +447,7 @@
             Update Saved Card
           </button>
         </div>
-        <div id="message" class="message"></div>
+        <div id="paymentMessage" class="message"></div>
       </div>
     </div>
 
@@ -507,9 +508,12 @@
     const userName = @json((string) auth()->user()->name);
     const userEmail = @json((string) auth()->user()->email);
 
-    const messageBox = document.getElementById('message');
+    const paymentMessageBox = document.getElementById('paymentMessage');
+    const subscriptionMessageBox = document.getElementById('subscriptionMessage');
     const updateCardBtn = document.getElementById('updateCardBtn');
     const cancelBtn = document.getElementById('cancelBtn');
+    const subscriptionStatusBadge = document.getElementById('subscriptionStatusBadge');
+    const renewsOnRow = document.getElementById('renewsOnRow');
     const cardError = document.getElementById('card-error');
     const updateCardBtnDefaultText = updateCardBtn ? updateCardBtn.textContent.trim() : 'Update Saved Card';
     const cancelBtnDefaultText = cancelBtn ? cancelBtn.textContent.trim() : 'Cancel Subscription';
@@ -538,7 +542,8 @@
         : DARK_CARD_STYLE;
     }
 
-    function setMessage(type, text) {
+    function setMessage(messageBox, type, text) {
+      if (!messageBox) return;
       messageBox.className = 'message';
       messageBox.textContent = '';
       if (!text) return;
@@ -619,7 +624,7 @@
 
     updateCardBtn?.addEventListener('click', async () => {
       setButtonBusy(updateCardBtn, true, 'Updating card...', updateCardBtnDefaultText);
-      setMessage('', '');
+      setMessage(paymentMessageBox, '', '');
 
       try {
         if (!cardComplete) {
@@ -633,10 +638,10 @@
           throw new Error(response.data?.message || 'Card update failed.');
         }
 
-        setMessage('ok', response.data?.message || 'Card updated successfully.');
+        setMessage(paymentMessageBox, 'ok', response.data?.message || 'Card updated successfully.');
         setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
-        setMessage('error', error.message || 'Card update failed.');
+        setMessage(paymentMessageBox, 'error', error.message || 'Card update failed.');
       } finally {
         setButtonBusy(updateCardBtn, false, '', updateCardBtnDefaultText);
       }
@@ -644,7 +649,7 @@
 
     cancelBtn?.addEventListener('click', async () => {
       setButtonBusy(cancelBtn, true, 'Canceling...', cancelBtnDefaultText);
-      setMessage('', '');
+      setMessage(subscriptionMessageBox, '', '');
 
       try {
         const proceed = window.confirm('Are you sure you want to cancel your subscription? Your access will remain active until the end of the current billing period.');
@@ -655,10 +660,18 @@
           throw new Error(response.data?.message || 'Cancellation failed.');
         }
 
-        setMessage('ok', response.data?.message || 'Subscription canceled successfully.');
-        setTimeout(() => window.location.reload(), 1500);
+        setMessage(subscriptionMessageBox, 'ok', response.data?.message || 'Subscription canceled successfully.');
+
+        subscriptionStatusBadge?.classList.remove('active', 'canceled');
+        subscriptionStatusBadge?.classList.add('pending');
+        if (subscriptionStatusBadge) {
+          subscriptionStatusBadge.textContent = 'Cancellation scheduled';
+        }
+
+        renewsOnRow?.remove();
+        cancelBtn?.remove();
       } catch (error) {
-        setMessage('error', error.message || 'Cancellation failed.');
+        setMessage(subscriptionMessageBox, 'error', error.message || 'Cancellation failed.');
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
       }

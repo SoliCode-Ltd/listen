@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BillingSubscription;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -35,6 +36,62 @@ class StripeWebhookEmailService
             'charge.refunded' => $this->handleChargeRefunded($object),
             default => null,
         };
+    }
+
+    public function sendCancellationScheduledForUser(User $user, ?BillingSubscription $billingSubscription = null): void
+    {
+        if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
+            return;
+        }
+
+        $billingSubscription = $billingSubscription?->fresh()
+            ?? BillingSubscription::query()
+                ->where('user_id', $user->id)
+                ->where('type', 'default')
+                ->latest('id')
+                ->first();
+
+        if (! $billingSubscription || ! $billingSubscription->onGracePeriod()) {
+            return;
+        }
+
+        $subscriptionId = trim((string) $billingSubscription->stripe_id);
+        $periodEnd = $this->formatUnixTimestamp($billingSubscription->ends_at?->timestamp);
+        $dedupeSubscriptionId = $subscriptionId !== '' ? $subscriptionId : "local-{$billingSubscription->id}";
+
+        if ($this->shouldSkipEmail("cancel-scheduled:{$dedupeSubscriptionId}:{$periodEnd}", 24 * 30)) {
+            return;
+        }
+
+        $priceId = trim((string) $billingSubscription->stripe_price);
+        if ($priceId === '') {
+            $firstItem = $billingSubscription->items()->latest('id')->first();
+            $priceId = trim((string) ($firstItem?->stripe_price ?? ''));
+        }
+
+        $planLabel = $this->planLabelFromPriceId($priceId !== '' ? $priceId : null);
+        if ($planLabel === 'subscription') {
+            $planLabel = $this->localPlanLabelFromUser($user) ?? $planLabel;
+        }
+
+        $details = [
+            'Plan' => $planLabel,
+            'Status' => 'Cancellation scheduled',
+            'Access Ends' => $periodEnd,
+            'Stripe Subscription ID' => $subscriptionId !== '' ? $subscriptionId : null,
+            'Stripe Customer ID' => trim((string) ($user->stripe_id ?? '')) ?: null,
+        ];
+
+        $html = $this->renderEmail(
+            $user,
+            'Cancellation scheduled',
+            ['Your subscription is set to cancel at the end of the current period.'],
+            $details,
+            $this->manageBillingUrl(),
+            'Manage Billing'
+        );
+
+        $this->sendMail($user, 'Cancellation scheduled', $html);
     }
 
     private function handleCheckoutSessionCompleted(object $session): void
@@ -207,17 +264,18 @@ class StripeWebhookEmailService
             return;
         }
 
-        $hadPrev = is_object($previousAttributes);
-        $changedStatus = $hadPrev && property_exists($previousAttributes, 'status');
-        $changedCancelAtPeriodEnd = $hadPrev && property_exists($previousAttributes, 'cancel_at_period_end');
-        $changedItems = $hadPrev && property_exists($previousAttributes, 'items');
+        $changedStatus = $this->hasAttribute($previousAttributes, 'status');
+        $changedCancelAtPeriodEnd = $this->hasAttribute($previousAttributes, 'cancel_at_period_end');
+        $changedItems = $this->hasAttribute($previousAttributes, 'items');
 
         if (! $changedStatus && ! $changedCancelAtPeriodEnd && ! $changedItems) {
             return;
         }
 
         $status = strtolower((string) ($subscription->status ?? ''));
-        $previousStatus = $changedStatus ? strtolower((string) ($previousAttributes->status ?? '')) : '';
+        $previousStatus = $changedStatus
+            ? strtolower((string) $this->attributeValue($previousAttributes, 'status', ''))
+            : '';
         $cancelAtPeriodEnd = (bool) ($subscription->cancel_at_period_end ?? false);
         $periodEnd = $this->formatUnixTimestamp(isset($subscription->current_period_end) ? (int) $subscription->current_period_end : null);
         $subscriptionId = trim((string) ($subscription->id ?? ''));
@@ -698,6 +756,40 @@ class StripeWebhookEmailService
         $cacheKey = 'stripe_webhook_email:'.sha1($key);
 
         return ! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)));
+    }
+
+    private function hasAttribute(mixed $attributes, string $key): bool
+    {
+        if (is_array($attributes)) {
+            return array_key_exists($key, $attributes);
+        }
+
+        if ($attributes instanceof \ArrayAccess) {
+            return $attributes->offsetExists($key);
+        }
+
+        if (is_object($attributes)) {
+            return property_exists($attributes, $key);
+        }
+
+        return false;
+    }
+
+    private function attributeValue(mixed $attributes, string $key, mixed $default = null): mixed
+    {
+        if (is_array($attributes)) {
+            return array_key_exists($key, $attributes) ? $attributes[$key] : $default;
+        }
+
+        if ($attributes instanceof \ArrayAccess) {
+            return $attributes->offsetExists($key) ? $attributes[$key] : $default;
+        }
+
+        if (is_object($attributes) && property_exists($attributes, $key)) {
+            return $attributes->{$key};
+        }
+
+        return $default;
     }
 
     /**

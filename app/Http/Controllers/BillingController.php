@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
+use App\Services\StripeWebhookEmailService;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -22,6 +23,7 @@ class BillingController extends Controller
     public function __construct(
         private readonly BillingSyncService $billingSyncService,
         private readonly PlanAccessService $planAccessService,
+        private readonly StripeWebhookEmailService $stripeWebhookEmailService,
     ) {}
 
     public function index(Request $request)
@@ -88,6 +90,8 @@ class BillingController extends Controller
             'defaultPaymentMethod' => $defaultPaymentMethod,
             'invoices' => $invoices,
             'hasActiveSubscription' => (bool) ($subscription?->valid() ?? false),
+            'hasCancelableSubscription' => (bool) ($subscription?->valid() ?? false) && ! ($subscription?->onGracePeriod() ?? false),
+            'isCancellationScheduled' => (bool) ($subscription?->onGracePeriod() ?? false),
             'subscriptionStatus' => $this->subscriptionStatusLabel($subscription),
             'subscriptionEndsAt' => $this->formatDateLabel($subscription?->ends_at?->toDateString()),
             'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
@@ -258,6 +262,8 @@ class BillingController extends Controller
         try {
             $subscription->cancel();
             $this->billingSyncService->syncIfStale($user, true);
+            $subscription->refresh();
+            $this->stripeWebhookEmailService->sendCancellationScheduledForUser($user, $subscription);
         } catch (\Throwable $exception) {
             Log::warning('Unable to cancel Stripe subscription renewal.', [
                 'user_id' => $user->id,
@@ -622,6 +628,10 @@ class BillingController extends Controller
     {
         if (! $subscription) {
             return 'No subscription';
+        }
+
+        if ($subscription->onGracePeriod()) {
+            return 'Cancellation scheduled';
         }
 
         return match (strtolower((string) $subscription->stripe_status)) {
