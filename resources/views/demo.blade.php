@@ -331,7 +331,7 @@
       <div class="hero-grid">
         <article class="page-card reveal">
           <!-- <span class="eyebrow">Live voice test studio</span> -->
-          <h1>Choose voice, language, and translation - then preview instantly.</h1>
+          <h1>Choose speaker, voice language, and translation - then preview instantly.</h1>
           <p style="color: var(--muted); margin: 0;">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
           <div class="hero-list">
             <div>- Branded voice personas only</div>
@@ -397,7 +397,7 @@
                 </select>
               </div>
               <div>
-                <label for="target_language">Target language</label>
+                <label for="target_language">Voice Language</label>
                 <select id="target_language" name="target_language">
                   <option value="ar">Arabic</option>
                   <option value="en">English</option>
@@ -414,7 +414,7 @@
             </div>
 
             <div>
-              <label for="voice_key">Voice</label>
+              <label for="voice_key">Speaker</label>
               <select id="voice_key" name="voice_key"></select>
             </div>
 
@@ -424,7 +424,7 @@
                 <option value="1">Yes - translate text first</option>
                 <option value="0">No - keep text as-is</option>
               </select>
-              <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected target language.</div>
+              <div class="hint" id="translateHint">Enabled: text is translated first, then spoken in the selected voice language.</div>
             </div>
 
             <div style="display: flex; gap: .6rem; flex-wrap: wrap;">
@@ -584,7 +584,7 @@
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Enabled: text is translated first, then spoken in the selected target language.'
+        ? 'Enabled: text is translated first, then spoken in the selected voice language.'
         : 'Disabled: original text is spoken directly without translation.';
     }
 
@@ -623,7 +623,7 @@
       const current = voiceSelect.value;
       voiceSelect.innerHTML = '';
       if (!voices.length) {
-        voiceSelect.innerHTML = '<option value="">No voices available</option>';
+        voiceSelect.innerHTML = '<option value="">No speakers available</option>';
         return;
       }
       for (const voice of voices) {
@@ -686,10 +686,10 @@
         audioWrap.style.display = 'block';
         previewAudio.src = data.audio_url;
         previewAudio.load();
-        const label = data?.voice?.label || 'Selected voice';
+        const label = data?.voice?.label || 'Selected speaker';
         const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
         const quality = data?.voice_tier_label ? ` - ${data.voice_tier_label}` : '';
-        audioMeta.textContent = `Voice: ${label}${gender}${quality} - ${data.translate_note}`;
+        audioMeta.textContent = `Speaker: ${label}${gender}${quality} - ${data.translate_note}`;
       } catch (err) {
         hideAudioPreview();
         const message = String(err?.message || 'Preview failed. Try another text or voice.');

@@ -617,7 +617,7 @@
         </button>
       </div>
       <div class="listen-body">
-        <div class="listen-voice" data-role="voice">Voice: -</div>
+        <div class="listen-voice" data-role="voice">Speaker: -</div>
         <div class="listen-text" data-role="text"></div>
         <div class="listen-wave">
           <span></span><span></span><span></span><span></span><span></span>
@@ -789,7 +789,7 @@
     const text = String(payload?.text || '').trim();
     const mimeType = String(payload?.mimeType || 'audio/mpeg').trim();
 
-    voiceEl.textContent = `Voice: ${voiceLabel || 'Auto'}`;
+    voiceEl.textContent = `Speaker: ${voiceLabel || 'Auto'}`;
     textEl.textContent = text || 'Audio ready';
 
     const arrayBuffer = base64ToArrayBuffer(base64);

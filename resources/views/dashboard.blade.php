@@ -396,14 +396,14 @@
 
           <div class="two-col">
             <div>
-              <label>Target language</label>
+              <label>Voice Language</label>
               <select name="target_language" id="target_language">
                 <option value="ar">Arabic</option>
                 <option value="en">English</option>
               </select>
             </div>
             <div>
-              <label>Voice</label>
+              <label>Speaker</label>
               <select name="voice_key" id="voice_key"></select>
             </div>
           </div>
@@ -414,7 +414,7 @@
               <option value="1">Yes - translate text first</option>
               <option value="0">No - keep text as-is</option>
             </select>
-            <small style="color: var(--muted);" id="translateHint">Enabled: text is translated first, then spoken in target language.</small>
+            <small style="color: var(--muted);" id="translateHint">Enabled: text is translated first, then spoken in selected voice language.</small>
           </div>
 
           <button class="btn btn-primary" id="generateBtn" type="submit">Generate Voice Now</button>
@@ -422,7 +422,7 @@
       </article>
 
       <aside class="page-card reveal sidebar-info">
-        <h3>Plan + Voice Defaults</h3>
+        <h3>Plan + Speaker Defaults</h3>
         <p>Current plan: {{ $activePlan?->name ?? 'Free' }}</p>
         <p>Voice quality: {{ $planTierLabel }}</p>
         <p>Monthly characters: {{ number_format($planChars) }}</p>
@@ -452,7 +452,7 @@
         <table>
           <thead>
             <tr>
-              <th>ID</th><th>Status</th><th>Flow</th><th>Voice</th><th>Translate</th><th>Est.</th><th>Audio</th><th>Created</th>
+              <th>ID</th><th>Status</th><th>Flow</th><th>Speaker</th><th>Translate</th><th>Est.</th><th>Audio</th><th>Created</th>
             </tr>
           </thead>
           <tbody id="jobsTableBody">
@@ -462,7 +462,7 @@
                 'status' => $job->status,
                 'source_language' => $job->source_language,
                 'target_language' => $job->target_language,
-                'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice',
+                'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker',
                 'translate' => $job->translate,
                 'duration_seconds' => $job->duration_seconds,
                 'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
@@ -472,7 +472,7 @@
                 <td>#{{ $job->id }}</td>
                 <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
                 <td>{{ $job->source_language ?? '-' }} -> {{ $job->target_language }}</td>
-                <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice' }}</td>
+                <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker' }}</td>
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
                 <td>{{ $job->duration_seconds ? $job->duration_seconds.'s' : '-' }}</td>
                 <td>
@@ -577,7 +577,7 @@
       const current = voiceSelect?.value || preferredVoiceKey || '';
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
-      if (!voices.length) { voiceSelect.innerHTML = '<option value="">No voices available</option>'; return; }
+      if (!voices.length) { voiceSelect.innerHTML = '<option value="">No speakers available</option>'; return; }
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
@@ -595,7 +595,7 @@
     function updateTranslateHint() {
       if (!translateSelect || !translateHint) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Enabled: text is translated first, then spoken in target language.'
+        ? 'Enabled: text is translated first, then spoken in selected voice language.'
         : 'Disabled: original text is spoken directly without translation.';
     }
 
@@ -626,7 +626,7 @@
       const statusLabel = statusClass.toUpperCase();
       const sourceLanguage = escapeHtml(job?.source_language || '-');
       const targetLanguageValue = escapeHtml(job?.target_language || '-');
-      const voiceLabel = escapeHtml(job?.voice_label || 'Default voice');
+      const voiceLabel = escapeHtml(job?.voice_label || 'Default speaker');
       const translateLabel = job?.translate ? 'Yes' : 'No';
       const duration = job?.duration_seconds ? `${Number(job.duration_seconds)}s` : '-';
       const created = escapeHtml(job?.created_human || 'just now');

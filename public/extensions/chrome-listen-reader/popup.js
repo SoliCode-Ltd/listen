@@ -173,7 +173,7 @@ function renderVoiceOptions(preferredKey = '') {
     const quality = String(voice?.tier_label || '').trim();
     const baseLabel = formatGender(voice?.gender)
       ? `${voice.label} - ${formatGender(voice.gender)}`
-      : String(voice?.label || voice?.key || 'Voice');
+      : String(voice?.label || voice?.key || 'Speaker');
     option.textContent = quality ? `${baseLabel} - ${quality}` : baseLabel;
     elements.voiceKey.appendChild(option);
   }

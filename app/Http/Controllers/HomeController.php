@@ -113,7 +113,7 @@ class HomeController extends Controller
             'target_language' => $validated['target_language'],
             'translate' => (bool) ($validated['translate'] ?? false),
             'translate_note' => (bool) ($validated['translate'] ?? false)
-                ? 'Text will be translated to the target language before audio generation.'
+                ? 'Text will be translated to the selected voice language before audio generation.'
                 : 'Text will be spoken as-is without translation.',
             'voice' => VoiceCatalog::voiceMeta($voiceName),
             'voice_tier' => $tier,
@@ -183,7 +183,7 @@ class HomeController extends Controller
                 'target_language' => $validated['target_language'],
                 'translate' => (bool) ($validated['translate'] ?? false),
                 'translate_note' => (bool) ($validated['translate'] ?? false)
-                    ? 'Text was translated to the target language before audio generation.'
+                    ? 'Text was translated to the selected voice language before audio generation.'
                     : 'Text was spoken as-is without translation.',
                 'voice' => VoiceCatalog::voiceMeta($voiceName),
                 'voice_tier' => $tier,
@@ -415,7 +415,7 @@ class HomeController extends Controller
             $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
-                    'target_language' => 'Selected language is not available for this voice quality.',
+                    'target_language' => 'Selected voice language is not available for this voice quality.',
                 ]);
             }
 
@@ -425,7 +425,7 @@ class HomeController extends Controller
         $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_key' => 'Selected voice is not available for the chosen language.',
+                'voice_key' => 'Selected speaker is not available for the chosen voice language.',
             ]);
         }
 

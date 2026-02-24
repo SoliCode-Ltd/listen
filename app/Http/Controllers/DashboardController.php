@@ -220,7 +220,7 @@ class DashboardController extends Controller
             $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
-                    'target_language' => 'Selected language is not available for your current voice quality.',
+                    'target_language' => 'Selected voice language is not available for your current voice quality.',
                 ]);
             }
 
@@ -230,7 +230,7 @@ class DashboardController extends Controller
         $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_key' => 'Selected voice is not available for the chosen language.',
+                'voice_key' => 'Selected speaker is not available for the chosen voice language.',
             ]);
         }
 
@@ -272,7 +272,7 @@ class DashboardController extends Controller
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
-            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default voice',
+            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker',
             'voice_tier' => VoiceTier::label((string) ($job->voice_tier ?: VoiceTier::STANDARD)),
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,

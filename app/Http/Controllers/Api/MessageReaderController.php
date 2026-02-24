@@ -327,7 +327,7 @@ class MessageReaderController extends Controller
             $mapped = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
             if (! $mapped) {
                 throw ValidationException::withMessages([
-                    'voice_key' => 'Selected voice is not available for the chosen language.',
+                    'voice_key' => 'Selected speaker is not available for the chosen voice language.',
                 ]);
             }
 
@@ -337,7 +337,7 @@ class MessageReaderController extends Controller
         if ($voiceName !== '') {
             if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language, $tier)) {
                 throw ValidationException::withMessages([
-                    'voice_name' => 'Selected voice is not available for the chosen language.',
+                    'voice_name' => 'Selected speaker is not available for the chosen voice language.',
                 ]);
             }
 
@@ -347,7 +347,7 @@ class MessageReaderController extends Controller
         $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
         if ($defaultVoice === '') {
             throw ValidationException::withMessages([
-                'target_language' => 'Selected language is not available for your current voice quality.',
+                'target_language' => 'Selected voice language is not available for your current voice quality.',
             ]);
         }
 
