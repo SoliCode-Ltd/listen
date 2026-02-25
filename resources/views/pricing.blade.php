@@ -511,7 +511,13 @@
 
           <div class="plan-header">
             <h2 class="plan-name">{{ $plan['name'] }}</h2>
-            <p class="plan-desc">{{ $plan['slug'] === 'free' ? 'Perfect for testing and exploration' : 'Built for production workloads' }}</p>
+            <p class="plan-desc">
+    {{
+        $plan['slug'] === 'free' ? 'Start exploring AI voice generation' :
+        ($plan['slug'] === 'creator' ? 'Powerful voice generation for creators' :
+        'Advanced features for high-volume production')
+    }}
+</p>
           </div>
 
           <div class="plan-pricing">
