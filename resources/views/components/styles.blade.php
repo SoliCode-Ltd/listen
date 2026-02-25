@@ -793,6 +793,221 @@ form:has(button.mobile-nav-link) {
   margin-bottom: 0;
 }
 
+/* ===== CONTACT PAGE STYLES ===== */
+.contact-page {
+  padding-top: 4rem;
+}
+
+.contact-hero {
+  position: relative;
+  padding: 4rem 1rem 6rem;
+  overflow: hidden;
+}
+
+.hero-bg-accent {
+  position: absolute;
+  top: -40%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100vw;
+  max-width: 1200px;
+  max-height: 1200px;
+  background: radial-gradient(circle, color-mix(in oklab, var(--b) 25%, transparent) 0%, transparent 50%);
+  z-index: -1;
+  pointer-events: none;
+  animation: heroPulse 10s ease-in-out infinite alternate;
+}
+
+@keyframes heroPulse {
+  0% { opacity: 0.6; transform: translateX(-50%) scale(0.95) translateY(0); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1.05) translateY(20px); }
+}
+
+.contact-form-card {
+  background: color-mix(in oklab, var(--surface) 65%, transparent);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+  border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  border-radius: 1.5rem;
+  padding: 3.5rem;
+  box-shadow: 0 32px 64px rgba(0,0,0,0.4), 
+              inset 0 1px 1px color-mix(in oklab, var(--text) 5%, transparent),
+              0 0 0 1px color-mix(in oklab, var(--surface) 50%, transparent);
+  margin-top: -3rem;
+  position: relative;
+  z-index: 2;
+  transition: border-color .4s ease, box-shadow .4s ease, transform .4s ease;
+}
+
+.contact-form-card:hover {
+  border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 
+              0 0 40px color-mix(in oklab, var(--a) 15%, transparent),
+              inset 0 1px 1px color-mix(in oklab, var(--text) 5%, transparent);
+  transform: translateY(-4px);
+}
+
+.styled-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 1.75rem;
+}
+
+.styled-form .form-grid .form-group {
+  margin-bottom: 0;
+}
+
+.styled-form .form-group {
+  margin-bottom: 1.75rem;
+  position: relative;
+}
+
+.styled-form label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 0.6rem;
+  transition: color 0.3s ease;
+}
+
+.styled-form .form-group:focus-within label {
+  color: var(--a);
+}
+
+.styled-form .form-control {
+  width: 100%;
+  padding: 1rem 1.15rem;
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  color: var(--text);
+  background: color-mix(in oklab, var(--surface2) 40%, transparent);
+  border: 2px solid var(--line);
+  border-radius: var(--radius);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.styled-form .form-control:focus {
+  outline: none;
+  border-color: var(--b);
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--b) 15%, transparent), inset 0 2px 4px rgba(0,0,0,0.1);
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  transform: translateY(-2px);
+}
+
+.styled-form .form-control::placeholder {
+  color: var(--muted);
+  opacity: 0.6;
+}
+
+.contact-submit-btn {
+  margin-top: 2rem;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.15rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: var(--radius-lg);
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+.contact-submit-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: linear-gradient(135deg, var(--b), var(--a));
+  opacity: 0;
+  z-index: -1;
+  transition: opacity 0.4s ease;
+}
+
+.contact-submit-btn:hover::before {
+  opacity: 1;
+}
+
+.btn-icon-right {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  transition: transform 0.3s ease;
+}
+
+.contact-submit-btn:hover .btn-icon-right {
+  transform: translateX(4px) translateY(-4px);
+}
+
+/* Animations */
+.animate-in {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: fadeUpIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeUpIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Alerts */
+.alert {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-radius: var(--radius);
+  margin-bottom: 2rem;
+  font-weight: 500;
+  font-size: 0.95rem;
+  animation: fadeUpIn 0.4s ease forwards;
+}
+
+.alert-icon {
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+
+.alert-success {
+  background: color-mix(in oklab, var(--ok) 15%, transparent);
+  color: var(--ok);
+  border: 1px solid color-mix(in oklab, var(--ok) 30%, transparent);
+}
+
+.alert-error {
+  background: color-mix(in oklab, var(--danger) 15%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in oklab, var(--danger) 30%, transparent);
+}
+
+.text-danger {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
 /* ===== RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .footer-grid {
@@ -938,6 +1153,10 @@ form:has(button.mobile-nav-link) {
     text-align: center;
   }
 
+  .styled-form .form-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
 }
 
 /* ===== ANIMATIONS ===== */
