@@ -324,20 +324,33 @@
 
     /* Simulating Typing Text */
     .tts-typing-text {
-      font-family: var(--font-mono, monospace);
-      font-size: clamp(0.7rem, 3.2vw, 1.05rem);
-      font-weight: 500;
+      font-family: 'Outfit', sans-serif;
+      font-size: clamp(1.1rem, 4vw, 1.35rem);
       color: var(--text);
       white-space: pre-wrap;
       word-break: break-word;
       overflow: hidden;
-      border-right: 2px solid var(--a);
-      display: inline-block;
+      display: block;
       align-self: center;
-      width: max-content;
-      max-width: 100%;
+      text-align: center;
+      width: 100%;
+      min-height: 3em;
+    }
+
+    .tts-caret {
+      display: inline-block;
+      width: 2px;
+      height: 1.1em;
+      background-color: var(--a);
+      vertical-align: middle;
       animation: blink-caret .75s step-end infinite;
-      min-height: 1.5em;
+      margin-left: 2px;
+      transform: translateY(-1px);
+    }
+
+    @keyframes blink-caret {
+      from, to { opacity: 0; }
+      50% { opacity: 1; }
     }
 
     /* Dynamic 12-bar Sound Wave Animation */
@@ -429,7 +442,7 @@
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
           <h1>Turn any text into <span class="brand-text">human voice</span> instantly.</h1>
-          <p class="lead">Listen seamlessly integrates with your browser. Transform articles, emails, and PDFs into crystal-clear synthesized voice with one click.</p>
+          <p class="lead">Listen integrates with your browser. Turn Arabic and English content into natural, studio-quality voice in one click.</p>
           <div class="hero-cta">
             @guest
               <a class="btn btn-primary" href="{{ route('demo.page') }}">Try Demo</a>
@@ -540,13 +553,17 @@
 
       function type() {
         const current = texts[textIndex];
+        let currentText = "";
+        
         if (isDeleting) {
-          el.textContent = current.substring(0, charIndex - 1);
+          currentText = current.substring(0, charIndex - 1);
           charIndex--;
         } else {
-          el.textContent = current.substring(0, charIndex + 1);
+          currentText = current.substring(0, charIndex + 1);
           charIndex++;
         }
+        
+        el.innerHTML = currentText + '<span class="tts-caret"></span>';
 
         let speed = isDeleting ? 30 : 50;
 
