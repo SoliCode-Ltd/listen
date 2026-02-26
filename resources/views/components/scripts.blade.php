@@ -236,6 +236,44 @@
         var s = Math.floor(seconds % 60);
         return m + ':' + (s < 10 ? '0' : '') + s;
       };
+      var sanitizeFileSegment = function(value, fallback) {
+        var segment = String(value == null ? '' : value).trim();
+        if (!segment) return fallback;
+        segment = segment.replace(/\s+/g, '-');
+        segment = segment.replace(/[\\/:*?"<>|]/g, '');
+        segment = segment.replace(/[\u0000-\u001f\u007f]/g, '');
+        try {
+          segment = segment.replace(new RegExp('[^\\p{L}\\p{N}_+\\-]+', 'gu'), '');
+        } catch (_e) {
+          segment = segment.replace(/[^A-Za-z0-9_+\-\u0600-\u06FF]+/g, '');
+        }
+        segment = segment.replace(/[-_+.]{2,}/g, '-');
+        segment = segment.replace(/^[-_+.]+|[-_+.]+$/g, '');
+        if (!segment) return fallback;
+        return segment.slice(0, 32);
+      };
+      var getDownloadExtension = function(src) {
+        var fallback = 'mp3';
+        if (!src) return fallback;
+        try {
+          var parsed = new URL(src, window.location.href);
+          var match = String(parsed.pathname || '').match(/\.([a-z0-9]+)$/i);
+          if (match && match[1]) return String(match[1]).toLowerCase();
+        } catch (_e) {}
+        var plain = String(src).split('?')[0].split('#')[0];
+        var fallbackMatch = plain.match(/\.([a-z0-9]+)$/i);
+        if (fallbackMatch && fallbackMatch[1]) return String(fallbackMatch[1]).toLowerCase();
+        return fallback;
+      };
+      var buildDownloadFilename = function() {
+        var src = audio.getAttribute('src') || '';
+        var language = sanitizeFileSegment(audio.dataset.downloadLanguage, 'audio');
+        var textPart = sanitizeFileSegment(audio.dataset.downloadText, 'sample');
+        var speaker = sanitizeFileSegment(audio.dataset.downloadSpeaker, 'speaker');
+        var quality = sanitizeFileSegment(audio.dataset.downloadQuality, 'standard');
+        var extension = getDownloadExtension(src);
+        return [language, textPart, speaker, quality].join('_') + '.' + extension;
+      };
 
       var isDragging = false;
       var progressRafId = 0;
@@ -428,7 +466,7 @@
          var src = audio.getAttribute('src');
          if (!src) return;
          a.href = src;
-         a.download = src.substring(src.lastIndexOf('/') + 1) || 'download.mp3';
+         a.download = buildDownloadFilename();
          a.target = '_blank';
          document.body.appendChild(a);
          a.click();

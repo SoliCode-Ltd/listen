@@ -555,10 +555,12 @@
               <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
                 'id' => $job->id,
                 'title' => $job->textItem?->title,
+                'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
                 'status' => $job->status,
                 'source_language' => $job->source_language,
                 'target_language' => $job->target_language,
                 'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker',
+                'voice_tier' => \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)),
                 'translate' => $job->translate,
                 'duration_seconds' => $job->duration_seconds,
                 'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
@@ -573,7 +575,15 @@
                 <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
                 <td>
                   @if($job->audio_path)
-                    <audio controls preload="none" src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"></audio>
+                    <audio
+                      controls
+                      preload="none"
+                      src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"
+                      data-download-language="{{ $job->target_language }}"
+                      data-download-text="{{ \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, '') }}"
+                      data-download-speaker="{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker' }}"
+                      data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
+                    ></audio>
                   @elseif($job->status === 'failed')
                     <small style="color: var(--danger);">{{ $job->error_message ?: 'Generation failed' }}</small>
                   @else
@@ -798,13 +808,15 @@
       const sourceLanguage = escapeHtml(job?.source_language || '-');
       const targetLanguageValue = escapeHtml(job?.target_language || '-');
       const voiceLabel = escapeHtml(job?.voice_label || 'Default speaker');
+      const voiceTier = escapeHtml(job?.voice_tier || 'Standard');
+      const textExcerpt = escapeHtml(job?.text_excerpt || job?.title || 'preview');
       const translateLabel = job?.translate ? 'Yes' : 'No';
       const created = escapeHtml(job?.created_human || 'just now');
       const errorMessage = escapeHtml(job?.error_message || 'Generation failed');
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
 
       let audioCell = '<small style="color: var(--muted);">Processing...</small>';
-      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '"></audio>';
+      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + targetLanguageValue + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
       else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
 
       return '<tr data-job-id="' + Number(job?.id || 0) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +

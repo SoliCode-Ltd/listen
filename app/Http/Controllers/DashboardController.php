@@ -13,6 +13,7 @@ use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
@@ -301,6 +302,7 @@ class DashboardController extends Controller
         return [
             'id' => (int) $job->id,
             'title' => (string) ($job->textItem?->title ?? ''),
+            'text_excerpt' => (string) Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,

@@ -561,6 +561,10 @@
       audioWrap.style.display = 'none';
       previewAudio.pause();
       previewAudio.removeAttribute('src');
+      delete previewAudio.dataset.downloadLanguage;
+      delete previewAudio.dataset.downloadText;
+      delete previewAudio.dataset.downloadSpeaker;
+      delete previewAudio.dataset.downloadQuality;
       previewAudio.load();
       audioMeta.textContent = '';
     }
@@ -788,6 +792,10 @@
         }
         audioWrap.style.display = 'block';
         if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
+        previewAudio.dataset.downloadLanguage = String(data?.target_language || normalizeLanguage(targetLanguage?.value || 'ar'));
+        previewAudio.dataset.downloadText = String(trimmed).slice(0, 42);
+        previewAudio.dataset.downloadSpeaker = String(data?.voice?.label || 'Selected speaker');
+        previewAudio.dataset.downloadQuality = String(data?.voice_tier_label || 'Standard');
         previewAudio.src = data.audio_url;
         previewAudio.load();
         const label = data?.voice?.label || 'Selected speaker';
