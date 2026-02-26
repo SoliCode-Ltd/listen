@@ -247,8 +247,8 @@
         } catch (_e) {
           segment = segment.replace(/[^A-Za-z0-9_+\-\u0600-\u06FF]+/g, '');
         }
-        segment = segment.replace(/[-_+.]{2,}/g, '-');
-        segment = segment.replace(/^[-_+.]+|[-_+.]+$/g, '');
+        segment = segment.replace(/[-_.]{2,}/g, '-');
+        segment = segment.replace(/^[-_.]+|[-_.]+$/g, '');
         if (!segment) return fallback;
         return segment.slice(0, 32);
       };

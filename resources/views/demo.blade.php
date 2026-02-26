@@ -825,6 +825,10 @@
         document.getElementById('text').value = btn.getAttribute('data-sample') || '';
       });
     });
+    form?.addEventListener('submit', (event) => {
+      event.preventDefault();
+      previewBtn?.click();
+    });
 
     voiceTier?.addEventListener('change', renderVoiceOptions);
     targetLanguage?.addEventListener('change', () => {

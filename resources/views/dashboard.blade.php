@@ -1029,10 +1029,6 @@
         if (data?.stats) updateStats(data.stats);
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
         showFormMessage('ok', data?.message || 'Voice generated successfully.');
-        const titleField = voiceForm.querySelector('input[name="title"]');
-        const contentField = voiceForm.querySelector('textarea[name="content"]');
-        if (titleField) titleField.value = '';
-        if (contentField) contentField.value = '';
       } catch (error) {
         showFormMessage('error', extractErrorMessage(data, error?.message || 'Voice generation failed.'));
       } finally {
