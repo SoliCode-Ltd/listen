@@ -173,6 +173,10 @@
       color: var(--text);
       font-size: .95rem;
     }
+    input[dir="auto"], textarea[dir="auto"] {
+      unicode-bidi: plaintext;
+      text-align: start;
+    }
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--b);
@@ -400,7 +404,7 @@
           <form id="demoForm" class="form-grid">
             <div>
               <label for="text">Text input</label>
-              <textarea id="text" name="text" placeholder="Paste content to test..." required></textarea>
+              <textarea id="text" name="text" dir="auto" placeholder="Paste content to test..." required></textarea>
             </div>
 
             <div class="chips">
@@ -522,8 +526,13 @@
       return new Intl.NumberFormat().format(Number(value || 0));
     }
 
-    function countNonSpaceChars(value) {
-      return String(value || '').replace(/\s+/g, '').length;
+    function countBillableChars(value) {
+      const text = String(value || '');
+      try {
+        return (text.match(new RegExp('[\\p{L}\\p{N}]', 'gu')) || []).length;
+      } catch (_error) {
+        return (text.match(/[A-Za-z0-9]/g) || []).length;
+      }
     }
 
     function normalizeLanguage(value) {
@@ -588,8 +597,8 @@
         quotaFill.style.width = `${percent}%`;
       }
       if (quotaBox) {
-        const pending = countNonSpaceChars(textInput?.value || '');
-        if (pending > 0) quotaBox.title = `${formatNumber(pending)} chars selected`;
+        const pending = countBillableChars(textInput?.value || '');
+        if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
       }
       setUpgradeVisible(Boolean(currentQuota.is_exhausted), `Guest demo quota reached (${formatNumber(currentQuota.limit_chars)} chars total). Create a free account to unlock ${formatNumber(starterPlanChars)} characters to start.`);
     }
@@ -754,7 +763,7 @@
 
         const rawText = String(textInput?.value || '');
         const trimmed = rawText.trim();
-        const selectedChars = countNonSpaceChars(trimmed);
+        const selectedChars = countBillableChars(trimmed);
         if (!trimmed) {
           hideAudioPreview();
           setError('The text field is required.');
@@ -762,7 +771,7 @@
         }
         if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
           hideAudioPreview();
-          const message = `You selected ${formatNumber(selectedChars)} characters, but only ${formatNumber(currentQuota.remaining_chars)} are left in guest demo credit.`;
+          const message = `You selected ${formatNumber(selectedChars)} billable characters, but only ${formatNumber(currentQuota.remaining_chars)} are left in guest demo credit.`;
           setError(message);
           setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
           return;

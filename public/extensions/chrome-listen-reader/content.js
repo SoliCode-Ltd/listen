@@ -789,6 +789,11 @@
     const text = String(payload?.text || '').trim();
     const mimeType = String(payload?.mimeType || 'audio/mpeg').trim();
 
+    voiceEl.setAttribute('dir', 'auto');
+    textEl.setAttribute('dir', 'auto');
+    textEl.style.unicodeBidi = 'plaintext';
+    textEl.style.textAlign = 'start';
+
     voiceEl.textContent = `Speaker: ${voiceLabel || 'Auto'}`;
     textEl.textContent = text || 'Audio ready';
 

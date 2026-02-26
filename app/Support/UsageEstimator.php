@@ -7,10 +7,10 @@ class UsageEstimator
     public static function billableChars(string $text): int
     {
         $plain = trim(strip_tags($text));
-        $withoutWhitespace = preg_replace('/\s+/u', '', $plain);
-        $normalized = is_string($withoutWhitespace) ? $withoutWhitespace : $plain;
+        preg_match_all('/[\p{L}\p{N}]/u', $plain, $matches);
+        $count = is_array($matches[0] ?? null) ? count($matches[0]) : 0;
 
-        return max(0, mb_strlen($normalized));
+        return max(0, $count);
     }
 
     /**

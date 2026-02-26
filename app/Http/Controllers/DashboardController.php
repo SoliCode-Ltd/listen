@@ -106,7 +106,7 @@ class DashboardController extends Controller
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
-                'content' => "Request exceeds plan per-request limit ({$maxChars} non-space characters).",
+                'content' => "Request exceeds plan per-request limit ({$maxChars} billable characters: letters and numbers only).",
             ]);
         }
 

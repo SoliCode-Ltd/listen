@@ -1169,4 +1169,150 @@ form:has(button.mobile-nav-link) {
 .app-footer {
   animation: fadeIn .4s ease forwards;
 }
+.custom-audio-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  background: color-mix(in oklab, var(--surface) 60%, transparent);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+  padding: 0.5rem 0.9rem;
+  border-radius: var(--radius-full);
+  width: 100%;
+  max-width: 360px;
+  box-shadow: var(--shadow-sm), inset 0 1px 1px color-mix(in oklab, #ffffff 5%, transparent);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.custom-audio-wrapper:hover {
+  border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+  box-shadow: 0 8px 24px color-mix(in oklab, var(--surface2) 80%, transparent);
+  transform: translateY(-1px);
+}
+.custom-audio-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a), var(--b));
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--a) 35%, transparent);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+}
+.custom-audio-play:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 50%, transparent), 0 0 0 3px color-mix(in oklab, var(--b) 20%, transparent);
+}
+.custom-audio-play:active {
+  transform: scale(0.95);
+}
+.custom-audio-play svg {
+  width: 15px;
+  height: 15px;
+  fill: currentColor;
+  margin-left: 2px;
+  transition: transform 0.2s ease;
+}
+.custom-audio-play.playing svg {
+  margin-left: 0;
+}
+.custom-audio-time {
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  flex-shrink: 0;
+  min-width: 34px;
+}
+.custom-audio-time.end {
+  text-align: right;
+  color: var(--muted);
+  opacity: 0.7;
+}
+.custom-audio-progress-container {
+  flex-grow: 1;
+  height: 8px;
+  background: color-mix(in oklab, var(--line) 40%, transparent);
+  border-radius: 99px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
+}
+.custom-audio-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, var(--a), var(--b));
+  width: 0%;
+  border-radius: 99px;
+  pointer-events: none;
+  transition: width 0.1s linear;
+}
+.custom-audio-progress::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  box-shadow: -2px 0 4px rgba(0,0,0,0.2);
+}
+.custom-audio-menu {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all .2s ease;
+}
+.custom-audio-menu:hover {
+  background: color-mix(in oklab, var(--surface2) 80%, transparent);
+  border-color: var(--line);
+  color: var(--text);
+}
+.custom-audio-menu svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+}
+html[data-theme="light"] .custom-audio-wrapper {
+  background: color-mix(in oklab, #ffffff 80%, transparent);
+  border-color: color-mix(in oklab, var(--line) 80%, transparent);
+  box-shadow: 0 4px 16px rgba(35,56,97,.06);
+}
+html[data-theme="light"] .custom-audio-wrapper:hover {
+  box-shadow: 0 8px 24px rgba(35,56,97,.1);
+}
+@media (max-width: 640px) {
+  .custom-audio-wrapper {
+    max-width: 100%;
+    padding: 0.4rem 0.7rem;
+    gap: 0.6rem;
+  }
+}
+input[dir="auto"],
+textarea[dir="auto"] {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
 </style>

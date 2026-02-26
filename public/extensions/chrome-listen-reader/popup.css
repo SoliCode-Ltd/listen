@@ -154,6 +154,12 @@ textarea:focus {
   border-color: var(--primaryB);
 }
 
+input[dir="auto"],
+textarea[dir="auto"] {
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+
 .grid2 {
   display: grid;
   grid-template-columns: 1fr 1fr;

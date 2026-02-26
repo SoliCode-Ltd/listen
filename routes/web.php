@@ -17,6 +17,7 @@ Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
 Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
 Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
 Route::get('/media/{path}', [MediaController::class, 'show'])
+    ->where('path', '.*')
     ->name('media.file');
 
 Route::get('/contact-us', [\App\Http\Controllers\ContactController::class, 'show'])->name('contact');

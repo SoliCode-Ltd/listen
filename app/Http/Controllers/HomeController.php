@@ -530,12 +530,12 @@ class HomeController extends Controller
     private function demoLimitExceededMessage(Request $request, int $maxChars): string
     {
         if ($request->user()) {
-            return "Demo limit exceeded ({$maxChars} non-space characters).";
+            return "Demo limit exceeded ({$maxChars} billable characters: letters and numbers only).";
         }
 
         $starterPlanChars = max(1, (int) (Plan::query()->where('slug', 'free')->value('monthly_chars') ?? 30000));
 
-        return "Guest demo allows {$maxChars} non-space characters total. Create a free account to unlock {$starterPlanChars} characters to start.";
+        return "Guest demo allows {$maxChars} billable characters total (letters and numbers only). Create a free account to unlock {$starterPlanChars} characters to start.";
     }
 
     private function demoDailyCapReachedMessage(Request $request): string

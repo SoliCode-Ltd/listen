@@ -134,6 +134,10 @@
       color: var(--text);
       font-size: .9rem;
     }
+    input[dir="auto"], textarea[dir="auto"] {
+      unicode-bidi: plaintext;
+      text-align: start;
+    }
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--a);
@@ -461,12 +465,12 @@
           @csrf
           <div>
             <label>Title (optional)</label>
-            <input name="title" value="{{ old('title') }}" placeholder="Notification summary" />
+            <input name="title" dir="auto" value="{{ old('title') }}" placeholder="Notification summary" />
           </div>
 
           <div>
             <label>Text content</label>
-            <textarea name="content" rows="8" required placeholder="Paste your text...">{{ old('content') }}</textarea>
+            <textarea name="content" dir="auto" rows="8" required placeholder="Paste your text...">{{ old('content') }}</textarea>
           </div>
 
           <div class="two-col">
