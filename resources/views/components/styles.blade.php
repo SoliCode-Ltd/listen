@@ -1,9 +1,10 @@
 <style id="listen-shared-styles">
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
   --font-display: 'Outfit', sans-serif;
   --font-body: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --bg: #070910;
   --surface: #11182a;
   --surface2: #15213a;
@@ -1158,13 +1159,17 @@ form:has(button.mobile-nav-link) {
     gap: 1.25rem;
   }
 
+  .contact-page {
+    padding-top: 1.5rem;
+  }
+
   .contact-hero {
-    padding: 2rem 1rem 3rem;
+    padding: 1rem 1rem 1.5rem;
   }
 
   .contact-form-card {
-    padding: 2.25rem 1.5rem;
-    margin-top: -1.75rem;
+    padding: 2rem 1.25rem;
+    margin-top: -1rem;
   }
 }
 

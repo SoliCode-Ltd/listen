@@ -324,33 +324,38 @@
 
     /* Simulating Typing Text */
     .tts-typing-text {
-      font-family: 'Outfit', sans-serif;
-      font-size: clamp(1.1rem, 4vw, 1.35rem);
-      color: var(--text);
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-size: clamp(0.95rem, 3.5vw, 1.15rem);
+      color: color-mix(in oklab, var(--text) 90%, transparent);
       white-space: pre-wrap;
       word-break: break-word;
       overflow: hidden;
-      display: block;
-      align-self: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       text-align: center;
       width: 100%;
-      min-height: 3em;
+      min-height: 2.5em;
+      letter-spacing: -0.01em;
+      line-height: 1.5;
     }
 
     .tts-caret {
       display: inline-block;
       width: 2px;
-      height: 1.1em;
+      height: 1.15em;
       background-color: var(--a);
+      border-radius: 2px;
       vertical-align: middle;
-      animation: blink-caret .75s step-end infinite;
-      margin-left: 2px;
+      animation: blink-caret 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      margin-left: 5px;
       transform: translateY(-1px);
     }
 
     @keyframes blink-caret {
-      from, to { opacity: 0; }
-      50% { opacity: 1; }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
     }
 
     /* Dynamic 12-bar Sound Wave Animation */
@@ -464,7 +469,9 @@
                 <div class="tts-dot"></div>
               </div>
               <div class="tts-body">
-                <div class="tts-typing-text"></div>
+                <div class="tts-typing-text">
+                  <span id="typing-content"></span><span class="tts-caret"></span>
+                </div>
                 <div class="tts-audio-wave">
                   <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
                   <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
@@ -539,41 +546,56 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const texts = [
-        "Processing text input...",
-        "Applying voice characteristics...",
-        "Enhancing speech naturalness...",
-        "Finalizing crystal-clear audio..."
+        "Generate human voice instantly.",
+        "Scale with enterprise voice.",
+        "Turn text into lifelike audio."
       ];
       let textIndex = 0;
       let charIndex = 0;
       let isDeleting = false;
-      const el = document.querySelector('.tts-typing-text');
+      const el = document.getElementById('typing-content');
       
       if(!el) return;
 
       function type() {
         const current = texts[textIndex];
-        let currentText = "";
         
         if (isDeleting) {
-          currentText = current.substring(0, charIndex - 1);
+          el.textContent = current.substring(0, charIndex - 1);
           charIndex--;
         } else {
-          currentText = current.substring(0, charIndex + 1);
+          el.textContent = current.substring(0, charIndex + 1);
           charIndex++;
         }
         
-        el.innerHTML = currentText + '<span class="tts-caret"></span>';
-
-        let speed = isDeleting ? 30 : 50;
+        // Simulating natural human typing patterns
+        let speed;
+        if (isDeleting) {
+          // Humans delete much faster, often holding down backspace
+          speed = 15 + Math.random() * 15;
+        } else {
+          // Normal typing speed variations
+          speed = 35 + Math.random() * 55;
+          
+          // Micro-pauses for thinking or tricky keys
+          if (Math.random() < 0.05) {
+            speed += 120 + Math.random() * 200;
+          }
+          
+          // Pause slightly longer after punctuation like a human
+          const lastChar = current.charAt(charIndex - 1);
+          if (['.', ',', '!', '?'].includes(lastChar)) {
+            speed += 250 + Math.random() * 250;
+          }
+        }
 
         if (!isDeleting && charIndex === current.length) {
-          speed = 2000;
+          speed = 3000; // Let the reader read the full sentence
           isDeleting = true;
         } else if (isDeleting && charIndex === 0) {
           isDeleting = false;
           textIndex = (textIndex + 1) % texts.length;
-          speed = 500;
+          speed = 600; // Pause before typing the next sentence
         }
 
         setTimeout(type, speed);
