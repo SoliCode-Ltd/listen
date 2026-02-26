@@ -546,7 +546,7 @@
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const texts = [
-        "Generate human voice instantly.",
+        "Generate human voice.",
         "Scale with enterprise voice.",
         "Turn text into lifelike audio."
       ];
