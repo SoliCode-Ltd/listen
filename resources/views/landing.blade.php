@@ -283,7 +283,8 @@
     .tts-card {
       position: relative;
       width: 85%;
-      height: 70%;
+      height: auto;
+      min-height: 70%;
       border-radius: 1.5rem;
       background: linear-gradient(145deg, color-mix(in oklab, var(--a) 15%, transparent), color-mix(in oklab, var(--surface) 50%, transparent));
       border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
@@ -315,15 +316,17 @@
 
     .tts-body {
       flex: 1;
-      padding: 2rem 1.5rem;
+      padding: 1.5rem 1.5rem 2rem;
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
-      position: relative;
+      align-items: center;
+      justify-content: space-evenly;
+      gap: 1rem;
     }
 
     /* Simulating Typing Text */
     .tts-typing-text {
+      flex: 1;
       font-family: var(--font-mono);
       font-weight: 500;
       font-size: clamp(0.95rem, 3.5vw, 1.15rem);
@@ -360,15 +363,13 @@
 
     /* Dynamic 12-bar Sound Wave Animation */
     .tts-audio-wave {
-      position: absolute;
-      bottom: 3.5rem;
-      left: 50%;
-      transform: translateX(-50%);
       display: flex;
       align-items: flex-end;
+      justify-content: center;
       gap: 6px;
       height: 64px;
-      padding: 0 1rem;
+      flex-shrink: 0;
+      margin-top: 0.5rem;
     }
 
     .tts-bar {
@@ -422,10 +423,9 @@
 
     @media (max-width: 640px) {
       .tts-body {
-        padding: 1.25rem 1rem;
+        padding: 1.25rem 1rem 1.75rem;
       }
       .tts-audio-wave {
-        bottom: 1.5rem;
         gap: 4px;
         height: 50px;
       }
