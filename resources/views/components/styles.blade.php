@@ -1157,6 +1157,15 @@ form:has(button.mobile-nav-link) {
     grid-template-columns: 1fr;
     gap: 1.25rem;
   }
+
+  .contact-hero {
+    padding: 2rem 1rem 3rem;
+  }
+
+  .contact-form-card {
+    padding: 2.25rem 1.5rem;
+    margin-top: -1.75rem;
+  }
 }
 
 /* ===== ANIMATIONS ===== */

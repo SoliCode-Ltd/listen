@@ -250,6 +250,7 @@
       justify-content: space-between;
       gap: .7rem;
       margin-bottom: .5rem;
+      flex-wrap: wrap;
     }
     .quota-label {
       font-size: .85rem;
@@ -258,6 +259,7 @@
     .quota-value {
       font-size: .9rem;
       font-weight: 700;
+      white-space: nowrap;
     }
     .quota-track {
       height: 10px;

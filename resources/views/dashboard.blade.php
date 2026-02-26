@@ -274,6 +274,11 @@
       flex-wrap: wrap;
       margin-top: .85rem;
     }
+    .sidebar-actions .btn {
+      flex: 1;
+      text-align: center;
+      justify-content: center;
+    }
 
     .pagination {
       display: flex;
@@ -528,12 +533,12 @@
         </div>
 
         <div class="sidebar-actions">
-          <a class="btn" href="{{ route('pricing') }}" style="flex:1;">Pricing & Plans</a>
-          <a class="btn btn-primary" href="{{ route('billing.page') }}" style="flex:1;">Upgrade Plan</a>
+          <a class="btn" href="{{ route('pricing') }}">Pricing & Plans</a>
+          <a class="btn btn-primary" href="{{ route('billing.page') }}">Upgrade Plan</a>
         </div>
         <div class="sidebar-actions" style="margin-top: .6rem;">
-          <a class="btn" href="{{ route('manage-subscription.page') }}" style="flex:1;">Manage Subscription</a>
-          <a class="btn" href="{{ route('browsers-extension.page') }}" style="flex:1;">Browser Extension</a>
+          <a class="btn" href="{{ route('manage-subscription.page') }}">Manage Subscription</a>
+          <a class="btn" href="{{ route('browsers-extension.page') }}">Browser Extension</a>
         </div>
       </aside>
     </section>
