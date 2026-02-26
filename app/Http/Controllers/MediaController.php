@@ -2,12 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class MediaController extends Controller
 {
-    public function show(string $path): BinaryFileResponse
+    public function show(Request $request, string $path)
     {
         $normalized = ltrim(str_replace('\\', '/', trim($path)), '/');
         if ($normalized === '' || str_contains($normalized, '..')) {
@@ -24,11 +25,17 @@ class MediaController extends Controller
             abort(404);
         }
 
+        $fileSize = filesize($absolutePath);
+        if (! is_int($fileSize) || $fileSize <= 0) {
+            abort(404);
+        }
+
         $headers = [
             'Cache-Control' => 'public, max-age=86400',
             'Access-Control-Allow-Origin' => '*',
             'Access-Control-Allow-Methods' => 'GET, HEAD, OPTIONS',
             'Access-Control-Allow-Headers' => 'Accept, Content-Type, X-Listen-Key',
+            'Accept-Ranges' => 'bytes',
         ];
 
         // Set proper Content-Type for audio files
@@ -40,6 +47,52 @@ class MediaController extends Controller
         } elseif ($extension === 'ogg') {
             $headers['Content-Type'] = 'audio/ogg';
         }
+
+        $rangeHeader = trim((string) $request->headers->get('Range', ''));
+        if ($rangeHeader !== '' && preg_match('/bytes=(\d+)-(\d*)/i', $rangeHeader, $matches) === 1) {
+            $start = (int) $matches[1];
+            $end = $matches[2] === '' ? ($fileSize - 1) : (int) $matches[2];
+
+            if ($start >= $fileSize || $start > $end) {
+                return response('', Response::HTTP_REQUESTED_RANGE_NOT_SATISFIABLE, [
+                    'Content-Range' => 'bytes */'.$fileSize,
+                ] + $headers);
+            }
+
+            $end = min($end, $fileSize - 1);
+            $length = ($end - $start) + 1;
+
+            return response()->stream(function () use ($absolutePath, $start, $end): void {
+                $handle = fopen($absolutePath, 'rb');
+                if ($handle === false) {
+                    return;
+                }
+
+                try {
+                    fseek($handle, $start);
+                    $remaining = ($end - $start) + 1;
+                    $chunkSize = 1024 * 64;
+
+                    while ($remaining > 0 && ! feof($handle)) {
+                        $read = fread($handle, (int) min($chunkSize, $remaining));
+                        if ($read === false || $read === '') {
+                            break;
+                        }
+
+                        echo $read;
+                        flush();
+                        $remaining -= strlen($read);
+                    }
+                } finally {
+                    fclose($handle);
+                }
+            }, Response::HTTP_PARTIAL_CONTENT, $headers + [
+                'Content-Length' => (string) $length,
+                'Content-Range' => 'bytes '.$start.'-'.$end.'/'.$fileSize,
+            ]);
+        }
+
+        $headers['Content-Length'] = (string) $fileSize;
 
         return response()->file($absolutePath, $headers);
     }

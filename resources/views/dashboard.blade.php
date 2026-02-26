@@ -858,6 +858,7 @@
         }
       }
       renderPagination(totalPages);
+      if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
     }
 
     function renderPagination(totalPages) {

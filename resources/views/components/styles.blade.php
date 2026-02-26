@@ -1172,15 +1172,17 @@ form:has(button.mobile-nav-link) {
 .custom-audio-wrapper {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 0.5rem;
   background: color-mix(in oklab, var(--surface) 60%, transparent);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-  padding: 0.5rem 0.9rem;
+  padding: 0.45rem 0.65rem;
   border-radius: var(--radius-full);
   width: 100%;
+  min-width: 250px;
   max-width: 360px;
+  container-type: inline-size;
   box-shadow: var(--shadow-sm), inset 0 1px 1px color-mix(in oklab, #ffffff 5%, transparent);
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -1193,8 +1195,8 @@ form:has(button.mobile-nav-link) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--a), var(--b));
   color: #fff;
@@ -1223,14 +1225,14 @@ form:has(button.mobile-nav-link) {
 }
 .custom-audio-time {
   font-family: var(--font-body);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   color: var(--text);
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
   flex-shrink: 0;
-  min-width: 34px;
+  min-width: 30px;
 }
 .custom-audio-time.end {
   text-align: right;
@@ -1238,13 +1240,21 @@ form:has(button.mobile-nav-link) {
   opacity: 0.7;
 }
 .custom-audio-progress-container {
-  flex-grow: 1;
-  height: 8px;
-  background: color-mix(in oklab, var(--line) 40%, transparent);
-  border-radius: 99px;
+  flex: 1 1 92px;
+  min-width: 92px;
+  height: 24px;
+  display: flex;
+  align-items: center;
   cursor: pointer;
   position: relative;
-  overflow: hidden;
+  touch-action: none;
+}
+.custom-audio-track {
+  width: 100%;
+  height: 6px;
+  background: color-mix(in oklab, var(--line) 40%, transparent);
+  border-radius: 99px;
+  position: relative;
   box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);
 }
 .custom-audio-progress {
@@ -1256,25 +1266,34 @@ form:has(button.mobile-nav-link) {
   width: 0%;
   border-radius: 99px;
   pointer-events: none;
-  transition: width 0.1s linear;
 }
-.custom-audio-progress::after {
-  content: '';
+.custom-audio-thumb {
   position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  background: rgba(255, 255, 255, 0.8);
+  top: 50%;
+  left: 0%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  background: #fff;
   border-radius: 50%;
-  box-shadow: -2px 0 4px rgba(0,0,0,0.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  pointer-events: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  z-index: 2;
+}
+.custom-audio-progress-container:hover .custom-audio-thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: 0 3px 8px color-mix(in oklab, var(--a) 40%, transparent);
+}
+.custom-audio-progress-container:active .custom-audio-thumb {
+  transform: translate(-50%, -50%) scale(1.3);
 }
 .custom-audio-menu {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   border: 1px solid transparent;
   background: transparent;
@@ -1295,6 +1314,26 @@ form:has(button.mobile-nav-link) {
   stroke-width: 2;
   fill: none;
 }
+@container (max-width: 280px) {
+  .custom-audio-menu {
+    display: none;
+  }
+  .custom-audio-time {
+    min-width: 28px;
+    font-size: 0.72rem;
+  }
+  .custom-audio-progress-container {
+    min-width: 86px;
+  }
+}
+@container (max-width: 230px) {
+  .custom-audio-time.end {
+    display: none;
+  }
+  .custom-audio-progress-container {
+    min-width: 78px;
+  }
+}
 html[data-theme="light"] .custom-audio-wrapper {
   background: color-mix(in oklab, #ffffff 80%, transparent);
   border-color: color-mix(in oklab, var(--line) 80%, transparent);
@@ -1306,6 +1345,7 @@ html[data-theme="light"] .custom-audio-wrapper:hover {
 @media (max-width: 640px) {
   .custom-audio-wrapper {
     max-width: 100%;
+    min-width: 200px;
     padding: 0.4rem 0.7rem;
     gap: 0.6rem;
   }

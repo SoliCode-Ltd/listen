@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\BillingSubscription;
 use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -32,6 +33,16 @@ class BillingSyncService
     {
         $freePlan = $this->planAccessService->freePlan();
         if (! $freePlan) {
+            return;
+        }
+
+        // Admin can explicitly lock a user's plan by setting
+        // billing_payment_state=manual_override on an active subscription.
+        if ($this->hasManualPlanOverride($user)) {
+            $user->forceFill([
+                'subscription_status_checked_at' => now(),
+            ])->save();
+
             return;
         }
 
@@ -129,6 +140,15 @@ class BillingSyncService
         $user->forceFill([
             'subscription_status_checked_at' => now(),
         ])->save();
+    }
+
+    private function hasManualPlanOverride(User $user): bool
+    {
+        return Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('billing_payment_state', 'manual_override')
+            ->exists();
     }
 
     public function syncActiveSubscribers(): int

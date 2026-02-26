@@ -8,4 +8,13 @@ use Filament\Resources\Pages\CreateRecord;
 class CreateSubscription extends CreateRecord
 {
     protected static string $resource = SubscriptionResource::class;
+
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        if (! isset($data['billing_payment_state']) || trim((string) $data['billing_payment_state']) === '') {
+            $data['billing_payment_state'] = 'manual_override';
+        }
+
+        return $data;
+    }
 }

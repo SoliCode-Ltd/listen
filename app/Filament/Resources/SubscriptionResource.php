@@ -53,6 +53,7 @@ class SubscriptionResource extends Resource
                                 'pending' => 'Pending',
                                 'failed' => 'Failed',
                                 'grace' => 'Grace',
+                                'manual_override' => 'Manual Override (Admin)',
                             ]),
                     ]),
                 Forms\Components\Section::make('Billing Period')
@@ -112,6 +113,7 @@ class SubscriptionResource extends Resource
                         'pending' => 'warning',
                         'failed' => 'danger',
                         'grace' => 'info',
+                        'manual_override' => 'primary',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('current_period_end')

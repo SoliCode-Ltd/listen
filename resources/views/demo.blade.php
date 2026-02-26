@@ -787,6 +787,7 @@
           return;
         }
         audioWrap.style.display = 'block';
+        if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
         previewAudio.src = data.audio_url;
         previewAudio.load();
         const label = data?.voice?.label || 'Selected speaker';
