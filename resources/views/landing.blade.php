@@ -270,10 +270,10 @@
     .tts-illustration {
       position: relative;
       width: 100%;
-      max-width: 500px;
-      aspect-ratio: 4 / 3;
+      max-width: 580px;
+      aspect-ratio: 5 / 4;
       margin: 0 auto;
-      perspective: 1000px;
+      perspective: 1200px;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -282,9 +282,9 @@
 
     .tts-card {
       position: relative;
-      width: 85%;
+      width: 90%;
       height: auto;
-      min-height: 70%;
+      min-height: 75%;
       border-radius: 1.5rem;
       background: linear-gradient(145deg, color-mix(in oklab, var(--a) 15%, transparent), color-mix(in oklab, var(--surface) 50%, transparent));
       border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
@@ -320,43 +320,208 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-evenly;
+      justify-content: center;
       gap: 1rem;
     }
 
-    /* Simulating Typing Text */
-    .tts-typing-text {
+    .hero-audio-player {
+      width: 100%;
       flex: 1;
-      font-family: var(--font-mono);
-      font-weight: 500;
-      font-size: clamp(0.95rem, 3.5vw, 1.15rem);
-      color: color-mix(in oklab, var(--text) 90%, transparent);
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow: hidden;
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      text-align: center;
-      width: 100%;
+      gap: 0.75rem;
       min-height: 2.5em;
-      letter-spacing: -0.01em;
-      line-height: 1.5;
     }
 
-    .tts-caret {
+    .hero-audio-btn {
+      width: 64px;
+      height: 64px;
+      border: none;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: white;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform .3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow .3s ease, background .3s ease;
+      box-shadow: 0 10px 24px color-mix(in oklab, var(--a) 40%, transparent), inset 0 2px 4px rgba(255,255,255,0.3);
+      padding: 0;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-audio-btn::before {
+      content: "";
+      position: absolute;
+      inset: -6px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      opacity: 0.3;
+      z-index: -1;
+      transition: opacity .3s ease, transform .4s ease;
+      filter: blur(8px);
+      animation: idleGlow 3s ease-in-out infinite alternate;
+    }
+
+    .hero-audio-btn::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      border: 1px solid white;
+      opacity: 0;
+      transform: scale(1);
+      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .hero-audio-btn:hover {
+      transform: scale(1.08) translateY(-2px);
+      box-shadow: 0 14px 32px color-mix(in oklab, var(--a) 50%, transparent), inset 0 2px 4px rgba(255,255,255,0.4);
+    }
+
+    .hero-audio-btn:hover::before {
+      opacity: 0.6;
+      transform: scale(1.1);
+    }
+
+    .hero-audio-btn:hover::after {
+      opacity: 0.4;
+      transform: scale(1.15);
+    }
+
+    .hero-audio-btn:active {
+      transform: scale(0.95);
+    }
+
+    .hero-audio-btn:focus-visible {
+      outline: 2px solid color-mix(in oklab, var(--a) 72%, white);
+      outline-offset: 4px;
+    }
+
+    .hero-audio-btn svg {
+      width: 28px;
+      height: 28px;
+      fill: currentColor;
+      margin-left: 4px; /* offset play icon slightly */
+      transition: margin .3s ease, transform .2s ease;
+      flex-shrink: 0;
+    }
+
+    .hero-audio-btn.is-playing {
+      box-shadow: 0 14px 32px color-mix(in oklab, var(--a) 50%, transparent), inset 0 2px 4px rgba(255,255,255,0.4);
+      animation: btnFloat 3s ease-in-out infinite;
+    }
+
+    .hero-audio-btn.is-playing::before {
+      opacity: 0.6;
+      transform: scale(1.15);
+      animation: glowPulse 2s infinite alternate;
+    }
+
+    .hero-audio-btn.is-playing::after {
+      opacity: 0;
+      transform: scale(1.3);
+      transition: all 0.4s ease;
+    }
+
+    .hero-audio-btn.is-playing svg {
+      margin-left: 0;
+    }
+
+    @keyframes btnFloat {
+      0%, 100% { transform: scale(1.08) translateY(-2px); }
+      50% { transform: scale(1.08) translateY(-6px); }
+    }
+
+    @keyframes glowPulse {
+      0% { opacity: 0.4; transform: scale(1.1); }
+      100% { opacity: 0.7; transform: scale(1.25); filter: blur(12px); }
+    }
+
+    @keyframes idleGlow {
+      0% { opacity: 0.1; transform: scale(1); }
+      100% { opacity: 0.4; transform: scale(1.05); }
+    }
+
+    .hero-audio-content {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .hero-audio-captions-wrapper {
+      position: absolute;
+      top: 100%;
+      margin-top: 1.25rem;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      pointer-events: none;
+    }
+
+    .hero-audio-caption {
+      position: absolute;
+      font-size: 0.75rem;
+      font-weight: 500;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: color-mix(in oklab, var(--text) 90%, transparent);
+      text-shadow: 0 0 16px color-mix(in oklab, var(--text) 50%, transparent), 0 0 8px color-mix(in oklab, var(--a) 30%, transparent);
+      white-space: nowrap;
+      transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: opacity, transform;
+    }
+
+    .active-caption {
+      opacity: 0;
+      transform: translateY(-8px);
+    }
+
+    .tts-body.is-playing .active-caption {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .tts-body.is-playing .active-caption.is-switching {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+
+    .idle-caption {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .tts-body.is-playing .idle-caption {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+
+    .idle-caption::after {
+      content: '';
       display: inline-block;
-      width: 2px;
-      height: 1.15em;
-      background-color: var(--a);
-      border-radius: 2px;
-      vertical-align: middle;
-      animation: blink-caret 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-      margin-left: 5px;
-      transform: translateY(-1px);
+      width: 4px;
+      height: 1.1em;
+      background: var(--a);
+      margin-left: 6px;
+      vertical-align: text-bottom;
+      animation: blinkCaret 0.9s step-end infinite;
+      box-shadow: 0 0 8px var(--a);
+      border-radius: 1px;
+      opacity: 1;
+      transition: opacity 0.18s ease;
     }
 
-    @keyframes blink-caret {
+    .tts-body.is-playing .idle-caption::after {
+      opacity: 0;
+    }
+
+    @keyframes blinkCaret {
       0%, 100% { opacity: 1; }
       50% { opacity: 0; }
     }
@@ -367,39 +532,54 @@
       align-items: flex-end;
       justify-content: center;
       gap: 6px;
-      height: 64px;
+      height: 0;
+      opacity: 0;
       flex-shrink: 0;
-      margin-top: 0.5rem;
+      margin-top: 0;
+      overflow: hidden;
+      transition: height 0.6s cubic-bezier(0.22, 1, 0.36, 1), margin-top 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.5s ease;
+    }
+
+    .tts-body.is-playing .tts-audio-wave {
+      height: 48px;
+      opacity: 1;
+      margin-top: 2.5rem;
     }
 
     .tts-bar {
       width: 8px;
+      height: 12px;
       border-radius: var(--radius-full);
       background: linear-gradient(180deg, var(--a), var(--b));
-      animation: heroWavePulse 1.2s ease-in-out infinite;
-      opacity: 0.9;
+      opacity: 0.5;
+      transition: height 0.3s ease, opacity 0.3s ease;
     }
-    .tts-bar:nth-child(2) { animation-delay: .1s; }
-    .tts-bar:nth-child(3) { animation-delay: .2s; }
-    .tts-bar:nth-child(4) { animation-delay: .3s; }
-    .tts-bar:nth-child(5) { animation-delay: .4s; }
-    .tts-bar:nth-child(6) { animation-delay: .5s; }
-    .tts-bar:nth-child(7) { animation-delay: .6s; }
-    .tts-bar:nth-child(8) { animation-delay: .7s; }
-    .tts-bar:nth-child(9) { animation-delay: .8s; }
-    .tts-bar:nth-child(10) { animation-delay: .9s; }
-    .tts-bar:nth-child(11) { animation-delay: 1.0s; }
-    .tts-bar:nth-child(12) { animation-delay: 1.1s; }
-    .tts-bar:nth-child(13) { animation-delay: 1.2s; }
-    .tts-bar:nth-child(14) { animation-delay: 1.3s; }
-    .tts-bar:nth-child(15) { animation-delay: 1.4s; }
-    .tts-bar:nth-child(16) { animation-delay: 1.5s; }
-    .tts-bar:nth-child(17) { animation-delay: 1.6s; }
-    .tts-bar:nth-child(18) { animation-delay: 1.7s; }
+    
+    .tts-body.is-playing .tts-bar {
+      opacity: 1;
+      animation: heroWavePulse 0.85s ease-in-out infinite;
+    }
+    .tts-body.is-playing .tts-bar:nth-child(2) { animation-delay: .1s; }
+    .tts-body.is-playing .tts-bar:nth-child(3) { animation-delay: .2s; }
+    .tts-body.is-playing .tts-bar:nth-child(4) { animation-delay: .3s; }
+    .tts-body.is-playing .tts-bar:nth-child(5) { animation-delay: .4s; }
+    .tts-body.is-playing .tts-bar:nth-child(6) { animation-delay: .5s; }
+    .tts-body.is-playing .tts-bar:nth-child(7) { animation-delay: .6s; }
+    .tts-body.is-playing .tts-bar:nth-child(8) { animation-delay: .7s; }
+    .tts-body.is-playing .tts-bar:nth-child(9) { animation-delay: .8s; }
+    .tts-body.is-playing .tts-bar:nth-child(10) { animation-delay: .9s; }
+    .tts-body.is-playing .tts-bar:nth-child(11) { animation-delay: 1.0s; }
+    .tts-body.is-playing .tts-bar:nth-child(12) { animation-delay: 1.1s; }
+    .tts-body.is-playing .tts-bar:nth-child(13) { animation-delay: 1.2s; }
+    .tts-body.is-playing .tts-bar:nth-child(14) { animation-delay: 1.3s; }
+    .tts-body.is-playing .tts-bar:nth-child(15) { animation-delay: 1.4s; }
+    .tts-body.is-playing .tts-bar:nth-child(16) { animation-delay: 1.5s; }
+    .tts-body.is-playing .tts-bar:nth-child(17) { animation-delay: 1.6s; }
+    .tts-body.is-playing .tts-bar:nth-child(18) { animation-delay: 1.7s; }
 
     @keyframes heroWavePulse {
       0%, 100% { height: 12px; }
-      50% { height: 60px; }
+      50% { height: 44px; }
     }
 
     .tts-glowing-orb {
@@ -422,12 +602,30 @@
     }
 
     @media (max-width: 640px) {
+      .tts-illustration {
+        aspect-ratio: 1 / 1.05;
+        max-width: 440px;
+      }
+      .hero-audio-captions-wrapper {
+        margin-top: 1rem;
+      }
+      .tts-card {
+        width: 95%;
+      }
+      .hero-audio-caption {
+        font-size: 0.65rem;
+        letter-spacing: 0.2em;
+        margin-top: 0.85rem;
+      }
       .tts-body {
         padding: 1.25rem 1rem 1.75rem;
       }
       .tts-audio-wave {
         gap: 4px;
-        height: 50px;
+      }
+      .tts-body.is-playing .tts-audio-wave {
+        height: 48px;
+        margin-top: 2rem;
       }
       .tts-bar {
         width: 6px;
@@ -469,8 +667,21 @@
                 <div class="tts-dot"></div>
               </div>
               <div class="tts-body">
-                <div class="tts-typing-text">
-                  <span id="typing-content"></span><span class="tts-caret"></span>
+                <div class="hero-audio-player">
+                  <div class="hero-audio-content">
+                    <button class="hero-audio-btn" id="heroAudioToggle" type="button" aria-label="Play Voice Sample" aria-controls="heroSampleAudio">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path id="heroAudioIconPath" d="M8 5v14l11-7z"></path>
+                      </svg>
+                    </button>
+                    <div class="hero-audio-captions-wrapper">
+                      <p class="hero-audio-caption idle-caption" id="heroAudioIdleCaption"></p>
+                      <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">Arabic (Nabil)</p>
+                    </div>
+                  </div>
+                  <audio id="heroSampleAudio" class="initialized" preload="auto">
+                    <source src="{{ asset('audio/hero-ar-en.mp3') }}" type="audio/mpeg">
+                  </audio>
                 </div>
                 <div class="tts-audio-wave">
                   <div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div><div class="tts-bar"></div>
@@ -545,63 +756,192 @@
   @include('components.scripts')
   <script>
     document.addEventListener('DOMContentLoaded', () => {
-      const texts = [
-        "Generate human voice.",
-        "Scale with enterprise voice.",
-        "Turn text into lifelike audio."
-      ];
-      let textIndex = 0;
+      const audio = document.getElementById('heroSampleAudio');
+      const toggle = document.getElementById('heroAudioToggle');
+      const iconPath = document.getElementById('heroAudioIconPath');
+      const idleCaption = document.getElementById('heroAudioIdleCaption');
+      const activeCaption = document.getElementById('heroAudioActiveCaption');
+      const ttsBody = toggle ? toggle.closest('.tts-body') : null;
+
+      if (!audio || !toggle || !iconPath || !idleCaption || !activeCaption || !ttsBody) return;
+
+      const playPath = 'M8 5v14l11-7z';
+      const pausePath = 'M6 5h4v14H6zM14 5h4v14h-4z';
+      const arabicDurationFallback = 7.056;
+      let transitionTime = arabicDurationFallback;
+      let isPlayingState = false;
+      let typingTimer = null;
+      let captionSwapTimer = null;
+      let syncFrame = null;
+      let activeCaptionTarget = activeCaption.textContent;
+      let phraseIndex = 0;
       let charIndex = 0;
       let isDeleting = false;
-      const el = document.getElementById('typing-content');
+
+      const arabicSegmentAudio = new Audio('{{ asset('audio/ar.mp3') }}');
+      arabicSegmentAudio.preload = 'metadata';
+      arabicSegmentAudio.addEventListener('loadedmetadata', () => {
+        if (Number.isFinite(arabicSegmentAudio.duration) && arabicSegmentAudio.duration > 0) {
+          transitionTime = arabicSegmentAudio.duration;
+        }
+      });
+
+      const setState = (isPlaying) => {
+        if (isPlayingState === isPlaying) return;
+        isPlayingState = isPlaying;
+        toggle.classList.toggle('is-playing', isPlaying);
+        ttsBody.classList.toggle('is-playing', isPlaying);
+        iconPath.setAttribute('d', isPlaying ? pausePath : playPath);
+        toggle.setAttribute('aria-label', isPlaying ? 'Pause Voice Sample' : 'Play Voice Sample');
+
+        if (isPlaying) {
+          stopTyping();
+        } else {
+          startTyping();
+        }
+      };
       
-      if(!el) return;
+      const phrases = [
+        "Generate human voice.",
+        "Scale with enterprise voice.",
+        "Turn text into lifelike audio.",
+        "Arabic and English in one click."
+      ];
 
-      function type() {
-        const current = texts[textIndex];
+      const typeLoop = () => {
+        if (isPlayingState) return;
+        const currentPhrase = phrases[phraseIndex];
         
         if (isDeleting) {
-          el.textContent = current.substring(0, charIndex - 1);
-          charIndex--;
+          charIndex -= 1;
         } else {
-          el.textContent = current.substring(0, charIndex + 1);
-          charIndex++;
-        }
-        
-        // Simulating natural human typing patterns
-        let speed;
-        if (isDeleting) {
-          // Humans delete much faster, often holding down backspace
-          speed = 15 + Math.random() * 15;
-        } else {
-          // Normal typing speed variations
-          speed = 35 + Math.random() * 55;
-          
-          // Micro-pauses for thinking or tricky keys
-          if (Math.random() < 0.05) {
-            speed += 120 + Math.random() * 200;
-          }
-          
-          // Pause slightly longer after punctuation like a human
-          const lastChar = current.charAt(charIndex - 1);
-          if (['.', ',', '!', '?'].includes(lastChar)) {
-            speed += 250 + Math.random() * 250;
-          }
+          charIndex += 1;
         }
 
-        if (!isDeleting && charIndex === current.length) {
-          speed = 3000; // Let the reader read the full sentence
+        if (charIndex < 0) charIndex = 0;
+        if (charIndex > currentPhrase.length) charIndex = currentPhrase.length;
+        idleCaption.textContent = currentPhrase.substring(0, charIndex);
+
+        let typeSpeed = isDeleting ? 26 : 58;
+
+        if (!isDeleting && charIndex === currentPhrase.length) {
+          typeSpeed = 2100;
           isDeleting = true;
         } else if (isDeleting && charIndex === 0) {
           isDeleting = false;
-          textIndex = (textIndex + 1) % texts.length;
-          speed = 600; // Pause before typing the next sentence
+          phraseIndex = (phraseIndex + 1) % phrases.length;
+          typeSpeed = 420;
         }
 
-        setTimeout(type, speed);
-      }
-      
-      type();
+        typingTimer = window.setTimeout(typeLoop, typeSpeed);
+      };
+
+      const startTyping = () => {
+        if (isPlayingState || typingTimer) return;
+        typingTimer = window.setTimeout(typeLoop, 200);
+      };
+
+      const stopTyping = () => {
+        if (!typingTimer) return;
+        window.clearTimeout(typingTimer);
+        typingTimer = null;
+      };
+
+      startTyping();
+
+      const updateActiveCaption = (text) => {
+        if (activeCaptionTarget === text) return;
+        activeCaptionTarget = text;
+        if (captionSwapTimer) {
+          window.clearTimeout(captionSwapTimer);
+          captionSwapTimer = null;
+        }
+
+        activeCaption.classList.add('is-switching');
+        activeCaption.textContent = activeCaptionTarget;
+        captionSwapTimer = window.setTimeout(() => {
+          activeCaption.classList.remove('is-switching');
+          captionSwapTimer = null;
+        }, 16);
+      };
+
+      const syncActiveCaptionWithTime = () => {
+        if (audio.currentTime < transitionTime) {
+          updateActiveCaption('Arabic (Nabil)');
+        } else {
+          updateActiveCaption('English (Hannah)');
+        }
+      };
+
+      toggle.addEventListener('click', async () => {
+        if (audio.paused) {
+          setState(true);
+          syncActiveCaptionWithTime();
+          try {
+            await audio.play();
+            setState(true);
+          } catch (_err) {
+            setState(false);
+          }
+          return;
+        }
+
+        setState(false);
+        audio.pause();
+      });
+
+      const startCaptionSyncLoop = () => {
+        if (syncFrame) return;
+        const tick = () => {
+          if (!isPlayingState) {
+            syncFrame = null;
+            return;
+          }
+          syncActiveCaptionWithTime();
+          syncFrame = window.requestAnimationFrame(tick);
+        };
+        syncFrame = window.requestAnimationFrame(tick);
+      };
+
+      const stopCaptionSyncLoop = () => {
+        if (!syncFrame) return;
+        window.cancelAnimationFrame(syncFrame);
+        syncFrame = null;
+      };
+
+      audio.addEventListener('play', () => {
+        setState(true);
+        startCaptionSyncLoop();
+      });
+      audio.addEventListener('pause', () => {
+        setState(false);
+        stopCaptionSyncLoop();
+      });
+      audio.addEventListener('ended', () => {
+        setState(false);
+        stopCaptionSyncLoop();
+        if (captionSwapTimer) {
+          window.clearTimeout(captionSwapTimer);
+          captionSwapTimer = null;
+        }
+        activeCaption.classList.remove('is-switching');
+        audio.currentTime = 0;
+        activeCaptionTarget = 'Arabic (Nabil)';
+        activeCaption.textContent = activeCaptionTarget;
+      });
+
+      audio.addEventListener('timeupdate', () => {
+        if (audio.paused && audio.currentTime === 0) return;
+        syncActiveCaptionWithTime();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          stopTyping();
+          return;
+        }
+        if (!isPlayingState) startTyping();
+      });
     });
   </script>
 </body>
