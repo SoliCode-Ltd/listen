@@ -371,10 +371,11 @@
       position: absolute;
       inset: 0;
       border-radius: 50%;
-      border: 1px solid white;
+      border: 1px solid color-mix(in oklab, white 75%, var(--a) 25%);
       opacity: 0;
       transform: scale(1);
-      transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+      pointer-events: none;
     }
 
     .hero-audio-btn:hover {
@@ -604,13 +605,16 @@
     @media (max-width: 640px) {
       .tts-illustration {
         aspect-ratio: 1 / 1.05;
-        max-width: 440px;
+        max-width: 100%;
       }
       .hero-audio-captions-wrapper {
         margin-top: 1rem;
       }
       .tts-card {
-        width: 95%;
+        width: 92%;
+        margin-inline: auto;
+        transform: rotateY(-8deg) rotateX(8deg);
+        transform-origin: center center;
       }
       .hero-audio-caption {
         font-size: 0.65rem;
