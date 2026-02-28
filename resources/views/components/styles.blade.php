@@ -1347,7 +1347,9 @@ form:has(button.mobile-nav-link) {
 }
 @container (max-width: 230px) {
   .custom-audio-time.end {
-    display: none;
+    display: block;
+    min-width: 24px;
+    font-size: 0.7rem;
   }
   .custom-audio-time {
     min-width: 24px;
