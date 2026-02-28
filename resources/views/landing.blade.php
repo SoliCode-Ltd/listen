@@ -354,7 +354,7 @@
     }
 
     .hero-audio-btn:not(.is-playing) {
-      animation: heroHeartbeat 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+      animation: heroHeartbeat 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
     }
 
     .hero-audio-btn::before {
@@ -407,15 +407,15 @@
     }
 
     .hero-audio-btn:not(.is-playing) + .hero-audio-rings::before {
-      animation: heroRingFade 2.4s linear infinite;
+      animation: heroRingFade 1.8s linear infinite;
     }
 
     .hero-audio-btn:not(.is-playing) + .hero-audio-rings::after {
-      animation: heroRingFade 2.4s linear infinite .8s;
+      animation: heroRingFade 1.8s linear infinite .6s;
     }
 
     .hero-audio-btn:not(.is-playing) + .hero-audio-rings span {
-      animation: heroRingFade 2.4s linear infinite 1.6s;
+      animation: heroRingFade 1.8s linear infinite 1.2s;
     }
 
     .hero-audio-btn.is-playing + .hero-audio-rings::before,
@@ -446,7 +446,22 @@
     .hero-audio-btn:hover + .hero-audio-rings::after,
     .hero-audio-btn:hover + .hero-audio-rings span {
       border-color: color-mix(in oklab, white 76%, var(--a) 24%);
-      animation-duration: 2.05s;
+      animation-duration: 1.55s;
+    }
+
+    html[data-theme="light"] .hero-audio-rings::before,
+    html[data-theme="light"] .hero-audio-rings::after,
+    html[data-theme="light"] .hero-audio-rings span {
+      border-color: color-mix(in oklab, var(--a) 58%, var(--b) 42%);
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--a) 34%, transparent),
+        0 0 24px color-mix(in oklab, var(--a) 42%, transparent);
+    }
+
+    html[data-theme="light"] .hero-audio-btn:not(.is-playing) + .hero-audio-rings::before,
+    html[data-theme="light"] .hero-audio-btn:not(.is-playing) + .hero-audio-rings::after,
+    html[data-theme="light"] .hero-audio-btn:not(.is-playing) + .hero-audio-rings span {
+      animation-name: heroRingFadeLight;
     }
 
     .hero-audio-btn:active {
@@ -502,9 +517,16 @@
 
     @keyframes heroRingFade {
       0% { opacity: 0; transform: scale(0.78); }
-      14% { opacity: 0.42; }
+      14% { opacity: 0.48; }
       45% { opacity: 0.18; }
-      100% { opacity: 0; transform: scale(1.95); }
+      100% { opacity: 0; transform: scale(1.82); }
+    }
+
+    @keyframes heroRingFadeLight {
+      0% { opacity: 0; transform: scale(0.78); }
+      14% { opacity: 0.62; }
+      45% { opacity: 0.24; }
+      100% { opacity: 0; transform: scale(1.78); }
     }
 
     @keyframes btnFloat {
