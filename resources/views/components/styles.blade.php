@@ -1329,23 +1329,32 @@ form:has(button.mobile-nav-link) {
   fill: none;
 }
 @container (max-width: 280px) {
-  .custom-audio-menu {
-    display: none;
-  }
   .custom-audio-time {
     min-width: 28px;
     font-size: 0.72rem;
   }
+  .custom-audio-menu {
+    width: 24px;
+    height: 24px;
+  }
+  .custom-audio-menu svg {
+    width: 13px;
+    height: 13px;
+  }
   .custom-audio-progress-container {
-    min-width: 86px;
+    min-width: 82px;
   }
 }
 @container (max-width: 230px) {
   .custom-audio-time.end {
     display: none;
   }
+  .custom-audio-time {
+    min-width: 24px;
+    font-size: 0.7rem;
+  }
   .custom-audio-progress-container {
-    min-width: 78px;
+    min-width: 74px;
   }
 }
 html[data-theme="light"] .custom-audio-wrapper {
