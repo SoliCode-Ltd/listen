@@ -1309,16 +1309,16 @@ form:has(button.mobile-nav-link) {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--muted);
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface2) 80%, transparent);
+  color: var(--text);
   cursor: pointer;
   flex-shrink: 0;
   transition: all .2s ease;
 }
 .custom-audio-menu:hover {
-  background: color-mix(in oklab, var(--surface2) 80%, transparent);
-  border-color: var(--line);
+  background: color-mix(in oklab, var(--surface2) 88%, transparent);
+  border-color: color-mix(in oklab, var(--a) 26%, var(--line));
   color: var(--text);
 }
 .custom-audio-menu svg {
