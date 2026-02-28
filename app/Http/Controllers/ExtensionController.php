@@ -62,6 +62,10 @@ class ExtensionController extends Controller
 
             // Download & announcement
             'downloadEnabled' => SiteSetting::get('extension_download_enabled', '1') === '1',
+            'chromeZipButtonText' => SiteSetting::get('extension_chrome_zip_button_text', 'ZIP'),
+            'chromeStoreEnabled' => SiteSetting::get('extension_chrome_store_enabled', '1') === '1',
+            'chromeStoreButtonText' => SiteSetting::get('extension_chrome_store_button_text', 'Store'),
+            'chromeStoreUrl' => SiteSetting::get('extension_chrome_store_url', 'https://chromewebstore.google.com/detail/listen-%E2%80%93-turn-text-into-h/hgffdggimfklddpnjdfjonijlempljpa?authuser=0&hl=en'),
             'announcement' => SiteSetting::get('extension_announcement', ''),
             'announcementType' => SiteSetting::get('extension_announcement_type', 'info'),
         ]);

@@ -346,11 +346,15 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform .3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow .3s ease, background .3s ease;
+      transition: transform .45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .45s cubic-bezier(0.22, 1, 0.36, 1), filter .35s ease;
       box-shadow: 0 10px 24px color-mix(in oklab, var(--a) 40%, transparent), inset 0 2px 4px rgba(255,255,255,0.3);
       padding: 0;
       position: relative;
       z-index: 2;
+    }
+
+    .hero-audio-btn:not(.is-playing) {
+      animation: heroHeartbeat 2.2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
     }
 
     .hero-audio-btn::before {
@@ -369,18 +373,63 @@
     .hero-audio-btn::after {
       content: "";
       position: absolute;
-      inset: 0;
+      inset: 1px;
       border-radius: 50%;
       border: 1px solid color-mix(in oklab, white 75%, var(--a) 25%);
-      opacity: 0;
-      transform: scale(1);
-      transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.4s ease;
+      opacity: 0.3;
+      transition: opacity .35s ease, transform .45s cubic-bezier(0.22, 1, 0.36, 1);
       pointer-events: none;
     }
 
+    .hero-audio-rings {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      width: 64px;
+      height: 64px;
+      transform: translateX(-50%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .hero-audio-rings::before,
+    .hero-audio-rings::after,
+    .hero-audio-rings span {
+      content: "";
+      position: absolute;
+      inset: -2px;
+      border-radius: 50%;
+      border: 1px solid color-mix(in oklab, white 70%, var(--a) 30%);
+      opacity: 0;
+      transform: scale(0.78);
+      box-shadow: 0 0 0 1px color-mix(in oklab, var(--a) 16%, transparent), 0 0 28px color-mix(in oklab, var(--a) 22%, transparent);
+      will-change: transform, opacity;
+    }
+
+    .hero-audio-btn:not(.is-playing) + .hero-audio-rings::before {
+      animation: heroRingFade 2.4s linear infinite;
+    }
+
+    .hero-audio-btn:not(.is-playing) + .hero-audio-rings::after {
+      animation: heroRingFade 2.4s linear infinite .8s;
+    }
+
+    .hero-audio-btn:not(.is-playing) + .hero-audio-rings span {
+      animation: heroRingFade 2.4s linear infinite 1.6s;
+    }
+
+    .hero-audio-btn.is-playing + .hero-audio-rings::before,
+    .hero-audio-btn.is-playing + .hero-audio-rings::after,
+    .hero-audio-btn.is-playing + .hero-audio-rings span {
+      animation: none;
+      opacity: 0;
+      transform: scale(0.9);
+    }
+
     .hero-audio-btn:hover {
-      transform: scale(1.08) translateY(-2px);
-      box-shadow: 0 14px 32px color-mix(in oklab, var(--a) 50%, transparent), inset 0 2px 4px rgba(255,255,255,0.4);
+      transform: scale(1.06) translateY(-2px);
+      box-shadow: 0 14px 34px color-mix(in oklab, var(--a) 52%, transparent), inset 0 2px 4px rgba(255,255,255,0.38);
+      filter: saturate(1.08);
     }
 
     .hero-audio-btn:hover::before {
@@ -389,8 +438,15 @@
     }
 
     .hero-audio-btn:hover::after {
-      opacity: 0.4;
-      transform: scale(1.15);
+      opacity: 0.5;
+      transform: scale(1.03);
+    }
+
+    .hero-audio-btn:hover + .hero-audio-rings::before,
+    .hero-audio-btn:hover + .hero-audio-rings::after,
+    .hero-audio-btn:hover + .hero-audio-rings span {
+      border-color: color-mix(in oklab, white 76%, var(--a) 24%);
+      animation-duration: 2.05s;
     }
 
     .hero-audio-btn:active {
@@ -414,6 +470,7 @@
     .hero-audio-btn.is-playing {
       box-shadow: 0 14px 32px color-mix(in oklab, var(--a) 50%, transparent), inset 0 2px 4px rgba(255,255,255,0.4);
       animation: btnFloat 3s ease-in-out infinite;
+      filter: saturate(1.05);
     }
 
     .hero-audio-btn.is-playing::before {
@@ -423,13 +480,31 @@
     }
 
     .hero-audio-btn.is-playing::after {
-      opacity: 0;
-      transform: scale(1.3);
-      transition: all 0.4s ease;
+      opacity: 0.22;
+      transform: scale(1.02);
+      transition: opacity .3s ease, transform .3s ease;
     }
 
     .hero-audio-btn.is-playing svg {
       margin-left: 0;
+    }
+
+    @keyframes heroHeartbeat {
+      0%, 100% { transform: scale(1); }
+      12% { transform: scale(1.045); }
+      24% { transform: scale(0.992); }
+      36% { transform: scale(1.03); }
+      48% { transform: scale(1); }
+      62% { transform: scale(1.022); }
+      74% { transform: scale(0.996); }
+      86% { transform: scale(1.012); }
+    }
+
+    @keyframes heroRingFade {
+      0% { opacity: 0; transform: scale(0.78); }
+      14% { opacity: 0.42; }
+      45% { opacity: 0.18; }
+      100% { opacity: 0; transform: scale(1.95); }
     }
 
     @keyframes btnFloat {
@@ -508,11 +583,11 @@
       display: inline-block;
       width: 4px;
       height: 1.1em;
-      background: var(--a);
+      background: linear-gradient(180deg, var(--a), var(--b));
       margin-left: 6px;
       vertical-align: text-bottom;
       animation: blinkCaret 0.9s step-end infinite;
-      box-shadow: 0 0 8px var(--a);
+      box-shadow: 0 0 8px color-mix(in oklab, var(--a) 60%, var(--b) 40%);
       border-radius: 1px;
       opacity: 1;
       transition: opacity 0.18s ease;
@@ -602,18 +677,42 @@
       100% { opacity: 0.6; transform: translate(-50%, -50%) translateZ(-50px) scale(1.2); }
     }
 
+    @media (prefers-reduced-motion: reduce) {
+      .hero-audio-btn,
+      .hero-audio-btn::before,
+      .hero-audio-btn::after,
+      .hero-audio-rings::before,
+      .hero-audio-rings::after,
+      .hero-audio-rings span {
+        animation: none !important;
+      }
+      .hero-audio-rings {
+        display: none;
+      }
+      .hero-audio-btn {
+        transition: box-shadow .2s ease, background .2s ease;
+      }
+      .hero-audio-btn:hover {
+        transform: none;
+      }
+    }
+
     @media (max-width: 640px) {
+      .hero-art {
+        padding-inline: .5rem;
+      }
       .tts-illustration {
         aspect-ratio: 1 / 1.05;
+        width: 100%;
         max-width: 100%;
       }
       .hero-audio-captions-wrapper {
         margin-top: 1rem;
       }
       .tts-card {
-        width: 92%;
+        width: 100%;
         margin-inline: auto;
-        transform: rotateY(-8deg) rotateX(8deg);
+        transform: rotateX(8deg);
         transform-origin: center center;
       }
       .hero-audio-caption {
@@ -678,6 +777,7 @@
                         <path id="heroAudioIconPath" d="M8 5v14l11-7z"></path>
                       </svg>
                     </button>
+                    <div class="hero-audio-rings" aria-hidden="true"><span></span></div>
                     <div class="hero-audio-captions-wrapper">
                       <p class="hero-audio-caption idle-caption" id="heroAudioIdleCaption"></p>
                       <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">Arabic (Nabil)</p>

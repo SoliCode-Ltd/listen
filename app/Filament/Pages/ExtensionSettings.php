@@ -79,6 +79,10 @@ class ExtensionSettings extends Page implements HasForms
 
             // Download settings
             'extension_download_enabled' => SiteSetting::get('extension_download_enabled', '1'),
+            'extension_chrome_zip_button_text' => SiteSetting::get('extension_chrome_zip_button_text', 'ZIP'),
+            'extension_chrome_store_enabled' => SiteSetting::get('extension_chrome_store_enabled', '1'),
+            'extension_chrome_store_button_text' => SiteSetting::get('extension_chrome_store_button_text', 'Store'),
+            'extension_chrome_store_url' => SiteSetting::get('extension_chrome_store_url', 'https://chromewebstore.google.com/detail/listen-%E2%80%93-turn-text-into-h/hgffdggimfklddpnjdfjonijlempljpa?authuser=0&hl=en'),
             'extension_custom_api_base' => SiteSetting::get('extension_custom_api_base', ''),
             'extension_remote_config_url' => SiteSetting::get('extension_remote_config_url', ''),
 
@@ -283,7 +287,23 @@ class ExtensionSettings extends Page implements HasForms
                                     ->columns(2)
                                     ->schema([
                                         Forms\Components\Toggle::make('extension_download_enabled')
-                                            ->label('Allow Extension Download'),
+                                            ->label('Allow ZIP Download'),
+                                        Forms\Components\Toggle::make('extension_chrome_store_enabled')
+                                            ->label('Show Chrome Store Button'),
+                                        Forms\Components\TextInput::make('extension_chrome_zip_button_text')
+                                            ->label('ZIP Button Text')
+                                            ->maxLength(24)
+                                            ->placeholder('ZIP'),
+                                        Forms\Components\TextInput::make('extension_chrome_store_button_text')
+                                            ->label('Store Button Text')
+                                            ->maxLength(24)
+                                            ->placeholder('Store'),
+                                        Forms\Components\TextInput::make('extension_chrome_store_url')
+                                            ->label('Chrome Store URL')
+                                            ->url()
+                                            ->placeholder('https://chromewebstore.google.com/...')
+                                            ->helperText('Used by the Chrome card Store button.')
+                                            ->columnSpanFull(),
                                         Forms\Components\TextInput::make('extension_custom_api_base')
                                             ->label('Production API Base URL')
                                             ->url()

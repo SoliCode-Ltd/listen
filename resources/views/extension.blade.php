@@ -106,7 +106,7 @@
     .download-btn {
       display: inline-flex;
       align-items: center;
-      gap: .5rem;
+      justify-content: center;
       padding: .65rem 1.2rem;
       border-radius: var(--radius);
       background: linear-gradient(135deg, var(--a), var(--b));
@@ -115,14 +115,18 @@
       font-size: .92rem;
       text-decoration: none;
       transition: all .2s ease;
+      white-space: nowrap;
     }
     .download-btn:hover {
       transform: translateY(-2px);
       box-shadow: 0 8px 20px color-mix(in oklab, var(--b) 30%, transparent);
     }
-    .download-btn svg {
-      width: 1.1rem;
-      height: 1.1rem;
+    .download-actions {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: .55rem;
+      flex-wrap: nowrap;
     }
 
     .section {
@@ -388,11 +392,24 @@
         </div>
         <h3>{{ $chromeCardTitle }}</h3>
         <p>{{ $chromeCardSubtitle }}</p>
-        @if($chromeEnabled && $downloadEnabled)
-        <a class="download-btn" href="{{ route('browsers-extension.download', ['v' => $extensionVersion]) }}">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
-          Download
-        </a>
+        @php
+          $storeUrl = trim((string) ($chromeStoreUrl ?? ''));
+          $showZipButton = $chromeEnabled && $downloadEnabled;
+          $showStoreButton = $chromeEnabled && $chromeStoreEnabled && $storeUrl !== '';
+        @endphp
+        @if($showZipButton || $showStoreButton)
+        <div class="download-actions">
+          @if($showZipButton)
+          <a class="download-btn" href="{{ route('browsers-extension.download', ['v' => $extensionVersion]) }}">
+            {{ trim((string) ($chromeZipButtonText ?? '')) !== '' ? $chromeZipButtonText : 'ZIP' }}
+          </a>
+          @endif
+          @if($showStoreButton)
+          <a class="download-btn" href="{{ $storeUrl }}" target="_blank" rel="noopener noreferrer">
+            {{ trim((string) ($chromeStoreButtonText ?? '')) !== '' ? $chromeStoreButtonText : 'Store' }}
+          </a>
+          @endif
+        </div>
         @else
         <span class="coming-soon-badge">Coming Soon</span>
         @endif
