@@ -56,7 +56,9 @@ body {
 }
 
 .panel {
-  background: color-mix(in oklab, var(--panel) 90%, transparent);
+  background:
+    linear-gradient(135deg, rgba(255, 68, 51, 0.08), rgba(138, 43, 226, 0.1)),
+    color-mix(in oklab, var(--panel) 92%, transparent);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;

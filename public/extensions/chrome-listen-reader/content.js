@@ -98,6 +98,14 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${PANEL_ID} {
+        --bg: #070910;
+        --surface: #11182a;
+        --surface2: #15213a;
+        --line: #2b3a5d;
+        --text: #f4f7ff;
+        --muted: #9fb0d4;
+        --brandA: #FF4433;
+        --brandB: #8A2BE2;
         position: fixed;
         right: 8px;
         top: 50%;
@@ -105,10 +113,13 @@
         z-index: 2147483647;
         width: min(380px, calc(100vw - 16px));
         border-radius: 14px;
-        border: 1px solid rgba(146, 168, 205, 0.35);
-        background: linear-gradient(180deg, rgba(11, 18, 33, 0.98), rgba(10, 16, 29, 0.98));
+        border: 1px solid rgba(43, 58, 93, 0.85);
+        background:
+          radial-gradient(90% 80% at 94% -15%, rgba(138, 43, 226, 0.16), transparent 65%),
+          radial-gradient(95% 85% at -15% -20%, rgba(255, 68, 51, 0.14), transparent 62%),
+          linear-gradient(180deg, rgba(17, 24, 42, 0.98), rgba(10, 16, 29, 0.98));
         box-shadow: 0 22px 52px rgba(0, 0, 0, 0.42);
-        color: #f4f8ff;
+        color: var(--text);
         font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
         overflow: hidden;
         backdrop-filter: blur(9px);
@@ -127,8 +138,8 @@
         justify-content: space-between;
         gap: 10px;
         padding: 11px 12px 10px;
-        border-bottom: 1px solid rgba(146, 168, 205, 0.2);
-        background: linear-gradient(90deg, rgba(251, 131, 8, 0.15), rgba(89, 6, 178, 0.22));
+        border-bottom: 1px solid rgba(43, 58, 93, 0.65);
+        background: linear-gradient(135deg, rgba(255, 68, 51, 0.17), rgba(138, 43, 226, 0.22));
         cursor: grab;
         touch-action: none;
       }
@@ -137,14 +148,18 @@
       }
       #${PANEL_ID} .listen-brand {
         font-size: 13px;
-        font-weight: 700;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--brandA), var(--brandB));
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
       #${PANEL_ID} .listen-close {
         width: 30px;
         height: 30px;
-        border: 1px solid rgba(146, 168, 205, 0.25);
-        background: rgba(15, 24, 42, 0.95);
-        color: #d7e2f7;
+        border: 1px solid rgba(43, 58, 93, 0.7);
+        background: rgba(21, 33, 58, 0.92);
+        color: var(--text);
         border-radius: 8px;
         display: inline-grid;
         place-items: center;
@@ -152,8 +167,8 @@
         transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
       }
       #${PANEL_ID} .listen-close:hover {
-        background: rgba(24, 37, 62, 0.98);
-        border-color: rgba(181, 201, 236, 0.45);
+        background: rgba(26, 39, 68, 0.98);
+        border-color: rgba(255, 68, 51, 0.45);
       }
       #${PANEL_ID} .listen-close:active {
         transform: scale(0.97);
@@ -176,14 +191,14 @@
       #${PANEL_ID} .listen-voice {
         font-size: 13px;
         font-weight: 600;
-        color: #f7f9ff;
+        color: var(--text);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
       }
       #${PANEL_ID} .listen-text {
         font-size: 12px;
-        color: #9db1d4;
+        color: var(--muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -191,8 +206,8 @@
       #${PANEL_ID} .listen-wave {
         height: 40px;
         border-radius: 10px;
-        border: 1px solid rgba(146, 168, 205, 0.23);
-        background: rgba(13, 22, 40, 0.9);
+        border: 1px solid rgba(43, 58, 93, 0.7);
+        background: rgba(17, 24, 42, 0.88);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -203,12 +218,12 @@
         width: 4px;
         height: 8px;
         border-radius: 999px;
-        background: linear-gradient(180deg, #fb8308, #5906b2);
+        background: linear-gradient(180deg, var(--brandA), var(--brandB));
         transition: height 100ms linear;
       }
       #${PANEL_ID} .listen-progress {
         width: 100%;
-        accent-color: #fb8308;
+        accent-color: var(--brandA);
       }
       #${PANEL_ID} .listen-controls {
         display: flex;
@@ -228,33 +243,34 @@
         font-size: 12px;
         font-weight: 600;
         color: #fff;
-        background: linear-gradient(90deg, #fb8308, #5906b2);
+        background: linear-gradient(135deg, var(--brandA), var(--brandB));
+        box-shadow: 0 6px 16px rgba(255, 68, 51, 0.3);
         cursor: pointer;
       }
       #${PANEL_ID} .listen-speed {
-        border: 1px solid rgba(146, 168, 205, 0.3);
+        border: 1px solid rgba(43, 58, 93, 0.75);
         border-radius: 8px;
         padding: 7px 10px;
         min-width: 52px;
         font-size: 12px;
         font-weight: 700;
-        color: #d7e2f7;
-        background: rgba(15, 24, 42, 0.95);
+        color: var(--text);
+        background: rgba(21, 33, 58, 0.92);
         cursor: pointer;
       }
       #${PANEL_ID} .listen-speed:hover {
-        border-color: rgba(181, 201, 236, 0.45);
-        background: rgba(24, 37, 62, 0.98);
+        border-color: rgba(255, 68, 51, 0.45);
+        background: rgba(26, 39, 68, 0.98);
       }
       #${PANEL_ID} .listen-download {
-        border: 1px solid rgba(146, 168, 205, 0.25);
+        border: 1px solid rgba(43, 58, 93, 0.7);
         border-radius: 8px;
         padding: 7px 10px;
         font-size: 12px;
         font-weight: 600;
-        color: #d7e2f7;
+        color: var(--text);
         text-decoration: none;
-        background: rgba(15, 24, 42, 0.95);
+        background: rgba(21, 33, 58, 0.92);
       }
       #${PANEL_ID} .listen-download[aria-disabled='true'] {
         opacity: 0.45;
@@ -262,7 +278,7 @@
       }
       #${PANEL_ID} .listen-time {
         font-size: 11px;
-        color: #9db1d4;
+        color: var(--muted);
         min-width: 86px;
         text-align: right;
         font-variant-numeric: tabular-nums;
