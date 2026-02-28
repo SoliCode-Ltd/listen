@@ -168,7 +168,7 @@
 
       <section class="legal-section">
         <h2>8. Contact</h2>
-        <p>Questions about these Terms can be sent to <a href="mailto:support@solicode.me">support@solicode.me</a>.</p>
+        <p>Questions about these Terms can be sent to <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
       </section>
     </article>
   </main>

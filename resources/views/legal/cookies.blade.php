@@ -200,7 +200,7 @@
 
       <section class="legal-section">
         <h2>6. Contact</h2>
-        <p>For cookie-related questions, contact <a href="mailto:support@solicode.me">support@solicode.me</a>.</p>
+        <p>For cookie-related questions, contact <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
       </section>
     </article>
   </main>

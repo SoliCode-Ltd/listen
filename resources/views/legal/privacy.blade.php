@@ -169,7 +169,7 @@
 
       <section class="legal-section">
         <h2>7. Contact</h2>
-        <p>For privacy questions or data requests, contact SoliCode Ltd at <a href="mailto:support@solicode.me">support@solicode.me</a>.</p>
+        <p>For privacy questions or data requests, contact SoliCode Ltd at <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
       </section>
     </article>
   </main>
