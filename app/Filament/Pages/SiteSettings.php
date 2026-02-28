@@ -39,6 +39,7 @@ class SiteSettings extends Page implements HasForms
             'footer_social_enabled' => (string) SiteSetting::get('footer_social_enabled', '1') === '1',
             'footer_social_twitter_url' => SiteSetting::get('footer_social_twitter_url', ''),
             'footer_social_github_url' => SiteSetting::get('footer_social_github_url', ''),
+            'footer_social_facebook_url' => SiteSetting::get('footer_social_facebook_url', ''),
             'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
         ]);
     }
@@ -128,12 +129,17 @@ class SiteSettings extends Page implements HasForms
                             ->maxLength(500)
                             ->placeholder('https://github.com/your-account')
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
+                        Forms\Components\TextInput::make('footer_social_facebook_url')
+                            ->label('Facebook URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://facebook.com/your-page')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
                         Forms\Components\TextInput::make('footer_social_linkedin_url')
                             ->label('LinkedIn URL')
                             ->url()
                             ->maxLength(500)
                             ->placeholder('https://www.linkedin.com/company/your-company')
-                            ->columnSpanFull()
                             ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
                     ]),
             ])
