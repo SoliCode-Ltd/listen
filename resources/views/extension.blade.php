@@ -445,7 +445,7 @@
     <section class="section reveal">
       <div class="two-col">
         <article class="page-card">
-          <h2>Installation Guide</h2>
+          <h2>Installation Guide (ZIP Version)</h2>
           <ol class="steps">
             <li>{{ $installStep1 }}</li>
             <li>{!! str_contains($installStep2, 'chrome://extensions/') ? 'Open<a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
@@ -662,7 +662,7 @@
       extensionsLink.addEventListener('click', async function(event) {
         event.preventDefault();
         var target = 'chrome://extensions/';
-        
+
         // Browsers block websites from navigating to chrome:// URLs for security.
         // The fallback is to copy it to their clipboard.
         if (extensionsOpenHint) {

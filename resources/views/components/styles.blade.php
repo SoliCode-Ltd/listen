@@ -68,7 +68,7 @@ img, svg, video, canvas, iframe {
 h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-display);
   font-weight: 800;
-  letter-spacing: -0.04em;
+  /* letter-spacing: -0.04em; */
   line-height: 1.1;
 }
 
@@ -832,7 +832,7 @@ form:has(button.mobile-nav-link) {
   border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
   border-radius: 1.5rem;
   padding: 3.5rem;
-  box-shadow: 0 32px 64px rgba(0,0,0,0.4), 
+  box-shadow: 0 32px 64px rgba(0,0,0,0.4),
               inset 0 1px 1px color-mix(in oklab, var(--text) 5%, transparent),
               0 0 0 1px color-mix(in oklab, var(--surface) 50%, transparent);
   margin-top: -3rem;
@@ -843,7 +843,7 @@ form:has(button.mobile-nav-link) {
 
 .contact-form-card:hover {
   border-color: color-mix(in oklab, var(--a) 40%, var(--line));
-  box-shadow: 0 32px 80px rgba(0,0,0,0.5), 
+  box-shadow: 0 32px 80px rgba(0,0,0,0.5),
               0 0 40px color-mix(in oklab, var(--a) 15%, transparent),
               inset 0 1px 1px color-mix(in oklab, var(--text) 5%, transparent);
   transform: translateY(-4px);
