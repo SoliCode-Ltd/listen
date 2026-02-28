@@ -36,6 +36,10 @@ class SiteSettings extends Page implements HasForms
             'custom_css' => SiteSetting::get('custom_css', ''),
             'favicon_url' => SiteSetting::get('favicon_url', ''),
             'logo_url' => SiteSetting::get('logo_url', ''),
+            'footer_social_enabled' => (string) SiteSetting::get('footer_social_enabled', '1') === '1',
+            'footer_social_twitter_url' => SiteSetting::get('footer_social_twitter_url', ''),
+            'footer_social_github_url' => SiteSetting::get('footer_social_github_url', ''),
+            'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
         ]);
     }
 
@@ -104,6 +108,34 @@ class SiteSettings extends Page implements HasForms
                             ->rows(8)
                             ->columnSpanFull(),
                     ]),
+                Forms\Components\Section::make('Footer Social Media')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Toggle::make('footer_social_enabled')
+                            ->label('Show Social Media In Footer')
+                            ->helperText('Disable to hide all social icons in the website footer.')
+                            ->default(true)
+                            ->columnSpanFull(),
+                        Forms\Components\TextInput::make('footer_social_twitter_url')
+                            ->label('Twitter/X URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://twitter.com/your-account')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
+                        Forms\Components\TextInput::make('footer_social_github_url')
+                            ->label('GitHub URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://github.com/your-account')
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
+                        Forms\Components\TextInput::make('footer_social_linkedin_url')
+                            ->label('LinkedIn URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->placeholder('https://www.linkedin.com/company/your-company')
+                            ->columnSpanFull()
+                            ->visible(fn (Forms\Get $get): bool => (bool) $get('footer_social_enabled')),
+                    ]),
             ])
             ->statePath('data');
     }
@@ -113,7 +145,7 @@ class SiteSettings extends Page implements HasForms
         $data = $this->form->getState();
 
         foreach ($data as $key => $value) {
-            SiteSetting::set($key, $value, 'general');
+            SiteSetting::set($key, is_bool($value) ? ($value ? '1' : '0') : (string) $value, 'general');
         }
 
         SiteSetting::flushGroupCache('general');
