@@ -7,6 +7,7 @@ use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\MediaController;
 use App\Models\SiteSetting;
+use App\Support\SeoHelper;
 use Illuminate\Support\Facades\Route;
 use Spatie\Sitemap\Sitemap;
 use Spatie\Sitemap\Tags\Url;
@@ -27,24 +28,34 @@ Route::post('/contact', [\App\Http\Controllers\ContactController::class, 'submit
 
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
-    $sitemap = Sitemap::create()
-        ->add(Url::create('/')->setPriority(1.0)->setChangeFrequency('daily'))
-        ->add(Url::create('/pricing')->setPriority(0.9)->setChangeFrequency('weekly'))
-        ->add(Url::create('/demo')->setPriority(0.8)->setChangeFrequency('weekly'))
-        ->add(Url::create('/login')->setPriority(0.5)->setChangeFrequency('monthly'))
-        ->add(Url::create('/register')->setPriority(0.6)->setChangeFrequency('monthly'))
-        ->add(Url::create('/privacy-policy')->setPriority(0.3)->setChangeFrequency('yearly'))
-        ->add(Url::create('/terms-of-service')->setPriority(0.3)->setChangeFrequency('yearly'))
-        ->add(Url::create('/cookie-policy')->setPriority(0.3)->setChangeFrequency('yearly'));
+    $sitemap = Sitemap::create();
+
+    foreach (SeoHelper::sitemapEntries() as $entry) {
+        $sitemap->add(
+            Url::create($entry['path'])
+                ->setPriority((float) $entry['priority'])
+                ->setChangeFrequency($entry['change_frequency'])
+        );
+    }
 
     return $sitemap->toResponse(request());
 })->name('sitemap');
 
 // SEO: robots.txt
 Route::get('/robots.txt', function () {
-    $content = SiteSetting::get('robots_txt', "User-agent: *\nAllow: /\n\nSitemap: " . url('/sitemap.xml'));
+    $content = (string) SiteSetting::get('robots_txt', SeoHelper::defaultRobotsTxt());
     return response($content, 200)->header('Content-Type', 'text/plain');
 })->name('robots');
+
+// SEO: llms.txt
+Route::get('/llms.txt', function () {
+    if (!SeoHelper::llmsTxtEnabled()) {
+        abort(404);
+    }
+
+    return response(SeoHelper::llmsTxtContent() . "\n", 200)
+        ->header('Content-Type', 'text/plain; charset=UTF-8');
+})->name('llms');
 
 Route::middleware('guest')->group(function () {
     Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
