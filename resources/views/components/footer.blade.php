@@ -13,17 +13,27 @@
 
   $socialLinks = [];
   if ($showSocial) {
-    if ($twitterUrl !== '' && filter_var($twitterUrl, FILTER_VALIDATE_URL)) {
-      $socialLinks[] = ['label' => 'Twitter', 'url' => $twitterUrl, 'icon' => 'twitter'];
+    $rawSocialLinks = [
+      ['label' => 'Twitter', 'url' => $twitterUrl, 'icon' => 'twitter'],
+      ['label' => 'GitHub', 'url' => $githubUrl, 'icon' => 'github'],
+      ['label' => 'Facebook', 'url' => $facebookUrl, 'icon' => 'facebook'],
+      ['label' => 'LinkedIn', 'url' => $linkedinUrl, 'icon' => 'linkedin'],
+    ];
+
+    foreach ($rawSocialLinks as $item) {
+      if ($item['url'] !== '' && filter_var($item['url'], FILTER_VALIDATE_URL)) {
+        $socialLinks[] = $item;
+      }
     }
-    if ($githubUrl !== '' && filter_var($githubUrl, FILTER_VALIDATE_URL)) {
-      $socialLinks[] = ['label' => 'GitHub', 'url' => $githubUrl, 'icon' => 'github'];
-    }
-    if ($facebookUrl !== '' && filter_var($facebookUrl, FILTER_VALIDATE_URL)) {
-      $socialLinks[] = ['label' => 'Facebook', 'url' => $facebookUrl, 'icon' => 'facebook'];
-    }
-    if ($linkedinUrl !== '' && filter_var($linkedinUrl, FILTER_VALIDATE_URL)) {
-      $socialLinks[] = ['label' => 'LinkedIn', 'url' => $linkedinUrl, 'icon' => 'linkedin'];
+
+    // Keep social icons visible by default when enabled, even before links are configured.
+    if (empty($socialLinks)) {
+      $socialLinks = [
+        ['label' => 'Twitter', 'url' => '#', 'icon' => 'twitter'],
+        ['label' => 'GitHub', 'url' => '#', 'icon' => 'github'],
+        ['label' => 'Facebook', 'url' => '#', 'icon' => 'facebook'],
+        ['label' => 'LinkedIn', 'url' => '#', 'icon' => 'linkedin'],
+      ];
     }
   }
 

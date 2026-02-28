@@ -55,4 +55,21 @@ class FooterSocialSettingsTest extends TestCase
             ->assertSee('aria-label="Twitter"', false)
             ->assertDontSee('aria-label="Facebook"', false);
     }
+
+    public function test_footer_social_links_fallback_to_default_icons_when_no_urls_are_set(): void
+    {
+        SiteSetting::set('footer_social_enabled', '1', 'general');
+        SiteSetting::set('footer_social_twitter_url', '', 'general');
+        SiteSetting::set('footer_social_facebook_url', '', 'general');
+        SiteSetting::set('footer_social_github_url', '', 'general');
+        SiteSetting::set('footer_social_linkedin_url', '', 'general');
+
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('aria-label="Twitter"', false)
+            ->assertSee('aria-label="Facebook"', false)
+            ->assertSee('aria-label="GitHub"', false)
+            ->assertSee('aria-label="LinkedIn"', false)
+            ->assertSee('href="#"', false);
+    }
 }
