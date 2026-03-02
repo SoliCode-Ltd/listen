@@ -429,6 +429,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   position: absolute;
   top: calc(100% + .5rem);
   right: 0;
+  left: auto;
   width: 260px;
   max-width: calc(100vw - 1rem);
   background: color-mix(in oklab, var(--surface) 80%, transparent);
@@ -1509,6 +1510,13 @@ html[data-theme="light"] .custom-audio-wrapper:hover {
 html[dir="rtl"] .dropdown-item,
 html[dir="rtl"] button.mobile-nav-link {
   text-align: right;
+}
+
+/* In RTL the user menu sits on the left side of header actions.
+   Anchor dropdown to the left so it opens into the viewport. */
+html[dir="rtl"] .user-dropdown {
+  right: auto;
+  left: 0;
 }
 
 html[dir="rtl"] .custom-audio-play svg {
