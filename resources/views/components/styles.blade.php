@@ -1571,13 +1571,14 @@ textarea[dir="auto"] {
 html.locale-switching,
 body.locale-switching {
   background-color: var(--bg) !important;
+  overflow-x: hidden !important;
 }
 
 body.locale-switching {
   opacity: .985 !important;
-  transform: scale(.998) !important;
-  filter: saturate(.96) !important;
-  transition: opacity .14s ease-out, transform .14s ease-out, filter .14s ease-out !important;
+  transform: none !important;
+  filter: none !important;
+  transition: opacity .14s ease-out !important;
 }
 
 body.locale-fade-in {

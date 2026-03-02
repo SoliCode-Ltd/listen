@@ -117,6 +117,9 @@
     var mobileLinks = mobileNav.querySelectorAll('a, button');
     Array.prototype.forEach.call(mobileLinks, function(link) {
       link.addEventListener('click', function() {
+        if (link.classList && link.classList.contains('locale-link')) {
+          return;
+        }
         if (link.hasAttribute('data-mobile-menu-stay-open')) {
           return;
         }
