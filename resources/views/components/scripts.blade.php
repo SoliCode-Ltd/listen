@@ -538,28 +538,52 @@
       if (!href) return;
       localeNavigationPending = true;
 
-      // Immediately slide the indicator visually
-      var switcher = target.closest('.locale-switch, .mobile-locale-switch');
-      if (switcher) {
-        switcher.classList.toggle('ar-active');
-        // Toggle active class on links
-        var links = switcher.querySelectorAll('.locale-link');
-        Array.prototype.forEach.call(links, function(l) {
-          l.classList.toggle('active');
-        });
-      }
-
       try {
         sessionStorage.setItem('listen_locale_switch', '1');
       } catch (_err) {}
 
-      // Smooth fade out then navigate
+      // Animate only the locale switch shape/indicator before navigation.
+      var switcher = target.closest('.locale-switch, .mobile-locale-switch');
+      if (switcher) {
+        var targetLocale = String(target.getAttribute('hreflang') || '').toLowerCase();
+        if (!targetLocale) {
+          var hrefLower = String(href || '').toLowerCase();
+          targetLocale = hrefLower.indexOf('/ar') !== -1 ? 'ar' : 'en';
+        }
+        switcher.classList.toggle('ar-active', targetLocale === 'ar');
+
+        // Make selected locale label white immediately before navigation.
+        var localeLinksInSwitcher = switcher.querySelectorAll('.locale-link');
+        Array.prototype.forEach.call(localeLinksInSwitcher, function(linkEl) {
+          var linkLocale = String(linkEl.getAttribute('hreflang') || '').toLowerCase();
+          var shouldBeActive = linkLocale
+            ? linkLocale === targetLocale
+            : linkEl === target;
+          linkEl.classList.toggle('active', shouldBeActive);
+        });
+      }
+
+      // Smooth fade-out without mutating locale toggle state in-place.
+      var reduceMotion = false;
+      try {
+        reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      } catch (_err) {}
+
       document.body.classList.add('locale-switching');
       document.documentElement.classList.add('locale-switching');
       document.body.classList.remove('locale-fade-in');
-      setTimeout(function() {
+
+      if (reduceMotion) {
         window.location.assign(href);
-      }, 110);
+        return;
+      }
+
+      // Let the fade-out render before leaving the page.
+      window.requestAnimationFrame(function() {
+        window.setTimeout(function() {
+          window.location.assign(href);
+        }, 170);
+      });
     });
   }
 
