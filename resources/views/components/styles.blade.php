@@ -248,6 +248,18 @@ html[dir="rtl"] h6 {
   transform: translateX(100%);
 }
 
+/* During locale navigation, snap the switch state instantly to avoid
+   transient visual gaps/flicker on mobile (notably ar -> en). */
+.locale-switch.locale-switch-prep .locale-indicator,
+.mobile-locale-switch.locale-switch-prep .locale-indicator {
+  transition-duration: 0s !important;
+}
+
+.locale-switch.locale-switch-prep .locale-link,
+.mobile-locale-switch.locale-switch-prep .locale-link {
+  transition: none !important;
+}
+
 
 .locale-link {
   display: inline-flex;

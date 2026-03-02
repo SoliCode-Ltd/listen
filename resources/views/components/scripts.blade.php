@@ -545,6 +545,7 @@
       // Animate only the locale switch shape/indicator before navigation.
       var switcher = target.closest('.locale-switch, .mobile-locale-switch');
       if (switcher) {
+        switcher.classList.add('locale-switch-prep');
         var targetLocale = String(target.getAttribute('hreflang') || '').toLowerCase();
         if (!targetLocale) {
           var hrefLower = String(href || '').toLowerCase();
