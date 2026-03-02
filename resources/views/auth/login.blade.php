@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Sign In', 'page' => 'login'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.login_title'), 'page' => 'login'])
   <style>
     .auth-page {
       min-height: calc(100vh - 180px);
@@ -164,30 +155,30 @@
   <main class="container auth-page">
     <form class="auth-card reveal" method="POST" action="{{ route('login.submit') }}">
       @csrf
-      <h1>Welcome back</h1>
-      <p class="subtitle">Sign in to your Listen Studio Account.</p>
+      <h1>{{ __('ui.auth.login_title') }}</h1>
+      <p class="subtitle">{{ __('ui.auth.login_subtitle') }}</p>
 
       <a class="google-btn" href="{{ route('auth.social.redirect') }}">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 31.367 32"><path d="M31.367,16.368a18.825,18.825,0,0,0-.276-3.251H16v6.161h8.642a7.4,7.4,0,0,1-3.2,4.862v4H26.6A15.626,15.626,0,0,0,31.367,16.368Z" fill="#4285f4"></path><path d="M16,32a15.317,15.317,0,0,0,10.606-3.862l-5.156-4A9.7,9.7,0,0,1,7.022,19.066H1.7v4.122A16,16,0,0,0,16,32Z" fill="#34a853"></path><path d="M7.016,19.066a9.583,9.583,0,0,1,0-6.125V8.819H1.7a16.017,16.017,0,0,0,0,14.369Z" fill="#fbbc04"></path><path d="M16,6.333a8.694,8.694,0,0,1,6.138,2.4h0l4.568-4.568A15.376,15.376,0,0,0,16,0,16,16,0,0,0,1.7,8.819l5.314,4.122A9.57,9.57,0,0,1,16,6.333Z" fill="#ea4335"></path></svg>
-        Continue with Google
+        {{ __('ui.auth.continue_google') }}
       </a>
 
-      <div class="divider">or sign in with email</div>
+      <div class="divider">{{ __('ui.auth.or_email_signin') }}</div>
 
       <div class="form-grid">
         <div>
-          <label for="email">Email</label>
+          <label for="email">{{ __('ui.auth.email') }}</label>
           <input type="email" id="email" name="email" value="{{ old('email') }}" required autocomplete="email">
         </div>
         <div>
-          <label for="password">Password</label>
+          <label for="password">{{ __('ui.auth.password') }}</label>
           <input type="password" id="password" name="password" required autocomplete="current-password">
         </div>
         <label class="remember-row">
           <input type="checkbox" name="remember" value="1">
-          Remember me
+          {{ __('ui.auth.remember_me') }}
         </label>
-        <button class="submit-btn" type="submit">Sign In</button>
+        <button class="submit-btn" type="submit">{{ __('ui.auth.sign_in') }}</button>
       </div>
 
       @error('email')
@@ -195,7 +186,7 @@
       @enderror
 
       <p class="auth-footer">
-        No account? <a href="{{ route('register') }}">Create one</a>
+        {{ __('ui.auth.no_account') }} <a href="{{ route('register') }}">{{ __('ui.auth.create_one') }}</a>
       </p>
     </form>
   </main>
@@ -204,3 +195,4 @@
   @include('components.scripts')
 </body>
 </html>
+

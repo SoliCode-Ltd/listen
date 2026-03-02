@@ -14,6 +14,10 @@ class ExtensionController extends Controller
     public function show(Request $request)
     {
         $user = $request->user();
+        $announcement = trim((string) SiteSetting::get('extension_announcement', ''));
+        if ($this->isArabicLocale() && $announcement !== '' && ! $this->containsArabic($announcement)) {
+            $announcement = '';
+        }
 
         return view('extension', [
             'newApiKey' => $request->session()->pull('new_api_key'),
@@ -21,8 +25,8 @@ class ExtensionController extends Controller
             'extensionVersion' => $this->extensionVersion(),
 
             // Page content from admin Extension Settings
-            'pageTitle' => SiteSetting::get('extension_page_title', 'Browsers Extension'),
-            'pageSubtitle' => SiteSetting::get('extension_page_subtitle', 'Turn any text on the web into natural voice. Select, click, and listen across all your favorite websites.'),
+            'pageTitle' => $this->localizedSetting('extension_page_title', 'ui.extension.page_title'),
+            'pageSubtitle' => $this->localizedSetting('extension_page_subtitle', 'ui.extension.page_subtitle'),
 
             // Browser availability
             'chromeEnabled' => SiteSetting::get('extension_chrome_enabled', '1') === '1',
@@ -30,43 +34,43 @@ class ExtensionController extends Controller
             'safariEnabled' => SiteSetting::get('extension_safari_enabled', '0') === '1',
 
             // Browser cards
-            'chromeCardTitle' => SiteSetting::get('extension_chrome_card_title', 'Chrome'),
-            'chromeCardSubtitle' => SiteSetting::get('extension_chrome_card_subtitle', 'Full support with context menu integration'),
-            'firefoxCardTitle' => SiteSetting::get('extension_firefox_card_title', 'Mozilla Firefox'),
-            'firefoxCardSubtitle' => SiteSetting::get('extension_firefox_card_subtitle', 'WebExtension API support'),
-            'safariCardTitle' => SiteSetting::get('extension_safari_card_title', 'Apple Safari'),
-            'safariCardSubtitle' => SiteSetting::get('extension_safari_card_subtitle', 'Native Safari Web Extension'),
+            'chromeCardTitle' => $this->localizedSetting('extension_chrome_card_title', 'ui.extension.chrome_title'),
+            'chromeCardSubtitle' => $this->localizedSetting('extension_chrome_card_subtitle', 'ui.extension.chrome_subtitle'),
+            'firefoxCardTitle' => $this->localizedSetting('extension_firefox_card_title', 'ui.extension.firefox_title'),
+            'firefoxCardSubtitle' => $this->localizedSetting('extension_firefox_card_subtitle', 'ui.extension.firefox_subtitle'),
+            'safariCardTitle' => $this->localizedSetting('extension_safari_card_title', 'ui.extension.safari_title'),
+            'safariCardSubtitle' => $this->localizedSetting('extension_safari_card_subtitle', 'ui.extension.safari_subtitle'),
 
             // Feature cards
-            'feature1Title' => SiteSetting::get('extension_feature_1_title', 'One-Click Listening'),
-            'feature1Desc' => SiteSetting::get('extension_feature_1_desc', 'Select text anywhere and listen instantly with context menu integration.'),
-            'feature2Title' => SiteSetting::get('extension_feature_2_title', 'Secure by Design'),
-            'feature2Desc' => SiteSetting::get('extension_feature_2_desc', 'Your API key is stored locally and tied to your account with instant rotation.'),
-            'feature3Title' => SiteSetting::get('extension_feature_3_title', 'Built for Speed'),
-            'feature3Desc' => SiteSetting::get('extension_feature_3_desc', 'Audio streams immediately with no waiting. Keep your workflow uninterrupted.'),
+            'feature1Title' => $this->localizedSetting('extension_feature_1_title', 'ui.extension.feature1_title'),
+            'feature1Desc' => $this->localizedSetting('extension_feature_1_desc', 'ui.extension.feature1_desc'),
+            'feature2Title' => $this->localizedSetting('extension_feature_2_title', 'ui.extension.feature2_title'),
+            'feature2Desc' => $this->localizedSetting('extension_feature_2_desc', 'ui.extension.feature2_desc'),
+            'feature3Title' => $this->localizedSetting('extension_feature_3_title', 'ui.extension.feature3_title'),
+            'feature3Desc' => $this->localizedSetting('extension_feature_3_desc', 'ui.extension.feature3_desc'),
 
             // Installation steps
-            'installStep1' => SiteSetting::get('extension_install_step_1', 'Download the extension package using the button above.'),
-            'installStep2' => SiteSetting::get('extension_install_step_2', 'Open chrome://extensions/ in your browser.'),
-            'installStep3' => SiteSetting::get('extension_install_step_3', 'Enable Developer mode in the top right corner.'),
-            'installStep4' => SiteSetting::get('extension_install_step_4', 'Click Load unpacked and select the extracted folder.'),
-            'installStep5' => SiteSetting::get('extension_install_step_5', 'Pin the extension to your toolbar for quick access.'),
+            'installStep1' => $this->localizedSetting('extension_install_step_1', 'ui.extension.install_step_1'),
+            'installStep2' => $this->localizedSetting('extension_install_step_2', 'ui.extension.install_step_2'),
+            'installStep3' => $this->localizedSetting('extension_install_step_3', 'ui.extension.install_step_3'),
+            'installStep4' => $this->localizedSetting('extension_install_step_4', 'ui.extension.install_step_4'),
+            'installStep5' => $this->localizedSetting('extension_install_step_5', 'ui.extension.install_step_5'),
 
             // How to Use steps
-            'howToUseStep1' => SiteSetting::get('extension_how_to_use_step_1', 'Click the extension icon and paste your API key.'),
-            'howToUseStep2' => SiteSetting::get('extension_how_to_use_step_2', 'Select any text on a webpage.'),
-            'howToUseStep3' => SiteSetting::get('extension_how_to_use_step_3', 'Right-click and choose Listen Selected Text.'),
-            'howToUseStep4' => SiteSetting::get('extension_how_to_use_step_4', 'Audio opens in the side player on the current tab.'),
-            'howToUseStep5' => SiteSetting::get('extension_how_to_use_step_5', 'Adjust voice and language settings anytime.'),
+            'howToUseStep1' => $this->localizedSetting('extension_how_to_use_step_1', 'ui.extension.use_step_1'),
+            'howToUseStep2' => $this->localizedSetting('extension_how_to_use_step_2', 'ui.extension.use_step_2'),
+            'howToUseStep3' => $this->localizedSetting('extension_how_to_use_step_3', 'ui.extension.use_step_3'),
+            'howToUseStep4' => $this->localizedSetting('extension_how_to_use_step_4', 'ui.extension.use_step_4'),
+            'howToUseStep5' => $this->localizedSetting('extension_how_to_use_step_5', 'ui.extension.use_step_5'),
 
 
             // Download & announcement
             'downloadEnabled' => SiteSetting::get('extension_download_enabled', '1') === '1',
-            'chromeZipButtonText' => SiteSetting::get('extension_chrome_zip_button_text', 'ZIP'),
+            'chromeZipButtonText' => $this->localizedSetting('extension_chrome_zip_button_text', 'ui.extension.zip_button'),
             'chromeStoreEnabled' => SiteSetting::get('extension_chrome_store_enabled', '1') === '1',
-            'chromeStoreButtonText' => SiteSetting::get('extension_chrome_store_button_text', 'Store'),
+            'chromeStoreButtonText' => $this->localizedSetting('extension_chrome_store_button_text', 'ui.extension.store_button'),
             'chromeStoreUrl' => SiteSetting::get('extension_chrome_store_url', 'https://chromewebstore.google.com/detail/listen-%E2%80%93-turn-text-into-h/hgffdggimfklddpnjdfjonijlempljpa?authuser=0&hl=en'),
-            'announcement' => SiteSetting::get('extension_announcement', ''),
+            'announcement' => $announcement,
             'announcementType' => SiteSetting::get('extension_announcement_type', 'info'),
         ]);
     }
@@ -81,7 +85,7 @@ class ExtensionController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'message' => 'New API key generated.',
+                'message' => __('ui.backend.extension_new_key_generated'),
                 'new_api_key' => $newApiKey,
                 'api_state' => $this->apiState($user),
             ]);
@@ -89,7 +93,7 @@ class ExtensionController extends Controller
 
         return redirect()
             ->route('browsers-extension.page')
-            ->with('ok', 'A new API key was generated successfully.')
+            ->with('ok', __('ui.backend.extension_key_generated_redirect'))
             ->with('new_api_key', $newApiKey);
     }
 
@@ -102,14 +106,14 @@ class ExtensionController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'message' => 'API key revoked.',
+                'message' => __('ui.backend.extension_key_revoked'),
                 'api_state' => $this->apiState($user),
             ]);
         }
 
         return redirect()
             ->route('browsers-extension.page')
-            ->with('ok', 'API key revoked. Generate a new key to reconnect the extension.');
+            ->with('ok', __('ui.backend.extension_key_revoked_redirect'));
     }
 
     public function download(Request $request): BinaryFileResponse
@@ -239,5 +243,39 @@ class ExtensionController extends Controller
         }
 
         return (string) max($latestMtime, (int) now()->timestamp);
+    }
+
+    private function localizedSetting(string $settingKey, string $translationKey): string
+    {
+        $configured = trim((string) SiteSetting::get($settingKey, ''));
+        $translated = trim((string) __($translationKey));
+
+        if (! $this->isArabicLocale()) {
+            if ($configured !== '') {
+                return $configured;
+            }
+
+            return $translated;
+        }
+
+        if ($configured !== '' && $this->containsArabic($configured)) {
+            return $configured;
+        }
+
+        if ($translated !== '' && $translated !== $translationKey) {
+            return $translated;
+        }
+
+        return $configured;
+    }
+
+    private function isArabicLocale(): bool
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'ar');
+    }
+
+    private function containsArabic(string $value): bool
+    {
+        return (bool) preg_match('/[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}]/u', $value);
     }
 }

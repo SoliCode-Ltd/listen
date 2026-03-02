@@ -1,7 +1,15 @@
+@php
+  $sharedI18n = [
+    'audio_play' => __('ui.scripts.audio_play'),
+    'audio_download' => __('ui.scripts.audio_download'),
+  ];
+@endphp
+
 <script id="listen-shared-scripts">
 (function() {
   if (window.__listenSharedScriptsBooted) return;
   window.__listenSharedScriptsBooted = true;
+  var i18n = @json($sharedI18n);
 
   function safeGetTheme() {
     try {
@@ -189,7 +197,7 @@
       var playBtn = document.createElement('button');
       playBtn.className = 'custom-audio-play';
       playBtn.type = 'button';
-      playBtn.setAttribute('aria-label', 'Play');
+      playBtn.setAttribute('aria-label', i18n.audio_play || 'Play');
       playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
 
       var currTime = document.createElement('span');
@@ -218,8 +226,8 @@
       var menuBtn = document.createElement('button');
       menuBtn.className = 'custom-audio-menu';
       menuBtn.type = 'button';
-      menuBtn.title = 'Download Audio';
-      menuBtn.setAttribute('aria-label', 'Download Audio');
+      menuBtn.title = i18n.audio_download || 'Download Audio';
+      menuBtn.setAttribute('aria-label', i18n.audio_download || 'Download Audio');
       menuBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
 
       wrapper.appendChild(playBtn);
@@ -491,12 +499,90 @@
     });
   };
 
+  function initLocaleSwitchTransition() {
+    var localeNavigationPending = false;
+    var shouldAnimateIn = false;
+    try {
+      shouldAnimateIn = sessionStorage.getItem('listen_locale_switch') === '1';
+      if (shouldAnimateIn) {
+        sessionStorage.removeItem('listen_locale_switch');
+      }
+    } catch (e) {}
+
+    if (shouldAnimateIn) {
+      document.body.classList.add('locale-fade-in');
+      setTimeout(function() {
+        document.body.classList.remove('locale-fade-in');
+      }, 260);
+    }
+
+    // Prefetch alternate locale links
+    var localeLinks = document.querySelectorAll('.locale-link:not(.active)');
+    Array.prototype.forEach.call(localeLinks, function(link) {
+      var href = link.getAttribute('href');
+      if (href && !document.querySelector('link[rel="prefetch"][href="' + href + '"]')) {
+        var prefetch = document.createElement('link');
+        prefetch.rel = 'prefetch';
+        prefetch.href = href;
+        document.head.appendChild(prefetch);
+      }
+    });
+
+    // Intercept locale link clicks for smooth transition
+    document.addEventListener('click', function(e) {
+      var target = e.target.closest('.locale-link:not(.active)');
+      if (!target) return;
+      if (localeNavigationPending) return;
+      e.preventDefault();
+      var href = target.getAttribute('href');
+      if (!href) return;
+      localeNavigationPending = true;
+
+      // Immediately slide the indicator visually
+      var switcher = target.closest('.locale-switch, .mobile-locale-switch');
+      if (switcher) {
+        switcher.classList.toggle('ar-active');
+        // Toggle active class on links
+        var links = switcher.querySelectorAll('.locale-link');
+        Array.prototype.forEach.call(links, function(l) {
+          l.classList.toggle('active');
+        });
+      }
+
+      try {
+        sessionStorage.setItem('listen_locale_switch', '1');
+      } catch (_err) {}
+
+      // Smooth fade out then navigate
+      document.body.classList.add('locale-switching');
+      document.documentElement.classList.add('locale-switching');
+      document.body.classList.remove('locale-fade-in');
+      setTimeout(function() {
+        window.location.assign(href);
+      }, 110);
+    });
+  }
+
+  // Handle bfcache (back/forward): remove switching class
+  window.addEventListener('pageshow', function(e) {
+    document.body.classList.remove('locale-switching');
+    document.documentElement.classList.remove('locale-switching');
+    document.body.classList.remove('locale-fade-in');
+    if (e.persisted) {
+      document.body.classList.add('locale-fade-in');
+      setTimeout(function() {
+        document.body.classList.remove('locale-fade-in');
+      }, 260);
+    }
+  });
+
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
       initThemeToggle();
       initUserMenu();
       initMobileMenu();
       initRevealAnimations();
+      initLocaleSwitchTransition();
       window.initCustomAudioPlayers();
     });
   } else {
@@ -504,6 +590,7 @@
     initUserMenu();
     initMobileMenu();
     initRevealAnimations();
+    initLocaleSwitchTransition();
     window.initCustomAudioPlayers();
   }
 })();

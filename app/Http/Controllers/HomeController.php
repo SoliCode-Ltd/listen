@@ -108,13 +108,13 @@ class HomeController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => 'Setup validated. You can generate voice now.',
+            'message' => __('ui.backend.demo_setup_validated'),
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
             'translate' => (bool) ($validated['translate'] ?? false),
             'translate_note' => (bool) ($validated['translate'] ?? false)
-                ? 'Text will be translated to the selected voice language before audio generation.'
-                : 'Text will be spoken as-is without translation.',
+                ? __('ui.backend.demo_translate_note_before')
+                : __('ui.backend.demo_translate_note_as_is'),
             'voice' => VoiceCatalog::voiceMeta($voiceName),
             'voice_tier' => $tier,
             'voice_tier_label' => VoiceTier::label($tier),
@@ -183,8 +183,8 @@ class HomeController extends Controller
                 'target_language' => $validated['target_language'],
                 'translate' => (bool) ($validated['translate'] ?? false),
                 'translate_note' => (bool) ($validated['translate'] ?? false)
-                    ? 'Text was translated to the selected voice language before audio generation.'
-                    : 'Text was spoken as-is without translation.',
+                    ? __('ui.backend.demo_translate_note_done')
+                    : __('ui.backend.demo_translate_note_as_is_done'),
                 'voice' => VoiceCatalog::voiceMeta($voiceName),
                 'voice_tier' => $tier,
                 'voice_tier_label' => VoiceTier::label($tier),
@@ -211,7 +211,7 @@ class HomeController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => $firstError !== '' ? $firstError : 'Request validation failed.',
+                'message' => $firstError !== '' ? $firstError : __('ui.backend.request_validation_failed'),
                 'errors' => $errors,
                 'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
             ], 422);
@@ -229,7 +229,7 @@ class HomeController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'Voice generation failed. Please try again in a moment.',
+                'message' => __('ui.backend.demo_voice_generation_failed'),
                 'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
             ], 422);
         }
@@ -251,7 +251,7 @@ class HomeController extends Controller
         }
         if ($retryAfter > 0) {
             throw ValidationException::withMessages([
-                'text' => "Too many demo requests. Please retry in {$retryAfter}s.",
+                'text' => __('ui.backend.demo_too_many_requests', ['seconds' => $retryAfter]),
             ]);
         }
 
@@ -277,7 +277,7 @@ class HomeController extends Controller
                 $globalUsedRequests = (int) Cache::get($globalRequestKey, 0);
                 if (($globalUsedRequests + 1) > $globalRequestCap) {
                     throw ValidationException::withMessages([
-                        'text' => 'Demo preview capacity reached for today. Please try again tomorrow.',
+                        'text' => __('ui.backend.demo_preview_capacity_reached'),
                     ]);
                 }
 
@@ -286,7 +286,7 @@ class HomeController extends Controller
                 $globalUsedChars = (int) Cache::get($globalCharKey, 0);
                 if (($globalUsedChars + $chars) > $globalCharCap) {
                     throw ValidationException::withMessages([
-                        'text' => 'Demo preview capacity reached for today. Please try again tomorrow.',
+                        'text' => __('ui.backend.demo_preview_capacity_reached'),
                     ]);
                 }
 
@@ -311,7 +311,7 @@ class HomeController extends Controller
             $usedRequests = (int) Cache::get($dailyRequestKey, 0);
             if (($usedRequests + 1) > $dailyRequestCap) {
                 throw ValidationException::withMessages([
-                    'text' => 'Demo daily request limit reached. Please try again tomorrow.',
+                    'text' => __('ui.backend.demo_daily_request_limit'),
                 ]);
             }
         }
@@ -333,7 +333,7 @@ class HomeController extends Controller
             $globalUsedRequests = (int) Cache::get($globalRequestKey, 0);
             if (($globalUsedRequests + 1) > $globalRequestCap) {
                 throw ValidationException::withMessages([
-                    'text' => 'Demo preview capacity reached for today. Please try again tomorrow.',
+                    'text' => __('ui.backend.demo_preview_capacity_reached'),
                 ]);
             }
 
@@ -342,7 +342,7 @@ class HomeController extends Controller
             $globalUsedChars = (int) Cache::get($globalCharKey, 0);
             if (($globalUsedChars + $chars) > $globalCharCap) {
                 throw ValidationException::withMessages([
-                    'text' => 'Demo preview capacity reached for today. Please try again tomorrow.',
+                    'text' => __('ui.backend.demo_preview_capacity_reached'),
                 ]);
             }
 
@@ -415,7 +415,7 @@ class HomeController extends Controller
             $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
-                    'target_language' => 'Selected voice language is not available for this voice quality.',
+                    'target_language' => __('ui.backend.demo_language_not_available_for_quality'),
                 ]);
             }
 
@@ -425,7 +425,7 @@ class HomeController extends Controller
         $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_key' => 'Selected speaker is not available for the chosen voice language.',
+                'voice_key' => __('ui.backend.demo_speaker_not_available'),
             ]);
         }
 
@@ -492,20 +492,15 @@ class HomeController extends Controller
      */
     private static function resolveStructuredFeatures(Plan $plan, string $tier): array
     {
-        $raw = is_array($plan->features) ? $plan->features : [];
-
-        // Check if features are already in structured format
-        if (!empty($raw) && isset($raw[0]) && is_array($raw[0]) && array_key_exists('label', $raw[0])) {
-            return $raw;
-        }
-
-        // Auto-build defaults from plan attributes
+        // Always auto-build from plan attributes so labels are locale-aware.
+        // Stored raw features (DB JSON column) may contain hardcoded English strings
+        // and are intentionally bypassed here for i18n correctness.
         return [
-            ['label' => 'Requests', 'value' => (int) $plan->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $plan->monthly_requests), 'icon' => 'activity'],
-            ['label' => 'Max input', 'value' => number_format((int) $plan->max_chars_per_request) . ' chars', 'icon' => 'type'],
-            ['label' => 'Commercial use', 'value' => $plan->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
-            ['label' => 'Priority queue', 'value' => ($plan->processing_priority ?? 'standard') === 'high' ? 'High' : 'Standard', 'icon' => 'bolt'],
-            ['label' => 'Voice quality', 'value' => VoiceTier::label($tier), 'icon' => 'mic'],
+            ['label' => __('ui.pricing.feature_label_requests'), 'value' => (int) $plan->monthly_requests <= 0 ? __('ui.pricing.unlimited') : number_format((int) $plan->monthly_requests), 'icon' => 'activity'],
+            ['label' => __('ui.pricing.feature_label_max_input'), 'value' => number_format((int) $plan->max_chars_per_request) . ' ' . __('ui.pricing.chars'), 'icon' => 'type'],
+            ['label' => __('ui.pricing.feature_label_commercial_use'), 'value' => $plan->commercial_use_allowed ? __('ui.pricing.allowed') : __('ui.pricing.personal_only'), 'icon' => 'lock'],
+            ['label' => __('ui.pricing.feature_label_priority_queue'), 'value' => ($plan->processing_priority ?? 'standard') === 'high' ? __('ui.pricing.high') : __('ui.pricing.standard'), 'icon' => 'bolt'],
+            ['label' => __('ui.pricing.feature_label_voice_quality'), 'value' => VoiceTier::label($tier), 'icon' => 'mic'],
         ];
     }
 
@@ -530,24 +525,24 @@ class HomeController extends Controller
     private function demoLimitExceededMessage(Request $request, int $maxChars): string
     {
         if ($request->user()) {
-            return "Demo limit exceeded ({$maxChars} billable characters: letters and numbers only).";
+            return __('ui.backend.demo_limit_exceeded', ['max' => $maxChars]);
         }
 
         $starterPlanChars = max(1, (int) (Plan::query()->where('slug', 'free')->value('monthly_chars') ?? 30000));
 
-        return "Guest demo allows {$maxChars} billable characters total (letters and numbers only). Create a free account to unlock {$starterPlanChars} characters to start.";
+        return __('ui.backend.demo_guest_limit_exceeded', ['max' => $maxChars, 'starter' => $starterPlanChars]);
     }
 
     private function demoDailyCapReachedMessage(Request $request): string
     {
         if ($request->user()) {
-            return 'Demo daily character limit reached. Please try again tomorrow.';
+            return __('ui.backend.demo_daily_char_limit');
         }
 
         $starterPlanChars = max(1, (int) (Plan::query()->where('slug', 'free')->value('monthly_chars') ?? 30000));
         $allowance = $this->demoCharAllowance($request);
 
-        return "Guest demo quota reached ({$allowance} chars total). Create a free account to unlock {$starterPlanChars} characters to start.";
+        return __('ui.backend.demo_guest_quota_reached', ['allowance' => $allowance, 'starter' => $starterPlanChars]);
     }
 
     /**

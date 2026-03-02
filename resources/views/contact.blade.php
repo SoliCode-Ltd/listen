@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() ?? 'dark' }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Contact Us', 'page' => 'contact'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.contact_title'), 'page' => 'contact', 'theme' => (\App\Support\SeoHelper::defaultTheme() ?? 'dark')])
   <style>
     .bg-orb {
       position: fixed;
@@ -48,9 +39,9 @@
     <div class="contact-hero">
       <div class="hero-bg-accent" aria-hidden="true"></div>
       <div class="container text-left" style="max-width: 740px; margin: 0 auto; z-index: 10; position: relative; padding-bottom: 1rem;">
-        <h1 class="hero-title animate-in" style="font-size: clamp(2.75rem, 5vw, 4rem); font-weight: 800; letter-spacing: -.03em; margin-bottom: 1.25rem; font-family: var(--font-display); background: linear-gradient(135deg, var(--text) 40%, color-mix(in oklab, var(--text) 40%, transparent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Get in Touch</h1>
+        <h1 class="hero-title animate-in" style="font-size: clamp(2.75rem, 5vw, 4rem); font-weight: 800; letter-spacing: -.03em; margin-bottom: 1.25rem; font-family: var(--font-display); background: linear-gradient(135deg, var(--text) 40%, color-mix(in oklab, var(--text) 40%, transparent)); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{{ __('ui.contact.title') }}</h1>
         <p class="hero-subtitle animate-in" style="animation-delay: 0.1s; color: var(--muted); font-size: 1.2rem; line-height: 1.6; margin-bottom: 0; max-width: 580px;">
-          Have questions, feedback, or need support? We're here to help. Fill out the form below and our team will get back to you shortly.
+          {{ __('ui.contact.subtitle') }}
         </p>
       </div>
     </div>
@@ -79,33 +70,33 @@
           
           <div class="form-grid">
             <div class="form-group">
-              <label for="name">Name</label>
-              <input type="text" id="name" name="name" class="form-control" value="{{ old('name') }}" required placeholder="John Doe">
+              <label for="name">{{ __('ui.contact.name') }}</label>
+              <input type="text" id="name" name="name" class="form-control" value="{{ old('name') }}" required placeholder="{{ __('ui.contact.name_placeholder') }}">
               <span class="text-danger" data-error-for="name" @unless($errors->has('name')) style="display: none;" @endunless>{{ $errors->first('name') }}</span>
             </div>
             
             <div class="form-group">
-              <label for="email">Email Address</label>
-              <input type="email" id="email" name="email" class="form-control" value="{{ old('email') }}" required placeholder="john@example.com">
+              <label for="email">{{ __('ui.contact.email') }}</label>
+              <input type="email" id="email" name="email" class="form-control" value="{{ old('email') }}" required placeholder="{{ __('ui.contact.email_placeholder') }}">
               <span class="text-danger" data-error-for="email" @unless($errors->has('email')) style="display: none;" @endunless>{{ $errors->first('email') }}</span>
             </div>
           </div>
           
           <div class="form-group">
-            <label for="subject">Subject</label>
-            <input type="text" id="subject" name="subject" class="form-control" value="{{ old('subject') }}" required placeholder="How can we help?">
+            <label for="subject">{{ __('ui.contact.subject') }}</label>
+            <input type="text" id="subject" name="subject" class="form-control" value="{{ old('subject') }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
             <span class="text-danger" data-error-for="subject" @unless($errors->has('subject')) style="display: none;" @endunless>{{ $errors->first('subject') }}</span>
           </div>
           
           <div class="form-group">
-            <label for="message">Message</label>
-            <textarea id="message" name="message" class="form-control" rows="5" required placeholder="Tell us more about your inquiry...">{{ old('message') }}</textarea>
+            <label for="message">{{ __('ui.contact.message') }}</label>
+            <textarea id="message" name="message" class="form-control" rows="5" required placeholder="{{ __('ui.contact.message_placeholder') }}">{{ old('message') }}</textarea>
             <span class="text-danger" data-error-for="message" @unless($errors->has('message')) style="display: none;" @endunless>{{ $errors->first('message') }}</span>
           </div>
           
           <div class="form-submit">
             <button type="submit" class="btn btn-primary btn-lg btn-block contact-submit-btn">
-              <span data-submit-label>Send Message</span>
+              <span data-submit-label>{{ __('ui.contact.send_message') }}</span>
               <svg viewBox="0 0 24 24" class="btn-icon-right"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
             </button>
           </div>
@@ -116,15 +107,26 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $contactI18n = [
+      'send_message' => __('ui.contact.send_message'),
+      'sending' => __('ui.contact.sending'),
+      'success' => __('ui.contact.success'),
+      'fix_fields' => __('ui.contact.fix_fields'),
+      'send_failed' => __('ui.contact.send_failed'),
+      'network_error' => __('ui.contact.network_error'),
+    ];
+  @endphp
   <script>
     (function () {
+      var i18n = @json($contactI18n);
       var form = document.getElementById('contactForm');
       if (!form || !window.fetch) return;
 
       var submitButton = form.querySelector('button[type="submit"]');
       var submitLabel = form.querySelector('[data-submit-label]');
       var alertContainer = document.getElementById('contactAlertContainer');
-      var defaultButtonText = submitLabel ? submitLabel.textContent : 'Send Message';
+      var defaultButtonText = submitLabel ? submitLabel.textContent : (i18n.send_message || 'Send Message');
 
       var errorNodes = {};
       form.querySelectorAll('[data-error-for]').forEach(function (node) {
@@ -171,7 +173,7 @@
         clearErrors();
 
         if (submitButton) submitButton.disabled = true;
-        if (submitLabel) submitLabel.textContent = 'Sending...';
+        if (submitLabel) submitLabel.textContent = i18n.sending || 'Sending...';
 
         try {
           var response = await fetch(form.action, {
@@ -193,19 +195,19 @@
 
           if (response.ok && payload && payload.ok) {
             form.reset();
-            renderAlert('success', payload.message || 'Your message has been sent successfully!');
+            renderAlert('success', payload.message || i18n.success || 'Your message has been sent successfully!');
             return;
           }
 
           if (response.status === 422 && payload && payload.errors) {
             applyErrors(payload.errors);
-            renderAlert('error', payload.message || 'Please correct the highlighted fields.');
+            renderAlert('error', payload.message || i18n.fix_fields || 'Please correct the highlighted fields.');
             return;
           }
 
-          renderAlert('error', (payload && payload.message) ? payload.message : 'Unable to send your message right now. Please try again.');
+          renderAlert('error', (payload && payload.message) ? payload.message : (i18n.send_failed || 'Unable to send your message right now. Please try again.'));
         } catch (networkError) {
-          renderAlert('error', 'Network error. Please check your connection and try again.');
+          renderAlert('error', i18n.network_error || 'Network error. Please check your connection and try again.');
         } finally {
           if (submitButton) submitButton.disabled = false;
           if (submitLabel) submitLabel.textContent = defaultButtonText;
@@ -215,3 +217,4 @@
   </script>
 </body>
 </html>
+

@@ -3,6 +3,8 @@
 
   $currentYear = date('Y');
   $siteName = \App\Models\SiteSetting::get('site_name', 'Listen');
+  $currentLocale = app()->getLocale();
+  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'إسمع' : $siteName;
   $logoPath = trim((string) \App\Models\SiteSetting::get('logo_url', ''));
   $logoUrl = null;
   $showSocial = (string) \App\Models\SiteSetting::get('footer_social_enabled', '1') === '1';
@@ -47,69 +49,51 @@
 @endphp
 
 <footer class="app-footer">
+  @php
+    $hasSocialLinks = !empty($socialLinks);
+  @endphp
   <div class="footer-container">
     <div class="footer-grid">
       <div class="footer-brand">
-        <a class="brand" href="{{ route('home') }}" aria-label="{{ $siteName }} home">
+        <a class="brand" href="{{ route('home') }}" aria-label="{{ __('ui.header.brand_home', ['name' => $brandName]) }}">
           @if($logoUrl)
-            <img src="{{ $logoUrl }}" alt="{{ $siteName }}" style="max-height: 32px; width: auto;" />
+            <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 32px; width: auto;" />
           @else
             <span class="brand-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" role="img"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
             </span>
-            <span class="brand-text">{{ $siteName }}</span>
+            <span class="brand-text">{{ $brandName }}</span>
           @endif
         </a>
-        <p class="footer-tagline">Enterprise-grade voice synthesis for modern applications. Arabic and English support with premium voice presets.</p>
+        <p class="footer-tagline">{{ __('ui.footer.tagline') }}</p>
       </div>
 
       <div class="footer-links">
         <div class="footer-column">
-          <h4>Product</h4>
+          <h4>{{ __('ui.footer.product') }}</h4>
           <ul>
-            <!-- <li><a href="{{ route('home') }}">Features</a></li> -->
-            <li><a href="{{ route('pricing') }}">Pricing</a></li>
-            <li><a href="{{ route('demo.page') }}">Demo</a></li>
-            <li><a href="{{ route('browsers-extension.page') }}">Browsers Extension</a></li>
-          </ul>
-        </div>
-
-        <!-- <div class="footer-column">
-          <h4>Resources</h4>
-          <ul>
-            <li><a href="{{ route('dashboard') }}">Dashboard</a></li>
-            <li><a href="#">Documentation</a></li>
-            <li><a href="#">API Reference</a></li>
-            <li><a href="#">Status</a></li>
+            <li><a href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a></li>
+            <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
+            <li><a href="{{ route('browsers-extension.page') }}">{{ __('ui.nav.extension') }}</a></li>
           </ul>
         </div>
 
         <div class="footer-column">
-          <h4>Company</h4>
+          <h4>{{ __('ui.footer.legal') }}</h4>
           <ul>
-            <li><a href="#">About</a></li>
-            <li><a href="#">Blog</a></li>
-            <li><a href="#">Careers</a></li>
-            <li><a href="#">Contact</a></li>
-          </ul>
-        </div> -->
-
-        <div class="footer-column">
-          <h4>Legal</h4>
-          <ul>
-            <li><a href="{{ route('legal.privacy') }}">Privacy Policy</a></li>
-            <li><a href="{{ route('legal.terms') }}">Terms of Service</a></li>
-            <li><a href="{{ route('legal.cookies') }}">Cookie Policy</a></li>
+            <li><a href="{{ route('legal.privacy') }}">{{ __('ui.footer.privacy') }}</a></li>
+            <li><a href="{{ route('legal.terms') }}">{{ __('ui.footer.terms') }}</a></li>
+            <li><a href="{{ route('legal.cookies') }}">{{ __('ui.footer.cookies') }}</a></li>
           </ul>
         </div>
       </div>
     </div>
 
-    <div class="footer-bottom">
+    <div class="footer-bottom {{ $hasSocialLinks ? '' : 'single' }}">
       <div class="footer-copyright">
-        <p>&copy; {{ $currentYear }} Listen. Crafted by SoliCode Ltd. All rights reserved.</p>
+        <p>{{ __('ui.footer.copyright', ['year' => $currentYear, 'name' => $brandName]) }}</p>
       </div>
-      @if(!empty($socialLinks))
+      @if($hasSocialLinks)
         <div class="footer-social">
           @foreach($socialLinks as $social)
             <a href="{{ $social['url'] }}" aria-label="{{ $social['label'] }}" class="social-link" target="_blank" rel="noopener noreferrer">
@@ -129,3 +113,4 @@
     </div>
   </div>
 </footer>
+

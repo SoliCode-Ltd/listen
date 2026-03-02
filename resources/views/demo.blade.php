@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Demo', 'page' => 'demo'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <style>
     .bg-orb {
       position: fixed;
@@ -360,13 +351,13 @@
       <div class="hero-grid">
         <article class="page-card reveal">
           <!-- <span class="eyebrow">Live voice test studio</span> -->
-          <h1>Choose speaker, voice language, and translation - then preview instantly.</h1>
-          <p style="color: var(--muted); margin: 0;">This page is optimized for quick product validation. No clutter, only the controls that matter.</p>
+          <h1>{{ __('ui.demo.hero_title') }}</h1>
+          <p style="color: var(--muted); margin: 0;">{{ __('ui.demo.hero_subtitle') }}</p>
           <div class="hero-list">
-            <div>- Branded voice personas only</div>
-            <div>- Clear translation behavior</div>
-            <div>- Quality switch (Standard / HD / HD+)</div>
-            <div>- Instant audio preview</div>
+            <div>- {{ __('ui.demo.hero_point_1') }}</div>
+            <div>- {{ __('ui.demo.hero_point_2') }}</div>
+            <div>- {{ __('ui.demo.hero_point_3') }}</div>
+            <div>- {{ __('ui.demo.hero_point_4') }}</div>
           </div>
           <div class="sound-wave" id="heroWave" aria-hidden="true">
             <span></span><span></span><span></span><span></span><span></span><span></span>
@@ -375,12 +366,12 @@
         </article>
 
         <aside class="page-card reveal">
-          <h3 style="margin: .1rem 0 .5rem; font-size: 1.1rem;">Voice coverage</h3>
+          <h3 style="margin: .1rem 0 .5rem; font-size: 1.1rem;">{{ __('ui.demo.voice_coverage') }}</h3>
           <div class="stats">
-            <div class="stat"><small>Arabic voices</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['ar'] ?? [])) }}</b></div>
-            <div class="stat"><small>English voices</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['en'] ?? [])) }}</b></div>
-            <div class="stat"><small>Arabic default</small><b>{{ $defaultVoiceAr['label'] ?? 'Sara' }}</b></div>
-            <div class="stat"><small>English default</small><b>{{ $defaultVoiceEn['label'] ?? 'Emma' }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.arabic_voices') }}</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['ar'] ?? [])) }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.english_voices') }}</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['en'] ?? [])) }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.arabic_default') }}</small><b>{{ app()->getLocale() === 'ar' ? ($defaultVoiceAr['label_ar'] ?? $defaultVoiceAr['label'] ?? 'سارة') : ($defaultVoiceAr['label'] ?? 'Sara') }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.english_default') }}</small><b>{{ app()->getLocale() === 'ar' ? ($defaultVoiceEn['label_ar'] ?? $defaultVoiceEn['label'] ?? 'إيما') : ($defaultVoiceEn['label'] ?? 'Emma') }}</b></div>
           </div>
         </aside>
       </div>
@@ -389,34 +380,34 @@
     <section class="lab">
       <div class="lab-grid">
         <section class="page-card reveal">
-          <h3 style="margin: .1rem 0 .7rem; font-size: 1.1rem;">Try your best demo flow</h3>
-          <p class="hint" style="margin: -.2rem 0 .5rem;">Guest demo includes one-time starter credit. Create a free account for full starter capacity.</p>
+          <h3 style="margin: .1rem 0 .7rem; font-size: 1.1rem;">{{ __('ui.demo.try_flow_title') }}</h3>
+          <p class="hint" style="margin: -.2rem 0 .5rem;">{{ __('ui.demo.try_flow_subtitle') }}</p>
           <div class="quota" id="quotaBox">
             <div class="quota-head">
-              <span class="quota-label">Guest starter allowance</span>
+              <span class="quota-label">{{ __('ui.demo.guest_starter_allowance') }}</span>
               <strong class="quota-value" id="quotaValue">
-                {{ number_format((int) ($demoQuota['remaining_chars'] ?? $guestAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $guestAllowanceChars)) }} chars left
+                {{ number_format((int) ($demoQuota['remaining_chars'] ?? $guestAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $guestAllowanceChars)) }} {{ __('ui.demo.chars_left') }}
               </strong>
             </div>
             <div class="quota-track">
               <div class="quota-fill" id="quotaFill"></div>
             </div>
-            <div class="quota-note">One-time guest credit. Create a free account to unlock {{ number_format((int) $starterPlanChars) }} characters.</div>
+            <div class="quota-note">{{ __('ui.demo.one_time_guest_credit', ['chars' => number_format((int) $starterPlanChars)]) }}</div>
           </div>
           <form id="demoForm" class="form-grid">
             <div>
-              <label for="text">Text input</label>
-              <textarea id="text" name="text" dir="auto" placeholder="Paste content to test..." required></textarea>
+              <label for="text">{{ __('ui.demo.text_input') }}</label>
+              <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
             </div>
 
             <div class="chips">
-              <button class="chip" type="button" data-sample="Welcome to our platform. We build professional software with world-class quality.">English sample</button>
-              <button class="chip" type="button" data-sample="مرحبًا بك في منصتنا. نحن نبني برمجيات احترافية بجودة عالمية.">Arabic sample</button>
+              <button class="chip" type="button" data-sample="Welcome to our platform. We build professional software with world-class quality.">{{ __('ui.demo.english_sample') }}</button>
+              <button class="chip" type="button" data-sample="{{ __('ui.demo.arabic_sample_text') }}">{{ __('ui.demo.arabic_sample') }}</button>
             </div>
 
             <div class="two-col demo-controls">
               <div>
-                <label for="voice_tier">Voice quality</label>
+                <label for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
                 <select id="voice_tier" name="voice_tier">
                   @foreach($demoTiers as $tier)
                     <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>
@@ -426,22 +417,22 @@
                 </select>
               </div>
               <div>
-                <label for="target_language">Voice Language</label>
+                <label for="target_language">{{ __('ui.demo.voice_language') }}</label>
                 <select id="target_language" name="target_language">
-                  <option value="ar">Arabic</option>
-                  <option value="en">English</option>
+                  <option value="ar">{{ __('ui.demo.arabic') }}</option>
+                  <option value="en">{{ __('ui.demo.english') }}</option>
                 </select>
               </div>
               <div>
-                <label for="voice_gender">Gender</label>
+                <label for="voice_gender">{{ __('ui.demo.gender') }}</label>
                 <select id="voice_gender">
-                  <option value="all">Any</option>
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
+                  <option value="all">{{ __('ui.demo.any') }}</option>
+                  <option value="female">{{ __('ui.demo.female') }}</option>
+                  <option value="male">{{ __('ui.demo.male') }}</option>
                 </select>
               </div>
               <div>
-                <label for="voice_key">Speaker</label>
+                <label for="voice_key">{{ __('ui.demo.speaker') }}</label>
                 <select id="voice_key" name="voice_key"></select>
               </div>
             </div>
@@ -449,10 +440,10 @@
             <div>
               <div class="setting-card" style="margin-top: .5rem;">
                 <div class="setting-info">
-                  <label for="translateToggle">Translate before speaking</label>
-                  <div class="hint" id="translateHint">Text is translated first, then spoken in the selected voice language.</div>
+                  <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
+                  <div class="hint" id="translateHint">{{ __('ui.demo.translate_enabled_hint') }}</div>
                 </div>
-                <label class="toggle-switch" aria-label="Translate before speaking">
+                <label class="toggle-switch" aria-label="{{ __('ui.demo.translate_before_speaking') }}">
                   <input type="checkbox" id="translateToggle" checked>
                   <span class="toggle-slider"></span>
                 </label>
@@ -461,14 +452,14 @@
             </div>
 
             <div style="display: flex; gap: .6rem; flex-wrap: wrap;">
-              <button class="btn btn-primary" type="button" id="previewBtn">Generate Voice</button>
+              <button class="btn btn-primary" type="button" id="previewBtn">{{ __('ui.demo.generate_voice') }}</button>
             </div>
           </form>
 
           <div id="errorBox" class="error-box" style="display: none;"></div>
           <div class="quota-upgrade" id="upgradeBox">
-            <p id="upgradeText">Guest demo quota reached. Create a free account to unlock {{ number_format((int) $starterPlanChars) }} characters and continue instantly.</p>
-            <a class="btn btn-primary" href="{{ route('register') }}">Create Free Account</a>
+            <p id="upgradeText">{{ __('ui.demo.upgrade_text', ['chars' => number_format((int) $starterPlanChars)]) }}</p>
+            <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.demo.create_free_account') }}</a>
           </div>
 
           <div class="audio-box" id="audioWrap" style="display: none;">
@@ -482,6 +473,27 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $demoI18n = [
+      'upgrade_text' => __('ui.demo.upgrade_text_raw'),
+      'chars_left' => __('ui.demo.chars_left'),
+      'quota_total_start' => __('ui.demo.quota_total_start'),
+      'translate_enabled_hint' => __('ui.demo.translate_enabled_hint'),
+      'translate_disabled_hint' => __('ui.demo.translate_disabled_hint'),
+      'any' => __('ui.demo.any'),
+      'no_speakers' => __('ui.demo.no_speakers'),
+      'request_failed' => __('ui.demo.request_failed'),
+      'text_required' => __('ui.demo.text_required'),
+      'selected_chars_exceed' => __('ui.demo.selected_chars_exceed'),
+      'generating' => __('ui.demo.generating'),
+      'no_audio_returned' => __('ui.demo.no_audio_returned'),
+      'selected_speaker' => __('ui.demo.selected_speaker'),
+      'preview_failed' => __('ui.demo.preview_failed'),
+      'generate_voice' => __('ui.demo.generate_voice'),
+      'create_account_unlock' => __('ui.demo.create_account_unlock'),
+      'speaker_prefix' => __('ui.demo.speaker_prefix'),
+    ];
+  @endphp
   <script>
     const voiceCatalogByTier = @json($voiceCatalog);
     const form = document.getElementById('demoForm');
@@ -506,6 +518,8 @@
     const textInput = document.getElementById('text');
     const demoQuota = @json($demoQuota ?? null);
     const starterPlanChars = Number(@json((int) $starterPlanChars));
+    const i18n = @json($demoI18n);
+    const pageLocale = document.documentElement.lang || 'en';
 
     const csrfHeaders = {
       'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -525,7 +539,7 @@
     let fingerprintPromise = null;
 
     function formatNumber(value) {
-      return new Intl.NumberFormat().format(Number(value || 0));
+      return new Intl.NumberFormat('en-US').format(Number(value || 0));
     }
 
     function countBillableChars(value) {
@@ -585,7 +599,7 @@
       if (!upgradeBox) return;
       upgradeBox.style.display = show ? 'block' : 'none';
       if (show && upgradeText) {
-        const fallback = `Guest demo quota reached. Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue instantly.`;
+        const fallback = i18n.upgrade_text.replace(':chars', formatNumber(starterPlanChars));
         upgradeText.textContent = customMessage || fallback;
       }
     }
@@ -594,7 +608,7 @@
       if (!quota || typeof quota !== 'object') return;
       currentQuota = { ...currentQuota, ...quota };
       if (quotaValue) {
-        quotaValue.textContent = `${formatNumber(currentQuota.remaining_chars)} / ${formatNumber(currentQuota.limit_chars)} chars left`;
+        quotaValue.textContent = `${formatNumber(currentQuota.remaining_chars)} / ${formatNumber(currentQuota.limit_chars)} ${i18n.chars_left}`;
       }
       if (quotaFill) {
         const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
@@ -606,7 +620,7 @@
         const pending = countBillableChars(textInput?.value || '');
         if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
       }
-      setUpgradeVisible(Boolean(currentQuota.is_exhausted), `Guest demo quota reached (${formatNumber(currentQuota.limit_chars)} chars total). Create a free account to unlock ${formatNumber(starterPlanChars)} characters to start.`);
+      setUpgradeVisible(Boolean(currentQuota.is_exhausted), i18n.quota_total_start.replace(':total', formatNumber(currentQuota.limit_chars)).replace(':chars', formatNumber(starterPlanChars)));
     }
 
     async function buildFingerprint() {
@@ -651,8 +665,8 @@
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Text is translated first, then spoken in the selected voice language.'
-        : 'Original text is spoken directly without translation.';
+        ? i18n.translate_enabled_hint
+        : i18n.translate_disabled_hint;
     }
 
     function getFilteredVoices() {
@@ -665,10 +679,19 @@
       return sortVoices(filtered);
     }
 
-    function formatGender(value) {
-      const text = String(value || '').trim().toLowerCase();
-      if (!text) return 'Any';
-      return text.charAt(0).toUpperCase() + text.slice(1);
+    function cleanSpeakerLabel(value) {
+      return String(value || '').replace(/^\++\s*/, '').trim();
+    }
+
+    function voiceDisplayLabel(voice) {
+      const label = pageLocale === 'ar' && voice.label_ar ? voice.label_ar : voice.label;
+      return cleanSpeakerLabel(label);
+    }
+
+    function formatTierLabel(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      return `\u2066${text}\u2069`;
     }
 
     function sortVoices(list) {
@@ -693,14 +716,18 @@
       const current = String(remembered || '').trim();
       voiceSelect.innerHTML = '';
       if (!voices.length) {
-        voiceSelect.innerHTML = '<option value="">No speakers available</option>';
+        voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>';
         preferredVoiceKeyByLanguage[lang] = '';
         return;
       }
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        option.textContent = `${voice.label} - ${formatGender(voice.gender)}`;
+        const label = voiceDisplayLabel(voice);
+        const quality = String(voice?.tier_label || '').trim();
+        option.textContent = quality !== ''
+          ? `${label} - ${formatTierLabel(quality)}`
+          : label;
         voiceSelect.appendChild(option);
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
@@ -753,7 +780,7 @@
       if (!res.ok || data?.ok === false) {
         const firstError = data?.errors && typeof data.errors === 'object' ? Object.values(data.errors)[0] : null;
         const firstErrorText = Array.isArray(firstError) ? String(firstError[0] || '') : '';
-        const error = new Error(String(data?.message || firstErrorText || 'Request failed'));
+        const error = new Error(String(data?.message || firstErrorText || i18n.request_failed));
         error.payload = data;
         throw error;
       }
@@ -772,52 +799,52 @@
         const selectedChars = countBillableChars(trimmed);
         if (!trimmed) {
           hideAudioPreview();
-          setError('The text field is required.');
+          setError(i18n.text_required);
           return;
         }
         if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
           hideAudioPreview();
-          const message = `You selected ${formatNumber(selectedChars)} billable characters, but only ${formatNumber(currentQuota.remaining_chars)} are left in guest demo credit.`;
+          const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(currentQuota.remaining_chars));
           setError(message);
-          setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+          setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
           return;
         }
         previewBtn.disabled = true;
-        previewBtn.textContent = 'Generating...';
+        previewBtn.textContent = i18n.generating;
         hideAudioPreview();
         const data = await callEndpoint('{{ route('demo.preview') }}');
         renderQuota(data?.quota || null);
         if (!data?.audio_url) {
           hideAudioPreview();
-          setError('Voice generation did not return audio. Please try again.');
+          setError(i18n.no_audio_returned);
           return;
         }
         audioWrap.style.display = 'block';
         if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
         previewAudio.dataset.downloadLanguage = String(data?.target_language || normalizeLanguage(targetLanguage?.value || 'ar'));
         previewAudio.dataset.downloadText = String(trimmed).slice(0, 42);
-        previewAudio.dataset.downloadSpeaker = String(data?.voice?.label || 'Selected speaker');
+        previewAudio.dataset.downloadSpeaker = cleanSpeakerLabel(String(data?.voice?.label || i18n.selected_speaker));
         previewAudio.dataset.downloadQuality = String(data?.voice_tier_label || 'Standard');
         previewAudio.src = data.audio_url;
         previewAudio.load();
-        const label = data?.voice?.label || 'Selected speaker';
-        const gender = data?.voice?.gender ? ` (${formatGender(data.voice.gender)})` : '';
-        const quality = data?.voice_tier_label ? ` - ${data.voice_tier_label}` : '';
-        audioMeta.textContent = `Speaker: ${label}${gender}${quality} - ${data.translate_note}`;
+        const voiceData = data?.voice || {};
+        const label = pageLocale === 'ar' && voiceData.label_ar ? cleanSpeakerLabel(voiceData.label_ar) : cleanSpeakerLabel(voiceData.label || i18n.selected_speaker);
+        const quality = data?.voice_tier_label ? ` - ${formatTierLabel(data.voice_tier_label)}` : '';
+        audioMeta.textContent = `${i18n.speaker_prefix} ${label}${quality} - ${data.translate_note}`;
       } catch (err) {
         hideAudioPreview();
-        const message = String(err?.message || 'Preview failed. Try another text or voice.');
+        const message = String(err?.message || i18n.preview_failed);
         if (err?.payload?.quota) {
           renderQuota(err.payload.quota);
         }
         setError(message);
         if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
-          setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+          setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0 });
         }
       } finally {
         previewBtn.disabled = false;
-        previewBtn.textContent = 'Generate Voice';
+        previewBtn.textContent = i18n.generate_voice;
         setTimeout(() => heroWave?.classList.remove('dynamic'), 900);
       }
     });
@@ -855,7 +882,7 @@
     });
     textInput?.addEventListener('input', () => {
       if (currentQuota.remaining_chars <= 0) {
-        setUpgradeVisible(true, `Create a free account to unlock ${formatNumber(starterPlanChars)} characters and continue.`);
+        setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
       }
     });
     if (translateToggle && translateSelect) {

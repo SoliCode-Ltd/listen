@@ -32,7 +32,7 @@ class VoiceTier
         return match (self::normalize($tier)) {
             self::HD => 'HD',
             self::HD_PLUS => 'HD+',
-            default => 'Standard',
+            default => __('ui.pricing.standard'),
         };
     }
 

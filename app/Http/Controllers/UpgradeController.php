@@ -39,7 +39,7 @@ class UpgradeController extends Controller
                     'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
                     'overage_label' => $plan->allow_overage
                         ? '$'.number_format(((int) ($plan->overage_price_per_million_cents ?? 0)) / 100, 2).' / 1M chars'
-                        : 'No overage',
+                        : __('ui.upgrade.no_overage'),
                     'voice_tier' => VoiceTier::label((string) ($plan->voice_tier ?: 'standard')),
                     'is_popular' => $plan->slug === 'creator',
                 ];

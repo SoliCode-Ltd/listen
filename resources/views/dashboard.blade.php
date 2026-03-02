@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Dashboard', 'page' => 'dashboard'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <style>
     .main-content {
       padding: 1.5rem 0 3rem;
@@ -410,57 +401,107 @@
   </script>
 </head>
 <body>
+  @php
+    $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
+      return match ((string) $slug) {
+        'free' => __('ui.pricing.plan_name_free'),
+        'creator' => __('ui.pricing.plan_name_creator'),
+        'pro' => __('ui.pricing.plan_name_pro'),
+        default => (string) ($fallback ?: '-'),
+      };
+    };
+    $statusLabelByKey = static function (?string $status): string {
+      return match (strtolower((string) $status)) {
+        'queued' => __('ui.dashboard.status_queued'),
+        'processing' => __('ui.dashboard.status_processing'),
+        'done' => __('ui.dashboard.status_done'),
+        'failed' => __('ui.dashboard.status_failed'),
+        default => strtoupper((string) $status),
+      };
+    };
+    $languageLabelByCode = static function (?string $code): string {
+      return match ((string) $code) {
+        'ar' => __('ui.dashboard.arabic'),
+        'en' => __('ui.dashboard.english'),
+        default => (string) ($code ?: '-'),
+      };
+    };
+    $processingPriorityLabel = static function (?string $value): string {
+      return strtolower((string) $value) === 'high'
+        ? __('ui.dashboard.priority_high')
+        : __('ui.dashboard.priority_standard');
+    };
+    $cleanSpeakerLabel = static function (?string $value): string {
+      return ltrim(trim((string) $value), '+');
+    };
+    $formatTierLabel = static function (?string $label): string {
+      $text = trim((string) $label);
+      if ($text !== '' && preg_match('/[A-Za-z0-9+]/', $text) && !preg_match('/[\x{0600}-\x{06FF}]/u', $text)) {
+        return "\u{2066}{$text}\u{2069}";
+      }
+      return $text;
+    };
+    $activePlanDisplayName = $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    $speakerDisplayLabel = static function (?string $voiceName) use ($voiceNameMap, $cleanSpeakerLabel): string {
+      $entry = $voiceNameMap[$voiceName] ?? null;
+      if (! $entry) return $cleanSpeakerLabel(__('ui.dashboard.default_speaker'));
+      $label = app()->getLocale() === 'ar'
+        ? ($entry['label_ar'] ?? $entry['label'] ?? __('ui.dashboard.default_speaker'))
+        : ($entry['label'] ?? __('ui.dashboard.default_speaker'));
+      return $cleanSpeakerLabel($label);
+    };
+  @endphp
   @include('components.header')
 
   <main class="container main-content">
     <section>
       <div class="hero-grid">
         <article class="page-card reveal">
-          <h1>Command Center</h1>
-          <p style="color: var(--muted); margin: 0;">Manage voice jobs, monitor usage, and keep delivery smooth.</p>
+          <h1>{{ __('ui.dashboard.command_center') }}</h1>
+          <p style="color: var(--muted); margin: 0;">{{ __('ui.dashboard.command_center_subtitle') }}</p>
 
           <div class="meter">
             <div class="meter-header">
-              <small>Characters usage ({{ $activePlan?->name ?? 'Free' }})</small>
-              <small id="usageCharsText">{{ number_format($usage->total_chars) }} / {{ number_format($planChars) }} chars</small>
+              <small>{{ __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
+              <small id="usageCharsText">{{ number_format($usage->total_chars) }} / {{ number_format($planChars) }} {{ __('ui.dashboard.chars') }}</small>
             </div>
             <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ $usageCharsPercent }}%"></div></div>
           </div>
 
           <div class="meter">
             <div class="meter-header">
-              <small>Requests usage</small>
+              <small>{{ __('ui.dashboard.requests_usage') }}</small>
               <small id="usageRequestsText">
                 {{ $usage->total_requests }} /
-                {{ $requestsUnlimited ? 'Unlimited' : $planRequests }}
-                requests
+                {{ $requestsUnlimited ? __('ui.dashboard.unlimited') : $planRequests }}
+                {{ __('ui.dashboard.requests') }}
               </small>
             </div>
             <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ $usageRequestsPercent }}%"></div></div>
           </div>
 
           <div class="kpis">
-            <div class="kpi"><small>Requests</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
-            <div class="kpi"><small>Characters</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
-            <div class="kpi"><small>Total Jobs</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
+            <div class="kpi"><small>{{ __('ui.dashboard.requests') }}</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
+            <div class="kpi"><small>{{ __('ui.dashboard.characters') }}</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
+            <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
         </article>
 
         <aside class="page-card reveal">
-          <h2>System health</h2>
+          <h2>{{ __('ui.dashboard.system_health') }}</h2>
           <div class="mini">
-            <div class="box"><small>Processing</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
-            <div class="box"><small>Done</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
-            <div class="box"><small>Failed</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
+            <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
+            <div class="box"><small>{{ __('ui.dashboard.done') }}</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
+            <div class="box"><small>{{ __('ui.dashboard.failed') }}</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
           </div>
-          <p style="color: var(--muted); margin-top: .85rem;">Voice quality on this account: <strong>{{ $planTierLabel }}</strong>.</p>
+          <p style="color: var(--muted); margin-top: .85rem;">{{ __('ui.dashboard.voice_quality_on_account') }}: <strong>{{ $formatTierLabel($planTierLabel) }}</strong>.</p>
         </aside>
       </div>
     </section>
 
     <section class="main-grid" id="queue">
       <article class="page-card reveal">
-        <h2>Generate a new voice</h2>
+        <h2>{{ __('ui.dashboard.generate_new_voice') }}</h2>
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
@@ -469,25 +510,25 @@
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
           <div>
-            <label>Title (optional)</label>
-            <input name="title" dir="auto" value="{{ old('title') }}" placeholder="Notification summary" />
+            <label>{{ __('ui.dashboard.title_optional') }}</label>
+            <input name="title" dir="auto" value="{{ old('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
           </div>
 
           <div>
-            <label>Text content</label>
-            <textarea name="content" dir="auto" rows="8" required placeholder="Paste your text...">{{ old('content') }}</textarea>
+            <label>{{ __('ui.dashboard.text_content') }}</label>
+            <textarea name="content" dir="auto" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
           </div>
 
           <div class="two-col">
             <div>
-              <label>Voice Language</label>
+              <label>{{ __('ui.dashboard.voice_language') }}</label>
               <select name="target_language" id="target_language">
-                <option value="ar" {{ old('target_language', 'ar') === 'ar' ? 'selected' : '' }}>Arabic</option>
-                <option value="en" {{ old('target_language', 'ar') === 'en' ? 'selected' : '' }}>English</option>
+                <option value="ar" {{ old('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
+                <option value="en" {{ old('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
               </select>
             </div>
             <div>
-              <label>Speaker</label>
+              <label>{{ __('ui.dashboard.speaker') }}</label>
               <select name="voice_key" id="voice_key"></select>
             </div>
           </div>
@@ -495,10 +536,10 @@
           <div>
             <div class="setting-card" style="margin-top: .5rem;">
               <div class="setting-info">
-                <label for="translateToggle">Translate before speaking</label>
-                <div class="hint" id="translateHint">Text is translated first, then spoken in selected voice language.</div>
+                <label for="translateToggle">{{ __('ui.dashboard.translate_before_speaking') }}</label>
+                <div class="hint" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
               </div>
-              <label class="toggle-switch" aria-label="Translate before speaking">
+              <label class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
                 <input type="checkbox" id="translateToggle" {{ old('translate', '1') ? 'checked' : '' }}>
                 <span class="toggle-slider"></span>
               </label>
@@ -506,53 +547,53 @@
             </div>
           </div>
 
-          <button class="btn btn-primary" id="generateBtn" type="submit">Generate Voice Now</button>
+          <button class="btn btn-primary" id="generateBtn" type="submit">{{ __('ui.dashboard.generate_voice_now') }}</button>
         </form>
       </article>
 
       <aside class="page-card reveal sidebar-info">
-        <h3 style="margin-top:0;">Plan & Defaults</h3>
+        <h3 style="margin-top:0;">{{ __('ui.dashboard.plan_and_defaults') }}</h3>
         
         <div class="info-list">
-          <div class="info-row"><span class="info-label">Current plan</span><span class="info-value"><span class="status done">{{ strtoupper($activePlan?->name ?? 'Free') }}</span></span></div>
-          <div class="info-row"><span class="info-label">Voice quality</span><span class="info-value">{{ $planTierLabel }}</span></div>
-          <div class="info-row"><span class="info-label">Monthly chars</span><span class="info-value">{{ number_format($planChars) }}</span></div>
-          <div class="info-row"><span class="info-label">Monthly reqs</span><span class="info-value">{{ $requestsUnlimited ? 'Unlimited' : $planRequests }}</span></div>
-          <div class="info-row"><span class="info-label">Max chars/req</span><span class="info-value">{{ $activePlan?->max_chars_per_request ?? 600 }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.current_plan') }}</span><span class="info-value"><span class="status done">{{ $activePlanDisplayName }}</span></span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.voice_quality') }}</span><span class="info-value">{{ $formatTierLabel($planTierLabel) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.monthly_chars') }}</span><span class="info-value">{{ number_format($planChars) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.monthly_reqs') }}</span><span class="info-value">{{ $requestsUnlimited ? __('ui.dashboard.unlimited') : $planRequests }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.max_chars_per_req') }}</span><span class="info-value">{{ $activePlan?->max_chars_per_request ?? 600 }}</span></div>
         </div>
 
         <div class="info-list">
-          <div class="info-row"><span class="info-label">Overage</span><span class="info-value">{{ ($activePlan?->allow_overage ?? false) ? ('$'.number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2).' / 1M') : 'No' }}</span></div>
-          <div class="info-row"><span class="info-label">Commercial use</span><span class="info-value">{{ ($activePlan?->commercial_use_allowed ?? false) ? 'Yes' : 'No' }}</span></div>
-          <div class="info-row"><span class="info-label">Processing</span><span class="info-value">{{ ucfirst((string) ($activePlan?->processing_priority ?? 'standard')) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.overage') }}</span><span class="info-value">{{ ($activePlan?->allow_overage ?? false) ? __('ui.dashboard.overage_per_million', ['amount' => "\u{2066}$".number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2)."\u{2069}"]) : __('ui.upgrade.no_overage') }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.commercial_use') }}</span><span class="info-value">{{ ($activePlan?->commercial_use_allowed ?? false) ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.processing') }}</span><span class="info-value">{{ $processingPriorityLabel((string) ($activePlan?->processing_priority ?? 'standard')) }}</span></div>
         </div>
 
         <div class="info-list">
-          <div class="info-row"><span class="info-label">Arabic default</span><span class="info-value">{{ $voiceNameMap[$defaultVoiceAr]['label'] ?? 'Default' }}</span></div>
-          <div class="info-row"><span class="info-label">English default</span><span class="info-value">{{ $voiceNameMap[$defaultVoiceEn]['label'] ?? 'Default' }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.arabic_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? ($voiceNameMap[$defaultVoiceAr]['label_ar'] ?? $voiceNameMap[$defaultVoiceAr]['label'] ?? __('ui.dashboard.default')) : ($voiceNameMap[$defaultVoiceAr]['label'] ?? __('ui.dashboard.default')) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.english_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? ($voiceNameMap[$defaultVoiceEn]['label_ar'] ?? $voiceNameMap[$defaultVoiceEn]['label'] ?? __('ui.dashboard.default')) : ($voiceNameMap[$defaultVoiceEn]['label'] ?? __('ui.dashboard.default')) }}</span></div>
         </div>
 
         <div class="sidebar-actions">
-          <a class="btn" href="{{ route('pricing') }}">Pricing & Plans</a>
-          <a class="btn btn-primary" href="{{ route('billing.page') }}">Upgrade Plan</a>
+          <a class="btn" href="{{ route('pricing') }}">{{ __('ui.dashboard.pricing_and_plans') }}</a>
+          <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.dashboard.upgrade_plan') }}</a>
         </div>
         <div class="sidebar-actions" style="margin-top: .6rem;">
-          <a class="btn" href="{{ route('manage-subscription.page') }}">Manage Subscription</a>
-          <a class="btn" href="{{ route('browsers-extension.page') }}">Browser Extension</a>
+          <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.dashboard.manage_subscription') }}</a>
+          <a class="btn" href="{{ route('browsers-extension.page') }}">{{ __('ui.dashboard.browser_extension') }}</a>
         </div>
       </aside>
     </section>
 
     <section id="recentJobsSection" class="page-card table-card reveal">
       <div class="table-header">
-        <h2>Recent Voices</h2>
+        <h2>{{ __('ui.dashboard.recent_voices') }}</h2>
         <span class="jobs-count" id="jobsCount"></span>
       </div>
       <div style="overflow-x: auto;">
         <table>
           <thead>
             <tr>
-              <th>ID</th><th>Title</th><th>Status</th><th>Flow</th><th>Speaker</th><th>Translate</th><th>Audio</th><th>Created</th><th>Actions</th>
+              <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_translate') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
             </tr>
           </thead>
           <tbody id="jobsTableBody">
@@ -564,7 +605,7 @@
                 'status' => $job->status,
                 'source_language' => $job->source_language,
                 'target_language' => $job->target_language,
-                'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker',
+	                'voice_label' => $speakerDisplayLabel($job->voice_name),
                 'voice_tier' => \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)),
                 'translate' => $job->translate,
                 'duration_seconds' => $job->duration_seconds,
@@ -574,10 +615,10 @@
               ]) }}">
                 <td>#{{ $job->id }}</td>
                 <td>{{ $job->textItem?->title ?: '-' }}</td>
-                <td><span class="status {{ $job->status }}">{{ strtoupper($job->status) }}</span></td>
-                <td>{{ $job->source_language ?? '-' }} -> {{ $job->target_language }}</td>
-                <td>{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker' }}</td>
-                <td>{{ $job->translate ? 'Yes' : 'No' }}</td>
+                <td><span class="status {{ $job->status }}">{{ $statusLabelByKey($job->status) }}</span></td>
+                <td>{{ $languageLabelByCode($job->source_language) }} -> {{ $languageLabelByCode($job->target_language) }}</td>
+	                <td>{{ $speakerDisplayLabel($job->voice_name) }}</td>
+	                <td>{{ $job->translate ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</td>
                 <td>
                   @if($job->audio_path)
                     <audio
@@ -586,14 +627,14 @@
                       src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"
                       data-download-language="{{ $job->target_language }}"
                       data-download-text="{{ \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, '') }}"
-                      data-download-speaker="{{ $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker' }}"
+	                      data-download-speaker="{{ $speakerDisplayLabel($job->voice_name) }}"
                       data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
                     ></audio>
                   @elseif($job->status === 'failed')
-                    <small style="color: var(--danger);">{{ $job->error_message ?: 'Generation failed' }}</small>
-                  @else
-                    <small style="color: var(--muted);">Processing...</small>
-                  @endif
+	                    <small style="color: var(--danger);">{{ $job->error_message ?: __('ui.dashboard.generation_failed') }}</small>
+	                  @else
+	                    <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
+	                  @endif
                 </td>
                 <td>{{ $job->created_at?->diffForHumans() }}</td>
                 <td>
@@ -603,12 +644,12 @@
                     data-action="delete-job"
                     data-job-id="{{ $job->id }}"
                   >
-                    Delete
-                  </button>
+	                    {{ __('ui.dashboard.delete') }}
+	                  </button>
                 </td>
               </tr>
             @empty
-              <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">No jobs yet.</td></tr>
+	              <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
             @endforelse
           </tbody>
         </table>
@@ -619,6 +660,46 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $dashboardI18n = [
+      'any' => __('ui.dashboard.any'),
+      'no_speakers' => __('ui.dashboard.no_speakers'),
+      'translate_enabled_hint' => __('ui.dashboard.translate_enabled_hint'),
+      'translate_disabled_hint' => __('ui.dashboard.translate_disabled_hint'),
+      'chars' => __('ui.dashboard.chars'),
+      'requests' => __('ui.dashboard.requests'),
+      'unlimited' => __('ui.dashboard.unlimited'),
+      'status_queued' => __('ui.dashboard.status_queued'),
+      'status_processing' => __('ui.dashboard.status_processing'),
+      'status_done' => __('ui.dashboard.status_done'),
+      'status_failed' => __('ui.dashboard.status_failed'),
+      'default_speaker' => __('ui.dashboard.default_speaker'),
+      'standard' => __('ui.dashboard.standard'),
+      'priority_high' => __('ui.dashboard.priority_high'),
+      'priority_standard' => __('ui.dashboard.priority_standard'),
+      'preview' => __('ui.dashboard.preview'),
+      'yes' => __('ui.dashboard.yes'),
+      'no' => __('ui.dashboard.no'),
+      'just_now' => __('ui.dashboard.just_now'),
+      'generation_failed' => __('ui.dashboard.generation_failed'),
+      'processing_ellipsis' => __('ui.dashboard.processing_ellipsis'),
+      'delete' => __('ui.dashboard.delete'),
+      'no_jobs_yet' => __('ui.dashboard.no_jobs_yet'),
+      'showing_zero' => __('ui.dashboard.showing_zero'),
+      'showing_range' => __('ui.dashboard.showing_range'),
+      'voices' => __('ui.dashboard.voices'),
+      'prev' => __('ui.dashboard.prev'),
+      'next' => __('ui.dashboard.next'),
+      'language_ar' => __('ui.dashboard.arabic'),
+      'language_en' => __('ui.dashboard.english'),
+      'confirm_delete' => __('ui.dashboard.confirm_delete'),
+      'unable_delete_voice' => __('ui.dashboard.unable_delete_voice'),
+      'voice_generation_failed' => __('ui.dashboard.voice_generation_failed'),
+      'generate_voice_now' => __('ui.dashboard.generate_voice_now'),
+      'generating' => __('ui.dashboard.generating'),
+      'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
+    ];
+  @endphp
   <script>
     const voiceCatalog = @json($voiceCatalog);
     const oldVoice = @json(old('voice_key'));
@@ -648,6 +729,8 @@
     const statFailed = document.getElementById('statFailed');
     const jobsCount = document.getElementById('jobsCount');
     const jobsPagination = document.getElementById('jobsPagination');
+    const i18n = @json($dashboardI18n);
+    const pageLocale = document.documentElement.lang || 'en';
 
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
     const preferredVoiceKeyByLanguage = { ar: '', en: '' };
@@ -656,7 +739,7 @@
     const jobsPerPage = 10;
 
     function formatNumber(value) {
-      return new Intl.NumberFormat().format(Number(value || 0));
+      return new Intl.NumberFormat('en-US').format(Number(value || 0));
     }
 
     function normalizeLanguage(value) {
@@ -671,6 +754,22 @@
       return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en';
     }
 
+    function languageLabel(code) {
+      const normalized = String(code || '').toLowerCase();
+      if (normalized === 'ar') return i18n.language_ar;
+      if (normalized === 'en') return i18n.language_en;
+      return code || '-';
+    }
+
+    function statusLabel(status) {
+      const normalized = String(status || '').toLowerCase();
+      if (normalized === 'queued') return i18n.status_queued;
+      if (normalized === 'processing') return i18n.status_processing;
+      if (normalized === 'done') return i18n.status_done;
+      if (normalized === 'failed') return i18n.status_failed;
+      return String(status || '').toUpperCase();
+    }
+
     function isTranslateEnabled() {
       return String(translateSelect?.value || '1') === '1';
     }
@@ -681,10 +780,19 @@
       preferredVoiceKeyByLanguage[normalizeLanguage(language)] = selectedVoiceKey;
     }
 
-    function formatGender(value) {
-      const text = String(value || '').trim().toLowerCase();
-      if (!text) return 'Any';
-      return text.charAt(0).toUpperCase() + text.slice(1);
+    function cleanSpeakerLabel(value) {
+      return String(value || '').replace(/^\++\s*/, '').trim();
+    }
+
+    function voiceDisplayLabel(voice) {
+      const label = pageLocale === 'ar' && voice.label_ar ? voice.label_ar : voice.label;
+      return cleanSpeakerLabel(label);
+    }
+
+    function formatTierLabel(value) {
+      const text = String(value || '').trim();
+      if (!text) return '';
+      return `\u2066${text}\u2069`;
     }
 
     function sortVoices(list) {
@@ -726,17 +834,18 @@
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
       if (!voices.length) {
-        voiceSelect.innerHTML = '<option value="">No speakers available</option>';
+        voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>';
         preferredVoiceKeyByLanguage[lang] = '';
         return;
       }
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
+        const label = voiceDisplayLabel(voice);
         const quality = String(voice?.tier_label || '').trim();
         option.textContent = quality !== ''
-          ? `${voice.label} - ${formatGender(voice.gender)} - ${quality}`
-          : `${voice.label} - ${formatGender(voice.gender)}`;
+          ? `${label} - ${formatTierLabel(quality)}`
+          : label;
         voiceSelect.appendChild(option);
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
@@ -780,17 +889,17 @@
     function updateTranslateHint() {
       if (!translateSelect || !translateHint) return;
       translateHint.textContent = translateSelect.value === '1'
-        ? 'Text is translated first, then spoken in selected voice language.'
-        : 'Original text is spoken directly without translation.';
+        ? i18n.translate_enabled_hint
+        : i18n.translate_disabled_hint;
     }
 
     function updateUsagePanel(usage) {
       if (!usage || typeof usage !== 'object') return;
       const requestsUnlimited = Boolean(usage.requests_unlimited);
-      if (usageCharsText) usageCharsText.textContent = `${formatNumber(usage.total_chars)} / ${formatNumber(usage.plan_chars)} chars`;
+      if (usageCharsText) usageCharsText.textContent = `${formatNumber(usage.total_chars)} / ${formatNumber(usage.plan_chars)} ${i18n.chars}`;
       if (usageRequestsText) usageRequestsText.textContent = requestsUnlimited
-        ? `${formatNumber(usage.total_requests)} / Unlimited requests`
-        : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} requests`;
+        ? `${formatNumber(usage.total_requests)} / ${i18n.unlimited} ${i18n.requests}`
+        : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} ${i18n.requests}`;
       if (usageCharsMeter) usageCharsMeter.style.width = `${Number(usage.chars_percent || 0)}%`;
       if (usageRequestsMeter) usageRequestsMeter.style.width = `${Number(usage.requests_percent || 0)}%`;
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
@@ -808,32 +917,36 @@
     function renderJobRow(job) {
       const status = String(job?.status || 'processing').toLowerCase();
       const statusClass = ['queued', 'processing', 'done', 'failed'].includes(status) ? status : 'processing';
-      const statusLabel = statusClass.toUpperCase();
+      const statusText = statusLabel(statusClass);
       const title = escapeHtml(job?.title || '-');
-      const sourceLanguage = escapeHtml(job?.source_language || '-');
-      const targetLanguageValue = escapeHtml(job?.target_language || '-');
-      const voiceLabel = escapeHtml(job?.voice_label || 'Default speaker');
-      const voiceTier = escapeHtml(job?.voice_tier || 'Standard');
-      const textExcerpt = escapeHtml(job?.text_excerpt || job?.title || 'preview');
-      const translateLabel = job?.translate ? 'Yes' : 'No';
-      const created = escapeHtml(job?.created_human || 'just now');
-      const errorMessage = escapeHtml(job?.error_message || 'Generation failed');
+      const sourceLanguageCode = String(job?.source_language || '-');
+      const targetLanguageCode = String(job?.target_language || '-');
+      const sourceLanguage = escapeHtml(languageLabel(sourceLanguageCode));
+      const targetLanguageValue = escapeHtml(languageLabel(targetLanguageCode));
+      const voiceLabelValue = cleanSpeakerLabel(job?.voice_label || i18n.default_speaker);
+      const voiceLabel = escapeHtml(voiceLabelValue);
+      const voiceTierValue = String(job?.voice_tier || i18n.standard).trim();
+      const voiceTier = escapeHtml(voiceTierValue);
+      const textExcerpt = escapeHtml(job?.text_excerpt || job?.title || i18n.preview);
+      const translateLabel = job?.translate ? i18n.yes : i18n.no;
+      const created = escapeHtml(job?.created_human || i18n.just_now);
+      const errorMessage = escapeHtml(job?.error_message || i18n.generation_failed);
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
 
-      let audioCell = '<small style="color: var(--muted);">Processing...</small>';
-      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + targetLanguageValue + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
+      let audioCell = '<small style="color: var(--muted);">' + i18n.processing_ellipsis + '</small>';
+      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
       else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
 
       return '<tr data-job-id="' + Number(job?.id || 0) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
         '<td>#' + Number(job?.id || 0) + '</td>' +
         '<td>' + title + '</td>' +
-        '<td><span class="status ' + statusClass + '">' + statusLabel + '</span></td>' +
+        '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
         '<td>' + sourceLanguage + ' -> ' + targetLanguageValue + '</td>' +
         '<td>' + voiceLabel + '</td>' +
         '<td>' + translateLabel + '</td>' +
         '<td>' + audioCell + '</td>' +
         '<td>' + created + '</td>' +
-        '<td><button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">Delete</button></td>' +
+        '<td><button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button></td>' +
       '</tr>';
     }
 
@@ -858,7 +971,7 @@
 
       jobsTableBody.innerHTML = '';
       if (pageJobs.length === 0) {
-        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">No jobs yet.</td></tr>';
+        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
       } else {
         pageJobs.forEach(function(job) {
           jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job));
@@ -867,11 +980,15 @@
 
       if (jobsCount) {
         if (totalLoaded === 0) {
-          jobsCount.textContent = 'Showing 0 of 0 Voices';
+          jobsCount.textContent = i18n.showing_zero;
         } else {
           const showingFrom = start + 1;
           const showingTo = Math.min(end, totalLoaded);
-          jobsCount.textContent = 'Showing ' + showingFrom + '-' + showingTo + ' of ' + formatNumber(totalLoaded) + ' Voices';
+          jobsCount.textContent = i18n.showing_range
+            .replace(':from', String(showingFrom))
+            .replace(':to', String(showingTo))
+            .replace(':total', formatNumber(totalLoaded))
+            .replace(':label', i18n.voices);
         }
       }
       renderPagination(totalPages);
@@ -886,7 +1003,7 @@
       }
 
       let html = '';
-      html += '<button type="button" class="pagination-btn" data-page="prev"' + (jobsCurrentPage === 1 ? ' disabled' : '') + '>Prev</button>';
+      html += '<button type="button" class="pagination-btn" data-page="prev"' + (jobsCurrentPage === 1 ? ' disabled' : '') + '>' + i18n.prev + '</button>';
 
       for (let i = 1; i <= totalPages; i++) {
         if (totalPages > 7) {
@@ -900,7 +1017,7 @@
         }
       }
 
-      html += '<button type="button" class="pagination-btn" data-page="next"' + (jobsCurrentPage === totalPages ? ' disabled' : '') + '>Next</button>';
+      html += '<button type="button" class="pagination-btn" data-page="next"' + (jobsCurrentPage === totalPages ? ' disabled' : '') + '>' + i18n.next + '</button>';
       jobsPagination.innerHTML = html;
     }
 
@@ -946,7 +1063,7 @@
       const parsedJobId = Number(jobId || 0);
       if (!parsedJobId) return;
 
-      if (!window.confirm('Delete this generated voice from your jobs table?')) {
+      if (!window.confirm(i18n.confirm_delete)) {
         return;
       }
 
@@ -967,7 +1084,7 @@
 
         data = await response.json().catch(() => ({}));
         if (!response.ok || data?.ok === false) {
-          throw new Error(extractErrorMessage(data, 'Unable to delete this voice.'));
+          throw new Error(extractErrorMessage(data, i18n.unable_delete_voice));
         }
 
         const deletedId = Number(data?.deleted_id || parsedJobId);
@@ -978,7 +1095,7 @@
         renderJobsPage();
         showFormMessage(null, '');
       } catch (error) {
-        showFormMessage('error', extractErrorMessage(data, error?.message || 'Unable to delete this voice.'));
+        showFormMessage('error', extractErrorMessage(data, error?.message || i18n.unable_delete_voice));
       } finally {
         if (triggerBtn instanceof HTMLButtonElement) {
           triggerBtn.disabled = false;
@@ -997,7 +1114,7 @@
       deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn);
     });
 
-    function extractErrorMessage(data, fallback = 'Voice generation failed. Please try again.') {
+    function extractErrorMessage(data, fallback = i18n.voice_generation_failed) {
       if (data?.message) return String(data.message);
       if (data?.error_message) return String(data.error_message);
       const errors = data?.errors;
@@ -1018,9 +1135,9 @@
         syncLanguageToCurrentTextWhenTranslationOff();
       }
       showFormMessage(null, '');
-      const defaultText = generateBtn.textContent || 'Generate Voice Now';
+      const defaultText = generateBtn.textContent || i18n.generate_voice_now;
       generateBtn.disabled = true;
-      generateBtn.textContent = 'Generating...';
+      generateBtn.textContent = i18n.generating;
       let data = null;
       try {
         const response = await fetch(queueUrl, {
@@ -1033,9 +1150,9 @@
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
-        showFormMessage('ok', data?.message || 'Voice generated successfully.');
+        showFormMessage('ok', data?.message || i18n.voice_generated_success);
       } catch (error) {
-        showFormMessage('error', extractErrorMessage(data, error?.message || 'Voice generation failed.'));
+        showFormMessage('error', extractErrorMessage(data, error?.message || i18n.voice_generation_failed));
       } finally {
         generateBtn.disabled = false;
         generateBtn.textContent = defaultText;

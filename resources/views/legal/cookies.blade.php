@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Cookie Policy', 'page' => 'cookies'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.cookies_title'), 'page' => 'cookies'])
   <style>
     .bg-orb {
       position: fixed;
@@ -145,61 +136,65 @@
   @include('components.header')
 
   <main class="container legal-page">
+    @php
+      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
+      $supportEmailLink = '<a href="mailto:support@listenai.studio">support@listenai.studio</a>';
+    @endphp
     <article class="legal-shell">
-      <span class="legal-kicker">Legal</span>
-      <h1>Cookie Policy</h1>
-      <p class="legal-updated">Effective date: February 22, 2026</p>
-      <p class="legal-intro">This Cookie Policy describes how Listen uses cookies and similar technologies to provide secure sign-in, maintain session state, remember preferences, and protect service integrity.</p>
+      <span class="legal-kicker">{{ __('ui.legal.kicker') }}</span>
+      <h1>{{ __('ui.legal.cookies.title') }}</h1>
+      <p class="legal-updated">{{ __('ui.legal.effective_date', ['date' => $effectiveDate]) }}</p>
+      <p class="legal-intro">{{ __('ui.legal.cookies.intro') }}</p>
 
       <section class="legal-section">
-        <h2>1. What Cookies Are</h2>
-        <p>Cookies are small text files stored on your device by your browser. They help websites remember your session and preferences and can also support security and reliability functions.</p>
+        <h2>{{ __('ui.legal.cookies.s1_title') }}</h2>
+        <p>{{ __('ui.legal.cookies.s1_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>2. Cookie Categories We Use</h2>
+        <h2>{{ __('ui.legal.cookies.s2_title') }}</h2>
         <div class="cookie-grid">
           <article class="cookie-card">
-            <h3>Essential</h3>
-            <p>Required for login state, secure session handling, CSRF protection, and core navigation.</p>
+            <h3>{{ __('ui.legal.cookies.c1_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c1_body') }}</p>
           </article>
           <article class="cookie-card">
-            <h3>Preference</h3>
-            <p>Used to remember product settings such as your selected theme (dark/light).</p>
+            <h3>{{ __('ui.legal.cookies.c2_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c2_body') }}</p>
           </article>
           <article class="cookie-card">
-            <h3>Security and Abuse Prevention</h3>
-            <p>Supports rate limiting and anti-abuse controls for public demo and API protection.</p>
+            <h3>{{ __('ui.legal.cookies.c3_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c3_body') }}</p>
           </article>
           <article class="cookie-card">
-            <h3>Billing and Account Continuity</h3>
-            <p>Helps maintain secure account and subscription flows during checkout and account updates.</p>
+            <h3>{{ __('ui.legal.cookies.c4_title') }}</h3>
+            <p>{{ __('ui.legal.cookies.c4_body') }}</p>
           </article>
         </div>
       </section>
 
       <section class="legal-section">
-        <h2>3. Similar Technologies</h2>
-        <p>In addition to cookies, Listen may use local storage for non-sensitive UI preferences (for example, theme selection) and short-lived identifiers required for security and product operation.</p>
+        <h2>{{ __('ui.legal.cookies.s3_title') }}</h2>
+        <p>{{ __('ui.legal.cookies.s3_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>4. Managing Cookies</h2>
+        <h2>{{ __('ui.legal.cookies.s4_title') }}</h2>
         <ul>
-          <li>You can control or delete cookies through your browser settings.</li>
-          <li>Blocking essential cookies may prevent sign-in, billing actions, or core features from working correctly.</li>
-          <li>Clearing preference cookies or local storage resets UI settings such as theme choice.</li>
+          <li>{{ __('ui.legal.cookies.s4_1') }}</li>
+          <li>{{ __('ui.legal.cookies.s4_2') }}</li>
+          <li>{{ __('ui.legal.cookies.s4_3') }}</li>
         </ul>
       </section>
 
       <section class="legal-section">
-        <h2>5. Updates to This Policy</h2>
-        <p>We may update this Cookie Policy as product behavior, infrastructure, or legal requirements evolve. The effective date at the top indicates the latest revision.</p>
+        <h2>{{ __('ui.legal.cookies.s5_title') }}</h2>
+        <p>{{ __('ui.legal.cookies.s5_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>6. Contact</h2>
-        <p>For cookie-related questions, contact <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
+        <h2>{{ __('ui.legal.cookies.s6_title') }}</h2>
+        <p>{!! __('ui.legal.cookies.s6_body', ['email' => $supportEmailLink]) !!}</p>
       </section>
     </article>
   </main>
@@ -208,3 +203,4 @@
   @include('components.scripts')
 </body>
 </html>
+

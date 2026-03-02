@@ -38,7 +38,7 @@ class AuthController extends Controller
 
         if (! Auth::attempt($credentials, $remember)) {
             return back()->withErrors([
-                'email' => 'Invalid credentials.',
+                'email' => __('ui.backend.auth_invalid_credentials'),
             ])->onlyInput('email');
         }
 
@@ -83,7 +83,7 @@ class AuthController extends Controller
     {
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             return redirect()->route('login')->withErrors([
-                'email' => 'Social login is not configured yet. Add OAuth client credentials.',
+                'email' => __('ui.backend.auth_social_not_configured'),
             ]);
         }
 
@@ -98,7 +98,7 @@ class AuthController extends Controller
             $googleUser = $this->googleProvider()->user();
         } catch (InvalidStateException) {
             return redirect()->route('login')->withErrors([
-                'email' => 'Social login session expired. Please try again.',
+                'email' => __('ui.backend.auth_social_session_expired'),
             ]);
         } catch (\Throwable $exception) {
             Log::warning('Social OAuth callback failed.', [
@@ -107,14 +107,14 @@ class AuthController extends Controller
             ]);
 
             return redirect()->route('login')->withErrors([
-                'email' => 'Social login failed. Please try again.',
+                'email' => __('ui.backend.auth_social_failed'),
             ]);
         }
 
         $email = trim((string) $googleUser->getEmail());
         if ($email === '') {
             return redirect()->route('login')->withErrors([
-                'email' => 'Social account did not return an email address.',
+                'email' => __('ui.backend.auth_social_no_email'),
             ]);
         }
 
@@ -127,7 +127,7 @@ class AuthController extends Controller
             ->first();
 
         if (! $user) {
-            $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: 'Listen User'));
+            $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: __('ui.backend.auth_social_default_name')));
 
             $user = User::create([
                 'name' => $name,

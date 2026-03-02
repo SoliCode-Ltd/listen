@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Pricing', 'page' => 'pricing'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing'])
   <style>
     .bg-orb {
       position: fixed;
@@ -54,6 +45,11 @@
       font-size: clamp(2rem, 4vw, 2.75rem);
       letter-spacing: -.02em;
     }
+    html[dir="rtl"] .page-hero h1 {
+      letter-spacing: 0;
+      line-height: 1.2;
+      text-wrap: balance;
+    }
     .page-hero .lead {
       color: var(--muted);
       max-width: 48ch;
@@ -97,6 +93,7 @@
       background: transparent;
       color: var(--muted);
       padding: .55rem 1.1rem;
+      min-width: 6.2rem;
       border-radius: var(--radius-full);
       cursor: pointer;
       font-weight: 600;
@@ -105,10 +102,22 @@
       position: relative;
       z-index: 1;
     }
+    html[dir="rtl"] .billing-toggle button {
+      min-width: 6.8rem;
+      font-family: var(--font-body-ar);
+    }
     .billing-toggle button:hover {
       color: var(--text);
     }
     .billing-toggle button.active { color: white; }
+
+    html[dir="rtl"] .billing-indicator {
+      left: auto;
+      right: .22rem;
+    }
+    html[dir="rtl"] .billing-toggle.yearly .billing-indicator {
+      transform: translateX(-100%);
+    }
     .billing-savings {
       font-size: .78rem;
       color: color-mix(in oklab, var(--ok) 88%, var(--text));
@@ -193,6 +202,13 @@
       align-items: baseline;
       gap: .15rem;
     }
+    .price-main {
+      display: inline-flex;
+      align-items: baseline;
+      gap: .15rem;
+      direction: ltr;
+      unicode-bidi: isolate;
+    }
     .price-currency {
       font-size: 1.4rem;
       font-weight: 700;
@@ -208,7 +224,7 @@
       font-size: .95rem;
       color: var(--muted);
       font-weight: 500;
-      margin-left: .1rem;
+      margin-inline-start: .1rem;
     }
     .price-note {
       font-size: .8rem;
@@ -464,18 +480,28 @@
   @include('components.header')
 
   <main class="container">
+    @php
+      $planDisplayName = static function (array $plan): string {
+        return match ((string) ($plan['slug'] ?? '')) {
+          'free' => __('ui.pricing.plan_name_free'),
+          'creator' => __('ui.pricing.plan_name_creator'),
+          'pro' => __('ui.pricing.plan_name_pro'),
+          default => (string) ($plan['name'] ?? '-'),
+        };
+      };
+    @endphp
     <section class="page-hero reveal">
       <!-- <span class="eyebrow">Flexible pricing</span> -->
-      <h1>Scale your voice product with confidence</h1>
-      <p class="lead">Start free and upgrade as you grow. All plans include Arabic and English voice synthesis with production-ready reliability.</p>
+      <h1>{{ __('ui.pricing.hero_title') }}</h1>
+      <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
 
       <div class="billing-wrapper">
         <div class="billing-toggle" id="billingToggle">
           <span class="billing-indicator" aria-hidden="true"></span>
-          <button id="monthlyBtn" class="active">Monthly</button>
-          <button id="yearlyBtn">Yearly</button>
+          <button id="monthlyBtn" class="active">{{ __('ui.pricing.monthly') }}</button>
+          <button id="yearlyBtn">{{ __('ui.pricing.yearly') }}</button>
         </div>
-        <span class="billing-savings" id="billingSavings">Annual plan saves 20%</span>
+        <span class="billing-savings" id="billingSavings">{{ __('ui.pricing.annual_saves') }}</span>
       </div>
     </section>
 
@@ -506,30 +532,32 @@
              data-savings-cents="{{ $savingsCents }}">
 
           @if($plan['is_popular'] && !$isCurrent)
-            <span class="popular-badge">Most Popular</span>
+            <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
           @endif
 
           <div class="plan-header">
-            <h2 class="plan-name">{{ $plan['name'] }}</h2>
+            <h2 class="plan-name">{{ $planDisplayName($plan) }}</h2>
             <p class="plan-desc">
     {{
-        $plan['slug'] === 'free' ? 'Start exploring AI voice generation' :
-        ($plan['slug'] === 'creator' ? 'Powerful voice generation for creators' :
-        'Advanced features for high-volume production')
+        $plan['slug'] === 'free' ? __('ui.pricing.plan_desc_free') :
+        ($plan['slug'] === 'creator' ? __('ui.pricing.plan_desc_creator') :
+        __('ui.pricing.plan_desc_pro'))
     }}
 </p>
           </div>
 
           <div class="plan-pricing">
             <div class="price-row">
-              <span class="price-currency">$</span>
-              <span class="price-amount price-value">0</span>
-              <span class="price-period">/mo</span>
+              <span class="price-main" dir="ltr">
+                <span class="price-currency">$</span>
+                <span class="price-amount price-value">0</span>
+              </span>
+              <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
             </div>
             <div class="price-note price-note-text"></div>
           </div>
 
-          <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} characters/month</div>
+          <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</div>
 
           <ul class="plan-features">
             @foreach($plan['features'] as $feature)
@@ -554,7 +582,7 @@
                 <svg viewBox="0 0 24 24">{!! $iconSvg !!}</svg>
                 {{ $feature['label'] ?? '' }}
               </span>
-              <span class="feature-value">{{ $feature['value'] ?? '✓' }}</span>
+              <span class="feature-value">{{ $feature['value'] ?? __('ui.pricing.included_mark') }}</span>
             </li>
             @endforeach
           </ul>
@@ -562,14 +590,14 @@
           <div class="plan-action">
             @auth
               @if($isCurrent)
-                <span class="plan-btn btn-disabled">Current plan</span>
+                <span class="plan-btn btn-disabled">{{ __('ui.pricing.current_plan') }}</span>
               @elseif($isLower || $plan['slug'] === 'free')
-                <span class="plan-btn btn-disabled">Downgrade</span>
+                <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
               @else
-                <a class="plan-btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">Upgrade now</a>
+                <a class="plan-btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">{{ __('ui.pricing.upgrade_now') }}</a>
               @endif
             @else
-              <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? 'Start free' : 'Get started' }}</a>
+              <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
             @endauth
           </div>
         </div>
@@ -577,8 +605,8 @@
     </section>
 
     <section class="features-section">
-      <h2 class="section-title reveal">What's included in every plan</h2>
-      <p class="section-subtitle reveal">Core features available across all tiers</p>
+      <h2 class="section-title reveal">{{ __('ui.pricing.included_title') }}</h2>
+      <p class="section-subtitle reveal">{{ __('ui.pricing.included_subtitle') }}</p>
       <div class="features-grid">
         <article class="feature-card reveal">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -587,8 +615,8 @@
             <line x1="12" y1="19" x2="12" y2="23"/>
             <line x1="8" y1="23" x2="16" y2="23"/>
           </svg>
-          <h3>Bilingual voice synthesis</h3>
-          <p>Native Arabic and English voices with accurate pronunciation and natural prosody across all quality tiers.</p>
+          <h3>{{ __('ui.pricing.feature1_title') }}</h3>
+          <p>{{ __('ui.pricing.feature1_body') }}</p>
         </article>
         <article class="feature-card reveal">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -597,60 +625,69 @@
             <line x1="11" y1="8" x2="11" y2="14"/>
             <line x1="8" y1="11" x2="14" y2="11"/>
           </svg>
-          <h3>Real-time translation</h3>
-          <p>Translate text before synthesis. Arabic to English, English to Arabic, or speak text as-is without translation.</p>
+          <h3>{{ __('ui.pricing.feature2_title') }}</h3>
+          <p>{{ __('ui.pricing.feature2_body') }}</p>
         </article>
         <article class="feature-card reveal">
           <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <rect x="5" y="2" width="14" height="20" rx="2" ry="2"/>
             <line x1="12" y1="18" x2="12.01" y2="18"/>
           </svg>
-          <h3>Browser extension</h3>
-          <p>Chrome extension for instant text-to-speech across any website. Select text, right-click, and listen.</p>
+          <h3>{{ __('ui.pricing.feature3_title') }}</h3>
+          <p>{{ __('ui.pricing.feature3_body') }}</p>
         </article>
       </div>
     </section>
 
     <section class="faq-section">
-      <h2 class="section-title reveal">Frequently asked questions</h2>
+      <h2 class="section-title reveal">{{ __('ui.pricing.faq_title') }}</h2>
       <div class="faq-grid">
         <article class="faq-item reveal">
-          <h3>Can I switch plans anytime?</h3>
-          <p>Yes. Upgrades take effect immediately with prorated billing. Downgrades apply at your next billing cycle.</p>
+          <h3>{{ __('ui.pricing.faq1_q') }}</h3>
+          <p>{{ __('ui.pricing.faq1_a') }}</p>
         </article>
         <article class="faq-item reveal">
-          <h3>What happens when I hit my limit?</h3>
-          <p>You'll receive a notification. Upgrade instantly to continue, or wait for your monthly reset. No surprise charges.</p>
+          <h3>{{ __('ui.pricing.faq2_q') }}</h3>
+          <p>{{ __('ui.pricing.faq2_a') }}</p>
         </article>
         <article class="faq-item reveal">
-          <h3>Do you support Arabic dialects?</h3>
-          <p>Modern Standard Arabic with natural pronunciation. Our voices handle transliterated Arabic input gracefully.</p>
+          <h3>{{ __('ui.pricing.faq3_q') }}</h3>
+          <p>{{ __('ui.pricing.faq3_a') }}</p>
         </article>
         <article class="faq-item reveal">
-          <h3>Is there a free trial?</h3>
-          <p>The Free plan is yours forever. No credit card required. Upgrade when you're ready for production use.</p>
+          <h3>{{ __('ui.pricing.faq4_q') }}</h3>
+          <p>{{ __('ui.pricing.faq4_a') }}</p>
         </article>
       </div>
     </section>
 
     <section class="cta-section reveal">
-      <h2>Ready to build with Listen?</h2>
-      <p>Start with our free tier. No credit card required.</p>
+      <h2>{{ __('ui.pricing.cta_title') }}</h2>
+      <p>{{ __('ui.pricing.cta_subtitle') }}</p>
       @auth
-        <a class="btn btn-primary" href="{{ route('dashboard') }}">Go to dashboard</a>
+        <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
       @else
-        <a class="btn btn-primary" href="{{ route('register') }}">Create free account</a>
+        <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
       @endauth
       <div class="cta-badges">
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>No credit card</span>
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Cancel anytime</span>
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>Secure billing</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_no_card') }}</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_cancel_anytime') }}</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_secure_billing') }}</span>
       </div>
     </section>
   </main>
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $pricingI18n = [
+      'free_forever' => __('ui.pricing.free_forever'),
+      'billed_yearly_save' => __('ui.pricing.billed_yearly_save'),
+      'billed_monthly' => __('ui.pricing.billed_monthly'),
+      'year' => __('ui.pricing.year'),
+      'save' => __('ui.pricing.save'),
+    ];
+  @endphp
   <script>
     (function() {
       var monthlyBtn = document.getElementById('monthlyBtn');
@@ -659,6 +696,7 @@
       var billingSavings = document.getElementById('billingSavings');
       var planCards = document.querySelectorAll('.plan-card');
       var isYearly = false;
+      var i18n = @json($pricingI18n);
 
       function formatUsd(cents) {
         var dollars = (Number(cents || 0) / 100);
@@ -666,6 +704,10 @@
           minimumFractionDigits: dollars % 1 === 0 ? 0 : 2,
           maximumFractionDigits: 2
         });
+      }
+
+      function formatUsdLabel(cents) {
+        return '\u2066$' + formatUsd(cents) + '\u2069';
       }
 
       function updatePrices() {
@@ -682,15 +724,17 @@
 
           if (isFree) {
             priceValue.textContent = '0';
-            priceNote.textContent = 'Free forever';
+            priceNote.textContent = i18n.free_forever;
             priceNote.className = 'price-note price-note-text';
           } else if (isYearly) {
             priceValue.textContent = formatUsd(yearlyMonthlyCents);
-            priceNote.textContent = 'Billed $' + formatUsd(yearlyCents) + '/year (save $' + formatUsd(savingsCents) + ')';
+            var yearlyLabel = formatUsdLabel(yearlyCents);
+            var savingsLabel = formatUsdLabel(savingsCents);
+            priceNote.textContent = i18n.billed_yearly_save + ' ' + yearlyLabel + '/' + i18n.year + ' (' + i18n.save + ' ' + savingsLabel + ')';
             priceNote.className = 'price-note price-note-text savings';
           } else {
             priceValue.textContent = formatUsd(monthlyCents);
-            priceNote.textContent = 'Billed monthly';
+            priceNote.textContent = i18n.billed_monthly;
             priceNote.className = 'price-note price-note-text';
           }
         });

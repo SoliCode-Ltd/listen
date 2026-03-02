@@ -1,14 +1,5 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Billing', 'page' => 'billing'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+@include('components.page-head', ['pageTitle' => __('ui.seo.billing_title'), 'page' => 'billing'])
   <script src="https://js.stripe.com/v3/"></script>
-  @include('components.styles')
   <style>
     .main-content {
       padding: 1.5rem 0 3rem;
@@ -243,6 +234,9 @@
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
+      direction: ltr;
+      unicode-bidi: isolate;
+      display: inline-block;
     }
     .quote-highlight .hint {
       margin: .4rem 0 0;
@@ -328,30 +322,55 @@
   </style>
 </head>
 <body>
+  @php
+    $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
+      return match ((string) $slug) {
+        'free' => __('ui.pricing.plan_name_free'),
+        'creator' => __('ui.pricing.plan_name_creator'),
+        'pro' => __('ui.pricing.plan_name_pro'),
+        default => (string) ($fallback ?: '-'),
+      };
+    };
+    $normalizeTierLabel = static function (?string $label): string {
+      $raw = trim((string) $label);
+      $value = strtolower($raw);
+      $display = $value === 'standard' ? __('ui.dashboard.standard') : $raw;
+      if ($display !== '' && preg_match('/[A-Za-z0-9+]/', $display) && !preg_match('/[\x{0600}-\x{06FF}]/u', $display)) {
+        return "\u{2066}{$display}\u{2069}";
+      }
+      return $display;
+    };
+    $activePlanName = $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    $plansForUi = collect($plans)->map(function (array $plan) use ($planNameBySlug, $normalizeTierLabel): array {
+      $plan['localized_name'] = $planNameBySlug((string) ($plan['slug'] ?? ''), (string) ($plan['name'] ?? ''));
+      $plan['localized_voice_tier'] = $normalizeTierLabel((string) ($plan['voice_tier'] ?? ''));
+      return $plan;
+    })->values()->all();
+  @endphp
   @include('components.header')
 
   <main class="container main-content">
     <div class="page-header">
-      <h1>Billing</h1>
-      <p>Upgrade your plan, manage payment methods, and view charge previews.</p>
+      <h1>{{ __('ui.billing.title') }}</h1>
+      <p>{{ __('ui.billing.subtitle') }}</p>
     </div>
 
     <div class="status-grid" style="margin-bottom: 1rem;">
       <div class="status-item">
-        <small>Current Plan</small>
-        <b>{{ $activePlan?->name ?? 'FREE' }}</b>
+        <small>{{ __('ui.billing.current_plan') }}</small>
+        <b>{{ $activePlanName }}</b>
       </div>
       <div class="status-item">
-        <small>Voice Quality</small>
-        <b>{{ $activeTierLabel }}</b>
+        <small>{{ __('ui.billing.voice_quality') }}</small>
+        <b>{{ $normalizeTierLabel($activeTierLabel) }}</b>
       </div>
       <div class="status-item">
-        <small>Saved Card</small>
+        <small>{{ __('ui.billing.saved_card') }}</small>
         <b>
           @if($defaultPaymentMethod)
             {{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} **** {{ $defaultPaymentMethod->card->last4 ?? '' }}
           @else
-            Not saved
+            {{ __('ui.billing.not_saved') }}
           @endif
         </b>
       </div>
@@ -360,27 +379,27 @@
     <div class="grid-layout">
       <div class="card">
         <div class="card-header">
-          <h2>Upgrade Plan</h2>
-          <p>Select your preferred plan and billing cycle, then complete payment.</p>
+          <h2>{{ __('ui.billing.upgrade_plan') }}</h2>
+          <p>{{ __('ui.billing.upgrade_plan_hint') }}</p>
         </div>
 
         <form id="billingForm" class="form-grid">
           <div class="form-row">
             <div class="form-group">
-              <label for="plan">Plan</label>
+              <label for="plan">{{ __('ui.billing.plan') }}</label>
               <select id="plan">
-                @foreach($plans as $plan)
+                @foreach($plansForUi as $plan)
                   <option value="{{ $plan['slug'] }}" {{ $selectedPlan === $plan['slug'] ? 'selected' : '' }}>
-                    {{ $plan['name'] }} - {{ $plan['voice_tier'] }}
+                    {{ $plan['localized_name'] }} - {{ $plan['localized_voice_tier'] }}
                   </option>
                 @endforeach
               </select>
             </div>
             <div class="form-group">
-              <label for="cycle">Billing Cycle</label>
+              <label for="cycle">{{ __('ui.billing.billing_cycle') }}</label>
               <select id="cycle">
-                <option value="monthly">Monthly</option>
-                <option value="yearly">Yearly (Save 20%)</option>
+                <option value="monthly">{{ __('ui.billing.monthly') }}</option>
+                <option value="yearly">{{ __('ui.billing.yearly_save_20') }}</option>
               </select>
             </div>
           </div>
@@ -402,26 +421,25 @@
                   <rect x="11.5" y="14.2" width="7.3" height="1.1" rx=".55" fill="rgba(255,255,255,.88)"></rect>
                 </svg>
               </span>
-              Credit or Debit Card
+              {{ __('ui.billing.credit_or_debit_card') }}
             </div>
             <div id="card-element"></div>
             <div id="card-error" class="card-error"></div>
             @if($stripeReady)
-              <p class="card-hint">Card data is encrypted and securely processed by Stripe.</p>
+              <p class="card-hint">{{ __('ui.billing.card_processed_by_stripe') }}</p>
             @else
-              <p class="card-hint" style="color: var(--danger);">Billing is not configured. Add Stripe keys to enable payments.</p>
+              <p class="card-hint" style="color: var(--danger);">{{ __('ui.billing.stripe_not_configured') }}</p>
             @endif
             <div class="consent-box">
-              Subscriptions renew automatically using your payment card until you cancel.
-              <!-- <div class="consent-row">Your payment card will be used for the next billing cycles.</div> -->
+              {{ __('ui.billing.auto_renew_notice') }}
             </div>
           </div>
 
           <div class="actions">
             <button class="btn btn-primary" id="subscribeBtn" type="button" {{ $stripeReady ? '' : 'disabled' }}>
-              Confirm & Pay
+              {{ __('ui.billing.confirm_and_pay') }}
             </button>
-            <a class="btn" href="{{ route('manage-subscription.page') }}">Manage Subscription</a>
+            <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
           <div id="message" class="message"></div>
         </form>
@@ -429,44 +447,63 @@
 
       <div class="card quote-section">
         <div class="card-header">
-          <h2>Charge Preview</h2>
-          <p>Exact amount based on your selected plan and billing cycle.</p>
+          <h2>{{ __('ui.billing.charge_preview') }}</h2>
+          <p>{{ __('ui.billing.charge_preview_hint') }}</p>
         </div>
 
         <div class="quote-highlight">
-          <small>Amount to be charged</small>
-          <p class="amount" id="quoteAmount">-</p>
-          <p class="hint" id="quoteHint">Select a plan to preview your charge.</p>
+          <small>{{ __('ui.billing.amount_to_be_charged') }}</small>
+          <p class="amount" id="quoteAmount" dir="ltr">-</p>
+          <p class="hint" id="quoteHint">{{ __('ui.billing.select_plan_for_preview') }}</p>
         </div>
 
         <div class="quote-details">
           <div class="quote-row">
-            <dt>Plan</dt>
+            <dt>{{ __('ui.billing.plan') }}</dt>
             <dd id="quotePlan">-</dd>
           </div>
           <div class="quote-row">
-            <dt>Billing Cycle</dt>
+            <dt>{{ __('ui.billing.billing_cycle') }}</dt>
             <dd id="quoteCycle">-</dd>
           </div>
         </div>
-<!--
-        <div class="quick-links">
-          <a class="btn" href="{{ route('pricing') }}">View All Plans</a>
-          <a class="btn" href="{{ route('manage-subscription.page') }}">Subscription Details</a>
-        </div> -->
       </div>
     </div>
   </main>
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $billingI18n = [
+      'confirm_and_pay' => __('ui.billing.confirm_and_pay'),
+      'every' => __('ui.billing.every'),
+      'month' => __('ui.billing.month'),
+      'months' => __('ui.billing.months'),
+      'year' => __('ui.billing.year'),
+      'years' => __('ui.billing.years'),
+      'select_plan_for_preview' => __('ui.billing.select_plan_for_preview'),
+      'you_will_be_charged' => __('ui.billing.you_will_be_charged'),
+      'stripe_not_configured' => __('ui.billing.stripe_not_configured'),
+      'invalid_card_details' => __('ui.billing.invalid_card_details'),
+      'processing_payment' => __('ui.billing.processing_payment'),
+      'choose_plan_and_cycle' => __('ui.billing.choose_plan_and_cycle'),
+      'enter_card_details' => __('ui.billing.enter_card_details'),
+      'securing_card' => __('ui.billing.securing_card'),
+      'finalizing_subscription' => __('ui.billing.finalizing_subscription'),
+      'waiting_bank_confirmation' => __('ui.billing.waiting_bank_confirmation'),
+      'payment_auth_failed' => __('ui.billing.payment_auth_failed'),
+      'payment_confirmed_redirecting' => __('ui.billing.payment_confirmed_redirecting'),
+      'upgrade_failed' => __('ui.billing.upgrade_failed'),
+      'subscription_updated_redirecting' => __('ui.billing.subscription_updated_redirecting'),
+    ];
+  @endphp
   <script>
     const stripeKey = @json($stripeKey);
     const csrfToken = '{{ csrf_token() }}';
     const userName = @json((string) auth()->user()->name);
     const userEmail = @json((string) auth()->user()->email);
     const hasDefaultPaymentMethod = @json((bool) $defaultPaymentMethod);
-    const planCatalog = @json(collect($plans)->keyBy('slug')->all());
+    const planCatalog = @json(collect($plansForUi)->keyBy('slug')->all());
 
     const messageBox = document.getElementById('message');
     const subscribeBtn = document.getElementById('subscribeBtn');
@@ -478,7 +515,10 @@
     const quoteHint = document.getElementById('quoteHint');
     const quotePlan = document.getElementById('quotePlan');
     const quoteCycle = document.getElementById('quoteCycle');
-    const subscribeBtnDefaultText = subscribeBtn ? subscribeBtn.textContent.trim() : 'Confirm & Pay';
+    const i18n = @json($billingI18n);
+    const localeCode = String(document.documentElement.lang || '').toLowerCase();
+    const isArabicLocale = localeCode.startsWith('ar');
+    const subscribeBtnDefaultText = subscribeBtn ? subscribeBtn.textContent.trim() : i18n.confirm_and_pay;
     const LIGHT_CARD_STYLE = {
       base: {
         color: '#13213d',
@@ -502,6 +542,46 @@
       return document.documentElement.getAttribute('data-theme') === 'light'
         ? LIGHT_CARD_STYLE
         : DARK_CARD_STYLE;
+    }
+
+    function hasArabicChars(value) {
+      return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(String(value || ''));
+    }
+
+    function normalizeStripeMessage(message, fallback) {
+      const raw = String(message || '').trim();
+      if (!raw) {
+        return fallback || '';
+      }
+
+      if (hasArabicChars(raw) || !isArabicLocale) {
+        return raw;
+      }
+
+      const lowered = raw.toLowerCase();
+      const invalidCard =
+        lowered.includes('card number') ||
+        lowered.includes('cvc') ||
+        lowered.includes('expiry') ||
+        lowered.includes('expired card') ||
+        lowered.includes('insufficient funds') ||
+        lowered.includes('declined') ||
+        lowered.includes('invalid card') ||
+        lowered.includes('incomplete');
+
+      if (invalidCard) {
+        return i18n.invalid_card_details;
+      }
+
+      if (
+        lowered.includes('authentication') ||
+        lowered.includes('3d secure') ||
+        lowered.includes('requires_action')
+      ) {
+        return i18n.payment_auth_failed;
+      }
+
+      return fallback || i18n.invalid_card_details;
     }
 
     function setMessage(type, text) {
@@ -548,7 +628,9 @@
     card?.mount('#card-element');
     card?.on('change', (event) => {
       cardComplete = Boolean(event.complete);
-      cardError.textContent = event.error?.message || '';
+      cardError.textContent = event.error
+        ? normalizeStripeMessage(event.error.message, i18n.invalid_card_details)
+        : '';
     });
 
     if (card && 'MutationObserver' in window) {
@@ -582,8 +664,10 @@
     function cycleLabel(meta) {
       const intervalCount = Number(meta?.interval_count || 1);
       const interval = String(meta?.interval || 'month');
-      const unit = intervalCount > 1 ? `${interval}s` : interval;
-      return intervalCount > 1 ? `Every ${intervalCount} ${unit}` : `Every ${unit}`;
+      const unit = interval === 'year'
+        ? (intervalCount > 1 ? i18n.years : i18n.year)
+        : (intervalCount > 1 ? i18n.months : i18n.month);
+      return intervalCount > 1 ? `${i18n.every} ${intervalCount} ${unit}` : `${i18n.every} ${unit}`;
     }
 
     function renderChargePreview() {
@@ -592,18 +676,20 @@
         quoteAmount.textContent = '-';
         quotePlan.textContent = '-';
         quoteCycle.textContent = '-';
-        quoteHint.textContent = 'Select a plan to preview your charge.';
+        quoteHint.textContent = i18n.select_plan_for_preview;
         return;
       }
 
-      quoteAmount.textContent = String(selected.meta.amount_formatted || '-');
-      quotePlan.textContent = String(selected.plan.name || selected.plan.slug || '-');
+      const amountText = String(selected.meta.amount_formatted || '-');
+      const amountBidi = `\u2066${amountText}\u2069`;
+      quoteAmount.textContent = amountText;
+      quotePlan.textContent = String(selected.plan.localized_name || selected.plan.name || selected.plan.slug || '-');
       quoteCycle.textContent = cycleLabel(selected.meta);
-      quoteHint.textContent = `You will be charged ${selected.meta.amount_formatted} (${cycleLabel(selected.meta)}).`;
+      quoteHint.textContent = `${i18n.you_will_be_charged} ${amountBidi} (${cycleLabel(selected.meta)}).`;
     }
 
     async function collectCardPaymentMethod() {
-      if (!stripe || !card) throw new Error('Stripe is not configured.');
+      if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
       const result = await stripe.createPaymentMethod({
         type: 'card',
         card,
@@ -614,31 +700,31 @@
       });
 
       if (result.error) {
-        throw new Error(result.error.message || 'Card details are invalid.');
+        throw new Error(normalizeStripeMessage(result.error.message, i18n.invalid_card_details));
       }
 
       return String(result.paymentMethod?.id || '');
     }
 
     subscribeBtn?.addEventListener('click', async () => {
-      setSubscribeButtonBusy(true, 'Processing payment...');
+      setSubscribeButtonBusy(true, i18n.processing_payment);
       setMessage('', '');
 
       try {
         const selected = selectedMeta();
         if (!selected) {
-          throw new Error('Please choose a plan and billing cycle.');
+          throw new Error(i18n.choose_plan_and_cycle);
         }
 
         let paymentMethod = '';
         if (cardComplete) {
-          setSubscribeButtonBusy(true, 'Securing card...');
+          setSubscribeButtonBusy(true, i18n.securing_card);
           paymentMethod = await collectCardPaymentMethod();
         } else if (!hasDefaultPaymentMethod) {
-          throw new Error('Please enter your credit card details to continue.');
+          throw new Error(i18n.enter_card_details);
         }
 
-        setSubscribeButtonBusy(true, 'Finalizing subscription...');
+        setSubscribeButtonBusy(true, i18n.finalizing_subscription);
         const response = await post('{{ route('billing.subscribe') }}', {
           plan: String(selected.plan.slug || ''),
           billing_cycle: String(selected.cycle || 'monthly'),
@@ -646,25 +732,25 @@
         });
 
         if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
-          setSubscribeButtonBusy(true, 'Waiting for bank confirmation...');
+          setSubscribeButtonBusy(true, i18n.waiting_bank_confirmation);
           const confirmation = await stripe.confirmCardPayment(String(response.data.client_secret));
           if (confirmation.error) {
-            throw new Error(confirmation.error.message || 'Payment authentication failed.');
+            throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
           }
 
-          setMessage('ok', 'Payment confirmed. Redirecting to your subscription details...');
+          setMessage('ok', i18n.payment_confirmed_redirecting);
           window.location.href = '{{ route('manage-subscription.page') }}';
           return;
         }
 
         if (!response.ok || response.data?.ok === false) {
-          throw new Error(response.data?.message || 'Upgrade failed.');
+          throw new Error(response.data?.message || i18n.upgrade_failed);
         }
 
-        setMessage('ok', response.data?.message || 'Subscription updated successfully. Redirecting...');
+        setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
-        setMessage('error', error.message || 'Upgrade failed.');
+        setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
       } finally {
         setSubscribeButtonBusy(false, subscribeBtnDefaultText);
       }
@@ -678,3 +764,4 @@
   </script>
 </body>
 </html>
+

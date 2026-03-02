@@ -4,12 +4,16 @@ namespace App\Providers;
 
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
+use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
+use Mcamara\LaravelLocalization\Traits\LoadsTranslatedCachedRoutes;
 
 class AppServiceProvider extends ServiceProvider
 {
+    use LoadsTranslatedCachedRoutes;
+
     /**
      * Register any application services.
      */
@@ -23,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        RouteServiceProvider::loadCachedRoutesUsing(fn () => $this->loadCachedRoutes());
+
         Cashier::useSubscriptionModel(BillingSubscription::class);
         Cashier::useSubscriptionItemModel(BillingSubscriptionItem::class);
 

@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Terms of Service', 'page' => 'terms'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.terms_title'), 'page' => 'terms'])
   <style>
     .bg-orb {
       position: fixed;
@@ -120,54 +111,58 @@
   @include('components.header')
 
   <main class="container legal-page">
+    @php
+      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
+      $supportEmailLink = '<a href="mailto:support@listenai.studio">support@listenai.studio</a>';
+    @endphp
     <article class="legal-shell">
-      <span class="legal-kicker">Legal</span>
-      <h1>Terms of Service</h1>
-      <p class="legal-updated">Effective date: February 22, 2026</p>
-      <p class="legal-intro">These Terms govern your access to and use of Listen, including our website, APIs, dashboard, demo tools, and subscription features. By using the service, you agree to these Terms.</p>
+      <span class="legal-kicker">{{ __('ui.legal.kicker') }}</span>
+      <h1>{{ __('ui.legal.terms.title') }}</h1>
+      <p class="legal-updated">{{ __('ui.legal.effective_date', ['date' => $effectiveDate]) }}</p>
+      <p class="legal-intro">{{ __('ui.legal.terms.intro') }}</p>
 
       <section class="legal-section">
-        <h2>1. Eligibility and Accounts</h2>
-        <p>You are responsible for maintaining accurate account information, safeguarding your credentials, and all activity under your account. You must use the service in compliance with applicable laws and these Terms.</p>
+        <h2>{{ __('ui.legal.terms.s1_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s1_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>2. Acceptable Use</h2>
+        <h2>{{ __('ui.legal.terms.s2_title') }}</h2>
         <ul>
-          <li>Do not use the service for unlawful, abusive, infringing, deceptive, or harmful purposes.</li>
-          <li>Do not attempt to bypass quotas, pricing controls, security controls, or access restrictions.</li>
-          <li>Do not interfere with platform stability, reverse engineer protected systems, or abuse automated access.</li>
+          <li>{{ __('ui.legal.terms.s2_1') }}</li>
+          <li>{{ __('ui.legal.terms.s2_2') }}</li>
+          <li>{{ __('ui.legal.terms.s2_3') }}</li>
         </ul>
       </section>
 
       <section class="legal-section">
-        <h2>3. Plans, Billing, and Renewals</h2>
-        <p>Paid plans renew automatically until canceled. By subscribing, you authorize recurring charges under your selected billing cycle. Pricing, included usage, and overage terms are shown in the product and may be updated with notice as required by law.</p>
+        <h2>{{ __('ui.legal.terms.s3_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s3_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>4. Service Content and License</h2>
-        <p>You retain rights to content you submit. You grant us a limited license to process, store, and transmit that content only as needed to operate and secure the service. Listen and its software, branding, and platform materials remain the property of SoliCode Ltd and its licensors.</p>
+        <h2>{{ __('ui.legal.terms.s4_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s4_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>5. Availability and Changes</h2>
-        <p>We may modify features, limits, or components to improve quality, reliability, or security. While we aim for high uptime, uninterrupted or error-free operation is not guaranteed.</p>
+        <h2>{{ __('ui.legal.terms.s5_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s5_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>6. Disclaimer and Liability Limits</h2>
-        <p>The service is provided on an "as available" basis. To the maximum extent allowed by law, SoliCode Ltd disclaims implied warranties and will not be liable for indirect, incidental, special, consequential, or punitive damages arising from use of the service.</p>
+        <h2>{{ __('ui.legal.terms.s6_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s6_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>7. Suspension and Termination</h2>
-        <p>We may suspend or terminate access for violations of these Terms, security risks, fraud indicators, or legal requirements. You may stop using the service and cancel subscriptions in accordance with your billing cycle.</p>
+        <h2>{{ __('ui.legal.terms.s7_title') }}</h2>
+        <p>{{ __('ui.legal.terms.s7_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>8. Contact</h2>
-        <p>Questions about these Terms can be sent to <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
+        <h2>{{ __('ui.legal.terms.s8_title') }}</h2>
+        <p>{!! __('ui.legal.terms.s8_body', ['email' => $supportEmailLink]) !!}</p>
       </section>
     </article>
   </main>
@@ -176,3 +171,4 @@
   @include('components.scripts')
 </body>
 </html>
+

@@ -110,7 +110,7 @@ class BillingController extends Controller
         if (! $this->isStripeReady()) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Billing is not configured yet.',
+                'message' => __('ui.backend.billing_not_configured'),
             ], 422);
         }
 
@@ -126,7 +126,7 @@ class BillingController extends Controller
         if ($priceId === '') {
             return response()->json([
                 'ok' => false,
-                'message' => 'Billing price is not configured for this plan.',
+                'message' => __('ui.backend.billing_price_not_configured'),
             ], 422);
         }
 
@@ -169,7 +169,7 @@ class BillingController extends Controller
                 'ok' => false,
                 'requires_action' => true,
                 'client_secret' => $exception->payment->client_secret,
-                'message' => 'Additional payment authentication is required.',
+                'message' => __('ui.backend.billing_auth_required'),
             ], 402);
         } catch (ValidationException $exception) {
             $errors = $exception->errors();
@@ -179,7 +179,7 @@ class BillingController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => $firstMessage !== '' ? $firstMessage : 'Please add a payment method before subscribing.',
+                'message' => $firstMessage !== '' ? $firstMessage : __('ui.backend.billing_add_payment_method'),
             ], 422);
         } catch (\Throwable $exception) {
             Log::warning('Unable to update Stripe subscription.', [
@@ -191,7 +191,7 @@ class BillingController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'Unable to update your subscription right now. Please try again in a moment.',
+                'message' => __('ui.backend.billing_update_subscription_failed'),
             ], 422);
         }
 
@@ -201,13 +201,13 @@ class BillingController extends Controller
         if (! $activePlan || $activePlan->slug !== $validated['plan']) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Payment was received but the plan is not active yet. Please refresh in a few seconds.',
+                'message' => __('ui.backend.billing_plan_not_active_yet'),
             ], 409);
         }
 
         return response()->json([
             'ok' => true,
-            'message' => 'Subscription updated successfully.',
+            'message' => __('ui.backend.billing_subscription_updated'),
             'plan' => [
                 'slug' => (string) $activePlan->slug,
                 'name' => (string) $activePlan->name,
@@ -221,7 +221,7 @@ class BillingController extends Controller
         if (! $this->isStripeReady()) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Billing is not configured yet.',
+                'message' => __('ui.backend.billing_not_configured'),
             ], 422);
         }
 
@@ -243,13 +243,13 @@ class BillingController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'Unable to update card right now. Please try again in a moment.',
+                'message' => __('ui.backend.billing_update_card_failed'),
             ], 422);
         }
 
         return response()->json([
             'ok' => true,
-            'message' => 'Payment method updated.',
+            'message' => __('ui.backend.billing_payment_method_updated'),
         ]);
     }
 
@@ -261,7 +261,7 @@ class BillingController extends Controller
         if (! $subscription || ! $subscription->valid()) {
             return response()->json([
                 'ok' => false,
-                'message' => 'No active subscription found.',
+                'message' => __('ui.backend.billing_no_active_subscription'),
             ], 422);
         }
 
@@ -279,13 +279,13 @@ class BillingController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => 'Unable to cancel renewal right now. Please try again in a moment.',
+                'message' => __('ui.backend.billing_cancel_failed'),
             ], 422);
         }
 
         return response()->json([
             'ok' => true,
-            'message' => 'Subscription will end at the close of your current billing period.',
+            'message' => __('ui.backend.billing_cancellation_scheduled'),
         ]);
     }
 
@@ -337,7 +337,7 @@ class BillingController extends Controller
 
         if ($paymentMethod === '') {
             throw ValidationException::withMessages([
-                'payment_method' => 'Please add a payment method before subscribing.',
+                'payment_method' => __('ui.backend.billing_add_payment_method'),
             ]);
         }
 
@@ -420,14 +420,14 @@ class BillingController extends Controller
             $paymentMethod = Cashier::stripe()->paymentMethods->retrieve($paymentMethodId, []);
         } catch (\Throwable) {
             throw ValidationException::withMessages([
-                'payment_method' => 'Invalid payment method. Please use a valid credit card.',
+                'payment_method' => __('ui.backend.billing_invalid_payment_method'),
             ]);
         }
 
         $type = strtolower((string) ($paymentMethod->type ?? ''));
         if ($type !== 'card') {
             throw ValidationException::withMessages([
-                'payment_method' => 'Only credit card payments are supported.',
+                'payment_method' => __('ui.backend.billing_only_cards_supported'),
             ]);
         }
     }
@@ -555,10 +555,11 @@ class BillingController extends Controller
                 $stripeInvoice = $invoice->asStripeInvoice();
                 $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
                 $totalCents = (int) ($stripeInvoice->total ?? 0);
+                $invoiceDate = $invoice->date();
 
                 return [
                     'id' => (string) $invoice->id,
-                    'date' => $invoice->date()?->format('M j, Y') ?: '-',
+                    'date' => $invoiceDate ? $this->formatCarbonDate($invoiceDate) : '-',
                     'status' => strtoupper((string) ($stripeInvoice->status ?? 'paid')),
                     'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
                     'purpose' => $this->resolveInvoicePurposeLabel($stripeInvoice),
@@ -617,7 +618,7 @@ class BillingController extends Controller
             return [
                 'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
                 'currency' => $currency,
-                'date' => $periodEndTs > 0 ? Carbon::createFromTimestamp($periodEndTs)->format('M j, Y') : null,
+                'date' => $periodEndTs > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($periodEndTs)) : null,
             ];
         } catch (\Throwable $exception) {
             Log::warning('Unable to load upcoming invoice for manage subscription page.', [
@@ -699,10 +700,18 @@ class BillingController extends Controller
         }
 
         try {
-            return Carbon::parse($date)->format('M j, Y');
+            return $this->formatCarbonDate(Carbon::parse($date));
         } catch (\Throwable) {
             return $date;
         }
+    }
+
+    private function formatCarbonDate(Carbon $date): string
+    {
+        return $date
+            ->clone()
+            ->locale((string) app()->getLocale())
+            ->translatedFormat('j M Y');
     }
 
     private function formatInvoiceTotalLabel(int $amountCents, string $currency): string
@@ -710,7 +719,7 @@ class BillingController extends Controller
         $formatted = Cashier::formatAmount(abs($amountCents), strtolower(trim($currency) !== '' ? $currency : 'USD'));
 
         if ($amountCents < 0) {
-            return 'Credit '.$formatted;
+            return __('ui.billing.credit_prefix').' '.$formatted;
         }
 
         return $formatted;
@@ -719,7 +728,7 @@ class BillingController extends Controller
     private function resolveInvoicePurposeLabel(mixed $stripeInvoice): string
     {
         if (! is_object($stripeInvoice)) {
-            return 'Subscription';
+            return __('ui.manage_subscription.subscription');
         }
 
         $lines = $stripeInvoice->lines->data ?? [];
@@ -737,7 +746,7 @@ class BillingController extends Controller
             return $description;
         }
 
-        return 'Subscription';
+        return __('ui.manage_subscription.subscription');
     }
 
     private function resolveConsistentActivePlan(?Plan $activePlan, ?BillingSubscription $subscription): ?Plan

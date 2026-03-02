@@ -52,3 +52,4 @@
 @if(SeoHelper::customCss())
 <style>{!! SeoHelper::customCss() !!}</style>
 @endif
+

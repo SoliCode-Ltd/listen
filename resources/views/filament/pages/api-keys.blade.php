@@ -14,7 +14,7 @@
                                 <dt class="text-sm font-medium text-gray-500 dark:text-gray-400">
                                     {{ $label }}
                                 </dt>
-                                <dd class="text-sm font-mono {{ str_contains($value, '✅') ? 'text-green-600 dark:text-green-400' : (str_contains($value, '❌') ? 'text-red-500' : (str_contains($value, '⚠️') ? 'text-yellow-500' : 'text-gray-900 dark:text-white')) }}">
+                                <dd class="text-sm font-mono {{ str_contains($value, 'âœ…') ? 'text-green-600 dark:text-green-400' : (str_contains($value, 'âŒ') ? 'text-red-500' : (str_contains($value, 'âš ï¸') ? 'text-yellow-500' : 'text-gray-900 dark:text-white')) }}">
                                     {{ $value }}
                                 </dd>
                             </div>
@@ -26,8 +26,9 @@
 
         <div class="rounded-xl bg-yellow-50 p-4 dark:bg-yellow-900/20 ring-1 ring-yellow-200 dark:ring-yellow-700/50">
             <p class="text-sm text-yellow-800 dark:text-yellow-200">
-                <strong>⚠️ Security Note:</strong> API keys are masked for security. To change any keys, update the <code class="px-1 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/50">.env</code> file directly or use the Environment Editor.
+                <strong>âš ï¸ Security Note:</strong> API keys are masked for security. To change any keys, update the <code class="px-1 py-0.5 rounded bg-yellow-100 dark:bg-yellow-900/50">.env</code> file directly or use the Environment Editor.
             </p>
         </div>
     </div>
 </x-filament-panels::page>
+

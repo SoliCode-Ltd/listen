@@ -1,14 +1,5 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Manage Subscription', 'page' => 'manage_subscription'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+@include('components.page-head', ['pageTitle' => __('ui.seo.manage_subscription_title'), 'page' => 'manage_subscription'])
   <script src="https://js.stripe.com/v3/"></script>
-  @include('components.styles')
   <style>
     .main-content {
       padding: 1.5rem 0 3rem;
@@ -328,51 +319,82 @@
   </style>
 </head>
 <body>
+  @php
+    $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
+      return match ((string) $slug) {
+        'free' => __('ui.pricing.plan_name_free'),
+        'creator' => __('ui.pricing.plan_name_creator'),
+        'pro' => __('ui.pricing.plan_name_pro'),
+        default => (string) ($fallback ?: '-'),
+      };
+    };
+    $normalizeTierLabel = static function (?string $label): string {
+      $raw = trim((string) $label);
+      $value = strtolower($raw);
+      $display = $value === 'standard' ? __('ui.dashboard.standard') : $raw;
+      if ($display !== '' && preg_match('/[A-Za-z0-9+]/', $display) && !preg_match('/[\x{0600}-\x{06FF}]/u', $display)) {
+        return "\u{2066}{$display}\u{2069}";
+      }
+      return $display;
+    };
+    $subscriptionStatusLower = strtolower((string) $subscriptionStatus);
+    $subscriptionStatusLabel = match ($subscriptionStatusLower) {
+      'no subscription' => __('ui.manage_subscription.status_no_subscription'),
+      'active' => __('ui.manage_subscription.status_active'),
+      'trialing' => __('ui.manage_subscription.status_trialing'),
+      'past due', 'past_due' => __('ui.manage_subscription.status_past_due'),
+      'incomplete payment', 'incomplete' => __('ui.manage_subscription.status_incomplete'),
+      'incomplete expired', 'incomplete_expired' => __('ui.manage_subscription.status_incomplete_expired'),
+      'canceled', 'cancelled' => __('ui.manage_subscription.status_canceled'),
+      'unpaid' => __('ui.manage_subscription.status_unpaid'),
+      'cancellation scheduled' => __('ui.manage_subscription.cancellation_scheduled'),
+      default => __('ui.manage_subscription.status_unknown'),
+    };
+  @endphp
   @include('components.header')
 
   <main class="container main-content">
     <div class="page-header">
-      <h1>Manage Subscription</h1>
-      <p>View subscription details, update payment methods, and access invoice history.</p>
+      <h1>{{ __('ui.manage_subscription.title') }}</h1>
+      <p>{{ __('ui.manage_subscription.subtitle') }}</p>
     </div>
     @if($billingProfileRemoved)
       <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
-        Your Stripe billing profile was removed. This account is now on the Free plan and has no active subscription.
+        {{ __('ui.manage_subscription.billing_profile_removed') }}
       </div>
     @endif
 
     <div class="status-grid">
       <div class="status-item">
-        <small>Current Plan</small>
-        <b>{{ $activePlan?->name ?? 'FREE' }}</b>
+        <small>{{ __('ui.manage_subscription.current_plan') }}</small>
+        <b>{{ $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan')) }}</b>
       </div>
       <div class="status-item">
-        <small>Status</small>
+        <small>{{ __('ui.manage_subscription.status') }}</small>
         @php
           $statusClass = 'active';
-          $statusLower = strtolower((string) $subscriptionStatus);
-          if (str_contains($statusLower, 'cancel')) $statusClass = 'canceled';
-          elseif (str_contains($statusLower, 'pending') || str_contains($statusLower, 'past due') || str_contains($statusLower, 'past_due') || str_contains($statusLower, 'no subscription')) $statusClass = 'pending';
+          if (str_contains($subscriptionStatusLower, 'cancel')) $statusClass = 'canceled';
+          elseif (str_contains($subscriptionStatusLower, 'pending') || str_contains($subscriptionStatusLower, 'past due') || str_contains($subscriptionStatusLower, 'past_due') || str_contains($subscriptionStatusLower, 'no subscription') || str_contains($subscriptionStatusLower, 'unpaid') || str_contains($subscriptionStatusLower, 'incomplete')) $statusClass = 'pending';
         @endphp
-        <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatus }}</span>
+        <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatusLabel }}</span>
       </div>
       <div class="status-item">
-        <small>Next Billing</small>
+        <small>{{ __('ui.manage_subscription.next_billing') }}</small>
         <b>
           @if(!empty($upcomingCharge['total']))
-            {{ $upcomingCharge['total'] }}{{ !empty($upcomingCharge['date']) ? ' on '.$upcomingCharge['date'] : '' }}
+            {{ $upcomingCharge['total'] }}{{ !empty($upcomingCharge['date']) ? ' ' . __('ui.manage_subscription.on_date', ['date' => $upcomingCharge['date']]) : '' }}
           @else
-            Not scheduled
+            {{ __('ui.manage_subscription.not_scheduled') }}
           @endif
         </b>
       </div>
       <div class="status-item">
-        <small>Saved Card</small>
+        <small>{{ __('ui.manage_subscription.saved_card') }}</small>
         <b>
           @if($defaultPaymentMethod)
             {{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} **** {{ $defaultPaymentMethod->card->last4 ?? '' }}
           @else
-            <span style="color: var(--muted);">Not saved</span>
+            <span style="color: var(--muted);">{{ __('ui.manage_subscription.not_saved') }}</span>
           @endif
         </b>
       </div>
@@ -381,39 +403,39 @@
     <div class="grid-layout">
       <div class="card">
         <div class="card-header">
-          <h2>Subscription Details</h2>
-          <p>Review your current subscription information and renewal schedule.</p>
+          <h2>{{ __('ui.manage_subscription.subscription_details') }}</h2>
+          <p>{{ __('ui.manage_subscription.subscription_details_hint') }}</p>
         </div>
 
         <div class="detail-list">
           <div class="detail-row">
-            <dt>Voice Tier</dt>
-            <dd>{{ $activeTierLabel }}</dd>
+            <dt>{{ __('ui.manage_subscription.voice_tier') }}</dt>
+            <dd>{{ $normalizeTierLabel($activeTierLabel) }}</dd>
           </div>
           @if($subscriptionRenewsAt && ! $isCancellationScheduled)
             <div class="detail-row" id="renewsOnRow">
-              <dt>Renews On</dt>
+              <dt>{{ __('ui.manage_subscription.renews_on') }}</dt>
               <dd>{{ $subscriptionRenewsAt }}</dd>
             </div>
           @endif
           @if($subscriptionEndsAt)
             <div class="detail-row">
-              <dt>Access Ends On</dt>
+              <dt>{{ __('ui.manage_subscription.access_ends_on') }}</dt>
               <dd>{{ $subscriptionEndsAt }}</dd>
             </div>
           @endif
           @if(!empty($upcomingCharge['total']))
             <div class="detail-row">
-              <dt>Upcoming Invoice</dt>
+              <dt>{{ __('ui.manage_subscription.upcoming_invoice') }}</dt>
               <dd>{{ $upcomingCharge['total'] }}</dd>
             </div>
           @endif
         </div>
 
         <div class="actions">
-          <a class="btn btn-primary" href="{{ route('billing.page') }}">Change Plan</a>
+          <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
           @if($hasCancelableSubscription)
-            <button class="btn btn-danger" id="cancelBtn" type="button">Cancel Subscription</button>
+            <button class="btn btn-danger" id="cancelBtn" type="button">{{ __('ui.manage_subscription.cancel_subscription') }}</button>
           @endif
         </div>
         <div id="subscriptionMessage" class="message"></div>
@@ -421,8 +443,8 @@
 
       <div class="card">
         <div class="card-header">
-          <h2>Payment Method</h2>
-          <p>Update your saved card for future renewals and upgrades.</p>
+          <h2>{{ __('ui.manage_subscription.payment_method') }}</h2>
+          <p>{{ __('ui.manage_subscription.payment_method_hint') }}</p>
         </div>
 
         <div class="stripe-container">
@@ -442,20 +464,20 @@
                 <rect x="11.5" y="14.2" width="7.3" height="1.1" rx=".55" fill="rgba(255,255,255,.88)"></rect>
               </svg>
             </span>
-            Credit or Debit Card
+            {{ __('ui.billing.credit_or_debit_card') }}
           </div>
           <div id="card-element"></div>
           <div id="card-error" class="card-error"></div>
           @if($stripeReady)
-            <p class="card-hint">This card will be used for future renewals and upgrades.</p>
+            <p class="card-hint">{{ __('ui.manage_subscription.card_used_for_future') }}</p>
           @else
-            <p class="card-hint" style="color: var(--danger);">Billing is not configured. Add Stripe keys to enable payments.</p>
+            <p class="card-hint" style="color: var(--danger);">{{ __('ui.billing.stripe_not_configured') }}</p>
           @endif
         </div>
 
         <div class="actions">
           <button class="btn btn-primary" id="updateCardBtn" type="button" {{ $stripeReady ? '' : 'disabled' }}>
-            Update Saved Card
+            {{ __('ui.manage_subscription.update_saved_card') }}
           </button>
         </div>
         <div id="paymentMessage" class="message"></div>
@@ -464,8 +486,8 @@
 
     <div class="card invoices-card">
       <div class="card-header">
-        <h2>Invoice History</h2>
-        <p>Download and view past invoices for your subscription.</p>
+        <h2>{{ __('ui.manage_subscription.invoice_history') }}</h2>
+        <p>{{ __('ui.manage_subscription.invoice_history_hint') }}</p>
       </div>
 
       @if(count($invoices) > 0)
@@ -473,11 +495,11 @@
           <table class="invoice-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Status</th>
-                <th>Paid For</th>
-                <th>Amount</th>
-                <th>Payment Details</th>
+                <th>{{ __('ui.manage_subscription.invoice_date') }}</th>
+                <th>{{ __('ui.manage_subscription.invoice_status') }}</th>
+                <th>{{ __('ui.manage_subscription.invoice_paid_for') }}</th>
+                <th>{{ __('ui.manage_subscription.invoice_amount') }}</th>
+                <th>{{ __('ui.manage_subscription.invoice_payment_details') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -487,15 +509,22 @@
                   $statusBadgeClass = 'paid';
                   if ($invStatus === 'open') $statusBadgeClass = 'open';
                   elseif (in_array($invStatus, ['void', 'uncollectible'])) $statusBadgeClass = 'void';
+                  $invStatusLabel = match ($invStatus) {
+                    'paid' => __('ui.manage_subscription.invoice_status_paid'),
+                    'open' => __('ui.manage_subscription.invoice_status_open'),
+                    'void' => __('ui.manage_subscription.invoice_status_void'),
+                    'uncollectible' => __('ui.manage_subscription.invoice_status_uncollectible'),
+                    default => __('ui.manage_subscription.status_unknown'),
+                  };
                 @endphp
                 <tr>
                   <td>{{ $invoice['date'] }}</td>
-                  <td><span class="invoice-status {{ $statusBadgeClass }}">{{ ucfirst($invStatus) }}</span></td>
-                  <td>{{ $invoice['purpose'] ?? 'Subscription' }}</td>
+                  <td><span class="invoice-status {{ $statusBadgeClass }}">{{ $invStatusLabel }}</span></td>
+                  <td>{{ $invoice['purpose'] ?? __('ui.manage_subscription.subscription') }}</td>
                   <td>{{ $invoice['total'] }}</td>
                   <td>
                     <div class="invoice-actions">
-                      <a class="btn" target="_blank" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">View</a>
+                      <a class="btn" target="_blank" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">{{ __('ui.manage_subscription.view') }}</a>
                     </div>
                   </td>
                 </tr>
@@ -505,7 +534,7 @@
         </div>
       @else
         <div class="empty-state">
-          <p>No invoices yet. Your paid invoices will appear here automatically.</p>
+          <p>{{ __('ui.manage_subscription.no_invoices_yet') }}</p>
         </div>
       @endif
     </div>
@@ -513,6 +542,23 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $manageSubscriptionI18n = [
+      'update_saved_card' => __('ui.manage_subscription.update_saved_card'),
+      'cancel_subscription' => __('ui.manage_subscription.cancel_subscription'),
+      'stripe_not_configured' => __('ui.billing.stripe_not_configured'),
+      'invalid_card_details' => __('ui.billing.invalid_card_details'),
+      'updating_card' => __('ui.manage_subscription.updating_card'),
+      'enter_new_card_first' => __('ui.manage_subscription.enter_new_card_first'),
+      'card_update_failed' => __('ui.manage_subscription.card_update_failed'),
+      'card_updated_successfully' => __('ui.manage_subscription.card_updated_successfully'),
+      'canceling' => __('ui.manage_subscription.canceling'),
+      'confirm_cancel_prompt' => __('ui.manage_subscription.confirm_cancel_prompt'),
+      'cancellation_failed' => __('ui.manage_subscription.cancellation_failed'),
+      'subscription_canceled_success' => __('ui.manage_subscription.subscription_canceled_success'),
+      'cancellation_scheduled' => __('ui.manage_subscription.cancellation_scheduled'),
+    ];
+  @endphp
   <script>
     const stripeKey = @json($stripeKey);
     const csrfToken = '{{ csrf_token() }}';
@@ -526,8 +572,11 @@
     const subscriptionStatusBadge = document.getElementById('subscriptionStatusBadge');
     const renewsOnRow = document.getElementById('renewsOnRow');
     const cardError = document.getElementById('card-error');
-    const updateCardBtnDefaultText = updateCardBtn ? updateCardBtn.textContent.trim() : 'Update Saved Card';
-    const cancelBtnDefaultText = cancelBtn ? cancelBtn.textContent.trim() : 'Cancel Subscription';
+    const i18n = @json($manageSubscriptionI18n);
+    const localeCode = String(document.documentElement.lang || '').toLowerCase();
+    const isArabicLocale = localeCode.startsWith('ar');
+    const updateCardBtnDefaultText = updateCardBtn ? updateCardBtn.textContent.trim() : i18n.update_saved_card;
+    const cancelBtnDefaultText = cancelBtn ? cancelBtn.textContent.trim() : i18n.cancel_subscription;
     const LIGHT_CARD_STYLE = {
       base: {
         color: '#13213d',
@@ -551,6 +600,38 @@
       return document.documentElement.getAttribute('data-theme') === 'light'
         ? LIGHT_CARD_STYLE
         : DARK_CARD_STYLE;
+    }
+
+    function hasArabicChars(value) {
+      return /[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/.test(String(value || ''));
+    }
+
+    function normalizeStripeMessage(message, fallback) {
+      const raw = String(message || '').trim();
+      if (!raw) {
+        return fallback || '';
+      }
+
+      if (hasArabicChars(raw) || !isArabicLocale) {
+        return raw;
+      }
+
+      const lowered = raw.toLowerCase();
+      const invalidCard =
+        lowered.includes('card number') ||
+        lowered.includes('cvc') ||
+        lowered.includes('expiry') ||
+        lowered.includes('expired card') ||
+        lowered.includes('insufficient funds') ||
+        lowered.includes('declined') ||
+        lowered.includes('invalid card') ||
+        lowered.includes('incomplete');
+
+      if (invalidCard) {
+        return i18n.invalid_card_details;
+      }
+
+      return fallback || i18n.invalid_card_details;
     }
 
     function setMessage(messageBox, type, text) {
@@ -598,7 +679,9 @@
     card?.mount('#card-element');
     card?.on('change', (event) => {
       cardComplete = Boolean(event.complete);
-      cardError.textContent = event.error?.message || '';
+      cardError.textContent = event.error
+        ? normalizeStripeMessage(event.error.message, i18n.invalid_card_details)
+        : '';
     });
 
     if (card && 'MutationObserver' in window) {
@@ -616,7 +699,7 @@
     }
 
     async function collectCardPaymentMethod() {
-      if (!stripe || !card) throw new Error('Stripe is not configured.');
+      if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
       const result = await stripe.createPaymentMethod({
         type: 'card',
         card,
@@ -627,62 +710,62 @@
       });
 
       if (result.error) {
-        throw new Error(result.error.message || 'Card details are invalid.');
+        throw new Error(normalizeStripeMessage(result.error.message, i18n.invalid_card_details));
       }
 
       return String(result.paymentMethod?.id || '');
     }
 
     updateCardBtn?.addEventListener('click', async () => {
-      setButtonBusy(updateCardBtn, true, 'Updating card...', updateCardBtnDefaultText);
+      setButtonBusy(updateCardBtn, true, i18n.updating_card, updateCardBtnDefaultText);
       setMessage(paymentMessageBox, '', '');
 
       try {
         if (!cardComplete) {
-          throw new Error('Please enter your new card details first.');
+          throw new Error(i18n.enter_new_card_first);
         }
 
         const paymentMethod = await collectCardPaymentMethod();
         const response = await post('{{ route('billing.payment-method') }}', { payment_method: paymentMethod });
 
         if (!response.ok || response.data?.ok === false) {
-          throw new Error(response.data?.message || 'Card update failed.');
+          throw new Error(response.data?.message || i18n.card_update_failed);
         }
 
-        setMessage(paymentMessageBox, 'ok', response.data?.message || 'Card updated successfully.');
+        setMessage(paymentMessageBox, 'ok', response.data?.message || i18n.card_updated_successfully);
         setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
-        setMessage(paymentMessageBox, 'error', error.message || 'Card update failed.');
+        setMessage(paymentMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.card_update_failed));
       } finally {
         setButtonBusy(updateCardBtn, false, '', updateCardBtnDefaultText);
       }
     });
 
     cancelBtn?.addEventListener('click', async () => {
-      setButtonBusy(cancelBtn, true, 'Canceling...', cancelBtnDefaultText);
+      setButtonBusy(cancelBtn, true, i18n.canceling, cancelBtnDefaultText);
       setMessage(subscriptionMessageBox, '', '');
 
       try {
-        const proceed = window.confirm('Are you sure you want to cancel your subscription? Your access will remain active until the end of the current billing period.');
+        const proceed = window.confirm(i18n.confirm_cancel_prompt);
         if (!proceed) return;
 
         const response = await post('{{ route('billing.cancel') }}');
         if (!response.ok || response.data?.ok === false) {
-          throw new Error(response.data?.message || 'Cancellation failed.');
+          throw new Error(response.data?.message || i18n.cancellation_failed);
         }
 
-        setMessage(subscriptionMessageBox, 'ok', response.data?.message || 'Subscription canceled successfully.');
+        setMessage(subscriptionMessageBox, 'ok', response.data?.message || i18n.subscription_canceled_success);
 
         subscriptionStatusBadge?.classList.remove('active', 'canceled');
         subscriptionStatusBadge?.classList.add('pending');
         if (subscriptionStatusBadge) {
-          subscriptionStatusBadge.textContent = 'Cancellation scheduled';
+          subscriptionStatusBadge.textContent = i18n.cancellation_scheduled;
         }
 
         renewsOnRow?.remove();
         cancelBtn?.remove();
       } catch (error) {
-        setMessage(subscriptionMessageBox, 'error', error.message || 'Cancellation failed.');
+        setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
       }
@@ -690,3 +773,4 @@
   </script>
 </body>
 </html>
+

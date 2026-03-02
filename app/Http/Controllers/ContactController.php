@@ -22,11 +22,11 @@ class ContactController extends Controller
             if ($request->expectsJson()) {
                 return response()->json([
                     'ok' => false,
-                    'message' => 'Contact form is currently disabled.',
+                    'message' => __('ui.backend.contact_disabled'),
                 ], 403);
             }
 
-            return redirect()->back()->with('error', 'Contact form is currently disabled.');
+            return redirect()->back()->with('error', __('ui.backend.contact_disabled'));
         }
 
         $validated = $request->validate([

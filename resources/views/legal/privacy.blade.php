@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Privacy Policy', 'page' => 'privacy'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.privacy_title'), 'page' => 'privacy'])
   <style>
     .bg-orb {
       position: fixed;
@@ -120,55 +111,59 @@
   @include('components.header')
 
   <main class="container legal-page">
+    @php
+      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
+      $supportEmailLink = '<a href="mailto:support@listenai.studio">support@listenai.studio</a>';
+    @endphp
     <article class="legal-shell">
-      <span class="legal-kicker">Legal</span>
-      <h1>Privacy Policy</h1>
-      <p class="legal-updated">Effective date: February 22, 2026</p>
-      <p class="legal-intro">This Privacy Policy explains how Listen, operated by SoliCode Ltd, collects, uses, and protects personal data when you use our website, demo tools, APIs, dashboard, and billing services.</p>
+      <span class="legal-kicker">{{ __('ui.legal.kicker') }}</span>
+      <h1>{{ __('ui.legal.privacy.title') }}</h1>
+      <p class="legal-updated">{{ __('ui.legal.effective_date', ['date' => $effectiveDate]) }}</p>
+      <p class="legal-intro">{{ __('ui.legal.privacy.intro') }}</p>
 
       <section class="legal-section">
-        <h2>1. Information We Collect</h2>
+        <h2>{{ __('ui.legal.privacy.s1_title') }}</h2>
         <ul>
-          <li>Account details, such as name, email address, and login profile data (including Google sign-in data if you choose social login).</li>
-          <li>Service usage data, including text submitted for voice generation, selected language/voice settings, and generation metadata.</li>
-          <li>Billing records needed to manage subscriptions and invoices. Card processing is handled by Stripe; Listen does not store full card numbers.</li>
-          <li>Technical and security data such as IP address, device/browser information, session identifiers, and anti-abuse signals.</li>
+          <li>{{ __('ui.legal.privacy.s1_1') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_2') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_3') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_4') }}</li>
         </ul>
       </section>
 
       <section class="legal-section">
-        <h2>2. How We Use Information</h2>
+        <h2>{{ __('ui.legal.privacy.s2_title') }}</h2>
         <ul>
-          <li>To provide core product functionality, including voice generation, account access, usage tracking, and support.</li>
-          <li>To process subscriptions, payment updates, and invoice delivery.</li>
-          <li>To detect abuse, enforce quotas and plan policies, and protect service reliability and security.</li>
-          <li>To improve performance, quality, and product experience.</li>
+          <li>{{ __('ui.legal.privacy.s2_1') }}</li>
+          <li>{{ __('ui.legal.privacy.s2_2') }}</li>
+          <li>{{ __('ui.legal.privacy.s2_3') }}</li>
+          <li>{{ __('ui.legal.privacy.s2_4') }}</li>
         </ul>
       </section>
 
       <section class="legal-section">
-        <h2>3. Processors and Sharing</h2>
-        <p>We share data only as needed to operate the service, including payment processing (Stripe), authentication providers, infrastructure providers, and speech-processing providers. We may also disclose information when required by law, legal process, or to protect rights and security.</p>
+        <h2>{{ __('ui.legal.privacy.s3_title') }}</h2>
+        <p>{{ __('ui.legal.privacy.s3_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>4. Data Retention</h2>
-        <p>We retain account, billing, and operational records for as long as needed to provide the service, maintain security, comply with legal obligations, and resolve disputes. We may delete or anonymize data that is no longer required for these purposes.</p>
+        <h2>{{ __('ui.legal.privacy.s4_title') }}</h2>
+        <p>{{ __('ui.legal.privacy.s4_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>5. Security</h2>
-        <p>We apply technical and organizational safeguards designed to protect data against unauthorized access, loss, and misuse. No method of storage or transmission is fully risk-free, so we cannot guarantee absolute security.</p>
+        <h2>{{ __('ui.legal.privacy.s5_title') }}</h2>
+        <p>{{ __('ui.legal.privacy.s5_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>6. Your Choices</h2>
-        <p>You may request access, correction, or deletion of personal data tied to your account, subject to applicable law and legitimate business needs. You can also close your account at any time from the product experience or by contacting us.</p>
+        <h2>{{ __('ui.legal.privacy.s6_title') }}</h2>
+        <p>{{ __('ui.legal.privacy.s6_body') }}</p>
       </section>
 
       <section class="legal-section">
-        <h2>7. Contact</h2>
-        <p>For privacy questions or data requests, contact SoliCode Ltd at <a href="mailto:support@listenai.studio">support@listenai.studio</a>.</p>
+        <h2>{{ __('ui.legal.privacy.s7_title') }}</h2>
+        <p>{!! __('ui.legal.privacy.s7_body', ['email' => $supportEmailLink]) !!}</p>
       </section>
     </article>
   </main>
@@ -177,3 +172,4 @@
   @include('components.scripts')
 </body>
 </html>
+

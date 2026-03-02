@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => ($pageTitle ?? 'Browser Extension'), 'page' => 'extension'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => ($pageTitle ?? __('ui.extension.title')), 'page' => 'extension'])
   <style>
     .hero {
       padding: 3rem 0 2rem;
@@ -125,7 +116,7 @@
       align-items: center;
       justify-content: center;
       gap: .55rem;
-      flex-wrap: nowrap;
+      flex-wrap: wrap;
     }
 
     .section {
@@ -159,7 +150,8 @@
 
     .steps {
       margin: 0;
-      padding-left: 1.3rem;
+      padding-inline-start: 1.3rem;
+      padding-left: 0;
       display: grid;
       gap: .6rem;
     }
@@ -173,6 +165,9 @@
       background: var(--surface);
       font-size: .85rem;
       color: var(--text);
+      direction: ltr;
+      unicode-bidi: isolate;
+      display: inline-block;
     }
 
     .api-section {
@@ -347,6 +342,20 @@
       transform: translateY(0);
     }
 
+    html[dir="rtl"] .steps {
+      padding-inline-start: 0;
+      padding-inline-end: 1.3rem;
+    }
+    html[dir="rtl"] .download-actions {
+      flex-direction: row-reverse;
+    }
+    html[dir="rtl"] .key-display-value,
+    html[dir="rtl"] .new-key-box code {
+      direction: ltr;
+      unicode-bidi: isolate;
+      text-align: left;
+    }
+
     @media (max-width: 960px) {
       .browsers-grid {
         grid-template-columns: 1fr;
@@ -387,7 +396,7 @@
     <section class="browsers-grid">
       <article class="browser-card {{ $chromeEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
-          <img src="{{ asset('icons/chrome.png') }}" alt="Chrome" />
+          <img src="{{ asset('icons/chrome.png') }}" alt="{{ __('ui.extension.chrome_title') }}" />
         </div>
         <h3>{{ $chromeCardTitle }}</h3>
         <p>{{ $chromeCardSubtitle }}</p>
@@ -400,43 +409,43 @@
         <div class="download-actions">
           @if($showZipButton)
           <a class="download-btn" href="{{ route('browsers-extension.download', ['v' => $extensionVersion]) }}">
-            {{ trim((string) ($chromeZipButtonText ?? '')) !== '' ? $chromeZipButtonText : 'ZIP' }}
+            {{ trim((string) ($chromeZipButtonText ?? '')) !== '' ? $chromeZipButtonText : __('ui.extension.zip_button') }}
           </a>
           @endif
           @if($showStoreButton)
           <a class="download-btn" href="{{ $storeUrl }}" target="_blank" rel="noopener noreferrer">
-            {{ trim((string) ($chromeStoreButtonText ?? '')) !== '' ? $chromeStoreButtonText : 'Store' }}
+            {{ trim((string) ($chromeStoreButtonText ?? '')) !== '' ? $chromeStoreButtonText : __('ui.extension.store_button') }}
           </a>
           @endif
         </div>
         @else
-        <span class="coming-soon-badge">Coming Soon</span>
+        <span class="coming-soon-badge">{{ __('ui.extension.coming_soon') }}</span>
         @endif
       </article>
 
       <article class="browser-card {{ $firefoxEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
-          <img src="{{ asset('icons/firefox.png') }}" alt="Firefox" />
+          <img src="{{ asset('icons/firefox.png') }}" alt="{{ __('ui.extension.firefox_title') }}" />
         </div>
         <h3>{{ $firefoxCardTitle }}</h3>
         <p>{{ $firefoxCardSubtitle }}</p>
         @if($firefoxEnabled)
-        <span class="coming-soon-badge">Available</span>
+        <span class="coming-soon-badge">{{ __('ui.extension.available') }}</span>
         @else
-        <span class="coming-soon-badge">Coming Soon</span>
+        <span class="coming-soon-badge">{{ __('ui.extension.coming_soon') }}</span>
         @endif
       </article>
 
       <article class="browser-card {{ $safariEnabled ? 'available' : 'coming-soon' }} reveal">
         <div class="browser-icon">
-          <img src="{{ asset('icons/safari.png') }}" alt="Safari" />
+          <img src="{{ asset('icons/safari.png') }}" alt="{{ __('ui.extension.safari_title') }}" />
         </div>
         <h3>{{ $safariCardTitle }}</h3>
         <p>{{ $safariCardSubtitle }}</p>
         @if($safariEnabled)
-        <span class="coming-soon-badge">Available</span>
+        <span class="coming-soon-badge">{{ __('ui.extension.available') }}</span>
         @else
-        <span class="coming-soon-badge">Coming Soon</span>
+        <span class="coming-soon-badge">{{ __('ui.extension.coming_soon') }}</span>
         @endif
       </article>
     </section>
@@ -444,10 +453,10 @@
     <section class="section reveal">
       <div class="two-col">
         <article class="page-card">
-          <h2>Installation Guide (ZIP Version)</h2>
+          <h2>{{ __('ui.extension.installation_guide') }}</h2>
           <ol class="steps">
             <li>{{ $installStep1 }}</li>
-            <li>{!! str_contains($installStep2, 'chrome://extensions/') ? 'Open<a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
+            <li>{!! str_contains($installStep2, 'chrome://extensions/') ? e(__('ui.extension.open_extensions')).' <a href="chrome://extensions/" id="extensionsLink" target="_blank" rel="noopener"><code>chrome://extensions/</code></a>' : e($installStep2) !!}</li>
             <li>{{ $installStep3 }}</li>
             <li>{{ $installStep4 }}</li>
             <li>{{ $installStep5 }}</li>
@@ -456,11 +465,25 @@
         </article>
 
         <article class="page-card">
-          <h2>How to Use</h2>
+          <h2>{{ __('ui.extension.how_to_use') }}</h2>
+          @php
+            $apiKeyInline = __('ui.extension.api_key_inline');
+            $apiKeyReplaced = str_replace(
+              ['API key', $apiKeyInline],
+              '<a href="#api-management" class="brand-text" style="text-decoration: underline; font-weight: 700;">'.e($apiKeyInline).'</a>',
+              e($howToUseStep1),
+            );
+            $listenSelectedInline = __('ui.extension.listen_selected_text_inline');
+            $listenSelectedReplaced = str_replace(
+              ['Listen Selected Text', $listenSelectedInline],
+              '<strong>'.e($listenSelectedInline).'</strong>',
+              e($howToUseStep3),
+            );
+          @endphp
           <ol class="steps">
-            <li>{!! str_replace('API key', '<a href="#api-management" class="brand-text" style="text-decoration: underline; font-weight: 700;">API key</a>', e($howToUseStep1)) !!}</li>
+            <li>{!! $apiKeyReplaced !!}</li>
             <li>{{ $howToUseStep2 }}</li>
-            <li>{!! str_replace('Listen Selected Text', '<strong>Listen Selected Text</strong>', e($howToUseStep3)) !!}</li>
+            <li>{!! $listenSelectedReplaced !!}</li>
             <li>{{ $howToUseStep4 }}</li>
             <li>{{ $howToUseStep5 }}</li>
           </ol>
@@ -498,31 +521,31 @@
       <article class="api-card">
         <div class="api-header">
           <div>
-            <h2>API Key Management</h2>
-            <p>Generate and manage your extension API key. Keep it secure.</p>
+            <h2>{{ __('ui.extension.api_key_management') }}</h2>
+            <p>{{ __('ui.extension.api_key_management_subtitle') }}</p>
           </div>
           <div class="api-actions">
-            <button class="btn btn-primary" id="generateBtn" type="button">Generate Key</button>
-            <button class="btn" id="revokeBtn" type="button">Revoke Key</button>
+            <button class="btn btn-primary" id="generateBtn" type="button">{{ __('ui.extension.generate_key') }}</button>
+            <button class="btn" id="revokeBtn" type="button">{{ __('ui.extension.revoke_key') }}</button>
           </div>
         </div>
 
         <div id="messageBox"></div>
 
         <div class="api-status">
-          <span id="keyBadge" class="badge inactive"><span class="badge-dot"></span>No API Key</span>
+          <span id="keyBadge" class="badge inactive"><span class="badge-dot"></span>{{ __('ui.extension.no_api_key') }}</span>
         </div>
 
         <div class="key-display" id="keyDisplayBox">
-          <div class="key-display-label">Active Key</div>
-          <div class="key-display-value" id="keyMask">Not generated yet. Click "Generate Key" to create one.</div>
+          <div class="key-display-label">{{ __('ui.extension.active_key') }}</div>
+          <div class="key-display-value" id="keyMask">{{ __('ui.extension.not_generated') }}</div>
         </div>
 
         <div class="new-key-box" id="newKeyBox">
-          <div class="new-key-box-label">New Key - Copy Now (shown only once)</div>
+          <div class="new-key-box-label">{{ __('ui.extension.new_key_box') }}</div>
           <code id="newKeyValue"></code>
           <div class="copy-btn-wrap">
-            <button class="btn" id="copyKeyBtn" type="button">Copy to Clipboard</button>
+            <button class="btn" id="copyKeyBtn" type="button">{{ __('ui.extension.copy_to_clipboard') }}</button>
           </div>
         </div>
       </article>
@@ -531,8 +554,26 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $extensionI18n = [
+      'api_key_active' => __('ui.extension.api_key_active'),
+      'no_api_key' => __('ui.extension.no_api_key'),
+      'not_generated' => __('ui.extension.not_generated'),
+      'request_failed' => __('ui.extension.request_failed'),
+      'generated_success' => __('ui.extension.generated_success'),
+      'generate_failed' => __('ui.extension.generate_failed'),
+      'revoked_success' => __('ui.extension.revoked_success'),
+      'revoke_failed' => __('ui.extension.revoke_failed'),
+      'copied' => __('ui.extension.copied'),
+      'copy_failed' => __('ui.extension.copy_failed'),
+      'created_prefix' => __('ui.extension.created_prefix'),
+      'extensions_hint_copied' => __('ui.extension.extensions_hint_copied'),
+      'extensions_hint_manual' => __('ui.extension.extensions_hint_manual'),
+    ];
+  @endphp
   <script>
     var csrfToken = '{{ csrf_token() }}';
+    var i18n = @json($extensionI18n);
     var routes = {
       generate: '{{ route('browsers-extension.key.regenerate') }}',
       revoke: '{{ route('browsers-extension.key.revoke') }}',
@@ -557,22 +598,22 @@
 
     function renderApiState(state) {
       var hasKey = Boolean(state && state.has_api_key);
-      if (hasKey) {
-        keyBadge.className = 'badge active';
-        keyBadge.innerHTML = '<span class="badge-dot"></span>API Key Active';
-        keyMask.textContent = 'lk_live_************************************' + (state.api_key_last4 || '');
-        if (state.api_key_created_human) {
-          keyMask.textContent += '  (Created ' + state.api_key_created_human + ')';
+        if (hasKey) {
+          keyBadge.className = 'badge active';
+          keyBadge.innerHTML = '<span class="badge-dot"></span>' + i18n.api_key_active;
+          keyMask.textContent = 'lk_live_************************************' + (state.api_key_last4 || '');
+          if (state.api_key_created_human) {
+            keyMask.textContent += '  (' + i18n.created_prefix + ' ' + state.api_key_created_human + ')';
+          }
+          keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--ok) 35%, var(--line))';
+          keyDisplayBox.style.background = 'color-mix(in oklab, var(--ok) 8%, var(--surface))';
+        } else {
+          keyBadge.className = 'badge inactive';
+          keyBadge.innerHTML = '<span class="badge-dot"></span>' + i18n.no_api_key;
+          keyMask.textContent = i18n.not_generated;
+          keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--a) 35%, var(--line))';
+          keyDisplayBox.style.background = 'color-mix(in oklab, var(--a) 8%, var(--surface))';
         }
-        keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--ok) 35%, var(--line))';
-        keyDisplayBox.style.background = 'color-mix(in oklab, var(--ok) 8%, var(--surface))';
-      } else {
-        keyBadge.className = 'badge inactive';
-        keyBadge.innerHTML = '<span class="badge-dot"></span>No API Key';
-        keyMask.textContent = 'Not generated yet. Click "Generate Key" to create one.';
-        keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--a) 35%, var(--line))';
-        keyDisplayBox.style.background = 'color-mix(in oklab, var(--a) 8%, var(--surface))';
-      }
       revokeBtn.disabled = !hasKey;
     }
 
@@ -604,7 +645,7 @@
             throw new Error(String(first[0]));
           }
         }
-        throw new Error((data && data.message) || 'Request failed.');
+        throw new Error((data && data.message) || i18n.request_failed);
       }
       return data;
     }
@@ -616,9 +657,9 @@
         var data = await postJson(routes.generate);
         renderApiState(data.api_state || {});
         showNewKey(data.new_api_key || '');
-        showMessage('ok', data.message || 'API key generated successfully.');
+        showMessage('ok', data.message || i18n.generated_success);
       } catch (error) {
-        showMessage('error', (error && error.message) || 'Could not generate API key.');
+        showMessage('error', (error && error.message) || i18n.generate_failed);
       } finally {
         generateBtn.disabled = false;
       }
@@ -631,9 +672,9 @@
         var data = await postJson(routes.revoke);
         renderApiState(data.api_state || {});
         showNewKey('');
-        showMessage('ok', data.message || 'API key revoked successfully.');
+        showMessage('ok', data.message || i18n.revoked_success);
       } catch (error) {
-        showMessage('error', (error && error.message) || 'Could not revoke API key.');
+        showMessage('error', (error && error.message) || i18n.revoke_failed);
       } finally {
         revokeBtn.disabled = false;
       }
@@ -644,9 +685,9 @@
       if (!raw) return;
       try {
         await navigator.clipboard.writeText(raw);
-        showMessage('ok', 'API key copied to clipboard.');
+        showMessage('ok', i18n.copied);
       } catch (e) {
-        showMessage('error', 'Copy failed. Please copy the key manually.');
+        showMessage('error', i18n.copy_failed);
       }
     });
 
@@ -667,9 +708,9 @@
         if (extensionsOpenHint) {
           try {
             await navigator.clipboard.writeText(target);
-            extensionsOpenHint.innerHTML = 'Chrome blocks direct links to its settings. We copied <strong>chrome://extensions/</strong> to your clipboard. Paste it in a new tab.';
+            extensionsOpenHint.innerHTML = i18n.extensions_hint_copied;
           } catch (err) {
-            extensionsOpenHint.innerHTML = 'Chrome blocks direct links to its settings. Please copy <strong>chrome://extensions/</strong> and paste it in your browser address bar.';
+            extensionsOpenHint.innerHTML = i18n.extensions_hint_manual;
           }
           extensionsOpenHint.style.display = 'block';
         }
@@ -678,3 +719,4 @@
   </script>
 </body>
 </html>
+

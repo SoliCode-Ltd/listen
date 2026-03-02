@@ -1,13 +1,4 @@
-<!doctype html>
-<html lang="en" data-theme="{{ \App\Support\SeoHelper::defaultTheme() }}">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  @include('components.seo', ['pageTitle' => 'Enterprise Voice Synthesis', 'page' => 'home'])
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  @include('components.styles')
+@include('components.page-head', ['pageTitle' => __('ui.seo.home_title'), 'page' => 'home'])
   <style>
     .bg-orb {
       position: fixed;
@@ -59,6 +50,12 @@
       font-size: clamp(2.4rem, 6vw, 4.5rem);
       line-height: 1.05;
       letter-spacing: -.03em;
+    }
+    html[dir="rtl"] .hero h1 {
+      font-size: clamp(2.4rem, 6vw, 4.5rem);
+      line-height: 1.22;
+      letter-spacing: 0;
+      text-wrap: balance;
     }
     .lead {
       margin: 0 0 1.5rem;
@@ -564,15 +561,20 @@
 
     .hero-audio-caption {
       position: absolute;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       font-weight: 500;
-      letter-spacing: 0.25em;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
       color: color-mix(in oklab, var(--text) 90%, transparent);
       text-shadow: 0 0 16px color-mix(in oklab, var(--text) 50%, transparent), 0 0 8px color-mix(in oklab, var(--a) 30%, transparent);
       white-space: nowrap;
       transition: opacity 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
       will-change: opacity, transform;
+    }
+
+    html[dir="rtl"] .hero-audio-caption {
+      letter-spacing: 0;
+      font-size: 0.95rem;
     }
 
     .active-caption {
@@ -738,9 +740,13 @@
         transform-origin: center center;
       }
       .hero-audio-caption {
-        font-size: 0.65rem;
-        letter-spacing: 0.2em;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
         margin-top: 0.85rem;
+      }
+      html[dir="rtl"] .hero-audio-caption {
+        letter-spacing: 0;
+        font-size: 0.85rem;
       }
       .tts-body {
         padding: 1.25rem 1rem 1.75rem;
@@ -769,15 +775,15 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
-          <h1>Turn any text into <span class="brand-text">human voice</span> instantly.</h1>
-          <p class="lead">Listen integrates with your browser. Turn Arabic and English content into natural, studio-quality voice in one click.</p>
+          <h1>{{ __('ui.landing.hero_title_before') }} <span class="brand-text">{{ __('ui.landing.hero_title_highlight') }}</span> {{ __('ui.landing.hero_title_after') }}</h1>
+          <p class="lead">{{ __('ui.landing.hero_subtitle') }}</p>
           <div class="hero-cta">
             @guest
-              <a class="btn btn-primary" href="{{ route('demo.page') }}">Try Demo</a>
-              <a class="btn" href="{{ route('register') }}">Create Free Account</a>
+              <a class="btn btn-primary" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
+              <a class="btn" href="{{ route('register') }}">{{ __('ui.landing.create_free_account') }}</a>
             @else
-              <a class="btn btn-primary" href="{{ route('dashboard') }}">Go to Dashboard</a>
-              <a class="btn" href="{{ route('browsers-extension.page') }}">Browsers Extension</a>
+              <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
+              <a class="btn" href="{{ route('browsers-extension.page') }}">{{ __('ui.landing.browser_extension') }}</a>
             @endguest
           </div>
         </div>
@@ -794,7 +800,7 @@
               <div class="tts-body">
                 <div class="hero-audio-player">
                   <div class="hero-audio-content">
-                    <button class="hero-audio-btn" id="heroAudioToggle" type="button" aria-label="Play Voice Sample" aria-controls="heroSampleAudio">
+                    <button class="hero-audio-btn" id="heroAudioToggle" type="button" aria-label="{{ __('ui.landing.play_voice_sample') }}" aria-controls="heroSampleAudio">
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path id="heroAudioIconPath" d="M8 5v14l11-7z"></path>
                       </svg>
@@ -802,7 +808,7 @@
                     <div class="hero-audio-rings" aria-hidden="true"><span></span></div>
                     <div class="hero-audio-captions-wrapper">
                       <p class="hero-audio-caption idle-caption" id="heroAudioIdleCaption"></p>
-                      <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">Arabic (Nabil)</p>
+                      <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">{{ __('ui.landing.arabic_sample_label') }}</p>
                     </div>
                   </div>
                   <audio id="heroSampleAudio" class="initialized" preload="auto">
@@ -822,64 +828,76 @@
     </section>
 
     <section class="section reveal">
-      <h2>Enterprise-Grade Delivery</h2>
-      <p class="section-lead">Purpose-built for teams that require reliability, auditability, and predictable voice operations at scale.</p>
+      <h2>{{ __('ui.landing.section1_title') }}</h2>
+      <p class="section-lead">{{ __('ui.landing.section1_subtitle') }}</p>
       <div class="cards">
         <article class="card reveal">
-          <h3>Operational Reliability</h3>
-          <p>Deterministic processing flow, resilient job execution, and clear system feedback for production incidents.</p>
+          <h3>{{ __('ui.landing.section1_card1_title') }}</h3>
+          <p>{{ __('ui.landing.section1_card1_body') }}</p>
         </article>
         <article class="card reveal">
-          <h3>Policy Enforcement</h3>
-          <p>Usage, plan governance, and entitlement controls are enforced in backend logic, not only in UI.</p>
+          <h3>{{ __('ui.landing.section1_card2_title') }}</h3>
+          <p>{{ __('ui.landing.section1_card2_body') }}</p>
         </article>
         <article class="card reveal">
-          <h3>Security By Default</h3>
-          <p>API-key isolation, role-safe account actions, and clean data boundaries for multi-tenant growth.</p>
+          <h3>{{ __('ui.landing.section1_card3_title') }}</h3>
+          <p>{{ __('ui.landing.section1_card3_body') }}</p>
         </article>
       </div>
     </section>
 
     <section class="section reveal">
-      <h2>Why This Feels Premium</h2>
-      <p class="section-lead">A high-confidence platform experience requires more than visuals. It requires system rigor end-to-end.</p>
+      <h2>{{ __('ui.landing.section2_title') }}</h2>
+      <p class="section-lead">{{ __('ui.landing.section2_subtitle') }}</p>
       <div class="premium-grid">
         <article class="premium-card reveal">
-          <h3>Voice Fidelity Governance</h3>
-          <p>Arabic and English voice mapping is validated against approved catalogs to prevent label-to-voice drift in production.</p>
-          <span class="premium-metric">Catalog integrity</span>
+          <h3>{{ __('ui.landing.section2_card1_title') }}</h3>
+          <p>{{ __('ui.landing.section2_card1_body') }}</p>
+          <span class="premium-metric">{{ __('ui.landing.section2_card1_metric') }}</span>
         </article>
         <article class="premium-card reveal">
-          <h3>Fast Path Processing</h3>
-          <p>Long requests are routed for non-blocking processing and prioritized execution so user-facing flows remain responsive.</p>
-          <span class="premium-metric">Queue-aware routing</span>
+          <h3>{{ __('ui.landing.section2_card2_title') }}</h3>
+          <p>{{ __('ui.landing.section2_card2_body') }}</p>
+          <span class="premium-metric">{{ __('ui.landing.section2_card2_metric') }}</span>
         </article>
         <article class="premium-card reveal">
-          <h3>Commercial Plan Controls</h3>
-          <p>Entitlement checks cover request limits, overage policy, commercial usage rights, and processing class per plan.</p>
-          <span class="premium-metric">Policy enforcement</span>
+          <h3>{{ __('ui.landing.section2_card3_title') }}</h3>
+          <p>{{ __('ui.landing.section2_card3_body') }}</p>
+          <span class="premium-metric">{{ __('ui.landing.section2_card3_metric') }}</span>
         </article>
         <article class="premium-card reveal">
-          <h3>Extension UX Discipline</h3>
-          <p>Playback controls, selection handling, and status feedback are tuned for stable behavior in real browsing environments.</p>
-          <span class="premium-metric">User trust</span>
+          <h3>{{ __('ui.landing.section2_card4_title') }}</h3>
+          <p>{{ __('ui.landing.section2_card4_body') }}</p>
+          <span class="premium-metric">{{ __('ui.landing.section2_card4_metric') }}</span>
         </article>
       </div>
     </section>
 
     <section class="cta-section reveal">
-      <h2>Ready to scale your voice product?</h2>
-      <p>Start free and upgrade as your usage grows. No credit card required.</p>
+      <h2>{{ __('ui.landing.cta_title') }}</h2>
+      <p>{{ __('ui.landing.cta_subtitle') }}</p>
       @auth
-        <a class="btn btn-primary" href="{{ route('dashboard') }}">Go to Dashboard</a>
+        <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
       @else
-        <a class="btn btn-primary" href="{{ route('register') }}">Get Started Free</a>
+        <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.landing.get_started_free') }}</a>
       @endauth
     </section>
   </main>
 
   @include('components.footer')
   @include('components.scripts')
+  @php
+    $landingI18n = [
+      'pause_voice_sample' => __('ui.landing.pause_voice_sample'),
+      'play_voice_sample' => __('ui.landing.play_voice_sample'),
+      'phrase1' => __('ui.landing.typing_phrase_1'),
+      'phrase2' => __('ui.landing.typing_phrase_2'),
+      'phrase3' => __('ui.landing.typing_phrase_3'),
+      'phrase4' => __('ui.landing.typing_phrase_4'),
+      'arabic_sample_label' => __('ui.landing.arabic_sample_label'),
+      'english_sample_label' => __('ui.landing.english_sample_label'),
+    ];
+  @endphp
   <script>
     document.addEventListener('DOMContentLoaded', () => {
       const audio = document.getElementById('heroSampleAudio');
@@ -894,6 +912,7 @@
       const playPath = 'M8 5v14l11-7z';
       const pausePath = 'M6 5h4v14H6zM14 5h4v14h-4z';
       const arabicDurationFallback = 7.056;
+      const i18n = @json($landingI18n);
       let transitionTime = arabicDurationFallback;
       let isPlayingState = false;
       let typingTimer = null;
@@ -918,7 +937,7 @@
         toggle.classList.toggle('is-playing', isPlaying);
         ttsBody.classList.toggle('is-playing', isPlaying);
         iconPath.setAttribute('d', isPlaying ? pausePath : playPath);
-        toggle.setAttribute('aria-label', isPlaying ? 'Pause Voice Sample' : 'Play Voice Sample');
+        toggle.setAttribute('aria-label', isPlaying ? i18n.pause_voice_sample : i18n.play_voice_sample);
 
         if (isPlaying) {
           stopTyping();
@@ -927,12 +946,7 @@
         }
       };
       
-      const phrases = [
-        "Generate human voice.",
-        "Scale with enterprise voice.",
-        "Turn text into lifelike audio.",
-        "Arabic and English in one click."
-      ];
+      const phrases = [i18n.phrase1, i18n.phrase2, i18n.phrase3, i18n.phrase4];
 
       const typeLoop = () => {
         if (isPlayingState) return;
@@ -993,9 +1007,9 @@
 
       const syncActiveCaptionWithTime = () => {
         if (audio.currentTime < transitionTime) {
-          updateActiveCaption('Arabic (Nabil)');
+          updateActiveCaption(i18n.arabic_sample_label);
         } else {
-          updateActiveCaption('English (Hannah)');
+          updateActiveCaption(i18n.english_sample_label);
         }
       };
 
@@ -1052,7 +1066,7 @@
         }
         activeCaption.classList.remove('is-switching');
         audio.currentTime = 0;
-        activeCaptionTarget = 'Arabic (Nabil)';
+        activeCaptionTarget = i18n.arabic_sample_label;
         activeCaption.textContent = activeCaptionTarget;
       });
 
@@ -1072,3 +1086,4 @@
   </script>
 </body>
 </html>
+

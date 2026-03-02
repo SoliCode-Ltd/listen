@@ -30,7 +30,7 @@ class SeoSettings extends Page implements HasForms
     public function mount(): void
     {
         $state = [
-            'meta_title_template' => SiteSetting::get('meta_title_template', '%page_title% | Listen'),
+            'meta_title_template' => SiteSetting::get('meta_title_template', '%page_title% - Listen'),
             'meta_description' => SiteSetting::get('meta_description', 'Listen - Convert text to natural speech with AI-powered TTS.'),
             'meta_keywords' => SiteSetting::get('meta_keywords', ''),
             'meta_robots' => SiteSetting::get('meta_robots', 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'),

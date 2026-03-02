@@ -107,7 +107,7 @@ class DashboardController extends Controller
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
-                'content' => "Request exceeds plan per-request limit ({$maxChars} billable characters: letters and numbers only).",
+                'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
             ]);
         }
 
@@ -188,8 +188,8 @@ class DashboardController extends Controller
             return response()->json([
                 'ok' => $isDone,
                 'message' => $isDone
-                    ? 'Voice generated successfully.'
-                    : ($job->error_message ?: 'Voice generation failed. Please try again.'),
+                    ? __('ui.backend.dashboard_voice_generated')
+                    : ($job->error_message ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
                 'usage' => [
                     'total_chars' => (int) $counter->total_chars,
@@ -209,7 +209,7 @@ class DashboardController extends Controller
 
         return redirect()->route('dashboard')->with(
             $isDone ? 'ok' : 'error',
-            $isDone ? 'Voice generated successfully.' : 'Voice generation failed. Check recent jobs for details.'
+            $isDone ? __('ui.backend.dashboard_voice_generated') : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
         );
     }
 
@@ -234,12 +234,12 @@ class DashboardController extends Controller
             return response()->json([
                 'ok' => true,
                 'deleted_id' => $deletedId,
-                'message' => 'Voice deleted successfully.',
+                'message' => __('ui.backend.dashboard_voice_deleted'),
                 'stats' => $stats,
             ]);
         }
 
-        return redirect()->route('dashboard')->with('ok', 'Voice deleted successfully.');
+        return redirect()->route('dashboard')->with('ok', __('ui.backend.dashboard_voice_deleted'));
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
@@ -250,7 +250,7 @@ class DashboardController extends Controller
             $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
-                    'target_language' => 'Selected voice language is not available for your current voice quality.',
+                    'target_language' => __('ui.backend.dashboard_language_not_available_for_tier'),
                 ]);
             }
 
@@ -260,7 +260,7 @@ class DashboardController extends Controller
         $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
         if (! $voiceName) {
             throw ValidationException::withMessages([
-                'voice_key' => 'Selected speaker is not available for the chosen voice language.',
+                'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
             ]);
         }
 
@@ -269,7 +269,7 @@ class DashboardController extends Controller
 
     private function rejectTierAccess(Request $request)
     {
-        $message = 'Upgrade your plan to unlock this voice quality.';
+        $message = __('ui.backend.dashboard_upgrade_for_quality');
 
         if ($request->expectsJson()) {
             return response()->json([
@@ -306,7 +306,7 @@ class DashboardController extends Controller
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
-            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? 'Default speaker',
+            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? __('ui.dashboard.default_speaker'),
             'voice_tier' => VoiceTier::label((string) ($job->voice_tier ?: VoiceTier::STANDARD)),
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,

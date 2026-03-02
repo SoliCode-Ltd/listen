@@ -266,20 +266,108 @@ class SeoHelper
      */
     public static function title(string $pageTitle = '', string $page = ''): string
     {
-        $template = (string) SiteSetting::get('meta_title_template', '%page_title% | Listen');
+        $isArabicLocale = self::isArabicLocale();
+        $template = self::localizedTitleTemplate($isArabicLocale);
 
         if ($page) {
             $override = trim((string) SiteSetting::get("seo_{$page}_title", ''));
-            if ($override !== '') {
+            if ($override !== '' && (! $isArabicLocale || self::containsArabic($override))) {
                 $pageTitle = $override;
             }
         }
 
-        if (trim($pageTitle) === '') {
+        $pageTitle = trim($pageTitle);
+
+        if ($pageTitle === '') {
             $pageTitle = (string) (self::pageDefinitions()[$page]['title'] ?? SiteSetting::get('site_name', config('app.name', 'Listen')));
         }
 
+        if ($isArabicLocale && ! self::containsArabic($pageTitle)) {
+            $localizedTitle = self::localizedPageTitle($page);
+            if ($localizedTitle !== '') {
+                $pageTitle = $localizedTitle;
+            }
+        }
+
         return str_replace('%page_title%', $pageTitle, $template);
+    }
+
+    private static function localizedTitleTemplate(bool $isArabicLocale): string
+    {
+        $template = trim((string) SiteSetting::get('meta_title_template', '%page_title% - Listen'));
+        if ($template === '') {
+            $template = '%page_title% - Listen';
+        }
+
+        // Normalize legacy templates that still use pipe separators.
+        $template = (string) preg_replace('/\s*\|\s*/u', ' - ', $template);
+
+        $localizedBrand = self::localizedBrandName($isArabicLocale);
+
+        if (str_contains($template, '%brand_name%')) {
+            return str_replace('%brand_name%', $localizedBrand, $template);
+        }
+
+        if ($isArabicLocale) {
+            $siteName = trim((string) SiteSetting::get('site_name', config('app.name', 'Listen')));
+            if ($siteName !== '') {
+                $template = str_replace($siteName, $localizedBrand, $template);
+            }
+            $template = str_replace('Listen', $localizedBrand, $template);
+        }
+
+        return $template;
+    }
+
+    private static function localizedBrandName(bool $isArabicLocale): string
+    {
+        if ($isArabicLocale) {
+            return 'إسمع';
+        }
+
+        return trim((string) SiteSetting::get('site_name', config('app.name', 'Listen')));
+    }
+
+    private static function localizedPageTitle(string $page): string
+    {
+        $translationKey = match ($page) {
+            'home' => 'ui.seo.home_title',
+            'pricing' => 'ui.seo.pricing_title',
+            'demo' => 'ui.seo.demo_title',
+            'contact' => 'ui.seo.contact_title',
+            'extension' => 'ui.extension.title',
+            'privacy' => 'ui.seo.privacy_title',
+            'terms' => 'ui.seo.terms_title',
+            'cookies' => 'ui.seo.cookies_title',
+            'login' => 'ui.seo.login_title',
+            'register' => 'ui.seo.register_title',
+            'dashboard' => 'ui.seo.dashboard_title',
+            'billing' => 'ui.seo.billing_title',
+            'manage_subscription' => 'ui.seo.manage_subscription_title',
+            'upgrade' => 'ui.seo.upgrade_title',
+            default => '',
+        };
+
+        if ($translationKey === '') {
+            return '';
+        }
+
+        $translated = trim((string) __($translationKey));
+        if ($translated === '' || $translated === $translationKey) {
+            return '';
+        }
+
+        return $translated;
+    }
+
+    private static function isArabicLocale(): bool
+    {
+        return str_starts_with(strtolower((string) app()->getLocale()), 'ar');
+    }
+
+    private static function containsArabic(string $value): bool
+    {
+        return (bool) preg_match('/[\x{0600}-\x{06FF}\x{0750}-\x{077F}\x{08A0}-\x{08FF}]/u', $value);
     }
 
     /**
