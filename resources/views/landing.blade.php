@@ -808,11 +808,11 @@
                     <div class="hero-audio-rings" aria-hidden="true"><span></span></div>
                     <div class="hero-audio-captions-wrapper">
                       <p class="hero-audio-caption idle-caption" id="heroAudioIdleCaption"></p>
-                      <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">{{ __('ui.landing.arabic_sample_label') }}</p>
+                      <p class="hero-audio-caption active-caption" id="heroAudioActiveCaption">{{ str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? __('ui.landing.arabic_sample_label') : __('ui.landing.english_sample_label') }}</p>
                     </div>
                   </div>
                   <audio id="heroSampleAudio" class="initialized" preload="auto">
-                    <source src="{{ asset('audio/hero-ar-en.mp3') }}" type="audio/mpeg">
+                    <source src="{{ str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? asset('audio/ar.mp3') : asset('audio/en.mp3') }}" type="audio/mpeg">
                   </audio>
                 </div>
                 <div class="tts-audio-wave">
@@ -911,9 +911,8 @@
 
       const playPath = 'M8 5v14l11-7z';
       const pausePath = 'M6 5h4v14H6zM14 5h4v14h-4z';
-      const arabicDurationFallback = 7.056;
       const i18n = @json($landingI18n);
-      let transitionTime = arabicDurationFallback;
+      const isArabicLocale = String(document.documentElement.lang || '').toLowerCase().startsWith('ar');
       let isPlayingState = false;
       let typingTimer = null;
       let captionSwapTimer = null;
@@ -923,13 +922,7 @@
       let charIndex = 0;
       let isDeleting = false;
 
-      const arabicSegmentAudio = new Audio('{{ asset('audio/ar.mp3') }}');
-      arabicSegmentAudio.preload = 'metadata';
-      arabicSegmentAudio.addEventListener('loadedmetadata', () => {
-        if (Number.isFinite(arabicSegmentAudio.duration) && arabicSegmentAudio.duration > 0) {
-          transitionTime = arabicSegmentAudio.duration;
-        }
-      });
+      const localeStartCaption = () => (isArabicLocale ? i18n.arabic_sample_label : i18n.english_sample_label);
 
       const setState = (isPlaying) => {
         if (isPlayingState === isPlaying) return;
@@ -1005,16 +998,34 @@
         }, 16);
       };
 
-      const syncActiveCaptionWithTime = () => {
-        if (audio.currentTime < transitionTime) {
-          updateActiveCaption(i18n.arabic_sample_label);
-        } else {
-          updateActiveCaption(i18n.english_sample_label);
-        }
+      const resetToLocaleStart = () => {
+        audio.currentTime = 0;
+        const caption = localeStartCaption();
+        activeCaptionTarget = caption;
+        activeCaption.textContent = caption;
       };
+
+      const syncActiveCaptionWithTime = () => {
+        updateActiveCaption(localeStartCaption());
+      };
+
+      audio.addEventListener('loadedmetadata', () => {
+        if (!isPlayingState) {
+          resetToLocaleStart();
+        }
+      });
+
+      resetToLocaleStart();
 
       toggle.addEventListener('click', async () => {
         if (audio.paused) {
+          const nearStart = audio.currentTime <= 0.05;
+          const nearEnd = Number.isFinite(audio.duration) && audio.currentTime >= (audio.duration - 0.05);
+
+          if (nearStart || nearEnd) {
+            resetToLocaleStart();
+          }
+
           setState(true);
           syncActiveCaptionWithTime();
           try {
@@ -1065,9 +1076,7 @@
           captionSwapTimer = null;
         }
         activeCaption.classList.remove('is-switching');
-        audio.currentTime = 0;
-        activeCaptionTarget = i18n.arabic_sample_label;
-        activeCaption.textContent = activeCaptionTarget;
+        resetToLocaleStart();
       });
 
       audio.addEventListener('timeupdate', () => {
@@ -1086,4 +1095,3 @@
   </script>
 </body>
 </html>
-

@@ -73,7 +73,7 @@ return [
         'play_voice_sample' => 'Play Voice Sample',
         'pause_voice_sample' => 'Pause Voice Sample',
         'arabic_sample_label' => 'Arabic (Nabil)',
-        'english_sample_label' => 'English (James)',
+        'english_sample_label' => 'English (Hannah)',
         'typing_phrase_1' => 'Generate human voice.',
         'typing_phrase_2' => 'Scale with enterprise voice.',
         'typing_phrase_3' => 'Turn text into lifelike audio.',
