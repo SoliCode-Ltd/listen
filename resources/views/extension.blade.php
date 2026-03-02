@@ -150,8 +150,8 @@
 
     .steps {
       margin: 0;
-      padding-inline-start: 1.3rem;
-      padding-left: 0;
+      /* padding-inline-start: 1.3rem; */
+      /* padding-left: 0; */
       display: grid;
       gap: .6rem;
     }
@@ -343,8 +343,8 @@
     }
 
     html[dir="rtl"] .steps {
-      padding-inline-start: 0;
-      padding-inline-end: 1.3rem;
+      /* padding-inline-start: 0; */
+      /* padding-inline-end: 1.3rem; */
     }
     html[dir="rtl"] .download-actions {
       flex-direction: row-reverse;
