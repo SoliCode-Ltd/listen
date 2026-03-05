@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DemoGuestUsage;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
@@ -64,19 +65,24 @@ class HomeController extends Controller
         $highlightPlans = array_slice($pricingPlans, 0, 3);
         $sampleLanguage = $this->sampleLanguageForLocale(app()->getLocale());
         $isArabicLocale = $sampleLanguage === 'ar';
+        $homepageSampleLimit = $this->landingVoiceSampleLimit();
 
-        // Load voice samples for the landing page hero section (shuffled)
-        $voiceSamples = Cache::remember("landing_voice_samples:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
-            return VoiceSample::query()
-                ->active()
-                ->where('category', 'hero')
-                ->where('language', $sampleLanguage)
-                ->inRandomOrder()
-                ->limit(12)
-                ->get()
-                ->map(fn (VoiceSample $s): array => $this->mapVoiceSample($s, $isArabicLocale))
-                ->toArray();
-        });
+        // Load hero voice samples from admin-managed records.
+        $voiceSamples = array_slice(
+            Cache::remember("landing_voice_samples:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
+                return VoiceSample::query()
+                    ->active()
+                    ->where('category', 'hero')
+                    ->where('language', $sampleLanguage)
+                    ->orderByDesc('is_featured')
+                    ->ordered()
+                    ->get()
+                    ->map(fn (VoiceSample $s): array => $this->mapVoiceSample($s, $isArabicLocale))
+                    ->toArray();
+            }),
+            0,
+            $homepageSampleLimit
+        );
 
         return view('landing', [
             'highlightPlans' => $highlightPlans,
@@ -1069,7 +1075,14 @@ class HomeController extends Controller
     {
         $locale = strtolower(trim((string) $locale));
 
-        return str_starts_with($locale, 'ar') ? 'ar' : 'en';
+        return str_starts_with($locale, 'en') ? 'en' : 'ar';
+    }
+
+    private function landingVoiceSampleLimit(): int
+    {
+        $raw = (int) SiteSetting::get('landing_voice_samples_limit', '12');
+
+        return max(1, min(60, $raw));
     }
 
     /**

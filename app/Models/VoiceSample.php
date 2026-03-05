@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 class VoiceSample extends Model
 {
@@ -40,6 +41,18 @@ class VoiceSample extends Model
         'duration_seconds' => 'integer',
         'metadata' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::saved(fn () => self::flushLandingCache());
+        static::deleted(fn () => self::flushLandingCache());
+    }
+
+    public static function flushLandingCache(): void
+    {
+        Cache::forget('landing_voice_samples:ar');
+        Cache::forget('landing_voice_samples:en');
+    }
 
     /**
      * Scope: active samples only.
