@@ -76,8 +76,8 @@ class Plan extends Model
      */
     public function getStripePriceId(string $cycle): ?string
     {
-        return $cycle === 'yearly' 
-            ? $this->stripe_price_yearly 
+        return $cycle === 'yearly'
+            ? $this->stripe_price_yearly
             : $this->stripe_price_monthly;
     }
 
@@ -96,20 +96,20 @@ class Plan extends Model
     public function getLocalizedName(?string $locale = null): string
     {
         $locale = $locale ?? app()->getLocale();
-        
+
         // Try locale-specific field (admin-configured)
         $field = "name_{$locale}";
         if (!empty($this->$field)) {
             return $this->$field;
         }
-        
+
         // Try translation file (ui.pricing.plan_name_{slug})
         $transKey = "ui.pricing.plan_name_{$this->slug}";
         $translated = __($transKey);
         if ($translated !== $transKey) {
             return $translated;
         }
-        
+
         // Fallback to default name
         return $this->name ?? $this->slug;
     }
@@ -121,40 +121,40 @@ class Plan extends Model
     public function getLocalizedDescription(?string $locale = null): string
     {
         $locale = $locale ?? app()->getLocale();
-        
+
         // Try locale-specific field (admin-configured)
         $field = "description_{$locale}";
         if (!empty($this->$field)) {
             return $this->$field;
         }
-        
+
         // Try translation file
         $transKey = "ui.pricing.plan_desc_{$this->slug}";
         $translated = __($transKey);
         if ($translated !== $transKey) {
             return $translated;
         }
-        
+
         return '';
     }
 
     /**
      * Get localized features array.
      * Priority: locale-specific features > empty (will trigger auto-generation)
-     * 
+     *
      * @return array<int, array{label: string, value: string, icon: string}>|null
      */
     public function getLocalizedFeatures(?string $locale = null): ?array
     {
         $locale = $locale ?? app()->getLocale();
-        
+
         $field = "features_{$locale}";
         $features = $this->$field;
-        
+
         if (is_array($features) && !empty($features)) {
             return $features;
         }
-        
+
         // Return null to signal auto-generation should be used
         return null;
     }
@@ -165,7 +165,7 @@ class Plan extends Model
     public function getLocalizedButtonText(?string $locale = null): ?string
     {
         $locale = $locale ?? app()->getLocale();
-        
+
         $field = "button_text_{$locale}";
         return !empty($this->$field) ? $this->$field : null;
     }

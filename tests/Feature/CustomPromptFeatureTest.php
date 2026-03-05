@@ -10,7 +10,7 @@ use Tests\TestCase;
 
 /**
  * Tests for the Custom Prompt (style_prompt) feature.
- * 
+ *
  * The Custom Prompt feature allows users on Premium (HD) tier plans
  * to provide custom voice styling instructions for Gemini TTS voices.
  */
@@ -63,7 +63,7 @@ class CustomPromptFeatureTest extends TestCase
         $plan = Plan::factory()->create([
             'voice_tier' => VoiceTier::STANDARD,
         ]);
-        
+
         $user = User::factory()->create([
             'plan_id' => $plan->id,
         ]);
@@ -92,7 +92,7 @@ class CustomPromptFeatureTest extends TestCase
     public function test_voice_tier_label_returns_premium(): void
     {
         $label = VoiceTier::label(VoiceTier::HD);
-        
+
         // The label should use the translation key
         // When using default locale, it should resolve to 'Premium'
         $this->assertNotEquals('HD', $label);
@@ -112,7 +112,7 @@ class CustomPromptFeatureTest extends TestCase
 
         $response = $this->get(route('pricing'));
         $response->assertStatus(200);
-        
+
         // The response should include the Custom Prompt feature label
         $response->assertSee(__('ui.pricing.feature_label_custom_prompt'));
     }

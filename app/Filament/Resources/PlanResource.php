@@ -290,13 +290,13 @@ class PlanResource extends Resource
                             ->columns(3)
                             ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
                                 if (!$record) return;
-                                
+
                                 // If already has custom features, use them
                                 $existing = $record->features_en;
                                 if (is_array($existing) && !empty($existing)) {
                                     return;
                                 }
-                                
+
                                 // Auto-generate default features from plan attributes with UUID keys
                                 $features = collect(self::buildDefaultFeaturesEn($record))
                                     ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
@@ -350,13 +350,13 @@ class PlanResource extends Resource
                             ->columns(3)
                             ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
                                 if (!$record) return;
-                                
+
                                 // If already has custom features, use them
                                 $existing = $record->features_ar;
                                 if (is_array($existing) && !empty($existing)) {
                                     return;
                                 }
-                                
+
                                 // Auto-generate default features from plan attributes with UUID keys
                                 $features = collect(self::buildDefaultFeaturesAr($record))
                                     ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
@@ -457,7 +457,7 @@ class PlanResource extends Resource
                     ->falseIcon('heroicon-o-x-circle')
                     ->trueColor('success')
                     ->falseColor('danger')
-                    ->tooltip(fn (Plan $record): string => $record->hasStripeConfig() 
+                    ->tooltip(fn (Plan $record): string => $record->hasStripeConfig()
                         ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
                         : 'Not synced to Stripe'),
             ])
@@ -484,7 +484,7 @@ class PlanResource extends Resource
                         try {
                             $syncService = app(StripeProductSyncService::class);
                             $syncService->syncPlan($record);
-                            
+
                             Notification::make()
                                 ->title('Stripe Sync Successful')
                                 ->body("Plan '{$record->name}' has been synced to Stripe.")
@@ -512,7 +512,7 @@ class PlanResource extends Resource
                             $syncService = app(StripeProductSyncService::class);
                             $success = 0;
                             $failed = 0;
-                            
+
                             foreach ($records as $plan) {
                                 try {
                                     $syncService->syncPlan($plan);
@@ -521,7 +521,7 @@ class PlanResource extends Resource
                                     $failed++;
                                 }
                             }
-                            
+
                             Notification::make()
                                 ->title('Stripe Sync Complete')
                                 ->body("Synced: {$success}, Failed: {$failed}")
@@ -549,14 +549,14 @@ class PlanResource extends Resource
 
     /**
      * Build default English features from plan attributes.
-     * 
+     *
      * @return array<int, array{label: string, value: string, icon: string}>
      */
     private static function buildDefaultFeaturesEn(Plan $record): array
     {
         $isFree = (int) $record->price_cents <= 0;
         $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
-        
+
         $priority = match ((string) ($record->processing_priority ?? 'standard')) {
             'standard_plus' => 'Standard+',
             'high' => 'High',
@@ -564,12 +564,12 @@ class PlanResource extends Resource
             'highest' => 'Highest',
             default => 'Standard',
         };
-        
+
         $recentDays = (int) ($record->recent_voices_days ?? 7);
         $recentValue = $recentDays <= 0 ? 'Unlimited' : "{$recentDays} days";
-        
+
         $emotionValue = $isFree ? 'Basic' : 'Full Controls';
-        
+
         $features = [
             ['label' => 'Requests', 'value' => (int) $record->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
             ['label' => 'Max Input', 'value' => number_format((int) $record->max_chars_per_request) . ' chars', 'icon' => 'type'],
@@ -579,7 +579,7 @@ class PlanResource extends Resource
             ['label' => 'Commercial Use', 'value' => $record->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
             ['label' => 'Recent Voices', 'value' => $recentValue, 'icon' => 'clock'],
         ];
-        
+
         if ((bool) ($record->dialogue_enabled ?? false)) {
             $features[] = ['label' => 'Dialogue Mode', 'value' => 'Included', 'icon' => 'users'];
         }
@@ -588,20 +588,20 @@ class PlanResource extends Resource
         if ((bool) ($record->custom_prompt_enabled ?? false)) {
             $features[] = ['label' => 'Custom Prompt', 'value' => 'Included', 'icon' => 'star'];
         }
-        
+
         return $features;
     }
 
     /**
      * Build default Arabic features from plan attributes.
-     * 
+     *
      * @return array<int, array{label: string, value: string, icon: string}>
      */
     private static function buildDefaultFeaturesAr(Plan $record): array
     {
         $isFree = (int) $record->price_cents <= 0;
         $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
-        
+
         $priority = match ((string) ($record->processing_priority ?? 'standard')) {
             'standard_plus' => 'عادية+',
             'high' => 'عالية',
@@ -609,17 +609,17 @@ class PlanResource extends Resource
             'highest' => 'أعلى أولوية',
             default => 'عادية',
         };
-        
+
         $tierLabel = match ($tier) {
             'hd' => 'متميزة',
             default => 'عادية',
         };
-        
+
         $recentDays = (int) ($record->recent_voices_days ?? 7);
         $recentValue = $recentDays <= 0 ? 'غير محدود' : "{$recentDays} يوم";
-        
+
         $emotionValue = $isFree ? 'أساسي' : 'تحكم كامل';
-        
+
         $features = [
             ['label' => 'الطلبات', 'value' => (int) $record->monthly_requests <= 0 ? 'غير محدود' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
             ['label' => 'الحد الأقصى للإدخال', 'value' => number_format((int) $record->max_chars_per_request) . ' حرف', 'icon' => 'type'],
@@ -629,7 +629,7 @@ class PlanResource extends Resource
             ['label' => 'الاستخدام التجاري', 'value' => $record->commercial_use_allowed ? 'مسموح' : 'شخصي فقط', 'icon' => 'lock'],
             ['label' => 'الأصوات الأخيرة', 'value' => $recentValue, 'icon' => 'clock'],
         ];
-        
+
         if ((bool) ($record->dialogue_enabled ?? false)) {
             $features[] = ['label' => 'وضع الحوار', 'value' => 'متاح', 'icon' => 'users'];
         }
@@ -638,7 +638,7 @@ class PlanResource extends Resource
         if ((bool) ($record->custom_prompt_enabled ?? false)) {
             $features[] = ['label' => 'التعليمات المخصصة', 'value' => 'متاح', 'icon' => 'star'];
         }
-        
+
         return $features;
     }
 }
