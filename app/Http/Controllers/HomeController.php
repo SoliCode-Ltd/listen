@@ -145,6 +145,7 @@ class HomeController extends Controller
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'style_prompt' => ['nullable', 'string', 'max:2000'],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
@@ -209,6 +210,7 @@ class HomeController extends Controller
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'style_prompt' => ['nullable', 'string', 'max:2000'],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
@@ -249,10 +251,11 @@ class HomeController extends Controller
             $studioOptions = $this->sanitizeStudioOptionsForTier($tier, [
                 'dialect' => $validated['dialect'] ?? null,
                 'performance_style' => $validated['performance_style'] ?? null,
+                'style_prompt' => $validated['style_prompt'] ?? null,
                 'emotion' => $validated['emotion'] ?? 'neutral',
                 'speed' => $validated['speed'] ?? 1.0,
                 'pitch' => $validated['pitch'] ?? 0.0,
-            ]);
+            ], $demoPlan);
             $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
 
             $voiceOptions = [
@@ -262,6 +265,7 @@ class HomeController extends Controller
                 'gender' => is_array($voiceMeta) ? ($voiceMeta['gender'] ?? null) : null,
                 'performance_style' => $studioOptions['performance_style'],
                 'style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
                 'dialect' => $studioOptions['dialect'],
                 'emotion' => $studioOptions['emotion'],
                 'speed' => $studioOptions['speed'],
@@ -669,6 +673,11 @@ class HomeController extends Controller
 
         if ((bool) ($plan->dialogue_enabled ?? false)) {
             $features[] = ['label' => __('ui.pricing.feature_label_dialogue_mode'), 'value' => __('ui.pricing.included_mark'), 'icon' => 'users'];
+        }
+
+        // Custom Prompt is enabled per-plan
+        if ((bool) ($plan->custom_prompt_enabled ?? false)) {
+            $features[] = ['label' => __('ui.pricing.feature_label_custom_prompt'), 'value' => __('ui.pricing.included_mark'), 'icon' => 'star'];
         }
 
         return $features;
@@ -1086,10 +1095,10 @@ class HomeController extends Controller
     }
 
     /**
-     * @param  array{dialect:mixed,performance_style:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
-     * @return array{dialect:?string,performance_style:string,emotion:string,speed:float,pitch:float}
+     * @param  array{dialect:mixed,performance_style:mixed,style_prompt:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,performance_style:string,style_prompt:?string,emotion:string,speed:float,pitch:float}
      */
-    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    private function sanitizeStudioOptionsForTier(string $tier, array $options, ?Plan $plan = null): array
     {
         $normalizedTier = VoiceTier::normalize($tier);
 
@@ -1098,6 +1107,7 @@ class HomeController extends Controller
             return [
                 'dialect'  => null,
                 'performance_style' => 'neutral',
+                'style_prompt' => null,
                 'emotion'  => 'neutral',
                 'speed'    => 1.0,
                 'pitch'    => 0.0,
@@ -1117,10 +1127,19 @@ class HomeController extends Controller
             $emotion = 'neutral';
         }
 
-        // HD tier: full performance controls.
+        // Style prompt is only allowed if the plan permits it (custom_prompt_enabled)
+        $stylePrompt = null;
+        if ($plan === null || (bool) ($plan->custom_prompt_enabled ?? false)) {
+            $stylePrompt = isset($options['style_prompt']) && is_string($options['style_prompt'])
+                ? trim($options['style_prompt']) ?: null
+                : null;
+        }
+
+        // Premium tier: full performance controls.
         return [
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
             'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
+            'style_prompt' => $stylePrompt,
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,

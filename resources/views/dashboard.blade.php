@@ -637,6 +637,15 @@
               </select>
             </div>
 
+            {{-- Custom Prompt Section (Premium only - Gemini) --}}
+            @if($customPromptEnabled ?? false)
+            <div class="studio-section" style="margin-top:.6rem;">
+              <div class="studio-section-label">✨ {{ __('ui.dashboard.style_prompt', ['default' => 'Custom Prompt']) }}</div>
+              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")']) }}" style="width:100%; resize:vertical; min-height:60px;"></textarea>
+              <!-- <div class="hint" style="margin-top:4px;">{{ __('ui.dashboard.style_prompt_hint', ['default' => 'Custom voice styling for Premium voices (Gemini). Max 2000 characters.']) }}</div> -->
+            </div>
+            @endif
+
             {{-- Emotion Section --}}
             <div class="studio-section" style="margin-top:.6rem;">
               <div class="studio-section-label">💫 {{ __('ui.dashboard.emotion_tone', ['default' => 'Emotion']) }}</div>
@@ -709,7 +718,7 @@
 
       <aside class="page-card reveal sidebar-info">
         <h3 style="margin-top:0;">{{ __('ui.dashboard.plan_and_defaults') }}</h3>
-        
+
         <div class="info-list">
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.current_plan') }}</span><span class="info-value"><span class="status done">{{ $activePlanDisplayName }}</span></span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.voice_quality') }}</span><span class="info-value">{{ $formatTierLabel($planTierLabel) }}</span></div>

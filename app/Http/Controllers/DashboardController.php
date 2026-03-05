@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\Plan;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
 use App\Services\PlanAccessService;
@@ -92,6 +93,7 @@ class DashboardController extends Controller
 
         // Hybrid TTS: resolve dialogue availability per plan
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+        $customPromptEnabled = (bool) ($activePlan?->custom_prompt_enabled ?? false);
 
         return view('dashboard', [
             'usage' => $usage,
@@ -112,6 +114,7 @@ class DashboardController extends Controller
             'defaultVoiceEn' => VoiceCatalog::defaultForLanguageAndProvider('en', $planTier, $preferredProvider),
             // Hybrid TTS studio data
             'dialogueEnabled' => $dialogueEnabled,
+            'customPromptEnabled' => $customPromptEnabled,
             'ttsProviderPolicy' => $activePlan?->tts_provider_policy ?? 'default',
         ]);
     }
@@ -134,6 +137,7 @@ class DashboardController extends Controller
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'style_prompt' => ['nullable', 'string', 'max:2000'],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
@@ -158,10 +162,11 @@ class DashboardController extends Controller
         $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
             'dialect' => $validated['dialect'] ?? null,
             'performance_style' => $validated['performance_style'] ?? null,
+            'style_prompt' => $validated['style_prompt'] ?? null,
             'emotion' => $validated['emotion'] ?? 'neutral',
             'speed' => $validated['speed'] ?? null,
             'pitch' => $validated['pitch'] ?? null,
-        ]);
+        ], $activePlan);
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -205,6 +210,7 @@ class DashboardController extends Controller
             // Studio fields
             'dialect' => $studioOptions['dialect'],
             'performance_style' => $studioOptions['performance_style'],
+            'style_prompt' => $studioOptions['style_prompt'],
             'emotion' => $studioOptions['emotion'],
             'speed' => $studioOptions['speed'],
             'pitch' => $studioOptions['pitch'],
@@ -396,10 +402,10 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  array{dialect:mixed,performance_style:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
-     * @return array{dialect:?string,performance_style:string,emotion:string,speed:float,pitch:float}
+     * @param  array{dialect:mixed,performance_style:mixed,style_prompt:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,performance_style:string,style_prompt:?string,emotion:string,speed:float,pitch:float}
      */
-    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    private function sanitizeStudioOptionsForTier(string $tier, array $options, ?Plan $plan = null): array
     {
         $normalizedTier = VoiceTier::normalize($tier);
 
@@ -408,6 +414,7 @@ class DashboardController extends Controller
             return [
                 'dialect'  => null,
                 'performance_style' => 'neutral',
+                'style_prompt' => null,
                 'emotion'  => 'neutral',
                 'speed'    => 1.0,
                 'pitch'    => 0.0,
@@ -427,10 +434,19 @@ class DashboardController extends Controller
             $emotion = 'neutral';
         }
 
-        // HD tier: full performance controls.
+        // Style prompt is only allowed if the plan permits it (custom_prompt_enabled)
+        $stylePrompt = null;
+        if ($plan === null || (bool) ($plan->custom_prompt_enabled ?? false)) {
+            $stylePrompt = isset($options['style_prompt']) && is_string($options['style_prompt'])
+                ? trim($options['style_prompt']) ?: null
+                : null;
+        }
+
+        // Premium tier: full performance controls.
         return [
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
             'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
+            'style_prompt' => $stylePrompt,
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,

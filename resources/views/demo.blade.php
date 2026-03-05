@@ -246,6 +246,19 @@
       margin-bottom: .45rem;
       letter-spacing: .01em;
     }
+    .premium-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: .15rem .45rem;
+      font-size: .7rem;
+      font-weight: 600;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: white;
+      text-transform: uppercase;
+      letter-spacing: .03em;
+      margin-inline-start: .35rem;
+    }
     .studio-panel input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
@@ -521,6 +534,13 @@
                 </select>
               </div>
 
+              {{-- Custom Prompt Section (Premium only - Gemini) --}}
+              <div class="studio-section" id="stylePromptSection" style="margin-top:.6rem; display:none;">
+                <div class="studio-section-label">✨ {{ __('ui.demo.style_prompt', ['default' => 'Custom Prompt']) }} <span class="premium-badge">{{ __('ui.pricing.premium', ['default' => 'Premium']) }}</span></div>
+                <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.demo.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")']) }}" style="width:100%; resize:vertical; min-height:60px;"></textarea>
+                <!-- <div class="hint" style="margin-top:4px;">{{ __('ui.demo.style_prompt_hint', ['default' => 'Available for Premium voices (Gemini). Max 2000 characters.']) }}</div> -->
+              </div>
+
               {{-- Emotion Section --}}
               <div class="studio-section" style="margin-top:.6rem;">
                 <div class="studio-section-label">💫 {{ __('ui.demo.emotion', ['default' => 'Emotion']) }}</div>
@@ -631,6 +651,8 @@
     const speedValue = document.getElementById('speedVal');
     const pitchValue = document.getElementById('pitchVal');
     const studioPanel = document.getElementById('studioPanel');
+    const stylePromptSection = document.getElementById('stylePromptSection');
+    const stylePromptInput = document.getElementById('style_prompt');
     const previewBtn = document.getElementById('previewBtn');
     const audioWrap = document.getElementById('audioWrap');
     const previewAudio = document.getElementById('previewAudio');
@@ -708,7 +730,12 @@
         studioPanel.style.display = isHd ? '' : 'none';
       }
 
-      [performanceStyleSelect, emotionSelect, dialectSelect, speedInput, pitchInput].forEach((el) => {
+      // Custom Prompt is only available for HD/Premium tier (Gemini voices)
+      if (stylePromptSection) {
+        stylePromptSection.style.display = isHd ? '' : 'none';
+      }
+
+      [performanceStyleSelect, emotionSelect, dialectSelect, speedInput, pitchInput, stylePromptInput].forEach((el) => {
         if (!el) return;
         el.disabled = !isHd;
       });
@@ -720,6 +747,7 @@
         if (dialectSelect) dialectSelect.value = '';
         if (speedInput) { speedInput.value = '1.0'; }
         if (pitchInput) { pitchInput.value = '0'; }
+        if (stylePromptInput) stylePromptInput.value = '';
         const speedValue = document.getElementById('speedVal');
         const pitchValue = document.getElementById('pitchVal');
         if (speedValue) speedValue.textContent = '1.0';

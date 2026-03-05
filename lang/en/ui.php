@@ -190,6 +190,8 @@ return [
         'topup_chars' => 'Character Top-up',
         'topup_per_million' => '/1M chars',
         'topup_available_on' => 'Available on paid plans',
+        'premium' => 'Premium',
+        'feature_label_custom_prompt' => 'Custom Prompt',
     ],
 
     // ===== CONTACT PAGE =====
@@ -556,6 +558,9 @@ return [
         'dialect' => 'Dialect',
         'speed' => 'Speed',
         'pitch' => 'Pitch',
+        'style_prompt' => 'Custom Prompt',
+        'style_prompt_placeholder' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")',
+        'style_prompt_hint' => 'Available for Premium voices (Gemini). Max 2000 characters.',
     ],
 
     // ===== DIALECTS =====
@@ -701,6 +706,9 @@ return [
         'pitch' => 'Pitch',
         'dialogue_mode' => 'Dialogue Mode',
         'dialogue_hint' => 'Multi-speaker conversation (Studio Max plan)',
+        'style_prompt' => 'Custom Prompt',
+        'style_prompt_placeholder' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")',
+        'style_prompt_hint' => 'Custom voice styling for Premium voices (Gemini). Max 2000 characters.',
     ],
 
     // ===== AUTH =====

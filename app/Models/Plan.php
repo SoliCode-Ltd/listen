@@ -44,6 +44,7 @@ class Plan extends Model
         // Hybrid TTS fields
         'tts_provider_policy',
         'dialogue_enabled',
+        'custom_prompt_enabled',
         'quality_tier',
         'queue_priority_weight',
         'recent_voices_days',
@@ -58,6 +59,7 @@ class Plan extends Model
         'is_active' => 'boolean',
         'is_featured' => 'boolean',
         'dialogue_enabled' => 'boolean',
+        'custom_prompt_enabled' => 'boolean',
         'queue_priority_weight' => 'integer',
     ];
 

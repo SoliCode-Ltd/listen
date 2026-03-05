@@ -33,7 +33,7 @@ class VoiceTier
     public static function label(string $tier): string
     {
         return match (self::normalize($tier)) {
-            self::HD => 'HD',
+            self::HD => __('ui.pricing.premium'),
             default => __('ui.pricing.standard'),
         };
     }

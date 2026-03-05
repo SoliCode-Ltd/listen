@@ -120,7 +120,7 @@ class PlanResource extends Resource
                             ->label('Voice Quality Tier')
                             ->options([
                                 'standard' => 'Standard',
-                                'hd' => 'HD',
+                                'hd' => 'Premium',
                             ])
                             ->required()
                             ->helperText('Voice quality level users get on this plan'),
@@ -235,6 +235,10 @@ class PlanResource extends Resource
                         Forms\Components\Toggle::make('dialogue_enabled')
                             ->label('Dialogue Mode')
                             ->helperText('Allow users to create multi-speaker dialogue audio.')
+                            ->default(false),
+                        Forms\Components\Toggle::make('custom_prompt_enabled')
+                            ->label('Custom Prompt')
+                            ->helperText('Allow users to provide custom voice styling instructions (Gemini voices).')
                             ->default(false),
                         Forms\Components\TextInput::make('queue_priority_weight')
                             ->label('Queue Priority Weight')
@@ -386,6 +390,10 @@ class PlanResource extends Resource
                 Tables\Columns\TextColumn::make('voice_tier')
                     ->label('Voice Tier')
                     ->badge()
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'hd' => 'Premium',
+                        default => 'Standard',
+                    })
                     ->color(fn (string $state): string => match ($state) {
                         'hd' => 'success',
                         default => 'gray',
@@ -433,6 +441,10 @@ class PlanResource extends Resource
                     ->label('Dialogue')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('custom_prompt_enabled')
+                    ->label('Custom Prompt')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('commercial_use_allowed')
                     ->label('Commercial')
                     ->boolean()
@@ -455,7 +467,7 @@ class PlanResource extends Resource
                 Tables\Filters\SelectFilter::make('voice_tier')
                     ->options([
                         'standard' => 'Standard',
-                        'hd' => 'HD',
+                        'hd' => 'Premium',
                     ]),
             ])
             ->actions([
@@ -571,6 +583,11 @@ class PlanResource extends Resource
         if ((bool) ($record->dialogue_enabled ?? false)) {
             $features[] = ['label' => 'Dialogue Mode', 'value' => 'Included', 'icon' => 'users'];
         }
+
+        // Custom Prompt is enabled per-plan
+        if ((bool) ($record->custom_prompt_enabled ?? false)) {
+            $features[] = ['label' => 'Custom Prompt', 'value' => 'Included', 'icon' => 'star'];
+        }
         
         return $features;
     }
@@ -594,7 +611,7 @@ class PlanResource extends Resource
         };
         
         $tierLabel = match ($tier) {
-            'hd' => 'HD عالية الجودة',
+            'hd' => 'متميزة',
             default => 'عادية',
         };
         
@@ -615,6 +632,11 @@ class PlanResource extends Resource
         
         if ((bool) ($record->dialogue_enabled ?? false)) {
             $features[] = ['label' => 'وضع الحوار', 'value' => 'متاح', 'icon' => 'users'];
+        }
+
+        // Custom Prompt is enabled per-plan
+        if ((bool) ($record->custom_prompt_enabled ?? false)) {
+            $features[] = ['label' => 'التعليمات المخصصة', 'value' => 'متاح', 'icon' => 'star'];
         }
         
         return $features;

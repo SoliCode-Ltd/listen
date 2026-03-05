@@ -32,6 +32,7 @@ class AudioGeneration extends Model
         // Voice studio controls
         'dialect',
         'performance_style',
+        'style_prompt',
         'emotion',
         'speed',
         'pitch',
