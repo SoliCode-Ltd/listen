@@ -135,19 +135,22 @@
     }
 
     .plans-grid {
+      --plans-max-width: 1100px;
+      --plans-gap: 1.25rem;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1.25rem;
+      gap: var(--plans-gap);
       margin: 2.5rem auto 3rem;
-      max-width: 1100px;
+      max-width: var(--plans-max-width);
     }
     .plans-row-2 {
       grid-column: 1 / -1;
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 1.25rem;
-      max-width: 720px;
+      gap: var(--plans-gap);
+      max-width: calc((((var(--plans-max-width) - (var(--plans-gap) * 2)) / 3) * 2) + var(--plans-gap));
       margin: 0 auto;
+      width: 100%;
     }
     .plan-card {
       background: linear-gradient(180deg, var(--surface2), var(--surface));
