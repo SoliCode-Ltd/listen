@@ -321,12 +321,14 @@
 <body>
   @php
     $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
-      return match ((string) $slug) {
+      $knownSlugs = [
         'free' => __('ui.pricing.plan_name_free'),
+        'starter' => __('ui.pricing.plan_name_starter', ['default' => 'Starter']),
         'creator' => __('ui.pricing.plan_name_creator'),
         'pro' => __('ui.pricing.plan_name_pro'),
-        default => (string) ($fallback ?: '-'),
-      };
+        'studio_max' => __('ui.pricing.plan_name_studio_max', ['default' => 'Studio Max']),
+      ];
+      return $knownSlugs[(string) $slug] ?? (string) ($fallback ?: ucfirst((string) $slug) ?: '-');
     };
     $normalizeTierLabel = static function (?string $label): string {
       $raw = trim((string) $label);
@@ -434,6 +436,9 @@
 
         <div class="actions">
           <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
+          @if($isCancellationScheduled)
+            <button class="btn btn-primary" id="resumeBtn" type="button">{{ __('ui.manage_subscription.resume_subscription', ['default' => 'Resume Subscription']) }}</button>
+          @endif
           @if($hasCancelableSubscription)
             <button class="btn btn-danger" id="cancelBtn" type="button">{{ __('ui.manage_subscription.cancel_subscription') }}</button>
           @endif
@@ -569,6 +574,7 @@
     const subscriptionMessageBox = document.getElementById('subscriptionMessage');
     const updateCardBtn = document.getElementById('updateCardBtn');
     const cancelBtn = document.getElementById('cancelBtn');
+    const resumeBtn = document.getElementById('resumeBtn');
     const subscriptionStatusBadge = document.getElementById('subscriptionStatusBadge');
     const renewsOnRow = document.getElementById('renewsOnRow');
     const cardError = document.getElementById('card-error');
@@ -768,6 +774,26 @@
         setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
       } finally {
         setButtonBusy(cancelBtn, false, '', cancelBtnDefaultText);
+      }
+    });
+
+    resumeBtn?.addEventListener('click', async () => {
+      const resumeBtnDefaultText = resumeBtn.textContent.trim();
+      setButtonBusy(resumeBtn, true, '{{ __("ui.manage_subscription.resuming", ["default" => "Resuming..."]) }}', resumeBtnDefaultText);
+      setMessage(subscriptionMessageBox, '', '');
+
+      try {
+        const response = await post('{{ route('billing.resume') }}');
+        if (!response.ok || response.data?.ok === false) {
+          throw new Error(response.data?.message || '{{ __("ui.manage_subscription.resume_failed", ["default" => "Unable to resume subscription."]) }}');
+        }
+
+        setMessage(subscriptionMessageBox, 'ok', response.data?.message || '{{ __("ui.manage_subscription.subscription_resumed", ["default" => "Subscription resumed successfully."]) }}');
+        setTimeout(() => window.location.reload(), 1500);
+      } catch (error) {
+        setMessage(subscriptionMessageBox, 'error', error?.message || '{{ __("ui.manage_subscription.resume_failed", ["default" => "Unable to resume subscription."]) }}');
+      } finally {
+        setButtonBusy(resumeBtn, false, '', resumeBtnDefaultText);
       }
     });
   </script>

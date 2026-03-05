@@ -1,0 +1,1042 @@
+<?php
+
+namespace App\Services\Tts;
+
+use App\Contracts\TtsProviderInterface;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+
+/**
+ * Gemini TTS Provider.
+ *
+ * Uses the Gemini 2.5 Flash Preview TTS model for high-quality speech synthesis.
+ * Supports multi-speaker dialogue mode.
+ *
+ * Model: gemini-2.5-flash-preview-tts
+ * API: Google AI Generative Language API
+ */
+class GeminiTtsProvider implements TtsProviderInterface
+{
+    private const MODEL = 'gemini-2.5-flash-preview-tts';
+
+    /**
+     * Current API key info (managed by GeminiKeyManager).
+     */
+    private ?array $currentKeyInfo = null;
+
+    /**
+     * GeminiKeyManager instance.
+     */
+    private ?GeminiKeyManager $keyManager = null;
+
+    /**
+     * Get the key manager instance.
+     */
+    private function getKeyManager(): GeminiKeyManager
+    {
+        if ($this->keyManager === null) {
+            $this->keyManager = app(GeminiKeyManager::class);
+        }
+        return $this->keyManager;
+    }
+
+    /** Gemini TTS supported voice names */
+    private const VOICES = [
+        'Zephyr', 'Puck', 'Charon', 'Kore', 'Fenrir', 'Leda',
+        'Orus', 'Aoede', 'Callirrhoe', 'Autonoe', 'Enceladus',
+        'Iapetus', 'Umbriel', 'Algieba', 'Despina', 'Erinome',
+        'Gacrux', 'Laomedeia', 'Achernar', 'Achird', 'Algenib',
+        'Alnilam', 'Pulcherrima', 'Rasalgethi', 'Sadachbia',
+        'Sadaltager', 'Schedar', 'Sulafat', 'Vindemiatrix',
+        'Zubenelgenubi',
+    ];
+
+    /**
+     * Legacy/alias voice names mapped to canonical Gemini voice names.
+     *
+     * @var array<string, string>
+     */
+    private const VOICE_ALIAS_MAP = [
+        // Arabic branded aliases (legacy)
+        'rawaa' => 'Kore',
+        'basem' => 'Puck',
+        'ghada' => 'Aoede',
+        'faris' => 'Charon',
+        'souad' => 'Leda',
+        'tariq' => 'Orus',
+        'lamis' => 'Zephyr',
+
+        // Arabic Gemini display names -> canonical voice
+        'fatima'     => 'Achernar',   // female
+        'nawaf'      => 'Achird',     // male
+        'sultan'     => 'Algenib',    // male
+        'turki'      => 'Algieba',    // male
+        'faisal'     => 'Alnilam',    // male
+        'khadija'    => 'Aoede',      // female
+        'ruqaya'     => 'Autonoe',    // female
+        'sumaya'     => 'Callirrhoe', // female
+        'waleed'     => 'Charon',     // male
+        'walid'      => 'Charon',     // male (transliteration variant)
+        'maha'       => 'Despina',    // female
+        'mansour'    => 'Enceladus',  // male
+        'aisha'      => 'Erinome',    // female
+        'saud'       => 'Fenrir',     // male
+        'duaa'       => 'Gacrux',     // female
+        'fahad'      => 'Iapetus',    // male
+        'lamya'      => 'Kore',       // female
+        'lubna'      => 'Laomedeia',  // female
+        'noura'      => 'Leda',       // female
+        'abdulaziz'  => 'Orus',       // male
+        'othman'     => 'Puck',       // male
+        'abeer'      => 'Pulcherrima',// female
+        'mishary'    => 'Rasalgethi', // male
+        'hamed'      => 'Sadachbia',  // male
+        'tamim'      => 'Sadaltager', // male
+        'hazem'      => 'Schedar',    // male
+        'manal'      => 'Sulafat',    // female
+        'raed'       => 'Umbriel',    // male
+        'jumana'     => 'Vindemiatrix', // female
+        'sawsan'     => 'Zephyr',     // female
+        'yasser'     => 'Zubenelgenubi', // male
+
+        // English Gemini display names -> canonical voice
+        'alice'      => 'Achernar',   // female
+        'oliver'     => 'Achird',     // male
+        'george'     => 'Algenib',    // male
+        'oscar'      => 'Algieba',    // male
+        'charlie'    => 'Alnilam',    // male
+        'ruby'       => 'Aoede',      // female
+        'ivy'        => 'Autonoe',    // female
+        'maya'       => 'Callirrhoe', // female
+        'theodore'   => 'Charon',     // male
+        'luna'       => 'Despina',    // female
+        'arthur'     => 'Enceladus',  // male
+        'willow'     => 'Erinome',    // female
+        'finn'       => 'Fenrir',     // male
+        'isla'       => 'Gacrux',     // female
+        'miles'      => 'Iapetus',    // male
+        'daisy'      => 'Kore',       // female
+        'poppy'      => 'Laomedeia',  // female
+        'sienna'     => 'Leda',       // female
+        'nathan'     => 'Orus',       // male
+        'dylan'      => 'Puck',       // male
+        'freya'      => 'Pulcherrima',// female
+        'ryan'       => 'Rasalgethi', // male
+        'adrian'     => 'Sadachbia',  // male
+        'caleb'      => 'Sadaltager', // male
+        'marcus'     => 'Schedar',    // male
+        'phoebe'     => 'Sulafat',    // female
+        'vincent'    => 'Umbriel',    // male
+        'rose'       => 'Vindemiatrix', // female
+        'clara'      => 'Zephyr',     // female
+        'philip'     => 'Zubenelgenubi', // male,
+    ];
+
+    /**
+     * Voice-to-gender mapping aligned with Chirp3/Gemini voice catalog.
+     *
+     * @var array<string, string>
+     */
+    private const VOICE_GENDER_MAP = [
+        'Achernar' => 'female',
+        'Achird' => 'male',
+        'Algenib' => 'male',
+        'Algieba' => 'male',
+        'Alnilam' => 'male',
+        'Aoede' => 'female',
+        'Autonoe' => 'female',
+        'Callirrhoe' => 'female',
+        'Charon' => 'male',
+        'Despina' => 'female',
+        'Enceladus' => 'male',
+        'Erinome' => 'female',
+        'Fenrir' => 'male',
+        'Gacrux' => 'female',
+        'Iapetus' => 'male',
+        'Kore' => 'female',
+        'Laomedeia' => 'female',
+        'Leda' => 'female',
+        'Orus' => 'male',
+        'Puck' => 'male',
+        'Pulcherrima' => 'female',
+        'Rasalgethi' => 'male',
+        'Sadachbia' => 'male',
+        'Sadaltager' => 'male',
+        'Schedar' => 'male',
+        'Sulafat' => 'female',
+        'Umbriel' => 'male',
+        'Vindemiatrix' => 'female',
+        'Zephyr' => 'female',
+        'Zubenelgenubi' => 'male',
+    ];
+
+    /** @var array<string, string> */
+    private const EMOTION_PROMPTS = [
+        'neutral' => 'Maintain a natural, balanced emotional tone throughout.',
+        'warm' => 'Infuse every word with genuine warmth and heartfelt friendliness. Sound like you truly care about the listener. Let your smile come through your voice.',
+        'sad' => 'Speak with deep, aching sadness and raw vulnerability. Let your voice tremble slightly with emotion. Slow down and let sorrow fill the pauses between phrases.',
+        'excited' => 'BURST with infectious, high-energy excitement! Raise your voice with genuine enthusiasm. Let your passion overflow and make the listener feel the thrill in every word.',
+        'formal' => 'Deliver with impeccable formality, polished diction, and authoritative gravitas. Every syllable precise and measured. Command respect with your tone.',
+        'calm' => 'Speak with serene, zen-like tranquility. Ultra-smooth, gentle delivery that soothes the listener. Let peaceful stillness fill the spaces between your words.',
+        'angry' => 'Channel controlled, simmering anger with fierce intensity. Let righteous fury sharpen each word. Build tension with restrained power that could explode at any moment.',
+    ];
+
+    /**
+     * Arabic dialect descriptions for style prompt building.
+     * These are used to instruct Gemini to speak with the appropriate regional accent.
+     */
+    private const ARABIC_DIALECT_PROMPTS = [
+        'ar-SA' => 'Saudi Arabic (Gulf dialect)',
+        'ar-AE' => 'Emirati Arabic (Gulf dialect)', 
+        'ar-KW' => 'Kuwaiti Arabic (Gulf dialect)',
+        'ar-QA' => 'Qatari Arabic (Gulf dialect)',
+        'ar-BH' => 'Bahraini Arabic (Gulf dialect)',
+        'ar-OM' => 'Omani Arabic (Gulf dialect)',
+        'ar-YE' => 'Yemeni Arabic',
+        'ar-EG' => 'Egyptian Arabic',
+        'ar-LB' => 'Lebanese Arabic (Levantine)',
+        'ar-SY' => 'Syrian Arabic (Levantine)',
+        'ar-JO' => 'Jordanian Arabic (Levantine)',
+        'ar-PS' => 'Palestinian Arabic (Levantine)',
+        'ar-IQ' => 'Iraqi Arabic',
+        'ar-MA' => 'Moroccan Arabic (Maghrebi)',
+        'ar-DZ' => 'Algerian Arabic (Maghrebi)',
+        'ar-TN' => 'Tunisian Arabic (Maghrebi)',
+        'ar-LY' => 'Libyan Arabic (Maghrebi)',
+        'ar-SD' => 'Sudanese Arabic',
+        'ar-XA' => 'Modern Standard Arabic (Fusha)',
+    ];
+
+    /** @var array<int, string> */
+    private const SUPPORTED_LANGUAGE_CODES = [
+        'ar-XA',
+        'bn-BD',
+        'de-DE',
+        'en-AU',
+        'en-GB',
+        'en-IN',
+        'en-US',
+        'es-US',
+        'fr-FR',
+        'gu-IN',
+        'hi-IN',
+        'id-ID',
+        'it-IT',
+        'ja-JP',
+        'kn-IN',
+        'ko-KR',
+        'ml-IN',
+        'mr-IN',
+        'nl-NL',
+        'pl-PL',
+        'pt-BR',
+        'ru-RU',
+        'ta-IN',
+        'te-IN',
+        'th-TH',
+        'tr-TR',
+        'vi-VN',
+    ];
+
+    /** Performance style prompts for Arabic synthesis */
+    private const ARABIC_STYLE_HINTS = [
+        'neutral'        => 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing.',
+        'warm'           => 'Speak this Arabic text with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
+        'sad'            => 'Read this Arabic text with deep, aching sadness. Let your voice tremble slightly with raw emotion. Slow down and let sorrow fill the pauses. Almost whisper the most painful words.',
+        'excited'        => 'Read this Arabic text BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow and make the listener feel the thrill!',
+        'formal'         => 'Deliver this Arabic text with impeccable formality and authoritative gravitas, like an official government spokesperson. Every syllable precise, measured, and commanding respect.',
+        'storytelling'   => 'Narrate this Arabic text like a master storyteller captivating an audience around a fire. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
+        'ad_style'       => 'Deliver this Arabic text as a high-energy, persuasive TV ad voiceover. PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
+        'news'           => 'You are an urgent Arabic news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep, resonant voice with zero warmth \xe2\x80\x94 pure broadcast professionalism and urgency. Punch each headline hard.',
+        'calm'           => 'Speak this Arabic text with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps between phrases. Soothing and deeply relaxing.',
+        'angry'          => 'Read this Arabic text with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power. RAISE your voice on the strongest points.',
+        'educational'    => 'You are an enthusiastic Arabic professor BURSTING with passion for teaching. Speak with clear structure and infectious energy. Emphasize key concepts. Make learning feel like the most thrilling adventure.',
+        'commercial'     => 'You are SHOUTING a flash-sale Arabic commercial! EXPLOSIVE energy, wild enthusiasm! Rush through words like the deal expires in seconds. Maximum hype, maximum urgency, maximum volume!',
+        'promo'          => 'Deliver this Arabic text as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel they MUST act.',
+        'podcast'        => 'You are a witty, charismatic Arabic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a juicy secret.',
+        'assistant'      => 'You are an upbeat, cheerful Arabic AI assistant overflowing with eagerness to help. Bubbly, warm, and genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
+        'narrative'      => 'Narrate this Arabic text like an epic audiobook. Use dramatic expression \xe2\x80\x94 whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make the listener hang on each sentence.',
+        'comedic'        => 'Deliver this Arabic text with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
+        'corporate'      => 'Speak this Arabic text with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands with boardroom gravitas.',
+        'conversational' => 'Speak this Arabic text naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth bleeding through.',
+        'inspirational'  => 'You are a FIERY Arabic motivational speaker at a packed stadium. Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding, relentless, like addressing an army before battle!',
+        'cinematic'      => 'Deliver this Arabic text with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a historical revelation.',
+        'documentary'    => 'Narrate this Arabic text like an epic documentary. Speak with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+    ];
+
+    public function name(): string
+    {
+        return 'gemini';
+    }
+
+    public function supportsDialogue(): bool
+    {
+        return true;
+    }
+
+    public function isAvailable(): bool
+    {
+        return count($this->getKeyManager()->getAllKeys()) > 0;
+    }
+
+    /**
+     * Get an available API key via GeminiKeyManager.
+     *
+     * @return array{key: string, name: string, index: int}
+     * @throws \RuntimeException if no keys available
+     */
+    private function getAvailableKey(): array
+    {
+        $keyInfo = $this->getKeyManager()->getAvailableKey();
+        if ($keyInfo === null) {
+            throw new \RuntimeException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
+        }
+        $this->currentKeyInfo = $keyInfo;
+        return $keyInfo;
+    }
+
+    /**
+     * Mark current key as exhausted and try to get next available.
+     *
+     * @return bool True if another key is available
+     */
+    private function rotateToNextKey(): bool
+    {
+        if ($this->currentKeyInfo !== null) {
+            $this->getKeyManager()->markKeyExhausted($this->currentKeyInfo['name']);
+        }
+        
+        $keyInfo = $this->getKeyManager()->getAvailableKey();
+        if ($keyInfo === null) {
+            return false;
+        }
+        
+        $this->currentKeyInfo = $keyInfo;
+        return true;
+    }
+
+    public function synthesize(string $text, string $targetLanguage, array $voiceConfig = []): array
+    {
+        $text = trim($text);
+        if ($text === '') {
+            throw new \RuntimeException('TTS text is empty.');
+        }
+
+        $charCount = mb_strlen($text);
+        $startTime = microtime(true);
+
+        if (!$this->isAvailable()) {
+            throw new \RuntimeException('Gemini TTS API key is not configured.');
+        }
+
+        // Get an available key (throws if all exhausted)
+        $keyInfo = $this->getAvailableKey();
+
+        $speakers = $voiceConfig['speakers'] ?? null;
+        $isDialogue = is_array($speakers) && count($speakers) > 1;
+
+        if ($isDialogue) {
+            $result = $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, '');
+        } else {
+            $result = $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, '');
+        }
+
+        // Record successful usage for current key
+        $this->getKeyManager()->recordUsage($keyInfo['name'], $charCount);
+
+        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
+
+        return array_merge($result, [
+            'provider' => $this->name(),
+            'model' => self::MODEL,
+            'latency_ms' => $latencyMs,
+            'char_count' => $charCount,
+            'cost_estimate_usd' => $this->estimateCost($charCount),
+        ]);
+    }
+
+    /**
+     * Single-speaker synthesis using Gemini TTS.
+     */
+    private function synthesizeSingle(string $text, string $targetLanguage, array $voiceConfig, string $apiKey): array
+    {
+        $voiceName = $this->resolveGeminiVoice(
+            (string) ($voiceConfig['voice_name'] ?? ''),
+            $voiceConfig['gender'] ?? null,
+        );
+        $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? 'neutral'));
+        $emotion = trim((string) ($voiceConfig['emotion'] ?? 'neutral'));
+        $speed = (float) ($voiceConfig['speed'] ?? 1.0);
+        $languageCode = $this->resolveLanguageCode(
+            $targetLanguage,
+            isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? $voiceConfig['dialect'] : null,
+        );
+
+        // Use custom style_prompt if provided, otherwise build from dialect, emotion, style, speed, and pitch
+        $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
+        $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
+        $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
+        $stylePrompt = $customPrompt !== '' ? $customPrompt : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
+        $endpoint = $this->buildEndpoint();
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $stylePrompt . "\n\n" . $text],
+                    ],
+                ],
+            ],
+            'generationConfig' => [
+                'responseModalities' => ['AUDIO'],
+                'speechConfig' => [
+                    'languageCode' => $languageCode,
+                    'voiceConfig' => [
+                        'prebuiltVoiceConfig' => [
+                            'voiceName' => $voiceName,
+                        ],
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $this->callGeminiApi($endpoint, $payload);
+        $audio = $this->extractAudioFromResponse($response);
+        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+
+        return [
+            'audio_path' => $filename,
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+        ];
+    }
+
+    /**
+     * Multi-speaker dialogue synthesis using Gemini TTS.
+     */
+    private function synthesizeDialogue(string $text, string $targetLanguage, array $speakers, array $voiceConfig, string $apiKey): array
+    {
+        $endpoint = $this->buildEndpoint();
+        $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? 'neutral'));
+        $emotion = trim((string) ($voiceConfig['emotion'] ?? 'neutral'));
+        $speed = (float) ($voiceConfig['speed'] ?? 1.0);
+        $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
+        $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
+        $languageCode = $this->resolveLanguageCode($targetLanguage, $dialect);
+
+        $stylePrompt = $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
+
+        // Build multi-speaker config
+        $speakerVoiceConfigs = [];
+        foreach ($speakers as $speaker) {
+            $speakerVoiceConfigs[] = [
+                'speaker' => $speaker['name'] ?? $speaker['id'] ?? 'Speaker',
+                'voiceConfig' => [
+                    'prebuiltVoiceConfig' => [
+                        'voiceName' => $this->resolveGeminiVoice(
+                            (string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''),
+                            $speaker['gender'] ?? null,
+                        ),
+                    ],
+                ],
+            ];
+        }
+
+        $payload = [
+            'contents' => [
+                [
+                    'parts' => [
+                        ['text' => $stylePrompt . "\n\n" . $text],
+                    ],
+                ],
+            ],
+            'generationConfig' => [
+                'responseModalities' => ['AUDIO'],
+                'speechConfig' => [
+                    'languageCode' => $languageCode,
+                    'multiSpeakerVoiceConfig' => [
+                        'speakerVoiceConfigs' => $speakerVoiceConfigs,
+                    ],
+                ],
+            ],
+        ];
+
+        $response = $this->callGeminiApi($endpoint, $payload);
+        $audio = $this->extractAudioFromResponse($response);
+        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+
+        return [
+            'audio_path' => $filename,
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+        ];
+    }
+
+    /**
+     * Build the Gemini API endpoint URL.
+     */
+    private function buildEndpoint(): string
+    {
+        $baseUrl = trim((string) config(
+            'services.gemini_tts.endpoint',
+            'https://generativelanguage.googleapis.com/v1beta'
+        ));
+
+        return rtrim($baseUrl, '/') . '/models/' . self::MODEL . ':generateContent';
+    }
+
+    /**
+     * Call the Gemini API with automatic API-key rotation on 429 errors.
+     */
+    private function callGeminiApi(string $endpoint, array $payload): array
+    {
+        $timeout = (int) config('services.gemini_tts.timeout_seconds', 60);
+        $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
+        $maxAttempts = count($this->getKeyManager()->getAllKeys());
+        $attempts = 0;
+
+        while ($attempts < $maxAttempts) {
+            // Get current available key (already set in synthesize, or get a new one)
+            if ($this->currentKeyInfo === null) {
+                $keyInfo = $this->getAvailableKey();
+            } else {
+                $keyInfo = $this->currentKeyInfo;
+            }
+            $apiKey = $keyInfo['key'];
+            $attempts++;
+
+            try {
+                $response = $this->sendWithSslFallback(
+                    fn(bool $verify) => Http::timeout($timeout)
+                        ->withOptions(['verify' => $verify])
+                        ->withHeaders([
+                            'Content-Type' => 'application/json',
+                            'x-goog-api-key' => $apiKey,
+                        ])
+                        ->post($endpoint, $payload),
+                    $verifySsl,
+                    'Gemini TTS API request',
+                );
+            } catch (\Throwable $e) {
+                Log::error('Gemini TTS API call failed', [
+                    'error' => $e->getMessage(),
+                    'model' => self::MODEL,
+                    'key' => $keyInfo['name'],
+                ]);
+                throw new \RuntimeException('Gemini TTS API call failed: ' . $e->getMessage(), 0, $e);
+            }
+
+            // On 429, rotate to next key and retry
+            if ($response->status() === 429 && $attempts < $maxAttempts) {
+                Log::warning('Gemini TTS key hit 429, rotating to next key.', [
+                    'key' => $keyInfo['name'],
+                    'attempts' => $attempts,
+                ]);
+                
+                if (!$this->rotateToNextKey()) {
+                    break; // No more keys available
+                }
+                continue;
+            }
+
+            if (!$response->ok()) {
+                Log::error('Gemini TTS API returned error', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                    'key' => $keyInfo['name'],
+                ]);
+                throw new \RuntimeException('Gemini TTS request failed (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
+            }
+
+            $json = $response->json();
+            if (!is_array($json)) {
+                throw new \RuntimeException('Gemini TTS returned invalid JSON response.');
+            }
+
+            return $json;
+        }
+
+        // All keys exhausted
+        throw new \RuntimeException('All Gemini TTS API keys exhausted (429 rate limit). Add more keys or wait for limits to reset.');
+    }
+
+    /**
+     * Extract raw audio bytes from Gemini API response.
+     */
+    private function extractAudioFromResponse(array $response): array
+    {
+        $candidates = $response['candidates'] ?? [];
+        if (!is_array($candidates) || empty($candidates)) {
+            throw new \RuntimeException('Gemini TTS response contains no candidates.');
+        }
+
+        $parts = $candidates[0]['content']['parts'] ?? [];
+        if (!is_array($parts)) {
+            throw new \RuntimeException('Gemini TTS response contains no parts.');
+        }
+
+        foreach ($parts as $part) {
+            if (isset($part['inlineData']['data'])) {
+                $decoded = base64_decode($part['inlineData']['data'], true);
+                if ($decoded !== false && $decoded !== '') {
+                    $mimeType = isset($part['inlineData']['mimeType']) && is_string($part['inlineData']['mimeType'])
+                        ? trim($part['inlineData']['mimeType'])
+                        : null;
+
+                    return [
+                        'bytes' => $decoded,
+                        'mime_type' => $mimeType,
+                    ];
+                }
+            }
+        }
+
+        throw new \RuntimeException('Gemini TTS response contains no audio data.');
+    }
+
+    /**
+     * Save raw audio bytes to disk and return the path.
+     */
+    private function saveAudioFile(string $audioData, ?string $mimeTypeHint = null): string
+    {
+        // Gemini can return raw PCM (L16); detect and wrap as WAV when needed.
+        $mimeType = $this->detectAudioMimeType($audioData, $mimeTypeHint);
+        if ($mimeType === 'audio/l16') {
+            $audioData = $this->wrapPcmL16AsWav($audioData, 24000, 1, 16);
+            $mimeType = 'audio/wav';
+        }
+        $extension = ($mimeType === 'audio/mpeg') ? 'mp3' : 'wav';
+
+        $filename = 'audio/' . now()->format('Ymd_His') . '_listen.studio_' . Str::random(12) . '.' . $extension;
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists('audio')) {
+            $disk->makeDirectory('audio');
+        }
+
+        $disk->put($filename, $audioData);
+
+        return $filename;
+    }
+
+    /**
+     * Detect audio MIME type from raw bytes.
+     */
+    private function detectAudioMimeType(string $data, ?string $hint = null): string
+    {
+        $normalizedHint = strtolower(trim((string) $hint));
+        if ($normalizedHint !== '') {
+            if (str_starts_with($normalizedHint, 'audio/wav') || str_starts_with($normalizedHint, 'audio/x-wav')) {
+                return 'audio/wav';
+            }
+            if (str_starts_with($normalizedHint, 'audio/mpeg') || str_starts_with($normalizedHint, 'audio/mp3')) {
+                return 'audio/mpeg';
+            }
+            if (str_starts_with($normalizedHint, 'audio/l16') || str_starts_with($normalizedHint, 'audio/pcm')) {
+                return 'audio/l16';
+            }
+        }
+
+        if (strlen($data) >= 12) {
+            if (substr($data, 0, 4) === 'RIFF' && substr($data, 8, 4) === 'WAVE') {
+                return 'audio/wav';
+            }
+
+            if (substr($data, 0, 3) === 'ID3') {
+                return 'audio/mpeg';
+            }
+
+            $firstTwo = unpack('n', substr($data, 0, 2))[1] ?? 0;
+            if (($firstTwo & 0xFFE0) === 0xFFE0) {
+                return 'audio/mpeg';
+            }
+        }
+
+        // Gemini commonly returns raw 16-bit PCM (audio/L16) in inlineData.
+        return 'audio/l16';
+    }
+
+    private function wrapPcmL16AsWav(
+        string $pcmData,
+        int $sampleRate = 24000,
+        int $channels = 1,
+        int $bitsPerSample = 16
+    ): string {
+        if ((strlen($pcmData) % 2) !== 0) {
+            $pcmData = substr($pcmData, 0, -1);
+        }
+
+        $dataLength = strlen($pcmData);
+        $byteRate = (int) ($sampleRate * $channels * ($bitsPerSample / 8));
+        $blockAlign = (int) ($channels * ($bitsPerSample / 8));
+
+        return 'RIFF'
+            . pack('V', 36 + $dataLength)
+            . 'WAVE'
+            . 'fmt '
+            . pack('V', 16)
+            . pack('v', 1)
+            . pack('v', $channels)
+            . pack('V', $sampleRate)
+            . pack('V', $byteRate)
+            . pack('v', $blockAlign)
+            . pack('v', $bitsPerSample)
+            . 'data'
+            . pack('V', $dataLength)
+            . $pcmData;
+    }
+
+    /**
+     * Build a comprehensive style prompt for Gemini TTS.
+     *
+     * Combines dialect, performance style, emotion, speed, and pitch into a single
+     * instruction like: "Voice dialect: Egyptian Arabic. Emotional tone: warm, friendly."
+     *
+     * Note: Gemini TTS doesn't have explicit speed/pitch API parameters like Google Cloud TTS.
+     * Instead, these are controlled via natural language instructions in the prompt.
+     */
+    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0): string
+    {
+        $style = strtolower(trim($style));
+        $emotion = strtolower(trim($emotion));
+        $isArabic = $this->isArabicLanguage($targetLanguage);
+
+        // Build dialect instruction for Arabic
+        $dialectInstruction = '';
+        if ($isArabic && $dialect !== null && $dialect !== '') {
+            $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? null;
+            if ($dialectName !== null) {
+                $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
+            }
+        }
+
+        // Build emotion description
+        $emotionDesc = $this->getEmotionDescription($emotion);
+
+        // Build style description
+        $styleDesc = $this->getPerformanceStyleDescription($style, $isArabic);
+
+        // Combine into comprehensive prompt
+        $prompt = '';
+
+        if ($dialectInstruction !== '') {
+            $prompt .= $dialectInstruction;
+        }
+
+        if ($emotionDesc !== '' && $emotion !== 'neutral') {
+            $prompt .= "Emotional tone: {$emotionDesc}. ";
+        }
+
+        if ($styleDesc !== '') {
+            $prompt .= $styleDesc;
+        }
+
+        // Add speed instruction (Gemini uses prompt-based control, not API parameters)
+        if ($speed <= 0.6) {
+            $prompt .= ' Speak very slowly and deliberately, taking pauses between phrases.';
+        } elseif ($speed < 0.85) {
+            $prompt .= ' Speak at a slow, measured pace.';
+        } elseif ($speed > 1.5) {
+            $prompt .= ' Speak very quickly with rapid, energetic pacing.';
+        } elseif ($speed > 1.2) {
+            $prompt .= ' Speak at a faster pace with energetic delivery.';
+        }
+
+        // Add pitch instruction (Gemini uses prompt-based control, not API parameters)
+        if ($pitch <= -10) {
+            $prompt .= ' Use a very deep, low-pitched voice.';
+        } elseif ($pitch < -3) {
+            $prompt .= ' Use a deeper, lower-pitched voice.';
+        } elseif ($pitch >= 10) {
+            $prompt .= ' Use a very high-pitched, bright voice.';
+        } elseif ($pitch > 3) {
+            $prompt .= ' Use a higher-pitched, brighter voice.';
+        }
+
+        // Fallback if prompt is empty
+        if (trim($prompt) === '') {
+            $prompt = $isArabic
+                ? 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone.'
+                : 'Read the following text naturally with clear pronunciation and a balanced, professional tone.';
+        }
+
+        return trim($prompt);
+    }
+
+    /**
+     * Check if the target language is Arabic (any dialect).
+     */
+    private function isArabicLanguage(string $targetLanguage): bool
+    {
+        $lang = strtolower(trim($targetLanguage));
+        
+        // Check if it starts with 'ar' (covers ar, ar-XA, ar-EG, ar-SA, etc.)
+        if (str_starts_with($lang, 'ar')) {
+            return true;
+        }
+        
+        return false;
+    }
+
+    /**
+     * Get human-readable emotion description for the style prompt.
+     */
+    private function getEmotionDescription(string $emotion): string
+    {
+        return match ($emotion) {
+            'warm' => 'warm, friendly, and approachable',
+            'sad' => 'melancholic, sorrowful, with deep emotional weight',
+            'excited' => 'highly energetic, enthusiastic, and thrilling',
+            'formal' => 'professional, authoritative, and dignified',
+            'calm' => 'serene, peaceful, and deeply relaxing',
+            'angry' => 'intense, passionate, with controlled fury',
+            default => '',
+        };
+    }
+
+    /**
+     * Get the performance style instruction.
+     */
+    private function getPerformanceStyleDescription(string $style, bool $isArabic): string
+    {
+        if ($isArabic && isset(self::ARABIC_STYLE_HINTS[$style])) {
+            return self::ARABIC_STYLE_HINTS[$style];
+        }
+
+        return match ($style) {
+            'warm'           => 'Speak with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
+            'sad'            => 'Read with deep, aching sadness and raw vulnerability. Let your voice tremble slightly with emotion. Slow down and let sorrow fill the pauses between phrases.',
+            'excited'        => 'Read BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow!',
+            'formal'         => 'Deliver with impeccable formality and authoritative gravitas, like an official spokesperson. Every syllable precise, measured, and commanding absolute respect.',
+            'storytelling'   => 'Narrate like a master storyteller captivating an audience. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence.',
+            'ad_style'       => 'Deliver as a high-energy, persuasive TV ad voiceover! PUNCH each selling point with explosive enthusiasm. Create urgency and make listeners want to act NOW!',
+            'news'           => 'You are an urgent breaking-news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep voice, zero warmth — pure broadcast professionalism.',
+            'calm'           => 'Speak with serene, zen-like tranquility, like a meditation guide. Ultra-slow, barely above a whisper. Let peaceful stillness fill the gaps. Soothing and deeply relaxing.',
+            'angry'          => 'Read with fierce, simmering anger and passionate intensity. Let righteous fury sharpen each word. Build tension with restrained power that could explode at any moment.',
+            'educational'    => 'You are an enthusiastic professor BURSTING with passion for teaching. Clear, structured delivery with infectious energy. Emphasize key concepts. Make learning thrilling.',
+            'commercial'     => 'You are SHOUTING a flash-sale commercial! EXPLOSIVE energy and wild enthusiasm! Rush through words like the deal expires NOW. Maximum hype, maximum urgency!',
+            'promo'          => 'Deliver as a powerful, cinematic promotional piece. Build from a firm opening to a thundering crescendo. Each word polished and impactful. Make the audience feel compelled to act.',
+            'podcast'        => 'You are a witty, charismatic podcast host. Natural, conversational, playfully engaging the audience. Quick pace with comedic timing and strategic pauses. Build intrigue like sharing a secret.',
+            'assistant'      => 'You are an upbeat, cheerful AI assistant overflowing with eagerness to help. Bubbly, warm, genuinely enthusiastic. Quick, friendly delivery with a permanent beaming smile in your voice.',
+            'narrative'      => 'Narrate like an epic audiobook. Use dramatic expression — whisper for tension, raise your voice for revelations. Paint vivid images with every word. Make listeners hang on each sentence.',
+            'comedic'        => 'Deliver with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness.',
+            'corporate'      => 'Speak with stern, polished corporate authority. Formal, no-nonsense delivery. Deep, commanding tone that inspires absolute trust. Each word lands like a gavel in the boardroom.',
+            'conversational' => 'Speak naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth.',
+            'inspirational'  => 'You are a FIERY motivational speaker at a packed stadium! Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding and relentless!',
+            'cinematic'      => 'Deliver with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a revelation.',
+            'documentary'    => 'Narrate like an epic documentary with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+            default          => '',
+        };
+    }
+
+    /**
+     * Resolve a voice name to a valid Gemini voice.
+     *
+     * Accepts:
+     *  - Raw Gemini names (Kore, Puck, Zephyr, ...)
+     *  - Branded internal_voice_id values (gemini-ar-rawaa, gemini-en-serene, ...)
+     *  - Display names
+     *
+     * When a branded ID is provided, the actual provider_voice_id is
+     * looked up from the voices table so the raw Gemini name is never
+     * exposed to end-users.
+     */
+    private function resolveGeminiVoice(string $voiceName, mixed $expectedGender = null): string
+    {
+        $voiceName = trim($voiceName);
+        $normalizedExpectedGender = $this->normalizeGender($expectedGender);
+        $resolved = '';
+        $detectedGender = null;
+
+        // 1. Already a known raw Gemini voice name -> use directly.
+        if ($voiceName !== '' && in_array($voiceName, self::VOICES, true)) {
+            $resolved = $voiceName;
+            $detectedGender = self::VOICE_GENDER_MAP[$resolved] ?? null;
+        }
+
+        // 2. Case-insensitive match against known voices.
+        if ($resolved === '') {
+            foreach (self::VOICES as $voice) {
+                if (strcasecmp($voice, $voiceName) === 0) {
+                    $resolved = $voice;
+                    $detectedGender = self::VOICE_GENDER_MAP[$resolved] ?? null;
+                    break;
+                }
+            }
+        }
+
+        // 3. Resolve from aliases and slug tokens (e.g. gemini-ar-walid, ar-Gemini-HD-Fenrir).
+        if ($resolved === '' && $voiceName !== '') {
+            $fromAlias = $this->voiceAliasToGeminiVoice($voiceName);
+            if ($fromAlias !== null) {
+                $resolved = $fromAlias;
+                $detectedGender = self::VOICE_GENDER_MAP[$resolved] ?? null;
+            }
+        }
+
+        // 4. Look up internal_voice_id/display_name from DB.
+        if ($resolved === '' && $voiceName !== '') {
+            $lowerVoiceName = strtolower($voiceName);
+            $voiceRow = \App\Models\Voice::query()
+                ->where('provider', 'gemini')
+                ->where('is_active', true)
+                ->where(function ($q) use ($voiceName, $lowerVoiceName) {
+                    $q->where('internal_voice_id', $voiceName)
+                        ->orWhere('display_name', $voiceName)
+                        ->orWhereRaw('LOWER(internal_voice_id) = ?', [$lowerVoiceName])
+                        ->orWhereRaw('LOWER(display_name) = ?', [$lowerVoiceName]);
+                })
+                ->first(['provider_voice_id', 'gender']);
+
+            if ($voiceRow) {
+                $providerVoiceId = trim((string) ($voiceRow->provider_voice_id ?? ''));
+                if ($providerVoiceId !== '' && in_array($providerVoiceId, self::VOICES, true)) {
+                    $resolved = $providerVoiceId;
+                } else {
+                    $providerVoiceToken = $this->extractGeminiVoiceToken($providerVoiceId);
+                    if ($providerVoiceToken !== null) {
+                        $resolved = $providerVoiceToken;
+                    }
+                }
+                $detectedGender = $this->normalizeGender($voiceRow->gender ?? null);
+            }
+        }
+
+        // 5. Default voice.
+        if ($resolved === '') {
+            $resolved = $this->defaultVoiceForGender($normalizedExpectedGender ?: $detectedGender);
+        }
+
+        // 6. Enforce requested gender when available.
+        if ($normalizedExpectedGender !== '' && ! $this->voiceMatchesGender($resolved, $normalizedExpectedGender)) {
+            $resolved = $this->defaultVoiceForGender($normalizedExpectedGender);
+        }
+
+        return $resolved;
+    }
+
+    private function resolveLanguageCode(string $targetLanguage, ?string $dialect): string
+    {
+        $candidate = trim((string) $dialect);
+        if ($candidate !== '' && in_array($candidate, self::SUPPORTED_LANGUAGE_CODES, true)) {
+            return $candidate;
+        }
+
+        $normalized = strtolower(trim($targetLanguage));
+        if (str_starts_with($normalized, 'ar')) {
+            return 'ar-XA';
+        }
+
+        return 'en-US';
+    }
+
+    private function normalizeGender(mixed $gender): string
+    {
+        $normalized = strtolower(trim((string) $gender));
+        return in_array($normalized, ['male', 'female'], true) ? $normalized : '';
+    }
+
+    private function voiceMatchesGender(string $voiceName, string $gender): bool
+    {
+        $voiceGender = self::VOICE_GENDER_MAP[$voiceName] ?? null;
+        return $voiceGender === null || $voiceGender === $gender;
+    }
+
+    private function defaultVoiceForGender(?string $gender): string
+    {
+        $normalized = $this->normalizeGender($gender);
+        if ($normalized === 'male') {
+            return 'Puck';
+        }
+
+        if ($normalized === 'female') {
+            return 'Kore';
+        }
+
+        $configuredDefault = trim((string) config('services.gemini_tts.default_voice', 'Kore'));
+        if ($configuredDefault !== '' && in_array($configuredDefault, self::VOICES, true)) {
+            return $configuredDefault;
+        }
+
+        return 'Kore';
+    }
+
+    private function voiceAliasToGeminiVoice(string $voiceName): ?string
+    {
+        $normalized = strtolower(trim($voiceName));
+        if ($normalized === '') {
+            return null;
+        }
+
+        if (isset(self::VOICE_ALIAS_MAP[$normalized])) {
+            return self::VOICE_ALIAS_MAP[$normalized];
+        }
+
+        return $this->extractGeminiVoiceToken($normalized);
+    }
+
+    private function extractGeminiVoiceToken(string $candidate): ?string
+    {
+        $normalized = strtolower(trim($candidate));
+        if ($normalized === '') {
+            return null;
+        }
+
+        foreach (self::VOICES as $voice) {
+            $voiceLower = strtolower($voice);
+            if ($normalized === $voiceLower || str_ends_with($normalized, '-'.$voiceLower)) {
+                return $voice;
+            }
+        }
+
+        return null;
+    }
+
+    private function estimateDurationSeconds(string $text): int
+    {
+        $wordEstimate = max(
+            str_word_count(strip_tags($text)),
+            (int) ceil(mb_strlen($text) / 5)
+        );
+
+        return max(3, (int) ceil($wordEstimate / 2.6));
+    }
+
+    /**
+     * Estimate USD cost for Gemini TTS.
+     * Gemini 2.5 Flash Preview TTS pricing (as of 2025): input text charged per character.
+     */
+    private function estimateCost(int $charCount): float
+    {
+        $ratePerMillion = (float) config('services.gemini_tts.cost_per_million_chars', 0.0);
+        return round(($charCount / 1_000_000) * $ratePerMillion, 6);
+    }
+
+    private function sendWithSslFallback(callable $sender, bool $verifySsl, string $context)
+    {
+        try {
+            return $sender($verifySsl);
+        } catch (\Throwable $e) {
+            if (!$this->shouldRetryWithoutSsl($e, $verifySsl)) {
+                throw $e;
+            }
+
+            Log::warning($context . ' failed SSL verification on local environment; retrying once without verification.');
+
+            return $sender(false);
+        }
+    }
+
+    private function shouldRetryWithoutSsl(\Throwable $e, bool $verifySsl): bool
+    {
+        if (!$verifySsl || !app()->environment('local')) {
+            return false;
+        }
+
+        $message = strtolower($e->getMessage());
+
+        return str_contains($message, 'curl error 60')
+            || str_contains($message, 'ssl certificate problem')
+            || str_contains($message, 'unable to get local issuer certificate');
+    }
+}

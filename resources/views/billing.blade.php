@@ -138,6 +138,33 @@
       fill: none;
       stroke: none;
     }
+    .saved-card-notice {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .4rem;
+      padding: .75rem 1rem;
+      margin-bottom: .75rem;
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--success) 12%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
+      font-size: .88rem;
+      color: var(--fg);
+    }
+    .saved-card-notice .saved-card-icon {
+      color: var(--success);
+      font-weight: 700;
+    }
+    .saved-card-notice strong {
+      color: var(--fg);
+      font-weight: 600;
+    }
+    .saved-card-notice .saved-card-hint {
+      flex-basis: 100%;
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
     #card-element {
       padding: .85rem;
       border: 1px solid var(--line);
@@ -157,6 +184,29 @@
       margin-top: .6rem;
       font-size: .82rem;
       color: var(--muted);
+    }
+    .save-card-checkbox {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin-top: .75rem;
+      padding: .6rem .75rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      cursor: pointer;
+      font-size: .88rem;
+      color: var(--fg);
+      transition: border-color 0.15s ease;
+    }
+    .save-card-checkbox:hover {
+      border-color: var(--a);
+    }
+    .save-card-checkbox input[type="checkbox"] {
+      width: 1.1rem;
+      height: 1.1rem;
+      accent-color: var(--a);
+      cursor: pointer;
     }
     .consent-box {
       margin-top: .65rem;
@@ -324,12 +374,15 @@
 <body>
   @php
     $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
-      return match ((string) $slug) {
+      // Dynamic plan name lookup — supports all plans
+      $knownSlugs = [
         'free' => __('ui.pricing.plan_name_free'),
+        'starter' => __('ui.pricing.plan_name_starter', ['default' => 'Starter']),
         'creator' => __('ui.pricing.plan_name_creator'),
         'pro' => __('ui.pricing.plan_name_pro'),
-        default => (string) ($fallback ?: '-'),
-      };
+        'studio_max' => __('ui.pricing.plan_name_studio_max', ['default' => 'Studio Max']),
+      ];
+      return $knownSlugs[(string) $slug] ?? (string) ($fallback ?: ucfirst((string) $slug) ?: '-');
     };
     $normalizeTierLabel = static function (?string $label): string {
       $raw = trim((string) $label);
@@ -423,8 +476,19 @@
               </span>
               {{ __('ui.billing.credit_or_debit_card') }}
             </div>
+            @if($defaultPaymentMethod)
+              <div class="saved-card-notice">
+                <span class="saved-card-icon">✓</span>
+                <span>{{ __('ui.billing.using_saved_card') }} <strong>{{ strtoupper($defaultPaymentMethod->card->brand) }} **** {{ $defaultPaymentMethod->card->last4 }}</strong></span>
+                <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
+              </div>
+            @endif
             <div id="card-element"></div>
             <div id="card-error" class="card-error"></div>
+            <label class="save-card-checkbox">
+              <input type="checkbox" id="saveCard" checked>
+              <span>{{ __('ui.billing.save_card_for_future') }}</span>
+            </label>
             @if($stripeReady)
               <p class="card-hint">{{ __('ui.billing.card_processed_by_stripe') }}</p>
             @else
@@ -510,6 +574,7 @@
     const planSelect = document.getElementById('plan');
     const cycleSelect = document.getElementById('cycle');
     const cardError = document.getElementById('card-error');
+    const saveCardCheckbox = document.getElementById('saveCard');
 
     const quoteAmount = document.getElementById('quoteAmount');
     const quoteHint = document.getElementById('quoteHint');
@@ -729,6 +794,7 @@
           plan: String(selected.plan.slug || ''),
           billing_cycle: String(selected.cycle || 'monthly'),
           payment_method: paymentMethod || null,
+          save_card: saveCardCheckbox ? saveCardCheckbox.checked : true,
         });
 
         if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {

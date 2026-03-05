@@ -4,20 +4,23 @@
   https://solicode.co.uk
 -->
 <!doctype html>
-<html lang="en">
+<html lang="en" dir="ltr">
 
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen StudioChrome</title>
+  <title>Listen Studio Chrome</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 
 <body>
   <main class="app">
     <header class="head">
-      <h1>Listen Studio Chrome</h1>
-      <p>Select text anywhere and listen instantly.</p>
+      <div class="head-row">
+        <h1 data-i18n="extName">Listen Studio Chrome</h1>
+        <button id="langSwitcher" class="lang-btn" type="button" title="Switch Language">عربي</button>
+      </div>
+      <p data-i18n="headerSubtitle">Select text anywhere and listen instantly.</p>
     </header>
 
     <p id="status" class="status"></p>
@@ -25,7 +28,7 @@
     <section class="panel profile">
       <div class="row-inline">
         <div class="avatar" id="userAvatar">L</div>
-        <div>
+        <div class="profile-info">
           <div class="name" id="userName">Connect your account</div>
           <div class="small" id="userPlan">Plan: -</div>
         </div>
@@ -43,34 +46,76 @@
     </section>
 
     <section class="panel settings">
-      <label>API Key
-        <input id="apiKey" type="password" placeholder="lk_live_..." />
+      <label><span data-i18n="apiKeyLabel">API Key</span>
+        <input id="apiKey" type="password" data-i18n-placeholder="apiKeyPlaceholder" placeholder="Paste your API key here" />
       </label>
 
-      <label>Voice Language
+      <label><span data-i18n="voiceLanguage">Voice Language</span>
         <select id="targetLanguage">
-          <option value="ar">Arabic</option>
-          <option value="en">English</option>
+          <option value="ar" data-i18n="arabic">Arabic</option>
+          <option value="en" data-i18n="english">English</option>
         </select>
       </label>
 
-      <label>Speaker
+      <label><span data-i18n="speaker">Speaker</span>
         <select id="voiceKey"></select>
       </label>
 
+      <div id="studioPanel" class="studio-panel" style="display:none;">
+        <div class="studio-label">🎛️ <span data-i18n="studioLabel">Voice Studio (HD)</span></div>
+        <label class="studio-full-width"><span data-i18n="dialect">Dialect</span>
+          <select id="dialect"></select>
+        </label>
+        <div class="studio-grid">
+          <label><span data-i18n="performanceStyle">Performance Style</span>
+            <select id="performanceStyle">
+              <option value="" data-i18n="chooseStyle">-- Choose Style --</option>
+              <option value="neutral" data-i18n="styleNeutral">Neutral</option>
+              <option value="educational" data-i18n="styleEducational">Educational</option>
+              <option value="commercial" data-i18n="styleCommercial">Commercial</option>
+              <option value="promo" data-i18n="stylePromo">Promotional</option>
+              <option value="podcast" data-i18n="stylePodcast">Podcast</option>
+              <option value="assistant" data-i18n="styleAssistant">Virtual Assistant</option>
+              <option value="narrative" data-i18n="styleNarrative">Narrative</option>
+              <option value="comedic" data-i18n="styleComedic">Comedic</option>
+              <option value="corporate" data-i18n="styleCorporate">Corporate</option>
+              <option value="conversational" data-i18n="styleConversational">Conversational</option>
+              <option value="inspirational" data-i18n="styleInspirational">Inspirational</option>
+              <option value="cinematic" data-i18n="styleCinematic">Cinematic</option>
+              <option value="documentary" data-i18n="styleDocumentary">Documentary</option>
+              <option value="storytelling" data-i18n="styleStorytelling">Storytelling</option>
+              <option value="ad_style" data-i18n="styleAdStyle">Ad Style</option>
+              <option value="news" data-i18n="styleNews">News</option>
+            </select>
+          </label>
+          <label><span data-i18n="emotion">Emotion</span>
+            <select id="emotion">
+              <option value="" data-i18n="chooseEmotion">-- Choose Emotion --</option>
+              <option value="neutral" data-i18n="emotionNeutral">Neutral</option>
+              <option value="warm" data-i18n="emotionWarm">Warm</option>
+              <option value="sad" data-i18n="emotionSad">Sad</option>
+              <option value="excited" data-i18n="emotionExcited">Excited</option>
+              <option value="formal" data-i18n="emotionFormal">Formal</option>
+              <option value="calm" data-i18n="emotionCalm">Calm</option>
+              <option value="angry" data-i18n="emotionAngry">Angry</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
       <div class="setting-card">
         <div class="setting-info">
-          <label id="translateLabel" for="translate">Translate before speaking</label>
+          <label id="translateLabel" for="translate" data-i18n="translateLabel">Translate before speaking</label>
         </div>
         <label class="toggle-switch" aria-label="Translate before speaking">
-          <input id="translate" type="checkbox" checked />
+          <input id="translate" type="checkbox" />
           <span class="toggle-slider"></span>
         </label>
       </div>
 
       <div class="setting-card">
         <div class="setting-info">
-          <label for="autoPlay">Play voice in side panel</label>
+          <label for="autoPlay" data-i18n="autoPlayLabel">Play voice in side panel</label>
         </div>
         <label class="toggle-switch" aria-label="Play voice in side panel">
           <input id="autoPlay" type="checkbox" />
@@ -78,15 +123,18 @@
         </label>
       </div>
 
-      <button id="saveBtn" class="btn">Save settings</button>
-      <button id="selectionBtn" class="btn primary">Read current selection</button>
+      <button id="saveBtn" class="btn" data-i18n="saveBtn">Save settings</button>
+      <button id="selectionBtn" class="btn primary" data-i18n="readSelectionBtn">Read current selection</button>
     </section>
 
     <section class="panel">
-      <label>Quick text (optional)
-        <textarea id="quickText" dir="auto" rows="4" placeholder="Paste any text and click Read quick text"></textarea>
+      <label><span data-i18n="quickTextLabel">Quick text (optional)</span>
+        <textarea id="quickText" dir="auto" rows="4" data-i18n-placeholder="quickTextPlaceholder" placeholder="Paste any text and click Read quick text"></textarea>
+        <div class="char-counter" id="charCounter">
+          <span id="charCount">0</span> / <span id="charLimit">-</span> <span data-i18n="characters">characters</span>
+        </div>
       </label>
-      <button id="quickBtn" class="btn">Read quick text</button>
+      <button id="quickBtn" class="btn" data-i18n="readQuickBtn">Read quick text</button>
     </section>
   </main>
 

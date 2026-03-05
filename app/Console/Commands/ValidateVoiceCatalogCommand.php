@@ -22,9 +22,8 @@ class ValidateVoiceCatalogCommand extends Command
         $byVoiceId = [];
         $byDisplayName = [];
         $expectedTokenByTier = [
-            'standard' => '-standard-',
-            'hd' => '-wavenet-',
-            'hd_plus' => '-chirp3-hd-',
+            'standard' => ['-standard-', '-wavenet-'],
+            'hd' => ['-chirp3-hd-'],
         ];
 
         foreach ($voices as $voice) {
@@ -56,8 +55,17 @@ class ValidateVoiceCatalogCommand extends Command
             $expectedToken = $expectedTokenByTier[$tier] ?? null;
             if (! $expectedToken) {
                 $errors[] = "Unknown tier found in voices table: {$tier}";
-            } elseif (! str_contains($voiceId, $expectedToken)) {
-                $errors[] = "Tier/engine mismatch: {$voiceId} does not match tier {$tier}";
+            } else {
+                $matchesEngine = false;
+                foreach ((array) $expectedToken as $token) {
+                    if (str_contains($voiceId, $token)) {
+                        $matchesEngine = true;
+                        break;
+                    }
+                }
+                if (! $matchesEngine) {
+                    $errors[] = "Tier/engine mismatch: {$voiceId} does not match tier {$tier}";
+                }
             }
         }
 
@@ -67,8 +75,6 @@ class ValidateVoiceCatalogCommand extends Command
                 ['language' => 'en', 'tier' => 'standard'],
                 ['language' => 'ar', 'tier' => 'hd'],
                 ['language' => 'en', 'tier' => 'hd'],
-                ['language' => 'ar', 'tier' => 'hd_plus'],
-                ['language' => 'en', 'tier' => 'hd_plus'],
             ];
 
             foreach ($required as $pair) {

@@ -138,13 +138,22 @@
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 1.25rem;
-      margin: 2.5rem 0 3rem;
+      margin: 2.5rem auto 3rem;
+      max-width: 1100px;
+    }
+    .plans-row-2 {
+      grid-column: 1 / -1;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.25rem;
+      max-width: 720px;
+      margin: 0 auto;
     }
     .plan-card {
       background: linear-gradient(180deg, var(--surface2), var(--surface));
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      padding: 1.75rem;
+      padding: 1.6rem;
       box-shadow: var(--shadow);
       transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease;
       position: relative;
@@ -258,7 +267,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: .6rem 0;
+      padding: .55rem 0;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
       font-size: .88rem;
     }
@@ -451,6 +460,61 @@
       transform: translateY(0);
     }
 
+    .topups-section {
+      padding: 2rem 0;
+    }
+    .topups-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+    .topup-card {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 1.5rem;
+      box-shadow: var(--shadow);
+      text-align: center;
+      transition: transform .25s ease, border-color .25s ease;
+    }
+    .topup-card:hover {
+      transform: translateY(-3px);
+      border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+    }
+    .topup-card h3 {
+      font-size: 1.05rem;
+      margin: 0 0 .75rem;
+    }
+    .topup-prices {
+      display: flex;
+      flex-direction: column;
+      gap: .4rem;
+    }
+    .topup-price-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: .88rem;
+      padding: .3rem 0;
+      border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
+    }
+    .topup-price-row:last-child {
+      border-bottom: none;
+    }
+    .topup-plan-name {
+      color: var(--muted);
+    }
+    .topup-plan-price {
+      font-weight: 600;
+    }
+    .topup-note {
+      font-size: .8rem;
+      color: var(--muted);
+      margin-top: .75rem;
+    }
+
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-14px); }
@@ -463,12 +527,19 @@
         margin-left: auto;
         margin-right: auto;
       }
+      .plans-row-2 {
+        grid-template-columns: 1fr;
+        max-width: 420px;
+      }
       .features-grid,
       .faq-grid {
         grid-template-columns: 1fr;
       }
       .page-hero {
         padding: 2.5rem 1rem 1.5rem;
+      }
+      .topups-grid {
+        grid-template-columns: 1fr;
       }
     }
   </style>
@@ -481,13 +552,12 @@
 
   <main class="container">
     @php
+      // Names and descriptions now come localized from the backend
       $planDisplayName = static function (array $plan): string {
-        return match ((string) ($plan['slug'] ?? '')) {
-          'free' => __('ui.pricing.plan_name_free'),
-          'creator' => __('ui.pricing.plan_name_creator'),
-          'pro' => __('ui.pricing.plan_name_pro'),
-          default => (string) ($plan['name'] ?? '-'),
-        };
+        return (string) ($plan['name'] ?? $plan['slug'] ?? '-');
+      };
+      $planDescription = static function (array $plan): string {
+        return (string) ($plan['description'] ?? '');
       };
     @endphp
     <section class="page-hero reveal">
@@ -510,100 +580,25 @@
         $planSlugs = collect($pricingPlans)->pluck('slug')->values();
         $currentPlanIndex = $planSlugs->search($activePlanSlug);
         if ($currentPlanIndex === false) $currentPlanIndex = 0;
+        $firstRow = array_slice($pricingPlans, 0, 3);
+        $secondRow = array_slice($pricingPlans, 3);
       @endphp
 
-      @foreach($pricingPlans as $index => $plan)
-        @php
-          $isCurrent = $activePlanSlug === $plan['slug'];
-          $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free';
-          $monthlyCents = max(0, (int) ($plan['price_monthly_cents'] ?? 0));
-          $yearlyCents = max(0, (int) ($plan['price_yearly_cents'] ?? 0));
-          if ($yearlyCents <= 0 && $monthlyCents > 0) {
-            $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
-          }
-          $isFree = $monthlyCents <= 0;
-          $savingsCents = $monthlyCents > 0 ? max(0, ($monthlyCents * 12) - $yearlyCents) : 0;
-        @endphp
-        <div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} reveal"
-             data-plan-slug="{{ $plan['slug'] }}"
-             data-is-free="{{ $isFree ? '1' : '0' }}"
-             data-monthly-cents="{{ $monthlyCents }}"
-             data-yearly-cents="{{ $yearlyCents }}"
-             data-savings-cents="{{ $savingsCents }}">
-
-          @if($plan['is_popular'] && !$isCurrent)
-            <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
-          @endif
-
-          <div class="plan-header">
-            <h2 class="plan-name">{{ $planDisplayName($plan) }}</h2>
-            <p class="plan-desc">
-    {{
-        $plan['slug'] === 'free' ? __('ui.pricing.plan_desc_free') :
-        ($plan['slug'] === 'creator' ? __('ui.pricing.plan_desc_creator') :
-        __('ui.pricing.plan_desc_pro'))
-    }}
-</p>
-          </div>
-
-          <div class="plan-pricing">
-            <div class="price-row">
-              <span class="price-main" dir="ltr">
-                <span class="price-currency">$</span>
-                <span class="price-amount price-value">0</span>
-              </span>
-              <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
-            </div>
-            <div class="price-note price-note-text"></div>
-          </div>
-
-          <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</div>
-
-          <ul class="plan-features">
-            @foreach($plan['features'] as $feature)
-              @php
-                $iconSvg = match($feature['icon'] ?? 'check') {
-                  'activity' => '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
-                  'type' => '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>',
-                  'lock' => '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
-                  'bolt' => '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
-                  'mic' => '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
-                  'globe' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
-                  'clock' => '<circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>',
-                  'star' => '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
-                  'shield' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
-                  'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
-                  'users' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-                  default => '<polyline points="20 6 9 17 4 12"/>',
-                };
-              @endphp
-            <li>
-              <span class="feature-label">
-                <svg viewBox="0 0 24 24">{!! $iconSvg !!}</svg>
-                {{ $feature['label'] ?? '' }}
-              </span>
-              <span class="feature-value">{{ $feature['value'] ?? __('ui.pricing.included_mark') }}</span>
-            </li>
-            @endforeach
-          </ul>
-
-          <div class="plan-action">
-            @auth
-              @if($isCurrent)
-                <span class="plan-btn btn-disabled">{{ __('ui.pricing.current_plan') }}</span>
-              @elseif($isLower || $plan['slug'] === 'free')
-                <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
-              @else
-                <a class="plan-btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">{{ __('ui.pricing.upgrade_now') }}</a>
-              @endif
-            @else
-              <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
-            @endauth
-          </div>
-        </div>
+      @foreach($firstRow as $index => $plan)
+        @include('components._plan-card', ['plan' => $plan, 'index' => $index])
       @endforeach
+
+      @if(count($secondRow) > 0)
+      <div class="plans-row-2">
+        @foreach($secondRow as $sIndex => $plan)
+          @php $index = $sIndex + 3; @endphp
+          @include('components._plan-card', ['plan' => $plan, 'index' => $index])
+        @endforeach
+      </div>
+      @endif
     </section>
 
+    {{-- ─── Top-ups Section ──────────────────────────────────────── --}}
     <section class="features-section">
       <h2 class="section-title reveal">{{ __('ui.pricing.included_title') }}</h2>
       <p class="section-subtitle reveal">{{ __('ui.pricing.included_subtitle') }}</p>

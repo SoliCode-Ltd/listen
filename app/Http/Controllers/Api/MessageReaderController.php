@@ -42,8 +42,16 @@ class MessageReaderController extends Controller
         $planChars = PlanUsageGuard::planChars($activePlan);
         $planRequests = PlanUsageGuard::planRequests($activePlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
-        $defaultAr = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar', $planTier));
-        $defaultEn = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en', $planTier));
+
+        // Determine the preferred provider for HD voices based on plan policy
+        $ttsProviderPolicy = strtolower(trim((string) ($activePlan?->tts_provider_policy ?? 'default')));
+        $preferredProvider = null;
+        if ($planTier === 'hd' && in_array($ttsProviderPolicy, ['gemini', 'google_cloud'], true)) {
+            $preferredProvider = $ttsProviderPolicy;
+        }
+
+        $defaultAr = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageByProvider('ar', $preferredProvider ?? 'gemini', $planTier));
+        $defaultEn = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageByProvider('en', $preferredProvider ?? 'gemini', $planTier));
 
         return response()->json([
             'ok' => true,
@@ -65,6 +73,8 @@ class MessageReaderController extends Controller
                     'commercial_use_allowed' => (bool) ($activePlan?->commercial_use_allowed ?? false),
                     'processing_priority' => (string) ($activePlan?->processing_priority ?: 'standard'),
                     'requests_unlimited' => $requestsUnlimited,
+                    'dialogue_enabled' => (bool) ($activePlan?->dialogue_enabled ?? false),
+                    'tts_provider_policy' => $activePlan?->tts_provider_policy ?? 'default',
                 ],
                 'usage' => [
                     'period' => $period,
@@ -80,7 +90,7 @@ class MessageReaderController extends Controller
                         : min(100, (int) round(((int) $counter->total_requests / max(1, $planRequests)) * 100)),
                 ],
                 'voices' => [
-                    'catalog' => VoiceCatalog::publicCatalog($planTier),
+                    'catalog' => VoiceCatalog::publicCatalog($planTier, $preferredProvider),
                     'defaults' => [
                         'ar' => $defaultAr['key'] ?? null,
                         'en' => $defaultEn['key'] ?? null,
@@ -106,9 +116,20 @@ class MessageReaderController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
-            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
+            'voice_tier' => ['nullable', 'in:standard,hd'],
             'translate' => ['nullable', 'boolean'],
             'prefer_sync' => ['nullable', 'boolean'],
+            // Studio parameters
+            'dialect' => ['nullable', 'string', 'max:10'],
+            'emotion' => ['nullable', 'string', 'in:neutral,warm,sad,excited,formal,calm,angry'],
+            'performance_style' => ['nullable', 'string', 'max:50'],
+            'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
+            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            // Dialogue parameters
+            'is_dialogue' => ['nullable', 'boolean'],
+            'dialogue_speakers' => ['nullable', 'array', 'max:6'],
+            'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
+            'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
@@ -123,8 +144,15 @@ class MessageReaderController extends Controller
             $validated['target_language'],
             $validated['voice_key'] ?? null,
             $validated['voice_name'] ?? null,
-            $planTier,
+            $requestedTier,
         );
+        $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
+            'dialect' => $validated['dialect'] ?? null,
+            'emotion' => $validated['emotion'] ?? 'neutral',
+            'performance_style' => $validated['performance_style'] ?? null,
+            'speed' => $validated['speed'] ?? null,
+            'pitch' => $validated['pitch'] ?? null,
+        ]);
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -164,17 +192,35 @@ class MessageReaderController extends Controller
             'received_at' => now(),
         ]);
 
+        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+
         $job = AudioGeneration::create([
             'user_id' => $user->id,
             'text_item_id' => $item->id,
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
-            'voice_tier' => $planTier,
+            'voice_tier' => $requestedTier,
             'voice_name' => $voiceName,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimate['seconds'],
             'status' => $initialStatus,
+            // Studio fields
+            'dialect' => $studioOptions['dialect'],
+            'emotion' => $studioOptions['emotion'],
+            'performance_style' => $studioOptions['performance_style'],
+            'speed' => $studioOptions['speed'],
+            'pitch' => $studioOptions['pitch'],
+            // Dialogue fields
+            'is_dialogue' => $dialogueEnabled
+                && $requestedTier !== VoiceTier::STANDARD
+                && ($validated['is_dialogue'] ?? false),
+            'dialogue_metadata' => ($dialogueEnabled
+                && $requestedTier !== VoiceTier::STANDARD
+                && ($validated['is_dialogue'] ?? false)
+                && ! empty($validated['dialogue_speakers']))
+                ? ['speakers' => $validated['dialogue_speakers']]
+                : null,
         ]);
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
@@ -215,8 +261,8 @@ class MessageReaderController extends Controller
             'item_id' => $item->id,
             'status' => $job->status,
             'voice' => VoiceCatalog::voiceMeta($voiceName),
-            'voice_tier' => $planTier,
-            'voice_tier_label' => VoiceTier::label($planTier),
+            'voice_tier' => $requestedTier,
+            'voice_tier_label' => VoiceTier::label($requestedTier),
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'estimated_chars' => $estimate['chars'],
@@ -352,5 +398,36 @@ class MessageReaderController extends Controller
         }
 
         return $defaultVoice;
+    }
+
+    /**
+     * @param  array{dialect:mixed,emotion:mixed,performance_style:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,emotion:string,performance_style:?string,speed:float,pitch:float}
+     */
+    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    {
+        $normalizedTier = VoiceTier::normalize($tier);
+
+        if ($normalizedTier === VoiceTier::STANDARD) {
+            return [
+                'dialect' => null,
+                'emotion' => 'neutral',
+                'performance_style' => null,
+                'speed' => 1.0,
+                'pitch' => 0.0,
+            ];
+        }
+
+        return [
+            'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
+            'emotion' => isset($options['emotion']) && is_string($options['emotion']) && trim($options['emotion']) !== ''
+                ? trim($options['emotion'])
+                : 'neutral',
+            'performance_style' => isset($options['performance_style']) && is_string($options['performance_style'])
+                ? trim($options['performance_style']) ?: null
+                : null,
+            'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
+            'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
+        ];
     }
 }

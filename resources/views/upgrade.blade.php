@@ -4,7 +4,7 @@
     .hero { text-align: center; margin-bottom: 1.5rem; }
     .hero h1 { margin: 0 0 .5rem; font-size: clamp(2rem, 4vw, 3rem); }
     .hero p { margin: 0; color: var(--muted); }
-    .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
     .plan { position: relative; background: linear-gradient(170deg, var(--surface2), var(--surface)); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 1.3rem; box-shadow: var(--shadow); }
     .plan.popular { border-color: color-mix(in oklab, var(--a) 50%, var(--line)); }
     .badge { position: absolute; top: .8rem; right: .8rem; padding: .25rem .6rem; border-radius: var(--radius-full); font-size: .74rem; border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 14%, var(--surface)); color: var(--text); }
@@ -20,18 +20,18 @@
 </head>
 <body>
   @php
+    // Plan names now come localized from the backend
     $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
-      return match ((string) $slug) {
-        'free' => __('ui.pricing.plan_name_free'),
-        'creator' => __('ui.pricing.plan_name_creator'),
-        'pro' => __('ui.pricing.plan_name_pro'),
-        default => (string) ($fallback ?: '-'),
-      };
+      return (string) ($fallback ?: $slug ?: '-');
     };
     $priorityLabel = static function (?string $value): string {
-      return strtolower((string) $value) === 'high'
-        ? __('ui.upgrade.processing_priority_high')
-        : __('ui.upgrade.processing_priority_standard');
+      return match (strtolower(trim((string) $value))) {
+        'standard_plus' => __('ui.pricing.standard_plus'),
+        'high' => __('ui.upgrade.processing_priority_high'),
+        'priority' => __('ui.pricing.priority'),
+        'highest' => __('ui.pricing.highest'),
+        default => __('ui.upgrade.processing_priority_standard'),
+      };
     };
     $formatTierLabel = static function (?string $label): string {
       $text = trim((string) $label);
@@ -70,19 +70,17 @@
             <div class="row"><span>{{ __('ui.upgrade.requests') }}</span><span>{{ $plan['requests_unlimited'] ? __('ui.upgrade.unlimited') : number_format($plan['monthly_requests']).' '. __('ui.upgrade.per_month') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.commercial_use') }}</span><span>{{ $plan['commercial_use_allowed'] ? __('ui.upgrade.allowed') : __('ui.upgrade.not_allowed') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.processing_priority') }}</span><span>{{ $priorityLabel((string) $plan['processing_priority']) }}</span></div>
-            <div class="row"><span>{{ __('ui.upgrade.overage') }}</span><span>{{ $plan['overage_label'] }}</span></div>
+            <div class="row"><span>{{ __('ui.pricing.topup_chars') }}</span><span>{{ $plan['char_topup_label'] }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.voice_quality') }}</span><span>{{ $formatTierLabel((string) $plan['voice_tier']) }}</span></div>
           </div>
 
           <div class="actions">
             @if($plan['slug'] === $currentPlanSlug)
               <button class="btn" disabled>{{ __('ui.upgrade.current_plan') }}</button>
-            @elseif($plan['slug'] === 'creator')
-              <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => 'creator']) }}">{{ __('ui.upgrade.upgrade_to_creator') }}</a>
-            @elseif($plan['slug'] === 'pro')
-              <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => 'pro']) }}">{{ __('ui.upgrade.upgrade_to_pro') }}</a>
-            @else
+            @elseif($plan['slug'] === 'free')
               <a class="btn" href="{{ route('dashboard') }}">{{ __('ui.upgrade.current_free_access') }}</a>
+            @else
+              <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">{{ __('ui.pricing.upgrade_now') }}</a>
             @endif
           </div>
         </article>
@@ -93,4 +91,3 @@
   @include('components.scripts')
 </body>
 </html>
-

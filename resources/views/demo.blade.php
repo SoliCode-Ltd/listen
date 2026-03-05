@@ -214,6 +214,58 @@
       border-color: color-mix(in oklab, var(--b) 45%, var(--line));
     }
 
+    .studio-panel {
+      margin-top: .6rem;
+      padding: .85rem;
+      border: 1px solid color-mix(in oklab, var(--a) 25%, var(--line));
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+    }
+    .studio-label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .88rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--a) 60%, var(--text));
+      margin-bottom: .6rem;
+    }
+    .studio-section {
+      padding: .65rem .75rem;
+      border-radius: calc(var(--radius) - 2px);
+      background: color-mix(in oklab, var(--a) 3%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
+    }
+    .studio-section-label {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--a) 50%, var(--text));
+      margin-bottom: .45rem;
+      letter-spacing: .01em;
+    }
+    .studio-panel input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: var(--radius-full);
+      background: var(--line);
+      outline: none;
+    }
+    .studio-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      cursor: pointer;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 4px rgba(0,0,0,.2);
+    }
+
     .hint {
         padding:0.5rem 0 0 0;
       font-size: .85rem;
@@ -332,6 +384,8 @@
         margin-top: .8rem;
       }
     }
+
+
   </style>
   <script>
     (() => {
@@ -370,8 +424,8 @@
           <div class="stats">
             <div class="stat"><small>{{ __('ui.demo.arabic_voices') }}</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['ar'] ?? [])) }}</b></div>
             <div class="stat"><small>{{ __('ui.demo.english_voices') }}</small><b>{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['en'] ?? [])) }}</b></div>
-            <div class="stat"><small>{{ __('ui.demo.arabic_default') }}</small><b>{{ app()->getLocale() === 'ar' ? ($defaultVoiceAr['label_ar'] ?? $defaultVoiceAr['label'] ?? 'سارة') : ($defaultVoiceAr['label'] ?? 'Sara') }}</b></div>
-            <div class="stat"><small>{{ __('ui.demo.english_default') }}</small><b>{{ app()->getLocale() === 'ar' ? ($defaultVoiceEn['label_ar'] ?? $defaultVoiceEn['label'] ?? 'إيما') : ($defaultVoiceEn['label'] ?? 'Emma') }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.arabic_default') }}</small><b>{{ app()->getLocale() === 'ar' ? (($defaultVoiceAr ?? [])['label_ar'] ?? ($defaultVoiceAr ?? [])['label'] ?? 'سارة') : (($defaultVoiceAr ?? [])['label'] ?? 'Sara') }}</b></div>
+            <div class="stat"><small>{{ __('ui.demo.english_default') }}</small><b>{{ app()->getLocale() === 'ar' ? (($defaultVoiceEn ?? [])['label_ar'] ?? ($defaultVoiceEn ?? [])['label'] ?? 'إيما') : (($defaultVoiceEn ?? [])['label'] ?? 'Emma') }}</b></div>
           </div>
         </aside>
       </div>
@@ -437,6 +491,72 @@
               </div>
             </div>
 
+            {{-- Performance Controls --}}
+            <div class="studio-panel" id="studioPanel" style="display:none;">
+              <div class="studio-label">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                {{ __('ui.demo.voice_studio', ['default' => 'Performance Controls']) }}
+              </div>
+              {{-- Performance Style Section --}}
+              <div class="studio-section">
+                <div class="studio-section-label">🎭 {{ __('ui.demo.performance_style', ['default' => 'Performance Style']) }}</div>
+                <select name="performance_style" id="performance_style">
+                  <option value="">-- {{ __('ui.demo.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
+                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
+                  <option value="educational">{{ __('ui.demo.style_educational', ['default' => 'Educational']) }}</option>
+                  <option value="commercial">{{ __('ui.demo.style_commercial', ['default' => 'Commercial']) }}</option>
+                  <option value="promo">{{ __('ui.demo.style_promo', ['default' => 'Promotional']) }}</option>
+                  <option value="podcast">{{ __('ui.demo.style_podcast', ['default' => 'Podcast']) }}</option>
+                  <option value="assistant">{{ __('ui.demo.style_assistant', ['default' => 'Virtual Assistant']) }}</option>
+                  <option value="narrative">{{ __('ui.demo.style_narrative', ['default' => 'Narrative']) }}</option>
+                  <option value="comedic">{{ __('ui.demo.style_comedic', ['default' => 'Comedic']) }}</option>
+                  <option value="corporate">{{ __('ui.demo.style_corporate', ['default' => 'Corporate']) }}</option>
+                  <option value="conversational">{{ __('ui.demo.style_conversational', ['default' => 'Conversational']) }}</option>
+                  <option value="inspirational">{{ __('ui.demo.style_inspirational', ['default' => 'Inspirational']) }}</option>
+                  <option value="cinematic">{{ __('ui.demo.style_cinematic', ['default' => 'Cinematic']) }}</option>
+                  <option value="documentary">{{ __('ui.demo.style_documentary', ['default' => 'Documentary']) }}</option>
+                  <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling', ['default' => 'Storytelling']) }}</option>
+                  <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style', ['default' => 'Ad Style']) }}</option>
+                  <option value="news">{{ __('ui.dashboard.emotion_news', ['default' => 'News']) }}</option>
+                </select>
+              </div>
+
+              {{-- Emotion Section --}}
+              <div class="studio-section" style="margin-top:.6rem;">
+                <div class="studio-section-label">💫 {{ __('ui.demo.emotion', ['default' => 'Emotion']) }}</div>
+                <select name="emotion" id="emotion">
+                  <option value="">-- {{ __('ui.demo.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
+                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
+                  <option value="warm">{{ __('ui.dashboard.emotion_warm', ['default' => 'Warm']) }}</option>
+                  <option value="sad">{{ __('ui.dashboard.emotion_sad', ['default' => 'Sad']) }}</option>
+                  <option value="excited">{{ __('ui.dashboard.emotion_excited', ['default' => 'Excited']) }}</option>
+                  <option value="formal">{{ __('ui.dashboard.emotion_formal', ['default' => 'Formal']) }}</option>
+                  <option value="calm">{{ __('ui.dashboard.emotion_calm', ['default' => 'Calm']) }}</option>
+                  <option value="angry">{{ __('ui.dashboard.emotion_angry', ['default' => 'Angry']) }}</option>
+                </select>
+              </div>
+              <div class="two-col" style="margin-top: .5rem;">
+                <div>
+                  <label for="dialect">{{ __('ui.demo.dialect', ['default' => 'Dialect']) }}</label>
+                  <select name="dialect" id="dialect">
+                    <option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="speed">{{ __('ui.demo.speed', ['default' => 'Speed']) }} (<span id="speedVal">1.0</span>x)</label>
+                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:100%"
+                    oninput="document.getElementById('speedVal').textContent=this.value">
+                </div>
+              </div>
+              <div class="two-col" style="margin-top: .5rem;">
+                <div>
+                  <label for="pitch">{{ __('ui.demo.pitch', ['default' => 'Pitch']) }} (<span id="pitchVal">0</span>)</label>
+                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" style="width:100%"
+                    oninput="document.getElementById('pitchVal').textContent=this.value">
+                </div>
+              </div>
+            </div>
+
             <div>
               <div class="setting-card" style="margin-top: .5rem;">
                 <div class="setting-info">
@@ -469,6 +589,8 @@
         </section>
       </div>
     </section>
+
+
   </main>
 
   @include('components.footer')
@@ -501,6 +623,14 @@
     const targetLanguage = document.getElementById('target_language');
     const voiceGender = document.getElementById('voice_gender');
     const voiceSelect = document.getElementById('voice_key');
+    const dialectSelect = document.getElementById('dialect');
+    const performanceStyleSelect = document.getElementById('performance_style');
+    const emotionSelect = document.getElementById('emotion');
+    const speedInput = document.getElementById('speed');
+    const pitchInput = document.getElementById('pitch');
+    const speedValue = document.getElementById('speedVal');
+    const pitchValue = document.getElementById('pitchVal');
+    const studioPanel = document.getElementById('studioPanel');
     const previewBtn = document.getElementById('previewBtn');
     const audioWrap = document.getElementById('audioWrap');
     const previewAudio = document.getElementById('previewAudio');
@@ -516,6 +646,86 @@
     const translateHint = document.getElementById('translateHint');
     const heroWave = document.getElementById('heroWave');
     const textInput = document.getElementById('text');
+
+    const dialectsByLanguage = {
+      ar: [
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
+        { value: 'ar-XA', label: '{{ __("ui.dialects.msa", ["default" => "Modern Standard Arabic"]) }}' },
+        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi", ["default" => "Saudi"]) }}' },
+        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati", ["default" => "Emirati"]) }}' },
+        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian", ["default" => "Egyptian"]) }}' },
+        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese", ["default" => "Lebanese"]) }}' },
+        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian", ["default" => "Syrian"]) }}' },
+        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian", ["default" => "Jordanian"]) }}' },
+        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi", ["default" => "Iraqi"]) }}' },
+        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan", ["default" => "Moroccan"]) }}' },
+        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti", ["default" => "Kuwaiti"]) }}' },
+      ],
+      en: [
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
+        { value: 'en-US', label: '{{ __("ui.dialects.american", ["default" => "American"]) }}' },
+        { value: 'en-GB', label: '{{ __("ui.dialects.british", ["default" => "British"]) }}' },
+        { value: 'en-AU', label: '{{ __("ui.dialects.australian", ["default" => "Australian"]) }}' },
+        { value: 'en-IN', label: '{{ __("ui.dialects.indian", ["default" => "Indian"]) }}' },
+        { value: 'en-ZA', label: '{{ __("ui.dialects.south_african", ["default" => "South African"]) }}' },
+      ],
+    };
+
+    function renderDialectOptions() {
+      if (!dialectSelect || !targetLanguage) return;
+      const lang = normalizeLanguage(targetLanguage.value);
+      const dialects = dialectsByLanguage[lang] || dialectsByLanguage['ar'];
+      dialectSelect.innerHTML = '';
+      for (const d of dialects) {
+        const opt = document.createElement('option');
+        opt.value = d.value;
+        opt.textContent = d.label;
+        dialectSelect.appendChild(opt);
+      }
+    }
+
+    function normalizeTier(value) {
+      const tier = String(value || 'standard').trim().toLowerCase();
+      return ['standard', 'hd'].includes(tier) ? tier : 'standard';
+    }
+
+    function resetStudioControls() {
+      if (performanceStyleSelect) performanceStyleSelect.value = 'neutral';
+      if (emotionSelect) emotionSelect.value = 'neutral';
+      if (speedInput) speedInput.value = '1.0';
+      if (pitchInput) pitchInput.value = '0';
+      if (speedValue) speedValue.textContent = '1.0';
+      if (pitchValue) pitchValue.textContent = '0';
+      if (dialectSelect) dialectSelect.value = '';
+    }
+
+    function applyStudioTierState() {
+      const tier = voiceTier?.value || 'standard';
+      const isHd = (tier === 'hd');
+
+      // Performance controls are only available for HD tier.
+      if (studioPanel) {
+        studioPanel.style.display = isHd ? '' : 'none';
+      }
+
+      [performanceStyleSelect, emotionSelect, dialectSelect, speedInput, pitchInput].forEach((el) => {
+        if (!el) return;
+        el.disabled = !isHd;
+      });
+
+      // Reset to defaults when switching to standard
+      if (!isHd) {
+        if (performanceStyleSelect) performanceStyleSelect.value = '';
+        if (emotionSelect) emotionSelect.value = '';
+        if (dialectSelect) dialectSelect.value = '';
+        if (speedInput) { speedInput.value = '1.0'; }
+        if (pitchInput) { pitchInput.value = '0'; }
+        const speedValue = document.getElementById('speedVal');
+        const pitchValue = document.getElementById('pitchVal');
+        if (speedValue) speedValue.textContent = '1.0';
+        if (pitchValue) pitchValue.textContent = '0';
+      }
+    }
     const demoQuota = @json($demoQuota ?? null);
     const starterPlanChars = Number(@json((int) $starterPlanChars));
     const i18n = @json($demoI18n);
@@ -680,7 +890,11 @@
     }
 
     function cleanSpeakerLabel(value) {
-      return String(value || '').replace(/^\++\s*/, '').trim();
+      return String(value || '')
+        .replace(/^\++\s*/, '')
+        .replace(/\b[a-z]{2}-[A-Z]{2}\b/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
     }
 
     function voiceDisplayLabel(voice) {
@@ -695,7 +909,7 @@
     }
 
     function sortVoices(list) {
-      const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+      const tierRank = { standard: 1, hd: 2 };
       return [...list].sort((a, b) => {
         const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
         const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
@@ -723,11 +937,7 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        const label = voiceDisplayLabel(voice);
-        const quality = String(voice?.tier_label || '').trim();
-        option.textContent = quality !== ''
-          ? `${label} - ${formatTierLabel(quality)}`
-          : label;
+        option.textContent = voiceDisplayLabel(voice);
         voiceSelect.appendChild(option);
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
@@ -859,12 +1069,18 @@
       previewBtn?.click();
     });
 
-    voiceTier?.addEventListener('change', renderVoiceOptions);
+    voiceTier?.addEventListener('change', () => {
+      renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioTierState();
+    });
     targetLanguage?.addEventListener('change', () => {
       if (isTranslateEnabled()) {
         preferredTranslateLanguage = normalizeLanguage(targetLanguage.value);
       }
       renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioTierState();
     });
     voiceGender?.addEventListener('change', renderVoiceOptions);
     voiceSelect?.addEventListener('change', () => {
@@ -892,10 +1108,15 @@
       preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
     }
     renderVoiceOptions();
+    renderDialectOptions();
+    applyStudioTierState();
     updateTranslateHint();
     renderQuota(currentQuota);
 
     ensureFingerprint().catch(() => {});
+
+
   </script>
 </body>
 </html>
+

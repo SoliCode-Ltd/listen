@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Listen Reader",
-  "description": "Listen to selected text on any page using your Listen account. Select text, right-click, and hear it read aloud with premium AI voices.",
-  "version": "1.0.0",
+  "name": "__MSG_extName__",
+  "description": "__MSG_extDescription__",
+  "version": "1.0.1",
   "minimum_chrome_version": "110",
+  "default_locale": "en",
   "icons": {
     "16": "icon-16.png",
     "32": "icon-32.png",

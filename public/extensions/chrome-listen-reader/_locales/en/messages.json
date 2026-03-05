@@ -1,0 +1,370 @@
+{
+  "extName": {
+    "message": "Listen Studio Chrome",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "Listen to selected text on any page using your Listen account. Select text, right-click, and hear it read aloud with premium AI voices.",
+    "description": "Extension description"
+  },
+  "headerSubtitle": {
+    "message": "Select text anywhere and listen instantly.",
+    "description": "Header subtitle"
+  },
+  "contextMenuTitle": {
+    "message": "Listen Selected Text",
+    "description": "Context menu item"
+  },
+  "profileSection": {
+    "message": "Profile",
+    "description": "Profile section header"
+  },
+  "connectAccount": {
+    "message": "Connect your account",
+    "description": "Default user name when not connected"
+  },
+  "planLabel": {
+    "message": "Plan:",
+    "description": "Plan label prefix"
+  },
+  "charactersLabel": {
+    "message": "Characters:",
+    "description": "Characters usage label"
+  },
+  "requestsLabel": {
+    "message": "Requests:",
+    "description": "Requests usage label"
+  },
+  "unlimited": {
+    "message": "Unlimited",
+    "description": "Unlimited text"
+  },
+  "apiKeyLabel": {
+    "message": "API Key",
+    "description": "API key input label"
+  },
+  "apiKeyPlaceholder": {
+    "message": "Paste your API key here",
+    "description": "API key input placeholder"
+  },
+  "voiceLanguage": {
+    "message": "Voice Language",
+    "description": "Voice language select label"
+  },
+  "arabic": {
+    "message": "Arabic",
+    "description": "Arabic language option"
+  },
+  "english": {
+    "message": "English",
+    "description": "English language option"
+  },
+  "speaker": {
+    "message": "Speaker",
+    "description": "Speaker/voice select label"
+  },
+  "auto": {
+    "message": "Auto",
+    "description": "Auto prefix for voice selection"
+  },
+  "autoPlanDefault": {
+    "message": "Auto (Plan default)",
+    "description": "Auto voice option with plan default"
+  },
+  "autoDefault": {
+    "message": "Auto (Plan default)",
+    "description": "Auto voice option"
+  },
+  "studioLabel": {
+    "message": "Voice Studio (HD)",
+    "description": "Studio panel label"
+  },
+  "dialect": {
+    "message": "Dialect",
+    "description": "Dialect select label"
+  },
+  "performanceStyle": {
+    "message": "Performance Style",
+    "description": "Performance style select label"
+  },
+  "chooseStyle": {
+    "message": "-- Choose Style --",
+    "description": "Default style option"
+  },
+  "emotion": {
+    "message": "Emotion",
+    "description": "Emotion select label"
+  },
+  "chooseEmotion": {
+    "message": "-- Choose Emotion --",
+    "description": "Default emotion option"
+  },
+  "translateLabel": {
+    "message": "Translate before speaking",
+    "description": "Translate toggle label"
+  },
+  "translateToEnglish": {
+    "message": "Translate Arabic → English speaking",
+    "description": "Label when translating to English"
+  },
+  "translateToArabic": {
+    "message": "Translate English → Arabic speaking",
+    "description": "Label when translating to Arabic"
+  },
+  "autoPlayLabel": {
+    "message": "Play voice in side panel",
+    "description": "Auto-play toggle label"
+  },
+  "saveBtn": {
+    "message": "Save settings",
+    "description": "Save button text"
+  },
+  "readSelectionBtn": {
+    "message": "Read current selection",
+    "description": "Read selection button text"
+  },
+  "quickTextLabel": {
+    "message": "Quick text (optional)",
+    "description": "Quick text textarea label"
+  },
+  "quickTextPlaceholder": {
+    "message": "Paste any text and click Read quick text",
+    "description": "Quick text placeholder"
+  },
+  "readQuickBtn": {
+    "message": "Read quick text",
+    "description": "Read quick text button"
+  },
+  "characters": {
+    "message": "characters",
+    "description": "Characters counter suffix"
+  },
+  "autoDetect": {
+    "message": "Auto-detect",
+    "description": "Auto-detect dialect option"
+  },
+  "dialectMsa": {
+    "message": "Modern Standard Arabic",
+    "description": "MSA dialect"
+  },
+  "dialectSaudi": {
+    "message": "Saudi",
+    "description": "Saudi dialect"
+  },
+  "dialectEmirati": {
+    "message": "Emirati",
+    "description": "Emirati dialect"
+  },
+  "dialectEgyptian": {
+    "message": "Egyptian",
+    "description": "Egyptian dialect"
+  },
+  "dialectLebanese": {
+    "message": "Lebanese",
+    "description": "Lebanese dialect"
+  },
+  "dialectSyrian": {
+    "message": "Syrian",
+    "description": "Syrian dialect"
+  },
+  "dialectJordanian": {
+    "message": "Jordanian",
+    "description": "Jordanian dialect"
+  },
+  "dialectIraqi": {
+    "message": "Iraqi",
+    "description": "Iraqi dialect"
+  },
+  "dialectMoroccan": {
+    "message": "Moroccan",
+    "description": "Moroccan dialect"
+  },
+  "dialectKuwaiti": {
+    "message": "Kuwaiti",
+    "description": "Kuwaiti dialect"
+  },
+  "dialectAmerican": {
+    "message": "American",
+    "description": "American English dialect"
+  },
+  "dialectBritish": {
+    "message": "British",
+    "description": "British English dialect"
+  },
+  "dialectAustralian": {
+    "message": "Australian",
+    "description": "Australian English dialect"
+  },
+  "dialectIndian": {
+    "message": "Indian",
+    "description": "Indian English dialect"
+  },
+  "dialectSouthAfrican": {
+    "message": "South African",
+    "description": "South African English dialect"
+  },
+  "styleNeutral": {
+    "message": "Neutral",
+    "description": "Neutral style"
+  },
+  "styleEducational": {
+    "message": "Educational",
+    "description": "Educational style"
+  },
+  "styleCommercial": {
+    "message": "Commercial",
+    "description": "Commercial style"
+  },
+  "stylePromo": {
+    "message": "Promotional",
+    "description": "Promotional style"
+  },
+  "stylePodcast": {
+    "message": "Podcast",
+    "description": "Podcast style"
+  },
+  "styleAssistant": {
+    "message": "Virtual Assistant",
+    "description": "Virtual Assistant style"
+  },
+  "styleNarrative": {
+    "message": "Narrative",
+    "description": "Narrative style"
+  },
+  "styleComedic": {
+    "message": "Comedic",
+    "description": "Comedic style"
+  },
+  "styleCorporate": {
+    "message": "Corporate",
+    "description": "Corporate style"
+  },
+  "styleConversational": {
+    "message": "Conversational",
+    "description": "Conversational style"
+  },
+  "styleInspirational": {
+    "message": "Inspirational",
+    "description": "Inspirational style"
+  },
+  "styleCinematic": {
+    "message": "Cinematic",
+    "description": "Cinematic style"
+  },
+  "styleDocumentary": {
+    "message": "Documentary",
+    "description": "Documentary style"
+  },
+  "styleStorytelling": {
+    "message": "Storytelling",
+    "description": "Storytelling style"
+  },
+  "styleAdStyle": {
+    "message": "Ad Style",
+    "description": "Ad Style"
+  },
+  "styleNews": {
+    "message": "News",
+    "description": "News style"
+  },
+  "emotionNeutral": {
+    "message": "Neutral",
+    "description": "Neutral emotion"
+  },
+  "emotionWarm": {
+    "message": "Warm",
+    "description": "Warm emotion"
+  },
+  "emotionSad": {
+    "message": "Sad",
+    "description": "Sad emotion"
+  },
+  "emotionExcited": {
+    "message": "Excited",
+    "description": "Excited emotion"
+  },
+  "emotionFormal": {
+    "message": "Formal",
+    "description": "Formal emotion"
+  },
+  "emotionCalm": {
+    "message": "Calm",
+    "description": "Calm emotion"
+  },
+  "emotionAngry": {
+    "message": "Angry",
+    "description": "Angry emotion"
+  },
+  "statusSetApiKey": {
+    "message": "Set your API key to load account details.",
+    "description": "Status when no API key"
+  },
+  "statusApiKeyVerified": {
+    "message": "API key verified.",
+    "description": "Status when API key verified"
+  },
+  "statusSaving": {
+    "message": "Saving settings...",
+    "description": "Status while saving"
+  },
+  "statusSaved": {
+    "message": "Settings saved.",
+    "description": "Status after save"
+  },
+  "statusReading": {
+    "message": "Reading selected text...",
+    "description": "Status while reading selection"
+  },
+  "statusGenerating": {
+    "message": "Generating voice...",
+    "description": "Status while generating"
+  },
+  "statusGenerated": {
+    "message": "Voice generated in side panel.",
+    "description": "Status after generation"
+  },
+  "statusNoText": {
+    "message": "Enter quick text first.",
+    "description": "Status when no quick text"
+  },
+  "statusTimeout": {
+    "message": "Request timed out. Check your dashboard - voice may have been generated.",
+    "description": "Status on timeout"
+  },
+  "statusNetworkError": {
+    "message": "Network error. If usage changed, check dashboard for the generated audio.",
+    "description": "Status on network error"
+  },
+  "languageName": {
+    "message": "English",
+    "description": "Language name for switcher"
+  },
+  "languageCode": {
+    "message": "en",
+    "description": "Language code"
+  },
+  "switchLanguage": {
+    "message": "عربي",
+    "description": "Switch to other language"
+  },
+  "playerBrand": {
+    "message": "Listen Voice",
+    "description": "Side panel brand"
+  },
+  "playerSpeaker": {
+    "message": "Speaker:",
+    "description": "Speaker label in player"
+  },
+  "playerPlay": {
+    "message": "Play",
+    "description": "Play button"
+  },
+  "playerPause": {
+    "message": "Pause",
+    "description": "Pause button"
+  },
+  "playerDownload": {
+    "message": "Download",
+    "description": "Download button"
+  }
+}

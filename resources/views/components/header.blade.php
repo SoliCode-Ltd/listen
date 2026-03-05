@@ -20,10 +20,9 @@
   foreach (['en', 'ar'] as $localeCode) {
     $supportedLocales = \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getSupportedLocales();
     if (!isset($supportedLocales[$localeCode])) continue;
-    $properties = $supportedLocales[$localeCode];
     $languageLinks[] = [
       'code' => $localeCode,
-      'native' => (string) ($properties['native'] ?? strtoupper($localeCode)),
+      'label' => strtoupper($localeCode),
       'url' => \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getLocalizedURL($localeCode, null, [], true),
       'active' => $currentLocale === $localeCode,
     ];
@@ -79,7 +78,7 @@
             href="{{ $language['url'] }}"
             hreflang="{{ $language['code'] }}"
             class="locale-link {{ $language['active'] ? 'active' : '' }}"
-          >{{ $language['native'] }}</a>
+          >{{ $language['label'] }}</a>
         @endforeach
       </div>
 
@@ -199,7 +198,7 @@
           href="{{ $language['url'] }}"
           hreflang="{{ $language['code'] }}"
           class="locale-link {{ $language['active'] ? 'active' : '' }}"
-        >{{ $language['native'] }}</a>
+        >{{ $language['label'] }}</a>
       @endforeach
     </div>
     <div class="mobile-nav-divider"></div>
@@ -241,4 +240,3 @@
     @endauth
   </nav>
 </div>
-

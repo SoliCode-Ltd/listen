@@ -2,6 +2,9 @@
 
 namespace App\Services;
 
+use App\Models\Plan;
+use App\Services\Tts\ArabicVoiceMapper;
+use App\Services\Tts\TtsRoutingService;
 use App\Support\VoiceCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -11,7 +14,56 @@ use Illuminate\Support\Str;
 
 class TtsService
 {
+    private ?TtsRoutingService $routingService = null;
+    private ?ArabicVoiceMapper $arabicMapper = null;
+
+    /** @var array<int, string> */
+    private const PERFORMANCE_STYLE_VALUES = [
+        'neutral',
+        'educational',
+        'commercial',
+        'promo',
+        'podcast',
+        'assistant',
+        'narrative',
+        'comedic',
+        'corporate',
+        'conversational',
+        'inspirational',
+        'cinematic',
+        'documentary',
+        'storytelling',
+        'ad_style',
+        'news',
+    ];
+
+    /** @var array<int, string> */
+    private const EMOTION_VALUES = [
+        'neutral',
+        'warm',
+        'sad',
+        'excited',
+        'formal',
+        'calm',
+        'angry',
+    ];
+
     /**
+     * Inject the routing service (optional for backward compat).
+     */
+    public function setRoutingService(TtsRoutingService $routingService): void
+    {
+        $this->routingService = $routingService;
+    }
+
+    public function setArabicMapper(ArabicVoiceMapper $mapper): void
+    {
+        $this->arabicMapper = $mapper;
+    }
+
+    /**
+     * Original synthesize method – BACKWARD COMPATIBLE.
+     *
      * @return array{audio_path:string,duration_seconds:int|null,provider:string}
      */
     public function synthesize(
@@ -27,7 +79,11 @@ class TtsService
         }
 
         $mode = $preferFast ? 'fast' : 'quality';
-        $voice = $this->resolveVoiceName($targetLanguage, $voiceName, $tier);
+        $voice = $this->normalizeLegacyGoogleVoice(
+            $this->resolveVoiceName($targetLanguage, $voiceName, $tier),
+            $targetLanguage,
+            $tier,
+        );
         $hash = sha1($mode.'|'.$targetLanguage.'|'.$tier.'|'.$voice.'|'.$text);
 
         if ($cached = $this->findCachedAudio($hash, $targetLanguage)) {
@@ -45,6 +101,154 @@ class TtsService
             'audio_path' => $cachedPath,
             'duration_seconds' => $generated['duration_seconds'] ?? $this->estimateDurationSeconds($text),
             'provider' => $generated['provider'] ?? 'tts-engine',
+        ];
+    }
+
+    /**
+     * Enhanced synthesize method using the routing service.
+     *
+     * Uses plan-aware provider selection, Arabic voice mapping,
+     * fallback logic, and telemetry logging.
+     *
+     * @param  string     $text           Text to synthesize
+     * @param  string     $targetLanguage Language code
+     * @param  array      $options        Extended options:
+     *                                     - voice_name: string
+     *                                     - tier: string
+     *                                     - dialect: string (e.g. 'ar-SA')
+     *                                     - emotion: string (e.g. 'warm')
+     *                                     - gender: string
+     *                                     - speed: float
+     *                                     - pitch: float
+     *                                     - speakers: array (dialogue mode)
+     * @param  Plan|null  $plan           User's active plan
+     * @param  int|null   $userId         User ID for telemetry
+     * @return array
+     */
+    public function synthesizeAdvanced(
+        string $text,
+        string $targetLanguage,
+        array $options = [],
+        ?Plan $plan = null,
+        ?int $userId = null,
+    ): array {
+        $text = trim($text);
+        if ($text === '') {
+            throw new \RuntimeException('TTS text is empty.');
+        }
+
+        // If routing service not available, fall back to legacy
+        if (!$this->routingService) {
+            return $this->synthesize(
+                $text,
+                $targetLanguage,
+                $options['voice_name'] ?? null,
+                $options['tier'] ?? 'standard',
+            );
+        }
+
+        $mode = $this->routingService->getGlobalMode();
+        $provider = $this->routingService->resolveProvider($mode, $plan, $options);
+
+        // Build voice config using Arabic mapper if applicable
+        $isArabic = in_array(strtolower($targetLanguage), ['ar', 'ar-xa']);
+        $voiceConfig = $options;
+
+        if (
+            $isArabic
+            && $this->arabicMapper
+            && (isset($options['dialect']) || isset($options['emotion']) || isset($options['performance_style']) || isset($options['style']))
+        ) {
+            $voiceConfig = $this->arabicMapper->mapToProviderConfig($provider->name(), $options);
+            // Preserve speakers for dialogue mode
+            if (isset($options['speakers'])) {
+                $voiceConfig['speakers'] = $options['speakers'];
+            }
+            // Preserve provider and tier hints so the routing service respects them
+            if (isset($options['provider'])) {
+                $voiceConfig['provider'] = $options['provider'];
+            }
+            if (isset($options['tier'])) {
+                $voiceConfig['tier'] = $options['tier'];
+            }
+        }
+
+        $studio = $this->normalizeStudioStyleOptions($voiceConfig);
+        $voiceConfig['performance_style'] = $studio['performance_style'];
+        $voiceConfig['style'] = $studio['performance_style']; // Backward compatibility for providers expecting `style`.
+        $voiceConfig['emotion'] = $studio['emotion'];
+
+        // Check cache
+        $cacheKey = $this->buildAdvancedCacheKey($text, $targetLanguage, $voiceConfig, $provider->name());
+        if ($cached = $this->findCachedAudio($cacheKey, $targetLanguage)) {
+            return [
+                'audio_path' => $cached,
+                'duration_seconds' => $this->estimateDurationSeconds($text),
+                'provider' => 'cache',
+                'model' => null,
+                'latency_ms' => 0,
+                'char_count' => mb_strlen($text),
+                'cost_estimate_usd' => 0.0,
+                'fallback_used' => false,
+                'routing_mode' => $mode,
+                'plan_slug' => $plan?->slug ?? 'free',
+            ];
+        }
+
+        // Synthesize using routing service
+        $result = $this->routingService->synthesize($text, $targetLanguage, $voiceConfig, $plan, $userId);
+
+        // Cache the result
+        $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
+
+        return $result;
+    }
+
+    /**
+     * Build cache key for advanced synthesis.
+     */
+    private function buildAdvancedCacheKey(string $text, string $lang, array $config, string $provider): string
+    {
+        $parts = [
+            $provider,
+            $lang,
+            $config['voice_name'] ?? '',
+            $config['performance_style'] ?? ($config['style'] ?? ''),
+            $config['emotion'] ?? '',
+            $config['dialect'] ?? '',
+            (string) ($config['speed'] ?? '1.0'),
+            (string) ($config['pitch'] ?? '0.0'),
+            $text,
+        ];
+        return sha1(implode('|', $parts));
+    }
+
+    /**
+     * @param  array<string, mixed>  $voiceConfig
+     * @return array{performance_style:string,emotion:string}
+     */
+    private function normalizeStudioStyleOptions(array $voiceConfig): array
+    {
+        $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? ''));
+        $emotion = trim((string) ($voiceConfig['emotion'] ?? ''));
+
+        // Backward compatibility for old payloads that used emotion for style.
+        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+            $performanceStyle = $emotion;
+            $emotion = 'neutral';
+        }
+
+        if ($performanceStyle === '') {
+            $performanceStyle = 'neutral';
+        }
+
+        if ($emotion === '') {
+            $emotion = 'neutral';
+        }
+
+        return [
+            'performance_style' => $performanceStyle,
+            'emotion' => $emotion,
         ];
     }
 
@@ -239,18 +443,61 @@ class TtsService
         };
     }
 
+    /**
+     * Legacy path always uses Google Cloud. If the selected voice belongs to
+     * another provider (Gemini), map to a valid Google voice automatically.
+     */
+    private function normalizeLegacyGoogleVoice(string $voiceName, string $targetLanguage, string $tier): string
+    {
+        $voiceName = trim($voiceName);
+        if ($voiceName === '') {
+            return '';
+        }
+
+        $provider = VoiceCatalog::providerForName($voiceName);
+        if ($provider === null) {
+            return $voiceName;
+        }
+
+        if ($provider === 'google_cloud') {
+            return VoiceCatalog::providerVoiceIdForName($voiceName) ?: $voiceName;
+        }
+
+        $baseLanguage = str_starts_with(strtolower($targetLanguage), 'ar') ? 'ar'
+            : (str_starts_with(strtolower($targetLanguage), 'en') ? 'en' : strtolower($targetLanguage));
+
+        $googleVoice = VoiceCatalog::defaultForLanguageByProvider($baseLanguage, 'google_cloud', $tier);
+        if ($googleVoice !== '') {
+            return VoiceCatalog::providerVoiceIdForName($googleVoice) ?: $googleVoice;
+        }
+
+        return $voiceName;
+    }
+
     private function findCachedAudio(string $hash, string $targetLanguage): ?string
     {
         $disk = Storage::disk('public');
-        $path = "audio/cache/{$targetLanguage}_{$hash}.mp3";
+        $extensions = ['mp3', 'wav', 'ogg'];
 
-        return $disk->exists($path) ? $path : null;
+        foreach ($extensions as $extension) {
+            $path = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
+            if ($disk->exists($path)) {
+                return $path;
+            }
+        }
+
+        return null;
     }
 
     private function storeInCache(string $sourcePath, string $hash, string $targetLanguage): string
     {
         $disk = Storage::disk('public');
-        $cachePath = "audio/cache/{$targetLanguage}_{$hash}.mp3";
+        $extension = strtolower((string) pathinfo($sourcePath, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            $extension = 'mp3';
+        }
+
+        $cachePath = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
 
         if (! $disk->exists($cachePath)) {
             $dir = dirname($disk->path($cachePath));

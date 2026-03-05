@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\SiteSetting;
 use App\Models\Voice;
 
 class VoiceCatalog
@@ -41,6 +42,21 @@ class VoiceCatalog
         'Rasha' => 'رشا',
         'Heba' => 'هبة',
         'Nadine' => 'نادين',
+        // Arabic female names – Gemini voices
+        'Fatima' => 'فاطمة',
+        'Khadija' => 'خديجة',
+        'Ruqaya' => 'رقية',
+        'Sumaya' => 'سمية',
+        'Maha' => 'مها',
+        'Aisha' => 'عائشة',
+        'Duaa' => 'دعاء',
+        'Lamya' => 'لمياء',
+        'Lubna' => 'لبنى',
+        'Noura' => 'نورة',
+        'Abeer' => 'عبير',
+        'Manal' => 'منال',
+        'Jumana' => 'جمانة',
+        'Sawsan' => 'سوسن',
         // Arabic male names
         'Omar' => 'عمر',
         'Ahmed' => 'أحمد',
@@ -72,6 +88,23 @@ class VoiceCatalog
         'Nasser' => 'ناصر',
         'Murad' => 'مراد',
         'Riyad' => 'رياض',
+        // Arabic male names – Gemini voices
+        'Nawaf' => 'نواف',
+        'Sultan' => 'سلطان',
+        'Turki' => 'تركي',
+        'Faisal' => 'فيصل',
+        'Waleed' => 'وليد',
+        'Mansour' => 'منصور',
+        'Saud' => 'سعود',
+        'Fahad' => 'فهد',
+        'Abdulaziz' => 'عبدالعزيز',
+        'Othman' => 'عثمان',
+        'Mishary' => 'مشاري',
+        'Hamed' => 'حامد',
+        'Tamim' => 'تميم',
+        'Hazem' => 'حازم',
+        'Raed' => 'رائد',
+        'Yasser' => 'ياسر',
         // English female names
         'Emma' => 'إيما',
         'Olivia' => 'أوليفيا',
@@ -103,6 +136,21 @@ class VoiceCatalog
         'Claire' => 'كلير',
         'Naomi' => 'ناعومي',
         'Elena' => 'إيلينا',
+        // English female names – Gemini voices
+        'Alice' => 'أليس',
+        'Ruby' => 'روبي',
+        'Ivy' => 'آيفي',
+        'Maya' => 'مايا',
+        'Luna' => 'لونا',
+        'Willow' => 'ويلو',
+        'Isla' => 'آيلا',
+        'Daisy' => 'ديزي',
+        'Poppy' => 'بوبي',
+        'Sienna' => 'سيينا',
+        'Freya' => 'فرايا',
+        'Phoebe' => 'فيبي',
+        'Rose' => 'روز',
+        'Clara' => 'كلارا',
         // English male names
         'Liam' => 'ليام',
         'Noah' => 'نوح',
@@ -134,45 +182,46 @@ class VoiceCatalog
         'Julian' => 'جوليان',
         'Isaac' => 'إسحاق',
         'Thomas' => 'توماس',
-        // HD+ voice names (star/celestial names)
-        'Achernar' => 'أخرنار',
-        'Achird' => 'أخيرد',
-        'Algenib' => 'الجنب',
-        'Algieba' => 'الجبهة',
-        'Alnilam' => 'النظام',
-        'Aoede' => 'أويدي',
-        'Autonoe' => 'أوتونوي',
-        'Callirrhoe' => 'كاليرهوي',
-        'Charon' => 'كارون',
-        'Despina' => 'ديسبينا',
-        'Enceladus' => 'إنسيلادوس',
-        'Erinome' => 'إرينومي',
-        'Fenrir' => 'فنرير',
-        'Gacrux' => 'غاكروكس',
-        'Iapetus' => 'يابيتوس',
-        'Kore' => 'كوري',
-        'Laomedeia' => 'لاوميديا',
-        'Leda' => 'ليدا',
-        'Orus' => 'أوروس',
-        'Puck' => 'باك',
-        'Pulcherrima' => 'بولكيريما',
-        'Rasalgethi' => 'رأس الجاثي',
-        'Sadachbia' => 'سعد الأخبية',
-        'Sadaltager' => 'سعد التاجر',
-        'Schedar' => 'شدر',
-        'Sulafat' => 'السلحفاة',
-        'Umbriel' => 'أمبريال',
-        'Vindemiatrix' => 'فنداماتريكس',
-        'Zephyr' => 'زفير',
-        'Zubenelgenubi' => 'الزبن الجنوبي',
+        // English male names – Gemini voices
+        'Oliver' => 'أوليفر',
+        'George' => 'جورج',
+        'Oscar' => 'أوسكار',
+        'Charlie' => 'تشارلي',
+        'Theodore' => 'ثيودور',
+        'Arthur' => 'آرثر',
+        'Finn' => 'فين',
+        'Miles' => 'مايلز',
+        'Nathan' => 'ناثان',
+        'Dylan' => 'ديلان',
+        'Ryan' => 'ريان',
+        'Adrian' => 'أدريان',
+        'Caleb' => 'كالب',
+        'Marcus' => 'ماركوس',
+        'Vincent' => 'فينسنت',
+        'Philip' => 'فيليب',
     ];
+
+    /**
+     * Resolve preferred provider for a tier based on global TTS mode.
+     * HD is provider-pinned by mode; standard is provider-agnostic.
+     */
+    public static function preferredProviderForTier(string $tier, ?string $ttsMode = null): ?string
+    {
+        if (VoiceTier::normalize($tier) !== VoiceTier::HD) {
+            return null;
+        }
+
+        $mode = strtolower(trim((string) ($ttsMode ?? SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')))));
+
+        return $mode === 'hybrid' ? 'gemini' : 'google_cloud';
+    }
 
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    public static function byLanguage(?string $tier = null): array
+    public static function byLanguage(?string $tier = null, ?string $provider = null): array
     {
-        $voices = self::activeQuery($tier)->get();
+        $voices = self::activeQuery($tier, $provider)->get();
         $catalog = [];
 
         foreach ($voices as $voice) {
@@ -229,11 +278,11 @@ class VoiceCatalog
     /**
      * @return array<string, array<int, array<string, mixed>>>
      */
-    public static function publicCatalog(?string $tier = null): array
+    public static function publicCatalog(?string $tier = null, ?string $provider = null): array
     {
         $catalog = [];
 
-        foreach (self::byLanguage($tier) as $language => $voices) {
+        foreach (self::byLanguage($tier, $provider) as $language => $voices) {
             $catalog[$language] = array_map(function (array $voice): array {
                 return [
                     'key' => $voice['key'],
@@ -256,13 +305,50 @@ class VoiceCatalog
      */
     public static function publicCatalogByTier(): array
     {
+        $ttsMode = strtolower(trim((string) SiteSetting::get('tts_mode', config('listen.tts.mode', 'google'))));
+
         $catalog = [];
 
         foreach (VoiceTier::all() as $tier) {
-            $catalog[$tier] = self::publicCatalog($tier);
+            // In hybrid mode, prefer Gemini voices for HD tier.
+            // If no Gemini HD voices are configured, gracefully fall back to Google, then any provider.
+            if ($tier === VoiceTier::HD) {
+                $preferredProvider = self::preferredProviderForTier($tier, $ttsMode);
+                $preferredCatalog = self::publicCatalog($tier, $preferredProvider);
+
+                if (self::catalogHasVoices($preferredCatalog)) {
+                    $catalog[$tier] = $preferredCatalog;
+                    continue;
+                }
+
+                $fallbackProvider = $preferredProvider === 'gemini' ? 'google_cloud' : 'gemini';
+                $fallbackCatalog = self::publicCatalog($tier, $fallbackProvider);
+                if (self::catalogHasVoices($fallbackCatalog)) {
+                    $catalog[$tier] = $fallbackCatalog;
+                    continue;
+                }
+
+                $catalog[$tier] = self::publicCatalog($tier);
+            } else {
+                $catalog[$tier] = self::publicCatalog($tier);
+            }
         }
 
         return $catalog;
+    }
+
+    /**
+     * @param  array<string, array<int, array<string, mixed>>>  $catalog
+     */
+    private static function catalogHasVoices(array $catalog): bool
+    {
+        foreach ($catalog as $voices) {
+            if (is_array($voices) && count($voices) > 0) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function voiceMeta(?string $voiceName): ?array
@@ -304,6 +390,17 @@ class VoiceCatalog
         return $voice?->internal_voice_id;
     }
 
+    public static function nameFromKeyForLanguageAndProvider(
+        string $language,
+        ?string $voiceKey,
+        ?string $tier = null,
+        ?string $provider = null,
+    ): ?string {
+        $voice = self::findByKeyForLanguage($voiceKey, $language, $tier, $provider);
+
+        return $voice?->internal_voice_id;
+    }
+
     public static function isAllowedForLanguage(?string $voiceName, string $language, ?string $tier = null): bool
     {
         $voiceName = trim((string) $voiceName);
@@ -319,26 +416,58 @@ class VoiceCatalog
 
     public static function defaultForLanguage(string $language, ?string $tier = null): string
     {
+        return self::defaultForLanguageAndProvider($language, $tier, null);
+    }
+
+    public static function defaultForLanguageAndProvider(string $language, ?string $tier = null, ?string $provider = null): string
+    {
         $language = strtolower(trim($language));
         $normalizedTier = $tier !== null && $tier !== ''
             ? VoiceTier::normalize($tier)
             : null;
+        $provider = strtolower(trim((string) $provider));
 
         if ($normalizedTier !== null) {
-            $voice = self::activeQuery($normalizedTier)
+            $voice = self::activeQuery($normalizedTier, $provider !== '' ? $provider : null)
                 ->where('language', $language)
                 ->orderBy('id')
                 ->first();
 
-            return $voice ? (string) $voice->internal_voice_id : '';
+            if ($voice) {
+                return (string) $voice->internal_voice_id;
+            }
+
+            if ($provider !== '') {
+                $providerAgnosticTierVoice = self::activeQuery($normalizedTier)
+                    ->where('language', $language)
+                    ->orderBy('id')
+                    ->first();
+
+                return $providerAgnosticTierVoice ? (string) $providerAgnosticTierVoice->internal_voice_id : '';
+            }
+
+            return '';
         }
 
-        $fallback = self::activeQuery()
+        $fallback = self::activeQuery(null, $provider !== '' ? $provider : null)
             ->where('language', $language)
             ->orderBy('id')
             ->first();
 
-        return $fallback ? (string) $fallback->internal_voice_id : '';
+        if ($fallback) {
+            return (string) $fallback->internal_voice_id;
+        }
+
+        if ($provider !== '') {
+            $providerAgnosticFallback = self::activeQuery()
+                ->where('language', $language)
+                ->orderBy('id')
+                ->first();
+
+            return $providerAgnosticFallback ? (string) $providerAgnosticFallback->internal_voice_id : '';
+        }
+
+        return '';
     }
 
     public static function tierForName(?string $voiceName): ?string
@@ -353,6 +482,86 @@ class VoiceCatalog
             ->value('tier');
     }
 
+    public static function providerForName(?string $voiceName): ?string
+    {
+        $voiceName = trim((string) $voiceName);
+        if ($voiceName === '') {
+            return null;
+        }
+
+        $provider = self::activeQuery()
+            ->where('internal_voice_id', $voiceName)
+            ->value('provider');
+
+        return is_string($provider) && trim($provider) !== ''
+            ? strtolower(trim($provider))
+            : null;
+    }
+
+    public static function providerVoiceIdForName(?string $voiceName): ?string
+    {
+        $voiceName = trim((string) $voiceName);
+        if ($voiceName === '') {
+            return null;
+        }
+
+        $voice = self::activeQuery()
+            ->where('internal_voice_id', $voiceName)
+            ->first(['internal_voice_id', 'provider_voice_id']);
+
+        if (! $voice) {
+            return null;
+        }
+
+        $providerVoiceId = trim((string) ($voice->provider_voice_id ?? ''));
+        if ($providerVoiceId !== '') {
+            return $providerVoiceId;
+        }
+
+        return trim((string) $voice->internal_voice_id) !== ''
+            ? (string) $voice->internal_voice_id
+            : null;
+    }
+
+    public static function defaultForLanguageByProvider(
+        string $language,
+        string $provider,
+        ?string $tier = null,
+        ?string $gender = null,
+    ): string {
+        $language = strtolower(trim($language));
+        $provider = strtolower(trim($provider));
+        $normalizedTier = $tier !== null && $tier !== ''
+            ? VoiceTier::normalize($tier)
+            : null;
+        $gender = strtolower(trim((string) $gender));
+
+        if ($language === '' || $provider === '') {
+            return '';
+        }
+
+        $query = Voice::query()
+            ->where('is_active', true)
+            ->where('language', $language)
+            ->where('provider', $provider);
+
+        if ($normalizedTier !== null) {
+            $query->where('tier', $normalizedTier);
+        }
+
+        if ($gender !== '' && in_array($gender, ['male', 'female'], true)) {
+            $query->where('gender', $gender);
+        }
+
+        $voice = $query
+            ->orderByRaw("CASE tier WHEN 'standard' THEN 1 WHEN 'hd' THEN 2 ELSE 99 END")
+            ->orderBy('display_name')
+            ->orderBy('id')
+            ->first();
+
+        return $voice ? (string) $voice->internal_voice_id : '';
+    }
+
     public static function isWaveNetVoiceName(?string $voiceName): bool
     {
         $voiceName = trim((string) $voiceName);
@@ -360,14 +569,19 @@ class VoiceCatalog
         return $voiceName !== '' && str_contains(strtolower($voiceName), '-wavenet-');
     }
 
-    public static function findByKeyForLanguage(?string $voiceKey, string $language, ?string $tier = null): ?Voice
+    public static function findByKeyForLanguage(
+        ?string $voiceKey,
+        string $language,
+        ?string $tier = null,
+        ?string $provider = null,
+    ): ?Voice
     {
         $id = self::idFromKey($voiceKey);
         if (! $id) {
             return null;
         }
 
-        $query = self::activeQuery($tier)->where('id', $id)->where('language', $language);
+        $query = self::activeQuery($tier, $provider)->where('id', $id)->where('language', $language);
 
         return $query->first();
     }
@@ -393,7 +607,10 @@ class VoiceCatalog
         return $id > 0 ? $id : null;
     }
 
-    private static function activeQuery(?string $tier = null)
+    /**
+     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Voice>
+     */
+    private static function activeQuery(?string $tier = null, ?string $provider = null): \Illuminate\Database\Eloquent\Builder
     {
         $query = Voice::query()->where('is_active', true);
 
@@ -401,9 +618,13 @@ class VoiceCatalog
             $query->where('tier', VoiceTier::normalize($tier));
         }
 
+        if ($provider !== null && $provider !== '') {
+            $query->where('provider', strtolower(trim($provider)));
+        }
+
         return $query
             ->orderBy('language')
-            ->orderByRaw("CASE tier WHEN 'standard' THEN 1 WHEN 'hd' THEN 2 WHEN 'hd_plus' THEN 3 ELSE 99 END")
+            ->orderByRaw("CASE tier WHEN 'standard' THEN 1 WHEN 'hd' THEN 2 ELSE 99 END")
             ->orderBy('display_name')
             ->orderBy('id');
     }

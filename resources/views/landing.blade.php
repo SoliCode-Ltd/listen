@@ -199,6 +199,98 @@
       transform: translateY(0);
     }
 
+    /* ─── Voice Sample Showcase Cards ─── */
+    .sample-showcase-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    @media (max-width: 1024px) {
+      .sample-showcase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 768px) {
+      .sample-showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 480px) {
+      .sample-showcase-grid { grid-template-columns: 1fr; }
+    }
+    .sample-card {
+      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      padding: 1.4rem 1.2rem 1.2rem;
+      box-shadow: var(--shadow);
+      transition: transform .25s ease, border-color .25s ease;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: .4rem;
+      position: relative;
+    }
+    .sample-card:hover {
+      transform: translateY(-4px);
+      border-color: color-mix(in oklab, var(--a) 50%, var(--line));
+    }
+    .sample-card-flag {
+      width: 3.4rem;
+      height: 3.4rem;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      display: grid;
+      place-items: center;
+      margin-bottom: .35rem;
+      flex-shrink: 0;
+    }
+    .sample-flag-emoji {
+      font-size: 1.65rem;
+      line-height: 1;
+    }
+    .sample-card-title {
+      margin: 0;
+      font-size: .92rem;
+      font-weight: 600;
+      line-height: 1.35;
+      color: var(--text);
+    }
+    .sample-card-desc {
+      margin: 0;
+      font-size: .8rem;
+      color: var(--muted);
+      line-height: 1.3;
+    }
+    .sample-play-btn {
+      margin-top: .5rem;
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      background: var(--surface);
+      cursor: pointer;
+      display: grid;
+      place-items: center;
+      transition: background .2s, border-color .2s, transform .15s;
+      flex-shrink: 0;
+    }
+    .sample-play-btn:hover {
+      background: color-mix(in oklab, var(--a) 12%, var(--surface));
+      border-color: var(--a);
+      transform: scale(1.06);
+    }
+    .sample-play-btn.is-playing {
+      background: linear-gradient(135deg, var(--a), var(--b));
+      border-color: var(--a);
+    }
+    .sample-play-btn.is-playing .sample-play-icon {
+      fill: #fff;
+    }
+    .sample-play-icon {
+      width: 1rem;
+      height: 1rem;
+      fill: var(--text);
+      transition: fill .2s;
+    }
+
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-14px); }
@@ -800,6 +892,12 @@
               <div class="tts-body">
                 <div class="hero-audio-player">
                   <div class="hero-audio-content">
+                    @php
+                      $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
+                      $heroSampleSource = collect($voiceSamples ?? [])
+                        ->firstWhere('language', $isArabicLocale ? 'ar' : 'en')['audio_url']
+                        ?? ($isArabicLocale ? '/audio/ar.mp3' : '/audio/en.mp3');
+                    @endphp
                     <button class="hero-audio-btn" id="heroAudioToggle" type="button" aria-label="{{ __('ui.landing.play_voice_sample') }}" aria-controls="heroSampleAudio">
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path id="heroAudioIconPath" d="M8 5v14l11-7z"></path>
@@ -812,7 +910,7 @@
                     </div>
                   </div>
                   <audio id="heroSampleAudio" class="initialized" preload="auto">
-                    <source src="{{ str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? asset('audio/ar.mp3') : asset('audio/en.mp3') }}" type="audio/mpeg">
+                    <source src="{{ $heroSampleSource }}">
                   </audio>
                 </div>
                 <div class="tts-audio-wave">
@@ -826,6 +924,34 @@
         </aside>
       </div>
     </section>
+
+    {{-- Voice Samples Showcase --}}
+    @if(!empty($voiceSamples))
+    <section class="section reveal" id="voice-samples">
+      <h2>{{ __('ui.landing.voice_samples_title', ['default' => 'Hear the Difference']) }}</h2>
+      <p class="section-lead">{{ __('ui.landing.voice_samples_subtitle', ['default' => 'Listen to our AI-powered voices.']) }}</p>
+      <div class="sample-showcase-grid">
+        @foreach($voiceSamples as $idx => $sample)
+        <article class="sample-card reveal" data-sample-idx="{{ $idx }}">
+          <div class="sample-card-flag">
+            <span class="sample-flag-emoji">{{ $sample['icon'] ?? '🌐' }}</span>
+          </div>
+          <h3 class="sample-card-title">{{ $sample['title'] }}</h3>
+          <p class="sample-card-desc">{{ $sample['description'] }}</p>
+          @if($sample['audio_url'])
+          <button class="sample-play-btn" type="button"
+                  data-audio-src="{{ $sample['audio_url'] }}"
+                  aria-label="{{ __('ui.landing.play_voice_sample') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="sample-play-icon">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          </button>
+          @endif
+        </article>
+        @endforeach
+      </div>
+    </section>
+    @endif
 
     <section class="section reveal">
       <h2>{{ __('ui.landing.section1_title') }}</h2>
@@ -921,6 +1047,8 @@
       let phraseIndex = 0;
       let charIndex = 0;
       let isDeleting = false;
+      let heroPlayPromise = null;
+      let heroPlayRequestId = 0;
 
       const localeStartCaption = () => (isArabicLocale ? i18n.arabic_sample_label : i18n.english_sample_label);
 
@@ -1018,6 +1146,13 @@
       resetToLocaleStart();
 
       toggle.addEventListener('click', async () => {
+        if (heroPlayPromise) {
+          heroPlayRequestId += 1;
+          audio.pause();
+          setState(false);
+          return;
+        }
+
         if (audio.paused) {
           const nearStart = audio.currentTime <= 0.05;
           const nearEnd = Number.isFinite(audio.duration) && audio.currentTime >= (audio.duration - 0.05);
@@ -1029,14 +1164,29 @@
           setState(true);
           syncActiveCaptionWithTime();
           try {
-            await audio.play();
-            setState(true);
-          } catch (_err) {
+            const requestId = ++heroPlayRequestId;
+            const playResult = audio.play();
+            if (playResult && typeof playResult.then === 'function') {
+              heroPlayPromise = playResult;
+              await playResult;
+              if (requestId === heroPlayRequestId) {
+                setState(!audio.paused);
+              }
+            } else {
+              setState(!audio.paused);
+            }
+          } catch (err) {
+            if (!(err && err.name === 'AbortError')) {
+              console.warn('Hero audio playback failed', err);
+            }
             setState(false);
+          } finally {
+            heroPlayPromise = null;
           }
           return;
         }
 
+        heroPlayRequestId += 1;
         setState(false);
         audio.pause();
       });
@@ -1091,6 +1241,63 @@
         }
         if (!isPlayingState) startTyping();
       });
+
+      // ─── Voice Sample Card Players ───
+      (() => {
+        let sampleAudio = null;
+        let activeBtn = null;
+        const playPath = 'M8 5v14l11-7z';
+        const pausePath = 'M6 5h4v14H6zM14 5h4v14h-4z';
+
+        document.querySelectorAll('.sample-play-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const src = btn.dataset.audioSrc;
+            if (!src) return;
+
+            // If clicking the already-playing button → pause
+            if (activeBtn === btn && sampleAudio && !sampleAudio.paused) {
+              sampleAudio.pause();
+              btn.classList.remove('is-playing');
+              btn.querySelector('path').setAttribute('d', playPath);
+              activeBtn = null;
+              return;
+            }
+
+            // Stop any previously playing sample
+            if (sampleAudio) {
+              sampleAudio.pause();
+              sampleAudio.removeAttribute('src');
+              sampleAudio.load();
+            }
+            if (activeBtn) {
+              activeBtn.classList.remove('is-playing');
+              activeBtn.querySelector('path').setAttribute('d', playPath);
+            }
+
+            // Also pause the hero audio if playing
+            if (audio && !audio.paused) {
+              audio.pause();
+            }
+
+            sampleAudio = new Audio(src);
+            activeBtn = btn;
+            btn.classList.add('is-playing');
+            btn.querySelector('path').setAttribute('d', pausePath);
+
+            sampleAudio.play().catch(() => {
+              btn.classList.remove('is-playing');
+              btn.querySelector('path').setAttribute('d', playPath);
+              activeBtn = null;
+            });
+
+            sampleAudio.addEventListener('ended', () => {
+              btn.classList.remove('is-playing');
+              btn.querySelector('path').setAttribute('d', playPath);
+              activeBtn = null;
+            });
+          });
+        });
+      })();
     });
   </script>
 </body>

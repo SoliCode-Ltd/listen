@@ -18,6 +18,37 @@ use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
+    /** @var array<int, string> */
+    private const PERFORMANCE_STYLE_VALUES = [
+        'neutral',
+        'educational',
+        'commercial',
+        'promo',
+        'podcast',
+        'assistant',
+        'narrative',
+        'comedic',
+        'corporate',
+        'conversational',
+        'inspirational',
+        'cinematic',
+        'documentary',
+        'storytelling',
+        'ad_style',
+        'news',
+    ];
+
+    /** @var array<int, string> */
+    private const EMOTION_VALUES = [
+        'neutral',
+        'warm',
+        'sad',
+        'excited',
+        'formal',
+        'calm',
+        'angry',
+    ];
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
     ) {}
@@ -48,6 +79,9 @@ class DashboardController extends Controller
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
+        $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
+        $catalogByTier = VoiceCatalog::publicCatalogByTier();
+        $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
         $planChars = PlanUsageGuard::planChars($activePlan);
         $planRequests = PlanUsageGuard::planRequests($activePlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
@@ -55,6 +89,9 @@ class DashboardController extends Controller
         $usageRequestsPercent = $requestsUnlimited
             ? 0
             : min(100, (int) round(($usage->total_requests / max(1, $planRequests)) * 100));
+
+        // Hybrid TTS: resolve dialogue availability per plan
+        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
 
         return view('dashboard', [
             'usage' => $usage,
@@ -64,14 +101,18 @@ class DashboardController extends Controller
             'planTier' => $planTier,
             'planTierLabel' => VoiceTier::label($planTier),
             'planChars' => $planChars,
+            'maxCharsPerRequest' => PlanUsageGuard::maxCharsPerRequest($activePlan),
             'planRequests' => $requestsUnlimited ? null : $planRequests,
             'requestsUnlimited' => $requestsUnlimited,
             'usageCharsPercent' => $usageCharsPercent,
             'usageRequestsPercent' => $usageRequestsPercent,
-            'voiceCatalog' => VoiceCatalog::publicCatalog($planTier),
+            'voiceCatalog' => $tierCatalog,
             'voiceNameMap' => VoiceCatalog::mapByName(),
-            'defaultVoiceAr' => VoiceCatalog::defaultForLanguage('ar', $planTier),
-            'defaultVoiceEn' => VoiceCatalog::defaultForLanguage('en', $planTier),
+            'defaultVoiceAr' => VoiceCatalog::defaultForLanguageAndProvider('ar', $planTier, $preferredProvider),
+            'defaultVoiceEn' => VoiceCatalog::defaultForLanguageAndProvider('en', $planTier, $preferredProvider),
+            // Hybrid TTS studio data
+            'dialogueEnabled' => $dialogueEnabled,
+            'ttsProviderPolicy' => $activePlan?->tts_provider_policy ?? 'default',
         ]);
     }
 
@@ -81,6 +122,7 @@ class DashboardController extends Controller
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
+        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
@@ -88,7 +130,18 @@ class DashboardController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
-            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
+            'voice_tier' => ['nullable', 'in:standard,hd'],
+            // Studio parameters
+            'dialect' => ['nullable', 'string', 'max:10'],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
+            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            // Dialogue parameters
+            'is_dialogue' => ['nullable', 'boolean'],
+            'dialogue_speakers' => ['nullable', 'array', 'max:6'],
+            'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
+            'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
@@ -99,8 +152,16 @@ class DashboardController extends Controller
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
-            $planTier,
+            $requestedTier,
         );
+        $voiceProvider = VoiceCatalog::providerForName($voiceName);
+        $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
+            'dialect' => $validated['dialect'] ?? null,
+            'performance_style' => $validated['performance_style'] ?? null,
+            'emotion' => $validated['emotion'] ?? 'neutral',
+            'speed' => $validated['speed'] ?? null,
+            'pitch' => $validated['pitch'] ?? null,
+        ]);
 
         $text = trim($validated['content']);
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -135,11 +196,28 @@ class DashboardController extends Controller
             'input_text' => $text,
             'source_language' => $sourceLanguage,
             'target_language' => $validated['target_language'],
-            'voice_tier' => $planTier,
+            'voice_tier' => $requestedTier,
             'voice_name' => $voiceName,
+            'tts_provider' => $voiceProvider,
             'translate' => (bool) ($validated['translate'] ?? false),
             'duration_seconds' => $estimate['seconds'],
             'status' => 'processing',
+            // Studio fields
+            'dialect' => $studioOptions['dialect'],
+            'performance_style' => $studioOptions['performance_style'],
+            'emotion' => $studioOptions['emotion'],
+            'speed' => $studioOptions['speed'],
+            'pitch' => $studioOptions['pitch'],
+            // Dialogue fields
+            'is_dialogue' => $dialogueEnabled
+                && $requestedTier !== VoiceTier::STANDARD
+                && ($validated['is_dialogue'] ?? false),
+            'dialogue_metadata' => ($dialogueEnabled
+                && $requestedTier !== VoiceTier::STANDARD
+                && ($validated['is_dialogue'] ?? false)
+                && ! empty($validated['dialogue_speakers']))
+                ? ['speakers' => $validated['dialogue_speakers']]
+                : null,
         ]);
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
@@ -245,9 +323,10 @@ class DashboardController extends Controller
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
+        $preferredProvider = VoiceCatalog::preferredProviderForTier($tier);
 
         if ($voiceKey === '') {
-            $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+            $defaultVoice = VoiceCatalog::defaultForLanguageAndProvider($language, $tier, $preferredProvider);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
                     'target_language' => __('ui.backend.dashboard_language_not_available_for_tier'),
@@ -257,7 +336,7 @@ class DashboardController extends Controller
             return $defaultVoice;
         }
 
-        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
+        $voiceName = VoiceCatalog::nameFromKeyForLanguageAndProvider($language, $voiceKey, $tier, $preferredProvider);
         if (! $voiceName) {
             throw ValidationException::withMessages([
                 'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
@@ -313,6 +392,48 @@ class DashboardController extends Controller
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'created_human' => $job->created_at?->diffForHumans(),
+        ];
+    }
+
+    /**
+     * @param  array{dialect:mixed,performance_style:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,performance_style:string,emotion:string,speed:float,pitch:float}
+     */
+    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    {
+        $normalizedTier = VoiceTier::normalize($tier);
+
+        // Standard tier: no performance controls — use defaults only.
+        if ($normalizedTier === VoiceTier::STANDARD) {
+            return [
+                'dialect'  => null,
+                'performance_style' => 'neutral',
+                'emotion'  => 'neutral',
+                'speed'    => 1.0,
+                'pitch'    => 0.0,
+            ];
+        }
+
+        $performanceStyle = isset($options['performance_style']) && is_string($options['performance_style'])
+            ? trim($options['performance_style'])
+            : '';
+        $emotion = isset($options['emotion']) && is_string($options['emotion'])
+            ? trim($options['emotion'])
+            : '';
+
+        // Backward compatibility for old clients that used emotion for style.
+        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+            $performanceStyle = $emotion;
+            $emotion = 'neutral';
+        }
+
+        // HD tier: full performance controls.
+        return [
+            'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
+            'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
+            'emotion' => $emotion !== '' ? $emotion : 'neutral',
+            'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
+            'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];
     }
 }

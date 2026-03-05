@@ -15,6 +15,8 @@ class AudioUrl
             return null;
         }
 
-        return route('media.file', ['path' => $audioPath]);
+        // Use relative URLs so audio keeps working across local domains,
+        // tunnels, and reverse proxies even when APP_URL is different.
+        return route('media.file', ['path' => $audioPath], false);
     }
 }

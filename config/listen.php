@@ -13,6 +13,23 @@ return [
         'default_tier' => env('LISTEN_DEFAULT_VOICE_TIER', 'standard'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | TTS Architecture (Hybrid Mode)
+    |--------------------------------------------------------------------------
+    |
+    | mode: 'google' (Google Cloud WaveNet & Chirp) or 'hybrid' (Free=WaveNet, Paid=Gemini)
+    | fallback_enabled: If Gemini fails, gracefully fall back to Google Cloud
+    | telemetry_channel: Log channel for TTS telemetry
+    |
+    */
+    'tts' => [
+        'mode' => env('LISTEN_TTS_MODE', 'google'),
+        'fallback_enabled' => (bool) env('LISTEN_TTS_FALLBACK_ENABLED', true),
+        'telemetry_channel' => env('LISTEN_TTS_TELEMETRY_CHANNEL', 'stack'),
+        'gemini_timeout_seconds' => (int) env('LISTEN_GEMINI_TIMEOUT_SECONDS', 60),
+    ],
+
     'billing' => [
         'subscription_sync_ttl_minutes' => (int) env('LISTEN_SUBSCRIPTION_SYNC_TTL_MINUTES', 10),
         'grace_days' => (int) env('LISTEN_BILLING_GRACE_DAYS', 7),
@@ -44,5 +61,20 @@ return [
         ],
         'global_preview_daily_requests' => (int) env('DEMO_GLOBAL_PREVIEW_DAILY_REQUESTS', 3000),
         'global_preview_daily_chars' => (int) env('DEMO_GLOBAL_PREVIEW_DAILY_CHARS', 500000),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cost Guardrails
+    |--------------------------------------------------------------------------
+    |
+    | Admin-configurable limits to prevent unexpected cost spikes.
+    | These are checked in addition to per-plan limits.
+    |
+    */
+    'cost_guardrails' => [
+        'daily_gemini_char_limit' => (int) env('LISTEN_DAILY_GEMINI_CHAR_LIMIT', 5_000_000),
+        'daily_total_char_limit' => (int) env('LISTEN_DAILY_TOTAL_CHAR_LIMIT', 20_000_000),
+        'daily_gemini_request_limit' => (int) env('LISTEN_DAILY_GEMINI_REQUEST_LIMIT', 10_000),
     ],
 ];

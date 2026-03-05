@@ -1,0 +1,370 @@
+{
+  "extName": {
+    "message": "ستوديو إسمع لكروم",
+    "description": "Extension name"
+  },
+  "extDescription": {
+    "message": "استمع إلى النص المحدد في أي صفحة باستخدام حسابك في ليسن. حدد النص، انقر بزر الماوس الأيمن، واستمع إليه بأصوات ذكاء اصطناعي متميزة.",
+    "description": "Extension description"
+  },
+  "headerSubtitle": {
+    "message": "حدد النص في أي مكان واستمع فوراً.",
+    "description": "Header subtitle"
+  },
+  "contextMenuTitle": {
+    "message": "استمع للنص المحدد",
+    "description": "Context menu item"
+  },
+  "profileSection": {
+    "message": "الملف الشخصي",
+    "description": "Profile section header"
+  },
+  "connectAccount": {
+    "message": "قم بربط حسابك",
+    "description": "Default user name when not connected"
+  },
+  "planLabel": {
+    "message": "الخطة:",
+    "description": "Plan label prefix"
+  },
+  "charactersLabel": {
+    "message": "الأحرف:",
+    "description": "Characters usage label"
+  },
+  "requestsLabel": {
+    "message": "الطلبات:",
+    "description": "Requests usage label"
+  },
+  "unlimited": {
+    "message": "غير محدود",
+    "description": "Unlimited text"
+  },
+  "apiKeyLabel": {
+    "message": "مفتاح API",
+    "description": "API key input label"
+  },
+  "apiKeyPlaceholder": {
+    "message": "الصق مفتاح API الخاص بك هنا",
+    "description": "API key input placeholder"
+  },
+  "voiceLanguage": {
+    "message": "لغة الصوت",
+    "description": "Voice language select label"
+  },
+  "arabic": {
+    "message": "العربية",
+    "description": "Arabic language option"
+  },
+  "english": {
+    "message": "الإنجليزية",
+    "description": "English language option"
+  },
+  "speaker": {
+    "message": "المتحدث",
+    "description": "Speaker/voice select label"
+  },
+  "auto": {
+    "message": "تلقائي",
+    "description": "Auto prefix for voice selection"
+  },
+  "autoPlanDefault": {
+    "message": "تلقائي (افتراضي الخطة)",
+    "description": "Auto voice option with plan default"
+  },
+  "autoDefault": {
+    "message": "تلقائي (افتراضي الخطة)",
+    "description": "Auto voice option"
+  },
+  "studioLabel": {
+    "message": "استوديو الصوت (HD)",
+    "description": "Studio panel label"
+  },
+  "dialect": {
+    "message": "اللهجة",
+    "description": "Dialect select label"
+  },
+  "performanceStyle": {
+    "message": "نمط الأداء",
+    "description": "Performance style select label"
+  },
+  "chooseStyle": {
+    "message": "-- اختر النمط --",
+    "description": "Default style option"
+  },
+  "emotion": {
+    "message": "العاطفة",
+    "description": "Emotion select label"
+  },
+  "chooseEmotion": {
+    "message": "-- اختر العاطفة --",
+    "description": "Default emotion option"
+  },
+  "translateLabel": {
+    "message": "ترجمة قبل النطق",
+    "description": "Translate toggle label"
+  },
+  "translateToEnglish": {
+    "message": "ترجمة العربية ← إنجليزي",
+    "description": "Label when translating to English"
+  },
+  "translateToArabic": {
+    "message": "ترجمة الإنجليزية ← عربي",
+    "description": "Label when translating to Arabic"
+  },
+  "autoPlayLabel": {
+    "message": "تشغيل الصوت في اللوحة الجانبية",
+    "description": "Auto-play toggle label"
+  },
+  "saveBtn": {
+    "message": "حفظ الإعدادات",
+    "description": "Save button text"
+  },
+  "readSelectionBtn": {
+    "message": "قراءة النص المحدد",
+    "description": "Read selection button text"
+  },
+  "quickTextLabel": {
+    "message": "نص سريع (اختياري)",
+    "description": "Quick text textarea label"
+  },
+  "quickTextPlaceholder": {
+    "message": "الصق أي نص واضغط على قراءة النص السريع",
+    "description": "Quick text placeholder"
+  },
+  "readQuickBtn": {
+    "message": "قراءة النص السريع",
+    "description": "Read quick text button"
+  },
+  "characters": {
+    "message": "حرف",
+    "description": "Characters counter suffix"
+  },
+  "autoDetect": {
+    "message": "كشف تلقائي",
+    "description": "Auto-detect dialect option"
+  },
+  "dialectMsa": {
+    "message": "العربية الفصحى",
+    "description": "MSA dialect"
+  },
+  "dialectSaudi": {
+    "message": "السعودية",
+    "description": "Saudi dialect"
+  },
+  "dialectEmirati": {
+    "message": "الإماراتية",
+    "description": "Emirati dialect"
+  },
+  "dialectEgyptian": {
+    "message": "المصرية",
+    "description": "Egyptian dialect"
+  },
+  "dialectLebanese": {
+    "message": "اللبنانية",
+    "description": "Lebanese dialect"
+  },
+  "dialectSyrian": {
+    "message": "السورية",
+    "description": "Syrian dialect"
+  },
+  "dialectJordanian": {
+    "message": "الأردنية",
+    "description": "Jordanian dialect"
+  },
+  "dialectIraqi": {
+    "message": "العراقية",
+    "description": "Iraqi dialect"
+  },
+  "dialectMoroccan": {
+    "message": "المغربية",
+    "description": "Moroccan dialect"
+  },
+  "dialectKuwaiti": {
+    "message": "الكويتية",
+    "description": "Kuwaiti dialect"
+  },
+  "dialectAmerican": {
+    "message": "الأمريكية",
+    "description": "American English dialect"
+  },
+  "dialectBritish": {
+    "message": "البريطانية",
+    "description": "British English dialect"
+  },
+  "dialectAustralian": {
+    "message": "الأسترالية",
+    "description": "Australian English dialect"
+  },
+  "dialectIndian": {
+    "message": "الهندية",
+    "description": "Indian English dialect"
+  },
+  "dialectSouthAfrican": {
+    "message": "جنوب أفريقيا",
+    "description": "South African English dialect"
+  },
+  "styleNeutral": {
+    "message": "محايد",
+    "description": "Neutral style"
+  },
+  "styleEducational": {
+    "message": "تعليمي",
+    "description": "Educational style"
+  },
+  "styleCommercial": {
+    "message": "تجاري",
+    "description": "Commercial style"
+  },
+  "stylePromo": {
+    "message": "ترويجي",
+    "description": "Promotional style"
+  },
+  "stylePodcast": {
+    "message": "بودكاست",
+    "description": "Podcast style"
+  },
+  "styleAssistant": {
+    "message": "مساعد افتراضي",
+    "description": "Virtual Assistant style"
+  },
+  "styleNarrative": {
+    "message": "سردي",
+    "description": "Narrative style"
+  },
+  "styleComedic": {
+    "message": "كوميدي",
+    "description": "Comedic style"
+  },
+  "styleCorporate": {
+    "message": "مؤسسي",
+    "description": "Corporate style"
+  },
+  "styleConversational": {
+    "message": "حواري",
+    "description": "Conversational style"
+  },
+  "styleInspirational": {
+    "message": "ملهم",
+    "description": "Inspirational style"
+  },
+  "styleCinematic": {
+    "message": "سينمائي",
+    "description": "Cinematic style"
+  },
+  "styleDocumentary": {
+    "message": "وثائقي",
+    "description": "Documentary style"
+  },
+  "styleStorytelling": {
+    "message": "قصصي",
+    "description": "Storytelling style"
+  },
+  "styleAdStyle": {
+    "message": "إعلاني",
+    "description": "Ad Style"
+  },
+  "styleNews": {
+    "message": "أخباري",
+    "description": "News style"
+  },
+  "emotionNeutral": {
+    "message": "محايد",
+    "description": "Neutral emotion"
+  },
+  "emotionWarm": {
+    "message": "دافئ",
+    "description": "Warm emotion"
+  },
+  "emotionSad": {
+    "message": "حزين",
+    "description": "Sad emotion"
+  },
+  "emotionExcited": {
+    "message": "متحمس",
+    "description": "Excited emotion"
+  },
+  "emotionFormal": {
+    "message": "رسمي",
+    "description": "Formal emotion"
+  },
+  "emotionCalm": {
+    "message": "هادئ",
+    "description": "Calm emotion"
+  },
+  "emotionAngry": {
+    "message": "غاضب",
+    "description": "Angry emotion"
+  },
+  "statusSetApiKey": {
+    "message": "أدخل مفتاح API لتحميل بيانات الحساب.",
+    "description": "Status when no API key"
+  },
+  "statusApiKeyVerified": {
+    "message": "تم التحقق من مفتاح API.",
+    "description": "Status when API key verified"
+  },
+  "statusSaving": {
+    "message": "جاري حفظ الإعدادات...",
+    "description": "Status while saving"
+  },
+  "statusSaved": {
+    "message": "تم حفظ الإعدادات.",
+    "description": "Status after save"
+  },
+  "statusReading": {
+    "message": "جاري قراءة النص المحدد...",
+    "description": "Status while reading selection"
+  },
+  "statusGenerating": {
+    "message": "جاري توليد الصوت...",
+    "description": "Status while generating"
+  },
+  "statusGenerated": {
+    "message": "تم توليد الصوت في اللوحة الجانبية.",
+    "description": "Status after generation"
+  },
+  "statusNoText": {
+    "message": "أدخل النص السريع أولاً.",
+    "description": "Status when no quick text"
+  },
+  "statusTimeout": {
+    "message": "انتهت مهلة الطلب. تحقق من لوحة التحكم - قد يكون الصوت قد تم توليده.",
+    "description": "Status on timeout"
+  },
+  "statusNetworkError": {
+    "message": "خطأ في الشبكة. إذا تغير الاستخدام، تحقق من لوحة التحكم للصوت المولد.",
+    "description": "Status on network error"
+  },
+  "languageName": {
+    "message": "العربية",
+    "description": "Language name for switcher"
+  },
+  "languageCode": {
+    "message": "ar",
+    "description": "Language code"
+  },
+  "switchLanguage": {
+    "message": "English",
+    "description": "Switch to other language"
+  },
+  "playerBrand": {
+    "message": "ليسن فويس",
+    "description": "Side panel brand"
+  },
+  "playerSpeaker": {
+    "message": "المتحدث:",
+    "description": "Speaker label in player"
+  },
+  "playerPlay": {
+    "message": "تشغيل",
+    "description": "Play button"
+  },
+  "playerPause": {
+    "message": "إيقاف",
+    "description": "Pause button"
+  },
+  "playerDownload": {
+    "message": "تحميل",
+    "description": "Download button"
+  }
+}

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\PlanResource\Pages;
 
 use App\Filament\Resources\PlanResource;
+use App\Models\Plan;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 
@@ -34,6 +35,31 @@ class EditPlan extends EditRecord
             $data['overage_price_per_million_cents'] = null;
         }
 
+        // Convert topup_char_price_dollars → topup_char_price_cents
+        if (!empty($rawState['topup_char_price_dollars'])) {
+            $data['topup_char_price_cents'] = (int) round(((float) $rawState['topup_char_price_dollars']) * 100);
+        } else {
+            $data['topup_char_price_cents'] = null;
+        }
+
+        // Convert topup_minute_price_dollars → topup_minute_price_cents
+        if (!empty($rawState['topup_minute_price_dollars'])) {
+            $data['topup_minute_price_cents'] = (int) round(((float) $rawState['topup_minute_price_dollars']) * 100);
+        } else {
+            $data['topup_minute_price_cents'] = null;
+        }
+
         return $data;
+    }
+
+    protected function afterSave(): void
+    {
+        if (! $this->record || ! (bool) $this->record->is_featured) {
+            return;
+        }
+
+        Plan::query()
+            ->whereKeyNot($this->record->getKey())
+            ->update(['is_featured' => false]);
     }
 }

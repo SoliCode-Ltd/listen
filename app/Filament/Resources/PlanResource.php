@@ -4,9 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
+use App\Services\StripeProductSyncService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -36,11 +38,53 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255)
-                            ->helperText('Display name shown to users'),
+                            ->helperText('Internal name (fallback if localized names are empty)'),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true)
                             ->helperText('Inactive plans are hidden from pricing page'),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured Plan')
+                            ->default(false)
+                            ->helperText('Highlighted as "Most Popular" on pricing pages.'),
+                    ]),
+                Forms\Components\Section::make('Localized Content (English)')
+                    ->description('English display names and descriptions shown on pricing pages.')
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\TextInput::make('name_en')
+                            ->label('Plan Name (English)')
+                            ->maxLength(255)
+                            ->placeholder('e.g. Creator, Professional')
+                            ->helperText('Leave empty to use translation file or fallback name'),
+                        Forms\Components\Textarea::make('description_en')
+                            ->label('Plan Description (English)')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->placeholder('Short tagline for the pricing card'),
+                        Forms\Components\TextInput::make('button_text_en')
+                            ->label('Button Text (English)')
+                            ->maxLength(50)
+                            ->placeholder('e.g. Get Started, Upgrade Now'),
+                    ]),
+                Forms\Components\Section::make('المحتوى المترجم (العربية)')
+                    ->description('الأسماء والأوصاف العربية المعروضة على صفحات الأسعار.')
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\TextInput::make('name_ar')
+                            ->label('اسم الخطة (العربية)')
+                            ->maxLength(255)
+                            ->placeholder('مثل: المبدع، الاحترافي')
+                            ->helperText('اتركه فارغاً لاستخدام ملف الترجمة'),
+                        Forms\Components\Textarea::make('description_ar')
+                            ->label('وصف الخطة (العربية)')
+                            ->rows(2)
+                            ->maxLength(500)
+                            ->placeholder('وصف قصير لبطاقة الأسعار'),
+                        Forms\Components\TextInput::make('button_text_ar')
+                            ->label('نص الزر (العربية)')
+                            ->maxLength(50)
+                            ->placeholder('مثل: ابدأ الآن، ترقية'),
                     ]),
                 Forms\Components\Section::make('Pricing')
                     ->description('Enter prices in dollars. Stored as cents in the database. Yearly auto-calculated at 20% discount.')
@@ -77,7 +121,6 @@ class PlanResource extends Resource
                             ->options([
                                 'standard' => 'Standard',
                                 'hd' => 'HD',
-                                'hd_plus' => 'HD+',
                             ])
                             ->required()
                             ->helperText('Voice quality level users get on this plan'),
@@ -107,16 +150,17 @@ class PlanResource extends Resource
                             ->required()
                             ->default(0)
                             ->helperText('0 = unlimited requests'),
-                        Forms\Components\TextInput::make('monthly_minutes')
-                            ->label('Monthly Audio Minutes')
-                            ->numeric()
-                            ->required(),
                         Forms\Components\TextInput::make('max_chars_per_request')
                             ->label('Max Characters Per Request')
                             ->numeric()
                             ->required(),
+                        Forms\Components\TextInput::make('recent_voices_days')
+                            ->label('Recent Voices Retention (days)')
+                            ->numeric()
+                            ->default(7)
+                            ->helperText('How many days generated voices are retained. 0 = unlimited.'),
                     ]),
-                Forms\Components\Section::make('Overage')
+                Forms\Components\Section::make('Overage & Top-Up Pricing')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('allow_overage')
@@ -137,12 +181,75 @@ class PlanResource extends Resource
                                     $component->state('0.00');
                                 }
                             }),
+                        Forms\Components\TextInput::make('topup_char_price_dollars')
+                            ->label('Top-Up Price per 1K chars ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->step('0.01')
+                            ->dehydrated(false)
+                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                                if ($record && $record->topup_char_price_cents !== null) {
+                                    $component->state(number_format($record->topup_char_price_cents / 100, 2, '.', ''));
+                                } else {
+                                    $component->state('0.00');
+                                }
+                            })
+                            ->helperText('Price per 1,000 extra characters (stored as cents).'),
+                        Forms\Components\TextInput::make('topup_minute_price_dollars')
+                            ->label('Top-Up Price per Minute ($)')
+                            ->numeric()
+                            ->prefix('$')
+                            ->step('0.01')
+                            ->dehydrated(false)
+                            ->afterStateHydrated(function (Forms\Components\TextInput $component, ?Plan $record) {
+                                if ($record && $record->topup_minute_price_cents !== null) {
+                                    $component->state(number_format($record->topup_minute_price_cents / 100, 2, '.', ''));
+                                } else {
+                                    $component->state('0.00');
+                                }
+                            })
+                            ->helperText('Price per extra audio minute (stored as cents).'),
                     ]),
-                Forms\Components\Section::make('Plan Features')
-                    ->description('Features shown on the pricing card. Edit labels, values, and icons. Drag to reorder.')
+                Forms\Components\Section::make('TTS & Hybrid Engine')
+                    ->description('Controls which TTS engine users on this plan receive and advanced audio features.')
+                    ->columns(2)
                     ->schema([
-                        Forms\Components\Repeater::make('features')
-                            ->label('Features List')
+                        Forms\Components\Select::make('tts_provider_policy')
+                            ->label('TTS Provider Policy')
+                            ->options([
+                                'default' => 'Use Global Setting',
+                                'google_only' => 'Google Cloud TTS Only',
+                                'gemini_only' => 'Gemini TTS Only',
+                                'gemini_preferred' => 'Gemini Preferred (fallback to Google)',
+                            ])
+                            ->default('default')
+                            ->helperText('Override the global TTS mode for this plan. "Default" follows the system-wide setting.'),
+                        Forms\Components\Select::make('quality_tier')
+                            ->label('Audio Quality Tier')
+                            ->options([
+                                'standard' => 'Standard (WaveNet)',
+                                'high' => 'High (Gemini)',
+                            ])
+                            ->default('standard')
+                            ->helperText('Standard = Google WaveNet, High = Gemini 2.5 Flash.'),
+                        Forms\Components\Toggle::make('dialogue_enabled')
+                            ->label('Dialogue Mode')
+                            ->helperText('Allow users to create multi-speaker dialogue audio.')
+                            ->default(false),
+                        Forms\Components\TextInput::make('queue_priority_weight')
+                            ->label('Queue Priority Weight')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(1000)
+                            ->default(0)
+                            ->helperText('Higher weight = higher priority in job queue (0-1000).'),
+                    ]),
+                Forms\Components\Section::make('Plan Features (English)')
+                    ->description('Features shown on the English pricing card. Auto-populated from plan data, edit as needed.')
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\Repeater::make('features_en')
+                            ->label('Features List (EN)')
                             ->schema([
                                 Forms\Components\TextInput::make('label')
                                     ->label('Label')
@@ -157,18 +264,20 @@ class PlanResource extends Resource
                                 Forms\Components\Select::make('icon')
                                     ->label('Icon')
                                     ->options([
-                                        'activity' => '📈 Activity (pulse line)',
-                                        'type' => '🔤 Type (text/font)',
-                                        'lock' => '🔒 Lock (security)',
-                                        'bolt' => '⚡ Bolt (speed/priority)',
-                                        'mic' => '🎙️ Mic (voice/audio)',
+                                        'activity' => '📈 Activity (Requests)',
+                                        'type' => '🔤 Type (Max Input)',
+                                        'mic' => '🎙️ Mic (Voice Quality)',
+                                        'star' => '⭐ Star (Quality/Performance)',
+                                        'heart' => '❤️ Heart (Emotion Controls)',
+                                        'bolt' => '⚡ Bolt (Priority)',
+                                        'lock' => '🔒 Lock (Commercial Use)',
+                                        'clock' => '🕐 Clock (Recent Voices)',
                                         'check' => '✓ Checkmark',
-                                        'globe' => '🌐 Globe (language)',
-                                        'clock' => '🕐 Clock (time)',
-                                        'star' => '⭐ Star (quality)',
-                                        'shield' => '🛡️ Shield (protection)',
+                                        'globe' => '🌐 Globe (Languages)',
+                                        'shield' => '🛡️ Shield (Protection)',
                                         'download' => '📥 Download',
-                                        'users' => '👥 Users (team)',
+                                        'users' => '👥 Users (Dialogue)',
+                                        'sliders' => '🎚️ Sliders (Controls)',
                                     ])
                                     ->default('check')
                                     ->required()
@@ -176,30 +285,81 @@ class PlanResource extends Resource
                             ])
                             ->columns(3)
                             ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
-                                if (! $record) {
+                                if (!$record) return;
+                                
+                                // If already has custom features, use them
+                                $existing = $record->features_en;
+                                if (is_array($existing) && !empty($existing)) {
                                     return;
                                 }
-
-                                $raw = is_array($record->features) ? $record->features : [];
-
-                                // Already structured — use as-is
-                                if (! empty($raw) && isset($raw[0]) && is_array($raw[0]) && array_key_exists('label', $raw[0])) {
-                                    return;
-                                }
-
-                                // Auto-build defaults from plan attributes
-                                $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: \App\Support\VoiceTier::STANDARD));
-                                $defaults = [
-                                    ['label' => 'Requests', 'value' => (int) $record->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
-                                    ['label' => 'Max input', 'value' => number_format((int) $record->max_chars_per_request) . ' chars', 'icon' => 'type'],
-                                    ['label' => 'Commercial use', 'value' => $record->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
-                                    ['label' => 'Priority queue', 'value' => ($record->processing_priority ?? 'standard') === 'high' ? 'High' : 'Standard', 'icon' => 'bolt'],
-                                    ['label' => 'Voice quality', 'value' => \App\Support\VoiceTier::label($tier), 'icon' => 'mic'],
-                                ];
-
-                                $component->state($defaults);
+                                
+                                // Auto-generate default features from plan attributes with UUID keys
+                                $features = collect(self::buildDefaultFeaturesEn($record))
+                                    ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
+                                    ->all();
+                                $component->state($features);
                             })
                             ->addActionLabel('Add Feature')
+                            ->defaultItems(0)
+                            ->reorderable()
+                            ->collapsible(),
+                    ]),
+                Forms\Components\Section::make('خصائص الخطة (العربية)')
+                    ->description('الخصائص المعروضة على بطاقة الأسعار العربية. يتم ملؤها تلقائياً، عدّل حسب الحاجة.')
+                    ->collapsed()
+                    ->schema([
+                        Forms\Components\Repeater::make('features_ar')
+                            ->label('قائمة الخصائص (AR)')
+                            ->schema([
+                                Forms\Components\TextInput::make('label')
+                                    ->label('التسمية')
+                                    ->required()
+                                    ->placeholder('مثل: الطلبات')
+                                    ->columnSpan(1),
+                                Forms\Components\TextInput::make('value')
+                                    ->label('القيمة')
+                                    ->required()
+                                    ->placeholder('مثل: غير محدود')
+                                    ->columnSpan(1),
+                                Forms\Components\Select::make('icon')
+                                    ->label('الأيقونة')
+                                    ->options([
+                                        'activity' => '📈 النشاط (الطلبات)',
+                                        'type' => '🔤 النص (الحد الأقصى)',
+                                        'mic' => '🎙️ الميكروفون (جودة الصوت)',
+                                        'star' => '⭐ النجمة (الأداء)',
+                                        'heart' => '❤️ القلب (التحكم بالمشاعر)',
+                                        'bolt' => '⚡ السرعة (الأولوية)',
+                                        'lock' => '🔒 القفل (الاستخدام التجاري)',
+                                        'clock' => '🕐 الساعة (الأصوات الأخيرة)',
+                                        'check' => '✓ علامة صح',
+                                        'globe' => '🌐 العالم (اللغات)',
+                                        'shield' => '🛡️ الدرع (الحماية)',
+                                        'download' => '📥 التحميل',
+                                        'users' => '👥 المستخدمين (الحوار)',
+                                        'sliders' => '🎚️ المنزلقات (التحكم)',
+                                    ])
+                                    ->default('check')
+                                    ->required()
+                                    ->columnSpan(1),
+                            ])
+                            ->columns(3)
+                            ->afterStateHydrated(function (Forms\Components\Repeater $component, ?Plan $record) {
+                                if (!$record) return;
+                                
+                                // If already has custom features, use them
+                                $existing = $record->features_ar;
+                                if (is_array($existing) && !empty($existing)) {
+                                    return;
+                                }
+                                
+                                // Auto-generate default features from plan attributes with UUID keys
+                                $features = collect(self::buildDefaultFeaturesAr($record))
+                                    ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
+                                    ->all();
+                                $component->state($features);
+                            })
+                            ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
                             ->reorderable()
                             ->collapsible(),
@@ -227,8 +387,7 @@ class PlanResource extends Resource
                     ->label('Voice Tier')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'hd' => 'warning',
-                        'hd_plus' => 'success',
+                        'hd' => 'success',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('monthly_chars')
@@ -239,14 +398,56 @@ class PlanResource extends Resource
                     ->label('Requests/mo')
                     ->formatStateUsing(fn (int $state) => $state <= 0 ? 'Unlimited' : number_format($state))
                     ->sortable(),
+                Tables\Columns\TextColumn::make('quality_tier')
+                    ->label('Quality')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'high' => 'success',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
                     ->sortable(),
+                Tables\Columns\IconColumn::make('is_featured')
+                    ->label('Featured')
+                    ->boolean()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('tts_provider_policy')
+                    ->label('TTS Policy')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'gemini_only', 'gemini_preferred' => 'success',
+                        'google_only' => 'info',
+                        default => 'gray',
+                    })
+                    ->formatStateUsing(fn (?string $state): string => match ($state) {
+                        'google_only' => 'Google',
+                        'gemini_only' => 'Gemini',
+                        'gemini_preferred' => 'Gemini+FB',
+                        default => 'Default',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\IconColumn::make('dialogue_enabled')
+                    ->label('Dialogue')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('commercial_use_allowed')
                     ->label('Commercial')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('stripe_synced')
+                    ->label('Stripe')
+                    ->state(fn (Plan $record): bool => $record->hasStripeConfig())
+                    ->boolean()
+                    ->trueIcon('heroicon-o-check-badge')
+                    ->falseIcon('heroicon-o-x-circle')
+                    ->trueColor('success')
+                    ->falseColor('danger')
+                    ->tooltip(fn (Plan $record): string => $record->hasStripeConfig() 
+                        ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
+                        : 'Not synced to Stripe'),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
@@ -255,16 +456,66 @@ class PlanResource extends Resource
                     ->options([
                         'standard' => 'Standard',
                         'hd' => 'HD',
-                        'hd_plus' => 'HD+',
                     ]),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('syncStripe')
+                    ->label('Sync Stripe')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->modalHeading('Sync Plan to Stripe')
+                    ->modalDescription('This will create or update the Stripe product and prices for this plan. Continue?')
+                    ->action(function (Plan $record) {
+                        try {
+                            $syncService = app(StripeProductSyncService::class);
+                            $syncService->syncPlan($record);
+                            
+                            Notification::make()
+                                ->title('Stripe Sync Successful')
+                                ->body("Plan '{$record->name}' has been synced to Stripe.")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            Notification::make()
+                                ->title('Stripe Sync Failed')
+                                ->body($e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('syncAllStripe')
+                        ->label('Sync All to Stripe')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->deselectRecordsAfterCompletion()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $syncService = app(StripeProductSyncService::class);
+                            $success = 0;
+                            $failed = 0;
+                            
+                            foreach ($records as $plan) {
+                                try {
+                                    $syncService->syncPlan($plan);
+                                    $success++;
+                                } catch (\Exception $e) {
+                                    $failed++;
+                                }
+                            }
+                            
+                            Notification::make()
+                                ->title('Stripe Sync Complete')
+                                ->body("Synced: {$success}, Failed: {$failed}")
+                                ->success()
+                                ->send();
+                        }),
                 ]),
             ]);
     }
@@ -282,5 +533,90 @@ class PlanResource extends Resource
             'view' => Pages\ViewPlan::route('/{record}'),
             'edit' => Pages\EditPlan::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Build default English features from plan attributes.
+     * 
+     * @return array<int, array{label: string, value: string, icon: string}>
+     */
+    private static function buildDefaultFeaturesEn(Plan $record): array
+    {
+        $isFree = (int) $record->price_cents <= 0;
+        $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
+        
+        $priority = match ((string) ($record->processing_priority ?? 'standard')) {
+            'standard_plus' => 'Standard+',
+            'high' => 'High',
+            'priority' => 'Priority',
+            'highest' => 'Highest',
+            default => 'Standard',
+        };
+        
+        $recentDays = (int) ($record->recent_voices_days ?? 7);
+        $recentValue = $recentDays <= 0 ? 'Unlimited' : "{$recentDays} days";
+        
+        $emotionValue = $isFree ? 'Basic' : 'Full Controls';
+        
+        $features = [
+            ['label' => 'Requests', 'value' => (int) $record->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
+            ['label' => 'Max Input', 'value' => number_format((int) $record->max_chars_per_request) . ' chars', 'icon' => 'type'],
+            ['label' => 'Voice Quality', 'value' => \App\Support\VoiceTier::label($tier), 'icon' => 'mic'],
+            ['label' => 'Emotion Controls', 'value' => $emotionValue, 'icon' => 'heart'],
+            ['label' => 'Priority Queue', 'value' => $priority, 'icon' => 'bolt'],
+            ['label' => 'Commercial Use', 'value' => $record->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
+            ['label' => 'Recent Voices', 'value' => $recentValue, 'icon' => 'clock'],
+        ];
+        
+        if ((bool) ($record->dialogue_enabled ?? false)) {
+            $features[] = ['label' => 'Dialogue Mode', 'value' => 'Included', 'icon' => 'users'];
+        }
+        
+        return $features;
+    }
+
+    /**
+     * Build default Arabic features from plan attributes.
+     * 
+     * @return array<int, array{label: string, value: string, icon: string}>
+     */
+    private static function buildDefaultFeaturesAr(Plan $record): array
+    {
+        $isFree = (int) $record->price_cents <= 0;
+        $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
+        
+        $priority = match ((string) ($record->processing_priority ?? 'standard')) {
+            'standard_plus' => 'عادية+',
+            'high' => 'عالية',
+            'priority' => 'أولوية',
+            'highest' => 'أعلى أولوية',
+            default => 'عادية',
+        };
+        
+        $tierLabel = match ($tier) {
+            'hd' => 'HD عالية الجودة',
+            default => 'عادية',
+        };
+        
+        $recentDays = (int) ($record->recent_voices_days ?? 7);
+        $recentValue = $recentDays <= 0 ? 'غير محدود' : "{$recentDays} يوم";
+        
+        $emotionValue = $isFree ? 'أساسي' : 'تحكم كامل';
+        
+        $features = [
+            ['label' => 'الطلبات', 'value' => (int) $record->monthly_requests <= 0 ? 'غير محدود' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
+            ['label' => 'الحد الأقصى للإدخال', 'value' => number_format((int) $record->max_chars_per_request) . ' حرف', 'icon' => 'type'],
+            ['label' => 'جودة الصوت', 'value' => $tierLabel, 'icon' => 'mic'],
+            ['label' => 'التحكم في المشاعر', 'value' => $emotionValue, 'icon' => 'heart'],
+            ['label' => 'أولوية المعالجة', 'value' => $priority, 'icon' => 'bolt'],
+            ['label' => 'الاستخدام التجاري', 'value' => $record->commercial_use_allowed ? 'مسموح' : 'شخصي فقط', 'icon' => 'lock'],
+            ['label' => 'الأصوات الأخيرة', 'value' => $recentValue, 'icon' => 'clock'],
+        ];
+        
+        if ((bool) ($record->dialogue_enabled ?? false)) {
+            $features[] = ['label' => 'وضع الحوار', 'value' => 'متاح', 'icon' => 'users'];
+        }
+        
+        return $features;
     }
 }

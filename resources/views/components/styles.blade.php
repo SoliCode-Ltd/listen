@@ -1471,7 +1471,7 @@ form:has(button.mobile-nav-link) {
   stroke-width: 2;
   fill: none;
 }
-@container (max-width: 280px) {
+@@container (max-width: 280px) {
   .custom-audio-time {
     min-width: 28px;
     font-size: 0.72rem;
@@ -1488,7 +1488,7 @@ form:has(button.mobile-nav-link) {
     min-width: 82px;
   }
 }
-@container (max-width: 230px) {
+@@container (max-width: 230px) {
   .custom-audio-time.end {
     display: block;
     min-width: 24px;

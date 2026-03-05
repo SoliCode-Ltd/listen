@@ -93,6 +93,7 @@ Route::group([
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
         Route::post('/billing/payment-method', [BillingController::class, 'updatePaymentMethod'])->name('billing.payment-method');
         Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
+        Route::post('/billing/resume', [BillingController::class, 'resume'])->name('billing.resume');
         Route::post('/billing/sync', [BillingController::class, 'sync'])->name('billing.sync');
         Route::get('/billing/invoices/{invoiceId}/view', [BillingController::class, 'viewInvoice'])->name('billing.invoice.view');
         Route::get('/billing/invoices/{invoiceId}/download', [BillingController::class, 'downloadInvoice'])->name('billing.invoice.download');

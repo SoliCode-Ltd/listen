@@ -37,43 +37,94 @@ class VoiceResource extends Resource
                             ->required()
                             ->searchable()
                             ->options([
-                                'en-US' => 'English (US)',
-                                'en-GB' => 'English (UK)',
-                                'en-AU' => 'English (AU)',
-                                'es-ES' => 'Spanish (Spain)',
-                                'es-US' => 'Spanish (US)',
-                                'fr-FR' => 'French',
-                                'de-DE' => 'German',
-                                'it-IT' => 'Italian',
-                                'pt-BR' => 'Portuguese (BR)',
-                                'ja-JP' => 'Japanese',
-                                'ko-KR' => 'Korean',
-                                'zh-CN' => 'Chinese (CN)',
-                                'ar-XA' => 'Arabic',
-                                'hi-IN' => 'Hindi',
-                                'ru-RU' => 'Russian',
-                                'nl-NL' => 'Dutch',
-                                'pl-PL' => 'Polish',
-                                'sv-SE' => 'Swedish',
-                                'tr-TR' => 'Turkish',
+                                'ar' => 'Arabic',
+                                'en' => 'English',
                             ]),
                         Forms\Components\Select::make('gender')
                             ->required()
                             ->options([
-                                'MALE' => 'Male',
-                                'FEMALE' => 'Female',
-                                'NEUTRAL' => 'Neutral',
+                                'male' => 'Male',
+                                'female' => 'Female',
                             ]),
                         Forms\Components\Select::make('tier')
                             ->required()
                             ->options([
-                                'standard' => 'Standard',
-                                'premium' => 'Premium',
-                                'studio' => 'Studio',
+                                'standard' => 'Standard (WaveNet)',
+                                'hd' => 'HD (Gemini Chirp3)',
                             ]),
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
                             ->default(true),
+                    ]),
+                Forms\Components\Section::make('Provider & Studio')
+                    ->description('Voice studio settings for the hybrid TTS engine.')
+                    ->columns(2)
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Select::make('provider')
+                            ->label('TTS Provider')
+                            ->options([
+                                'google_cloud' => 'Google Cloud TTS',
+                                'gemini' => 'Gemini TTS',
+                            ])
+                            ->default('google_cloud')
+                            ->helperText('Which TTS engine this voice belongs to.'),
+                        Forms\Components\TextInput::make('provider_voice_id')
+                            ->label('Provider Voice ID')
+                            ->maxLength(255)
+                            ->helperText('The voice identifier used by the provider (e.g. Gemini voice name).'),
+                        Forms\Components\Select::make('dialect')
+                            ->label('Arabic Dialect')
+                            ->options([
+                                '' => 'None / Not Arabic',
+                                'ar-XA' => 'MSA (Modern Standard Arabic)',
+                                'ar-SA' => 'Saudi Arabic',
+                                'ar-AE' => 'Emirati Arabic',
+                                'ar-EG' => 'Egyptian Arabic',
+                                'ar-LB' => 'Lebanese Arabic',
+                                'ar-SY' => 'Syrian Arabic',
+                                'ar-JO' => 'Jordanian Arabic',
+                                'ar-IQ' => 'Iraqi Arabic',
+                                'ar-MA' => 'Moroccan Arabic',
+                                'ar-DZ' => 'Algerian Arabic',
+                                'ar-TN' => 'Tunisian Arabic',
+                                'ar-KW' => 'Kuwaiti Arabic',
+                                'ar-QA' => 'Qatari Arabic',
+                                'ar-BH' => 'Bahraini Arabic',
+                                'ar-OM' => 'Omani Arabic',
+                                'ar-YE' => 'Yemeni Arabic',
+                                'ar-SD' => 'Sudanese Arabic',
+                                'ar-LY' => 'Libyan Arabic',
+                                'ar-PS' => 'Palestinian Arabic',
+                            ])
+                            ->searchable()
+                            ->helperText('Specific Arabic dialect for this voice.'),
+                        Forms\Components\TextInput::make('country')
+                            ->label('Country Code')
+                            ->maxLength(5)
+                            ->placeholder('e.g. SA, US, GB')
+                            ->helperText('ISO country code for flag display.'),
+                        Forms\Components\TagsInput::make('supported_emotions')
+                            ->label('Supported Emotions')
+                            ->placeholder('Add emotion...')
+                            ->suggestions([
+                                'neutral', 'warm', 'sad', 'excited', 'formal',
+                                'storytelling', 'ad_style', 'news', 'calm', 'angry',
+                            ])
+                            ->helperText('Emotions this voice can express (Gemini voices only).'),
+                        Forms\Components\TextInput::make('preview_audio_path')
+                            ->label('Preview Audio Path')
+                            ->maxLength(500)
+                            ->helperText('Path to a sample audio clip for this voice (relative to public/).'),
+                        Forms\Components\TextInput::make('sort_order')
+                            ->label('Sort Order')
+                            ->numeric()
+                            ->default(0)
+                            ->helperText('Lower numbers appear first in the voice picker.'),
+                        Forms\Components\Toggle::make('is_featured')
+                            ->label('Featured Voice')
+                            ->helperText('Show this voice in the featured section of the voice picker.')
+                            ->default(false),
                     ]),
             ]);
     }
@@ -99,18 +150,34 @@ class VoiceResource extends Resource
                     ->sortable()
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'MALE' => 'info',
-                        'FEMALE' => 'danger',
+                        'male' => 'info',
+                        'female' => 'danger',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('tier')
                     ->sortable()
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'premium' => 'warning',
-                        'studio' => 'success',
+                        'hd' => 'success',
                         default => 'gray',
                     }),
+                Tables\Columns\TextColumn::make('provider')
+                    ->label('Provider')
+                    ->badge()
+                    ->color(fn (?string $state): string => match ($state) {
+                        'gemini' => 'success',
+                        'google_cloud' => 'info',
+                        default => 'gray',
+                    })
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('dialect')
+                    ->label('Dialect')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('is_featured')
+                    ->label('Featured')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('Active')
                     ->boolean()
@@ -121,18 +188,23 @@ class VoiceResource extends Resource
                     ->options(fn () => Voice::query()->distinct()->pluck('language', 'language')->toArray()),
                 Tables\Filters\SelectFilter::make('gender')
                     ->options([
-                        'MALE' => 'Male',
-                        'FEMALE' => 'Female',
-                        'NEUTRAL' => 'Neutral',
+                        'male' => 'Male',
+                        'female' => 'Female',
                     ]),
                 Tables\Filters\SelectFilter::make('tier')
                     ->options([
-                        'standard' => 'Standard',
-                        'premium' => 'Premium',
-                        'studio' => 'Studio',
+                        'standard' => 'Standard (WaveNet)',
+                        'hd' => 'HD (Gemini Chirp3)',
                     ]),
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active'),
+                Tables\Filters\SelectFilter::make('provider')
+                    ->options([
+                        'google_cloud' => 'Google Cloud',
+                        'gemini' => 'Gemini',
+                    ]),
+                Tables\Filters\TernaryFilter::make('is_featured')
+                    ->label('Featured'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

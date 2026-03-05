@@ -18,10 +18,17 @@ const elements = {
   apiKey: document.getElementById('apiKey'),
   targetLanguage: document.getElementById('targetLanguage'),
   voiceKey: document.getElementById('voiceKey'),
+  dialect: document.getElementById('dialect'),
+  studioPanel: document.getElementById('studioPanel'),
+  performanceStyle: document.getElementById('performanceStyle'),
+  emotion: document.getElementById('emotion'),
   translate: document.getElementById('translate'),
   translateLabel: document.getElementById('translateLabel'),
   autoPlay: document.getElementById('autoPlay'),
   quickText: document.getElementById('quickText'),
+  charCounter: document.getElementById('charCounter'),
+  charCount: document.getElementById('charCount'),
+  charLimit: document.getElementById('charLimit'),
   saveBtn: document.getElementById('saveBtn'),
   selectionBtn: document.getElementById('selectionBtn'),
   quickBtn: document.getElementById('quickBtn'),
@@ -33,20 +40,114 @@ const elements = {
   requestsText: document.getElementById('requestsText'),
   charsBar: document.getElementById('charsBar'),
   requestsBar: document.getElementById('requestsBar'),
+  langSwitcher: document.getElementById('langSwitcher'),
 };
+
+// ===== i18n LOCALIZATION =====
+let currentUiLang = 'en';
+let translations = {};
+
+// Load translations from JSON files (chrome.i18n only works with browser locale)
+async function loadTranslations(lang) {
+  try {
+    const response = await fetch(chrome.runtime.getURL(`_locales/${lang}/messages.json`));
+    const messages = await response.json();
+    translations = {};
+    for (const [key, value] of Object.entries(messages)) {
+      translations[key] = value.message || '';
+    }
+    return translations;
+  } catch (error) {
+    console.warn('Failed to load translations:', error);
+    return {};
+  }
+}
+
+function t(key, fallback = '') {
+  return translations[key] || fallback || key;
+}
+
+function applyTranslations() {
+  // Translate elements with data-i18n attribute
+  document.querySelectorAll('[data-i18n]').forEach((el) => {
+    const key = el.getAttribute('data-i18n');
+    const translated = t(key, '');
+    if (translated) el.textContent = translated;
+  });
+
+  // Translate placeholders
+  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => {
+    const key = el.getAttribute('data-i18n-placeholder');
+    const translated = t(key, '');
+    if (translated) el.placeholder = translated;
+  });
+}
+
+function setUiDirection(lang) {
+  const isRtl = lang === 'ar';
+  document.documentElement.dir = isRtl ? 'rtl' : 'ltr';
+  document.documentElement.lang = lang;
+}
+
+async function loadUiLanguage() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ uiLanguage: '' }, (result) => {
+      // If no preference saved, detect from browser locale
+      let lang = result.uiLanguage;
+      if (!lang) {
+        const browserLang = chrome.i18n.getUILanguage().toLowerCase();
+        lang = browserLang.startsWith('ar') ? 'ar' : 'en';
+      }
+      currentUiLang = lang;
+      resolve(lang);
+    });
+  });
+}
+
+async function saveUiLanguage(lang) {
+  return new Promise((resolve) => {
+    chrome.storage.local.set({ uiLanguage: lang }, resolve);
+  });
+}
+
+function updateLangSwitcher() {
+  if (elements.langSwitcher) {
+    elements.langSwitcher.textContent = currentUiLang === 'ar' ? 'English' : 'عربي';
+  }
+}
+
+async function switchLanguage() {
+  const newLang = currentUiLang === 'ar' ? 'en' : 'ar';
+  currentUiLang = newLang;
+  await saveUiLanguage(newLang);
+  await loadTranslations(newLang);
+  setUiDirection(newLang);
+  applyTranslations();
+  updateLangSwitcher();
+  // Re-render dynamic content with new translations
+  const currentDialect = elements.dialect?.value || '';
+  const currentVoice = elements.voiceKey?.value || '';
+  renderDialectOptions(currentDialect);
+  // Re-render voice options with translated labels
+  renderVoiceOptions(currentVoice);
+  // Update translate direction label
+  updateTranslateLabel();
+  // Re-apply profile card with new translations
+  setProfileCard(profileData);
+}
 
 const fallbackCatalog = {
   ar: [
-    { key: 'voice_ar_f_1', label: 'Sara', gender: 'female' },
-    { key: 'voice_ar_f_2', label: 'Mariam', gender: 'female' },
-    { key: 'voice_ar_m_1', label: 'Omar', gender: 'male' },
-    { key: 'voice_ar_m_2', label: 'Ahmed', gender: 'male' },
+    { key: 'voice_ar_f_1', label: 'Sara', label_ar: 'سارة', gender: 'female' },
+    { key: 'voice_ar_f_2', label: 'Mariam', label_ar: 'مريم', gender: 'female' },
+    { key: 'voice_ar_m_1', label: 'Omar', label_ar: 'عمر', gender: 'male' },
+    { key: 'voice_ar_m_2', label: 'Ahmed', label_ar: 'أحمد', gender: 'male' },
   ],
   en: [
-    { key: 'voice_en_f_1', label: 'Emma', gender: 'female' },
-    { key: 'voice_en_f_2', label: 'Olivia', gender: 'female' },
-    { key: 'voice_en_m_1', label: 'Liam', gender: 'male' },
-    { key: 'voice_en_m_2', label: 'Noah', gender: 'male' },
+    { key: 'voice_en_f_1', label: 'Emma', label_ar: 'إيما', gender: 'female' },
+    { key: 'voice_en_f_2', label: 'Olivia', label_ar: 'أوليفيا', gender: 'female' },
+    { key: 'voice_en_m_1', label: 'Liam', label_ar: 'ليام', gender: 'male' },
+    { key: 'voice_en_m_2', label: 'Noah', label_ar: 'نوح', gender: 'male' },
   ],
 };
 
@@ -55,6 +156,30 @@ let apiKeyVerifyTimer = null;
 let lastVerifiedApiKey = '';
 let preferredTranslateLanguage = 'ar';
 const preferredVoiceKeyByLanguage = { ar: '', en: '' };
+
+const dialectsByLanguage = {
+  ar: [
+    { value: '', labelKey: 'autoDetect', label: 'Auto-detect' },
+    { value: 'ar-XA', labelKey: 'dialectMsa', label: 'Modern Standard Arabic' },
+    { value: 'ar-SA', labelKey: 'dialectSaudi', label: 'Saudi' },
+    { value: 'ar-AE', labelKey: 'dialectEmirati', label: 'Emirati' },
+    { value: 'ar-EG', labelKey: 'dialectEgyptian', label: 'Egyptian' },
+    { value: 'ar-LB', labelKey: 'dialectLebanese', label: 'Lebanese' },
+    { value: 'ar-SY', labelKey: 'dialectSyrian', label: 'Syrian' },
+    { value: 'ar-JO', labelKey: 'dialectJordanian', label: 'Jordanian' },
+    { value: 'ar-IQ', labelKey: 'dialectIraqi', label: 'Iraqi' },
+    { value: 'ar-MA', labelKey: 'dialectMoroccan', label: 'Moroccan' },
+    { value: 'ar-KW', labelKey: 'dialectKuwaiti', label: 'Kuwaiti' },
+  ],
+  en: [
+    { value: '', labelKey: 'autoDetect', label: 'Auto-detect' },
+    { value: 'en-US', labelKey: 'dialectAmerican', label: 'American' },
+    { value: 'en-GB', labelKey: 'dialectBritish', label: 'British' },
+    { value: 'en-AU', labelKey: 'dialectAustralian', label: 'Australian' },
+    { value: 'en-IN', labelKey: 'dialectIndian', label: 'Indian' },
+    { value: 'en-ZA', labelKey: 'dialectSouthAfrican', label: 'South African' },
+  ],
+};
 
 function setStatus(message, type = '') {
   elements.status.textContent = message || '';
@@ -97,6 +222,9 @@ function readSettingsFromForm() {
       ar: String(preferredVoiceKeyByLanguage.ar || '').trim(),
       en: String(preferredVoiceKeyByLanguage.en || '').trim(),
     },
+    dialect: String(elements.dialect?.value || '').trim(),
+    performanceStyle: String(elements.performanceStyle?.value || '').trim(),
+    emotion: String(elements.emotion?.value || '').trim(),
     translate: elements.translate.checked,
     autoPlay: elements.autoPlay.checked,
   };
@@ -154,8 +282,8 @@ function rememberCurrentVoiceSelection(language = normalizeLanguage(elements.tar
 
 function translateDirectionLabel(language) {
   return language === 'en'
-    ? 'Translate Arabic to English speaking'
-    : 'Translate English to Arabic speaking';
+    ? t('translateToEnglish', 'Translate Arabic → English speaking')
+    : t('translateToArabic', 'Translate English → Arabic speaking');
 }
 
 function updateTranslateLabel() {
@@ -165,6 +293,55 @@ function updateTranslateLabel() {
 
   const language = normalizeLanguage(elements.targetLanguage.value);
   elements.translateLabel.textContent = translateDirectionLabel(language);
+}
+
+function renderDialectOptions(preferredDialect = '') {
+  if (!elements.dialect) return;
+  const language = normalizeLanguage(elements.targetLanguage.value);
+  const dialects = dialectsByLanguage[language] || [];
+  
+  elements.dialect.innerHTML = '';
+  for (const dialect of dialects) {
+    const option = document.createElement('option');
+    option.value = dialect.value;
+    option.textContent = dialect.labelKey ? t(dialect.labelKey, dialect.label) : dialect.label;
+    elements.dialect.appendChild(option);
+  }
+  
+  if (dialects.some(d => d.value === preferredDialect)) {
+    elements.dialect.value = preferredDialect;
+  } else {
+    elements.dialect.value = '';
+  }
+}
+
+function updateStudioPanel() {
+  if (!elements.studioPanel) return;
+  // Only show studio panel if:
+  // 1. Profile is loaded (API key valid)
+  // 2. Plan is HD tier (not free/standard)
+  const hasValidProfile = profileData && profileData.plan;
+  const voiceTier = profileData?.plan?.voice_tier || 'standard';
+  const planSlug = String(profileData?.plan?.slug || 'free').toLowerCase();
+  const isHdPlan = voiceTier === 'hd' && planSlug !== 'free';
+  
+  elements.studioPanel.style.display = hasValidProfile && isHdPlan ? 'block' : 'none';
+}
+
+function updateCharCounter() {
+  if (!elements.quickText || !elements.charCount || !elements.charCounter) return;
+  const length = elements.quickText.value.length;
+  const maxChars = profileData?.plan?.max_chars_per_request || 5000;
+  
+  elements.charCount.textContent = length.toLocaleString();
+  elements.charLimit.textContent = maxChars.toLocaleString();
+  
+  elements.charCounter.classList.remove('warning', 'danger');
+  if (length > maxChars) {
+    elements.charCounter.classList.add('danger');
+  } else if (length > maxChars * 0.9) {
+    elements.charCounter.classList.add('warning');
+  }
 }
 
 function writeSettingsToForm(settings = {}) {
@@ -179,8 +356,13 @@ function writeSettingsToForm(settings = {}) {
   elements.targetLanguage.value = translateEnabled ? preferredTranslateLanguage : targetLanguage;
   elements.translate.checked = translateEnabled;
   elements.autoPlay.checked = settings.autoPlay !== false;
+  if (elements.performanceStyle) elements.performanceStyle.value = settings.performanceStyle || '';
+  if (elements.emotion) elements.emotion.value = settings.emotion || '';
   updateTranslateLabel();
   renderVoiceOptions(voiceKeys[normalizeLanguage(elements.targetLanguage.value)] || settings.voiceKey || '');
+  renderDialectOptions(settings.dialect || '');
+  updateStudioPanel();
+  updateCharCounter();
 }
 
 function voiceCatalog() {
@@ -199,17 +381,30 @@ function defaults() {
 function voiceLabel(language, key) {
   const list = Array.isArray(voiceCatalog()?.[language]) ? voiceCatalog()[language] : [];
   const match = list.find((voice) => voice?.key === key);
-  return match?.label || '';
+  if (!match) return '';
+  // Return Arabic label when UI is Arabic
+  return currentUiLang === 'ar' && match.label_ar ? match.label_ar : match.label;
+}
+
+function getVoiceDisplayLabel(voice) {
+  if (!voice) return '';
+  // Return Arabic label when UI is Arabic
+  return currentUiLang === 'ar' && voice.label_ar ? voice.label_ar : voice.label;
 }
 
 function formatGender(gender) {
   const text = String(gender || '').trim().toLowerCase();
   if (!text) return '';
+  // Return Arabic gender when UI is Arabic
+  if (currentUiLang === 'ar') {
+    if (text === 'male') return 'ذكر';
+    if (text === 'female') return 'أنثى';
+  }
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function sortVoices(list) {
-  const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+  const tierRank = { standard: 1, hd: 2 };
   return [...list].sort((a, b) => {
     const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
     const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
@@ -235,16 +430,17 @@ function renderVoiceOptions(preferredKey = '') {
   const autoLabel = voiceLabel(language, fallbackDefault);
   const autoOption = document.createElement('option');
   autoOption.value = '';
-  autoOption.textContent = autoLabel ? `Auto (${autoLabel})` : 'Auto (Plan default)';
+  autoOption.textContent = autoLabel ? `${t('auto', 'Auto')} (${autoLabel})` : t('autoPlanDefault', 'Auto (Plan default)');
   elements.voiceKey.appendChild(autoOption);
 
   for (const voice of list) {
     const option = document.createElement('option');
     option.value = String(voice?.key || '');
     const quality = String(voice?.tier_label || '').trim();
+    const voiceDisplayName = getVoiceDisplayLabel(voice);
     const baseLabel = formatGender(voice?.gender)
-      ? `${voice.label} - ${formatGender(voice.gender)}`
-      : String(voice?.label || voice?.key || 'Speaker');
+      ? `${voiceDisplayName} - ${formatGender(voice.gender)}`
+      : String(voiceDisplayName || voice?.key || t('speaker', 'Speaker'));
     option.textContent = quality ? `${baseLabel} - ${quality}` : baseLabel;
     elements.voiceKey.appendChild(option);
   }
@@ -264,20 +460,26 @@ function renderVoiceOptions(preferredKey = '') {
 }
 
 function setProfileCard(profile = null) {
-  const name = String(profile?.user?.name || 'Connect your account');
+  const defaultName = t('connectAccount', 'Connect your account');
+  const name = String(profile?.user?.name || defaultName);
   const plan = String(profile?.plan?.name || '-');
   const voiceTierLabel = String(profile?.plan?.voice_tier_label || '').trim();
   const usage = profile?.usage || {};
   const requestsUnlimited = Boolean(usage?.requests_unlimited);
 
+  const planLabel = t('planLabel', 'Plan:');
+  const charsLabel = t('charactersLabel', 'Characters:');
+  const reqLabel = t('requestsLabel', 'Requests:');
+  const unlimitedText = t('unlimited', 'Unlimited');
+
   const initial = name.trim().charAt(0).toUpperCase() || 'L';
   elements.userAvatar.textContent = initial;
   elements.userName.textContent = name;
-  elements.userPlan.textContent = voiceTierLabel ? `Plan: ${plan} (${voiceTierLabel})` : `Plan: ${plan}`;
-  elements.charsText.textContent = `Characters: ${Number(usage.total_chars || 0).toLocaleString()} / ${Number(usage.plan_chars || 0).toLocaleString()}`;
+  elements.userPlan.textContent = voiceTierLabel ? `${planLabel} ${plan} (${voiceTierLabel})` : `${planLabel} ${plan}`;
+  elements.charsText.textContent = `${charsLabel} ${Number(usage.total_chars || 0).toLocaleString()} / ${Number(usage.plan_chars || 0).toLocaleString()}`;
   elements.requestsText.textContent = requestsUnlimited
-    ? `Requests: ${Number(usage.total_requests || 0).toLocaleString()} / Unlimited`
-    : `Requests: ${Number(usage.total_requests || 0).toLocaleString()} / ${Number(usage.plan_requests || 0).toLocaleString()}`;
+    ? `${reqLabel} ${Number(usage.total_requests || 0).toLocaleString()} / ${unlimitedText}`
+    : `${reqLabel} ${Number(usage.total_requests || 0).toLocaleString()} / ${Number(usage.plan_requests || 0).toLocaleString()}`;
   elements.charsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.chars_percent || 0)))}%`;
   elements.requestsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.requests_percent || 0)))}%`;
 }
@@ -295,6 +497,8 @@ async function refreshProfile() {
   profileData = response.profile || null;
   setProfileCard(profileData);
   renderVoiceOptions(elements.voiceKey.value);
+  updateStudioPanel();
+  updateCharCounter();
 }
 
 async function persistSettingsSilently() {
@@ -319,7 +523,7 @@ function scheduleApiKeyVerify() {
     profileData = null;
     lastVerifiedApiKey = '';
     setProfileCard(null);
-    setStatus('Set your API key to load account details.');
+    setStatus(t('statusSetApiKey', 'Set your API key to load account details.'));
     return;
   }
 
@@ -337,7 +541,7 @@ function scheduleApiKeyVerify() {
       await refreshProfile();
       await persistSettingsSilently();
       lastVerifiedApiKey = currentApiKey;
-      setStatus('API key verified.', 'ok');
+      setStatus(t('statusApiKeyVerified', 'API key verified.'), 'ok');
     } catch (_error) {
       // Keep typing flow smooth; explicit actions still show hard errors.
     }
@@ -362,6 +566,13 @@ async function loadLastStatus() {
 }
 
 async function bootstrap() {
+  // Load UI language and translations
+  await loadUiLanguage();
+  await loadTranslations(currentUiLang);
+  setUiDirection(currentUiLang);
+  applyTranslations();
+  updateLangSwitcher();
+  
   setStatus('');
   try {
     const response = await requestBackground({ type: 'GET_SETTINGS' });
@@ -376,7 +587,7 @@ async function bootstrap() {
 
     if (!String(settings.apiKey || '').trim()) {
       setProfileCard(null);
-      setStatus('Set your API key to load account details.');
+      setStatus(t('statusSetApiKey', 'Set your API key to load account details.'));
       await loadLastStatus().catch(() => { });
       return;
     }
@@ -391,7 +602,7 @@ async function bootstrap() {
 }
 
 async function saveSettings() {
-  setStatus('Saving settings...');
+  setStatus(t('statusSaving', 'Saving settings...'));
   try {
     const response = await requestBackground({
       type: 'SAVE_SETTINGS',
@@ -405,14 +616,14 @@ async function saveSettings() {
     writeSettingsToForm(response.settings || {});
     await refreshProfile();
     lastVerifiedApiKey = String((response.settings || {}).apiKey || '').trim();
-    setStatus('Settings saved.', 'ok');
+    setStatus(t('statusSaved', 'Settings saved.'), 'ok');
   } catch (error) {
     setStatus(error.message || 'Save failed.', 'error');
   }
 }
 
 async function readSelection() {
-  setStatus('Reading selected text...');
+  setStatus(t('statusReading', 'Reading selected text...'));
   try {
     await syncLanguageToCurrentSelection().catch(() => { });
 
@@ -425,20 +636,30 @@ async function readSelection() {
     }
 
     await refreshProfile().catch(() => { });
-    setStatus('Voice generated in side panel.', 'ok');
+    setStatus(t('statusGenerated', 'Voice generated in side panel.'), 'ok');
   } catch (error) {
-    setStatus(error.message || 'Unable to read selected text.', 'error');
+    // Refresh profile to show accurate usage even after errors
+    await refreshProfile().catch(() => { });
+    const msg = String(error?.message || '').toLowerCase();
+    // Improve error messages for common network issues
+    if (msg.includes('timed out')) {
+      setStatus(t('statusTimeout', 'Request timed out. Check your dashboard - voice may have been generated.'), 'error');
+    } else if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network error')) {
+      setStatus(t('statusNetworkError', 'Network error. If usage changed, check dashboard for the generated audio.'), 'error');
+    } else {
+      setStatus(error.message || 'Unable to read selected text.', 'error');
+    }
   }
 }
 
 async function readQuickText() {
   const text = String(elements.quickText.value || '').trim();
   if (!text) {
-    setStatus('Enter quick text first.', 'error');
+    setStatus(t('statusNoText', 'Enter quick text first.'), 'error');
     return;
   }
 
-  setStatus('Generating voice...');
+  setStatus(t('statusGenerating', 'Generating voice...'));
   try {
     const response = await requestBackground({
       type: 'READ_TEXT',
@@ -451,9 +672,19 @@ async function readQuickText() {
     }
 
     await refreshProfile().catch(() => { });
-    setStatus('Voice generated in side panel.', 'ok');
+    setStatus(t('statusGenerated', 'Voice generated in side panel.'), 'ok');
   } catch (error) {
-    setStatus(error.message || 'Voice generation failed.', 'error');
+    // Refresh profile to show accurate usage even after errors
+    await refreshProfile().catch(() => { });
+    const msg = String(error?.message || '').toLowerCase();
+    // Improve error messages for common network issues
+    if (msg.includes('timed out')) {
+      setStatus(t('statusTimeout', 'Request timed out. Check your dashboard - voice may have been generated.'), 'error');
+    } else if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network error')) {
+      setStatus(t('statusNetworkError', 'Network error. If usage changed, check dashboard for the generated audio.'), 'error');
+    } else {
+      setStatus(error.message || 'Voice generation failed.', 'error');
+    }
   }
 }
 
@@ -527,6 +758,7 @@ elements.targetLanguage.addEventListener('change', () => {
 
   updateTranslateLabel();
   renderVoiceOptions('');
+  renderDialectOptions('');
   if (!elements.translate.checked) {
     syncLanguageToCurrentSelection()
       .then((changed) => {
@@ -574,7 +806,7 @@ elements.apiKey.addEventListener('change', async () => {
     profileData = null;
     lastVerifiedApiKey = '';
     setProfileCard(null);
-    setStatus('Set your API key to load account details.');
+    setStatus(t('statusSetApiKey', 'Set your API key to load account details.'));
     return;
   }
 
@@ -582,7 +814,7 @@ elements.apiKey.addEventListener('change', async () => {
     await refreshProfile();
     await persistSettingsSilently();
     lastVerifiedApiKey = apiKey;
-    setStatus('API key verified.', 'ok');
+    setStatus(t('statusApiKeyVerified', 'API key verified.'), 'ok');
   } catch (error) {
     setStatus(error.message || 'Invalid API key.', 'error');
   }
@@ -591,5 +823,26 @@ elements.apiKey.addEventListener('change', async () => {
 elements.saveBtn.addEventListener('click', saveSettings);
 elements.selectionBtn.addEventListener('click', readSelection);
 elements.quickBtn.addEventListener('click', readQuickText);
+
+// Character counter for quick text
+if (elements.quickText) {
+  elements.quickText.addEventListener('input', updateCharCounter);
+}
+
+// Studio panel controls
+if (elements.performanceStyle) {
+  elements.performanceStyle.addEventListener('change', () => persistSettingsSilently().catch(() => {}));
+}
+if (elements.emotion) {
+  elements.emotion.addEventListener('change', () => persistSettingsSilently().catch(() => {}));
+}
+if (elements.dialect) {
+  elements.dialect.addEventListener('change', () => persistSettingsSilently().catch(() => {}));
+}
+
+// Language switcher
+if (elements.langSwitcher) {
+  elements.langSwitcher.addEventListener('click', switchLanguage);
+}
 
 bootstrap();

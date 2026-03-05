@@ -110,6 +110,57 @@
       grid-template-columns: 1fr 1fr;
       gap: .7rem;
     }
+    .studio-panel {
+      margin-top: .6rem;
+      padding: .85rem;
+      border: 1px solid color-mix(in oklab, var(--a) 25%, var(--line));
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+    }
+    .studio-label {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .88rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--a) 60%, var(--text));
+      margin-bottom: .6rem;
+    }
+    .studio-section {
+      padding: .65rem .75rem;
+      border-radius: calc(var(--radius) - 2px);
+      background: color-mix(in oklab, var(--a) 3%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
+    }
+    .studio-section-label {
+      display: flex;
+      align-items: center;
+      gap: .35rem;
+      font-size: .82rem;
+      font-weight: 600;
+      color: color-mix(in oklab, var(--a) 50%, var(--text));
+      margin-bottom: .45rem;
+      letter-spacing: .01em;
+    }
+    .studio-panel input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      height: 6px;
+      border-radius: var(--radius-full);
+      background: var(--line);
+      outline: none;
+    }
+    .studio-panel input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      cursor: pointer;
+      border: 2px solid var(--surface);
+      box-shadow: 0 0 4px rgba(0,0,0,.2);
+    }
     label {
       display: block;
       font-size: .88rem;
@@ -146,6 +197,25 @@
     }
     select:hover {
       border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+    }
+    .char-counter {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: .25rem;
+      margin-top: .4rem;
+      padding: .25rem .5rem;
+      font-size: .8rem;
+      color: var(--muted);
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--surface) 50%, transparent);
+    }
+    .char-counter.warning {
+      color: var(--warning, #f59e0b);
+    }
+    .char-counter.danger {
+      color: var(--danger);
+      font-weight: 600;
     }
     html[data-theme="light"] select {
       background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6c89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
@@ -516,7 +586,10 @@
 
           <div>
             <label>{{ __('ui.dashboard.text_content') }}</label>
-            <textarea name="content" dir="auto" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
+            <textarea name="content" id="contentTextarea" dir="auto" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
+            <div class="char-counter" id="charCounter">
+              <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
+            </div>
           </div>
 
           <div class="two-col">
@@ -533,6 +606,89 @@
             </div>
           </div>
 
+          {{-- Performance Controls --}}
+          @if(($planTier ?? 'standard') === 'hd')
+          <div class="studio-panel" id="studioPanel">
+            <div class="studio-label">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              🎛️ {{ __('ui.dashboard.voice_studio', ['default' => 'Performance Controls']) }}
+            </div>
+            {{-- Performance Style Section --}}
+            <div class="studio-section">
+              <div class="studio-section-label">🎭 {{ __('ui.dashboard.performance_style', ['default' => 'Performance Style']) }}</div>
+              <select name="performance_style" id="performance_style">
+                <option value="">-- {{ __('ui.dashboard.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
+                <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
+                <option value="educational">{{ __('ui.dashboard.style_educational', ['default' => 'Educational']) }}</option>
+                <option value="commercial">{{ __('ui.dashboard.style_commercial', ['default' => 'Commercial']) }}</option>
+                <option value="promo">{{ __('ui.dashboard.style_promo', ['default' => 'Promotional']) }}</option>
+                <option value="podcast">{{ __('ui.dashboard.style_podcast', ['default' => 'Podcast']) }}</option>
+                <option value="assistant">{{ __('ui.dashboard.style_assistant', ['default' => 'Virtual Assistant']) }}</option>
+                <option value="narrative">{{ __('ui.dashboard.style_narrative', ['default' => 'Narrative']) }}</option>
+                <option value="comedic">{{ __('ui.dashboard.style_comedic', ['default' => 'Comedic']) }}</option>
+                <option value="corporate">{{ __('ui.dashboard.style_corporate', ['default' => 'Corporate']) }}</option>
+                <option value="conversational">{{ __('ui.dashboard.style_conversational', ['default' => 'Conversational']) }}</option>
+                <option value="inspirational">{{ __('ui.dashboard.style_inspirational', ['default' => 'Inspirational']) }}</option>
+                <option value="cinematic">{{ __('ui.dashboard.style_cinematic', ['default' => 'Cinematic']) }}</option>
+                <option value="documentary">{{ __('ui.dashboard.style_documentary', ['default' => 'Documentary']) }}</option>
+                <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling', ['default' => 'Storytelling']) }}</option>
+                <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style', ['default' => 'Ad Style']) }}</option>
+                <option value="news">{{ __('ui.dashboard.emotion_news', ['default' => 'News']) }}</option>
+              </select>
+            </div>
+
+            {{-- Emotion Section --}}
+            <div class="studio-section" style="margin-top:.6rem;">
+              <div class="studio-section-label">💫 {{ __('ui.dashboard.emotion_tone', ['default' => 'Emotion']) }}</div>
+              <select name="emotion" id="emotion">
+                <option value="">-- {{ __('ui.dashboard.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
+                <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
+                <option value="warm">{{ __('ui.dashboard.emotion_warm', ['default' => 'Warm']) }}</option>
+                <option value="sad">{{ __('ui.dashboard.emotion_sad', ['default' => 'Sad']) }}</option>
+                <option value="excited">{{ __('ui.dashboard.emotion_excited', ['default' => 'Excited']) }}</option>
+                <option value="formal">{{ __('ui.dashboard.emotion_formal', ['default' => 'Formal']) }}</option>
+                <option value="calm">{{ __('ui.dashboard.emotion_calm', ['default' => 'Calm']) }}</option>
+                <option value="angry">{{ __('ui.dashboard.emotion_angry', ['default' => 'Angry']) }}</option>
+              </select>
+            </div>
+            <div style="margin-top: .4rem;">
+              <div>
+                <label for="dialect">{{ __('ui.dashboard.dialect', ['default' => 'Dialect']) }}</label>
+                <select name="dialect" id="dialect">
+                  <option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="two-col" style="margin-top: .4rem;">
+              <div>
+                <label for="speed">{{ __('ui.dashboard.speed', ['default' => 'Speed']) }} (<span id="speedVal">1.0</span>x)</label>
+                <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:100%"
+                  oninput="document.getElementById('speedVal').textContent=this.value">
+              </div>
+              <div>
+                <label for="pitch">{{ __('ui.dashboard.pitch', ['default' => 'Pitch']) }} (<span id="pitchVal">0</span>)</label>
+                <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" style="width:100%"
+                  oninput="document.getElementById('pitchVal').textContent=this.value">
+              </div>
+            </div>
+            @if($dialogueEnabled ?? false)
+            <div style="margin-top: .5rem; border-top: 1px solid var(--line); padding-top: .5rem;">
+              <div class="setting-card" style="margin-bottom: .4rem;">
+                <div class="setting-info">
+                  <label for="dialogueToggle">{{ __('ui.dashboard.dialogue_mode', ['default' => 'Dialogue Mode']) }}</label>
+                  <div class="hint">{{ __('ui.dashboard.dialogue_hint', ['default' => 'Multi-speaker conversation (Pro plans only)']) }}</div>
+                </div>
+                <label class="toggle-switch" aria-label="{{ __('ui.dashboard.dialogue_mode', ['default' => 'Dialogue Mode']) }}">
+                  <input type="checkbox" id="dialogueToggle">
+                  <span class="toggle-slider"></span>
+                </label>
+                <input type="hidden" name="is_dialogue" id="dialogueSelect" value="0">
+              </div>
+            </div>
+            @endif
+          </div>
+          @endif
+
           <div>
             <div class="setting-card" style="margin-top: .5rem;">
               <div class="setting-info">
@@ -540,10 +696,10 @@
                 <div class="hint" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
               </div>
               <label class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
-                <input type="checkbox" id="translateToggle" {{ old('translate', '1') ? 'checked' : '' }}>
+                <input type="checkbox" id="translateToggle" {{ old('translate') ? 'checked' : '' }}>
                 <span class="toggle-slider"></span>
               </label>
-              <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate', '1') ? '1' : '0' }}">
+              <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate') ? '1' : '0' }}">
             </div>
           </div>
 
@@ -563,14 +719,14 @@
         </div>
 
         <div class="info-list">
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.overage') }}</span><span class="info-value">{{ ($activePlan?->allow_overage ?? false) ? __('ui.dashboard.overage_per_million', ['amount' => "\u{2066}$".number_format(((int) ($activePlan?->overage_price_per_million_cents ?? 0)) / 100, 2)."\u{2069}"]) : __('ui.upgrade.no_overage') }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.pricing.topup_chars') }}</span><span class="info-value">{{ (($activePlan?->topup_char_price_cents ?? null) !== null || ($activePlan?->overage_price_per_million_cents ?? null) !== null) ? "\u{2066}$".number_format(((int) (($activePlan?->topup_char_price_cents ?? $activePlan?->overage_price_per_million_cents) ?? 0)) / 100, 0)."\u{2069}".__('ui.pricing.topup_per_million') : __('ui.upgrade.not_allowed') }}</span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.commercial_use') }}</span><span class="info-value">{{ ($activePlan?->commercial_use_allowed ?? false) ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.processing') }}</span><span class="info-value">{{ $processingPriorityLabel((string) ($activePlan?->processing_priority ?? 'standard')) }}</span></div>
         </div>
 
         <div class="info-list">
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.arabic_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? ($voiceNameMap[$defaultVoiceAr]['label_ar'] ?? $voiceNameMap[$defaultVoiceAr]['label'] ?? __('ui.dashboard.default')) : ($voiceNameMap[$defaultVoiceAr]['label'] ?? __('ui.dashboard.default')) }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.english_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? ($voiceNameMap[$defaultVoiceEn]['label_ar'] ?? $voiceNameMap[$defaultVoiceEn]['label'] ?? __('ui.dashboard.default')) : ($voiceNameMap[$defaultVoiceEn]['label'] ?? __('ui.dashboard.default')) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.arabic_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? (($voiceNameMap[$defaultVoiceAr] ?? [])['label_ar'] ?? ($voiceNameMap[$defaultVoiceAr] ?? [])['label'] ?? __('ui.dashboard.default')) : (($voiceNameMap[$defaultVoiceAr] ?? [])['label'] ?? __('ui.dashboard.default')) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.english_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? (($voiceNameMap[$defaultVoiceEn] ?? [])['label_ar'] ?? ($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) : (($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) }}</span></div>
         </div>
 
         <div class="sidebar-actions">
@@ -704,7 +860,7 @@
     const voiceCatalog = @json($voiceCatalog);
     const oldVoice = @json(old('voice_key'));
     const queueUrl = '{{ route('dashboard.queue') }}';
-    const deleteJobBaseUrl = '{{ url('/dashboard/jobs') }}';
+    const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
     const csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
@@ -712,7 +868,10 @@
     const generateBtn = document.getElementById('generateBtn');
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_key');
-    const contentInput = voiceForm?.querySelector('textarea[name="content"]') || null;
+    const contentInput = document.getElementById('contentTextarea');
+    const charCounter = document.getElementById('charCounter');
+    const charCountEl = document.getElementById('charCount');
+    const maxCharsPerRequest = {{ $maxCharsPerRequest }};
     const translateSelect = document.getElementById('translateSelect');
     const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
@@ -734,7 +893,45 @@
 
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
     const preferredVoiceKeyByLanguage = { ar: '', en: '' };
+    const dialectSelect = document.getElementById('dialect');
     let allJobs = [];
+
+    const dialectsByLanguage = {
+      ar: [
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
+        { value: 'ar-XA', label: '{{ __("ui.dialects.msa", ["default" => "Modern Standard Arabic"]) }}' },
+        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi", ["default" => "Saudi"]) }}' },
+        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati", ["default" => "Emirati"]) }}' },
+        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian", ["default" => "Egyptian"]) }}' },
+        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese", ["default" => "Lebanese"]) }}' },
+        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian", ["default" => "Syrian"]) }}' },
+        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian", ["default" => "Jordanian"]) }}' },
+        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi", ["default" => "Iraqi"]) }}' },
+        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan", ["default" => "Moroccan"]) }}' },
+        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti", ["default" => "Kuwaiti"]) }}' },
+      ],
+      en: [
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
+        { value: 'en-US', label: '{{ __("ui.dialects.american", ["default" => "American"]) }}' },
+        { value: 'en-GB', label: '{{ __("ui.dialects.british", ["default" => "British"]) }}' },
+        { value: 'en-AU', label: '{{ __("ui.dialects.australian", ["default" => "Australian"]) }}' },
+        { value: 'en-IN', label: '{{ __("ui.dialects.indian", ["default" => "Indian"]) }}' },
+        { value: 'en-ZA', label: '{{ __("ui.dialects.south_african", ["default" => "South African"]) }}' },
+      ],
+    };
+
+    function renderDialectOptions() {
+      if (!dialectSelect || !targetLanguage) return;
+      const lang = normalizeLanguage(targetLanguage.value);
+      const dialects = dialectsByLanguage[lang] || dialectsByLanguage['ar'];
+      dialectSelect.innerHTML = '';
+      for (const d of dialects) {
+        const opt = document.createElement('option');
+        opt.value = d.value;
+        opt.textContent = d.label;
+        dialectSelect.appendChild(opt);
+      }
+    }
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
 
@@ -781,7 +978,11 @@
     }
 
     function cleanSpeakerLabel(value) {
-      return String(value || '').replace(/^\++\s*/, '').trim();
+      return String(value || '')
+        .replace(/^\++\s*/, '')
+        .replace(/\b[a-z]{2}-[A-Z]{2}\b/g, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
     }
 
     function voiceDisplayLabel(voice) {
@@ -796,7 +997,7 @@
     }
 
     function sortVoices(list) {
-      const tierRank = { standard: 1, hd: 2, hd_plus: 3 };
+      const tierRank = { standard: 1, hd: 2 };
       return [...list].sort((a, b) => {
         const aRank = tierRank[String(a?.tier || 'standard')] ?? 99;
         const bRank = tierRank[String(b?.tier || 'standard')] ?? 99;
@@ -841,11 +1042,7 @@
       for (const voice of voices) {
         const option = document.createElement('option');
         option.value = voice.key;
-        const label = voiceDisplayLabel(voice);
-        const quality = String(voice?.tier_label || '').trim();
-        option.textContent = quality !== ''
-          ? `${label} - ${formatTierLabel(quality)}`
-          : label;
+        option.textContent = voiceDisplayLabel(voice);
         voiceSelect.appendChild(option);
       }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
@@ -1164,6 +1361,7 @@
         preferredTranslateLanguage = normalizeLanguage(targetLanguage.value);
       }
       renderVoiceOptions();
+      renderDialectOptions();
     });
     voiceSelect?.addEventListener('change', function() {
       rememberCurrentVoiceSelection();
@@ -1190,9 +1388,36 @@
       preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
     }
     renderVoiceOptions();
+    renderDialectOptions();
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();
+
+    // Dialogue toggle binding
+    const dialogueToggle = document.getElementById('dialogueToggle');
+    const dialogueSelect = document.getElementById('dialogueSelect');
+    if (dialogueToggle && dialogueSelect) {
+      dialogueToggle.addEventListener('change', function() {
+        dialogueSelect.value = dialogueToggle.checked ? '1' : '0';
+      });
+    }
+
+    // Live character counter
+    function updateCharCounter() {
+      if (!contentInput || !charCountEl || !charCounter) return;
+      const length = contentInput.value.length; // includes spaces
+      charCountEl.textContent = length.toLocaleString();
+      charCounter.classList.remove('warning', 'danger');
+      if (length > maxCharsPerRequest) {
+        charCounter.classList.add('danger');
+      } else if (length > maxCharsPerRequest * 0.9) {
+        charCounter.classList.add('warning');
+      }
+    }
+    if (contentInput) {
+      contentInput.addEventListener('input', updateCharCounter);
+      updateCharCounter(); // initial count for old('content')
+    }
   </script>
 </body>
 </html>

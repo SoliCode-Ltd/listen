@@ -20,8 +20,50 @@ function normalizeApiBase(apiBase) {
   return String(apiBase || '').trim().replace(/\/+$/, '');
 }
 
+function toAbsoluteAudioUrl(audioUrl, apiBase) {
+  const url = String(audioUrl || '').trim();
+  if (!url) return '';
+  // Already absolute URL
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  // Relative URL - prepend apiBase
+  const base = normalizeApiBase(apiBase);
+  if (!base) return url;
+  const path = url.startsWith('/') ? url : '/' + url;
+  return base + path;
+}
+
 function normalizeLanguage(value) {
   return value === 'en' ? 'en' : 'ar';
+}
+
+/**
+ * Get the current UI language from storage
+ */
+async function getUiLanguage() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get({ uiLanguage: '' }, (result) => {
+      const lang = result?.uiLanguage;
+      if (lang === 'ar' || lang === 'en') {
+        resolve(lang);
+      } else {
+        const browserLang = chrome.i18n.getUILanguage().toLowerCase();
+        resolve(browserLang.startsWith('ar') ? 'ar' : 'en');
+      }
+    });
+  });
+}
+
+/**
+ * Get the appropriate voice label based on UI language
+ */
+function getVoiceLabel(voiceData, uiLang) {
+  if (!voiceData) return '';
+  if (uiLang === 'ar' && voiceData.label_ar) {
+    return voiceData.label_ar;
+  }
+  return voiceData.label || '';
 }
 
 const PACKAGED_API_BASE = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.apiBase || '');
@@ -37,7 +79,10 @@ const DEFAULT_SETTINGS = {
   translationTargetLanguage: 'ar',
   voiceKey: '',
   voiceKeyByLanguage: { ar: '', en: '' },
-  translate: true,
+  dialect: '',
+  performanceStyle: '',
+  emotion: '',
+  translate: false,
   autoPlay: true,
 };
 
@@ -432,12 +477,14 @@ function createContextMenu() {
     return contextMenuInitPromise;
   }
 
+  const menuTitle = chrome.i18n.getMessage('contextMenuTitle') || 'Listen Selected Text';
+
   contextMenuInitPromise = new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
       // Intentionally ignore removeAll errors (e.g., transient startup state).
       chrome.contextMenus.create({
         id: 'listen-read-selection',
-        title: 'Listen Selected Text',
+        title: menuTitle,
         contexts: ['selection'],
       }, () => {
         const createError = chrome.runtime.lastError;
@@ -449,7 +496,7 @@ function createContextMenu() {
         // Avoid noisy "duplicate id" failures when startup hooks race.
         if (String(createError.message || '').toLowerCase().includes('duplicate id')) {
           chrome.contextMenus.update('listen-read-selection', {
-            title: 'Listen Selected Text',
+            title: menuTitle,
             contexts: ['selection'],
           }, () => resolve());
           return;
@@ -512,6 +559,9 @@ function getSettings() {
         translationTargetLanguage,
         voiceKeyByLanguage,
         voiceKey,
+        dialect: String(stored?.dialect || '').trim(),
+        performanceStyle: String(stored?.performanceStyle || '').trim(),
+        emotion: String(stored?.emotion || '').trim(),
       });
     });
   });
@@ -543,6 +593,9 @@ function saveSettings(settings) {
   }
   payload.voiceKey = String(payload.voiceKeyByLanguage[payload.targetLanguage] || payload.voiceKey || '').trim();
   payload.autoPlay = payload.autoPlay !== false;
+  payload.dialect = String(payload.dialect || '').trim();
+  payload.performanceStyle = String(payload.performanceStyle || '').trim();
+  payload.emotion = String(payload.emotion || '').trim();
 
   return new Promise((resolve) => {
     chrome.storage.sync.set(payload, () => resolve(payload));
@@ -585,13 +638,19 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
   for (let i = 0; i < 28; i += 1) {
     await sleep(i < 8 ? 700 : 1300);
 
-    const response = await fetch(`${apiBase}/api/reader/jobs?limit=40`, {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json',
-        'X-Listen-Key': apiKey,
-      },
-    });
+    let response;
+    try {
+      response = await fetch(`${apiBase}/api/reader/jobs?limit=40`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'X-Listen-Key': apiKey,
+        },
+      });
+    } catch (networkError) {
+      // Continue polling on network hiccups
+      continue;
+    }
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
@@ -666,13 +725,27 @@ async function fetchProfile(overrides = {}) {
     throw new Error('Set API Key to connect your account.');
   }
 
-  const response = await fetch(`${apiBase}/api/reader/profile`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      'X-Listen-Key': apiKey,
-    },
-  });
+  let response;
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    
+    response = await fetch(`${apiBase}/api/reader/profile`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'X-Listen-Key': apiKey,
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+  } catch (networkError) {
+    if (networkError.name === 'AbortError') {
+      throw new Error('Request timed out. Server may be slow or unreachable.');
+    }
+    throw new Error('Network error. Check your connection and ensure the server is running.');
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
@@ -691,6 +764,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   const settings = { ...(await getSettings()), ...overrides };
   const apiBase = normalizeApiBase(settings.apiBase);
   const apiKey = String(settings.apiKey || '').trim();
+  const uiLang = await getUiLanguage();
 
   if (!apiBase) {
     throw new Error('Service endpoint is not configured.');
@@ -728,15 +802,46 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     payload.voice_key = voiceKey;
   }
 
-  const response = await fetch(`${apiBase}/api/reader/queue`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'X-Listen-Key': apiKey,
-    },
-    body: JSON.stringify(payload),
-  });
+  // Add dialect if specified
+  const dialect = String(settings.dialect || '').trim();
+  if (dialect) {
+    payload.dialect = dialect;
+  }
+
+  // Add HD tier features (performance style and emotion)
+  const performanceStyle = String(settings.performanceStyle || '').trim();
+  if (performanceStyle) {
+    payload.performance_style = performanceStyle;
+  }
+  const emotion = String(settings.emotion || '').trim();
+  if (emotion) {
+    payload.emotion = emotion;
+  }
+
+  let response;
+  try {
+    // Use AbortController for timeout (60s for sync voice generation)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    
+    response = await fetch(`${apiBase}/api/reader/queue`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'X-Listen-Key': apiKey,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+  } catch (networkError) {
+    if (networkError.name === 'AbortError') {
+      throw new Error('Request timed out. The voice may still be generating - check your history.');
+    }
+    throw new Error('Network error. Check your connection and ensure the server is running.');
+  }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
@@ -744,29 +849,31 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   }
 
   if (data.audio_url) {
+    const absoluteAudioUrl = toAbsoluteAudioUrl(data.audio_url, apiBase);
     if (settings.autoPlay) {
       const tabId = typeof runtimeContext.tabId === 'number'
         ? runtimeContext.tabId
         : await getActiveTabId();
       await openSidePlayer(
         tabId,
-        data.audio_url,
+        absoluteAudioUrl,
         selectedText,
-        data?.voice?.label || '',
+        getVoiceLabel(data?.voice, uiLang),
         Number(runtimeContext.requestToken || 0),
       );
     }
 
     return {
       status: data.status || 'done',
-      audio_url: data.audio_url,
-      voice_label: data?.voice?.label || '',
+      audio_url: absoluteAudioUrl,
+      voice_label: getVoiceLabel(data?.voice, uiLang),
       message: 'Voice generated successfully.',
     };
   }
 
   if (Number(data.job_id) > 0) {
     const readyJob = await pollJobUntilReady(apiBase, apiKey, data.job_id);
+    const absoluteJobAudioUrl = toAbsoluteAudioUrl(readyJob.audio_url, apiBase);
 
     if (settings.autoPlay) {
       const tabId = typeof runtimeContext.tabId === 'number'
@@ -774,17 +881,17 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
         : await getActiveTabId();
       await openSidePlayer(
         tabId,
-        readyJob.audio_url,
+        absoluteJobAudioUrl,
         selectedText,
-        readyJob?.voice?.label || '',
+        getVoiceLabel(readyJob?.voice, uiLang),
         Number(runtimeContext.requestToken || 0),
       );
     }
 
     return {
       status: readyJob.status,
-      audio_url: readyJob.audio_url,
-      voice_label: readyJob?.voice?.label || '',
+      audio_url: absoluteJobAudioUrl,
+      voice_label: getVoiceLabel(readyJob?.voice, uiLang),
       message: 'Voice generated successfully.',
     };
   }

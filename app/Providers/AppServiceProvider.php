@@ -2,8 +2,14 @@
 
 namespace App\Providers;
 
+use App\Contracts\TtsProviderInterface;
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
+use App\Services\Tts\ArabicVoiceMapper;
+use App\Services\Tts\GeminiTtsProvider;
+use App\Services\Tts\GoogleCloudTtsProvider;
+use App\Services\Tts\TtsRoutingService;
+use App\Services\TtsService;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -20,6 +26,28 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
+
+        // Register TTS providers as singletons
+        $this->app->singleton(GoogleCloudTtsProvider::class);
+        $this->app->singleton(GeminiTtsProvider::class);
+        $this->app->singleton(ArabicVoiceMapper::class);
+        $this->app->singleton(TtsRoutingService::class, function ($app) {
+            return new TtsRoutingService(
+                $app->make(GoogleCloudTtsProvider::class),
+                $app->make(GeminiTtsProvider::class),
+            );
+        });
+
+        // Inject routing service into TtsService (backward compatible)
+        $this->app->singleton(TtsService::class, function ($app) {
+            $service = new TtsService();
+            $service->setRoutingService($app->make(TtsRoutingService::class));
+            $service->setArabicMapper($app->make(ArabicVoiceMapper::class));
+            return $service;
+        });
+
+        // Bind the interface to Google Cloud by default
+        $this->app->bind(TtsProviderInterface::class, GoogleCloudTtsProvider::class);
     }
 
     /**

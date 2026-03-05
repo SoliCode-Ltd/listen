@@ -6,7 +6,6 @@ class VoiceTier
 {
     public const STANDARD = 'standard';
     public const HD = 'hd';
-    public const HD_PLUS = 'hd_plus';
 
     /**
      * @return array<int, string>
@@ -16,13 +15,17 @@ class VoiceTier
         return [
             self::STANDARD,
             self::HD,
-            self::HD_PLUS,
         ];
     }
 
     public static function normalize(?string $value): string
     {
         $value = strtolower(trim((string) $value));
+
+        // Legacy: treat old 'hd_plus' values as 'hd'
+        if ($value === 'hd_plus') {
+            return self::HD;
+        }
 
         return in_array($value, self::all(), true) ? $value : self::STANDARD;
     }
@@ -31,7 +34,6 @@ class VoiceTier
     {
         return match (self::normalize($tier)) {
             self::HD => 'HD',
-            self::HD_PLUS => 'HD+',
             default => __('ui.pricing.standard'),
         };
     }
@@ -40,7 +42,6 @@ class VoiceTier
     {
         return match (self::normalize($tier)) {
             self::HD => 2,
-            self::HD_PLUS => 3,
             default => 1,
         };
     }

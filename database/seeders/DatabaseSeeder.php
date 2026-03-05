@@ -24,6 +24,8 @@ class DatabaseSeeder extends Seeder
             AdminSeeder::class,
             PlanSeeder::class,
             VoiceSeeder::class,
+            HybridTtsSeeder::class,
+            VoiceSampleSeeder::class,
         ]);
     }
 }

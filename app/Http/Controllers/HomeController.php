@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\DemoGuestUsage;
 use App\Models\Plan;
+use App\Models\VoiceSample;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -16,10 +17,42 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class HomeController extends Controller
 {
+    /** @var array<int, string> */
+    private const PERFORMANCE_STYLE_VALUES = [
+        'neutral',
+        'educational',
+        'commercial',
+        'promo',
+        'podcast',
+        'assistant',
+        'narrative',
+        'comedic',
+        'corporate',
+        'conversational',
+        'inspirational',
+        'cinematic',
+        'documentary',
+        'storytelling',
+        'ad_style',
+        'news',
+    ];
+
+    /** @var array<int, string> */
+    private const EMOTION_VALUES = [
+        'neutral',
+        'warm',
+        'sad',
+        'excited',
+        'formal',
+        'calm',
+        'angry',
+    ];
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
     ) {
@@ -29,9 +62,25 @@ class HomeController extends Controller
     {
         $pricingPlans = $this->pricingPlans();
         $highlightPlans = array_slice($pricingPlans, 0, 3);
+        $sampleLanguage = $this->sampleLanguageForLocale(app()->getLocale());
+        $isArabicLocale = $sampleLanguage === 'ar';
+
+        // Load voice samples for the landing page hero section (shuffled)
+        $voiceSamples = Cache::remember("landing_voice_samples:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
+            return VoiceSample::query()
+                ->active()
+                ->where('category', 'hero')
+                ->where('language', $sampleLanguage)
+                ->inRandomOrder()
+                ->limit(12)
+                ->get()
+                ->map(fn (VoiceSample $s): array => $this->mapVoiceSample($s, $isArabicLocale))
+                ->toArray();
+        });
 
         return view('landing', [
             'highlightPlans' => $highlightPlans,
+            'voiceSamples' => $voiceSamples,
         ]);
     }
 
@@ -55,13 +104,14 @@ class HomeController extends Controller
             return $response;
         }
 
-        $defaultTier = VoiceTier::STANDARD;
-
+        $freePlan = $this->planAccessService->freePlan();
+        $defaultTier = $this->planAccessService->resolveTierForPlan($freePlan);
+        $defaultProvider = VoiceCatalog::preferredProviderForTier($defaultTier);
         return view('demo', [
             'voiceCatalog' => VoiceCatalog::publicCatalogByTier(),
             'defaultTier' => $defaultTier,
-            'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('ar', $defaultTier)),
-            'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguage('en', $defaultTier)),
+            'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $defaultTier, $defaultProvider)),
+            'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('en', $defaultTier, $defaultProvider)),
             'demoQuota' => $this->demoQuotaSnapshot($request, true),
             'guestAllowanceChars' => $this->demoCharAllowance($request),
             'starterPlanChars' => max(1, (int) (Plan::query()->where('slug', 'free')->value('monthly_chars') ?? 30000)),
@@ -85,10 +135,18 @@ class HomeController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
-            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
+            'voice_tier' => ['nullable', 'in:standard,hd'],
+            // Studio parameters
+            'dialect' => ['nullable', 'string', 'max:10'],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
+            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
         ]);
 
-        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? VoiceTier::STANDARD));
+        $demoPlan = $this->planAccessService->freePlan();
+        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
+        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
@@ -141,10 +199,18 @@ class HomeController extends Controller
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
-            'voice_tier' => ['nullable', 'in:standard,hd,hd_plus'],
+            'voice_tier' => ['nullable', 'in:standard,hd'],
+            // Studio parameters
+            'dialect' => ['nullable', 'string', 'max:10'],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
+            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
         ]);
 
-        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? VoiceTier::STANDARD));
+        $demoPlan = $this->planAccessService->freePlan();
+        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
+        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
@@ -174,7 +240,35 @@ class HomeController extends Controller
                 (bool) ($validated['translate'] ?? false),
             );
 
-            $audio = $ttsService->synthesize($textForSpeech, $validated['target_language'], $voiceName, $tier);
+            $studioOptions = $this->sanitizeStudioOptionsForTier($tier, [
+                'dialect' => $validated['dialect'] ?? null,
+                'performance_style' => $validated['performance_style'] ?? null,
+                'emotion' => $validated['emotion'] ?? 'neutral',
+                'speed' => $validated['speed'] ?? 1.0,
+                'pitch' => $validated['pitch'] ?? 0.0,
+            ]);
+            $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
+
+            $voiceOptions = [
+                'voice_name' => $voiceName,
+                'provider' => VoiceCatalog::providerForName($voiceName),
+                'tier' => $tier,
+                'gender' => is_array($voiceMeta) ? ($voiceMeta['gender'] ?? null) : null,
+                'performance_style' => $studioOptions['performance_style'],
+                'style' => $studioOptions['performance_style'],
+                'dialect' => $studioOptions['dialect'],
+                'emotion' => $studioOptions['emotion'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+            ];
+
+            $audio = $ttsService->synthesizeAdvanced(
+                $textForSpeech,
+                $validated['target_language'],
+                $voiceOptions,
+                $demoPlan,
+                null,
+            );
             $estimate = UsageEstimator::estimate($textForSpeech);
 
             return response()->json([
@@ -410,9 +504,10 @@ class HomeController extends Controller
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
+        $preferredProvider = VoiceCatalog::preferredProviderForTier($tier);
 
         if ($voiceKey === '') {
-            $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+            $defaultVoice = VoiceCatalog::defaultForLanguageAndProvider($language, $tier, $preferredProvider);
             if ($defaultVoice === '') {
                 throw ValidationException::withMessages([
                     'target_language' => __('ui.backend.demo_language_not_available_for_quality'),
@@ -422,7 +517,7 @@ class HomeController extends Controller
             return $defaultVoice;
         }
 
-        $voiceName = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
+        $voiceName = VoiceCatalog::nameFromKeyForLanguageAndProvider($language, $voiceKey, $tier, $preferredProvider);
         if (! $voiceName) {
             throw ValidationException::withMessages([
                 'voice_key' => __('ui.backend.demo_speaker_not_available'),
@@ -442,16 +537,35 @@ class HomeController extends Controller
             ->orderBy('price_cents')
             ->get();
 
-        $mapped = $plans->map(function (Plan $plan): array {
+        $locale = app()->getLocale();
+
+        $mapped = $plans->map(function (Plan $plan) use ($locale): array {
             $monthlyCents = max(0, (int) $plan->price_cents);
             $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
             $monthly = round($monthlyCents / 100, 2);
             $yearly = round($yearlyCents / 100, 2);
             $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
 
+            $premiumMinutes = (int) ($plan->premium_voice_minutes ?? 0);
+            $recentDays = (int) ($plan->recent_voices_days ?? 7);
+            $topupCharCents = $plan->topup_char_price_cents !== null ? (int) $plan->topup_char_price_cents : null;
+            $topupMinCents = $plan->topup_minute_price_cents !== null ? (int) $plan->topup_minute_price_cents : null;
+
+            // Use localized name/description from admin panel, or fall back to translation file
+            $localizedName = $plan->getLocalizedName($locale);
+            $localizedDescription = $plan->getLocalizedDescription($locale);
+            $localizedButtonText = $plan->getLocalizedButtonText($locale);
+
+            // Use admin-configured features if available, otherwise auto-generate
+            $customFeatures = $plan->getLocalizedFeatures($locale);
+            $features = $customFeatures ?? self::resolveStructuredFeatures($plan, $tier, $locale);
+
             return [
                 'slug' => $plan->slug,
-                'name' => $plan->name,
+                'name' => $localizedName,
+                'name_raw' => $plan->name, // Keep raw name for internal use
+                'description' => $localizedDescription,
+                'button_text' => $localizedButtonText,
                 'price_monthly' => $monthly,
                 'price_monthly_cents' => $monthlyCents,
                 'price_yearly' => $yearly,
@@ -469,13 +583,24 @@ class HomeController extends Controller
                 'processing_priority' => (string) ($plan->processing_priority ?: 'standard'),
                 'voice_tier' => $tier,
                 'voice_tier_label' => VoiceTier::label($tier),
-                'features' => self::resolveStructuredFeatures($plan, $tier),
+                'premium_voice_minutes' => $premiumMinutes,
+                'recent_voices_days' => $recentDays,
+                'dialogue_enabled' => (bool) ($plan->dialogue_enabled ?? false),
+                'topup_char_price_cents' => $topupCharCents,
+                'topup_minute_price_cents' => $topupMinCents,
+                'is_featured' => (bool) ($plan->is_featured ?? false),
+                'features' => $features,
             ];
         })->values();
 
-        $popularSlug = $mapped->contains(fn (array $plan) => $plan['slug'] === 'creator')
-            ? 'creator'
-            : (string) ($mapped->firstWhere('price_monthly', '>', 0)['slug'] ?? '');
+        $featuredSlug = (string) ($mapped->firstWhere('is_featured', true)['slug'] ?? '');
+        $popularSlug = $featuredSlug !== ''
+            ? $featuredSlug
+            : (
+                $mapped->contains(fn (array $plan) => $plan['slug'] === 'creator')
+                    ? 'creator'
+                    : (string) ($mapped->firstWhere('price_monthly', '>', 0)['slug'] ?? '')
+            );
 
         return $mapped->map(function (array $plan) use ($popularSlug): array {
             $plan['is_popular'] = $popularSlug !== '' && $plan['slug'] === $popularSlug;
@@ -485,23 +610,62 @@ class HomeController extends Controller
 
     /**
      * Build structured features array for the pricing card.
-     * If features are already structured (with 'label' key), use them.
-     * Otherwise, auto-build defaults from plan attributes.
+     * Auto-builds from plan attributes so labels are always locale-aware.
      *
      * @return array<int, array{label: string, value: string, icon: string}>
      */
-    private static function resolveStructuredFeatures(Plan $plan, string $tier): array
+    private static function resolveStructuredFeatures(Plan $plan, string $tier, string $locale = 'en'): array
     {
-        // Always auto-build from plan attributes so labels are locale-aware.
-        // Stored raw features (DB JSON column) may contain hardcoded English strings
-        // and are intentionally bypassed here for i18n correctness.
-        return [
+        $priority = (string) ($plan->processing_priority ?? 'standard');
+        $priorityLabel = match ($priority) {
+            'standard_plus' => __('ui.pricing.standard_plus'),
+            'high' => __('ui.pricing.high'),
+            'priority' => __('ui.pricing.priority'),
+            'highest' => __('ui.pricing.highest'),
+            default => __('ui.pricing.standard'),
+        };
+
+        $recentDays = (int) ($plan->recent_voices_days ?? 7);
+        $isFree = (int) $plan->price_cents <= 0;
+
+        $emotionValue = $isFree
+            ? __('ui.pricing.basic_controls')
+            : __('ui.pricing.full_controls');
+
+        $recentValue = $recentDays <= 0
+            ? __('ui.pricing.unlimited')
+            : $recentDays . ' ' . __('ui.pricing.days');
+
+        $features = [
             ['label' => __('ui.pricing.feature_label_requests'), 'value' => (int) $plan->monthly_requests <= 0 ? __('ui.pricing.unlimited') : number_format((int) $plan->monthly_requests), 'icon' => 'activity'],
             ['label' => __('ui.pricing.feature_label_max_input'), 'value' => number_format((int) $plan->max_chars_per_request) . ' ' . __('ui.pricing.chars'), 'icon' => 'type'],
-            ['label' => __('ui.pricing.feature_label_commercial_use'), 'value' => $plan->commercial_use_allowed ? __('ui.pricing.allowed') : __('ui.pricing.personal_only'), 'icon' => 'lock'],
-            ['label' => __('ui.pricing.feature_label_priority_queue'), 'value' => ($plan->processing_priority ?? 'standard') === 'high' ? __('ui.pricing.high') : __('ui.pricing.standard'), 'icon' => 'bolt'],
             ['label' => __('ui.pricing.feature_label_voice_quality'), 'value' => VoiceTier::label($tier), 'icon' => 'mic'],
+            ['label' => __('ui.pricing.feature_label_emotion_controls'), 'value' => $emotionValue, 'icon' => 'heart'],
+            ['label' => __('ui.pricing.feature_label_priority_queue'), 'value' => $priorityLabel, 'icon' => 'bolt'],
+            ['label' => __('ui.pricing.feature_label_commercial_use'), 'value' => $plan->commercial_use_allowed ? __('ui.pricing.allowed') : __('ui.pricing.personal_only'), 'icon' => 'lock'],
+            ['label' => __('ui.pricing.feature_label_recent_voices'), 'value' => $recentValue, 'icon' => 'clock'],
         ];
+
+        $charTopupCents = $plan->topup_char_price_cents !== null
+            ? (int) $plan->topup_char_price_cents
+            : (
+                $plan->allow_overage && $plan->overage_price_per_million_cents !== null
+                    ? (int) $plan->overage_price_per_million_cents
+                    : 0
+            );
+        if ($charTopupCents > 0) {
+            $features[] = [
+                'label' => __('ui.pricing.topup_chars'),
+                'value' => '$'.number_format($charTopupCents / 100, 0).__('ui.pricing.topup_per_million'),
+                'icon' => 'download',
+            ];
+        }
+
+        if ((bool) ($plan->dialogue_enabled ?? false)) {
+            $features[] = ['label' => __('ui.pricing.feature_label_dialogue_mode'), 'value' => __('ui.pricing.included_mark'), 'icon' => 'users'];
+        }
+
+        return $features;
     }
 
     private function demoCharAllowance(Request $request): int
@@ -781,5 +945,182 @@ class HomeController extends Controller
         }
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * @return array{
+     *   title:string,
+     *   text:string,
+     *   audio_url:?string,
+     *   language:string,
+     *   dialect:?string,
+     *   emotion:?string,
+     *   gender:?string,
+     *   voice_name:?string,
+     *   voice_label:string,
+     *   is_featured:bool
+     * }
+     */
+    private function mapVoiceSample(VoiceSample $sample, bool $isArabicLocale): array
+    {
+        $voiceMeta = VoiceCatalog::voiceMeta($sample->voice_name);
+        $title = $this->stripDialectCodes($this->humanReadableSampleTitle($sample, $isArabicLocale));
+        $description = $isArabicLocale
+            ? ($sample->description_ar ?: $sample->description ?: '')
+            : ($sample->description ?: '');
+        $text = trim((string) ($isArabicLocale ? ($sample->sample_text_ar ?: $sample->sample_text) : $sample->sample_text));
+
+        // Use custom speaker name from metadata if available
+        $metadata = is_array($sample->metadata) ? $sample->metadata : [];
+        $speakerName = $isArabicLocale
+            ? ($metadata['speaker_name_ar'] ?? $metadata['speaker_name'] ?? '')
+            : ($metadata['speaker_name'] ?? '');
+        $speakerName = trim((string) $speakerName);
+
+        // Fall back to voice catalog label if no custom speaker name
+        if ($speakerName === '') {
+            $speakerName = trim((string) ($isArabicLocale
+                ? ($voiceMeta['label_ar'] ?? $voiceMeta['label'] ?? '')
+                : ($voiceMeta['label'] ?? '')));
+            $speakerName = $this->stripDialectCodes($speakerName);
+        }
+
+        if ($speakerName === '') {
+            $speakerName = $title !== '' ? $title : '';
+        }
+
+        return [
+            'title' => $title,
+            'description' => $description,
+            'icon' => $sample->icon ?: $this->countryFlagEmoji($sample->country),
+            'text' => $text,
+            'audio_url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
+            'language' => (string) $sample->language,
+            'dialect' => $sample->dialect,
+            'emotion' => $sample->emotion,
+            'gender' => $sample->gender,
+            'country' => $sample->country,
+            'voice_name' => $voiceMeta ? $sample->voice_name : null,
+            'voice_label' => $speakerName,
+            'is_featured' => (bool) $sample->is_featured,
+        ];
+    }
+
+    /**
+     * Convert a 2-letter country code to a flag emoji.
+     */
+    private function countryFlagEmoji(?string $countryCode): string
+    {
+        $code = strtoupper(trim((string) $countryCode));
+        if (strlen($code) !== 2) {
+            return '🌐';
+        }
+
+        $flagOffset = 0x1F1E6;
+        $asciiOffset = ord('A');
+
+        return mb_chr($flagOffset + ord($code[0]) - $asciiOffset)
+            . mb_chr($flagOffset + ord($code[1]) - $asciiOffset);
+    }
+
+    private function humanReadableSampleTitle(VoiceSample $sample, bool $isArabicLocale): string
+    {
+        $fallback = trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title));
+        $emotion = strtolower(trim((string) ($sample->emotion ?? 'neutral')));
+
+        $emotionLabelsAr = [
+            'neutral' => 'نمط عام',
+            'formal' => 'نمط رسمي',
+            'ad_style' => 'نمط إعلاني',
+            'news' => 'نمط إخباري',
+            'storytelling' => 'نمط قصصي',
+            'warm' => 'نمط دافئ',
+            'excited' => 'حماسي',
+            'calm' => 'نمط هادئ',
+        ];
+
+        $emotionLabelsEn = [
+            'neutral' => 'General Style',
+            'formal' => 'Formal Style',
+            'ad_style' => 'Commercial Style',
+            'news' => 'News Style',
+            'storytelling' => 'Story Style',
+            'warm' => 'Warm',
+            'excited' => 'Energetic',
+            'calm' => 'Calm Style',
+        ];
+
+        $emotionLabel = $isArabicLocale
+            ? ($emotionLabelsAr[$emotion] ?? null)
+            : ($emotionLabelsEn[$emotion] ?? null);
+
+        return $emotionLabel ?: $fallback;
+    }
+
+    private function stripDialectCodes(string $value): string
+    {
+        $cleaned = preg_replace('/\b[a-z]{2}-[A-Z]{2}\b/u', '', $value);
+        $cleaned = preg_replace('/\s{2,}/u', ' ', (string) $cleaned);
+
+        return trim((string) $cleaned, " \t\n\r\0\x0B-");
+    }
+
+    private function sampleLanguageForLocale(?string $locale): string
+    {
+        $locale = strtolower(trim((string) $locale));
+
+        return str_starts_with($locale, 'ar') ? 'ar' : 'en';
+    }
+
+    /**
+     * @param  array{dialect:mixed,performance_style:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,performance_style:string,emotion:string,speed:float,pitch:float}
+     */
+    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    {
+        $normalizedTier = VoiceTier::normalize($tier);
+
+        // Standard tier: no performance controls — use defaults only.
+        if ($normalizedTier === VoiceTier::STANDARD) {
+            return [
+                'dialect'  => null,
+                'performance_style' => 'neutral',
+                'emotion'  => 'neutral',
+                'speed'    => 1.0,
+                'pitch'    => 0.0,
+            ];
+        }
+
+        $performanceStyle = isset($options['performance_style']) && is_string($options['performance_style'])
+            ? trim($options['performance_style'])
+            : '';
+        $emotion = isset($options['emotion']) && is_string($options['emotion'])
+            ? trim($options['emotion'])
+            : '';
+
+        // Backward compatibility for old clients that used emotion for style.
+        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+            $performanceStyle = $emotion;
+            $emotion = 'neutral';
+        }
+
+        // HD tier: full performance controls.
+        return [
+            'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
+            'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
+            'emotion' => $emotion !== '' ? $emotion : 'neutral',
+            'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
+            'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
+        ];
+    }
+
+    private function resolveSampleAudioUrl(?string $audioPath, string $language): ?string
+    {
+        $normalizedPath = ltrim(trim((string) $audioPath), '/');
+        if ($normalizedPath !== '' && Storage::disk('public')->exists($normalizedPath)) {
+            return AudioUrl::fromPath($normalizedPath);
+        }
+
+        return strtolower(trim($language)) === 'ar' ? '/audio/ar.mp3' : '/audio/en.mp3';
     }
 }

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\BillingSubscription;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
@@ -40,13 +41,18 @@ class BillingController extends Controller
 
         $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
         $selectedPlan = trim((string) $request->query('plan', ''));
+        $validPlanSlugs = Plan::query()
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->pluck('slug')
+            ->all();
 
         return view('billing', [
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
             'plans' => $this->resolveCheckoutPlans($stripeReady),
-            'selectedPlan' => in_array($selectedPlan, ['creator', 'pro'], true) ? $selectedPlan : '',
+            'selectedPlan' => in_array($selectedPlan, $validPlanSlugs, true) ? $selectedPlan : '',
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
             'defaultPaymentMethod' => $defaultPaymentMethod,
@@ -117,12 +123,27 @@ class BillingController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'plan' => ['required', 'in:creator,pro'],
+            'plan' => ['required', 'string', 'max:50'],
             'billing_cycle' => ['required', 'in:monthly,yearly'],
             'payment_method' => ['nullable', 'string', 'max:255'],
+            'save_card' => ['nullable', 'boolean'],
         ]);
 
-        $priceId = trim((string) config("services.stripe.prices.{$validated['plan']}.{$validated['billing_cycle']}", ''));
+        // Dynamically validate plan slug exists as an active paid plan
+        $planRecord = Plan::query()
+            ->where('slug', $validated['plan'])
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->first();
+
+        if (! $planRecord) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_invalid_plan'),
+            ], 422);
+        }
+
+        $priceId = $this->resolveStripePriceId($validated['plan'], $validated['billing_cycle']);
         if ($priceId === '') {
             return response()->json([
                 'ok' => false,
@@ -131,13 +152,17 @@ class BillingController extends Controller
         }
 
         $paymentMethod = trim((string) ($validated['payment_method'] ?? ''));
+        $saveCard = $validated['save_card'] ?? true;
 
         try {
             $this->ensureStripeCustomer($user);
 
             if ($paymentMethod !== '') {
                 $this->assertCardPaymentMethod($paymentMethod);
-                $user->updateDefaultPaymentMethod($paymentMethod);
+                // Only save card as default if user consented
+                if ($saveCard) {
+                    $user->updateDefaultPaymentMethod($paymentMethod);
+                }
             }
 
             $subscription = $this->currentDefaultSubscription($user);
@@ -286,6 +311,40 @@ class BillingController extends Controller
         return response()->json([
             'ok' => true,
             'message' => __('ui.backend.billing_cancellation_scheduled'),
+        ]);
+    }
+
+    public function resume(Request $request)
+    {
+        $user = $request->user();
+
+        $subscription = $this->currentDefaultSubscription($user);
+        if (! $subscription || ! $subscription->onGracePeriod()) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_no_cancellation_to_resume'),
+            ], 422);
+        }
+
+        try {
+            $subscription->resume();
+            $this->billingSyncService->syncIfStale($user, true);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to resume Stripe subscription.', [
+                'user_id' => $user->id,
+                'subscription_id' => $subscription->id,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_resume_failed'),
+            ], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'message' => __('ui.backend.billing_subscription_resumed'),
         ]);
     }
 
@@ -438,15 +497,22 @@ class BillingController extends Controller
     private function resolveCheckoutPlans(bool $stripeReady): array
     {
         return Plan::query()
-            ->whereIn('slug', ['creator', 'pro'])
             ->where('is_active', true)
+            ->where('price_cents', '>', 0)
             ->orderBy('price_cents')
             ->get()
+            ->filter(function (Plan $plan) {
+                // Only show plans that have at least one Stripe price configured
+                $slug = (string) $plan->slug;
+                $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
+                $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
+                return $monthlyPriceId !== '' || $yearlyPriceId !== '';
+            })
             ->map(function (Plan $plan) use ($stripeReady) {
                 $slug = (string) $plan->slug;
 
-                $monthlyPriceId = trim((string) config("services.stripe.prices.{$slug}.monthly", ''));
-                $yearlyPriceId = trim((string) config("services.stripe.prices.{$slug}.yearly", ''));
+                $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
+                $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
 
                 $monthlyFallback = max(0, (int) $plan->price_cents);
                 $yearlyFallback = max(0, (int) round($monthlyFallback * 12 * 0.8));
@@ -612,7 +678,7 @@ class BillingController extends Controller
 
             $stripeInvoice = $upcoming->asStripeInvoice();
             $periodEndTs = (int) ($stripeInvoice->period_end ?? 0);
-            $currency = strtoupper((string) ($stripeInvoice->currency ?? $upcoming->currency() ?? 'USD'));
+            $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
             $totalCents = (int) ($stripeInvoice->total ?? 0);
 
             return [
@@ -706,9 +772,9 @@ class BillingController extends Controller
         }
     }
 
-    private function formatCarbonDate(Carbon $date): string
+    private function formatCarbonDate(\DateTimeInterface $date): string
     {
-        return $date
+        return Carbon::parse($date)
             ->clone()
             ->locale((string) app()->getLocale())
             ->translatedFormat('j M Y');
@@ -795,15 +861,40 @@ class BillingController extends Controller
             return null;
         }
 
-        $prices = (array) config('services.stripe.prices', []);
-        foreach ($prices as $slug => $cycles) {
-            foreach ((array) $cycles as $configuredPriceId) {
-                if ($priceId === trim((string) $configuredPriceId)) {
+        // Check admin-set prices (SiteSetting) first, then .env config
+        $plans = Plan::where('is_active', true)->where('price_cents', '>', 0)->pluck('slug');
+        foreach ($plans as $slug) {
+            foreach (['monthly', 'yearly'] as $cycle) {
+                if ($priceId === $this->resolveStripePriceId((string) $slug, $cycle)) {
                     return (string) $slug;
                 }
             }
         }
 
         return null;
+    }
+
+    /**
+     * Resolve Stripe Price ID from Plan model first, then admin dashboard (SiteSetting), then .env config.
+     */
+    private function resolveStripePriceId(string $planSlug, string $cycle): string
+    {
+        // 1. Check Plan model (auto-synced from Stripe) - PRIMARY SOURCE
+        $plan = Plan::where('slug', $planSlug)->first();
+        if ($plan) {
+            $priceId = $plan->getStripePriceId($cycle);
+            if ($priceId && trim($priceId) !== '') {
+                return trim($priceId);
+            }
+        }
+
+        // 2. Check admin-editable setting (SiteSetting) - LEGACY FALLBACK
+        $adminPrice = trim((string) SiteSetting::get("stripe_price_{$planSlug}_{$cycle}", ''));
+        if ($adminPrice !== '') {
+            return $adminPrice;
+        }
+
+        // 3. Fall back to .env / config - LEGACY FALLBACK
+        return trim((string) config("services.stripe.prices.{$planSlug}.{$cycle}", ''));
     }
 }

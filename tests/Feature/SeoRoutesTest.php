@@ -51,7 +51,7 @@ class SeoRoutesTest extends TestCase
         SiteSetting::set('seo_home_robots', 'index,follow', 'seo');
         SiteSetting::set('meta_keywords', 'tts,ai voice,text to speech', 'seo');
 
-        $this->get('/')
+        $this->getLocalizedRoute('home')
             ->assertOk()
             ->assertSee('<meta name="description" content="Custom home description for SEO.">', false)
             ->assertSee('<meta name="robots" content="index,follow">', false)

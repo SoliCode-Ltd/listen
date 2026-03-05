@@ -1,0 +1,11 @@
+<?php
+
+require __DIR__ . '/../../vendor/autoload.php';
+$app = require __DIR__ . '/../../bootstrap/app.php';
+$app->make(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
+use App\Models\VoiceSample;
+
+$deleted = VoiceSample::where('title', 'Meditation Guide')->delete();
+$deleted += VoiceSample::where('title', 'وثائقي طبيعة عمانية')->delete();
+echo "Deleted {$deleted} failed records." . PHP_EOL;

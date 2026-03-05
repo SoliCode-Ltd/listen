@@ -120,13 +120,13 @@ class BillingSyncService
                         'pm_type' => null,
                         'pm_last_four' => null,
                     ])->save();
+                } else {
+                    Log::warning('Billing sync failed when contacting Stripe API.', [
+                        'user_id' => $user->id,
+                        'stripe_id' => $user->stripe_id,
+                        'error' => $exception->getMessage(),
+                    ]);
                 }
-
-                Log::warning('Billing sync failed when contacting Stripe API.', [
-                    'user_id' => $user->id,
-                    'stripe_id' => $user->stripe_id,
-                    'error' => $exception->getMessage(),
-                ]);
             } catch (\Throwable $exception) {
                 Log::warning('Billing sync failed unexpectedly.', [
                     'user_id' => $user->id,
@@ -276,12 +276,28 @@ class BillingSyncService
     private function knownPriceToSlugMap(): array
     {
         $map = [];
+        
+        // 1. PRIMARY: Read from Plan model (auto-synced Stripe prices)
+        $plans = Plan::query()->select(['slug', 'stripe_price_monthly', 'stripe_price_yearly'])->get();
+        foreach ($plans as $plan) {
+            $monthlyPrice = trim((string) $plan->stripe_price_monthly);
+            $yearlyPrice = trim((string) $plan->stripe_price_yearly);
+            
+            if ($monthlyPrice !== '') {
+                $map[$monthlyPrice] = (string) $plan->slug;
+            }
+            if ($yearlyPrice !== '') {
+                $map[$yearlyPrice] = (string) $plan->slug;
+            }
+        }
+        
+        // 2. FALLBACK: Legacy config values (for backwards compatibility)
         $prices = config('services.stripe.prices', []);
 
         foreach ((array) $prices as $slug => $cycles) {
             foreach ((array) $cycles as $priceId) {
                 $priceId = trim((string) $priceId);
-                if ($priceId !== '') {
+                if ($priceId !== '' && !isset($map[$priceId])) {
                     $map[$priceId] = (string) $slug;
                 }
             }

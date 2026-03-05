@@ -56,12 +56,37 @@ return [
         'timeout_seconds' => (int) env('SPEECH_TTS_TIMEOUT_SECONDS', env('GOOGLE_TTS_TIMEOUT_SECONDS', 30)),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Gemini TTS (Hybrid Mode)
+    |--------------------------------------------------------------------------
+    |
+    | Gemini 2.5 Flash Preview TTS for high-quality Arabic speech synthesis.
+    | API keys are dynamically loaded from .env by GeminiKeyManager.
+    | Pattern: GEMINI_TTS_API_KEY, GEMINI_TTS_API_KEY_2, GEMINI_TTS_API_KEY_3, etc.
+    |
+    */
+    'gemini_tts' => [
+        'endpoint' => env('GEMINI_TTS_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta'),
+        'timeout_seconds' => (int) env('GEMINI_TTS_TIMEOUT', 60),
+        'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
+        'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),
+    ],
+
     'stripe' => [
         'model' => App\Models\User::class,
         'key' => env('STRIPE_KEY'),
         'secret' => env('STRIPE_SECRET'),
         'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+        // NOTE: Stripe Price IDs are now automatically managed via StripeProductSyncService.
+        // Prices are stored in the plans table (stripe_price_monthly, stripe_price_yearly).
+        // Use `php artisan stripe:sync-plans --all` to sync plans to Stripe.
+        // The .env prices below are LEGACY FALLBACK only - can be removed after migration.
         'prices' => [
+            'starter' => [
+                'monthly' => env('STRIPE_PRICE_STARTER_MONTHLY'),
+                'yearly' => env('STRIPE_PRICE_STARTER_YEARLY'),
+            ],
             'creator' => [
                 'monthly' => env('STRIPE_PRICE_CREATOR_MONTHLY'),
                 'yearly' => env('STRIPE_PRICE_CREATOR_YEARLY'),
@@ -69,6 +94,10 @@ return [
             'pro' => [
                 'monthly' => env('STRIPE_PRICE_PRO_MONTHLY'),
                 'yearly' => env('STRIPE_PRICE_PRO_YEARLY'),
+            ],
+            'studio_max' => [
+                'monthly' => env('STRIPE_PRICE_STUDIO_MAX_MONTHLY'),
+                'yearly' => env('STRIPE_PRICE_STUDIO_MAX_YEARLY'),
             ],
         ],
     ],

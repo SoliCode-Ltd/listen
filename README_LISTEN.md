@@ -13,7 +13,7 @@ Arabic-first voice app for messages/emails/files with translation and queued aud
 - Laravel 12
 - SQLite (`database/database.sqlite`)
 - Queue: database driver + worker
-- Tiered voice quality (`Standard`, `HD`, `HD+`)
+- Tiered voice quality (`Standard`, `HD`)
 - Light/Dark themes on landing, demo, auth, dashboard, billing, and upgrade pages
 
 ## SaaS Features
@@ -78,7 +78,7 @@ LISTEN_AUDIO_FORCE_ASYNC_CHARS=2500
 ```
 
 ## Notes
-- Public demo supports `Standard`, `HD`, and `HD+` preview switching.
-- Authenticated generation is tier-locked by plan: `FREE -> Standard`, `CREATOR -> HD`, `PRO -> HD+`.
+- Public demo supports `Standard` and `HD` preview switching.
+- Authenticated generation is tier-locked by plan: `FREE -> Standard`, paid plans -> `HD`.
 - Voice labels are safe display names from DB mappings; internal voice IDs are not exposed.
 - API routes can be used server-to-server when secured with `LISTEN_API_KEY`.

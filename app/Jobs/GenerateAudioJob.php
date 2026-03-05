@@ -3,18 +3,54 @@
 namespace App\Jobs;
 
 use App\Models\AudioGeneration;
+use App\Models\TtsLog;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\UsageEstimator;
+use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GenerateAudioJob implements ShouldQueue
 {
     use Queueable;
+
+    /** @var array<int, string> */
+    private const PERFORMANCE_STYLE_VALUES = [
+        'neutral',
+        'educational',
+        'commercial',
+        'promo',
+        'podcast',
+        'assistant',
+        'narrative',
+        'comedic',
+        'corporate',
+        'conversational',
+        'inspirational',
+        'cinematic',
+        'documentary',
+        'storytelling',
+        'ad_style',
+        'news',
+    ];
+
+    /** @var array<int, string> */
+    private const EMOTION_VALUES = [
+        'neutral',
+        'warm',
+        'sad',
+        'excited',
+        'formal',
+        'calm',
+        'angry',
+    ];
 
     public int $tries = 3;
     public int $timeout = 120;
@@ -45,11 +81,54 @@ class GenerateAudioJob implements ShouldQueue
                 (bool) $generation->translate,
             );
 
-            $audio = $ttsService->synthesize(
+            // Use advanced synthesis with plan-aware routing
+            $planAccessService = app(PlanAccessService::class);
+            $plan = $generation->user_id ? $planAccessService->resolveActivePlanForUserId((int) $generation->user_id) : null;
+
+            $requestedTier = VoiceTier::normalize((string) ($generation->voice_tier ?: VoiceTier::STANDARD));
+            $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
+                'dialect' => $generation->dialect,
+                'performance_style' => $generation->performance_style,
+                'emotion' => $generation->emotion ?? 'neutral',
+                'speed' => $generation->speed ?? 1.0,
+                'pitch' => $generation->pitch ?? 0.0,
+            ]);
+            $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
+
+            $voiceOptions = [
+                'voice_name' => $generation->voice_name,
+                'provider' => $generation->tts_provider ?: VoiceCatalog::providerForName($generation->voice_name),
+                'tier' => $requestedTier,
+                'gender' => $voiceMeta['gender'] ?? null,
+                'performance_style' => $studioOptions['performance_style'],
+                'style' => $studioOptions['performance_style'],
+                'dialect' => $studioOptions['dialect'],
+                'emotion' => $studioOptions['emotion'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+            ];
+
+            // Add dialogue speakers if applicable
+            if (
+                $requestedTier !== VoiceTier::STANDARD
+                && $generation->is_dialogue
+                && is_array($generation->dialogue_metadata)
+            ) {
+                $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
+                $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
+                    $generation->dialogue_metadata['speakers'] ?? [],
+                    $generation->target_language,
+                    $requestedTier,
+                    $provider,
+                );
+            }
+
+            $audio = $ttsService->synthesizeAdvanced(
                 $textForSpeech,
                 $generation->target_language,
-                $generation->voice_name,
-                (string) ($generation->voice_tier ?: 'standard'),
+                $voiceOptions,
+                $plan,
+                (int) $generation->user_id,
             );
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
@@ -62,7 +141,17 @@ class GenerateAudioJob implements ShouldQueue
                 'duration_seconds' => $actualSeconds,
                 'status' => 'done',
                 'error_message' => null,
+                // TTS telemetry
+                'tts_provider' => $audio['provider'] ?? null,
+                'tts_model' => $audio['model'] ?? null,
+                'tts_latency_ms' => $audio['latency_ms'] ?? null,
+                'tts_fallback_used' => $audio['fallback_used'] ?? false,
+                'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
+                'billable_chars' => $actualChars,
             ]);
+
+            // Write TTS log entry
+            $this->writeTtsLog($generation, $audio, 'success');
 
             $this->applyUsageDelta(
                 (int) $generation->user_id,
@@ -81,11 +170,49 @@ class GenerateAudioJob implements ShouldQueue
                 'error_message' => 'Voice generation failed. Please try again.',
             ]);
 
+            // Log TTS failure telemetry
+            $this->writeTtsLog($generation, [], 'failed', $e);
+
             if ($generation->text_item_id) {
                 TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
             }
 
             throw $e;
+        }
+    }
+
+    /**
+     * Write a TTS telemetry log entry.
+     */
+    private function writeTtsLog(AudioGeneration $generation, array $result, string $status, ?\Throwable $error = null): void
+    {
+        try {
+            // Determine failure reason: explicit fallback_reason, or error message
+            $failureReason = $result['fallback_reason'] ?? null;
+            if ($error) {
+                $failureReason = mb_substr($error->getMessage(), 0, 500);
+            }
+
+            TtsLog::create([
+                'user_id' => $generation->user_id,
+                'audio_generation_id' => $generation->id,
+                'provider' => $result['provider'] ?? 'unknown',
+                'model' => $result['model'] ?? null,
+                'routing_mode' => $result['routing_mode'] ?? config('listen.tts.mode', 'legacy'),
+                'plan_slug' => $result['plan_slug'] ?? null,
+                'target_language' => $generation->target_language,
+                'char_count' => $result['char_count'] ?? $generation->billable_chars ?? 0,
+                'latency_ms' => $result['latency_ms'] ?? null,
+                'cost_estimate_usd' => $result['cost_estimate_usd'] ?? null,
+                'fallback_used' => $result['fallback_used'] ?? false,
+                'failure_reason' => $failureReason,
+                'status' => $status,
+            ]);
+        } catch (\Throwable $logError) {
+            Log::warning('Failed to write TTS log entry', [
+                'generation_id' => $generation->id,
+                'error' => $logError->getMessage(),
+            ]);
         }
     }
 
@@ -174,5 +301,90 @@ class GenerateAudioJob implements ShouldQueue
                 'total_minutes' => $nextMinutes,
             ]);
         });
+    }
+
+    /**
+     * @param  array{dialect:mixed,performance_style:mixed,emotion:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,performance_style:string,emotion:string,speed:float,pitch:float}
+     */
+    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    {
+        $normalizedTier = VoiceTier::normalize($tier);
+
+        if ($normalizedTier === VoiceTier::STANDARD) {
+            return [
+                'dialect' => null,
+                'performance_style' => 'neutral',
+                'emotion' => 'neutral',
+                'speed' => 1.0,
+                'pitch' => 0.0,
+            ];
+        }
+
+        $performanceStyle = isset($options['performance_style']) && is_string($options['performance_style'])
+            ? trim($options['performance_style'])
+            : '';
+        $emotion = isset($options['emotion']) && is_string($options['emotion'])
+            ? trim($options['emotion'])
+            : '';
+
+        // Backward compatibility for old records that stored style in emotion.
+        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+            $performanceStyle = $emotion;
+            $emotion = 'neutral';
+        }
+
+        return [
+            'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
+            'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
+            'emotion' => $emotion !== '' ? $emotion : 'neutral',
+            'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
+            'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
+        ];
+    }
+
+    /**
+     * @param  mixed  $rawSpeakers
+     * @return array<int, array{name:string,voice_name:string,gender:?string}>
+     */
+    private function normalizeDialogueSpeakers(mixed $rawSpeakers, string $targetLanguage, string $tier, ?string $provider): array
+    {
+        if (! is_array($rawSpeakers)) {
+            return [];
+        }
+
+        $normalized = [];
+
+        foreach ($rawSpeakers as $speaker) {
+            if (! is_array($speaker)) {
+                continue;
+            }
+
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? 'Speaker'));
+            $requestedVoice = trim((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''));
+            $voiceName = $requestedVoice;
+
+            if (preg_match('/^voice_\d+$/', $requestedVoice) === 1) {
+                $voiceName = VoiceCatalog::nameFromKeyForLanguageAndProvider(
+                    $targetLanguage,
+                    $requestedVoice,
+                    $tier,
+                    $provider,
+                ) ?: (VoiceCatalog::nameFromKeyForLanguage($targetLanguage, $requestedVoice, $tier) ?? '');
+            }
+
+            if ($voiceName === '') {
+                continue;
+            }
+
+            $meta = VoiceCatalog::voiceMeta($voiceName);
+            $normalized[] = [
+                'name' => $name !== '' ? $name : 'Speaker',
+                'voice_name' => $voiceName,
+                'gender' => is_array($meta) ? ($meta['gender'] ?? null) : null,
+            ];
+        }
+
+        return $normalized;
     }
 }

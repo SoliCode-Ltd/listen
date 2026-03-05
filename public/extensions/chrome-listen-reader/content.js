@@ -48,7 +48,37 @@
     dragOffsetY: 0,
     hasCustomPosition: false,
     resizeBound: false,
+    uiLang: 'en',
   };
+
+  // Side panel translations
+  const panelTranslations = {
+    en: {
+      brandName: 'Listen Studio',
+      close: 'Close',
+      speakerLabel: 'Speaker:',
+      play: 'Play',
+      pause: 'Pause',
+      download: 'Download',
+      audioReady: 'Audio ready',
+      auto: 'Auto',
+    },
+    ar: {
+      brandName: 'ستوديو إسمع',
+      close: 'إغلاق',
+      speakerLabel: 'المتحدث:',
+      play: 'تشغيل',
+      pause: 'إيقاف',
+      download: 'تحميل',
+      audioReady: 'الصوت جاهز',
+      auto: 'تلقائي',
+    },
+  };
+
+  function pt(key, fallback = '') {
+    const lang = state.uiLang === 'ar' ? 'ar' : 'en';
+    return panelTranslations[lang]?.[key] || panelTranslations.en?.[key] || fallback || key;
+  }
 
   function clamp(value, min, max) {
     return Math.max(min, Math.min(max, value));
@@ -288,6 +318,27 @@
           width: calc(100vw - 12px);
         }
       }
+      /* RTL Support */
+      #${PANEL_ID}[dir='rtl'] {
+        left: 8px;
+        right: auto;
+      }
+      #${PANEL_ID}[dir='rtl'] .listen-head {
+        flex-direction: row-reverse;
+      }
+      #${PANEL_ID}[dir='rtl'] .listen-controls {
+        flex-direction: row-reverse;
+      }
+      #${PANEL_ID}[dir='rtl'] .listen-controls-left {
+        flex-direction: row-reverse;
+      }
+      #${PANEL_ID}[dir='rtl'] .listen-time {
+        text-align: left;
+      }
+      #${PANEL_ID}[dir='rtl'] .listen-voice,
+      #${PANEL_ID}[dir='rtl'] .listen-text {
+        text-align: right;
+      }
     `;
 
     document.documentElement.appendChild(style);
@@ -311,7 +362,7 @@
   function updatePlayButton() {
     const playBtn = state.panel?.querySelector('[data-role="play"]');
     if (playBtn instanceof HTMLButtonElement) {
-      playBtn.textContent = state.isPlaying ? 'Pause' : 'Play';
+      playBtn.textContent = state.isPlaying ? pt('pause', 'Pause') : pt('play', 'Play');
     }
   }
 
@@ -620,12 +671,14 @@
       return panel;
     }
 
+    const isRtl = state.uiLang === 'ar';
     panel = document.createElement('aside');
     panel.id = PANEL_ID;
+    panel.setAttribute('dir', isRtl ? 'rtl' : 'ltr');
     panel.innerHTML = `
       <div class="listen-head">
-        <div class="listen-brand">Listen Voice</div>
-        <button class="listen-close" type="button" data-role="close" title="Close" aria-label="Close">
+        <div class="listen-brand">${pt('brandName', 'Listen Voice')}</div>
+        <button class="listen-close" type="button" data-role="close" title="${pt('close', 'Close')}" aria-label="${pt('close', 'Close')}">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12"></path>
             <path d="M18 6l-12 12"></path>
@@ -633,7 +686,7 @@
         </button>
       </div>
       <div class="listen-body">
-        <div class="listen-voice" data-role="voice">Speaker: -</div>
+        <div class="listen-voice" data-role="voice">${pt('speakerLabel', 'Speaker:')} -</div>
         <div class="listen-text" data-role="text"></div>
         <div class="listen-wave">
           <span></span><span></span><span></span><span></span><span></span>
@@ -642,9 +695,9 @@
         <input class="listen-progress" data-role="range" type="range" min="0" value="0" step="0.01" />
         <div class="listen-controls">
           <div class="listen-controls-left">
-            <button class="listen-play" data-role="play" type="button">Play</button>
+            <button class="listen-play" data-role="play" type="button">${pt('play', 'Play')}</button>
             <button class="listen-speed" data-role="speed" type="button">1x</button>
-            <a class="listen-download" data-role="download" href="#" aria-disabled="true">Download</a>
+            <a class="listen-download" data-role="download" href="#" aria-disabled="true">${pt('download', 'Download')}</a>
           </div>
           <div class="listen-time" data-role="time">00:00 / 00:00</div>
         </div>
@@ -777,6 +830,23 @@
   }
 
   async function playInSidePanel(payload) {
+    // Load UI language from storage before creating panel
+    try {
+      const stored = await new Promise((resolve) => {
+        chrome.storage.local.get({ uiLanguage: '' }, (result) => resolve(result));
+      });
+      state.uiLang = stored?.uiLanguage === 'ar' ? 'ar' : 'en';
+    } catch {
+      state.uiLang = 'en';
+    }
+
+    // Remove existing panel to recreate with current language
+    const existingPanel = document.getElementById(PANEL_ID);
+    if (existingPanel) {
+      existingPanel.remove();
+      state.panel = null;
+    }
+
     const panel = ensurePanel();
     const token = Number(payload?.requestToken || 0);
     if (Number.isFinite(token) && token > 0) {
@@ -810,8 +880,8 @@
     textEl.style.unicodeBidi = 'plaintext';
     textEl.style.textAlign = 'start';
 
-    voiceEl.textContent = `Speaker: ${voiceLabel || 'Auto'}`;
-    textEl.textContent = text || 'Audio ready';
+    voiceEl.textContent = `${pt('speakerLabel', 'Speaker:')} ${voiceLabel || pt('auto', 'Auto')}`;
+    textEl.textContent = text || pt('audioReady', 'Audio ready');
 
     const arrayBuffer = base64ToArrayBuffer(base64);
     setMediaSource(arrayBuffer, mimeType, voiceLabel, text);

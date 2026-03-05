@@ -18,7 +18,7 @@ class FooterSocialSettingsTest extends TestCase
         SiteSetting::set('footer_social_github_url', 'https://github.com/listen', 'general');
         SiteSetting::set('footer_social_linkedin_url', 'https://www.linkedin.com/company/listen', 'general');
 
-        $this->get('/')
+        $this->getLocalizedRoute('home')
             ->assertOk()
             ->assertDontSee('aria-label="Twitter"', false)
             ->assertDontSee('aria-label="Facebook"', false)
@@ -34,7 +34,7 @@ class FooterSocialSettingsTest extends TestCase
         SiteSetting::set('footer_social_github_url', 'https://github.com/listen', 'general');
         SiteSetting::set('footer_social_linkedin_url', 'https://www.linkedin.com/company/listen', 'general');
 
-        $this->get('/')
+        $this->getLocalizedRoute('home')
             ->assertOk()
             ->assertSee('footer-social', false)
             ->assertSee('aria-label="Twitter"', false)
@@ -50,7 +50,7 @@ class FooterSocialSettingsTest extends TestCase
         SiteSetting::set('footer_social_facebook_url', 'not-a-url', 'general');
         SiteSetting::set('footer_social_twitter_url', 'https://twitter.com/listen', 'general');
 
-        $this->get('/')
+        $this->getLocalizedRoute('home')
             ->assertOk()
             ->assertSee('aria-label="Twitter"', false)
             ->assertDontSee('aria-label="Facebook"', false);
@@ -64,7 +64,7 @@ class FooterSocialSettingsTest extends TestCase
         SiteSetting::set('footer_social_github_url', '', 'general');
         SiteSetting::set('footer_social_linkedin_url', '', 'general');
 
-        $this->get('/')
+        $this->getLocalizedRoute('home')
             ->assertOk()
             ->assertSee('aria-label="Twitter"', false)
             ->assertSee('aria-label="Facebook"', false)
