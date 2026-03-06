@@ -155,18 +155,28 @@
                 <div class="perf-section-label">✨ {{ __('ui.demo.style_prompt', ['default' => 'Custom Prompt']) }} <span class="premium-badge">{{ __('ui.pricing.premium', ['default' => 'Premium']) }}</span></div>
                 <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.demo.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound…']) }}"></textarea>
               </div>
-              <div class="perf-grid perf-grid-3">
-                <div>
-                  <label for="dialect">{{ __('ui.demo.dialect', ['default' => 'Dialect']) }}</label>
-                  <select name="dialect" id="dialect"><option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option></select>
+              <div class="perf-section">
+                <div class="perf-section-label">🌍 {{ __('ui.demo.dialect', ['default' => 'Dialect']) }}</div>
+                <select name="dialect" id="dialect"><option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option></select>
+              </div>
+              <div class="perf-row-2">
+                <div class="perf-section">
+                  <div class="perf-section-label">
+                    ⚡ {{ __('ui.demo.speed', ['default' => 'Speed']) }}
+                    <span class="slider-value" id="speedVal">1.0</span>x
+                  </div>
+                  <div class="slider-wrap">
+                    <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value">
+                  </div>
                 </div>
-                <div>
-                  <label for="speed">{{ __('ui.demo.speed', ['default' => 'Speed']) }} (<span id="speedVal">1.0</span>x)</label>
-                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value">
-                </div>
-                <div>
-                  <label for="pitch">{{ __('ui.demo.pitch', ['default' => 'Pitch']) }} (<span id="pitchVal">0</span>)</label>
-                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value">
+                <div class="perf-section">
+                  <div class="perf-section-label">
+                    🎵 {{ __('ui.demo.pitch', ['default' => 'Pitch']) }}
+                    <span class="slider-value" id="pitchVal">0</span>
+                  </div>
+                  <div class="slider-wrap">
+                    <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value">
+                  </div>
                 </div>
               </div>
             </div>

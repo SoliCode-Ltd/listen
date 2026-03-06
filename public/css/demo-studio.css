@@ -235,6 +235,10 @@
 /* ══════════════════════════════════════════════
    PREMIUM SELECT / DROPDOWN STYLING
    ══════════════════════════════════════════════ */
+
+#stylePromptSection {
+    margin-top: 0.6rem;
+}
 .ctrl-group select,
 .perf-section select,
 .perf-grid select {
@@ -655,7 +659,8 @@ html[dir="rtl"] .perf-grid select {
 
 /* ── Studio panel (HD controls) ── */
 .perf-panel {
-  margin-top: .15rem
+  margin-top: .15rem;
+  padding: 1.4rem;
 }
 
 .perf-panel .perf-header {
@@ -677,14 +682,14 @@ html[dir="rtl"] .perf-grid select {
 }
 
 .perf-section {
-  padding: .75rem .9rem;
-  border-radius: .8rem;
-  background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
-  border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line))
+  padding: .85rem 1rem;
+  border-radius: .85rem;
+  /* background: color-mix(in oklab, var(--surface2) 30%, var(--surface)); */
+  /* border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line)) */
 }
 
 .perf-section+.perf-section {
-  margin-top: .5rem
+  /* margin-top: .6rem */
 }
 
 /* Side-by-side performance style + emotion */
@@ -692,6 +697,7 @@ html[dir="rtl"] .perf-grid select {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: .6rem;
+  margin-top: .6rem;
 }
 
 .perf-row-2 .perf-section+.perf-section {
@@ -701,11 +707,27 @@ html[dir="rtl"] .perf-grid select {
 .perf-section-label {
   display: flex;
   align-items: center;
-  gap: .3rem;
-  font-size: .8rem;
+  gap: .35rem;
+  font-size: .82rem;
   font-weight: 700;
   color: color-mix(in oklab, var(--a) 45%, var(--text));
-  margin-bottom: .4rem
+  margin-bottom: .5rem
+}
+
+/* Slider value badge */
+.slider-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.8em;
+  padding: .1rem .4rem;
+  margin-inline-start: .25rem;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, color-mix(in oklab, var(--a) 20%, transparent), color-mix(in oklab, var(--b) 20%, transparent));
+  color: var(--text);
+  font-size: .78rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .premium-badge {
@@ -742,7 +764,84 @@ html[dir="rtl"] .perf-grid select {
   box-shadow: 0 0 0 3px var(--brand-accent-glow)
 }
 
-/* Performance grid – 3 columns for dialect/speed/pitch */
+/* ══════════════════════════════════════════════
+   PREMIUM RANGE SLIDERS
+   ══════════════════════════════════════════════ */
+.slider-wrap {
+  position: relative;
+  padding: .35rem 0 .2rem;
+}
+
+.slider-wrap input[type="range"],
+.perf-panel input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg,
+      color-mix(in oklab, var(--a) 35%, var(--line)),
+      color-mix(in oklab, var(--b) 25%, var(--line)));
+  outline: none;
+  cursor: pointer;
+  transition: background .2s;
+}
+
+/* Webkit thumb */
+.slider-wrap input[type="range"]::-webkit-slider-thumb,
+.perf-panel input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a), var(--b));
+  cursor: pointer;
+  border: 3px solid var(--surface);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent),
+    0 2px 8px rgba(0, 0, 0, .25);
+  transition: transform .15s, box-shadow .15s;
+}
+
+.slider-wrap input[type="range"]::-webkit-slider-thumb:hover,
+.perf-panel input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--a) 50%, transparent),
+    0 4px 14px rgba(0, 0, 0, .3);
+}
+
+.slider-wrap input[type="range"]:active::-webkit-slider-thumb,
+.perf-panel input[type="range"]:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+/* Firefox thumb */
+.slider-wrap input[type="range"]::-moz-range-thumb,
+.perf-panel input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--a), var(--b));
+  cursor: pointer;
+  border: 3px solid var(--surface);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent),
+    0 2px 8px rgba(0, 0, 0, .25);
+}
+
+.slider-wrap input[type="range"]::-moz-range-track,
+.perf-panel input[type="range"]::-moz-range-track {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(90deg,
+      color-mix(in oklab, var(--a) 35%, var(--line)),
+      color-mix(in oklab, var(--b) 25%, var(--line)));
+  border: none;
+}
+
+/* Performance grid – fallback 2-col for other uses */
 .perf-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -760,29 +859,6 @@ html[dir="rtl"] .perf-grid select {
   color: var(--muted);
   margin-bottom: .3rem;
   display: block
-}
-
-.perf-panel input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 100%;
-  height: 5px;
-  border-radius: var(--radius-full);
-  background: var(--line);
-  outline: none;
-  margin-top: .4rem
-}
-
-.perf-panel input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--a), var(--b));
-  cursor: pointer;
-  border: 2px solid var(--surface);
-  box-shadow: 0 0 4px rgba(0, 0, 0, .2)
 }
 
 /* ── Reveal animation ── */
