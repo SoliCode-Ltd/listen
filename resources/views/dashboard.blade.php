@@ -5,7 +5,7 @@
     }
     .hero-grid {
       display: grid;
-      grid-template-columns: 1.05fr .95fr;
+      grid-template-columns: minmax(0, 1fr);
       gap: 1rem;
     }
     .page-card {
@@ -97,7 +97,7 @@
 
     .main-grid {
       display: grid;
-      grid-template-columns: 1.03fr .97fr;
+      grid-template-columns: minmax(0, 1.22fr) minmax(320px, .78fr);
       gap: 1rem;
       margin-top: 1.5rem;
     }
@@ -110,62 +110,187 @@
       grid-template-columns: 1fr 1fr;
       gap: .7rem;
     }
-    .studio-panel {
+    .perf-panel {
       margin-top: .6rem;
-      padding: .85rem;
+      padding: 1.4rem;
+      border-radius: 1.1rem;
       border: 1px solid color-mix(in oklab, var(--a) 25%, var(--line));
-      border-radius: var(--radius);
-      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+      /* background:
+        radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 35%),
+        color-mix(in oklab, var(--surface) 84%, transparent); */
     }
-    .studio-label {
+    .perf-panel .perf-header {
       display: flex;
       align-items: center;
       gap: .4rem;
       font-size: .88rem;
-      font-weight: 600;
-      color: color-mix(in oklab, var(--a) 60%, var(--text));
-      margin-bottom: .6rem;
+      font-weight: 700;
+      color: color-mix(in oklab, var(--a) 55%, var(--text));
+      margin-bottom: 1rem;
     }
-    .studio-section {
-      padding: .65rem .75rem;
-      border-radius: calc(var(--radius) - 2px);
-      background: color-mix(in oklab, var(--a) 3%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
+    .perf-panel .perf-header svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
     }
-    .studio-section-label {
+    .perf-section {
+      padding: .85rem 1rem;
+      border-radius: .85rem;
+      /* background: color-mix(in oklab, var(--surface2) 30%, var(--surface)); */
+      /* border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line)); */
+    }
+    .perf-section+.perf-section {
+      /* margin-top: .6rem; */
+    }
+    .perf-row-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: .6rem;
+      margin-top: .6rem;
+    }
+    .perf-row-2 .perf-section + .perf-section {
+      margin-top: 0;
+    }
+    .perf-section-label {
       display: flex;
       align-items: center;
       gap: .35rem;
       font-size: .82rem;
-      font-weight: 600;
-      color: color-mix(in oklab, var(--a) 50%, var(--text));
-      margin-bottom: .45rem;
-      letter-spacing: .01em;
+      font-weight: 700;
+      color: color-mix(in oklab, var(--a) 45%, var(--text));
+      margin-bottom: .5rem;
     }
-    .studio-panel input[type="range"] {
+    .slider-value {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.8em;
+      padding: .1rem .4rem;
+      margin-inline-start: .25rem;
+      border-radius: var(--radius-full);
+      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 20%, transparent), color-mix(in oklab, var(--b) 20%, transparent));
+      color: var(--text);
+      font-size: .78rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .slider-wrap {
+      position: relative;
+      padding: .35rem 0 .2rem;
+    }
+    .slider-wrap input[type="range"] {
       -webkit-appearance: none;
       appearance: none;
+      width: 100%;
       height: 6px;
       border-radius: var(--radius-full);
-      background: var(--line);
+      background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--a) 35%, var(--line)),
+        color-mix(in oklab, var(--b) 25%, var(--line))
+      );
       outline: none;
+      cursor: pointer;
+      transition: background .2s;
     }
-    .studio-panel input[type="range"]::-webkit-slider-thumb {
+    .slider-wrap input[type="range"]::-webkit-slider-thumb {
       -webkit-appearance: none;
       appearance: none;
-      width: 16px;
-      height: 16px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--a), var(--b));
       cursor: pointer;
-      border: 2px solid var(--surface);
-      box-shadow: 0 0 4px rgba(0,0,0,.2);
+      border: 3px solid var(--surface);
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent),
+        0 2px 8px rgba(0,0,0,.25);
+      transition: transform .15s, box-shadow .15s;
+    }
+    .slider-wrap input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--a) 50%, transparent),
+        0 4px 14px rgba(0,0,0,.3);
+    }
+    .slider-wrap input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.2);
+    }
+    .slider-wrap input[type="range"]::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      cursor: pointer;
+      border: 3px solid var(--surface);
+      box-shadow:
+        0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent),
+        0 2px 8px rgba(0,0,0,.25);
+    }
+    .slider-wrap input[type="range"]::-moz-range-track {
+      height: 6px;
+      border-radius: var(--radius-full);
+      background: linear-gradient(
+        90deg,
+        color-mix(in oklab, var(--a) 35%, var(--line)),
+        color-mix(in oklab, var(--b) 25%, var(--line))
+      );
+      border: none;
+    }
+    .premium-badge {
+      font-size: 0.65rem;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: white;
+      padding: 0.15rem 0.45rem;
+      border-radius: var(--radius-full);
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      margin-inline-start: 0.35rem;
+    }
+    .s-card {
+      border-radius: var(--radius-lg);
+      border: 1px solid color-mix(in oklab, var(--a) 15%, var(--line));
+      background: color-mix(in oklab, var(--surface) 80%, transparent);
+      margin-top: .6rem;
+    }
+    .compact-toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      padding: .85rem 1rem;
+      cursor: pointer;
+    }
+    .compact-toggle-row .t-title {
+      font-weight: 700;
+      color: var(--text);
+      font-size: .9rem;
+      margin-bottom: .2rem;
+    }
+    .compact-toggle-row .t-desc {
+      font-size: .8rem;
+      color: var(--muted);
+      line-height: 1.3;
     }
     label {
       display: block;
       font-size: .88rem;
       color: color-mix(in oklab, var(--text) 86%, var(--muted));
       margin-bottom: .35rem;
+    }
+    .control-pair label {
+      margin-bottom: .4rem;
+      font-size: .8rem;
+      font-weight: 700;
+      color: color-mix(in oklab, var(--text) 80%, var(--muted));
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    html[dir="rtl"] .control-pair label {
+      letter-spacing: 0;
+      text-transform: none;
     }
     input, select, textarea {
       width: 100%;
@@ -176,27 +301,81 @@
       color: var(--text);
       font-size: .9rem;
     }
+    .editor-panel input,
+    .editor-panel textarea {
+      border-radius: .85rem;
+      border: 1px solid var(--line);
+      background: color-mix(in oklab, var(--surface2) 40%, var(--surface));
+      color: var(--text);
+      font-family: var(--font-body);
+      transition: border-color .25s, box-shadow .25s, background-color .2s;
+    }
+    .editor-panel input {
+      font-size: .98rem;
+      line-height: 1.5;
+      padding: .95rem 1rem;
+    }
+    .editor-panel textarea {
+      min-height: 180px;
+      padding: 1rem;
+      font-size: 1rem;
+      line-height: 1.7;
+      resize: vertical;
+    }
+    .perf-section textarea {
+      font-family: var(--font-body);
+    }
     input[dir="auto"], textarea[dir="auto"] {
       unicode-bidi: plaintext;
       text-align: start;
+    }
+    html[dir="rtl"] .editor-panel input,
+    html[dir="rtl"] .editor-panel textarea {
+      font-family: var(--font-body);
+    }
+    html[dir="rtl"] .perf-section textarea {
+      font-family: var(--font-body);
+    }
+    html[lang="ar"] input[name="title"],
+    html[lang="ar"] textarea[name="content"] {
+      direction: rtl;
+      text-align: right;
+    }
+    html[lang="ar"] input[name="title"]::placeholder,
+    html[lang="ar"] textarea[name="content"]::placeholder {
+      direction: rtl;
+      text-align: right;
     }
     input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--a);
       box-shadow: 0 0 0 3px var(--brand-accent-glow);
     }
-    select {
+    .queue-card select,
+    .perf-section select {
+      padding: .85rem 1.1rem;
+      padding-inline-end: 2.8rem;
+      border-radius: .75rem;
+      border: 1px solid var(--line);
+      background-color: color-mix(in oklab, var(--surface2) 50%, var(--surface));
+      color: var(--text);
+      font-size: .9rem;
+      font-family: var(--font-body);
+      line-height: 1.35;
+      cursor: pointer;
       appearance: none;
       -webkit-appearance: none;
-      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239fb0d4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      -moz-appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239fb0d4' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
       background-repeat: no-repeat;
-      background-position: right 1rem center;
-      background-size: 1.1em;
-      padding-right: 2.8rem;
-      cursor: pointer;
+      background-size: 1.05em;
+      background-position: calc(100% - .9rem) center;
+      transition: border-color .25s, box-shadow .25s, background-color .2s;
     }
-    select:hover {
-      border-color: color-mix(in oklab, var(--a) 40%, var(--line));
+    .queue-card select:hover,
+    .perf-section select:hover {
+      border-color: color-mix(in oklab, var(--b) 35%, var(--line));
+      background-color: color-mix(in oklab, var(--surface2) 65%, var(--surface));
     }
     .char-counter {
       display: flex;
@@ -217,8 +396,16 @@
       color: var(--danger);
       font-weight: 600;
     }
-    html[data-theme="light"] select {
-      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235b6c89' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    html[data-theme="light"] .queue-card select,
+    html[data-theme="light"] .perf-section select {
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b6c89' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    }
+    html[dir="rtl"] .queue-card select,
+    html[dir="rtl"] .perf-section select {
+      background-position: .9rem center;
+      padding-inline-start: 1.1rem;
+      padding-inline-end: 2.8rem;
+      font-family: var(--font-body-ar);
     }
 
     .note {
@@ -340,6 +527,18 @@
       text-align: center;
       justify-content: center;
     }
+    .key-inline-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: .65rem;
+    }
+    .key-inline-actions .btn {
+      width: 100%;
+      justify-content: center;
+    }
+    .mini-message {
+      margin-top: .65rem;
+    }
 
     .dashboard-shell {
       position: relative;
@@ -351,13 +550,13 @@
     }
     .page-card {
       position: relative;
-      overflow: hidden;
+      overflow: visible;
       border-radius: calc(var(--radius-lg) + .2rem);
       border-color: color-mix(in oklab, var(--line) 72%, var(--a) 28%);
-      background:
+      /* background:
         radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 30%),
         linear-gradient(180deg, color-mix(in oklab, var(--surface2) 96%, transparent), color-mix(in oklab, var(--surface) 99%, transparent));
-      box-shadow: 0 26px 60px rgba(0, 0, 0, .22);
+      box-shadow: 0 26px 60px rgba(0, 0, 0, .22); */
     }
     .page-card::before {
       content: "";
@@ -367,21 +566,24 @@
       background: linear-gradient(90deg, transparent, color-mix(in oklab, white 40%, var(--a)), transparent);
       opacity: .7;
       pointer-events: none;
+      border-top-left-radius: inherit;
+      border-top-right-radius: inherit;
     }
     .command-card {
       padding: clamp(1.35rem, 2vw, 1.8rem);
     }
-    .health-card {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
+    .command-card .summary-block {
+      margin-top: 1.25rem;
+    }
+    .command-card .summary-block h2 {
+      margin: 0 0 .7rem;
     }
     .meter {
       margin-top: 1rem;
       padding: .9rem 1rem;
       border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%);
-      background: color-mix(in oklab, var(--surface) 82%, transparent);
+      /* border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%); */
+      /* background: color-mix(in oklab, var(--surface) 82%, transparent); */
     }
     .meter-header {
       margin-bottom: .65rem;
@@ -390,6 +592,9 @@
     .mini {
       gap: .8rem;
       margin-top: 1rem;
+    }
+    .mini {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .kpi,
     .mini .box {
@@ -420,18 +625,7 @@
       border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%);
       background: color-mix(in oklab, var(--surface) 80%, transparent);
     }
-    .studio-panel {
-      padding: 1rem;
-      border-radius: 1.1rem;
-      background:
-        radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 35%),
-        color-mix(in oklab, var(--surface) 84%, transparent);
-    }
-    .studio-section {
-      border-radius: .95rem;
-      padding: .8rem .85rem;
-      background: color-mix(in oklab, var(--surface2) 35%, var(--surface));
-    }
+    /* Duplicate studio-panel definitions removed since we consolidated into perf-panel above */
     .plan-card {
       position: sticky;
       top: 5.5rem;
@@ -440,10 +634,10 @@
     .info-list {
       border-radius: 1.05rem;
       padding: 0 1rem;
-      background:
+      /* background:
         radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--b) 10%, transparent), transparent 34%),
         color-mix(in oklab, var(--surface) 84%, transparent);
-      border-color: color-mix(in oklab, var(--line) 74%, var(--b) 26%);
+      border-color: color-mix(in oklab, var(--line) 74%, var(--b) 26%); */
     }
     .jobs-shell {
       padding: clamp(1.2rem, 2vw, 1.5rem);
@@ -495,7 +689,7 @@
       min-width: 2.2rem;
       height: 2.2rem;
       padding: 0 .5rem;
-      border-radius: var(--radius);
+      border-radius: 10px;
       border: 1px solid var(--line);
       background: var(--surface);
       color: var(--muted);
@@ -621,8 +815,10 @@
     $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
       return match ((string) $slug) {
         'free' => __('ui.pricing.plan_name_free'),
+        'starter' => __('ui.pricing.plan_name_starter'),
         'creator' => __('ui.pricing.plan_name_creator'),
         'pro' => __('ui.pricing.plan_name_pro'),
+        'studio_max' => __('ui.pricing.plan_name_studio_max'),
         default => (string) ($fallback ?: '-'),
       };
     };
@@ -701,17 +897,17 @@
             <div class="kpi"><small>{{ __('ui.dashboard.characters') }}</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
             <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
-        </article>
 
-        <aside class="page-card reveal health-card">
-          <h2>{{ __('ui.dashboard.system_health') }}</h2>
-          <div class="mini">
-            <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
-            <div class="box"><small>{{ __('ui.dashboard.done') }}</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
-            <div class="box"><small>{{ __('ui.dashboard.failed') }}</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
+          <div class="summary-block">
+            <h2>{{ __('ui.dashboard.system_health') }}</h2>
+            <div class="mini">
+              <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
+              <div class="box"><small>{{ __('ui.dashboard.done') }}</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
+              <div class="box"><small>{{ __('ui.dashboard.failed') }}</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
+            </div>
           </div>
-          <p style="color: var(--muted); margin-top: .85rem;">{{ __('ui.dashboard.voice_quality_on_account') }}: <strong>{{ $formatTierLabel($planTierLabel) }}</strong>.</p>
-        </aside>
+
+        </article>
       </div>
     </section>
 
@@ -727,12 +923,12 @@
           @csrf
           <div class="editor-panel">
             <label>{{ __('ui.dashboard.title_optional') }}</label>
-            <input name="title" dir="auto" value="{{ old('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
+            <input name="title" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ old('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
           </div>
 
           <div class="editor-panel">
             <label>{{ __('ui.dashboard.text_content') }}</label>
-            <textarea name="content" id="contentTextarea" dir="auto" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
+            <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
             </div>
@@ -754,108 +950,115 @@
 
           {{-- Performance Controls --}}
           @if(($planTier ?? 'standard') === 'hd')
-          <div class="studio-panel" id="studioPanel">
-            <div class="studio-label">
+          <div class="perf-panel" id="studioPanel">
+            <div class="perf-header">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              🎛️ {{ __('ui.dashboard.voice_studio', ['default' => 'Performance Controls']) }}
-            </div>
-            {{-- Performance Style Section --}}
-            <div class="studio-section">
-              <div class="studio-section-label">🎭 {{ __('ui.dashboard.performance_style', ['default' => 'Performance Style']) }}</div>
-              <select name="performance_style" id="performance_style">
-                <option value="">-- {{ __('ui.dashboard.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
-                <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
-                <option value="educational">{{ __('ui.dashboard.style_educational', ['default' => 'Educational']) }}</option>
-                <option value="commercial">{{ __('ui.dashboard.style_commercial', ['default' => 'Commercial']) }}</option>
-                <option value="promo">{{ __('ui.dashboard.style_promo', ['default' => 'Promotional']) }}</option>
-                <option value="podcast">{{ __('ui.dashboard.style_podcast', ['default' => 'Podcast']) }}</option>
-                <option value="assistant">{{ __('ui.dashboard.style_assistant', ['default' => 'Virtual Assistant']) }}</option>
-                <option value="narrative">{{ __('ui.dashboard.style_narrative', ['default' => 'Narrative']) }}</option>
-                <option value="comedic">{{ __('ui.dashboard.style_comedic', ['default' => 'Comedic']) }}</option>
-                <option value="corporate">{{ __('ui.dashboard.style_corporate', ['default' => 'Corporate']) }}</option>
-                <option value="conversational">{{ __('ui.dashboard.style_conversational', ['default' => 'Conversational']) }}</option>
-                <option value="inspirational">{{ __('ui.dashboard.style_inspirational', ['default' => 'Inspirational']) }}</option>
-                <option value="cinematic">{{ __('ui.dashboard.style_cinematic', ['default' => 'Cinematic']) }}</option>
-                <option value="documentary">{{ __('ui.dashboard.style_documentary', ['default' => 'Documentary']) }}</option>
-                <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling', ['default' => 'Storytelling']) }}</option>
-                <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style', ['default' => 'Ad Style']) }}</option>
-                <option value="news">{{ __('ui.dashboard.emotion_news', ['default' => 'News']) }}</option>
-              </select>
+              {{ __('ui.dashboard.voice_studio') }}
             </div>
 
-            {{-- Custom Prompt Section (Premium only - Gemini) --}}
-            @if($customPromptEnabled ?? false)
-            <div class="studio-section" style="margin-top:.6rem;">
-              <div class="studio-section-label">✨ {{ __('ui.dashboard.style_prompt', ['default' => 'Custom Prompt']) }}</div>
-              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")']) }}" style="width:100%; resize:vertical; min-height:60px;"></textarea>
-              <!-- <div class="hint" style="margin-top:4px;">{{ __('ui.dashboard.style_prompt_hint', ['default' => 'Custom voice styling for Premium voices (Gemini). Max 2000 characters.']) }}</div> -->
-            </div>
-            @endif
+            <div class="perf-row-2">
+              <div class="perf-section">
+                <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
+                <select name="performance_style" id="performance_style">
+                  <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
+                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
+                  <option value="educational">{{ __('ui.dashboard.style_educational') }}</option>
+                  <option value="commercial">{{ __('ui.dashboard.style_commercial') }}</option>
+                  <option value="promo">{{ __('ui.dashboard.style_promo') }}</option>
+                  <option value="podcast">{{ __('ui.dashboard.style_podcast') }}</option>
+                  <option value="assistant">{{ __('ui.dashboard.style_assistant') }}</option>
+                  <option value="narrative">{{ __('ui.dashboard.style_narrative') }}</option>
+                  <option value="comedic">{{ __('ui.dashboard.style_comedic') }}</option>
+                  <option value="corporate">{{ __('ui.dashboard.style_corporate') }}</option>
+                  <option value="conversational">{{ __('ui.dashboard.style_conversational') }}</option>
+                  <option value="inspirational">{{ __('ui.dashboard.style_inspirational') }}</option>
+                  <option value="cinematic">{{ __('ui.dashboard.style_cinematic') }}</option>
+                  <option value="documentary">{{ __('ui.dashboard.style_documentary') }}</option>
+                  <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling') }}</option>
+                  <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style') }}</option>
+                  <option value="news">{{ __('ui.dashboard.emotion_news') }}</option>
+                </select>
+              </div>
 
-            {{-- Emotion Section --}}
-            <div class="studio-section" style="margin-top:.6rem;">
-              <div class="studio-section-label">💫 {{ __('ui.dashboard.emotion_tone', ['default' => 'Emotion']) }}</div>
-              <select name="emotion" id="emotion">
-                <option value="">-- {{ __('ui.dashboard.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
-                <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
-                <option value="warm">{{ __('ui.dashboard.emotion_warm', ['default' => 'Warm']) }}</option>
-                <option value="sad">{{ __('ui.dashboard.emotion_sad', ['default' => 'Sad']) }}</option>
-                <option value="excited">{{ __('ui.dashboard.emotion_excited', ['default' => 'Excited']) }}</option>
-                <option value="formal">{{ __('ui.dashboard.emotion_formal', ['default' => 'Formal']) }}</option>
-                <option value="calm">{{ __('ui.dashboard.emotion_calm', ['default' => 'Calm']) }}</option>
-                <option value="angry">{{ __('ui.dashboard.emotion_angry', ['default' => 'Angry']) }}</option>
-              </select>
-            </div>
-            <div style="margin-top: .4rem;">
-              <div>
-                <label for="dialect">{{ __('ui.dashboard.dialect', ['default' => 'Dialect']) }}</label>
-                <select name="dialect" id="dialect">
-                  <option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option>
+              <div class="perf-section">
+                <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
+                <select name="emotion" id="emotion">
+                  <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
+                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
+                  <option value="warm">{{ __('ui.dashboard.emotion_warm') }}</option>
+                  <option value="sad">{{ __('ui.dashboard.emotion_sad') }}</option>
+                  <option value="excited">{{ __('ui.dashboard.emotion_excited') }}</option>
+                  <option value="formal">{{ __('ui.dashboard.emotion_formal') }}</option>
+                  <option value="calm">{{ __('ui.dashboard.emotion_calm') }}</option>
+                  <option value="angry">{{ __('ui.dashboard.emotion_angry') }}</option>
                 </select>
               </div>
             </div>
-            <div class="two-col" style="margin-top: .4rem;">
-              <div>
-                <label for="speed">{{ __('ui.dashboard.speed', ['default' => 'Speed']) }} (<span id="speedVal">1.0</span>x)</label>
-                <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" style="width:100%"
-                  oninput="document.getElementById('speedVal').textContent=this.value">
+
+            @if($customPromptEnabled ?? false)
+            <div class="perf-section" style="margin-top:.6rem;">
+              <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span></div>
+              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;"></textarea>
+            </div>
+            @endif
+
+            <div class="perf-section">
+              <div class="perf-section-label">🌍 {{ __('ui.dashboard.dialect') }}</div>
+              <select name="dialect" id="dialect">
+                <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>
+              </select>
+            </div>
+
+            <div class="perf-row-2">
+              <div class="perf-section">
+                <div class="perf-section-label">
+                  ⚡ {{ __('ui.dashboard.speed') }}
+                  <span class="slider-value" id="speedVal">1.0</span>x
+                </div>
+                <div class="slider-wrap">
+                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value">
+                </div>
               </div>
-              <div>
-                <label for="pitch">{{ __('ui.dashboard.pitch', ['default' => 'Pitch']) }} (<span id="pitchVal">0</span>)</label>
-                <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" style="width:100%"
-                  oninput="document.getElementById('pitchVal').textContent=this.value">
+              <div class="perf-section">
+                <div class="perf-section-label">
+                  🎵 {{ __('ui.dashboard.pitch') }}
+                  <span class="slider-value" id="pitchVal">0</span>
+                </div>
+                <div class="slider-wrap">
+                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value">
+                </div>
               </div>
             </div>
             @if($dialogueEnabled ?? false)
-            <div style="margin-top: .5rem; border-top: 1px solid var(--line); padding-top: .5rem;">
-              <div class="setting-card" style="margin-bottom: .4rem;">
-                <div class="setting-info">
-                  <label for="dialogueToggle">{{ __('ui.dashboard.dialogue_mode', ['default' => 'Dialogue Mode']) }}</label>
-                  <div class="hint">{{ __('ui.dashboard.dialogue_hint', ['default' => 'Multi-speaker conversation (Pro plans only)']) }}</div>
+            <div class="s-card" style="margin-top: .6rem;">
+              <label class="compact-toggle-row" for="dialogueToggle">
+                <div class="txt">
+                  <div class="t-title">🗣️ {{ __('ui.dashboard.dialogue_mode') }}</div>
+                  <div class="t-desc" id="dialogueHint">{{ __('ui.dashboard.dialogue_hint') }}</div>
                 </div>
-                <label class="toggle-switch" aria-label="{{ __('ui.dashboard.dialogue_mode', ['default' => 'Dialogue Mode']) }}">
+                <div class="toggle-switch">
                   <input type="checkbox" id="dialogueToggle">
                   <span class="toggle-slider"></span>
-                </label>
-                <input type="hidden" name="is_dialogue" id="dialogueSelect" value="0">
-              </div>
+                </div>
+              </label>
+              <input type="hidden" name="is_dialogue" id="dialogueSelect" value="0">
             </div>
             @endif
           </div>
           @endif
 
-          <div>
-            <div class="setting-card" style="margin-top: .5rem;">
-              <div class="setting-info">
-                <label for="translateToggle">{{ __('ui.dashboard.translate_before_speaking') }}</label>
-                <div class="hint" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
+          <div class="s-card">
+            <label class="compact-toggle-row" for="translateToggle">
+              <div class="txt">
+                <div class="t-title">🌐 {{ __('ui.dashboard.translate_before_speaking') }}</div>
+                <div class="t-desc" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
               </div>
-              <label class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
+              <div class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
                 <input type="checkbox" id="translateToggle" {{ old('translate') ? 'checked' : '' }}>
                 <span class="toggle-slider"></span>
-              </label>
-              <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate') ? '1' : '0' }}">
-            </div>
+              </div>
+            </label>
+            <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate') ? '1' : '0' }}">
           </div>
 
           <button class="btn btn-primary" id="generateBtn" type="submit">{{ __('ui.dashboard.generate_voice_now') }}</button>
@@ -884,13 +1087,47 @@
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.english_default') }}</span><span class="info-value">{{ app()->getLocale() === 'ar' ? (($voiceNameMap[$defaultVoiceEn] ?? [])['label_ar'] ?? ($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) : (($voiceNameMap[$defaultVoiceEn] ?? [])['label'] ?? __('ui.dashboard.default')) }}</span></div>
         </div>
 
+        <div class="info-list">
+          <div class="info-row">
+            <span class="info-label">{{ __('ui.dashboard.extension_api_key') }}</span>
+            <span class="info-value">
+              @if($extensionApiState['has_api_key'])
+                <span dir="ltr" id="extensionKeyValue">{{ $extensionApiState['masked_key'] }}</span>
+              @else
+                {{ __('ui.dashboard.extension_key_not_created') }}
+              @endif
+            </span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">{{ __('ui.dashboard.extension_key_created') }}</span>
+            <span class="info-value">
+              {{ $extensionApiState['has_api_key'] ? ($extensionApiState['api_key_created_human'] ?? __('ui.dashboard.just_now')) : '-' }}
+            </span>
+          </div>
+          @if($extensionApiState['has_api_key'])
+          <div class="key-inline-actions">
+            <button
+              type="button"
+              class="btn"
+              id="copyExtensionKeyBtn"
+              data-copy-value="{{ $extensionApiState['masked_key'] }}"
+            >
+              {{ __('ui.extension.copy_to_clipboard') }}
+            </button>
+          </div>
+          <div id="extensionKeyMessage" class="mini-message"></div>
+          @endif
+        </div>
+
         <div class="sidebar-actions">
           <a class="btn" href="{{ route('pricing') }}">{{ __('ui.dashboard.pricing_and_plans') }}</a>
           <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.dashboard.upgrade_plan') }}</a>
         </div>
         <div class="sidebar-actions" style="margin-top: .6rem;">
           <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.dashboard.manage_subscription') }}</a>
-          <a class="btn" href="{{ route('browsers-extension.page') }}">{{ __('ui.dashboard.browser_extension') }}</a>
+          <a class="btn" href="{{ route('browsers-extension.page') }}#api-management">
+            {{ __('ui.dashboard.manage_extension_key') }}
+          </a>
         </div>
       </aside>
     </section>
@@ -1009,6 +1246,8 @@
       'generate_voice_now' => __('ui.dashboard.generate_voice_now'),
       'generating' => __('ui.dashboard.generating'),
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
+      'copied' => __('ui.extension.copied'),
+      'copy_failed' => __('ui.extension.copy_failed'),
     ];
   @endphp
   <script>
@@ -1043,6 +1282,8 @@
     const statFailed = document.getElementById('statFailed');
     const jobsCount = document.getElementById('jobsCount');
     const jobsPagination = document.getElementById('jobsPagination');
+    const copyExtensionKeyBtn = document.getElementById('copyExtensionKeyBtn');
+    const extensionKeyMessage = document.getElementById('extensionKeyMessage');
     const i18n = @json($dashboardI18n);
     const pageLocale = document.documentElement.lang || 'en';
 
@@ -1053,23 +1294,23 @@
 
     const dialectsByLanguage = {
       ar: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
-        { value: 'ar-XA', label: '{{ __("ui.dialects.msa", ["default" => "Modern Standard Arabic"]) }}' },
-        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi", ["default" => "Saudi"]) }}' },
-        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati", ["default" => "Emirati"]) }}' },
-        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian", ["default" => "Egyptian"]) }}' },
-        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese", ["default" => "Lebanese"]) }}' },
-        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian", ["default" => "Syrian"]) }}' },
-        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian", ["default" => "Jordanian"]) }}' },
-        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi", ["default" => "Iraqi"]) }}' },
-        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan", ["default" => "Moroccan"]) }}' },
-        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti", ["default" => "Kuwaiti"]) }}' },
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto") }}' },
+        { value: 'ar-XA', label: '{{ __("ui.dialects.msa") }}' },
+        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi") }}' },
+        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati") }}' },
+        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian") }}' },
+        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese") }}' },
+        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian") }}' },
+        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian") }}' },
+        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi") }}' },
+        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan") }}' },
+        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti") }}' },
       ],
       en: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
-        { value: 'en-US', label: '{{ __("ui.dialects.american", ["default" => "American"]) }}' },
-        { value: 'en-GB', label: '{{ __("ui.dialects.british", ["default" => "British"]) }}' },
-        { value: 'en-AU', label: '{{ __("ui.dialects.australian", ["default" => "Australian"]) }}' },
+        { value: '', label: '{{ __("ui.dashboard.dialect_auto") }}' },
+        { value: 'en-US', label: '{{ __("ui.dialects.american") }}' },
+        { value: 'en-GB', label: '{{ __("ui.dialects.british") }}' },
+        { value: 'en-AU', label: '{{ __("ui.dialects.australian") }}' },
       ],
     };
 
@@ -1089,7 +1330,7 @@
     const jobsPerPage = 10;
 
     function formatNumber(value) {
-      return new Intl.NumberFormat('en-US').format(Number(value || 0));
+      return new Intl.NumberFormat(pageLocale === 'ar' ? 'ar' : 'en-US').format(Number(value || 0));
     }
 
     function normalizeLanguage(value) {
@@ -1177,6 +1418,16 @@
       if (!message) { formMessage.innerHTML = ''; return; }
       const cls = type === 'error' ? 'error' : 'note';
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+    }
+
+    function showExtensionKeyMessage(type, message) {
+      if (!extensionKeyMessage) return;
+      if (!message) {
+        extensionKeyMessage.innerHTML = '';
+        return;
+      }
+      const cls = type === 'error' ? 'error' : 'note';
+      extensionKeyMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
     }
 
     function renderVoiceOptions() {
@@ -1571,6 +1822,21 @@
       contentInput.addEventListener('input', updateCharCounter);
       updateCharCounter(); // initial count for old('content')
     }
+
+    copyExtensionKeyBtn?.addEventListener('click', async function() {
+      const raw = String(copyExtensionKeyBtn.getAttribute('data-copy-value') || '').trim();
+      if (!raw) {
+        showExtensionKeyMessage('error', i18n.copy_failed);
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(raw);
+        showExtensionKeyMessage('ok', i18n.copied);
+      } catch (error) {
+        showExtensionKeyMessage('error', i18n.copy_failed);
+      }
+    });
   </script>
 </body>
 </html>

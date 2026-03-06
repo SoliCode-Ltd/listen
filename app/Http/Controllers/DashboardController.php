@@ -94,6 +94,7 @@ class DashboardController extends Controller
         // Hybrid TTS: resolve dialogue availability per plan
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         $customPromptEnabled = (bool) ($activePlan?->custom_prompt_enabled ?? false);
+        $extensionApiState = $this->extensionApiState(auth()->user());
 
         return view('dashboard', [
             'usage' => $usage,
@@ -116,6 +117,7 @@ class DashboardController extends Controller
             'dialogueEnabled' => $dialogueEnabled,
             'customPromptEnabled' => $customPromptEnabled,
             'ttsProviderPolicy' => $activePlan?->tts_provider_policy ?? 'default',
+            'extensionApiState' => $extensionApiState,
         ]);
     }
 
@@ -364,6 +366,17 @@ class DashboardController extends Controller
         }
 
         abort(403, $message);
+    }
+
+    private function extensionApiState(?object $user): array
+    {
+        $last4 = trim((string) ($user?->api_key_last4 ?? ''));
+
+        return [
+            'has_api_key' => (bool) ($user?->api_key_hash ?? false),
+            'masked_key' => $last4 !== '' ? 'lk_live_****'.$last4 : null,
+            'api_key_created_human' => $user?->api_key_created_at?->diffForHumans(),
+        ];
     }
 
     /**

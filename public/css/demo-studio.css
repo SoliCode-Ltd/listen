@@ -216,7 +216,7 @@
 
 .sample-chip {
   padding: .45rem .8rem;
-  border-radius: var(--radius-full);
+  border-radius: 10px;
   border: 1px solid var(--line);
   background: color-mix(in oklab, var(--surface) 70%, transparent);
   font-size: .8rem;
@@ -237,8 +237,9 @@
    ══════════════════════════════════════════════ */
 
 #stylePromptSection {
-    margin-top: 0.6rem;
+  margin-top: 0.6rem;
 }
+
 .ctrl-group select,
 .perf-section select,
 .perf-grid select {
@@ -366,7 +367,7 @@ html[dir="rtl"] .perf-grid select {
   justify-content: center;
   gap: .6rem;
   padding: .95rem 2rem;
-  border-radius: var(--radius-full);
+  border-radius: 10px;
   border: none;
   background: linear-gradient(135deg, var(--a), var(--b));
   color: #fff;
@@ -670,7 +671,7 @@ html[dir="rtl"] .perf-grid select {
   font-size: .85rem;
   font-weight: 700;
   color: color-mix(in oklab, var(--a) 55%, var(--text));
-  margin-bottom: .6rem
+  margin-bottom: 1rem;
 }
 
 .perf-panel .perf-header svg {
@@ -685,11 +686,11 @@ html[dir="rtl"] .perf-grid select {
   padding: .85rem 1rem;
   border-radius: .85rem;
   /* background: color-mix(in oklab, var(--surface2) 30%, var(--surface)); */
-  /* border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line)) */
+  /* border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line)); */
 }
 
 .perf-section+.perf-section {
-  /* margin-top: .6rem */
+  /* margin-top: .6rem; */
 }
 
 /* Side-by-side performance style + emotion */
@@ -933,7 +934,20 @@ html[dir="rtl"] .perf-grid select {
 
 /* ── RTL adjustments ── */
 html[dir="rtl"] .s-card-editor textarea {
-  font-family: var(--font-body-ar)
+  font-family: var(--font-body)
+}
+
+html[dir="rtl"] .s-card-editor textarea,
+html[dir="rtl"] #style_prompt {
+  direction: rtl;
+  text-align: right;
+  font-family: var(--font-body);
+}
+
+html[dir="rtl"] .s-card-editor textarea::placeholder,
+html[dir="rtl"] #style_prompt::placeholder {
+  direction: rtl;
+  text-align: right;
 }
 
 html[dir="rtl"] .studio-hero h1 {

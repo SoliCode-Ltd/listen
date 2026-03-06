@@ -7,6 +7,7 @@
   --font-display-ar: 'Cairo', sans-serif;
   --font-body-ar: 'Cairo', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --btn-radius: 10px;
   --bg: #070910;
   --surface: #11182a;
   --surface2: #15213a;
@@ -302,7 +303,7 @@ html[dir="rtl"] h6 {
   font-weight: 600;
   font-size: 0.95rem;
   padding: 0.85rem 1.8rem;
-  border-radius: 99px;
+  border-radius: var(--btn-radius);
   border: 1px solid var(--line);
   background: color-mix(in oklab, var(--surface) 80%, transparent);
   color: var(--text);
@@ -326,8 +327,10 @@ html[dir="rtl"] h6 {
   box-shadow: 0 4px 12px color-mix(in oklab, var(--a) 25%, transparent);
 }
 
+.btn.btn-primary:hover,
 .btn-primary:hover {
-  box-shadow: 0 12px 32px color-mix(in oklab, var(--a) 45%, transparent), 0 0 0 2px color-mix(in oklab, var(--b) 30%, transparent);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 45%, transparent);
 }
 
 .btn-ghost {
@@ -347,7 +350,7 @@ html[dir="rtl"] h6 {
   width: 2.35rem;
   height: 2.35rem;
   padding: 0;
-  border-radius: var(--radius);
+  border-radius: var(--btn-radius);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
@@ -685,7 +688,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   font-weight: 600;
   color: var(--muted);
   text-decoration: none;
-  border-radius: var(--radius);
+  border-radius: var(--btn-radius);
   transition: all .2s ease;
 }
 
@@ -1058,10 +1061,12 @@ form:has(button.mobile-nav-link) {
   padding: 1.15rem;
   font-size: 1.1rem;
   font-weight: 700;
-  border-radius: var(--radius-lg);
+  border-radius: var(--btn-radius);
   position: relative;
   overflow: hidden;
   z-index: 1;
+  background: linear-gradient(135deg, var(--a), var(--b));
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .contact-submit-btn::before {
@@ -1077,6 +1082,11 @@ form:has(button.mobile-nav-link) {
 
 .contact-submit-btn:hover::before {
   opacity: 1;
+}
+
+.contact-submit-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 45%, transparent);
 }
 
 .btn-icon-right {
