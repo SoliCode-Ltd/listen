@@ -3,6 +3,75 @@
     .main-content {
       padding: 1.5rem 0 3rem;
     }
+    .dashboard-layout {
+      display: grid;
+      grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
+      gap: 1rem;
+      align-items: start;
+    }
+    .dashboard-content {
+      min-width: 0;
+    }
+    .dashboard-panel {
+      display: none;
+    }
+    .dashboard-panel.active {
+      display: block;
+    }
+    .dashboard-panel + .dashboard-panel {
+      margin-top: 1.5rem;
+    }
+    .dashboard-panel-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 1rem;
+    }
+    .dashboard-menu {
+      position: sticky;
+      top: 5.5rem;
+      padding: 1rem;
+    }
+    .dashboard-menu-title {
+      margin: 0 0 .75rem;
+      font-size: .95rem;
+      font-weight: 800;
+      color: var(--text);
+    }
+    .dashboard-menu-list {
+      display: grid;
+      gap: .45rem;
+    }
+    .dashboard-menu-link {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      padding: .8rem .9rem;
+      border-radius: 10px;
+      border: 1px solid color-mix(in oklab, var(--line) 74%, transparent);
+      background: color-mix(in oklab, var(--surface) 75%, transparent);
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .88rem;
+      font-weight: 700;
+      transition: all .25s cubic-bezier(.4, 0, .2, 1);
+    }
+    .dashboard-menu-link:hover {
+      color: var(--text);
+      transform: translateY(-2px);
+      border-color: color-mix(in oklab, var(--a) 35%, var(--line));
+      box-shadow: 0 8px 24px color-mix(in oklab, var(--line) 35%, transparent);
+    }
+    .dashboard-menu-link.active {
+      color: #fff;
+      border-color: transparent;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 35%, transparent);
+    }
+    .dashboard-menu-link span:last-child {
+      font-size: .78rem;
+      opacity: .72;
+    }
     .hero-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
@@ -273,6 +342,61 @@
       font-size: .8rem;
       color: var(--muted);
       line-height: 1.3;
+    }
+    .output-panel {
+      min-height: 120px;
+      margin-top: 1rem;
+    }
+    .output-panel .panel-title {
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+      font-size: .82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin-bottom: .6rem;
+    }
+    .output-panel .panel-title svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+    .output-panel audio {
+      width: 100%;
+      height: 34px;
+    }
+    .output-panel .audio-meta {
+      margin-top: .45rem;
+      font-size: .8rem;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+    .output-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: .85rem;
+      opacity: .6;
+    }
+    .output-placeholder svg {
+      width: 32px;
+      height: 32px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+      opacity: .5;
+    }
+    html[dir="rtl"] .output-panel .panel-title {
+      letter-spacing: 0;
     }
     label {
       display: block;
@@ -631,6 +755,10 @@
       top: 5.5rem;
       padding: clamp(1.2rem, 2vw, 1.5rem);
     }
+    .dashboard-panel .plan-card {
+      position: static;
+      top: auto;
+    }
     .info-list {
       border-radius: 1.05rem;
       padding: 0 1rem;
@@ -757,12 +885,18 @@
     }
 
     @media (max-width: 980px) {
+      .dashboard-layout,
       .hero-grid,
-      .main-grid,
       .kpis,
       .two-col,
       .mini {
         grid-template-columns: 1fr;
+      }
+      .dashboard-menu {
+        position: static;
+      }
+      .dashboard-menu-list {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .plan-card {
         position: static;
@@ -777,6 +911,9 @@
       }
       .page-card h1 {
         font-size: 1.3rem;
+      }
+      .dashboard-menu-list {
+        grid-template-columns: 1fr;
       }
       .control-pair > div,
       .editor-panel {
@@ -866,7 +1003,31 @@
   @include('components.header')
 
   <main class="container main-content dashboard-shell">
-    <section>
+    <div class="dashboard-layout">
+      <aside class="page-card reveal dashboard-menu">
+        <h2 class="dashboard-menu-title">{{ __('ui.dashboard.menu_panel') }}</h2>
+        <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
+          <a class="dashboard-menu-link active" href="#overviewSection" data-dashboard-nav>
+            <span>{{ __('ui.dashboard.command_center') }}</span>
+            <span>01</span>
+          </a>
+          <a class="dashboard-menu-link" href="#queueSection" data-dashboard-nav>
+            <span>{{ __('ui.dashboard.generate_new_voice') }}</span>
+            <span>02</span>
+          </a>
+          <a class="dashboard-menu-link" href="#planSection" data-dashboard-nav>
+            <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
+            <span>03</span>
+          </a>
+          <a class="dashboard-menu-link" href="#recentJobsSection" data-dashboard-nav>
+            <span>{{ __('ui.dashboard.recent_voices') }}</span>
+            <span>04</span>
+          </a>
+        </nav>
+      </aside>
+
+      <div class="dashboard-content">
+    <section id="overviewSection" class="dashboard-panel active" data-dashboard-section>
       <div class="hero-grid">
         <article class="page-card reveal command-card">
           <h1>{{ __('ui.dashboard.command_center') }}</h1>
@@ -911,8 +1072,8 @@
       </div>
     </section>
 
-    <section class="main-grid" id="queue">
-      <article class="page-card reveal queue-card">
+    <section id="queueSection" class="dashboard-panel" data-dashboard-section>
+      <article class="page-card reveal queue-card" id="queueCardSection">
         <h2>{{ __('ui.dashboard.generate_new_voice') }}</h2>
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
@@ -1063,9 +1224,27 @@
 
           <button class="btn btn-primary" id="generateBtn" type="submit">{{ __('ui.dashboard.generate_voice_now') }}</button>
         </form>
-      </article>
 
-      <aside class="page-card reveal sidebar-info plan-card">
+        <div class="s-card output-panel" id="generatedAudioWrap" style="display:none;">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            {{ __('ui.dashboard.instant_preview') }}
+          </div>
+          <audio id="generatedPreviewAudio" controls preload="none"></audio>
+          <div class="audio-meta" id="generatedAudioMeta"></div>
+        </div>
+
+        <div class="s-card output-panel reveal show" id="generatedOutputPlaceholder">
+          <div class="output-placeholder">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            {{ __('ui.dashboard.instant_preview') }}
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="planSection" class="dashboard-panel" data-dashboard-section>
+      <article class="page-card reveal sidebar-info plan-card">
         <h3 style="margin-top:0;">{{ __('ui.dashboard.plan_and_defaults') }}</h3>
 
         <div class="info-list">
@@ -1129,81 +1308,85 @@
             {{ __('ui.dashboard.manage_extension_key') }}
           </a>
         </div>
-      </aside>
+      </article>
     </section>
 
-    <section id="recentJobsSection" class="page-card table-card reveal jobs-shell">
-      <div class="table-header">
-        <h2>{{ __('ui.dashboard.recent_voices') }}</h2>
-        <span class="jobs-count" id="jobsCount"></span>
-      </div>
-      <div style="overflow-x: auto;">
-        <table>
-          <thead>
-            <tr>
-              <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_translate') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
-            </tr>
-          </thead>
-          <tbody id="jobsTableBody">
-            @forelse($jobs as $job)
-              <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
-                'id' => $job->id,
-                'title' => $job->textItem?->title,
-                'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
-                'status' => $job->status,
-                'source_language' => $job->source_language,
-                'target_language' => $job->target_language,
-	                'voice_label' => $speakerDisplayLabel($job->voice_name),
-                'voice_tier' => \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)),
-                'translate' => $job->translate,
-                'duration_seconds' => $job->duration_seconds,
-                'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
-                'error_message' => $job->error_message,
-                'created_human' => $job->created_at?->diffForHumans(),
-              ]) }}">
-                <td>#{{ $job->id }}</td>
-                <td>{{ $job->textItem?->title ?: '-' }}</td>
-                <td><span class="status {{ $job->status }}">{{ $statusLabelByKey($job->status) }}</span></td>
-                <td>{{ $languageLabelByCode($job->source_language) }} -> {{ $languageLabelByCode($job->target_language) }}</td>
-	                <td>{{ $speakerDisplayLabel($job->voice_name) }}</td>
-	                <td>{{ $job->translate ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</td>
-                <td>
-                  @if($job->audio_path)
-                    <audio
-                      controls
-                      preload="none"
-                      src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"
-                      data-download-language="{{ $job->target_language }}"
-                      data-download-text="{{ \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, '') }}"
-	                      data-download-speaker="{{ $speakerDisplayLabel($job->voice_name) }}"
-                      data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
-                    ></audio>
-                  @elseif($job->status === 'failed')
-	                    <small style="color: var(--danger);">{{ $job->error_message ?: __('ui.dashboard.generation_failed') }}</small>
-	                  @else
-	                    <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
-	                  @endif
-                </td>
-                <td>{{ $job->created_at?->diffForHumans() }}</td>
-                <td>
-                  <button
-                    type="button"
-                    class="pagination-btn job-delete-btn"
-                    data-action="delete-job"
-                    data-job-id="{{ $job->id }}"
-                  >
-	                    {{ __('ui.dashboard.delete') }}
-	                  </button>
-                </td>
+    <section id="recentJobsSection" class="dashboard-panel" data-dashboard-section>
+      <div class="page-card table-card reveal jobs-shell">
+        <div class="table-header">
+          <h2>{{ __('ui.dashboard.recent_voices') }}</h2>
+          <span class="jobs-count" id="jobsCount"></span>
+        </div>
+        <div style="overflow-x: auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_translate') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
               </tr>
-            @empty
-	              <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
-            @endforelse
-          </tbody>
-        </table>
+            </thead>
+            <tbody id="jobsTableBody">
+              @forelse($jobs as $job)
+                <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
+                  'id' => $job->id,
+                  'title' => $job->textItem?->title,
+                  'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
+                  'status' => $job->status,
+                  'source_language' => $job->source_language,
+                  'target_language' => $job->target_language,
+	                  'voice_label' => $speakerDisplayLabel($job->voice_name),
+                  'voice_tier' => \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)),
+                  'translate' => $job->translate,
+                  'duration_seconds' => $job->duration_seconds,
+                  'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
+                  'error_message' => $job->error_message,
+                  'created_human' => $job->created_at?->diffForHumans(),
+                ]) }}">
+                  <td>#{{ $job->id }}</td>
+                  <td>{{ $job->textItem?->title ?: '-' }}</td>
+                  <td><span class="status {{ $job->status }}">{{ $statusLabelByKey($job->status) }}</span></td>
+                  <td>{{ $languageLabelByCode($job->source_language) }} -> {{ $languageLabelByCode($job->target_language) }}</td>
+	                  <td>{{ $speakerDisplayLabel($job->voice_name) }}</td>
+	                  <td>{{ $job->translate ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</td>
+                  <td>
+                    @if($job->audio_path)
+                      <audio
+                        controls
+                        preload="none"
+                        src="{{ \App\Support\AudioUrl::fromPath($job->audio_path) }}"
+                        data-download-language="{{ $job->target_language }}"
+                        data-download-text="{{ \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, '') }}"
+	                        data-download-speaker="{{ $speakerDisplayLabel($job->voice_name) }}"
+                        data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
+                      ></audio>
+                    @elseif($job->status === 'failed')
+	                      <small style="color: var(--danger);">{{ $job->error_message ?: __('ui.dashboard.generation_failed') }}</small>
+	                    @else
+	                      <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
+	                    @endif
+                  </td>
+                  <td>{{ $job->created_at?->diffForHumans() }}</td>
+                  <td>
+                    <button
+                      type="button"
+                      class="pagination-btn job-delete-btn"
+                      data-action="delete-job"
+                      data-job-id="{{ $job->id }}"
+                    >
+	                      {{ __('ui.dashboard.delete') }}
+	                    </button>
+                  </td>
+                </tr>
+              @empty
+	                <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
+              @endforelse
+            </tbody>
+          </table>
+        </div>
+        <div class="pagination" id="jobsPagination"></div>
       </div>
-      <div class="pagination" id="jobsPagination"></div>
     </section>
+      </div>
+    </div>
   </main>
 
   @include('components.footer')
@@ -1248,6 +1431,9 @@
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
       'copied' => __('ui.extension.copied'),
       'copy_failed' => __('ui.extension.copy_failed'),
+      'instant_preview' => __('ui.dashboard.instant_preview'),
+      'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
+      'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
     ];
   @endphp
   <script>
@@ -1284,6 +1470,12 @@
     const jobsPagination = document.getElementById('jobsPagination');
     const copyExtensionKeyBtn = document.getElementById('copyExtensionKeyBtn');
     const extensionKeyMessage = document.getElementById('extensionKeyMessage');
+    const dashboardNavLinks = Array.from(document.querySelectorAll('[data-dashboard-nav]'));
+    const dashboardSections = Array.from(document.querySelectorAll('[data-dashboard-section]'));
+    const generatedAudioWrap = document.getElementById('generatedAudioWrap');
+    const generatedOutputPlaceholder = document.getElementById('generatedOutputPlaceholder');
+    const generatedPreviewAudio = document.getElementById('generatedPreviewAudio');
+    const generatedAudioMeta = document.getElementById('generatedAudioMeta');
     const i18n = @json($dashboardI18n);
     const pageLocale = document.documentElement.lang || 'en';
 
@@ -1428,6 +1620,63 @@
       }
       const cls = type === 'error' ? 'error' : 'note';
       extensionKeyMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+    }
+
+    function hideGeneratedPreview() {
+      if (generatedPreviewAudio) {
+        generatedPreviewAudio.pause();
+        generatedPreviewAudio.removeAttribute('src');
+        delete generatedPreviewAudio.dataset.downloadLanguage;
+        delete generatedPreviewAudio.dataset.downloadText;
+        delete generatedPreviewAudio.dataset.downloadSpeaker;
+        delete generatedPreviewAudio.dataset.downloadQuality;
+        generatedPreviewAudio.load();
+      }
+      if (generatedAudioMeta) generatedAudioMeta.textContent = '';
+      if (generatedAudioWrap) generatedAudioWrap.style.display = 'none';
+      if (generatedOutputPlaceholder) generatedOutputPlaceholder.style.display = '';
+    }
+
+    function showGeneratedPreview(job) {
+      if (!generatedPreviewAudio || !generatedAudioWrap || !generatedOutputPlaceholder) return;
+      const audioUrl = String(job?.audio_url || '').trim();
+      if (!audioUrl) {
+        hideGeneratedPreview();
+        return;
+      }
+
+      const voiceLabel = cleanSpeakerLabel(String(job?.voice_label || i18n.default_speaker));
+      const voiceTier = String(job?.voice_tier || i18n.standard).trim();
+
+      generatedOutputPlaceholder.style.display = 'none';
+      generatedAudioWrap.style.display = 'block';
+      generatedPreviewAudio.dataset.downloadLanguage = String(job?.target_language || '');
+      generatedPreviewAudio.dataset.downloadText = String(job?.text_excerpt || job?.title || '').slice(0, 42);
+      generatedPreviewAudio.dataset.downloadSpeaker = voiceLabel;
+      generatedPreviewAudio.dataset.downloadQuality = voiceTier;
+      generatedPreviewAudio.src = audioUrl;
+      generatedPreviewAudio.load();
+      generatedPreviewAudio.addEventListener('canplaythrough', function autoPlayHandler() {
+        generatedPreviewAudio.removeEventListener('canplaythrough', autoPlayHandler);
+        generatedPreviewAudio.play().catch(() => {});
+      });
+
+      if (generatedAudioMeta) {
+        const meta = [`${i18n.speaker_prefix} ${voiceLabel}`];
+        if (voiceTier) meta.push(formatTierLabel(voiceTier));
+        meta.push(i18n.generated_audio_ready);
+        generatedAudioMeta.textContent = meta.join(' - ');
+      }
+    }
+
+    function setActiveDashboardSection(sectionId) {
+      dashboardNavLinks.forEach(function(link) {
+        const targetId = String(link.getAttribute('href') || '').replace(/^#/, '');
+        link.classList.toggle('active', targetId === sectionId);
+      });
+      dashboardSections.forEach(function(section) {
+        section.classList.toggle('active', section.id === sectionId);
+      });
     }
 
     function renderVoiceOptions() {
@@ -1751,6 +2000,9 @@
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
+        if (data?.job?.audio_url) {
+          showGeneratedPreview(data.job);
+        }
         showFormMessage('ok', data?.message || i18n.voice_generated_success);
       } catch (error) {
         showFormMessage('error', extractErrorMessage(data, error?.message || i18n.voice_generation_failed));
@@ -1821,6 +2073,34 @@
     if (contentInput) {
       contentInput.addEventListener('input', updateCharCounter);
       updateCharCounter(); // initial count for old('content')
+    }
+
+    if (dashboardNavLinks.length) {
+      const validSectionIds = dashboardSections.map(function(section) { return section.id; });
+      const hashSectionId = String(window.location.hash || '').replace(/^#/, '');
+      const savedSectionId = String(window.localStorage?.getItem('dashboard_active_section') || '');
+      const initialSectionId = validSectionIds.includes(hashSectionId)
+        ? hashSectionId
+        : (validSectionIds.includes(savedSectionId) ? savedSectionId : (validSectionIds[0] || 'overviewSection'));
+
+      if (initialSectionId) {
+        setActiveDashboardSection(initialSectionId);
+      }
+
+      dashboardNavLinks.forEach(function(link) {
+        link.addEventListener('click', function(event) {
+          event.preventDefault();
+          const targetId = String(link.getAttribute('href') || '').replace(/^#/, '');
+          if (!targetId) return;
+          setActiveDashboardSection(targetId);
+          if (window.localStorage) {
+            window.localStorage.setItem('dashboard_active_section', targetId);
+          }
+          if (window.location.hash !== '#' + targetId) {
+            history.replaceState(null, '', '#' + targetId);
+          }
+        });
+      });
     }
 
     copyExtensionKeyBtn?.addEventListener('click', async function() {
