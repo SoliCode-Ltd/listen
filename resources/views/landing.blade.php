@@ -491,6 +491,9 @@
     .sample-card-hero {
       position: relative;
       min-height: 9rem;
+      overflow: hidden;
+      isolation: isolate;
+      border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
     }
     .sample-card-hero::after {
       content: "";
@@ -503,22 +506,27 @@
       background-repeat: no-repeat;
       background-size: cover;
       filter: saturate(1.15) brightness(0.9) contrast(1.03);
-      border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
       pointer-events: none;
-      z-index: 0;
+      z-index: 1;
+    }
+    .sample-card-hero.has-inline-art::after {
+      background: linear-gradient(135deg, rgba(8, 12, 24, .04), rgba(8, 12, 24, .16));
     }
     .sample-card-hero-svg {
       position: absolute;
       inset: 0;
-      z-index: -1;
+      z-index: 0;
       overflow: hidden;
-      border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
     }
     .sample-card-hero-svg svg {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
+    }
+    .sample-card-hero-svg .sample-card-hero-msa-label {
+      font-family: var(--font-display-ar), 'Cairo', sans-serif;
+      font-weight: 800;
     }
     /* no white line divider */
     /* Card body */
@@ -1401,6 +1409,7 @@
             $flagImage = preg_match('/^[a-z]{2}$/', $countryCode)
               ? "https://flagcdn.com/w320/{$countryCode}.png"
               : null;
+            $usesInlineArabicFallback = ! $flagImage && $sampleLanguage === 'ar';
             $fallbackSvg = $sampleLanguage === 'ar'
               ? <<<'SVG'
 <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 640'>
@@ -1485,10 +1494,52 @@ SVG
 SVG;
             $heroArtwork = $flagImage
               ? "url('{$flagImage}')"
-              : "url(\"data:image/svg+xml," . rawurlencode($fallbackSvg) . "\")";
+              : ($usesInlineArabicFallback ? null : "url(\"data:image/svg+xml," . rawurlencode($fallbackSvg) . "\")");
           @endphp
           <article class="sample-card reveal" data-sample-idx="{{ $idx }}" id="sample-card-{{ $idx }}">
-            <div class="sample-card-hero" style="--sample-flag-image: {{ $heroArtwork }};"></div>
+            <div
+              class="sample-card-hero{{ $usesInlineArabicFallback ? ' has-inline-art' : '' }}"
+              @if($heroArtwork)
+                style="--sample-flag-image: {{ $heroArtwork }};"
+              @endif
+            >
+              @if($usesInlineArabicFallback)
+              <div class="sample-card-hero-svg" aria-hidden="true">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 640" preserveAspectRatio="xMidYMid slice">
+                  <defs>
+                    <radialGradient id="sample-msa-grad-bg-{{ $idx }}" cx="50%" cy="50%" r="70%">
+                      <stop offset="0%" stop-color="#141E30"/>
+                      <stop offset="100%" stop-color="#040914"/>
+                    </radialGradient>
+                    <linearGradient id="sample-msa-text-grad-{{ $idx }}" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#ffffff"/>
+                      <stop offset="100%" stop-color="#94a3b8"/>
+                    </linearGradient>
+                    <linearGradient id="sample-msa-gold-{{ $idx }}" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0%" stop-color="#fcd34d"/>
+                      <stop offset="100%" stop-color="#d97706"/>
+                    </linearGradient>
+                    <filter id="sample-msa-glow-{{ $idx }}">
+                      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  <rect width="1200" height="640" fill="url(#sample-msa-grad-bg-{{ $idx }})"/>
+                  <path d="M-100 320 C 250 100, 350 540, 600 320 C 850 100, 950 540, 1300 320" fill="none" stroke="url(#sample-msa-gold-{{ $idx }})" stroke-width="4" opacity="0.3" filter="url(#sample-msa-glow-{{ $idx }})"/>
+                  <path d="M-100 360 C 250 140, 350 580, 600 360 C 850 140, 950 580, 1300 360" fill="none" stroke="url(#sample-msa-gold-{{ $idx }})" stroke-width="1.5" opacity="0.3"/>
+                  <path d="M-100 280 C 250 60, 350 500, 600 280 C 850 60, 950 500, 1300 280" fill="none" stroke="url(#sample-msa-gold-{{ $idx }})" stroke-width="1.5" opacity="0.3"/>
+
+                  <g text-anchor="middle" direction="rtl">
+                    <text x="600" y="350" font-size="130" fill="url(#sample-msa-text-grad-{{ $idx }})" class="sample-card-hero-msa-label">العربية الفصحى</text>
+                  </g>
+                </svg>
+              </div>
+              @endif
+            </div>
             <div class="sample-card-body">
               <h3 class="sample-card-title">{{ $sample['title'] }}</h3>
               <p class="sample-card-desc">{{ $sample['description'] }}</p>

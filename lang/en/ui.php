@@ -507,7 +507,7 @@ return [
         'hero_subtitle' => 'This page is optimized for quick product validation. No clutter, only the controls that matter.',
         'hero_point_1' => 'Branded voice personas only',
         'hero_point_2' => 'Clear translation behavior',
-        'hero_point_3' => 'Quality switch (Standard / HD)',
+        'hero_point_3' => 'Quality switch (Standard / Premium)',
         'hero_point_4' => 'Instant audio preview',
         'voice_coverage' => 'Voice coverage',
         'arabic_voices' => 'Arabic voices',
