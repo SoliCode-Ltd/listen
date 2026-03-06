@@ -668,9 +668,12 @@
         <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
       @endauth
       <div class="cta-badges">
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_no_card') }}</span>
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_cancel_anytime') }}</span>
-        <span class="cta-badge"><svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>{{ __('ui.pricing.badge_secure_billing') }}</span>
+        @php
+          $premiumCheck = '<defs><linearGradient id="ctaCheckGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--ok)"/><stop offset="100%" stop-color="#10B981"/></linearGradient></defs><circle cx="12" cy="12" r="12" style="fill:url(#ctaCheckGrad);stroke:none;" opacity="0.2"/><circle cx="12" cy="12" r="9" style="fill:url(#ctaCheckGrad);stroke:none;"/><path d="M8.5 12L10.5 14.5L16 9" style="stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;"/>';
+        @endphp
+        <span class="cta-badge"><svg viewBox="0 0 24 24">{!! $premiumCheck !!}</svg>{{ __('ui.pricing.badge_no_card') }}</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24">{!! $premiumCheck !!}</svg>{{ __('ui.pricing.badge_cancel_anytime') }}</span>
+        <span class="cta-badge"><svg viewBox="0 0 24 24">{!! $premiumCheck !!}</svg>{{ __('ui.pricing.badge_secure_billing') }}</span>
       </div>
     </section>
   </main>

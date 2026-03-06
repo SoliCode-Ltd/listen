@@ -577,14 +577,18 @@ html[dir="rtl"] .perf-grid select {
 
 /* Output panel */
 .output-panel {
-  min-height: 120px
+  min-height: 120px;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
+  border-radius: 1.25rem;
 }
 
 .output-panel .panel-title {
   display: flex;
   align-items: center;
-  gap: .4rem;
-  font-size: .82rem;
+  gap: .5rem;
+  font-size: .88rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -600,16 +604,24 @@ html[dir="rtl"] .perf-grid select {
   stroke-width: 2
 }
 
-.output-panel audio {
-  width: 100%;
-  height: 34px
+.output-panel .custom-audio-wrapper {
+  max-width: 100%;
+  padding: .75rem 1rem;
+  border-radius: 2rem;
+  margin: 1rem 0;
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+}
+
+.output-panel .custom-audio-time {
+  font-size: .85rem;
 }
 
 .output-panel .audio-meta {
-  margin-top: .45rem;
-  font-size: .8rem;
-  color: var(--muted);
-  line-height: 1.45
+  margin-top: .75rem;
+  font-size: .85rem;
+  color: color-mix(in oklab, var(--text) 70%, var(--muted));
+  line-height: 1.5;
+  font-weight: 500;
 }
 
 .output-placeholder {

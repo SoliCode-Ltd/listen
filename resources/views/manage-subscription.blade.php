@@ -228,9 +228,13 @@
     .invoice-table th,
     .invoice-table td {
       padding: .7rem .5rem;
-      text-align: left;
+      text-align: start;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
       font-size: .88rem;
+    }
+    .invoice-table th:last-child,
+    .invoice-table td:last-child {
+      text-align: end;
     }
     .invoice-table th {
       color: var(--muted);
@@ -264,6 +268,7 @@
     .invoice-actions {
       display: flex;
       gap: .4rem;
+      justify-content: flex-end;
     }
     .invoice-actions .btn {
       padding: .35rem .55rem;

@@ -112,7 +112,7 @@
             <div class="s-card perf-panel reveal" id="studioPanel" style="display:none;">
               <div class="perf-header">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                {{ __('ui.demo.voice_studio', ['default' => 'Performance Controls']) }}
+                {{ __('ui.demo.voice_studio', ['default' => 'Performance Controls']) }} <span class="premium-badge">{{ __('ui.pricing.premium', ['default' => 'Premium']) }}</span>
               </div>
               <div class="perf-row-2">
                 <div class="perf-section">
@@ -152,7 +152,7 @@
                 </div>
               </div>
               <div class="perf-section" id="stylePromptSection" style="display:none;">
-                <div class="perf-section-label">✨ {{ __('ui.demo.style_prompt', ['default' => 'Custom Prompt']) }} <span class="premium-badge">{{ __('ui.pricing.premium', ['default' => 'Premium']) }}</span></div>
+                <div class="perf-section-label">✨ {{ __('ui.demo.style_prompt', ['default' => 'Custom Prompt']) }}</div>
                 <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.demo.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound…']) }}"></textarea>
               </div>
               <div class="perf-section">

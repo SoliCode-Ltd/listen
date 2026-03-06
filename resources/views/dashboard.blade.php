@@ -1,12 +1,42 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <style>
+    /* Background orbs */
+    .bg-orb {
+      position: fixed;
+      z-index: -1;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(60px);
+      opacity: .18;
+      animation: float 12s ease-in-out infinite;
+    }
+    .bg-orb.a {
+      width: 22rem;
+      height: 22rem;
+      background: color-mix(in oklab, var(--a) 60%, transparent);
+      left: -6rem;
+      top: 12vh;
+    }
+    .bg-orb.b {
+      width: 26rem;
+      height: 26rem;
+      background: color-mix(in oklab, var(--b) 55%, transparent);
+      right: -6rem;
+      bottom: 6vh;
+      animation-delay: -4s;
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-18px) scale(1.03); }
+    }
+
     .main-content {
       padding: 1.5rem 0 3rem;
     }
     .dashboard-layout {
       display: grid;
-      grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
-      gap: 1rem;
+      grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+      gap: 2rem;
       align-items: start;
     }
     .dashboard-content {
@@ -18,7 +48,7 @@
     .dashboard-panel.active {
       display: block;
     }
-    .dashboard-panel + .dashboard-panel {
+    .dashboard-panel + .dashboard-panel, #commandCenterSection, .reveal.dashboard-menu {
       margin-top: 1.5rem;
     }
     .dashboard-panel-grid {
@@ -29,139 +59,214 @@
     .dashboard-menu {
       position: sticky;
       top: 5.5rem;
-      padding: 1rem;
+      padding: 0 1rem 0 0;
+    }
+    html[dir="rtl"] .dashboard-menu {
+      padding: 0 0 0 1rem;
     }
     .dashboard-menu-title {
-      margin: 0 0 .75rem;
-      font-size: .95rem;
+      margin: 0 0 1.5rem;
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
       font-weight: 800;
-      color: var(--text);
+      color: color-mix(in oklab, var(--text) 50%, var(--muted));
+      padding-inline-start: 1rem;
     }
     .dashboard-menu-list {
       display: grid;
-      gap: .45rem;
+      gap: .25rem;
     }
     .dashboard-menu-link {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: .8rem;
-      padding: .8rem .9rem;
-      border-radius: 10px;
-      border: 1px solid color-mix(in oklab, var(--line) 74%, transparent);
-      background: color-mix(in oklab, var(--surface) 75%, transparent);
-      color: var(--muted);
+      padding: .85rem 1rem;
+      border-radius: .75rem;
+      border: 1px solid transparent;
+      background: transparent;
+      color: color-mix(in oklab, var(--text) 70%, var(--muted));
       text-decoration: none;
-      font-size: .88rem;
-      font-weight: 700;
+      font-size: .95rem;
+      font-weight: 600;
       transition: all .25s cubic-bezier(.4, 0, .2, 1);
+      position: relative;
+    }
+    .dashboard-menu-link::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      bottom: 50%;
+      width: 4px;
+      background: linear-gradient(180deg, var(--a), var(--b));
+      border-radius: 0 4px 4px 0;
+      opacity: 0;
+      transition: all .25s cubic-bezier(.4, 0, .2, 1);
+    }
+    html[dir="rtl"] .dashboard-menu-link::before {
+      left: auto;
+      right: 0;
+      border-radius: 4px 0 0 4px;
     }
     .dashboard-menu-link:hover {
       color: var(--text);
-      transform: translateY(-2px);
-      border-color: color-mix(in oklab, var(--a) 35%, var(--line));
-      box-shadow: 0 8px 24px color-mix(in oklab, var(--line) 35%, transparent);
+      background: color-mix(in oklab, var(--line) 20%, transparent);
+      transform: translateX(4px);
+    }
+    html[dir="rtl"] .dashboard-menu-link:hover {
+      transform: translateX(-4px);
     }
     .dashboard-menu-link.active {
-      color: #fff;
-      border-color: transparent;
-      background: linear-gradient(135deg, var(--a), var(--b));
-      box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 35%, transparent);
+      color: var(--text);
+      background: color-mix(in oklab, var(--line) 25%, transparent);
+      font-weight: 700;
+    }
+    .dashboard-menu-link.active::before {
+      opacity: 1;
+      top: 15%;
+      bottom: 15%;
     }
     .dashboard-menu-link span:last-child {
-      font-size: .78rem;
-      opacity: .72;
+      font-size: .75rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: color-mix(in oklab, var(--a) 60%, var(--muted));
+      opacity: .8;
     }
     .hero-grid {
       display: grid;
       grid-template-columns: minmax(0, 1fr);
-      gap: 1rem;
+      gap: 1.5rem;
     }
     .page-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      box-shadow: var(--shadow);
+      background: color-mix(in oklab, var(--surface) 50%, transparent);
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+      border-radius: 1.5rem;
+      padding: clamp(1.5rem, 3vw, 2.25rem);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, .06), inset 0 1px 1px rgba(255,255,255,.03);
+      position: relative;
+      transition: all .3s ease;
+    }
+    .page-card:hover {
+      border-color: color-mix(in oklab, var(--a) 25%, var(--line));
+      box-shadow: 0 16px 50px rgba(0, 0, 0, .1), inset 0 1px 1px rgba(255,255,255,.05);
     }
     .page-card h1 {
-      margin: 0 0 .5rem;
-      font-size: 1.5rem;
+      margin: 0 0 1.2rem;
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -.03em;
+    }
+    .page-card h1:first-child {
+      margin-top: 0;
     }
     .page-card h2 {
       margin: 0 0 .6rem;
-      font-size: 1.1rem;
+      font-size: 1.25rem;
+      letter-spacing: -.01em;
     }
-    .page-card h3 {
-      margin: .1rem 0 .45rem;
-      font-size: 1.05rem;
+    .page-card    .meter {
+      margin-top: 1.25rem;
+      padding: 1.15rem;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+      background: color-mix(in oklab, var(--surface) 40%, transparent);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03), inset 0 1px 1px rgba(255,255,255,.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(.4, 0, .2, 1);
     }
-
-    .meter {
-      margin-top: .8rem;
+    .meter:hover {
+      border-color: color-mix(in oklab, var(--b) 30%, var(--line));
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,.05);
     }
     .meter-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: .4rem;
+      margin-bottom: .75rem;
     }
     .meter-header small {
       color: var(--muted);
+      font-weight: 500;
     }
     .meter-track {
-      height: 12px;
+      height: 10px;
       border-radius: var(--radius-full);
-      border: 1px solid var(--line);
-      background: var(--surface);
+      background: color-mix(in oklab, var(--line) 30%, transparent);
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
       overflow: hidden;
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
     }
     .meter-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--a), var(--b));
+      transition: width .4s cubic-bezier(0.4, 0, 0.2, 1);
     }
     .meter-fill.requests {
       background: linear-gradient(90deg, var(--b), var(--a));
     }
 
     .kpis {
-      margin-top: 1rem;
+      margin-top: 1.25rem;
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: .65rem;
+      gap: 1rem;
     }
     .kpi {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: .75rem;
+      border-radius: 1rem;
+      padding: 1.15rem;
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+      background: color-mix(in oklab, var(--surface) 40%, transparent);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03), inset 0 1px 1px rgba(255,255,255,.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(.4, 0, .2, 1);
     }
     .kpi small {
       color: var(--muted);
-      font-size: .8rem;
+      font-size: .85rem;
+      font-weight: 500;
     }
     .kpi b {
       display: block;
-      font-size: 1.15rem;
-      margin-top: .2rem;
+      font-size: 1.35rem;
+      margin-top: .3rem;
+      font-weight: 800;
     }
 
     .mini {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: .65rem;
+      gap: 1rem;
     }
     .mini .box {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      padding: .75rem;
+      border-radius: 1rem;
+      padding: 1.15rem;
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+      background: color-mix(in oklab, var(--surface) 40%, transparent);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.03), inset 0 1px 1px rgba(255,255,255,.03);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.3s cubic-bezier(.4, 0, .2, 1);
+    }
+    .kpi:hover, .mini .box:hover {
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08), inset 0 1px 1px rgba(255,255,255,.05);
     }
     .mini .box small {
       color: var(--muted);
+      font-weight: 500;
+      font-size: .85rem;
     }
     .mini .box b {
       display: block;
-      margin-top: .2rem;
+      margin-top: .3rem;
+      font-size: 1.35rem;
+      font-weight: 800;
     }
 
     .main-grid {
@@ -418,21 +523,32 @@
     }
     input, select, textarea {
       width: 100%;
-      padding: .75rem;
+      padding: .85rem;
       border-radius: var(--radius);
-      border: 1px solid var(--line);
-      background: var(--surface);
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: color-mix(in oklab, var(--surface) 60%, transparent);
       color: var(--text);
-      font-size: .9rem;
+      font-size: .95rem;
+      transition: all .2s ease;
+    }
+    input:hover, select:hover, textarea:hover {
+      border-color: color-mix(in oklab, var(--b) 45%, var(--line));
+      background: color-mix(in oklab, var(--surface) 85%, transparent);
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--brand-accent);
+      box-shadow: 0 0 0 4px var(--brand-accent-glow);
+      background: var(--surface);
     }
     .editor-panel input,
     .editor-panel textarea {
       border-radius: .85rem;
-      border: 1px solid var(--line);
-      background: color-mix(in oklab, var(--surface2) 40%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: color-mix(in oklab, var(--surface2) 40%, transparent);
       color: var(--text);
       font-family: var(--font-body);
-      transition: border-color .25s, box-shadow .25s, background-color .2s;
+      transition: all .25s ease;
     }
     .editor-panel input {
       font-size: .98rem;
@@ -575,14 +691,17 @@
        font-size: .9rem;
      }
     th, td {
-      padding: .85rem .65rem;
-      border-bottom: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+      padding: 1.1rem .85rem;
+      border-bottom: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
       text-align: left;
       vertical-align: middle;
     }
     th {
-      color: color-mix(in oklab, var(--text) 85%, var(--muted));
-      font-weight: 700;
+      color: color-mix(in oklab, var(--text) 70%, var(--muted));
+      font-weight: 800;
+      text-transform: uppercase;
+      font-size: .8rem;
+      letter-spacing: .05em;
     }
     .status {
       display: inline-block;
@@ -595,7 +714,7 @@
     .status.processing { background: color-mix(in oklab, var(--a) 12%, var(--surface)); }
     .status.done { background: color-mix(in oklab, var(--ok) 12%, var(--surface)); }
     .status.failed { background: color-mix(in oklab, var(--danger) 12%, var(--surface)); }
-    audio {
+    table audio {
       max-width: 230px;
       width: 230px;
       height: 32px;
@@ -676,11 +795,6 @@
       position: relative;
       overflow: visible;
       border-radius: calc(var(--radius-lg) + .2rem);
-      border-color: color-mix(in oklab, var(--line) 72%, var(--a) 28%);
-      /* background:
-        radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 30%),
-        linear-gradient(180deg, color-mix(in oklab, var(--surface2) 96%, transparent), color-mix(in oklab, var(--surface) 99%, transparent));
-      box-shadow: 0 26px 60px rgba(0, 0, 0, .22); */
     }
     .page-card::before {
       content: "";
@@ -694,20 +808,28 @@
       border-top-right-radius: inherit;
     }
     .command-card {
-      padding: clamp(1.35rem, 2vw, 1.8rem);
+      /* Padding inherited uniformly from .page-card */
     }
     .command-card .summary-block {
-      margin-top: 1.25rem;
+      margin-top: 1.5rem;
     }
-    .command-card .summary-block h2 {
-      margin: 0 0 .7rem;
+    .command-card .summary-block h1 {
+      margin: 0 0 1rem;
+      font-size: 1.4rem;
     }
     .meter {
       margin-top: 1rem;
-      padding: .9rem 1rem;
+      padding: 1rem;
       border-radius: 1rem;
-      /* border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%); */
-      /* background: color-mix(in oklab, var(--surface) 82%, transparent); */
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 50%, transparent);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+    }
+    .meter:hover {
+      border-color: color-mix(in oklab, var(--b) 30%, var(--line));
     }
     .meter-header {
       margin-bottom: .65rem;
@@ -723,16 +845,25 @@
     .kpi,
     .mini .box {
       border-radius: 1rem;
-      padding: .95rem 1rem;
-      border-color: color-mix(in oklab, var(--line) 74%, var(--a) 26%);
-      background: color-mix(in oklab, var(--surface) 84%, transparent);
+      padding: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 50%, transparent);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.05);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: all 0.25s ease;
+    }
+    .kpi:hover, .mini .box:hover {
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.1);
     }
     .kpi b,
     .mini .box b {
-      font-size: 1.25rem;
+      font-size: 1.35rem;
     }
     .queue-card {
-      padding: clamp(1.2rem, 2vw, 1.7rem);
+      /* Padding inherited uniformly from .page-card */
     }
     .form-grid > div {
       position: relative;
@@ -753,7 +884,6 @@
     .plan-card {
       position: sticky;
       top: 5.5rem;
-      padding: clamp(1.2rem, 2vw, 1.5rem);
     }
     .dashboard-panel .plan-card {
       position: static;
@@ -768,10 +898,13 @@
       border-color: color-mix(in oklab, var(--line) 74%, var(--b) 26%); */
     }
     .jobs-shell {
-      padding: clamp(1.2rem, 2vw, 1.5rem);
+      /* Padding inherited uniformly from .page-card */
     }
     .table-header {
       margin-bottom: 1.1rem;
+    }
+    .table-header h1:first-child {
+      margin-top: 0;
     }
     table {
       border-collapse: separate;
@@ -784,16 +917,17 @@
       backdrop-filter: blur(8px);
     }
     tbody tr {
-      background: color-mix(in oklab, var(--surface) 70%, transparent);
+      background: color-mix(in oklab, var(--surface) 40%, transparent);
+      transition: background .2s ease;
     }
     tbody tr:hover td {
-      background: color-mix(in oklab, var(--surface2) 48%, var(--surface));
+      background: color-mix(in oklab, var(--surface2) 48%, transparent);
     }
     th:first-child, td:first-child {
-      border-inline-start: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+      border-inline-start: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
     }
     th:last-child, td:last-child {
-      border-inline-end: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+      border-inline-end: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
     }
     thead th:first-child {
       border-top-inline-start-radius: 1rem;
@@ -882,6 +1016,96 @@
     }
     .new-job-row td {
       animation: rowHighlight 3.5s ease-out forwards;
+    }
+    
+    .s-card {
+      background: color-mix(in oklab, var(--surface) 72%, transparent);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+      border-radius: 1.15rem;
+      padding: 1.25rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
+      transition: border-color .25s, box-shadow .25s;
+    }
+    .s-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 22%, var(--a)), transparent);
+      opacity: .5;
+      pointer-events: none;
+    }
+    .s-card:hover {
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+    }
+    .output-panel {
+      min-height: 120px;
+      margin-top: 1.5rem;
+      padding: 1.5rem;
+      background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
+      border-radius: 1.25rem;
+    }
+    .output-panel .panel-title {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      font-size: .88rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+      color: var(--muted);
+      margin-bottom: .6rem;
+    }
+    .output-panel .panel-title svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+    }
+    .output-panel .custom-audio-wrapper {
+      max-width: 100%;
+      padding: .75rem 1rem;
+      border-radius: 2rem;
+      margin: 1rem 0;
+      background: color-mix(in oklab, var(--surface) 80%, transparent);
+    }
+    .output-panel .custom-audio-time {
+      font-size: .85rem;
+    }
+    .output-panel .audio-meta {
+      margin-top: .75rem;
+      font-size: .85rem;
+      color: color-mix(in oklab, var(--text) 70%, var(--muted));
+      line-height: 1.5;
+      font-weight: 500;
+    }
+    .output-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: .5rem;
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--muted);
+      font-size: .85rem;
+      opacity: .6;
+    }
+    .output-placeholder svg {
+      width: 32px;
+      height: 32px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.5;
+      opacity: .5;
+    }
+    html[dir="rtl"] .output-panel .panel-title {
+      letter-spacing: 0;
     }
 
     @media (max-width: 980px) {
@@ -1002,43 +1226,48 @@
   @endphp
   @include('components.header')
 
-  <main class="container main-content dashboard-shell">
+  <!-- Background Orbs -->
+  <div class="bg-orb a"></div>
+  <div class="bg-orb b"></div>
+
+  <main class="main-content dashboard-shell" style="max-width: 1700px; padding: 2rem clamp(1rem, 3vw, 3rem); margin: 0 auto; min-height: 80vh;">
     <div class="dashboard-layout">
-      <aside class="page-card reveal dashboard-menu">
-        <h2 class="dashboard-menu-title">{{ __('ui.dashboard.menu_panel') }}</h2>
+      <aside class="reveal dashboard-menu">
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
-          <a class="dashboard-menu-link active" href="#overviewSection" data-dashboard-nav>
+          <a class="dashboard-menu-link active" href="#commandCenterSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.command_center') }}</span>
-            <span>01</span>
+            <span></span>
           </a>
-          <a class="dashboard-menu-link" href="#queueSection" data-dashboard-nav>
+          <a class="dashboard-menu-link" href="#generateVoiceSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.generate_new_voice') }}</span>
-            <span>02</span>
+            <span></span>
           </a>
-          <a class="dashboard-menu-link" href="#planSection" data-dashboard-nav>
+          <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
-            <span>03</span>
+            <span></span>
           </a>
-          <a class="dashboard-menu-link" href="#recentJobsSection" data-dashboard-nav>
+          <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.recent_voices') }}</span>
-            <span>04</span>
+            <span></span>
           </a>
         </nav>
       </aside>
 
       <div class="dashboard-content">
-    <section id="overviewSection" class="dashboard-panel active" data-dashboard-section>
+    <section id="commandCenterSection" class="dashboard-panel active" data-dashboard-section>
       <div class="hero-grid">
         <article class="page-card reveal command-card">
-          <h1>{{ __('ui.dashboard.command_center') }}</h1>
-          <p style="color: var(--muted); margin: 0;">{{ __('ui.dashboard.command_center_subtitle') }}</p>
+          <h1>
+            <span class="grad-text">{{ __('ui.dashboard.command_center') }}</span>
+            <span style="display:block; font-size:1rem; color:var(--muted); margin-top:.3rem; font-weight:500; letter-spacing:0;">{{ __('ui.dashboard.command_center_subtitle') }}</span>
+          </h1>
 
           <div class="meter">
             <div class="meter-header">
               <small>{{ __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
               <small id="usageCharsText">{{ number_format($usage->total_chars) }} / {{ number_format($planChars) }} {{ __('ui.dashboard.chars') }}</small>
             </div>
-            <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ $usageCharsPercent }}%"></div></div>
+            <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
           </div>
 
           <div class="meter">
@@ -1050,7 +1279,7 @@
                 {{ __('ui.dashboard.requests') }}
               </small>
             </div>
-            <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ $usageRequestsPercent }}%"></div></div>
+            <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
           </div>
 
           <div class="kpis">
@@ -1060,7 +1289,7 @@
           </div>
 
           <div class="summary-block">
-            <h2>{{ __('ui.dashboard.system_health') }}</h2>
+            <h1><span class="grad-text">{{ __('ui.dashboard.system_health') }}</span></h1>
             <div class="mini">
               <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
               <div class="box"><small>{{ __('ui.dashboard.done') }}</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
@@ -1072,9 +1301,9 @@
       </div>
     </section>
 
-    <section id="queueSection" class="dashboard-panel" data-dashboard-section>
+    <section id="generateVoiceSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal queue-card" id="queueCardSection">
-        <h2>{{ __('ui.dashboard.generate_new_voice') }}</h2>
+        <h1><span class="grad-text">{{ __('ui.dashboard.generate_new_voice') }}</span></h1>
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
@@ -1114,7 +1343,7 @@
           <div class="perf-panel" id="studioPanel">
             <div class="perf-header">
               <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              {{ __('ui.dashboard.voice_studio') }}
+              {{ __('ui.dashboard.voice_studio') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span>
             </div>
 
             <div class="perf-row-2">
@@ -1158,7 +1387,7 @@
 
             @if($customPromptEnabled ?? false)
             <div class="perf-section" style="margin-top:.6rem;">
-              <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span></div>
+              <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }}</div>
               <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;"></textarea>
             </div>
             @endif
@@ -1243,9 +1472,9 @@
       </article>
     </section>
 
-    <section id="planSection" class="dashboard-panel" data-dashboard-section>
+    <section id="planDefaultsSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal sidebar-info plan-card">
-        <h3 style="margin-top:0;">{{ __('ui.dashboard.plan_and_defaults') }}</h3>
+        <h1><span class="grad-text">{{ __('ui.dashboard.plan_and_defaults') }}</span></h1>
 
         <div class="info-list">
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.current_plan') }}</span><span class="info-value"><span class="status done">{{ $activePlanDisplayName }}</span></span></div>
@@ -1311,10 +1540,10 @@
       </article>
     </section>
 
-    <section id="recentJobsSection" class="dashboard-panel" data-dashboard-section>
+    <section id="recentVoicesSection" class="dashboard-panel" data-dashboard-section>
       <div class="page-card table-card reveal jobs-shell">
         <div class="table-header">
-          <h2>{{ __('ui.dashboard.recent_voices') }}</h2>
+          <h1><span class="grad-text">{{ __('ui.dashboard.recent_voices') }}</span></h1>
           <span class="jobs-count" id="jobsCount"></span>
         </div>
         <div style="overflow-x: auto;">
@@ -1750,8 +1979,8 @@
       if (usageRequestsText) usageRequestsText.textContent = requestsUnlimited
         ? `${formatNumber(usage.total_requests)} / ${i18n.unlimited} ${i18n.requests}`
         : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} ${i18n.requests}`;
-      if (usageCharsMeter) usageCharsMeter.style.width = `${Number(usage.chars_percent || 0)}%`;
-      if (usageRequestsMeter) usageRequestsMeter.style.width = `${Number(usage.requests_percent || 0)}%`;
+      if (usageCharsMeter) usageCharsMeter.style.width = `${Math.max(0, 100 - Number(usage.chars_percent || 0))}%`;
+      if (usageRequestsMeter) usageRequestsMeter.style.width = `${Math.max(0, 100 - Number(usage.requests_percent || 0))}%`;
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
       if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
     }

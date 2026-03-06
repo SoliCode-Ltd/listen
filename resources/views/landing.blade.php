@@ -464,8 +464,10 @@
       border: 1px solid color-mix(in oklab, var(--line) 78%, var(--a) 22%);
       background: linear-gradient(160deg, color-mix(in oklab, var(--surface2) 90%, var(--a) 10%), color-mix(in oklab, var(--surface) 92%, var(--b) 8%));
       padding: 0;
-      box-shadow: 0 8px 28px rgba(0,0,0,.2);
-      transition: transform .3s cubic-bezier(.22,1,.36,1), border-color .3s ease, box-shadow .3s ease;
+      box-shadow: 0 8px 28px rgba(0,0,0,.15);
+      transition: transform .4s cubic-bezier(.22,1,.36,1), border-color .4s ease, box-shadow .4s ease;
+      will-change: transform, box-shadow;
+      backface-visibility: hidden;
       display: flex;
       flex-direction: column;
       cursor: default;
@@ -479,9 +481,9 @@
       pointer-events: none;
     }
     .sample-card:hover {
-      transform: translateY(-6px) scale(1.012);
+      transform: translateY(-8px) scale(1.02);
       border-color: color-mix(in oklab, var(--b) 45%, var(--line));
-      box-shadow: 0 20px 50px color-mix(in oklab, var(--b) 10%, rgba(0,0,0,.22));
+      box-shadow: 0 24px 48px color-mix(in oklab, var(--b) 12%, rgba(0,0,0,.25));
     }
     .sample-card.is-active-card {
       border-color: color-mix(in oklab, var(--a) 60%, var(--line));
@@ -494,6 +496,8 @@
       overflow: hidden;
       isolation: isolate;
       border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
+      backface-visibility: hidden;
+      transform: translate3d(0,0,0);
     }
     .sample-card-hero::after {
       content: "";
@@ -517,6 +521,8 @@
       inset: 0;
       z-index: 0;
       overflow: hidden;
+      backface-visibility: hidden;
+      transform: translate3d(0,0,0);
     }
     .sample-card-hero-svg svg {
       width: 100%;
@@ -565,14 +571,16 @@
       overflow: hidden;
       transform: translateY(6px) scaleY(.82);
       transform-origin: center bottom;
-      transition: height .28s ease, margin .28s ease, opacity .22s ease, transform .28s ease;
+      transition: height .4s cubic-bezier(.22, 1, .36, 1), margin .4s cubic-bezier(.22, 1, .36, 1), opacity .3s ease, transform .4s cubic-bezier(.22, 1, .36, 1);
+      will-change: height, margin, opacity, transform;
     }
     .sample-eq-bar {
       width: 3px;
       border-radius: 6px;
       background: linear-gradient(180deg, var(--a), var(--b));
       opacity: 0;
-      transition: opacity .22s ease, height .35s ease;
+      transition: opacity .3s ease, height .4s cubic-bezier(.22, 1, .36, 1);
+      will-change: height, opacity;
     }
     /* Idle natural heights */
     .sample-eq-bar:nth-child(1) { height: 8px; }
@@ -619,10 +627,10 @@
     .sample-play-btn {
       position: relative;
       margin: .4rem auto 1.3rem;
-      width: 3rem;
-      height: 3rem;
+      width: 3.2rem;
+      height: 3.2rem;
       border-radius: 999px;
-      border: 1px solid color-mix(in oklab, rgba(255,255,255,.2) 50%, transparent);
+      border: none;
       background: linear-gradient(135deg, var(--a), var(--b));
       cursor: pointer;
       display: flex;
@@ -633,7 +641,9 @@
         0 8px 20px color-mix(in oklab, var(--a) 30%, transparent),
         inset 0 1px 1.5px rgba(255,255,255,.4),
         inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black); */
-      transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .25s cubic-bezier(0.22, 1, 0.36, 1), filter .25s ease;
+      transition: all .4s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: transform, box-shadow, filter;
+      backface-visibility: hidden;
     }
     /* Outer pulse ring — static */
     .sample-play-btn::before {
@@ -650,15 +660,15 @@
       pointer-events: none;
     }
     .sample-play-btn:hover {
-      transform: translateY(-2px) scale(1.05);
+      transform: translateY(-4px) scale(1.08);
       box-shadow:
-        0 14px 26px color-mix(in oklab, var(--a) 45%, rgba(0,0,0,.2)),
+        0 14px 26px color-mix(in oklab, var(--a) 45%, rgba(0,0,0,.25)),
         inset 0 1px 1.5px rgba(255,255,255,.5),
         inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black);
-      filter: brightness(1.05);
+      filter: brightness(1.1) saturate(1.1);
     }
     .sample-play-btn:active {
-      transform: translateY(1px) scale(0.98);
+      transform: translateY(1px) scale(0.96);
       box-shadow:
         0 4px 10px color-mix(in oklab, var(--a) 25%, transparent),
         inset 0 2px 4px rgba(0,0,0,.3);
@@ -669,35 +679,37 @@
         0 6px 16px color-mix(in oklab, var(--a) 35%, transparent),
         inset 0 1px 1.5px rgba(255,255,255,.2),
         inset 0 -2px 6px color-mix(in oklab, var(--b) 95%, black);
-      border-color: color-mix(in oklab, rgba(255,255,255,.1) 50%, transparent);
+      transform: scale(0.96);
+      filter: brightness(1) saturate(1);
     }
     .sample-play-btn > * { position: relative; z-index: 1; }
     .sample-play-icon {
-      width: 1.2rem;
-      height: 1.2rem;
+      width: 1.4rem;
+      height: 1.4rem;
       overflow: visible;
-      transition: transform .18s ease;
+      transition: all .4s cubic-bezier(0.22, 1, 0.36, 1);
     }
     .sample-play-icon path {
       fill: currentColor;
       transform-origin: center;
-      transition: opacity .2s ease, transform .22s ease;
+      transition: opacity .3s ease, transform .4s cubic-bezier(0.22, 1, 0.36, 1);
+      will-change: opacity, transform;
     }
     .sample-icon-play {
       opacity: 1;
-      transform: scale(1) translateX(0);
+      transform: scale(1) translate3d(0,0,0);
     }
     .sample-icon-pause {
       opacity: 0;
-      transform: scale(.68);
+      transform: scale(.68) translate3d(0,0,0);
     }
     .sample-play-btn.is-playing .sample-icon-play {
       opacity: 0;
-      transform: scale(.68) translateX(-1px);
+      transform: scale(.68) translate3d(-1px,0,0);
     }
     .sample-play-btn.is-playing .sample-icon-pause {
       opacity: 1;
-      transform: scale(1);
+      transform: scale(1) translate3d(0,0,0);
     }
     .sample-play-btn:hover .sample-play-icon {
       transform: scale(1.06);
@@ -874,7 +886,7 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .25s cubic-bezier(0.22, 1, 0.36, 1), filter .25s ease;
+      transition: all .4s cubic-bezier(0.22, 1, 0.36, 1);
       box-shadow:
         0 8px 24px color-mix(in oklab, var(--a) 30%, transparent),
         inset 0 1px 1.5px rgba(255,255,255,.4),
@@ -882,6 +894,8 @@
       padding: 0;
       position: relative;
       z-index: 2;
+      will-change: transform, box-shadow, filter;
+      backface-visibility: hidden;
     }
 
     .hero-audio-btn:hover {
@@ -1031,9 +1045,10 @@
       width: 28px;
       height: 28px;
       fill: currentColor;
-      margin-left: 4px; /* offset play icon slightly */
-      transition: margin .3s ease, transform .2s ease;
+      margin-left: 4px;
+      transition: margin .4s cubic-bezier(0.22, 1, 0.36, 1), transform .4s cubic-bezier(0.22, 1, 0.36, 1);
       flex-shrink: 0;
+      will-change: margin, transform;
     }
 
     .hero-audio-btn.is-playing {

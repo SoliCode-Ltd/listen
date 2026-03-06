@@ -447,7 +447,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   left: auto;
   width: 260px;
   max-width: calc(100vw - 1rem);
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  background: color-mix(in oklab, var(--surface) 100%, transparent);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
@@ -507,7 +507,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 }
 
 .dropdown-divider {
-  height: 1px;
+  /* height: 1px; */
   background: var(--line);
   margin: .25rem 0;
 }
@@ -1399,7 +1399,7 @@ form:has(button.mobile-nav-link) {
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
   flex-shrink: 0;
-  min-width: 30px;
+  min-width: 35px;
 }
 .custom-audio-time.end {
   text-align: right;
@@ -1483,7 +1483,7 @@ form:has(button.mobile-nav-link) {
 }
 @@container (max-width: 280px) {
   .custom-audio-time {
-    min-width: 28px;
+    min-width: 35px;
     font-size: 0.72rem;
   }
   .custom-audio-menu {
@@ -1505,7 +1505,7 @@ form:has(button.mobile-nav-link) {
     font-size: 0.7rem;
   }
   .custom-audio-time {
-    min-width: 24px;
+    min-width: 30px;
     font-size: 0.7rem;
   }
   .custom-audio-progress-container {
@@ -1581,30 +1581,27 @@ textarea[dir="auto"] {
 html.locale-switching,
 body.locale-switching {
   background-color: var(--bg) !important;
-  overflow-x: hidden !important;
 }
 
-body.locale-switching {
-  opacity: .985 !important;
-  transform: none !important;
-  filter: none !important;
-  transition: opacity .14s ease-out !important;
+body.locale-switching main,
+body.locale-switching .app-footer,
+body.locale-switching .mobile-nav-inner {
+  opacity: 0 !important;
+  transition: opacity .16s ease-out !important;
 }
 
-body.locale-fade-in {
-  animation: localeFadeIn .22s cubic-bezier(.22,.61,.36,1) forwards;
+body.locale-fade-in main,
+body.locale-fade-in .app-footer,
+body.locale-fade-in .mobile-nav-inner {
+  animation: localeFadeIn .25s ease-out forwards;
 }
 
 @keyframes localeFadeIn {
   from {
-    opacity: .985;
-    transform: scale(.998);
-    filter: saturate(.96);
+    opacity: 0;
   }
   to {
     opacity: 1;
-    transform: scale(1);
-    filter: saturate(1);
   }
 }
 

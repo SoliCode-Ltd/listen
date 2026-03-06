@@ -189,11 +189,8 @@
       display: flex;
       align-items: center;
       gap: .5rem;
-      margin-top: .75rem;
       padding: .6rem .75rem;
-      border: 1px solid var(--line);
       border-radius: var(--radius);
-      background: var(--surface);
       cursor: pointer;
       font-size: .88rem;
       color: var(--fg);
@@ -203,10 +200,36 @@
       border-color: var(--a);
     }
     .save-card-checkbox input[type="checkbox"] {
-      width: 1.1rem;
-      height: 1.1rem;
-      accent-color: var(--a);
+      appearance: none;
+      -webkit-appearance: none;
+      width: 1.25rem;
+      height: 1.25rem;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      background: var(--surface);
       cursor: pointer;
+      position: relative;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+      margin: 0;
+    }
+    .save-card-checkbox input[type="checkbox"]:hover {
+      border-color: var(--a);
+    }
+    .save-card-checkbox input[type="checkbox"]:checked {
+      background: linear-gradient(135deg, var(--a), var(--b));
+      border-color: transparent;
+    }
+    .save-card-checkbox input[type="checkbox"]:checked::after {
+      content: "";
+      position: absolute;
+      top: 45%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(45deg);
+      width: 4px;
+      height: 9px;
+      border-right: 2px solid white;
+      border-bottom: 2px solid white;
     }
     .consent-box {
       margin-top: .65rem;
@@ -478,7 +501,19 @@
             </div>
             @if($defaultPaymentMethod)
               <div class="saved-card-notice">
-                <span class="saved-card-icon">✓</span>
+                <span class="saved-card-icon" style="display: flex; align-items: center; justify-content: center;">
+                  <svg viewBox="0 0 24 24" width="20" height="20">
+                    <defs>
+                      <linearGradient id="savedCardGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="var(--ok)"/>
+                        <stop offset="100%" stop-color="#10B981"/>
+                      </linearGradient>
+                    </defs>
+                    <circle cx="12" cy="12" r="12" fill="url(#savedCardGrad)" opacity="0.2"/>
+                    <circle cx="12" cy="12" r="9" fill="url(#savedCardGrad)"/>
+                    <path d="M8.5 12L10.5 14.5L16 9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                  </svg>
+                </span>
                 <span>{{ __('ui.billing.using_saved_card') }} <strong>{{ strtoupper($defaultPaymentMethod->card->brand) }} **** {{ $defaultPaymentMethod->card->last4 }}</strong></span>
                 <span class="saved-card-hint">{{ __('ui.billing.enter_new_card_optional') }}</span>
               </div>
