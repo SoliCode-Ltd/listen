@@ -176,8 +176,6 @@ const dialectsByLanguage = {
     { value: 'en-US', labelKey: 'dialectAmerican', label: 'American' },
     { value: 'en-GB', labelKey: 'dialectBritish', label: 'British' },
     { value: 'en-AU', labelKey: 'dialectAustralian', label: 'Australian' },
-    { value: 'en-IN', labelKey: 'dialectIndian', label: 'Indian' },
-    { value: 'en-ZA', labelKey: 'dialectSouthAfrican', label: 'South African' },
   ],
 };
 

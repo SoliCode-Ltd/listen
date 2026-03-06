@@ -341,6 +341,145 @@
       justify-content: center;
     }
 
+    .dashboard-shell {
+      position: relative;
+    }
+    .hero-grid,
+    .main-grid {
+      gap: 1rem;
+      align-items: stretch;
+    }
+    .page-card {
+      position: relative;
+      overflow: hidden;
+      border-radius: calc(var(--radius-lg) + .2rem);
+      border-color: color-mix(in oklab, var(--line) 72%, var(--a) 28%);
+      background:
+        radial-gradient(circle at 0% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 30%),
+        linear-gradient(180deg, color-mix(in oklab, var(--surface2) 96%, transparent), color-mix(in oklab, var(--surface) 99%, transparent));
+      box-shadow: 0 26px 60px rgba(0, 0, 0, .22);
+    }
+    .page-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 40%, var(--a)), transparent);
+      opacity: .7;
+      pointer-events: none;
+    }
+    .command-card {
+      padding: clamp(1.35rem, 2vw, 1.8rem);
+    }
+    .health-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .meter {
+      margin-top: 1rem;
+      padding: .9rem 1rem;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%);
+      background: color-mix(in oklab, var(--surface) 82%, transparent);
+    }
+    .meter-header {
+      margin-bottom: .65rem;
+    }
+    .kpis,
+    .mini {
+      gap: .8rem;
+      margin-top: 1rem;
+    }
+    .kpi,
+    .mini .box {
+      border-radius: 1rem;
+      padding: .95rem 1rem;
+      border-color: color-mix(in oklab, var(--line) 74%, var(--a) 26%);
+      background: color-mix(in oklab, var(--surface) 84%, transparent);
+    }
+    .kpi b,
+    .mini .box b {
+      font-size: 1.25rem;
+    }
+    .queue-card {
+      padding: clamp(1.2rem, 2vw, 1.7rem);
+    }
+    .form-grid > div {
+      position: relative;
+    }
+    .editor-panel {
+      padding: 1rem;
+      border-radius: 1.1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 75%, var(--a) 25%);
+      background: color-mix(in oklab, var(--surface) 82%, transparent);
+    }
+    .control-pair > div {
+      padding: .95rem;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%);
+      background: color-mix(in oklab, var(--surface) 80%, transparent);
+    }
+    .studio-panel {
+      padding: 1rem;
+      border-radius: 1.1rem;
+      background:
+        radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 35%),
+        color-mix(in oklab, var(--surface) 84%, transparent);
+    }
+    .studio-section {
+      border-radius: .95rem;
+      padding: .8rem .85rem;
+      background: color-mix(in oklab, var(--surface2) 35%, var(--surface));
+    }
+    .plan-card {
+      position: sticky;
+      top: 5.5rem;
+      padding: clamp(1.2rem, 2vw, 1.5rem);
+    }
+    .info-list {
+      border-radius: 1.05rem;
+      padding: 0 1rem;
+      background:
+        radial-gradient(circle at 100% 0%, color-mix(in oklab, var(--b) 10%, transparent), transparent 34%),
+        color-mix(in oklab, var(--surface) 84%, transparent);
+      border-color: color-mix(in oklab, var(--line) 74%, var(--b) 26%);
+    }
+    .jobs-shell {
+      padding: clamp(1.2rem, 2vw, 1.5rem);
+    }
+    .table-header {
+      margin-bottom: 1.1rem;
+    }
+    table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    thead th {
+      position: sticky;
+      top: 0;
+      background: color-mix(in oklab, var(--surface2) 92%, transparent);
+      backdrop-filter: blur(8px);
+    }
+    tbody tr {
+      background: color-mix(in oklab, var(--surface) 70%, transparent);
+    }
+    tbody tr:hover td {
+      background: color-mix(in oklab, var(--surface2) 48%, var(--surface));
+    }
+    th:first-child, td:first-child {
+      border-inline-start: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+    }
+    th:last-child, td:last-child {
+      border-inline-end: 1px solid color-mix(in oklab, var(--line) 65%, transparent);
+    }
+    thead th:first-child {
+      border-top-inline-start-radius: 1rem;
+    }
+    thead th:last-child {
+      border-top-inline-end-radius: 1rem;
+    }
+
     .pagination {
       display: flex;
       align-items: center;
@@ -431,6 +570,9 @@
       .mini {
         grid-template-columns: 1fr;
       }
+      .plan-card {
+        position: static;
+      }
     }
     @media (max-width: 640px) {
       .main-content {
@@ -441,6 +583,10 @@
       }
       .page-card h1 {
         font-size: 1.3rem;
+      }
+      .control-pair > div,
+      .editor-panel {
+        padding: .85rem;
       }
       .meter-header {
         align-items: flex-start;
@@ -523,10 +669,10 @@
   @endphp
   @include('components.header')
 
-  <main class="container main-content">
+  <main class="container main-content dashboard-shell">
     <section>
       <div class="hero-grid">
-        <article class="page-card reveal">
+        <article class="page-card reveal command-card">
           <h1>{{ __('ui.dashboard.command_center') }}</h1>
           <p style="color: var(--muted); margin: 0;">{{ __('ui.dashboard.command_center_subtitle') }}</p>
 
@@ -557,7 +703,7 @@
           </div>
         </article>
 
-        <aside class="page-card reveal">
+        <aside class="page-card reveal health-card">
           <h2>{{ __('ui.dashboard.system_health') }}</h2>
           <div class="mini">
             <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
@@ -570,7 +716,7 @@
     </section>
 
     <section class="main-grid" id="queue">
-      <article class="page-card reveal">
+      <article class="page-card reveal queue-card">
         <h2>{{ __('ui.dashboard.generate_new_voice') }}</h2>
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
@@ -579,12 +725,12 @@
 
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
-          <div>
+          <div class="editor-panel">
             <label>{{ __('ui.dashboard.title_optional') }}</label>
             <input name="title" dir="auto" value="{{ old('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
           </div>
 
-          <div>
+          <div class="editor-panel">
             <label>{{ __('ui.dashboard.text_content') }}</label>
             <textarea name="content" id="contentTextarea" dir="auto" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
             <div class="char-counter" id="charCounter">
@@ -592,7 +738,7 @@
             </div>
           </div>
 
-          <div class="two-col">
+          <div class="two-col control-pair">
             <div>
               <label>{{ __('ui.dashboard.voice_language') }}</label>
               <select name="target_language" id="target_language">
@@ -716,7 +862,7 @@
         </form>
       </article>
 
-      <aside class="page-card reveal sidebar-info">
+      <aside class="page-card reveal sidebar-info plan-card">
         <h3 style="margin-top:0;">{{ __('ui.dashboard.plan_and_defaults') }}</h3>
 
         <div class="info-list">
@@ -749,7 +895,7 @@
       </aside>
     </section>
 
-    <section id="recentJobsSection" class="page-card table-card reveal">
+    <section id="recentJobsSection" class="page-card table-card reveal jobs-shell">
       <div class="table-header">
         <h2>{{ __('ui.dashboard.recent_voices') }}</h2>
         <span class="jobs-count" id="jobsCount"></span>
@@ -924,8 +1070,6 @@
         { value: 'en-US', label: '{{ __("ui.dialects.american", ["default" => "American"]) }}' },
         { value: 'en-GB', label: '{{ __("ui.dialects.british", ["default" => "British"]) }}' },
         { value: 'en-AU', label: '{{ __("ui.dialects.australian", ["default" => "Australian"]) }}' },
-        { value: 'en-IN', label: '{{ __("ui.dialects.indian", ["default" => "Indian"]) }}' },
-        { value: 'en-ZA', label: '{{ __("ui.dialects.south_african", ["default" => "South African"]) }}' },
       ],
     };
 

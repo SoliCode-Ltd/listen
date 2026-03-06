@@ -109,32 +109,206 @@
       font-size: 1.05rem;
     }
 
-    .cards {
+    /* ─── Listen Anywhere Section ─── */
+    .apps-shell {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid color-mix(in oklab, var(--line) 55%, var(--a) 45%);
+      border-top: 1px solid color-mix(in oklab, white 18%, var(--a));
+      border-radius: calc(var(--radius-lg) + .6rem);
+      padding: clamp(2rem, 3vw, 3rem);
+      background:
+        radial-gradient(ellipse 70% 60% at 0% 0%, color-mix(in oklab, var(--a) 20%, transparent), transparent),
+        radial-gradient(ellipse 60% 55% at 100% 100%, color-mix(in oklab, var(--b) 18%, transparent), transparent),
+        linear-gradient(150deg, color-mix(in oklab, var(--surface2) 90%, var(--a) 10%), color-mix(in oklab, var(--surface) 96%, transparent));
+      box-shadow: 0 32px 80px rgba(0,0,0,.28), inset 0 1px 0 color-mix(in oklab, white 14%, transparent);
+    }
+    .apps-shell::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle cx='1' cy='1' r='.85' fill='white' fill-opacity='.025'/%3E%3C/svg%3E");
+      pointer-events: none;
+    }
+    .apps-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      font-size: .72rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: color-mix(in oklab, var(--a) 75%, var(--text));
+      border: 1px solid color-mix(in oklab, var(--a) 35%, var(--line));
+      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      border-radius: var(--radius-full);
+      padding: .32rem .75rem;
+      margin-bottom: .85rem;
+      position: relative;
+      z-index: 1;
+    }
+    .apps-kicker::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
+    }
+    .apps-intro {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+      gap: 1.5rem;
+      align-items: end;
+      margin-bottom: 1.75rem;
+      position: relative;
+      z-index: 1;
+    }
+    .apps-copy { max-width: 44rem; }
+    .apps-copy h2 { margin-bottom: .6rem; }
+    .apps-points {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+      justify-content: flex-end;
+      align-self: start;
+      padding-top: .5rem;
+    }
+    .apps-point {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .48rem .8rem;
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in oklab, var(--line) 65%, var(--a) 35%);
+      background: color-mix(in oklab, var(--surface) 70%, transparent);
+      color: var(--muted);
+      font-size: .8rem;
+      white-space: nowrap;
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+    .apps-point::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      flex-shrink: 0;
+    }
+    /* Two app cards */
+    .apps-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1.1rem;
+      position: relative;
+      z-index: 1;
+    }
+    .app-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid color-mix(in oklab, var(--line) 75%, var(--a) 25%);
+      border-radius: calc(var(--radius-lg) + .15rem);
+      padding: 1.6rem 1.5rem;
+      background:
+        linear-gradient(175deg, color-mix(in oklab, var(--surface2) 92%, var(--a) 8%), color-mix(in oklab, var(--surface) 97%, transparent));
+      display: flex;
+      flex-direction: column;
       gap: 1rem;
+      transition: transform .28s cubic-bezier(.22,1,.36,1), border-color .28s ease, box-shadow .28s ease;
     }
-    .card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      box-shadow: var(--shadow);
-      transition: transform .25s ease, border-color .25s ease;
+    .app-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 40%, var(--a)), transparent);
+      opacity: .7;
     }
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: color-mix(in oklab, var(--a) 50%, var(--line));
+    .app-card:hover {
+      transform: translateY(-5px) scale(1.005);
+      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 18px 44px color-mix(in oklab, var(--a) 14%, rgba(0,0,0,.18));
     }
-    .card h3 {
-      margin: 0 0 .65rem;
-      font-size: 1.1rem;
+    .app-card-head {
+      display: flex;
+      align-items: center;
+      gap: .85rem;
     }
-    .card p {
+    .app-icon {
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: .9rem;
+      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+      background: color-mix(in oklab, var(--surface) 50%, transparent);
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      box-shadow: 0 4px 10px rgba(0,0,0,.08);
+    }
+    .app-icon svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      stroke: var(--text);
+      stroke-width: 1.8;
+      fill: none;
+    }
+    .app-icon img {
+      width: 1.45rem;
+      height: 1.45rem;
+      object-fit: contain;
+      display: block;
+    }
+    .app-card h3 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+    .app-card p {
       margin: 0;
       color: var(--muted);
-      font-size: .92rem;
-      line-height: 1.55;
+      font-size: .95rem;
+      line-height: 1.6;
+      flex: 1;
+    }
+    .app-card-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .8rem;
+      padding-top: .85rem;
+      border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+    }
+    .app-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      padding: .38rem .65rem;
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--line) 68%, var(--a) 32%);
+      color: color-mix(in oklab, var(--a) 60%, var(--muted));
+      font-size: .74rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .app-link {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      padding: .42rem .95rem;
+      border-radius: var(--radius-full);
+      background: linear-gradient(90deg, var(--a), var(--b));
+      color: #fff;
+      font-size: .85rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: opacity .2s ease, transform .2s ease;
+      white-space: nowrap;
+    }
+    .app-link:hover {
+      opacity: .88;
+      transform: scale(1.03);
     }
 
     .premium-grid {
@@ -199,96 +373,344 @@
       transform: translateY(0);
     }
 
-    /* ─── Voice Sample Showcase Cards ─── */
-    .sample-showcase-grid {
+    /* ─── Voice Sample Showcase — Premium Redesign ─── */
+    .voice-gallery-shell {
+      position: relative;
+      overflow: visible;
+      border: none;
+      border-radius: 0;
+      padding: 0;
+      background: transparent;
+      box-shadow: none;
+    }
+    .voice-gallery-inner {
+      position: relative;
+      z-index: 1;
+    }
+    .voice-gallery-head {
+      margin-bottom: 2rem;
+    }
+    .voice-gallery-copy {
+      width: min(100%, 34rem);
+    }
+    html[dir="rtl"] .voice-gallery-copy {
+      margin-left: auto;
+      margin-right: 0;
+      text-align: right;
+    }
+    html[dir="ltr"] .voice-gallery-copy {
+      margin-right: auto;
+      margin-left: 0;
+      text-align: left;
+    }
+    .voice-gallery-kicker {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .32rem .75rem;
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in oklab, var(--b) 38%, var(--line));
+      background: color-mix(in oklab, var(--b) 8%, var(--surface));
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: color-mix(in oklab, var(--b) 80%, var(--text));
+      margin-bottom: .75rem;
+    }
+    .voice-gallery-kicker::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--b), var(--a));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--b) 22%, transparent);
+    }
+    .voice-gallery-title {
+      margin: 0 0 .45rem;
+      font-size: clamp(1.5rem, 3vw, 2.2rem);
+    }
+    .voice-gallery-subtitle {
+      margin: 0;
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 46ch;
+    }
+    /* Scrollable track with snap */
+    .sample-showcase-track {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 1rem;
+      grid-template-columns: repeat(4, minmax(240px, 1fr));
+      column-gap: 1.1rem;
+      row-gap: 1.4rem;
     }
-    @media (max-width: 1024px) {
-      .sample-showcase-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    @media (max-width: 1100px) {
+      .sample-showcase-track { grid-template-columns: repeat(3, minmax(220px, 1fr)); }
     }
-    @media (max-width: 768px) {
-      .sample-showcase-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 780px) {
+      .sample-showcase-track {
+        grid-template-columns: repeat(2, minmax(200px, 1fr));
+      }
     }
-    @media (max-width: 480px) {
-      .sample-showcase-grid { grid-template-columns: 1fr; }
+    @media (max-width: 500px) {
+      .sample-showcase-track {
+        grid-template-columns: 1fr;
+      }
     }
+    /* Individual voice card */
     .sample-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      padding: 1.4rem 1.2rem 1.2rem;
-      box-shadow: var(--shadow);
-      transition: transform .25s ease, border-color .25s ease;
-      text-align: center;
+      position: relative;
+      overflow: hidden;
+      border-radius: calc(var(--radius-lg) + .2rem);
+      border: 1px solid color-mix(in oklab, var(--line) 78%, var(--a) 22%);
+      background: linear-gradient(160deg, color-mix(in oklab, var(--surface2) 90%, var(--a) 10%), color-mix(in oklab, var(--surface) 92%, var(--b) 8%));
+      padding: 0;
+      box-shadow: 0 8px 28px rgba(0,0,0,.2);
+      transition: transform .3s cubic-bezier(.22,1,.36,1), border-color .3s ease, box-shadow .3s ease;
       display: flex;
       flex-direction: column;
-      align-items: center;
-      gap: .4rem;
-      position: relative;
+      cursor: default;
+    }
+    .sample-card::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 35%, var(--b)), transparent);
+      pointer-events: none;
     }
     .sample-card:hover {
-      transform: translateY(-4px);
-      border-color: color-mix(in oklab, var(--a) 50%, var(--line));
+      transform: translateY(-6px) scale(1.012);
+      border-color: color-mix(in oklab, var(--b) 45%, var(--line));
+      box-shadow: 0 20px 50px color-mix(in oklab, var(--b) 10%, rgba(0,0,0,.22));
     }
-    .sample-card-flag {
-      width: 3.4rem;
-      height: 3.4rem;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--a), var(--b));
-      display: grid;
-      place-items: center;
-      margin-bottom: .35rem;
-      flex-shrink: 0;
+    .sample-card.is-active-card {
+      border-color: color-mix(in oklab, var(--a) 60%, var(--line));
+      box-shadow: 0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent), 0 20px 50px color-mix(in oklab, var(--a) 14%, transparent);
     }
-    .sample-flag-emoji {
-      font-size: 1.65rem;
-      line-height: 1;
+    /* Card hero section with gradient bg */
+    .sample-card-hero {
+      position: relative;
+      min-height: 9rem;
+    }
+    .sample-card-hero::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(135deg, rgba(8, 12, 24, 0), rgba(8, 12, 24, .1)),
+        var(--sample-flag-image, linear-gradient(135deg, color-mix(in oklab, var(--a) 12%, transparent), transparent 65%));
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      filter: saturate(1.15) brightness(0.9) contrast(1.03);
+      border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .sample-card-hero-svg {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+      border-radius: calc(var(--radius-lg) + .2rem) calc(var(--radius-lg) + .2rem) 0 0;
+    }
+    .sample-card-hero-svg svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    /* no white line divider */
+    /* Card body */
+    .sample-card-body {
+      padding: 1.05rem 1.4rem 1rem;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--surface2) 72%, var(--a) 28%), color-mix(in oklab, var(--surface) 80%, var(--b) 20%));
+      border-top: 1px solid color-mix(in oklab, rgba(255,255,255,.1) 40%, transparent);
+      display: flex;
+      flex-direction: column;
+      gap: .55rem;
+      flex: 1;
     }
     .sample-card-title {
       margin: 0;
-      font-size: .92rem;
-      font-weight: 600;
-      line-height: 1.35;
+      font-size: 1.05rem;
+      font-weight: 700;
+      line-height: 1.3;
       color: var(--text);
     }
     .sample-card-desc {
       margin: 0;
-      font-size: .8rem;
+      font-size: .83rem;
       color: var(--muted);
-      line-height: 1.3;
+      line-height: 1.5;
     }
+    /* ─── Equalizer wave visualizer ─── */
+    .sample-eq {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: 4px;
+      height: 0;
+      margin: 0;
+      pointer-events: none;
+      opacity: 0;
+      overflow: hidden;
+      transform: translateY(6px) scaleY(.82);
+      transform-origin: center bottom;
+      transition: height .28s ease, margin .28s ease, opacity .22s ease, transform .28s ease;
+    }
+    .sample-eq-bar {
+      width: 3px;
+      border-radius: 6px;
+      background: linear-gradient(180deg, var(--a), var(--b));
+      opacity: 0;
+      transition: opacity .22s ease, height .35s ease;
+    }
+    /* Idle natural heights */
+    .sample-eq-bar:nth-child(1) { height: 8px; }
+    .sample-eq-bar:nth-child(2) { height: 16px; }
+    .sample-eq-bar:nth-child(3) { height: 10px; }
+    .sample-eq-bar:nth-child(4) { height: 22px; }
+    .sample-eq-bar:nth-child(5) { height: 14px; }
+    .sample-eq-bar:nth-child(6) { height: 20px; }
+    .sample-eq-bar:nth-child(7) { height: 8px; }
+    .sample-eq-bar:nth-child(8) { height: 18px; }
+    .sample-eq-bar:nth-child(9) { height: 12px; }
+    .sample-eq-bar:nth-child(10) { height: 24px; }
+    .sample-eq-bar:nth-child(11) { height: 6px; }
+    .sample-eq-bar:nth-child(12) { height: 16px; }
+    /* Playing state */
+    .sample-card.is-playing-card .sample-eq {
+      height: 32px;
+      margin: .25rem 0 .1rem;
+      opacity: 1;
+      transform: translateY(0) scaleY(1);
+    }
+    .sample-card.is-playing-card .sample-eq-bar {
+      opacity: 1;
+      animation: sampleEqPulse .7s ease-in-out infinite;
+    }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(1)  { animation-delay: 0s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(2)  { animation-delay: .07s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(3)  { animation-delay: .14s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(4)  { animation-delay: .21s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(5)  { animation-delay: .28s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(6)  { animation-delay: .35s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(7)  { animation-delay: .42s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(8)  { animation-delay: .28s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(9)  { animation-delay: .14s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(10) { animation-delay: .07s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(11) { animation-delay: .35s; }
+    .sample-card.is-playing-card .sample-eq-bar:nth-child(12) { animation-delay: .21s; }
+    @keyframes sampleEqPulse {
+      0%, 100% { height: 5px; opacity: .85; }
+      50% { height: 28px; opacity: 1; }
+    }
+
+    /* ─── Play button ─── circular, icon-only, glowing ─── */
     .sample-play-btn {
-      margin-top: .5rem;
-      width: 2.6rem;
-      height: 2.6rem;
-      border-radius: 50%;
-      border: 1px solid var(--line);
-      background: var(--surface);
+      position: relative;
+      margin: .4rem auto 1.3rem;
+      width: 3rem;
+      height: 3rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, rgba(255,255,255,.2) 50%, transparent);
+      background: linear-gradient(135deg, var(--a), var(--b));
       cursor: pointer;
-      display: grid;
-      place-items: center;
-      transition: background .2s, border-color .2s, transform .15s;
-      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      /* box-shadow:
+        0 8px 20px color-mix(in oklab, var(--a) 30%, transparent),
+        inset 0 1px 1.5px rgba(255,255,255,.4),
+        inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black); */
+      transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .25s cubic-bezier(0.22, 1, 0.36, 1), filter .25s ease;
+    }
+    /* Outer pulse ring — static */
+    .sample-play-btn::before {
+      display: none;
+    }
+    /* Inner gloss sheen */
+    .sample-play-btn::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 50%);
+      opacity: 1;
+      pointer-events: none;
     }
     .sample-play-btn:hover {
-      background: color-mix(in oklab, var(--a) 12%, var(--surface));
-      border-color: var(--a);
-      transform: scale(1.06);
+      transform: translateY(-2px) scale(1.05);
+      box-shadow:
+        0 14px 26px color-mix(in oklab, var(--a) 45%, rgba(0,0,0,.2)),
+        inset 0 1px 1.5px rgba(255,255,255,.5),
+        inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black);
+      filter: brightness(1.05);
+    }
+    .sample-play-btn:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow:
+        0 4px 10px color-mix(in oklab, var(--a) 25%, transparent),
+        inset 0 2px 4px rgba(0,0,0,.3);
     }
     .sample-play-btn.is-playing {
-      background: linear-gradient(135deg, var(--a), var(--b));
-      border-color: var(--a);
+      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 85%, black), color-mix(in oklab, var(--b) 85%, black));
+      box-shadow:
+        0 6px 16px color-mix(in oklab, var(--a) 35%, transparent),
+        inset 0 1px 1.5px rgba(255,255,255,.2),
+        inset 0 -2px 6px color-mix(in oklab, var(--b) 95%, black);
+      border-color: color-mix(in oklab, rgba(255,255,255,.1) 50%, transparent);
     }
-    .sample-play-btn.is-playing .sample-play-icon {
-      fill: #fff;
-    }
+    .sample-play-btn > * { position: relative; z-index: 1; }
     .sample-play-icon {
-      width: 1rem;
-      height: 1rem;
-      fill: var(--text);
-      transition: fill .2s;
+      width: 1.2rem;
+      height: 1.2rem;
+      overflow: visible;
+      transition: transform .18s ease;
+    }
+    .sample-play-icon path {
+      fill: currentColor;
+      transform-origin: center;
+      transition: opacity .2s ease, transform .22s ease;
+    }
+    .sample-icon-play {
+      opacity: 1;
+      transform: scale(1) translateX(0);
+    }
+    .sample-icon-pause {
+      opacity: 0;
+      transform: scale(.68);
+    }
+    .sample-play-btn.is-playing .sample-icon-play {
+      opacity: 0;
+      transform: scale(.68) translateX(-1px);
+    }
+    .sample-play-btn.is-playing .sample-icon-pause {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .sample-play-btn:hover .sample-play-icon {
+      transform: scale(1.06);
+    }
+    /* Light-mode overrides */
+    html[data-theme="light"] .sample-card {
+      background: linear-gradient(160deg, color-mix(in oklab, white 88%, var(--a) 12%), color-mix(in oklab, white 92%, var(--surface) 8%));
+    }
+    html[data-theme="light"] .sample-card-body {
+      background: linear-gradient(180deg, color-mix(in oklab, white 86%, var(--a) 14%), color-mix(in oklab, white 92%, var(--b) 8%));
+      border-top-color: color-mix(in oklab, var(--line) 65%, white 35%);
+    }
+
+    html[data-theme="light"] .sample-card-hero::after {
+      background:
+        linear-gradient(135deg, rgba(15, 23, 42, 0), rgba(15, 23, 42, .1)),
+        var(--sample-flag-image, linear-gradient(135deg, color-mix(in oklab, var(--a) 12%, transparent), transparent 65%));
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: cover;
+      filter: saturate(1.15) brightness(1.02) contrast(1.02);
     }
 
     @keyframes float {
@@ -302,7 +724,9 @@
 
     @media (max-width: 960px) {
       .hero-grid,
-      .cards,
+      .voice-gallery-head,
+      .apps-intro,
+      .apps-grid,
       .premium-grid {
         grid-template-columns: 1fr;
       }
@@ -328,6 +752,13 @@
       }
       .section {
         padding: 2.5rem 0;
+      }
+      .apps-points {
+        justify-content: flex-start;
+      }
+      .voice-gallery-note {
+        min-width: 100%;
+        min-height: auto;
       }
       .hero-art {
         margin-top: .35rem;
@@ -427,7 +858,7 @@
     .hero-audio-btn {
       width: 64px;
       height: 64px;
-      border: none;
+      border: 1px solid color-mix(in oklab, rgba(255,255,255,.2) 50%, transparent);
       border-radius: 50%;
       background: linear-gradient(135deg, var(--a), var(--b));
       color: white;
@@ -435,11 +866,39 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform .45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .45s cubic-bezier(0.22, 1, 0.36, 1), filter .35s ease;
-      box-shadow: 0 10px 24px color-mix(in oklab, var(--a) 40%, transparent), inset 0 2px 4px rgba(255,255,255,0.3);
+      transition: transform .25s cubic-bezier(0.22, 1, 0.36, 1), box-shadow .25s cubic-bezier(0.22, 1, 0.36, 1), filter .25s ease;
+      box-shadow:
+        0 8px 24px color-mix(in oklab, var(--a) 30%, transparent),
+        inset 0 1px 1.5px rgba(255,255,255,.4),
+        inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black);
       padding: 0;
       position: relative;
       z-index: 2;
+    }
+
+    .hero-audio-btn:hover {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow:
+        0 14px 30px color-mix(in oklab, var(--a) 45%, rgba(0,0,0,.2)),
+        inset 0 1px 1.5px rgba(255,255,255,.5),
+        inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black);
+      filter: brightness(1.05);
+    }
+
+    .hero-audio-btn:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow:
+        0 4px 10px color-mix(in oklab, var(--a) 25%, transparent),
+        inset 0 2px 4px rgba(0,0,0,.3);
+    }
+
+    .hero-audio-btn.is-playing {
+      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 85%, black), color-mix(in oklab, var(--b) 85%, black));
+      box-shadow:
+        0 6px 16px color-mix(in oklab, var(--a) 35%, transparent),
+        inset 0 1px 1.5px rgba(255,255,255,.2),
+        inset 0 -2px 6px color-mix(in oklab, var(--b) 95%, black);
+      border-color: color-mix(in oklab, rgba(255,255,255,.1) 50%, transparent);
     }
 
     .hero-audio-btn:not(.is-playing) {
@@ -462,11 +921,9 @@
     .hero-audio-btn::after {
       content: "";
       position: absolute;
-      inset: 1px;
+      inset: 0;
       border-radius: 50%;
-      border: 1px solid color-mix(in oklab, white 75%, var(--a) 25%);
-      opacity: 0.3;
-      transition: opacity .35s ease, transform .45s cubic-bezier(0.22, 1, 0.36, 1);
+      background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 50%);
       pointer-events: none;
     }
 
@@ -746,7 +1203,7 @@
       opacity: 0.5;
       transition: height 0.3s ease, opacity 0.3s ease;
     }
-    
+
     .tts-body.is-playing .tts-bar {
       opacity: 1;
       animation: heroWavePulse 0.85s ease-in-out infinite;
@@ -928,47 +1385,198 @@
     {{-- Voice Samples Showcase --}}
     @if(!empty($voiceSamples))
     <section class="section reveal" id="voice-samples">
-      <h2>{{ __('ui.landing.voice_samples_title', ['default' => 'Hear the Difference']) }}</h2>
-      <p class="section-lead">{{ __('ui.landing.voice_samples_subtitle', ['default' => 'Listen to our AI-powered voices.']) }}</p>
-      <div class="sample-showcase-grid">
-        @foreach($voiceSamples as $idx => $sample)
-        <article class="sample-card reveal" data-sample-idx="{{ $idx }}">
-          <div class="sample-card-flag">
-            <span class="sample-flag-emoji">{{ $sample['icon'] ?? '🌐' }}</span>
+      <div class="voice-gallery-shell">
+        <div class="voice-gallery-inner">
+          <div class="voice-gallery-head">
+            <div class="voice-gallery-copy">
+              <h2 class="voice-gallery-title">{{ __('ui.landing.voice_samples_title') }}</h2>
+              <p class="voice-gallery-subtitle">{{ __('ui.landing.voice_samples_subtitle') }}</p>
+            </div>
           </div>
-          <h3 class="sample-card-title">{{ $sample['title'] }}</h3>
-          <p class="sample-card-desc">{{ $sample['description'] }}</p>
-          @if($sample['audio_url'])
-          <button class="sample-play-btn" type="button"
-                  data-audio-src="{{ $sample['audio_url'] }}"
-                  aria-label="{{ __('ui.landing.play_voice_sample') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true" class="sample-play-icon">
-              <path d="M8 5v14l11-7z"/>
-            </svg>
-          </button>
-          @endif
-        </article>
-        @endforeach
+          <div class="sample-showcase-track">
+          @foreach($voiceSamples as $idx => $sample)
+          @php
+            $countryCode = strtolower(trim((string) ($sample['country'] ?? '')));
+            $sampleLanguage = strtolower(trim((string) ($sample['language'] ?? '')));
+            $flagImage = preg_match('/^[a-z]{2}$/', $countryCode)
+              ? "https://flagcdn.com/w320/{$countryCode}.png"
+              : null;
+            $fallbackSvg = $sampleLanguage === 'ar'
+              ? <<<'SVG'
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 640'>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@800&amp;display=swap');
+  </style>
+  <defs>
+    <radialGradient id="gradBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#141E30"/>
+      <stop offset="100%" stop-color="#040914"/>
+    </radialGradient>
+    <linearGradient id="textGrad" x1="0" y1="0" x2="1" y2="1">
+       <stop offset="0%" stop-color="#ffffff"/>
+       <stop offset="100%" stop-color="#94a3b8"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+       <stop offset="0%" stop-color="#fcd34d"/>
+       <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="20" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="640" fill="url(#gradBg)"/>
+
+  <path d="M-100 320 C 250 100, 350 540, 600 320 C 850 100, 950 540, 1300 320" fill="none" stroke="url(#gold)" stroke-width="4" opacity="0.3" filter="url(#glow)"/>
+  <path d="M-100 360 C 250 140, 350 580, 600 360 C 850 140, 950 580, 1300 360" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.3"/>
+  <path d="M-100 280 C 250 60, 350 500, 600 280 C 850 60, 950 500, 1300 280" fill="none" stroke="url(#gold)" stroke-width="1.5" opacity="0.3"/>
+
+  <g text-anchor="middle" font-family="'Cairo', sans-serif">
+    <text x="600" y="350" font-size="130" font-weight="800" fill="url(#textGrad)">العربية الفصحى</text>
+  </g>
+</svg>
+SVG
+              : <<<'SVG'
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 640'>
+  <defs>
+    <linearGradient id='bg' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0%' stop-color='#151d2f'/>
+      <stop offset='100%' stop-color='#243553'/>
+    </linearGradient>
+    <linearGradient id='accent' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0%' stop-color='#78c6ff'/>
+      <stop offset='100%' stop-color='#ccecff'/>
+    </linearGradient>
+  </defs>
+  <rect width='1200' height='640' fill='url(#bg)'/>
+  <g opacity='.14' fill='none' stroke='url(#accent)'>
+    <circle cx='188' cy='132' r='90' stroke-width='10'/>
+    <circle cx='1010' cy='498' r='120' stroke-width='8'/>
+    <path d='M114 512c96-88 206-132 330-132 124 0 242 36 354 108 86 56 170 84 252 84' stroke-width='8'/>
+  </g>
+  <g transform='translate(600 270)'>
+    <rect x='-220' y='-110' width='440' height='220' rx='36' fill='rgba(7,12,24,.24)' stroke='rgba(204,236,255,.28)' stroke-width='3'/>
+    <circle cx='0' cy='0' r='70' fill='none' stroke='url(#accent)' stroke-width='10'/>
+    <circle cx='0' cy='0' r='30' fill='url(#accent)' opacity='.94'/>
+    <path d='M-138 0h44M94 0h44M0-138v44M0 94v44' stroke='url(#accent)' stroke-width='10' stroke-linecap='round'/>
+    <path d='M-92-92l30 30M92-92l-30 30M-92 92l30-30M92 92l-30-30' stroke='url(#accent)' stroke-width='10' stroke-linecap='round'/>
+  </g>
+  <g transform='translate(354 458)'>
+    <rect x='0' y='38' width='18' height='44' rx='9' fill='url(#accent)'/>
+    <rect x='36' y='16' width='18' height='88' rx='9' fill='url(#accent)'/>
+    <rect x='72' y='0' width='18' height='120' rx='9' fill='url(#accent)'/>
+    <rect x='108' y='24' width='18' height='72' rx='9' fill='url(#accent)'/>
+    <rect x='144' y='10' width='18' height='98' rx='9' fill='url(#accent)'/>
+    <rect x='180' y='28' width='18' height='64' rx='9' fill='url(#accent)'/>
+    <rect x='216' y='6' width='18' height='106' rx='9' fill='url(#accent)'/>
+    <rect x='252' y='18' width='18' height='82' rx='9' fill='url(#accent)'/>
+    <rect x='288' y='34' width='18' height='48' rx='9' fill='url(#accent)'/>
+  </g>
+  <g opacity='.22' fill='url(#accent)'>
+    <circle cx='340' cy='530' r='8'/>
+    <circle cx='860' cy='138' r='8'/>
+    <circle cx='910' cy='214' r='5'/>
+  </g>
+</svg>
+SVG;
+            $heroArtwork = $flagImage
+              ? "url('{$flagImage}')"
+              : "url(\"data:image/svg+xml," . rawurlencode($fallbackSvg) . "\")";
+          @endphp
+          <article class="sample-card reveal" data-sample-idx="{{ $idx }}" id="sample-card-{{ $idx }}">
+            <div class="sample-card-hero" style="--sample-flag-image: {{ $heroArtwork }};"></div>
+            <div class="sample-card-body">
+              <h3 class="sample-card-title">{{ $sample['title'] }}</h3>
+              <p class="sample-card-desc">{{ $sample['description'] }}</p>
+              <div class="sample-eq" aria-hidden="true">
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+                <div class="sample-eq-bar"></div>
+              </div>
+            @if($sample['audio_url'])
+            <button class="sample-play-btn" type="button"
+                    data-audio-src="{{ $sample['audio_url'] }}"
+                    data-card-id="sample-card-{{ $idx }}"
+                    data-play-aria-label="{{ __('ui.landing.play_voice_sample') }}"
+                    data-pause-aria-label="{{ __('ui.landing.pause_voice_sample') }}"
+                    aria-label="{{ __('ui.landing.play_voice_sample') }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="sample-play-icon" fill="currentColor">
+                <path class="sample-icon-play" fill-rule="evenodd" clip-rule="evenodd" d="M9.315 5.28a.75.75 0 0 0-1.215-.56L4.35 7.5H2.25a.75.75 0 0 0-.75.75v7.5c0 .414.336.75.75.75h2.1l3.75 2.78a.75.75 0 0 0 1.215-.56V5.28Zm5.955 1.545a.75.75 0 0 1 1.06 0 6.75 6.75 0 0 1 0 9.546.75.75 0 1 1-1.06-1.061 5.25 5.25 0 0 0 0-7.424.75.75 0 0 1 0-1.061Zm2.652-2.652a.75.75 0 0 1 1.06 0 10.5 10.5 0 0 1 0 14.85.75.75 0 1 1-1.06-1.061 9 9 0 0 0 0-12.728.75.75 0 0 1 0-1.061Z"/>
+                <path class="sample-icon-pause" fill-rule="evenodd" clip-rule="evenodd" d="M6.75 5.25a.75.75 0 0 1 .75-.75H9a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H7.5a.75.75 0 0 1-.75-.75V5.25Zm7.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 .75.75v13.5a.75.75 0 0 1-.75.75H15a.75.75 0 0 1-.75-.75V5.25Z"/>
+              </svg>
+            </button>
+            @endif
+            </div>
+          </article>
+          @endforeach
+          </div>
+        </div>
       </div>
     </section>
     @endif
 
     <section class="section reveal">
-      <h2>{{ __('ui.landing.section1_title') }}</h2>
-      <p class="section-lead">{{ __('ui.landing.section1_subtitle') }}</p>
-      <div class="cards">
-        <article class="card reveal">
-          <h3>{{ __('ui.landing.section1_card1_title') }}</h3>
-          <p>{{ __('ui.landing.section1_card1_body') }}</p>
-        </article>
-        <article class="card reveal">
-          <h3>{{ __('ui.landing.section1_card2_title') }}</h3>
-          <p>{{ __('ui.landing.section1_card2_body') }}</p>
-        </article>
-        <article class="card reveal">
-          <h3>{{ __('ui.landing.section1_card3_title') }}</h3>
-          <p>{{ __('ui.landing.section1_card3_body') }}</p>
-        </article>
+      <div class="apps-shell">
+        <div class="apps-intro">
+          <div class="apps-copy">
+            <!-- <span class="apps-kicker">{{ __('ui.landing.section1_eyebrow') }}</span> -->
+            <h2>{{ __('ui.landing.section1_title') }}</h2>
+            <p class="section-lead">{{ __('ui.landing.section1_subtitle') }}</p>
+          </div>
+          <!-- <div class="apps-points" aria-hidden="true">
+            <span class="apps-point">{{ __('ui.landing.section1_point1') }}</span>
+            <span class="apps-point">{{ __('ui.landing.section1_point2') }}</span>
+            <span class="apps-point">{{ __('ui.landing.section1_point3') }}</span>
+          </div> -->
+        </div>
+        <div class="apps-grid">
+          <article class="app-card reveal">
+            <div class="app-card-head">
+              <div class="app-icon" aria-hidden="true" style="filter: grayscale(100%) contrast(1.2) brightness(1.2);">
+                <svg viewBox="0 0 24 24">
+                  <circle cx="12" cy="12" r="8.5"></circle>
+                  <path d="M3.5 12h17"></path>
+                  <path d="M12 3.5a14 14 0 0 1 0 17"></path>
+                  <path d="M12 3.5a14 14 0 0 0 0 17"></path>
+                </svg>
+              </div>
+              <h3>{{ __('ui.landing.section1_card1_title') }}</h3>
+            </div>
+            <p>{{ __('ui.landing.section1_card1_body') }}</p>
+            <div class="app-card-footer">
+              @auth
+                <a class="app-link" href="{{ route('dashboard') }}">{{ __('ui.landing.section1_card1_cta') }}</a>
+              @else
+                <a class="app-link" href="{{ route('register') }}">{{ __('ui.landing.section1_card1_cta') }}</a>
+              @endauth
+            </div>
+          </article>
+          <article class="app-card reveal">
+            <div class="app-card-head">
+              <div class="app-icon" aria-hidden="true" style="filter: grayscale(100%) contrast(1.0) brightness(0.95)">
+                <img src="{{ asset('icons/chrome.png') }}" alt="" />
+              </div>
+              <h3>{{ __('ui.landing.section1_card2_title') }}</h3>
+            </div>
+            <p>{{ __('ui.landing.section1_card2_body') }}</p>
+            <div class="app-card-footer">
+              <a class="app-link" href="{{ route('browsers-extension.page') }}">{{ __('ui.landing.section1_card2_cta') }}</a>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -1066,13 +1674,13 @@
           startTyping();
         }
       };
-      
+
       const phrases = [i18n.phrase1, i18n.phrase2, i18n.phrase3, i18n.phrase4];
 
       const typeLoop = () => {
         if (isPlayingState) return;
         const currentPhrase = phrases[phraseIndex];
-        
+
         if (isDeleting) {
           charIndex -= 1;
         } else {
@@ -1246,10 +1854,26 @@
       (() => {
         let sampleAudio = null;
         let activeBtn = null;
-        const playPath = 'M8 5v14l11-7z';
-        const pausePath = 'M6 5h4v14H6zM14 5h4v14h-4z';
+        let activeCard = null;
+
+        const setCardPlaying = (card, playing) => {
+          if (!card) return;
+          card.classList.toggle('is-playing-card', playing);
+        };
+
+        const setAriaLabel = (btn, playing) => {
+          btn.setAttribute(
+            'aria-label',
+            playing
+              ? (btn.dataset.pauseAriaLabel || 'Pause Voice Sample')
+              : (btn.dataset.playAriaLabel || 'Play Voice Sample')
+          );
+        };
 
         document.querySelectorAll('.sample-play-btn').forEach(btn => {
+          const cardId = btn.dataset.cardId;
+          const card = cardId ? document.getElementById(cardId) : btn.closest('.sample-card');
+
           btn.addEventListener('click', () => {
             const src = btn.dataset.audioSrc;
             if (!src) return;
@@ -1258,8 +1882,10 @@
             if (activeBtn === btn && sampleAudio && !sampleAudio.paused) {
               sampleAudio.pause();
               btn.classList.remove('is-playing');
-              btn.querySelector('path').setAttribute('d', playPath);
+              setCardPlaying(card, false);
+              setAriaLabel(btn, false);
               activeBtn = null;
+              activeCard = null;
               return;
             }
 
@@ -1271,7 +1897,10 @@
             }
             if (activeBtn) {
               activeBtn.classList.remove('is-playing');
-              activeBtn.querySelector('path').setAttribute('d', playPath);
+              setAriaLabel(activeBtn, false);
+            }
+            if (activeCard) {
+              setCardPlaying(activeCard, false);
             }
 
             // Also pause the hero audio if playing
@@ -1281,19 +1910,25 @@
 
             sampleAudio = new Audio(src);
             activeBtn = btn;
+            activeCard = card;
             btn.classList.add('is-playing');
-            btn.querySelector('path').setAttribute('d', pausePath);
+            setCardPlaying(card, true);
+            setAriaLabel(btn, true);
 
             sampleAudio.play().catch(() => {
               btn.classList.remove('is-playing');
-              btn.querySelector('path').setAttribute('d', playPath);
+              setCardPlaying(card, false);
+              setAriaLabel(btn, false);
               activeBtn = null;
+              activeCard = null;
             });
 
             sampleAudio.addEventListener('ended', () => {
               btn.classList.remove('is-playing');
-              btn.querySelector('path').setAttribute('d', playPath);
+              setCardPlaying(card, false);
+              setAriaLabel(btn, false);
               activeBtn = null;
+              activeCard = null;
             });
           });
         });

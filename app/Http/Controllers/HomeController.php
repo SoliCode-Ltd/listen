@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Services\PlanAccessService;
+use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
@@ -56,6 +57,7 @@ class HomeController extends Controller
 
     public function __construct(
         private readonly PlanAccessService $planAccessService,
+        private readonly TtsRoutingService $ttsRoutingService,
     ) {
     }
 
@@ -112,9 +114,9 @@ class HomeController extends Controller
 
         $freePlan = $this->planAccessService->freePlan();
         $defaultTier = $this->planAccessService->resolveTierForPlan($freePlan);
-        $defaultProvider = VoiceCatalog::preferredProviderForTier($defaultTier);
+        $defaultProvider = $this->demoPreferredProviderForTier($defaultTier);
         return view('demo', [
-            'voiceCatalog' => VoiceCatalog::publicCatalogByTier(),
+            'voiceCatalog' => $this->demoVoiceCatalog(),
             'defaultTier' => $defaultTier,
             'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $defaultTier, $defaultProvider)),
             'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('en', $defaultTier, $defaultProvider)),
@@ -219,6 +221,7 @@ class HomeController extends Controller
         $demoPlan = $this->planAccessService->freePlan();
         $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+        $demoRoutingPlan = $this->demoRoutingPlan($demoPlan, $tier);
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
             $validated['voice_key'] ?? null,
@@ -276,7 +279,7 @@ class HomeController extends Controller
                 $textForSpeech,
                 $validated['target_language'],
                 $voiceOptions,
-                $demoPlan,
+                $demoRoutingPlan,
                 null,
             );
             $estimate = UsageEstimator::estimate($textForSpeech);
@@ -514,7 +517,7 @@ class HomeController extends Controller
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
     {
         $voiceKey = trim((string) $voiceKey);
-        $preferredProvider = VoiceCatalog::preferredProviderForTier($tier);
+        $preferredProvider = $this->demoPreferredProviderForTier($tier);
 
         if ($voiceKey === '') {
             $defaultVoice = VoiceCatalog::defaultForLanguageAndProvider($language, $tier, $preferredProvider);
@@ -535,6 +538,68 @@ class HomeController extends Controller
         }
 
         return $voiceName;
+    }
+
+    /**
+     * Demo rule: standard previews use Google, premium/HD previews use Gemini when available.
+     *
+     * @return array<string, array<string, array<int, array<string, mixed>>>>
+     */
+    private function demoVoiceCatalog(): array
+    {
+        $catalog = [];
+
+        foreach (VoiceTier::all() as $tier) {
+            $provider = $this->demoPreferredProviderForTier($tier);
+            $voices = VoiceCatalog::publicCatalog($tier, $provider);
+
+            if (! $this->voiceCatalogHasVoices($voices)) {
+                $voices = VoiceCatalog::publicCatalog($tier);
+            }
+
+            $catalog[$tier] = $voices;
+        }
+
+        return $catalog;
+    }
+
+    private function demoPreferredProviderForTier(string $tier): ?string
+    {
+        $normalizedTier = VoiceTier::normalize($tier);
+
+        if ($normalizedTier === VoiceTier::STANDARD) {
+            return 'google_cloud';
+        }
+
+        return $this->ttsRoutingService->getProviderByName('gemini')->isAvailable()
+            ? 'gemini'
+            : 'google_cloud';
+    }
+
+    private function demoRoutingPlan(?Plan $plan, string $tier): ?Plan
+    {
+        if (! $plan || VoiceTier::normalize($tier) === VoiceTier::STANDARD) {
+            return $plan;
+        }
+
+        $routingPlan = clone $plan;
+        $routingPlan->tts_provider_policy = 'auto';
+
+        return $routingPlan;
+    }
+
+    /**
+     * @param  array<string, array<int, array<string, mixed>>>  $catalog
+     */
+    private function voiceCatalogHasVoices(array $catalog): bool
+    {
+        foreach ($catalog as $voices) {
+            if (is_array($voices) && $voices !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
