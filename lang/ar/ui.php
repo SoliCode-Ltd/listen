@@ -72,7 +72,7 @@ return [
         'browser_extension' => 'إضافة المتصفح',
         'play_voice_sample' => 'تشغيل عيّنة صوتية',
         'pause_voice_sample' => 'إيقاف العيّنة الصوتية',
-        'arabic_sample_label' => 'العربية (أمل)',
+        'arabic_sample_label' => 'العربية (عبدالعزيز)',
         'english_sample_label' => 'الإنجليزية (كلارا)',
         'typing_phrase_1' => 'ولّد صوتاً بشرياً.',
         'typing_phrase_2' => 'وسّع منتجك الصوتي بثقة مؤسسية.',

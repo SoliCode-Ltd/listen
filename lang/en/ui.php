@@ -72,7 +72,7 @@ return [
         'browser_extension' => 'Browsers Extension',
         'play_voice_sample' => 'Play Voice Sample',
         'pause_voice_sample' => 'Pause Voice Sample',
-        'arabic_sample_label' => 'Arabic (Amal)',
+        'arabic_sample_label' => 'Arabic (Abdulaziz)',
         'english_sample_label' => 'English (Clara)',
         'typing_phrase_1' => 'Generate human voice.',
         'typing_phrase_2' => 'Scale with enterprise voice.',
