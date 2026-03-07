@@ -51,7 +51,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   2 => 
   array (
@@ -75,7 +79,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   3 => 
   array (
@@ -99,7 +107,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   4 => 
   array (
@@ -123,7 +135,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   5 => 
   array (
@@ -147,7 +163,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   6 => 
   array (
@@ -171,7 +191,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   7 => 
   array (
@@ -195,7 +219,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Layla',
+      'speaker_name_ar' => 'ليلى',
+    ),
   ),
   8 => 
   array (
@@ -219,7 +247,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   9 => 
   array (
@@ -243,7 +275,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   10 => 
   array (
@@ -267,7 +303,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Layla',
+      'speaker_name_ar' => 'ليلى',
+    ),
   ),
   11 => 
   array (
@@ -291,7 +331,11 @@ return array (
     'is_active' => false,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Layla',
+      'speaker_name_ar' => 'ليلى',
+    ),
   ),
   12 => 
   array (
@@ -315,7 +359,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   13 => 
   array (
@@ -339,7 +387,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   14 => 
   array (
@@ -363,7 +415,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   15 => 
   array (
@@ -387,7 +443,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   16 => 
   array (
@@ -411,7 +471,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   17 => 
   array (
@@ -435,7 +499,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   18 => 
   array (
@@ -459,7 +527,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   19 => 
   array (
@@ -483,7 +555,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   20 => 
   array (
@@ -507,7 +583,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Layla',
+      'speaker_name_ar' => 'ليلى',
+    ),
   ),
   21 => 
   array (
@@ -531,7 +611,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   22 => 
   array (
@@ -555,7 +639,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Nour',
+      'speaker_name_ar' => 'نور',
+    ),
   ),
   23 => 
   array (
@@ -579,7 +667,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Khaled',
+      'speaker_name_ar' => 'خالد',
+    ),
   ),
   24 => 
   array (
@@ -603,7 +695,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Layla',
+      'speaker_name_ar' => 'ليلى',
+    ),
   ),
   25 => 
   array (
@@ -627,7 +723,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Youssef',
+      'speaker_name_ar' => 'يوسف',
+    ),
   ),
   26 => 
   array (
@@ -654,6 +754,7 @@ return array (
     'metadata' => 
     array (
       'speaker_name' => 'Clara',
+      'speaker_name_ar' => 'كلارا',
     ),
   ),
   27 => 
@@ -678,7 +779,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Amelia',
+      'speaker_name_ar' => 'أميليا',
+    ),
   ),
   28 => 
   array (
@@ -702,7 +807,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Henry',
+      'speaker_name_ar' => 'هنري',
+    ),
   ),
   29 => 
   array (
@@ -726,7 +835,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Harper',
+      'speaker_name_ar' => 'هاربر',
+    ),
   ),
   30 => 
   array (
@@ -750,7 +863,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Alexander',
+      'speaker_name_ar' => 'ألكسندر',
+    ),
   ),
   31 => 
   array (
@@ -774,7 +891,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Henry',
+      'speaker_name_ar' => 'هنري',
+    ),
   ),
   32 => 
   array (
@@ -798,7 +919,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Amelia',
+      'speaker_name_ar' => 'أميليا',
+    ),
   ),
   33 => 
   array (
@@ -822,7 +947,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Alexander',
+      'speaker_name_ar' => 'ألكسندر',
+    ),
   ),
   34 => 
   array (
@@ -846,7 +975,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Charlotte',
+      'speaker_name_ar' => 'شارلوت',
+    ),
   ),
   35 => 
   array (
@@ -870,7 +1003,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Henry',
+      'speaker_name_ar' => 'هنري',
+    ),
   ),
   36 => 
   array (
@@ -894,7 +1031,11 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Alexander',
+      'speaker_name_ar' => 'ألكسندر',
+    ),
   ),
   37 => 
   array (
@@ -918,6 +1059,10 @@ return array (
     'is_active' => true,
     'category' => 'hero',
     'duration_seconds' => 0,
-    'metadata' => NULL,
+    'metadata' => 
+    array (
+      'speaker_name' => 'Amelia',
+      'speaker_name_ar' => 'أميليا',
+    ),
   ),
 );
