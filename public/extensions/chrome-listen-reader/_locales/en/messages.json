@@ -183,6 +183,14 @@
     "message": "Kuwaiti",
     "description": "Kuwaiti dialect"
   },
+  "dialectTunisian": {
+    "message": "Tunisian",
+    "description": "Tunisian dialect"
+  },
+  "dialectOmani": {
+    "message": "Omani",
+    "description": "Omani dialect"
+  },
   "dialectAmerican": {
     "message": "American",
     "description": "American English dialect"
@@ -267,6 +275,26 @@
     "message": "News",
     "description": "News style"
   },
+  "styleSportsCommentator": {
+    "message": "Sports Commentator",
+    "description": "Sports Commentator style"
+  },
+  "styleMeditation": {
+    "message": "Meditation",
+    "description": "Meditation style"
+  },
+  "styleAudiobook": {
+    "message": "Audiobook",
+    "description": "Audiobook style"
+  },
+  "styleChildrenStory": {
+    "message": "Children Story",
+    "description": "Children Story style"
+  },
+  "styleRadioHost": {
+    "message": "Radio Host",
+    "description": "Radio Host style"
+  },
   "emotionNeutral": {
     "message": "Neutral",
     "description": "Neutral emotion"
@@ -294,6 +322,26 @@
   "emotionAngry": {
     "message": "Angry",
     "description": "Angry emotion"
+  },
+  "emotionHopeful": {
+    "message": "Hopeful",
+    "description": "Hopeful emotion"
+  },
+  "emotionSerious": {
+    "message": "Serious",
+    "description": "Serious emotion"
+  },
+  "emotionPlayful": {
+    "message": "Playful",
+    "description": "Playful emotion"
+  },
+  "emotionMysterious": {
+    "message": "Mysterious",
+    "description": "Mysterious emotion"
+  },
+  "emotionConfident": {
+    "message": "Confident",
+    "description": "Confident emotion"
   },
   "statusSetApiKey": {
     "message": "Set your API key to load account details.",

@@ -183,6 +183,14 @@
     "message": "الكويتية",
     "description": "Kuwaiti dialect"
   },
+  "dialectTunisian": {
+    "message": "التونسية",
+    "description": "Tunisian dialect"
+  },
+  "dialectOmani": {
+    "message": "العُمانية",
+    "description": "Omani dialect"
+  },
   "dialectAmerican": {
     "message": "الأمريكية",
     "description": "American English dialect"
@@ -267,6 +275,26 @@
     "message": "أخباري",
     "description": "News style"
   },
+  "styleSportsCommentator": {
+    "message": "معلق رياضي",
+    "description": "Sports Commentator style"
+  },
+  "styleMeditation": {
+    "message": "تأمل",
+    "description": "Meditation style"
+  },
+  "styleAudiobook": {
+    "message": "كتاب صوتي",
+    "description": "Audiobook style"
+  },
+  "styleChildrenStory": {
+    "message": "قصة أطفال",
+    "description": "Children Story style"
+  },
+  "styleRadioHost": {
+    "message": "مذيع راديو",
+    "description": "Radio Host style"
+  },
   "emotionNeutral": {
     "message": "محايد",
     "description": "Neutral emotion"
@@ -294,6 +322,26 @@
   "emotionAngry": {
     "message": "غاضب",
     "description": "Angry emotion"
+  },
+  "emotionHopeful": {
+    "message": "متفائل",
+    "description": "Hopeful emotion"
+  },
+  "emotionSerious": {
+    "message": "جاد",
+    "description": "Serious emotion"
+  },
+  "emotionPlayful": {
+    "message": "مرح",
+    "description": "Playful emotion"
+  },
+  "emotionMysterious": {
+    "message": "غامض",
+    "description": "Mysterious emotion"
+  },
+  "emotionConfident": {
+    "message": "واثق",
+    "description": "Confident emotion"
   },
   "statusSetApiKey": {
     "message": "أدخل مفتاح API لتحميل بيانات الحساب.",
