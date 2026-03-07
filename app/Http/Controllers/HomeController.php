@@ -6,6 +6,7 @@ use App\Models\DemoGuestUsage;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
+use App\Services\DemoFraudService;
 use App\Services\PlanAccessService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
@@ -68,6 +69,7 @@ class HomeController extends Controller
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly TtsRoutingService $ttsRoutingService,
+        private readonly DemoFraudService $fraudService,
     ) {
     }
 
@@ -371,9 +373,16 @@ class HomeController extends Controller
     private function enforceDemoPolicy(Request $request, int $chars, bool $preview, bool $commit = true): array
     {
         $isUser = (bool) $request->user();
-        [$identities, $primaryIdentity] = $this->resolveDemoIdentities($request);
+        [$identities, $primaryIdentity, $identityTypes, $fraudSignals] = $this->resolveDemoIdentities($request);
         $scope = $preview ? 'preview' : 'check';
         $maxPerMinute = max(1, (int) config("listen.demo.{$scope}.".($isUser ? 'user' : 'guest')."_rate_per_minute", 10));
+
+        // Check if blocked due to abuse
+        if (! $isUser && $this->fraudService->isBlocked($identities)) {
+            throw ValidationException::withMessages([
+                'text' => __('ui.backend.demo_access_restricted'),
+            ]);
+        }
 
         $retryAfter = 0;
         foreach ($identities as $identity) {
@@ -395,8 +404,11 @@ class HomeController extends Controller
 
         if (! $isUser) {
             $lifetimeCap = $this->demoCharAllowance($request);
+
+            // Use linked usage for proper tracking (prevents abuse via identity reset)
+            $usedChars = $this->fraudService->getLinkedUsedChars($identities);
+
             if (! $commit) {
-                $usedChars = $this->guestLifetimeUsedChars($identities);
                 if (($usedChars + $chars) > $lifetimeCap) {
                     throw ValidationException::withMessages([
                         'text' => $this->demoDailyCapReachedMessage($request),
@@ -430,9 +442,14 @@ class HomeController extends Controller
             }
 
             if ($commit) {
-                $writeIdentities = $this->writableGuestIdentities($identities, $primaryIdentity);
-
-                $this->reserveGuestLifetimeChars($request, $writeIdentities, $chars, $lifetimeCap);
+                // Use fraud service for linked identity tracking
+                try {
+                    $this->fraudService->reserveChars($identities, $chars, $lifetimeCap);
+                } catch (\Throwable $e) {
+                    // Fallback to legacy method if fraud service fails
+                    $writeIdentities = $this->writableGuestIdentities($identities, $primaryIdentity);
+                    $this->reserveGuestLifetimeChars($request, $writeIdentities, $chars, $lifetimeCap);
+                }
             }
 
             return $this->demoQuotaSnapshot($request, $preview);
@@ -504,7 +521,7 @@ class HomeController extends Controller
     private function rollbackDemoPolicy(Request $request, int $chars, bool $preview): array
     {
         $isUser = (bool) $request->user();
-        [$identities, $primaryIdentity] = $this->resolveDemoIdentities($request);
+        [$identities, $primaryIdentity, , ] = $this->resolveDemoIdentities($request);
         $scope = $preview ? 'preview' : 'check';
 
         if ($preview) {
@@ -816,55 +833,45 @@ class HomeController extends Controller
     }
 
     /**
-     * @return array{0:array<int,string>,1:string}
+     * @return array{0:array<int,string>,1:string,2:array,3:array}
      */
     private function resolveDemoIdentities(Request $request): array
     {
         if ($request->user()) {
             $identity = 'u:'.$request->user()->id;
-            return [[$identity], $identity];
+            return [[$identity], $identity, [], []];
         }
 
-        $ua = mb_substr(trim((string) $request->userAgent()), 0, 180);
-        $acceptLanguage = mb_substr(trim((string) $request->header('Accept-Language', '')), 0, 64);
-        $secChUa = mb_substr(trim((string) $request->header('Sec-CH-UA', '')), 0, 180);
-        $secChUaPlatform = mb_substr(trim((string) $request->header('Sec-CH-UA-Platform', '')), 0, 80);
-        $secChUaMobile = mb_substr(trim((string) $request->header('Sec-CH-UA-Mobile', '')), 0, 20);
-        $ip = trim((string) $request->ip());
-        $fingerprintRaw = trim((string) $request->header('X-Listen-Fingerprint', ''));
-        if ($fingerprintRaw === '') {
-            $fingerprintRaw = trim((string) $request->cookie('listen_demo_fp', ''));
+        // Use enhanced fraud detection service
+        $extracted = $this->fraudService->extractIdentities($request);
+
+        // Get all linked identities (this catches users trying to reset via VPN/incognito)
+        $allIdentities = $this->fraudService->getLinkedIdentities($extracted['identities']);
+
+        // Link identities that appear together
+        if (count($extracted['identities']) >= 2) {
+            try {
+                $this->fraudService->linkIdentities($extracted['identities'], $extracted['identity_types']);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to link demo identities', ['error' => $e->getMessage()]);
+            }
         }
 
-        $fingerprintIdentity = $fingerprintRaw !== ''
-            ? 'fp:'.hash('sha256', $fingerprintRaw)
-            : null;
-        $deviceIdentity = 'dv:'.hash('sha256', implode('|', [
-            $ua,
-            $acceptLanguage,
-            $secChUa,
-            $secChUaPlatform,
-            $secChUaMobile,
-        ]));
-        $uaIdentity = 'ua:'.hash('sha256', implode('|', [
-            $ua,
-            $acceptLanguage,
-            $secChUa,
-            $secChUaPlatform,
-            $secChUaMobile,
-        ]));
-        $ipIdentity = $ip !== '' ? 'ip:'.hash('sha256', $ip) : null;
+        // Record fraud signals if any
+        if (!empty($extracted['fraud_signals'])) {
+            try {
+                $this->fraudService->recordFraudSignals($allIdentities, $extracted['fraud_signals']);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to record fraud signals', ['error' => $e->getMessage()]);
+            }
+        }
 
-        $identities = array_values(array_unique(array_filter([
-            $fingerprintIdentity,
-            $deviceIdentity,
-            $uaIdentity,
-            $ipIdentity,
-        ])));
-
-        $primary = $fingerprintIdentity ?: $deviceIdentity;
-
-        return [$identities, $primary];
+        return [
+            $allIdentities,
+            $extracted['primary'],
+            $extracted['identity_types'],
+            $extracted['fraud_signals'],
+        ];
     }
 
     /**
@@ -872,7 +879,7 @@ class HomeController extends Controller
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array
     {
-        [$identities, $primaryIdentity] = $this->resolveDemoIdentities($request);
+        [$identities, $primaryIdentity, , ] = $this->resolveDemoIdentities($request);
         $scope = $request->user() ? ($preview ? 'preview' : 'check') : 'lifetime';
         $limit = $request->user()
             ? $this->demoDailyCharCap($request, $scope)
@@ -882,7 +889,8 @@ class HomeController extends Controller
             $key = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$primaryIdentity;
             $used = min($limit, max(0, (int) Cache::get($key, 0)));
         } else {
-            $used = $this->guestLifetimeUsedChars($identities);
+            // Use fraud service for linked identity tracking
+            $used = $this->fraudService->getLinkedUsedChars($identities);
             $used = min($limit, max(0, $used));
         }
 

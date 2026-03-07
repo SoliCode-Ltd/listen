@@ -846,6 +846,10 @@
       overflow: hidden;
     }
 
+    html[dir="rtl"] .tts-card {
+      transform: rotateY(15deg) rotateX(10deg);
+    }
+
     .tts-header {
       padding: 1rem 1.5rem;
       border-bottom: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
@@ -1339,7 +1343,7 @@
         width: 100%;
         min-height: 100%;
         margin-inline: auto;
-        transform: none;
+        transform: rotateY(-15deg) rotateX(10deg);
         transform-origin: center center;
       }
       .tts-body {
@@ -1363,7 +1367,7 @@
         top: auto;
         left: auto;
         right: auto;
-        margin-top: 1rem;
+        margin-top: 2rem;
         min-height: 2.9rem;
         width: 100%;
         justify-content: center;

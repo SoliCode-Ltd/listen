@@ -44,8 +44,8 @@
 .studio-hero {
   text-align: center;
   padding: 2.5rem 0 1rem;
-  max-width: 680px;
-  margin: 0 auto
+    max-width: 850px;
+    margin: 1.5rem auto;
 }
 
 .studio-hero h1 {
@@ -578,7 +578,6 @@ html[dir="rtl"] .perf-grid select {
 /* Output panel */
 .output-panel {
   min-height: 120px;
-  margin-top: 1.5rem;
   padding: 1.5rem;
   background: color-mix(in oklab, var(--surface2) 30%, var(--surface));
   border-radius: 1.25rem;

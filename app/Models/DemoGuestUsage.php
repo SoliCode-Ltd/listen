@@ -11,12 +11,19 @@ class DemoGuestUsage extends Model
 
     protected $fillable = [
         'identity_hash',
+        'link_group',
         'used_chars',
+        'abuse_score',
+        'is_blocked',
+        'metadata',
         'last_seen_at',
     ];
 
     protected $casts = [
         'used_chars' => 'integer',
+        'abuse_score' => 'integer',
+        'is_blocked' => 'boolean',
+        'metadata' => 'array',
         'last_seen_at' => 'datetime',
     ];
 }

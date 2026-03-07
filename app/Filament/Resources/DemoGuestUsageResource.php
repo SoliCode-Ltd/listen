@@ -16,11 +16,11 @@ class DemoGuestUsageResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
 
-    protected static ?string $navigationGroup = 'Content';
+    protected static ?string $navigationGroup = 'Demo Tracking';
 
-    protected static ?int $navigationSort = 6;
+    protected static ?int $navigationSort = 1;
 
-    protected static ?string $navigationLabel = 'Demo Guest Usage';
+    protected static ?string $navigationLabel = 'Guest Usage';
 
     public static function form(Form $form): Form
     {
@@ -32,10 +32,21 @@ class DemoGuestUsageResource extends Resource
                         Forms\Components\TextInput::make('identity_hash')
                             ->required()
                             ->maxLength(255),
+                        Forms\Components\TextInput::make('link_group')
+                            ->maxLength(80),
                         Forms\Components\TextInput::make('used_chars')
                             ->numeric()
                             ->required(),
+                        Forms\Components\TextInput::make('abuse_score')
+                            ->numeric()
+                            ->default(0),
+                        Forms\Components\Toggle::make('is_blocked')
+                            ->default(false),
                         Forms\Components\DateTimePicker::make('last_seen_at'),
+                    ]),
+                Forms\Components\Section::make('Metadata')
+                    ->schema([
+                        Forms\Components\KeyValue::make('metadata'),
                     ]),
             ]);
     }
@@ -49,10 +60,30 @@ class DemoGuestUsageResource extends Resource
                 Tables\Columns\TextColumn::make('identity_hash')
                     ->label('Identity')
                     ->searchable()
-                    ->limit(20),
+                    ->limit(16)
+                    ->tooltip(fn ($record) => $record->identity_hash),
+                Tables\Columns\TextColumn::make('link_group')
+                    ->label('Link Group')
+                    ->searchable()
+                    ->limit(16)
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('used_chars')
                     ->label('Chars Used')
                     ->numeric()
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('abuse_score')
+                    ->label('Abuse Score')
+                    ->numeric()
+                    ->sortable()
+                    ->color(fn ($state) => match (true) {
+                        $state >= 100 => 'danger',
+                        $state >= 50 => 'warning',
+                        $state > 0 => 'gray',
+                        default => null,
+                    }),
+                Tables\Columns\IconColumn::make('is_blocked')
+                    ->label('Blocked')
+                    ->boolean()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('last_seen_at')
                     ->dateTime()
@@ -62,13 +93,45 @@ class DemoGuestUsageResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->filters([])
+            ->filters([
+                Tables\Filters\TernaryFilter::make('is_blocked')
+                    ->label('Blocked'),
+                Tables\Filters\Filter::make('high_abuse')
+                    ->label('High Abuse Score')
+                    ->query(fn ($query) => $query->where('abuse_score', '>=', 50)),
+            ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('block')
+                    ->label('Block')
+                    ->icon('heroicon-o-no-symbol')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->visible(fn ($record) => ! $record->is_blocked)
+                    ->action(fn ($record) => $record->update(['is_blocked' => true])),
+                Tables\Actions\Action::make('unblock')
+                    ->label('Unblock')
+                    ->icon('heroicon-o-check-circle')
+                    ->color('success')
+                    ->requiresConfirmation()
+                    ->visible(fn ($record) => $record->is_blocked)
+                    ->action(fn ($record) => $record->update(['is_blocked' => false])),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('block_selected')
+                        ->label('Block Selected')
+                        ->icon('heroicon-o-no-symbol')
+                        ->color('danger')
+                        ->requiresConfirmation()
+                        ->action(fn ($records) => $records->each->update(['is_blocked' => true])),
+                    Tables\Actions\BulkAction::make('unblock_selected')
+                        ->label('Unblock Selected')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->requiresConfirmation()
+                        ->action(fn ($records) => $records->each->update(['is_blocked' => false])),
                 ]),
             ])
             ->defaultSort('last_seen_at', 'desc');

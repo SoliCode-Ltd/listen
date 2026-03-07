@@ -511,23 +511,234 @@
       setUpgradeVisible(Boolean(currentQuota.is_exhausted), i18n.quota_total_start.replace(':total', formatNumber(currentQuota.limit_chars)).replace(':chars', formatNumber(starterPlanChars)));
     }
 
-    async function buildFingerprint() {
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-      const raw = [navigator.userAgent||'',navigator.language||'',Array.isArray(navigator.languages)?navigator.languages.join(','):'',navigator.platform||'',String(navigator.hardwareConcurrency||''),String(navigator.maxTouchPoints||''),timezone,`${screen.width}x${screen.height}`,String(screen.colorDepth||''),String(window.devicePixelRatio||'')].join('|');
-      if (!window.crypto?.subtle || !window.TextEncoder) return raw;
-      const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw));
+    // Enhanced fingerprinting system
+    const fingerprintComponents = {};
+
+    async function sha256(str) {
+      if (!window.crypto?.subtle || !window.TextEncoder) return str;
+      const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
       return Array.from(new Uint8Array(digest)).map((v) => v.toString(16).padStart(2, '0')).join('');
+    }
+
+    function getCanvasFingerprint() {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 200; canvas.height = 50;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return '';
+        ctx.textBaseline = 'top';
+        ctx.font = '14px Arial';
+        ctx.fillStyle = '#f60';
+        ctx.fillRect(125, 1, 62, 20);
+        ctx.fillStyle = '#069';
+        ctx.fillText('Listen Demo FP 🎵', 2, 15);
+        ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+        ctx.fillText('Listen Demo FP 🎵', 4, 17);
+        ctx.strokeStyle = '#2a4';
+        ctx.arc(50, 25, 20, 0, Math.PI * 2, true);
+        ctx.stroke();
+        return canvas.toDataURL();
+      } catch (e) { return ''; }
+    }
+
+    function getWebGLFingerprint() {
+      try {
+        const canvas = document.createElement('canvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        if (!gl) return '';
+        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+        const vendor = debugInfo ? gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) : '';
+        const renderer = debugInfo ? gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) : '';
+        const version = gl.getParameter(gl.VERSION) || '';
+        const shadingVersion = gl.getParameter(gl.SHADING_LANGUAGE_VERSION) || '';
+        const extensions = (gl.getSupportedExtensions() || []).sort().join(',');
+        return [vendor, renderer, version, shadingVersion, extensions].join('|');
+      } catch (e) { return ''; }
+    }
+
+    function getAudioFingerprint() {
+      return new Promise((resolve) => {
+        try {
+          const AudioContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+          if (!AudioContext) { resolve(''); return; }
+          const ctx = new AudioContext(1, 44100, 44100);
+          const oscillator = ctx.createOscillator();
+          const compressor = ctx.createDynamicsCompressor();
+          oscillator.type = 'triangle';
+          oscillator.frequency.setValueAtTime(10000, ctx.currentTime);
+          compressor.threshold.setValueAtTime(-50, ctx.currentTime);
+          compressor.knee.setValueAtTime(40, ctx.currentTime);
+          compressor.ratio.setValueAtTime(12, ctx.currentTime);
+          compressor.attack.setValueAtTime(0, ctx.currentTime);
+          compressor.release.setValueAtTime(0.25, ctx.currentTime);
+          oscillator.connect(compressor);
+          compressor.connect(ctx.destination);
+          oscillator.start(0);
+          ctx.startRendering();
+          ctx.oncomplete = (event) => {
+            try {
+              const data = event.renderedBuffer.getChannelData(0);
+              let sum = 0;
+              for (let i = 4500; i < 5000; i++) sum += Math.abs(data[i]);
+              resolve(sum.toString());
+            } catch (e) { resolve(''); }
+          };
+          setTimeout(() => resolve(''), 1000);
+        } catch (e) { resolve(''); }
+      });
+    }
+
+    function getFontsFingerprint() {
+      const testFonts = ['Arial', 'Arial Black', 'Calibri', 'Cambria', 'Comic Sans MS', 'Courier New', 'Georgia', 'Helvetica', 'Impact', 'Lucida Console', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana', 'Wingdings'];
+      const testString = 'mmmmmmmmmmlli';
+      const testSize = '72px';
+      const baseFonts = ['monospace', 'sans-serif', 'serif'];
+      const span = document.createElement('span');
+      span.style.cssText = 'position:absolute;left:-9999px;font-size:' + testSize;
+      span.textContent = testString;
+      document.body.appendChild(span);
+      const baseWidths = {};
+      for (const base of baseFonts) {
+        span.style.fontFamily = base;
+        baseWidths[base] = span.offsetWidth;
+      }
+      const detected = [];
+      for (const font of testFonts) {
+        let found = false;
+        for (const base of baseFonts) {
+          span.style.fontFamily = `'${font}',${base}`;
+          if (span.offsetWidth !== baseWidths[base]) { found = true; break; }
+        }
+        if (found) detected.push(font);
+      }
+      document.body.removeChild(span);
+      return detected.join(',');
+    }
+
+    function getHardwareFingerprint() {
+      return [
+        String(navigator.hardwareConcurrency || ''),
+        String(navigator.deviceMemory || ''),
+        String(navigator.maxTouchPoints || ''),
+        navigator.platform || '',
+        String(screen.width) + 'x' + String(screen.height),
+        String(screen.colorDepth || ''),
+        String(window.devicePixelRatio || ''),
+        String(screen.availWidth) + 'x' + String(screen.availHeight),
+        String(window.outerWidth) + 'x' + String(window.outerHeight),
+      ].join('|');
+    }
+
+    function getScreenFingerprint() {
+      return [
+        String(screen.width) + 'x' + String(screen.height),
+        String(screen.availWidth) + 'x' + String(screen.availHeight),
+        String(screen.colorDepth || ''),
+        String(screen.pixelDepth || ''),
+        String(window.devicePixelRatio || ''),
+        window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'reduced' : 'normal',
+      ].join('|');
+    }
+
+    function getTimezoneFingerprint() {
+      const tz = Intl.DateTimeFormat().resolvedOptions();
+      return [
+        tz.timeZone || '',
+        String(new Date().getTimezoneOffset()),
+        tz.locale || '',
+      ].join('|');
+    }
+
+    function detectWebDriver() {
+      return !!(navigator.webdriver || window.callPhantom || window._phantom || window.__nightmare || document.__selenium_evaluate || document.__webdriver_evaluate || document.__driver_evaluate);
+    }
+
+    async function buildFingerprint() {
+      // Collect all fingerprint components
+      const timezone = getTimezoneFingerprint();
+      const hardware = getHardwareFingerprint();
+      const screenFp = getScreenFingerprint();
+      const canvas = getCanvasFingerprint();
+      const webgl = getWebGLFingerprint();
+      const fonts = getFontsFingerprint();
+      let audio = '';
+      try { audio = await getAudioFingerprint(); } catch (e) {}
+
+      // Store components for sending to server
+      fingerprintComponents.timezone = timezone;
+      fingerprintComponents.hardware = hardware;
+      fingerprintComponents.screen = screenFp;
+      fingerprintComponents.canvas = await sha256(canvas);
+      fingerprintComponents.webgl = await sha256(webgl);
+      fingerprintComponents.fonts = await sha256(fonts);
+      fingerprintComponents.audio = await sha256(audio);
+      fingerprintComponents.webdriver = detectWebDriver() ? 'true' : 'false';
+
+      // Build primary fingerprint (combination of most stable signals)
+      const raw = [
+        fingerprintComponents.canvas,
+        fingerprintComponents.webgl,
+        fingerprintComponents.audio,
+        fingerprintComponents.fonts,
+        timezone,
+        hardware,
+        navigator.userAgent || '',
+        navigator.language || '',
+        Array.isArray(navigator.languages) ? navigator.languages.join(',') : '',
+      ].join('|');
+
+      return await sha256(raw);
     }
 
     async function ensureFingerprint() {
       if (clientFingerprint) return clientFingerprint;
       if (!fingerprintPromise) {
         fingerprintPromise = buildFingerprint()
-          .then((fp) => { clientFingerprint = String(fp || '').slice(0, 256); if (clientFingerprint) document.cookie = `listen_demo_fp=${encodeURIComponent(clientFingerprint)}; Max-Age=31536000; Path=/; SameSite=Lax`; return clientFingerprint; })
+          .then((fp) => {
+            clientFingerprint = String(fp || '').slice(0, 256);
+            if (clientFingerprint) {
+              // Store full fingerprint data as base64 JSON
+              const fpData = btoa(JSON.stringify(fingerprintComponents));
+              document.cookie = `listen_demo_fp=${encodeURIComponent(fpData)}; Max-Age=31536000; Path=/; SameSite=Lax`;
+              // Also store in localStorage as backup
+              try { localStorage.setItem('listen_demo_fp', fpData); } catch (e) {}
+              // Also store in IndexedDB as backup
+              try {
+                const req = indexedDB.open('listen_demo', 1);
+                req.onupgradeneeded = () => req.result.createObjectStore('fp');
+                req.onsuccess = () => { try { req.result.transaction('fp', 'readwrite').objectStore('fp').put(fpData, 'fingerprint'); } catch (e) {} };
+              } catch (e) {}
+            }
+            return clientFingerprint;
+          })
           .catch(() => { clientFingerprint = ''; return ''; });
       }
       return fingerprintPromise;
     }
+
+    // Restore fingerprint from storage on load
+    (function restoreFingerprint() {
+      try {
+        let stored = '';
+        // Try localStorage first
+        try { stored = localStorage.getItem('listen_demo_fp') || ''; } catch (e) {}
+        // Try cookie
+        if (!stored) {
+          const match = document.cookie.match(/listen_demo_fp=([^;]+)/);
+          if (match) stored = decodeURIComponent(match[1]);
+        }
+        // Parse and restore components
+        if (stored) {
+          try {
+            const data = JSON.parse(atob(stored));
+            if (data && typeof data === 'object') {
+              Object.assign(fingerprintComponents, data);
+            }
+          } catch (e) {}
+        }
+      } catch (e) {}
+    })();
 
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
@@ -602,9 +813,24 @@
       setError('');
       setUpgradeVisible(false);
       const fd = new FormData(form);
-      const headers = { ...csrfHeaders };
+
+      // Add fingerprint components to form data for enhanced tracking
       await ensureFingerprint();
-      if (clientFingerprint) headers['X-Listen-Fingerprint'] = clientFingerprint;
+      if (fingerprintComponents.canvas) fd.append('fp_canvas', fingerprintComponents.canvas);
+      if (fingerprintComponents.webgl) fd.append('fp_webgl', fingerprintComponents.webgl);
+      if (fingerprintComponents.audio) fd.append('fp_audio', fingerprintComponents.audio);
+      if (fingerprintComponents.fonts) fd.append('fp_fonts', fingerprintComponents.fonts);
+      if (fingerprintComponents.screen) fd.append('fp_screen', fingerprintComponents.screen);
+      if (fingerprintComponents.hardware) fd.append('fp_hardware', fingerprintComponents.hardware);
+      if (fingerprintComponents.timezone) fd.append('fp_timezone', fingerprintComponents.timezone);
+      if (fingerprintComponents.webdriver) fd.append('fp_webdriver', fingerprintComponents.webdriver);
+
+      const headers = { ...csrfHeaders };
+      if (clientFingerprint) {
+        // Send full fingerprint data as base64 JSON header
+        headers['X-Listen-Fingerprint'] = btoa(JSON.stringify(fingerprintComponents));
+      }
+
       const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.ok === false) {
