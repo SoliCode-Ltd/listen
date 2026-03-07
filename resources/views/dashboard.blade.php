@@ -1783,6 +1783,8 @@
       'chars_remaining_of_total' => __('ui.dashboard.chars_remaining_of_total'),
       'requests_remaining_of_total' => __('ui.dashboard.requests_remaining_of_total'),
       'used_requests_of_unlimited' => __('ui.dashboard.used_requests_of_unlimited'),
+      'ready_in_seconds' => __('ui.dashboard.ready_in_seconds'),
+      'preparing_next' => __('ui.dashboard.preparing_next'),
     ];
   @endphp
   <script>
@@ -1836,12 +1838,48 @@
     let feedbackScrollFrame = null;
     let allJobs = [];
 
+    // Cooldown state for rate limiting with good UX
+    let cooldownEndTime = 0;
+    let cooldownIntervalId = null;
+    const COOLDOWN_SECONDS = 5; // Seconds to wait between generations
+
     function renderGenerateButtonContent(label, loading = false) {
       if (!generateBtn) return;
       const icon = loading
         ? '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>'
         : '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
       generateBtn.innerHTML = `<span>${icon}${escapeHtml(label)}</span>`;
+    }
+
+    // Cooldown UI functions for smooth rate limiting
+    function getRemainingCooldown() {
+      return Math.max(0, Math.ceil((cooldownEndTime - Date.now()) / 1000));
+    }
+
+    function startCooldownCountdown(seconds) {
+      if (cooldownIntervalId) clearInterval(cooldownIntervalId);
+      cooldownEndTime = Date.now() + (seconds * 1000);
+      generateBtn.disabled = true;
+      updateCooldownDisplay();
+      cooldownIntervalId = setInterval(() => {
+        const remaining = getRemainingCooldown();
+        if (remaining <= 0) {
+          clearInterval(cooldownIntervalId);
+          cooldownIntervalId = null;
+          cooldownEndTime = 0;
+          generateBtn.disabled = false;
+          renderGenerateButtonContent(i18n.generate_voice_now);
+        } else {
+          updateCooldownDisplay();
+        }
+      }, 1000);
+    }
+
+    function updateCooldownDisplay() {
+      const remaining = getRemainingCooldown();
+      const text = (i18n.ready_in_seconds || 'Ready in :seconds...').replace(':seconds', remaining);
+      const icon = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>';
+      if (generateBtn) generateBtn.innerHTML = `<span>${icon}${escapeHtml(text)}</span>`;
     }
 
     const dialectsByLanguage = {
@@ -2412,6 +2450,11 @@
     async function submitVoiceForm(event) {
       event.preventDefault();
       if (!voiceForm || !generateBtn) return;
+      // Check if still in cooldown
+      const remaining = getRemainingCooldown();
+      if (remaining > 0) {
+        return; // Silently ignore - button should be disabled anyway
+      }
       if (translateToggle && translateSelect) {
         translateSelect.value = translateToggle.checked ? '1' : '0';
       }
@@ -2433,6 +2476,7 @@
       generateBtn.disabled = true;
       renderGenerateButtonContent(i18n.generating, true);
       let data = null;
+      let wasSuccessful = false;
       try {
         const response = await fetch(queueUrl, {
           method: 'POST',
@@ -2444,6 +2488,7 @@
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
+        wasSuccessful = true;
         if (data?.job?.audio_url) {
           showGeneratedPreview(data.job);
           // Scroll smoothly to the generated audio section
@@ -2451,11 +2496,20 @@
             generatedAudioWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
           }
         }
+        // Start cooldown after successful generation
+        startCooldownCountdown(COOLDOWN_SECONDS);
       } catch (error) {
-        showFormMessage('error', extractErrorMessage(data, error?.message || i18n.voice_generation_failed));
-      } finally {
-        generateBtn.disabled = false;
-        renderGenerateButtonContent(defaultText);
+        const message = extractErrorMessage(data, error?.message || i18n.voice_generation_failed);
+        showFormMessage('error', message);
+        // Check if server returned a rate limit with retry seconds
+        const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);
+        if (secondsMatch) {
+          startCooldownCountdown(parseInt(secondsMatch[1], 10));
+        } else {
+          // Re-enable button on other errors
+          generateBtn.disabled = false;
+          renderGenerateButtonContent(defaultText);
+        }
       }
     }
 

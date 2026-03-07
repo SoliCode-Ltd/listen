@@ -845,10 +845,22 @@ class HomeController extends Controller
         // Use enhanced fraud detection service
         $extracted = $this->fraudService->extractIdentities($request);
 
-        // Get all linked identities (this catches users trying to reset via VPN/incognito)
+        // For GET requests (page loads), don't link or expand identities.
+        // This prevents false positives where IP-sharing causes wrong quota display.
+        // Only POST requests (actual voice generation) should trigger linking.
+        if ($request->isMethod('GET')) {
+            return [
+                $extracted['identities'],
+                $extracted['primary'],
+                $extracted['identity_types'],
+                [], // No fraud signals on GET
+            ];
+        }
+
+        // For POST requests: Get all linked identities (catches users trying to reset via VPN/incognito)
         $allIdentities = $this->fraudService->getLinkedIdentities($extracted['identities']);
 
-        // Link identities that appear together
+        // Link identities that appear together (only on POST)
         if (count($extracted['identities']) >= 2) {
             try {
                 $this->fraudService->linkIdentities($extracted['identities'], $extracted['identity_types']);
@@ -857,7 +869,7 @@ class HomeController extends Controller
             }
         }
 
-        // Record fraud signals if any
+        // Record fraud signals if any (only on POST)
         if (!empty($extracted['fraud_signals'])) {
             try {
                 $this->fraudService->recordFraudSignals($allIdentities, $extracted['fraud_signals']);
@@ -879,7 +891,13 @@ class HomeController extends Controller
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array
     {
-        [$identities, $primaryIdentity, , ] = $this->resolveDemoIdentities($request);
+        // For quota display, use simple direct identity lookup without link expansion.
+        // This ensures consistent quota display between page load and after generation.
+        // Linked identity enforcement is handled separately in enforceDemoPolicy during generation.
+        $extracted = $this->fraudService->extractIdentities($request);
+        $identities = $extracted['identities'];
+        $primaryIdentity = $extracted['primary'];
+
         $scope = $request->user() ? ($preview ? 'preview' : 'check') : 'lifetime';
         $limit = $request->user()
             ? $this->demoDailyCharCap($request, $scope)
@@ -889,8 +907,9 @@ class HomeController extends Controller
             $key = 'demo:chars:'.now()->format('Ymd').':'.$scope.':'.$primaryIdentity;
             $used = min($limit, max(0, (int) Cache::get($key, 0)));
         } else {
-            // Use fraud service for linked identity tracking
-            $used = $this->fraudService->getLinkedUsedChars($identities);
+            // Always use direct identity lookup for quota display (no link expansion).
+            // This prevents showing other users' usage from shared IPs as your usage.
+            $used = $this->guestLifetimeUsedChars($identities);
             $used = min($limit, max(0, $used));
         }
 

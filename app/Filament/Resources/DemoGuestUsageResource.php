@@ -4,11 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DemoGuestUsageResource\Pages;
 use App\Models\DemoGuestUsage;
+use App\Models\DemoIdentityLink;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Filament\Notifications\Notification;
 
 class DemoGuestUsageResource extends Resource
 {
@@ -102,6 +104,36 @@ class DemoGuestUsageResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('reset_chars')
+                    ->label('Reset Chars')
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalDescription('Reset used_chars to 0 for this identity only.')
+                    ->action(fn ($record) => $record->update(['used_chars' => 0])),
+                Tables\Actions\Action::make('reset_link_group')
+                    ->label('Reset Link Group')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalDescription('Reset ALL identities in the same link group and remove links. Use this to fully reset a user\'s demo quota.')
+                    ->visible(fn ($record) => ! empty($record->link_group))
+                    ->action(function ($record) {
+                        $linkGroup = $record->link_group;
+                        if (empty($linkGroup)) {
+                            return;
+                        }
+                        // Reset all usage records in this link group
+                        DemoGuestUsage::where('link_group', $linkGroup)
+                            ->update(['used_chars' => 0, 'link_group' => null]);
+                        // Delete all identity links in this group
+                        DemoIdentityLink::where('link_group', $linkGroup)->delete();
+                        Notification::make()
+                            ->success()
+                            ->title('Link group reset')
+                            ->body("All identities in group {$linkGroup} have been reset.")
+                            ->send();
+                    }),
                 Tables\Actions\Action::make('block')
                     ->label('Block')
                     ->icon('heroicon-o-no-symbol')
@@ -120,6 +152,12 @@ class DemoGuestUsageResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\BulkAction::make('reset_chars_selected')
+                        ->label('Reset Chars')
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->action(fn ($records) => $records->each->update(['used_chars' => 0])),
                     Tables\Actions\BulkAction::make('block_selected')
                         ->label('Block Selected')
                         ->icon('heroicon-o-no-symbol')

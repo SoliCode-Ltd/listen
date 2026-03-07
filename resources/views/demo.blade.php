@@ -49,7 +49,7 @@
             <div class="quota-panel">
               <div class="q-head">
                 <span class="q-label">{{ __('ui.demo.guest_starter_allowance') }}</span>
-                <strong class="q-value" id="quotaValue">
+                <strong class="q-value" id="quotaValue" dir="ltr">
                   {{ number_format((int) ($demoQuota['remaining_chars'] ?? $guestAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $guestAllowanceChars)) }} {{ __('ui.demo.chars_left') }}
                 </strong>
               </div>
@@ -66,7 +66,7 @@
               <div class="editor-label">
                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 {{ __('ui.demo.text_input') }}
-                <span class="char-count" id="charCounter"></span>
+                <span class="char-count" id="charCounter" dir="ltr"></span>
               </div>
               <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
               <div class="sample-chips">
@@ -275,6 +275,8 @@
       'speaker_prefix' => __('ui.demo.speaker_prefix'),
       'performance_style_required' => __('ui.backend.performance_style_required'),
       'emotion_required' => __('ui.backend.emotion_required'),
+      'ready_in_seconds' => __('ui.demo.ready_in_seconds'),
+      'preparing_next' => __('ui.demo.preparing_next'),
     ];
   @endphp
   <script>
@@ -411,6 +413,11 @@
     let clientFingerprint = '';
     let fingerprintPromise = null;
 
+    // Cooldown state for rate limiting with good UX
+    let cooldownEndTime = 0;
+    let cooldownIntervalId = null;
+    const COOLDOWN_SECONDS = 6; // Seconds to wait between generations
+
     function formatNumber(value) { return new Intl.NumberFormat('en-US').format(Number(value || 0)); }
     function countBillableChars(value) {
       const text = String(value || '');
@@ -494,16 +501,31 @@
       }
     }
 
-    function renderQuota(quota) {
+    function renderQuota(quota, applyLivePreview = false) {
       if (!quota || typeof quota !== 'object') return;
       currentQuota = { ...currentQuota, ...quota };
-      if (quotaValue) quotaValue.textContent = `${formatNumber(currentQuota.remaining_chars)} / ${formatNumber(currentQuota.limit_chars)} ${i18n.chars_left}`;
+      
+      // Display the actual quota from server (no live preview adjustment)
+      const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
+      const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+      
       if (quotaFill) {
-        const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
-        const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-        const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
         quotaFill.style.width = `${percent}%`;
+        quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       }
+      if (quotaValue) {
+        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+      }
+      
+      // Only apply live preview if explicitly requested (e.g., on initial load)
+      if (applyLivePreview) {
+        const pending = countBillableChars(textInput?.value || '');
+        if (pending > 0) {
+          updateQuotaMeterLive(pending);
+        }
+      }
+      
       if (quotaBox) {
         const pending = countBillableChars(textInput?.value || '');
         if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
@@ -843,7 +865,42 @@
       return data;
     }
 
+    // Cooldown UI functions for smooth rate limiting
+    function getRemainingCooldown() {
+      return Math.max(0, Math.ceil((cooldownEndTime - Date.now()) / 1000));
+    }
+
+    function startCooldownCountdown(seconds) {
+      if (cooldownIntervalId) clearInterval(cooldownIntervalId);
+      cooldownEndTime = Date.now() + (seconds * 1000);
+      previewBtn.disabled = true;
+      updateCooldownDisplay();
+      cooldownIntervalId = setInterval(() => {
+        const remaining = getRemainingCooldown();
+        if (remaining <= 0) {
+          clearInterval(cooldownIntervalId);
+          cooldownIntervalId = null;
+          cooldownEndTime = 0;
+          previewBtn.disabled = false;
+          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
+        } else {
+          updateCooldownDisplay();
+        }
+      }, 1000);
+    }
+
+    function updateCooldownDisplay() {
+      const remaining = getRemainingCooldown();
+      const text = (i18n.ready_in_seconds || 'Ready in :seconds...').replace(':seconds', remaining);
+      previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>' + text;
+    }
+
     previewBtn?.addEventListener('click', async () => {
+      // Check if still in cooldown
+      const remaining = getRemainingCooldown();
+      if (remaining > 0) {
+        return; // Silently ignore - button should be disabled anyway
+      }
       heroWave?.classList.add('active');
       try {
         if (!isTranslateEnabled()) syncLanguageToCurrentTextWhenTranslationOff();
@@ -893,18 +950,29 @@
         const label = voiceDisplayLabel(voiceData || { label: i18n.selected_speaker, label_ar: i18n.selected_speaker });
         const quality = data?.voice_tier_label ? ` - ${formatTierLabel(data.voice_tier_label)}` : '';
         audioMeta.textContent = `${i18n.speaker_prefix} ${label}${quality} - ${data.translate_note}`;
+        // Start cooldown after successful generation
+        startCooldownCountdown(COOLDOWN_SECONDS);
       } catch (err) {
         hideAudioPreview();
         const message = String(err?.message || i18n.preview_failed);
         if (err?.payload?.quota) renderQuota(err.payload.quota);
         setError(message);
-        if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
+        // Check if server returned a rate limit with retry seconds
+        const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);
+        if (secondsMatch) {
+          startCooldownCountdown(parseInt(secondsMatch[1], 10));
+        } else if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
           setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0 });
+          // Re-enable button on quota errors (user might want to try with less text)
+          previewBtn.disabled = false;
+          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
+        } else {
+          // Re-enable button on other errors
+          previewBtn.disabled = false;
+          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
         }
       } finally {
-        previewBtn.disabled = false;
-        previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
         setTimeout(() => heroWave?.classList.remove('active'), 900);
       }
     });
@@ -937,6 +1005,26 @@
       if (!counter || !textInput) return;
       const count = countBillableChars(textInput.value);
       counter.textContent = count > 0 ? `${formatNumber(count)} / ${formatNumber(currentQuota.remaining_chars)}` : '';
+      // Update quota meter live to show preview of remaining after generation
+      updateQuotaMeterLive(count);
+    }
+
+    function updateQuotaMeterLive(pendingChars) {
+      if (!quotaFill || !quotaValue) return;
+      const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
+      const pending = Math.max(0, Number(pendingChars || 0));
+      const afterGeneration = Math.max(0, remaining - pending);
+      const percent = Math.max(0, Math.min(100, Math.round((afterGeneration / limit) * 100)));
+      quotaFill.style.width = `${percent}%`;
+      // Show live preview in the quota text
+      if (pending > 0) {
+        quotaValue.textContent = `${formatNumber(afterGeneration)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaFill.style.background = pending > remaining ? 'var(--error-color, #ef4444)' : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+      } else {
+        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+      }
     }
 
     if (translateToggle && translateSelect) translateToggle.checked = translateSelect.value === '1';
@@ -945,7 +1033,8 @@
     renderDialectOptions();
     applyStudioTierState();
     updateTranslateHint();
-    renderQuota(currentQuota);
+    renderQuota(currentQuota, true); // Apply live preview on initial load
+    updateCharCount(); // Initialize char counter on load
     ensureFingerprint().catch(() => {});
 
     // Reveal on scroll animation
