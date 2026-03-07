@@ -174,4 +174,48 @@ class HomeVoiceSamplesTest extends TestCase
 
         $this->assertSame($guestSamples, $authSamples);
     }
+
+    public function test_homepage_can_show_hero_audio_without_showing_same_record_in_showcase(): void
+    {
+        SiteSetting::set('landing_voice_samples_limit', '12', 'content');
+
+        VoiceSample::create([
+            'title' => 'Hero Only',
+            'sample_text' => 'sample',
+            'audio_path' => 'audio/missing.mp3',
+            'language' => 'ar',
+            'category' => 'hero',
+            'emotion' => 'custom_style',
+            'is_featured' => true,
+            'is_active' => true,
+            'show_in_hero' => true,
+            'show_in_showcase' => false,
+            'sort_order' => 0,
+        ]);
+
+        VoiceSample::create([
+            'title' => 'Showcase Only',
+            'sample_text' => 'sample',
+            'audio_path' => 'audio/missing.mp3',
+            'language' => 'ar',
+            'category' => 'hero',
+            'emotion' => 'custom_style',
+            'is_featured' => false,
+            'is_active' => true,
+            'show_in_hero' => false,
+            'show_in_showcase' => true,
+            'sort_order' => 1,
+        ]);
+
+        app()->setLocale('ar');
+        $response = $this->getLocalizedRoute('home');
+        $response->assertOk();
+
+        $heroVoiceSample = $response->viewData('heroVoiceSample');
+        $voiceSamples = $response->viewData('voiceSamples');
+
+        $this->assertSame('Hero Only', $heroVoiceSample['title']);
+        $this->assertCount(1, $voiceSamples);
+        $this->assertSame('Showcase Only', $voiceSamples[0]['title']);
+    }
 }

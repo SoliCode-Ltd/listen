@@ -127,7 +127,7 @@ class VoiceSampleResource extends Resource
                             ])
                             ->default('hero')
                             ->required()
-                            ->helperText('Where this sample is displayed.'),
+                            ->helperText('Content grouping used by the site. Display placement is controlled below.'),
                         Forms\Components\TextInput::make('voice_name')
                             ->label('Voice Name')
                             ->maxLength(255)
@@ -147,11 +147,20 @@ class VoiceSampleResource extends Resource
                     ->schema([
                         Forms\Components\Toggle::make('is_active')
                             ->label('Active')
-                            ->default(true),
+                            ->default(true)
+                            ->helperText('Global availability. Turn this off to hide the sample everywhere.'),
+                        Forms\Components\Toggle::make('show_in_hero')
+                            ->label('Show In Hero')
+                            ->default(false)
+                            ->helperText('Allow this sample to be used for the homepage hero audio player.'),
+                        Forms\Components\Toggle::make('show_in_showcase')
+                            ->label('Show In Voice Samples')
+                            ->default(true)
+                            ->helperText('Show this sample in the voice samples gallery/cards section.'),
                         Forms\Components\Toggle::make('is_featured')
                             ->label('Featured')
                             ->default(false)
-                            ->helperText('Featured samples appear prominently in the hero section.'),
+                            ->helperText('Featured items are prioritized first within hero/showcase lists.'),
                         Forms\Components\TextInput::make('sort_order')
                             ->numeric()
                             ->default(0)
@@ -184,6 +193,8 @@ class VoiceSampleResource extends Resource
                 Tables\Columns\TextColumn::make('provider')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('is_featured')->label('Featured')->boolean(),
                 Tables\Columns\IconColumn::make('is_active')->label('Active')->boolean()->sortable(),
+                Tables\Columns\IconColumn::make('show_in_hero')->label('Hero')->boolean(),
+                Tables\Columns\IconColumn::make('show_in_showcase')->label('Showcase')->boolean(),
                 Tables\Columns\TextColumn::make('sort_order')->sortable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
@@ -199,6 +210,8 @@ class VoiceSampleResource extends Resource
                     ->options(fn () => VoiceSample::query()->distinct()->pluck('language', 'language')->toArray()),
                 Tables\Filters\TernaryFilter::make('is_active')->label('Active'),
                 Tables\Filters\TernaryFilter::make('is_featured')->label('Featured'),
+                Tables\Filters\TernaryFilter::make('show_in_hero')->label('Show In Hero'),
+                Tables\Filters\TernaryFilter::make('show_in_showcase')->label('Show In Voice Samples'),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),

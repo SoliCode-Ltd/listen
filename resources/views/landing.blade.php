@@ -1455,8 +1455,7 @@
                   <div class="hero-audio-content">
                     @php
                       $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
-                      $heroSampleSource = collect($voiceSamples ?? [])
-                        ->firstWhere('language', $isArabicLocale ? 'ar' : 'en')['audio_url']
+                      $heroSampleSource = ($heroVoiceSample['audio_url'] ?? null)
                         ?? ($isArabicLocale ? '/audio/ar.mp3' : '/audio/en.mp3');
                     @endphp
                     <button class="hero-audio-btn" id="heroAudioToggle" type="button" aria-label="{{ __('ui.landing.play_voice_sample') }}" aria-controls="heroSampleAudio">

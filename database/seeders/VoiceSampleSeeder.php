@@ -13,6 +13,9 @@ class VoiceSampleSeeder extends Seeder
         $records = require __DIR__ . '/data/voice_samples.php';
 
         foreach ($records as $record) {
+            $record['show_in_hero'] = $record['show_in_hero'] ?? (bool) ($record['is_featured'] ?? false);
+            $record['show_in_showcase'] = $record['show_in_showcase'] ?? true;
+
             VoiceSample::updateOrCreate(
                 [
                     'title' => $record['title'],

@@ -29,6 +29,8 @@ class VoiceSample extends Model
         'sort_order',
         'is_featured',
         'is_active',
+        'show_in_hero',
+        'show_in_showcase',
         'category',
         'duration_seconds',
         'metadata',
@@ -37,6 +39,8 @@ class VoiceSample extends Model
     protected $casts = [
         'is_featured' => 'boolean',
         'is_active' => 'boolean',
+        'show_in_hero' => 'boolean',
+        'show_in_showcase' => 'boolean',
         'sort_order' => 'integer',
         'duration_seconds' => 'integer',
         'metadata' => 'array',
@@ -50,8 +54,10 @@ class VoiceSample extends Model
 
     public static function flushLandingCache(): void
     {
-        Cache::forget('landing_voice_samples:ar');
-        Cache::forget('landing_voice_samples:en');
+        foreach (['ar', 'en'] as $language) {
+            Cache::forget("landing_voice_samples_showcase:{$language}");
+            Cache::forget("landing_voice_sample_hero:{$language}");
+        }
     }
 
     /**
@@ -68,6 +74,16 @@ class VoiceSample extends Model
     public function scopeFeatured($query)
     {
         return $query->where('is_featured', true);
+    }
+
+    public function scopeShowInHero($query)
+    {
+        return $query->where('show_in_hero', true);
+    }
+
+    public function scopeShowInShowcase($query)
+    {
+        return $query->where('show_in_showcase', true);
     }
 
     /**

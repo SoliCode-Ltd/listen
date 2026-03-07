@@ -81,13 +81,26 @@ class HomeController extends Controller
         $isArabicLocale = $sampleLanguage === 'ar';
         $homepageSampleLimit = $this->landingVoiceSampleLimit();
 
-        // Load hero voice samples from admin-managed records.
+        $heroVoiceSample = Cache::remember("landing_voice_sample_hero:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
+            $sample = VoiceSample::query()
+                ->active()
+                ->where('category', 'hero')
+                ->where('language', $sampleLanguage)
+                ->showInHero()
+                ->orderByDesc('is_featured')
+                ->ordered()
+                ->first();
+
+            return $sample ? $this->mapVoiceSample($sample, $isArabicLocale) : null;
+        });
+
         $voiceSamples = array_slice(
-            Cache::remember("landing_voice_samples:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
+            Cache::remember("landing_voice_samples_showcase:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
                 return VoiceSample::query()
                     ->active()
                     ->where('category', 'hero')
                     ->where('language', $sampleLanguage)
+                    ->showInShowcase()
                     ->orderByDesc('is_featured')
                     ->ordered()
                     ->get()
@@ -100,6 +113,7 @@ class HomeController extends Controller
 
         return view('landing', [
             'highlightPlans' => $highlightPlans,
+            'heroVoiceSample' => $heroVoiceSample,
             'voiceSamples' => $voiceSamples,
         ]);
     }
