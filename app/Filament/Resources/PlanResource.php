@@ -303,6 +303,8 @@ class PlanResource extends Resource
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
                             ->reorderable()
+                            ->reorderableWithButtons()
+                            ->reorderableWithDragAndDrop(false)
                             ->collapsible(),
                     ]),
                 Forms\Components\Section::make('خصائص الخطة (العربية)')
@@ -360,6 +362,8 @@ class PlanResource extends Resource
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
                             ->reorderable()
+                            ->reorderableWithButtons()
+                            ->reorderableWithDragAndDrop(false)
                             ->collapsible(),
                     ]),
             ]);
