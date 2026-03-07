@@ -1291,7 +1291,13 @@ class HomeController extends Controller
     private function resolveSampleAudioUrl(?string $audioPath, string $language): ?string
     {
         $normalizedPath = ltrim(trim((string) $audioPath), '/');
-        if ($normalizedPath !== '' && Storage::disk('public')->exists($normalizedPath)) {
+        if (
+            $normalizedPath !== ''
+            && (
+                Storage::disk('public')->exists($normalizedPath)
+                || is_file(public_path($normalizedPath))
+            )
+        ) {
             return AudioUrl::fromPath($normalizedPath);
         }
 

@@ -15,12 +15,7 @@ class MediaController extends Controller
             abort(404);
         }
 
-        $disk = Storage::disk('public');
-        if (! $disk->exists($normalized)) {
-            abort(404);
-        }
-
-        $absolutePath = $disk->path($normalized);
+        $absolutePath = $this->resolveAbsolutePath($normalized);
         if (! is_file($absolutePath)) {
             abort(404);
         }
@@ -95,5 +90,20 @@ class MediaController extends Controller
         $headers['Content-Length'] = (string) $fileSize;
 
         return response()->file($absolutePath, $headers);
+    }
+
+    private function resolveAbsolutePath(string $normalized): ?string
+    {
+        $disk = Storage::disk('public');
+        if ($disk->exists($normalized)) {
+            return $disk->path($normalized);
+        }
+
+        $publicPath = public_path($normalized);
+        if (is_file($publicPath)) {
+            return $publicPath;
+        }
+
+        return null;
     }
 }
