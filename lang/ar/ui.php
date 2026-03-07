@@ -72,8 +72,8 @@ return [
         'browser_extension' => 'إضافة المتصفح',
         'play_voice_sample' => 'تشغيل عيّنة صوتية',
         'pause_voice_sample' => 'إيقاف العيّنة الصوتية',
-        'arabic_sample_label' => 'العربية (نبيل)',
-        'english_sample_label' => 'الإنجليزية (هانا)',
+        'arabic_sample_label' => 'العربية (أمل)',
+        'english_sample_label' => 'الإنجليزية (كلارا)',
         'typing_phrase_1' => 'ولّد صوتاً بشرياً.',
         'typing_phrase_2' => 'وسّع منتجك الصوتي بثقة مؤسسية.',
         'typing_phrase_3' => 'حوّل النص إلى صوت واقعي.',
@@ -812,5 +812,7 @@ return [
         'billing_no_cancellation_to_resume' => 'لا يوجد إلغاء لاستئنافه.',
         'billing_resume_failed' => 'تعذر استئناف الاشتراك.',
         'billing_subscription_resumed' => 'تم استئناف الاشتراك بنجاح.',
+        'api_missing_key' => 'مفتاح API مفقود.',
+        'api_invalid_key' => 'مفتاح API غير صالح.',
     ],
 ];

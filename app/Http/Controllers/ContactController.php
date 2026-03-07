@@ -78,10 +78,10 @@ class ContactController extends Controller
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
-                'message' => 'Your message has been sent successfully!',
+                'message' => __('ui.contact.success'),
             ]);
         }
 
-        return redirect()->back()->with('success', 'Your message has been sent successfully!');
+        return redirect()->back()->with('success', __('ui.contact.success'));
     }
 }

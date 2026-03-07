@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -102,7 +103,7 @@ class BillingLifecycleService
             return;
         }
 
-        $graceDays = max(1, (int) config('listen.billing.grace_days', 7));
+        $graceDays = max(1, (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)));
         $graceEndsAt = now()->addDays($graceDays);
 
         $subscription->forceFill([

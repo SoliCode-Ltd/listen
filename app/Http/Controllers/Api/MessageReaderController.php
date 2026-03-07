@@ -9,6 +9,7 @@ use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
+use App\Models\SiteSetting;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
@@ -44,14 +45,15 @@ class MessageReaderController extends Controller
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
 
         // Determine the preferred provider for HD voices based on plan policy
-        $ttsProviderPolicy = strtolower(trim((string) ($activePlan?->tts_provider_policy ?? 'default')));
-        $preferredProvider = null;
-        if ($planTier === 'hd' && in_array($ttsProviderPolicy, ['gemini', 'google_cloud'], true)) {
-            $preferredProvider = $ttsProviderPolicy;
-        }
+        $preferredProvider = $this->preferredProviderForPlan($activePlan, $planTier);
+        $catalog = VoiceCatalog::publicCatalog($planTier, $preferredProvider);
 
-        $defaultAr = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageByProvider('ar', $preferredProvider ?? 'gemini', $planTier));
-        $defaultEn = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageByProvider('en', $preferredProvider ?? 'gemini', $planTier));
+        $defaultAr = VoiceCatalog::voiceMeta(
+            VoiceCatalog::defaultForLanguageAndProvider('ar', $planTier, $preferredProvider)
+        );
+        $defaultEn = VoiceCatalog::voiceMeta(
+            VoiceCatalog::defaultForLanguageAndProvider('en', $planTier, $preferredProvider)
+        );
 
         return response()->json([
             'ok' => true,
@@ -90,7 +92,7 @@ class MessageReaderController extends Controller
                         : min(100, (int) round(((int) $counter->total_requests / max(1, $planRequests)) * 100)),
                 ],
                 'voices' => [
-                    'catalog' => VoiceCatalog::publicCatalog($planTier, $preferredProvider),
+                    'catalog' => $catalog,
                     'defaults' => [
                         'ar' => $defaultAr['key'] ?? null,
                         'en' => $defaultEn['key'] ?? null,
@@ -112,7 +114,8 @@ class MessageReaderController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:50000'],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text'],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content'],
             'target_language' => ['required', 'in:ar,en'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
@@ -136,7 +139,7 @@ class MessageReaderController extends Controller
         if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
             return response()->json([
                 'ok' => false,
-                'message' => 'Upgrade your plan to unlock this voice quality.',
+                'message' => __('ui.backend.dashboard_upgrade_for_quality'),
             ], 403);
         }
 
@@ -154,12 +157,12 @@ class MessageReaderController extends Controller
             'pitch' => $validated['pitch'] ?? null,
         ]);
 
-        $text = trim($validated['content']);
+        $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
-                'content' => "Request exceeds plan per-request limit ({$maxChars} billable characters: letters and numbers only).",
+                'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
             ]);
         }
 
@@ -330,7 +333,7 @@ class MessageReaderController extends Controller
 
         $provided = is_string($provided) ? trim($provided) : '';
         if ($provided === '') {
-            abort(401, 'Missing API key.');
+            abort(401, __('ui.backend.api_missing_key'));
         }
 
         $user = User::query()
@@ -347,7 +350,7 @@ class MessageReaderController extends Controller
             return User::query()->findOrFail(1);
         }
 
-        abort(401, 'Invalid API key.');
+        abort(401, __('ui.backend.api_invalid_key'));
     }
 
     /**
@@ -373,7 +376,7 @@ class MessageReaderController extends Controller
             $mapped = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
             if (! $mapped) {
                 throw ValidationException::withMessages([
-                    'voice_key' => 'Selected speaker is not available for the chosen voice language.',
+                    'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
                 ]);
             }
 
@@ -383,7 +386,7 @@ class MessageReaderController extends Controller
         if ($voiceName !== '') {
             if (! VoiceCatalog::isAllowedForLanguage($voiceName, $language, $tier)) {
                 throw ValidationException::withMessages([
-                    'voice_name' => 'Selected speaker is not available for the chosen voice language.',
+                    'voice_name' => __('ui.backend.dashboard_speaker_not_available'),
                 ]);
             }
 
@@ -393,7 +396,7 @@ class MessageReaderController extends Controller
         $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
         if ($defaultVoice === '') {
             throw ValidationException::withMessages([
-                'target_language' => 'Selected voice language is not available for your current voice quality.',
+                'target_language' => __('ui.backend.dashboard_language_not_available_for_tier'),
             ]);
         }
 
@@ -429,5 +432,38 @@ class MessageReaderController extends Controller
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];
+    }
+
+    private function preferredProviderForPlan(?\App\Models\Plan $plan, string $planTier): ?string
+    {
+        if ($planTier !== VoiceTier::HD) {
+            return null;
+        }
+
+        $siteOverride = $plan
+            ? $this->normalizeProviderPolicyValue(SiteSetting::get("tts_plan_provider_{$plan->slug}", null))
+            : null;
+
+        if ($siteOverride !== null) {
+            return $siteOverride;
+        }
+
+        $planOverride = $this->normalizeProviderPolicyValue($plan?->tts_provider_policy);
+        if ($planOverride !== null) {
+            return $planOverride;
+        }
+
+        return VoiceCatalog::preferredProviderForTier($planTier);
+    }
+
+    private function normalizeProviderPolicyValue(mixed $value): ?string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return match ($value) {
+            'google_cloud', 'google_only' => 'google_cloud',
+            'gemini', 'gemini_only', 'gemini_preferred' => 'gemini',
+            default => null,
+        };
     }
 }

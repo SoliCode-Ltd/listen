@@ -131,7 +131,8 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['required', 'string', 'max:50000'],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text'],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content'],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -170,7 +171,7 @@ class DashboardController extends Controller
             'pitch' => $validated['pitch'] ?? null,
         ], $activePlan);
 
-        $text = trim($validated['content']);
+        $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {

@@ -385,7 +385,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $stylePrompt . "\n\n" . $text],
+                        ['text' => $this->buildSingleSpeakerPrompt($stylePrompt, $text)],
                     ],
                 ],
             ],
@@ -447,7 +447,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $stylePrompt . "\n\n" . $text],
+                        ['text' => $this->buildDialoguePrompt($stylePrompt, $text)],
                     ],
                 ],
             ],
@@ -761,6 +761,42 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return trim($prompt);
+    }
+
+    /**
+     * Instruct Gemini TTS to recite the provided text exactly, instead of improvising.
+     */
+    private function buildSingleSpeakerPrompt(string $stylePrompt, string $text): string
+    {
+        $instruction = trim($stylePrompt);
+        $quotedText = json_encode($text, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        $parts = [];
+        if ($instruction !== '') {
+            $parts[] = $instruction;
+        }
+        $parts[] = 'Read aloud exactly the following text in the same language it is written. Do not add, remove, summarize, translate, or change any words.';
+        $parts[] = $quotedText === false ? $text : $quotedText;
+
+        return implode("\n\n", $parts);
+    }
+
+    /**
+     * Instruct Gemini TTS to perform the provided dialogue script exactly as written.
+     */
+    private function buildDialoguePrompt(string $stylePrompt, string $text): string
+    {
+        $instruction = trim($stylePrompt);
+        $parts = [];
+
+        if ($instruction !== '') {
+            $parts[] = $instruction;
+        }
+
+        $parts[] = 'Perform the following dialogue exactly as written. Preserve speaker labels, order, and wording.';
+        $parts[] = $text;
+
+        return implode("\n\n", $parts);
     }
 
     /**

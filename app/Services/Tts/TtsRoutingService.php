@@ -209,18 +209,25 @@ class TtsRoutingService
 
         // Site settings override always wins (admin runtime control).
         $override = SiteSetting::get("tts_plan_provider_{$plan->slug}");
-        $override = strtolower(trim((string) $override));
-        if ($override !== '' && ! in_array($override, ['auto', 'default'], true)) {
-            return in_array($override, ['google_cloud', 'gemini'], true) ? $override : null;
+        $override = $this->normalizeProviderPolicyValue($override);
+        if ($override !== null) {
+            return $override;
         }
 
         // Otherwise use plan-level policy from DB.
-        $policy = strtolower(trim((string) ($plan->tts_provider_policy ?? '')));
-        if ($policy === '' || in_array($policy, ['auto', 'default'], true)) {
-            return null;
-        }
+        return $this->normalizeProviderPolicyValue($plan->tts_provider_policy ?? null);
+    }
 
-        return in_array($policy, ['google_cloud', 'gemini'], true) ? $policy : null;
+    private function normalizeProviderPolicyValue(mixed $value): ?string
+    {
+        $value = strtolower(trim((string) $value));
+
+        return match ($value) {
+            '', 'auto', 'default' => null,
+            'google_cloud', 'google_only' => 'google_cloud',
+            'gemini', 'gemini_only', 'gemini_preferred' => 'gemini',
+            default => null,
+        };
     }
 
     /**
