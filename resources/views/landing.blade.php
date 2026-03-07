@@ -8,6 +8,7 @@
       filter: blur(36px);
       opacity: .25;
       animation: float 10s ease-in-out infinite;
+      will-change: transform;
     }
     .bg-orb.a {
       width: 16rem;
@@ -86,6 +87,7 @@
       opacity: .45;
       animation: pulseGlow 6s ease-in-out infinite;
       z-index: 0;
+      will-change: transform, opacity;
     }
     .hero-art img {
       width: min(520px, 100%);
@@ -807,10 +809,11 @@
       }
       .hero-cta {
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
+        gap: .85rem;
       }
       .hero-cta .btn {
-        width: 100%;
+        width: min(100%, 260px);
       }
     }
 
@@ -839,15 +842,15 @@
       box-shadow: 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 1px color-mix(in oklab, var(--text) 15%, transparent);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
-      transform: rotateY(-15deg) rotateX(10deg);
-      transform-style: preserve-3d;
+      transform: rotateY(-15deg) rotateX(10deg) translateZ(0);
+      will-change: transform;
       display: flex;
       flex-direction: column;
       overflow: hidden;
     }
 
     html[dir="rtl"] .tts-card {
-      transform: rotateY(15deg) rotateX(10deg);
+      transform: rotateY(15deg) rotateX(10deg) translateZ(0);
     }
 
     .tts-header {
@@ -950,6 +953,7 @@
       transition: opacity .3s ease, transform .4s ease;
       filter: blur(8px);
       animation: idleGlow 3s ease-in-out infinite alternate;
+      will-change: transform, opacity;
     }
 
     .hero-audio-btn::after {
@@ -1232,11 +1236,14 @@
 
     .tts-bar {
       width: 8px;
-      height: 12px;
+      height: 44px;
       border-radius: var(--radius-full);
       background: linear-gradient(180deg, var(--a), var(--b));
       opacity: 0.5;
-      transition: height 0.3s ease, opacity 0.3s ease;
+      transform: scaleY(0.27);
+      transform-origin: bottom;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      will-change: transform;
     }
 
     .tts-body.is-playing .tts-bar {
@@ -1262,8 +1269,8 @@
     .tts-body.is-playing .tts-bar:nth-child(18) { animation-delay: 1.7s; }
 
     @keyframes heroWavePulse {
-      0%, 100% { height: 12px; }
-      50% { height: 44px; }
+      0%, 100% { transform: scaleY(0.27); }
+      50% { transform: scaleY(1); }
     }
 
     .tts-glowing-orb {
@@ -1278,6 +1285,7 @@
       transform: translate(-50%, -50%) translateZ(-50px);
       opacity: 0.4;
       animation: pulse-glow 4s ease-in-out infinite alternate;
+      will-change: transform, opacity;
     }
 
     @keyframes pulse-glow {
@@ -1343,8 +1351,15 @@
         width: 100%;
         min-height: 100%;
         margin-inline: auto;
-        transform: rotateY(-15deg) rotateX(10deg);
+        transform: rotateY(-15deg) rotateX(10deg) translateZ(0);
         transform-origin: center center;
+        backface-visibility: hidden;
+      }
+      .tts-glowing-orb {
+        animation: none;
+      }
+      .bg-orb {
+        animation: none;
       }
       .tts-body {
         padding: 1.35rem 1rem 1.85rem;
@@ -1502,7 +1517,7 @@
             $countryCode = strtolower(trim((string) ($sample['country'] ?? '')));
             $sampleLanguage = strtolower(trim((string) ($sample['language'] ?? '')));
             $flagImage = preg_match('/^[a-z]{2}$/', $countryCode)
-              ? "https://flagcdn.com/w320/{$countryCode}.png"
+              ? "https://flagcdn.com/{$countryCode}.svg"
               : null;
             $usesInlineArabicFallback = ! $flagImage && $sampleLanguage === 'ar';
             $fallbackSvg = $sampleLanguage === 'ar'
