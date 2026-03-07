@@ -3,6 +3,14 @@
 namespace App\Providers;
 
 use App\Contracts\TtsProviderInterface;
+use App\Console\Commands\EnforceBillingGraceCommand;
+use App\Console\Commands\GenerateVoiceSamples;
+use App\Console\Commands\ListenSyncExtensionCommand;
+use App\Console\Commands\SendBillingRemindersCommand;
+use App\Console\Commands\SyncArabicTranslationsCommand;
+use App\Console\Commands\SyncBillingSubscriptionsCommand;
+use App\Console\Commands\SyncStripePlansCommand;
+use App\Console\Commands\ValidateVoiceCatalogCommand;
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
 use App\Models\SiteSetting;
@@ -27,6 +35,19 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                EnforceBillingGraceCommand::class,
+                GenerateVoiceSamples::class,
+                ListenSyncExtensionCommand::class,
+                SendBillingRemindersCommand::class,
+                SyncArabicTranslationsCommand::class,
+                SyncBillingSubscriptionsCommand::class,
+                SyncStripePlansCommand::class,
+                ValidateVoiceCatalogCommand::class,
+            ]);
+        }
 
         // Register TTS providers as singletons
         $this->app->singleton(GoogleCloudTtsProvider::class);
