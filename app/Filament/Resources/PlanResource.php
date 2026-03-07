@@ -294,14 +294,11 @@ class PlanResource extends Resource
                                 // If already has custom features, use them
                                 $existing = $record->features_en;
                                 if (is_array($existing) && !empty($existing)) {
+                                    $component->state(self::normalizeRepeaterItems($existing));
                                     return;
                                 }
 
-                                // Auto-generate default features from plan attributes with UUID keys
-                                $features = collect(self::buildDefaultFeaturesEn($record))
-                                    ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
-                                    ->all();
-                                $component->state($features);
+                                $component->state(self::normalizeRepeaterItems(self::buildDefaultFeaturesEn($record)));
                             })
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
@@ -354,14 +351,11 @@ class PlanResource extends Resource
                                 // If already has custom features, use them
                                 $existing = $record->features_ar;
                                 if (is_array($existing) && !empty($existing)) {
+                                    $component->state(self::normalizeRepeaterItems($existing));
                                     return;
                                 }
 
-                                // Auto-generate default features from plan attributes with UUID keys
-                                $features = collect(self::buildDefaultFeaturesAr($record))
-                                    ->mapWithKeys(fn ($item) => [(string) \Illuminate\Support\Str::uuid() => $item])
-                                    ->all();
-                                $component->state($features);
+                                $component->state(self::normalizeRepeaterItems(self::buildDefaultFeaturesAr($record)));
                             })
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
@@ -640,5 +634,20 @@ class PlanResource extends Resource
         }
 
         return $features;
+    }
+
+    /**
+     * Normalize repeater state to a numerically indexed array for Livewire reorder operations.
+     *
+     * @param  mixed  $items
+     * @return array<int, array{label?: string, value?: string, icon?: string}>
+     */
+    public static function normalizeRepeaterItems(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return array_values(array_filter($items, fn ($item) => is_array($item)));
     }
 }
