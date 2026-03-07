@@ -18,7 +18,14 @@
 /public/storage
 /storage/*.key
 /storage/pail
+/storage/app/public/audio/
+/storage/app/public/audio/cache/
 /vendor
+/test-results/
+/temp.html
+/tmp-*
+/tmp_*
+/bootstrap/cache/*.tmp
 /.venv-chatterbox
 /chatterbox-cache
 /chatterbox-service
