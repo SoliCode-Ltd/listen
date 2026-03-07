@@ -29,6 +29,10 @@
       0%, 100% { transform: translateY(0) scale(1); }
       50% { transform: translateY(-18px) scale(1.03); }
     }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
 
     .main-content {
       padding: 1.5rem 0 3rem;
@@ -193,12 +197,18 @@
       font-weight: 500;
     }
     .meter-track {
+      display: flex;
+      align-items: stretch;
+      justify-content: flex-start;
       height: 10px;
       border-radius: var(--radius-full);
       background: color-mix(in oklab, var(--line) 30%, transparent);
       box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
       overflow: hidden;
       border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
+    }
+    html[dir="rtl"] .meter-track {
+      direction: rtl;
     }
     .meter-fill {
       height: 100%;
@@ -207,6 +217,12 @@
     }
     .meter-fill.requests {
       background: linear-gradient(90deg, var(--b), var(--a));
+    }
+    html[dir="rtl"] .meter-fill {
+      background: linear-gradient(270deg, var(--a), var(--b));
+    }
+    html[dir="rtl"] .meter-fill.requests {
+      background: linear-gradient(270deg, var(--b), var(--a));
     }
 
     .kpis {
@@ -278,6 +294,69 @@
     .form-grid {
       display: grid;
       gap: .75rem;
+    }
+    .dashboard-generate-btn {
+      justify-self: center;
+      min-width: 200px;
+      display: inline-flex;
+      align-items: center;
+      margin-top: 1.5rem;
+      justify-content: center;
+      gap: .6rem;
+      padding: .95rem 2rem;
+      border-radius: 10px;
+      border: none;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 700;
+      font-family: var(--font-body);
+      cursor: pointer;
+      transition: all .3s cubic-bezier(.4, 0, .2, 1);
+      box-shadow: 0 4px 18px color-mix(in oklab, var(--a) 30%, transparent);
+      position: relative;
+      overflow: hidden;
+    }
+    .dashboard-generate-btn::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--b), var(--a));
+      opacity: 0;
+      transition: opacity .35s;
+    }
+    .dashboard-generate-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 45%, transparent);
+    }
+    .dashboard-generate-btn:hover::after {
+      opacity: 1;
+    }
+    .dashboard-generate-btn span {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .dashboard-generate-btn svg {
+      width: 18px;
+      height: 18px;
+      fill: currentColor;
+      position: relative;
+      z-index: 1;
+    }
+    .dashboard-generate-btn:disabled {
+      opacity: .6;
+      cursor: not-allowed;
+      transform: none;
+    }
+    html[dir="rtl"] .dashboard-generate-btn {
+      font-family: var(--font-body-ar);
+    }
+    #formMessage {
+      justify-self: center;
+      width: min(100%, 420px);
     }
     .two-col {
       display: grid;
@@ -868,6 +947,10 @@
     .form-grid > div {
       position: relative;
     }
+    .form-grid > button,
+    .form-grid > #formMessage {
+      position: relative;
+    }
     .editor-panel {
       padding: 1rem;
       border-radius: 1.1rem;
@@ -1143,6 +1226,13 @@
       .editor-panel {
         padding: .85rem;
       }
+      .dashboard-generate-btn {
+        width: 100%;
+        min-width: 0;
+      }
+      #formMessage {
+        width: 100%;
+      }
       .meter-header {
         align-items: flex-start;
         flex-direction: column;
@@ -1262,10 +1352,17 @@
             <span style="display:block; font-size:1rem; color:var(--muted); margin-top:.3rem; font-weight:500; letter-spacing:0;">{{ __('ui.dashboard.command_center_subtitle') }}</span>
           </h1>
 
+          @php
+            $remainingChars = max(0, (int) $planChars - (int) $usage->total_chars);
+            $remainingRequests = $requestsUnlimited
+              ? null
+              : max(0, (int) $planRequests - (int) $usage->total_requests);
+          @endphp
+
           <div class="meter">
             <div class="meter-header">
               <small>{{ __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
-              <small id="usageCharsText">{{ number_format($usage->total_chars) }} / {{ number_format($planChars) }} {{ __('ui.dashboard.chars') }}</small>
+              <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
             </div>
             <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
           </div>
@@ -1274,9 +1371,11 @@
             <div class="meter-header">
               <small>{{ __('ui.dashboard.requests_usage') }}</small>
               <small id="usageRequestsText">
-                {{ $usage->total_requests }} /
-                {{ $requestsUnlimited ? __('ui.dashboard.unlimited') : $planRequests }}
-                {{ __('ui.dashboard.requests') }}
+                @if ($requestsUnlimited)
+                  {{ __('ui.dashboard.used_requests_of_unlimited', ['used' => number_format($usage->total_requests)]) }}
+                @else
+                  {{ __('ui.dashboard.requests_remaining_of_total', ['remaining' => number_format($remainingRequests), 'total' => number_format($planRequests)]) }}
+                @endif
               </small>
             </div>
             <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
@@ -1284,7 +1383,7 @@
 
           <div class="kpis">
             <div class="kpi"><small>{{ __('ui.dashboard.requests') }}</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
-            <div class="kpi"><small>{{ __('ui.dashboard.characters') }}</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
+            <div class="kpi"><small>{{ __('ui.dashboard.used_characters') }}</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
             <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
 
@@ -1307,7 +1406,6 @@
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
-        <div id="formMessage"></div>
 
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
@@ -1349,7 +1447,7 @@
             <div class="perf-row-2">
               <div class="perf-section">
                 <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
-                <select name="performance_style" id="performance_style">
+                <select name="performance_style" id="performance_style" required>
                   <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
                   <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
                   <option value="educational">{{ __('ui.dashboard.style_educational') }}</option>
@@ -1367,12 +1465,17 @@
                   <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling') }}</option>
                   <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style') }}</option>
                   <option value="news">{{ __('ui.dashboard.emotion_news') }}</option>
+                  <option value="sports_commentator">{{ __('ui.dashboard.style_sports_commentator') }}</option>
+                  <option value="meditation">{{ __('ui.dashboard.style_meditation') }}</option>
+                  <option value="audiobook">{{ __('ui.dashboard.style_audiobook') }}</option>
+                  <option value="children_story">{{ __('ui.dashboard.style_children_story') }}</option>
+                  <option value="radio_host">{{ __('ui.dashboard.style_radio_host') }}</option>
                 </select>
               </div>
 
               <div class="perf-section">
                 <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
-                <select name="emotion" id="emotion">
+                <select name="emotion" id="emotion" required>
                   <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
                   <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
                   <option value="warm">{{ __('ui.dashboard.emotion_warm') }}</option>
@@ -1381,6 +1484,11 @@
                   <option value="formal">{{ __('ui.dashboard.emotion_formal') }}</option>
                   <option value="calm">{{ __('ui.dashboard.emotion_calm') }}</option>
                   <option value="angry">{{ __('ui.dashboard.emotion_angry') }}</option>
+                  <option value="hopeful">{{ __('ui.dashboard.emotion_hopeful') }}</option>
+                  <option value="serious">{{ __('ui.dashboard.emotion_serious') }}</option>
+                  <option value="playful">{{ __('ui.dashboard.emotion_playful') }}</option>
+                  <option value="mysterious">{{ __('ui.dashboard.emotion_mysterious') }}</option>
+                  <option value="confident">{{ __('ui.dashboard.emotion_confident') }}</option>
                 </select>
               </div>
             </div>
@@ -1451,7 +1559,13 @@
             <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate') ? '1' : '0' }}">
           </div>
 
-          <button class="btn btn-primary" id="generateBtn" type="submit">{{ __('ui.dashboard.generate_voice_now') }}</button>
+          <button class="dashboard-generate-btn" id="generateBtn" type="submit">
+            <span>
+              <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              {{ __('ui.dashboard.generate_voice_now') }}
+            </span>
+          </button>
+          <div id="formMessage"></div>
         </form>
 
         <div class="s-card output-panel" id="generatedAudioWrap" style="display:none;">
@@ -1655,6 +1769,7 @@
       'confirm_delete' => __('ui.dashboard.confirm_delete'),
       'unable_delete_voice' => __('ui.dashboard.unable_delete_voice'),
       'voice_generation_failed' => __('ui.dashboard.voice_generation_failed'),
+      'server_overload' => __('ui.dashboard.server_overload'),
       'generate_voice_now' => __('ui.dashboard.generate_voice_now'),
       'generating' => __('ui.dashboard.generating'),
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
@@ -1663,6 +1778,11 @@
       'instant_preview' => __('ui.dashboard.instant_preview'),
       'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
       'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
+      'performance_style_required' => __('ui.backend.performance_style_required'),
+      'emotion_required' => __('ui.backend.emotion_required'),
+      'chars_remaining_of_total' => __('ui.dashboard.chars_remaining_of_total'),
+      'requests_remaining_of_total' => __('ui.dashboard.requests_remaining_of_total'),
+      'used_requests_of_unlimited' => __('ui.dashboard.used_requests_of_unlimited'),
     ];
   @endphp
   <script>
@@ -1711,7 +1831,18 @@
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
     const preferredVoiceKeyByLanguage = { ar: '', en: '' };
     const dialectSelect = document.getElementById('dialect');
+    const performanceStyleSelect = document.getElementById('performance_style');
+    const emotionSelect = document.getElementById('emotion');
+    let feedbackScrollFrame = null;
     let allJobs = [];
+
+    function renderGenerateButtonContent(label, loading = false) {
+      if (!generateBtn) return;
+      const icon = loading
+        ? '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>'
+        : '<svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+      generateBtn.innerHTML = `<span>${icon}${escapeHtml(label)}</span>`;
+    }
 
     const dialectsByLanguage = {
       ar: [
@@ -1726,6 +1857,8 @@
         { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi") }}' },
         { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan") }}' },
         { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti") }}' },
+        { value: 'ar-TN', label: '{{ __("ui.dialects.tunisian") }}' },
+        { value: 'ar-OM', label: '{{ __("ui.dialects.omani") }}' },
       ],
       en: [
         { value: '', label: '{{ __("ui.dashboard.dialect_auto") }}' },
@@ -1839,6 +1972,28 @@
       if (!message) { formMessage.innerHTML = ''; return; }
       const cls = type === 'error' ? 'error' : 'note';
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+      scrollFeedbackIntoView(formMessage);
+    }
+
+    function scrollFeedbackIntoView(element) {
+      if (!element) return;
+      if (feedbackScrollFrame) {
+        cancelAnimationFrame(feedbackScrollFrame);
+      }
+      feedbackScrollFrame = requestAnimationFrame(() => {
+        feedbackScrollFrame = null;
+        const rect = element.getBoundingClientRect();
+        const topOffset = 108;
+        const bottomOffset = 24;
+        const isVisible = rect.top >= topOffset && rect.bottom <= (window.innerHeight - bottomOffset);
+        if (isVisible) return;
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        element.scrollIntoView({
+          behavior: reduceMotion ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
+      });
     }
 
     function showExtensionKeyMessage(type, message) {
@@ -1972,15 +2127,39 @@
         : i18n.translate_disabled_hint;
     }
 
+    function formatQuotaText(template, replacements) {
+      let text = String(template || '');
+      Object.entries(replacements || {}).forEach(function(entry) {
+        const [key, value] = entry;
+        text = text.replace(':' + key, String(value));
+      });
+
+      return text;
+    }
+
+    function remainingQuota(total, used) {
+      return Math.max(0, Number(total || 0) - Number(used || 0));
+    }
+
+    function meterWidthFromUsedPercent(percent) {
+      return `${Math.max(0, 100 - Number(percent || 0))}%`;
+    }
+
     function updateUsagePanel(usage) {
       if (!usage || typeof usage !== 'object') return;
       const requestsUnlimited = Boolean(usage.requests_unlimited);
-      if (usageCharsText) usageCharsText.textContent = `${formatNumber(usage.total_chars)} / ${formatNumber(usage.plan_chars)} ${i18n.chars}`;
+      if (usageCharsText) usageCharsText.textContent = formatQuotaText(i18n.chars_remaining_of_total, {
+        remaining: formatNumber(remainingQuota(usage.plan_chars, usage.total_chars)),
+        total: formatNumber(usage.plan_chars),
+      });
       if (usageRequestsText) usageRequestsText.textContent = requestsUnlimited
-        ? `${formatNumber(usage.total_requests)} / ${i18n.unlimited} ${i18n.requests}`
-        : `${formatNumber(usage.total_requests)} / ${formatNumber(usage.plan_requests)} ${i18n.requests}`;
-      if (usageCharsMeter) usageCharsMeter.style.width = `${Math.max(0, 100 - Number(usage.chars_percent || 0))}%`;
-      if (usageRequestsMeter) usageRequestsMeter.style.width = `${Math.max(0, 100 - Number(usage.requests_percent || 0))}%`;
+        ? formatQuotaText(i18n.used_requests_of_unlimited, { used: formatNumber(usage.total_requests) })
+        : formatQuotaText(i18n.requests_remaining_of_total, {
+          remaining: formatNumber(remainingQuota(usage.plan_requests, usage.total_requests)),
+          total: formatNumber(usage.plan_requests),
+        });
+      if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
+      if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
       if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
     }
@@ -2194,14 +2373,40 @@
     });
 
     function extractErrorMessage(data, fallback = i18n.voice_generation_failed) {
-      if (data?.message) return String(data.message);
-      if (data?.error_message) return String(data.error_message);
-      const errors = data?.errors;
-      if (errors && typeof errors === 'object') {
-        const keys = Object.keys(errors);
-        if (keys.length > 0 && Array.isArray(errors[keys[0]]) && errors[keys[0]][0]) return String(errors[keys[0]][0]);
+      // Helper to detect technical/internal error messages
+      const isTechnicalError = (msg) => {
+        if (!msg || typeof msg !== 'string') return false;
+        const patterns = [
+          /maximum execution time/i,
+          /timeout/i,
+          /memory.*exhausted/i,
+          /fatal error/i,
+          /internal server error/i,
+          /500/,
+          /502/,
+          /503/,
+          /504/,
+          /gateway/i,
+          /service unavailable/i,
+        ];
+        return patterns.some(p => p.test(msg));
+      };
+      let message = null;
+      if (data?.message) message = String(data.message);
+      else if (data?.error_message) message = String(data.error_message);
+      else {
+        const errors = data?.errors;
+        if (errors && typeof errors === 'object') {
+          const keys = Object.keys(errors);
+          if (keys.length > 0 && Array.isArray(errors[keys[0]]) && errors[keys[0]][0]) {
+            message = String(errors[keys[0]][0]);
+          }
+        }
       }
-      return fallback;
+      if (message && isTechnicalError(message)) {
+        return i18n.server_overload || fallback;
+      }
+      return message || fallback;
     }
 
     async function submitVoiceForm(event) {
@@ -2214,9 +2419,19 @@
         syncLanguageToCurrentTextWhenTranslationOff();
       }
       showFormMessage(null, '');
-      const defaultText = generateBtn.textContent || i18n.generate_voice_now;
+      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
+        showFormMessage('error', i18n.performance_style_required);
+        performanceStyleSelect.focus();
+        return;
+      }
+      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
+        showFormMessage('error', i18n.emotion_required);
+        emotionSelect.focus();
+        return;
+      }
+      const defaultText = i18n.generate_voice_now;
       generateBtn.disabled = true;
-      generateBtn.textContent = i18n.generating;
+      renderGenerateButtonContent(i18n.generating, true);
       let data = null;
       try {
         const response = await fetch(queueUrl, {
@@ -2231,13 +2446,16 @@
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
         if (data?.job?.audio_url) {
           showGeneratedPreview(data.job);
+          // Scroll smoothly to the generated audio section
+          if (generatedAudioWrap) {
+            generatedAudioWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
         }
-        showFormMessage('ok', data?.message || i18n.voice_generated_success);
       } catch (error) {
         showFormMessage('error', extractErrorMessage(data, error?.message || i18n.voice_generation_failed));
       } finally {
         generateBtn.disabled = false;
-        generateBtn.textContent = defaultText;
+        renderGenerateButtonContent(defaultText);
       }
     }
 
@@ -2272,6 +2490,7 @@
     if (!isTranslateEnabled()) {
       preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
     }
+    renderGenerateButtonContent(i18n.generate_voice_now);
     renderVoiceOptions();
     renderDialectOptions();
     updateTranslateHint();

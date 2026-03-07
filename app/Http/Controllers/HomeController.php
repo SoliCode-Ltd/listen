@@ -42,6 +42,11 @@ class HomeController extends Controller
         'storytelling',
         'ad_style',
         'news',
+        'sports_commentator',
+        'meditation',
+        'audiobook',
+        'children_story',
+        'radio_host',
     ];
 
     /** @var array<int, string> */
@@ -53,6 +58,11 @@ class HomeController extends Controller
         'formal',
         'calm',
         'angry',
+        'hopeful',
+        'serious',
+        'playful',
+        'mysterious',
+        'confident',
     ];
 
     public function __construct(
@@ -137,6 +147,14 @@ class HomeController extends Controller
         }
 
         $maxChars = $this->demoCharAllowance($request);
+        $demoPlan = $this->planAccessService->freePlan();
+        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
+        $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
+
+        $this->ensureRequiredStudioSelections($requestedTier, [
+            'performance_style' => $request->input('performance_style'),
+            'emotion' => $request->input('emotion'),
+        ]);
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'max:50000'],
@@ -151,10 +169,10 @@ class HomeController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+        ], [
+            'performance_style.in' => __('ui.backend.performance_style_invalid'),
+            'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
-
-        $demoPlan = $this->planAccessService->freePlan();
-        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
@@ -202,6 +220,14 @@ class HomeController extends Controller
         }
 
         $maxChars = $this->demoCharAllowance($request);
+        $demoPlan = $this->planAccessService->freePlan();
+        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
+        $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
+
+        $this->ensureRequiredStudioSelections($requestedTier, [
+            'performance_style' => $request->input('performance_style'),
+            'emotion' => $request->input('emotion'),
+        ]);
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'max:50000'],
@@ -216,10 +242,10 @@ class HomeController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+        ], [
+            'performance_style.in' => __('ui.backend.performance_style_invalid'),
+            'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
-
-        $demoPlan = $this->planAccessService->freePlan();
-        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
         $demoRoutingPlan = $this->demoRoutingPlan($demoPlan, $tier);
         $voiceName = $this->normalizeVoiceSelection(
@@ -1209,6 +1235,30 @@ class HomeController extends Controller
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];
+    }
+
+    /**
+     * @param array{performance_style:mixed,emotion:mixed} $input
+     */
+    private function ensureRequiredStudioSelections(string $tier, array $input): void
+    {
+        if (VoiceTier::normalize($tier) !== VoiceTier::HD) {
+            return;
+        }
+
+        $errors = [];
+
+        if (! is_string($input['performance_style'] ?? null) || trim((string) $input['performance_style']) === '') {
+            $errors['performance_style'] = [__('ui.backend.performance_style_required')];
+        }
+
+        if (! is_string($input['emotion'] ?? null) || trim((string) $input['emotion']) === '') {
+            $errors['emotion'] = [__('ui.backend.emotion_required')];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     private function resolveSampleAudioUrl(?string $audioPath, string $language): ?string

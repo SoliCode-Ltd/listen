@@ -170,12 +170,16 @@ const dialectsByLanguage = {
     { value: 'ar-IQ', labelKey: 'dialectIraqi', label: 'Iraqi' },
     { value: 'ar-MA', labelKey: 'dialectMoroccan', label: 'Moroccan' },
     { value: 'ar-KW', labelKey: 'dialectKuwaiti', label: 'Kuwaiti' },
+    { value: 'ar-TN', labelKey: 'dialectTunisian', label: 'Tunisian' },
+    { value: 'ar-OM', labelKey: 'dialectOmani', label: 'Omani' },
   ],
   en: [
     { value: '', labelKey: 'autoDetect', label: 'Auto-detect' },
     { value: 'en-US', labelKey: 'dialectAmerican', label: 'American' },
     { value: 'en-GB', labelKey: 'dialectBritish', label: 'British' },
     { value: 'en-AU', labelKey: 'dialectAustralian', label: 'Australian' },
+    { value: 'en-IN', labelKey: 'dialectIndian', label: 'Indian' },
+    { value: 'en-ZA', labelKey: 'dialectSouthAfrican', label: 'South African' },
   ],
 };
 

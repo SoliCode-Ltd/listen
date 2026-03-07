@@ -264,6 +264,16 @@ class GeminiTtsProvider implements TtsProviderInterface
         'inspirational'  => 'You are a FIERY Arabic motivational speaker at a packed stadium. Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding, relentless, like addressing an army before battle!',
         'cinematic'      => 'Deliver this Arabic text with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a historical revelation.',
         'documentary'    => 'Narrate this Arabic text like an epic documentary. Speak with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+        'sports_commentator' => 'You are an ELECTRIC Arabic sports commentator during the most intense football match! EXPLODE with energy on every play! Build tension, SCREAM the goals with raw passion! Let your voice crack with excitement! GOOOOOAL!',
+        'meditation'     => 'Speak this Arabic text with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
+        'audiobook'      => 'Narrate this Arabic text as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
+        'children_story' => 'Read this Arabic text like a beloved storyteller enchanting young children. Warm, playful, with wonder in your voice. Use animated expressions, fun sound effects hints, and make every moment magical and exciting!',
+        'radio_host'     => 'You are a charismatic Arabic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
+        'hopeful'        => 'Speak this Arabic text with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
+        'serious'        => 'Deliver this Arabic text with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
+        'playful'        => 'Read this Arabic text with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
+        'mysterious'     => 'Speak this Arabic text with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
+        'confident'      => 'Deliver this Arabic text with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
     ];
 
     public function name(): string
@@ -385,7 +395,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $this->buildSingleSpeakerPrompt($stylePrompt, $text)],
+                        ['text' => $stylePrompt . "\n\n" . $text],
                     ],
                 ],
             ],
@@ -447,7 +457,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $this->buildDialoguePrompt($stylePrompt, $text)],
+                        ['text' => $stylePrompt . "\n\n" . $text],
                     ],
                 ],
             ],
@@ -764,42 +774,6 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * Instruct Gemini TTS to recite the provided text exactly, instead of improvising.
-     */
-    private function buildSingleSpeakerPrompt(string $stylePrompt, string $text): string
-    {
-        $instruction = trim($stylePrompt);
-        $quotedText = json_encode($text, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-
-        $parts = [];
-        if ($instruction !== '') {
-            $parts[] = $instruction;
-        }
-        $parts[] = 'Read aloud exactly the following text in the same language it is written. Do not add, remove, summarize, translate, or change any words.';
-        $parts[] = $quotedText === false ? $text : $quotedText;
-
-        return implode("\n\n", $parts);
-    }
-
-    /**
-     * Instruct Gemini TTS to perform the provided dialogue script exactly as written.
-     */
-    private function buildDialoguePrompt(string $stylePrompt, string $text): string
-    {
-        $instruction = trim($stylePrompt);
-        $parts = [];
-
-        if ($instruction !== '') {
-            $parts[] = $instruction;
-        }
-
-        $parts[] = 'Perform the following dialogue exactly as written. Preserve speaker labels, order, and wording.';
-        $parts[] = $text;
-
-        return implode("\n\n", $parts);
-    }
-
-    /**
      * Check if the target language is Arabic (any dialect).
      */
     private function isArabicLanguage(string $targetLanguage): bool
@@ -861,6 +835,16 @@ class GeminiTtsProvider implements TtsProviderInterface
             'inspirational'  => 'You are a FIERY motivational speaker at a packed stadium! Start intense and build to a SHOUTING crescendo. Voice cracking with raw passion. Commanding and relentless!',
             'cinematic'      => 'Deliver with sweeping cinematic grandeur and emotional depth. Speak with thunderous majesty, extremely slow and dramatic. Let every word resonate like a revelation.',
             'documentary'    => 'Narrate like an epic documentary with deep, authoritative gravitas and sweeping grandeur. Measured pace with dramatic weight behind every phrase. Paint the scene with your voice.',
+            'sports_commentator' => 'You are an ELECTRIC sports commentator during the most intense football match! EXPLODE with energy on every play! Build tension, SCREAM the goals with raw passion! Let your voice crack with excitement! GOOOOOAL!',
+            'meditation'     => 'Speak with profound serenity and inner peace, like a spiritual guide leading a meditation. Ultra-slow, gentle, hypnotic rhythm. Let each word float softly. Create deep tranquility and mindfulness.',
+            'audiobook'      => 'Narrate as a professional audiobook narrator. Clear, engaging, with subtle emotional coloring. Vary pace for drama, maintain clarity, and bring characters to life with distinct vocal textures.',
+            'children_story' => 'Read like a beloved storyteller enchanting young children. Warm, playful, with wonder in your voice. Use animated expressions, fun sound effects hints, and make every moment magical and exciting!',
+            'radio_host'     => 'You are a charismatic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in.',
+            'hopeful'        => 'Speak with genuine hope and optimism shining through. Let your voice lift with possibility and promise. Bright, uplifting tones that inspire belief in better days ahead.',
+            'serious'        => 'Deliver with grave seriousness and weight. Deep, measured tones that convey the importance of every word. No lightness — pure gravity and significance.',
+            'playful'        => 'Read with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
+            'mysterious'     => 'Speak with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
+            'confident'      => 'Deliver with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
             default          => '',
         };
     }

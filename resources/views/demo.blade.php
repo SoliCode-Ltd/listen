@@ -117,7 +117,7 @@
               <div class="perf-row-2">
                 <div class="perf-section">
                   <div class="perf-section-label">🎭 {{ __('ui.demo.performance_style', ['default' => 'Performance Style']) }}</div>
-                  <select name="performance_style" id="performance_style">
+                  <select name="performance_style" id="performance_style" required>
                     <option value="">-- {{ __('ui.demo.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
                     <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
                     <option value="educational">{{ __('ui.demo.style_educational', ['default' => 'Educational']) }}</option>
@@ -135,11 +135,16 @@
                     <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling', ['default' => 'Storytelling']) }}</option>
                     <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style', ['default' => 'Ad Style']) }}</option>
                     <option value="news">{{ __('ui.dashboard.emotion_news', ['default' => 'News']) }}</option>
+                    <option value="sports_commentator">{{ __('ui.dashboard.style_sports_commentator', ['default' => 'Sports Commentator']) }}</option>
+                    <option value="meditation">{{ __('ui.dashboard.style_meditation', ['default' => 'Meditation']) }}</option>
+                    <option value="audiobook">{{ __('ui.dashboard.style_audiobook', ['default' => 'Audiobook']) }}</option>
+                    <option value="children_story">{{ __('ui.dashboard.style_children_story', ['default' => 'Children Story']) }}</option>
+                    <option value="radio_host">{{ __('ui.dashboard.style_radio_host', ['default' => 'Radio Host']) }}</option>
                   </select>
                 </div>
                 <div class="perf-section">
                   <div class="perf-section-label">💫 {{ __('ui.demo.emotion', ['default' => 'Emotion']) }}</div>
-                  <select name="emotion" id="emotion">
+                  <select name="emotion" id="emotion" required>
                     <option value="">-- {{ __('ui.demo.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
                     <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
                     <option value="warm">{{ __('ui.dashboard.emotion_warm', ['default' => 'Warm']) }}</option>
@@ -148,6 +153,11 @@
                     <option value="formal">{{ __('ui.dashboard.emotion_formal', ['default' => 'Formal']) }}</option>
                     <option value="calm">{{ __('ui.dashboard.emotion_calm', ['default' => 'Calm']) }}</option>
                     <option value="angry">{{ __('ui.dashboard.emotion_angry', ['default' => 'Angry']) }}</option>
+                    <option value="hopeful">{{ __('ui.dashboard.emotion_hopeful', ['default' => 'Hopeful']) }}</option>
+                    <option value="serious">{{ __('ui.dashboard.emotion_serious', ['default' => 'Serious']) }}</option>
+                    <option value="playful">{{ __('ui.dashboard.emotion_playful', ['default' => 'Playful']) }}</option>
+                    <option value="mysterious">{{ __('ui.dashboard.emotion_mysterious', ['default' => 'Mysterious']) }}</option>
+                    <option value="confident">{{ __('ui.dashboard.emotion_confident', ['default' => 'Confident']) }}</option>
                   </select>
                 </div>
               </div>
@@ -209,13 +219,12 @@
                 <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
               </div>
             </div>
+            <div id="errorBox" class="s-card error-box" style="display:none;"></div>
           </form>
         </div>
 
         {{-- ── RIGHT: Sidebar ── --}}
         <aside class="studio-sidebar">
-
-          <div id="errorBox" class="s-card error-box" style="display:none;"></div>
 
           <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
             <p id="upgradeText">{{ __('ui.demo.upgrade_text', ['chars' => number_format((int) $starterPlanChars)]) }}</p>
@@ -260,9 +269,12 @@
       'no_audio_returned' => __('ui.demo.no_audio_returned'),
       'selected_speaker' => __('ui.demo.selected_speaker'),
       'preview_failed' => __('ui.demo.preview_failed'),
+      'server_overload' => __('ui.dashboard.server_overload'),
       'generate_voice' => __('ui.demo.generate_voice'),
       'create_account_unlock' => __('ui.demo.create_account_unlock'),
       'speaker_prefix' => __('ui.demo.speaker_prefix'),
+      'performance_style_required' => __('ui.backend.performance_style_required'),
+      'emotion_required' => __('ui.backend.emotion_required'),
     ];
   @endphp
   <script>
@@ -295,6 +307,7 @@
     const translateSelect = document.getElementById('translate');
     const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
+    let feedbackScrollFrame = null;
     const heroWave = document.getElementById('heroWave');
     const textInput = document.getElementById('text');
     const outputPlaceholder = document.getElementById('outputPlaceholder');
@@ -312,6 +325,8 @@
         { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi", ["default" => "Iraqi"]) }}' },
         { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan", ["default" => "Moroccan"]) }}' },
         { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti", ["default" => "Kuwaiti"]) }}' },
+        { value: 'ar-TN', label: '{{ __("ui.dialects.tunisian", ["default" => "Tunisian"]) }}' },
+        { value: 'ar-OM', label: '{{ __("ui.dialects.omani", ["default" => "Omani"]) }}' },
       ],
       en: [
         { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
@@ -357,6 +372,9 @@
       [performanceStyleSelect, emotionSelect, dialectSelect, speedInput, pitchInput, stylePromptInput].forEach((el) => {
         if (!el) return;
         el.disabled = !isHd;
+        if (el === performanceStyleSelect || el === emotionSelect) {
+          el.required = isHd;
+        }
       });
       if (!isHd) {
         if (performanceStyleSelect) performanceStyleSelect.value = '';
@@ -424,8 +442,47 @@
 
     function setError(message = '') {
       if (!message) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
+      // Sanitize technical error messages
+      const technicalPatterns = [
+        /maximum execution time/i,
+        /timeout/i,
+        /memory.*exhausted/i,
+        /fatal error/i,
+        /internal server error/i,
+        /500/,
+        /502/,
+        /503/,
+        /504/,
+        /gateway/i,
+        /service unavailable/i,
+      ];
+      if (technicalPatterns.some(p => p.test(message))) {
+        message = i18n.server_overload || i18n.preview_failed;
+      }
       errorBox.style.display = 'block';
       errorBox.textContent = message;
+      scrollFeedbackIntoView(errorBox);
+    }
+
+    function scrollFeedbackIntoView(element) {
+      if (!element) return;
+      if (feedbackScrollFrame) {
+        cancelAnimationFrame(feedbackScrollFrame);
+      }
+      feedbackScrollFrame = requestAnimationFrame(() => {
+        feedbackScrollFrame = null;
+        const rect = element.getBoundingClientRect();
+        const topOffset = 108;
+        const bottomOffset = 24;
+        const isVisible = rect.top >= topOffset && rect.bottom <= (window.innerHeight - bottomOffset);
+        if (isVisible) return;
+        const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+        element.scrollIntoView({
+          behavior: reduceMotion ? 'auto' : 'smooth',
+          block: 'nearest',
+          inline: 'nearest',
+        });
+      });
     }
 
     function setUpgradeVisible(show, customMessage = '') {
@@ -568,6 +625,18 @@
         const trimmed = rawText.trim();
         const selectedChars = countBillableChars(trimmed);
         if (!trimmed) { hideAudioPreview(); setError(i18n.text_required); return; }
+        if ((voiceTier?.value || 'standard') === 'hd' && !String(performanceStyleSelect?.value || '').trim()) {
+          hideAudioPreview();
+          setError(i18n.performance_style_required);
+          performanceStyleSelect?.focus();
+          return;
+        }
+        if ((voiceTier?.value || 'standard') === 'hd' && !String(emotionSelect?.value || '').trim()) {
+          hideAudioPreview();
+          setError(i18n.emotion_required);
+          emotionSelect?.focus();
+          return;
+        }
         if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
           hideAudioPreview();
           const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(currentQuota.remaining_chars));
@@ -586,7 +655,7 @@
         if (window.initCustomAudioPlayers) window.initCustomAudioPlayers();
         previewAudio.dataset.downloadLanguage = String(data?.target_language || normalizeLanguage(targetLanguage?.value || 'ar'));
         previewAudio.dataset.downloadText = String(trimmed).slice(0, 42);
-        previewAudio.dataset.downloadSpeaker = cleanSpeakerLabel(String(data?.voice?.label || i18n.selected_speaker));
+        previewAudio.dataset.downloadSpeaker = voiceDisplayLabel(data?.voice || { label: i18n.selected_speaker, label_ar: i18n.selected_speaker });
         previewAudio.dataset.downloadQuality = String(data?.voice_tier_label || 'Standard');
         previewAudio.src = data.audio_url;
         previewAudio.load();
@@ -595,7 +664,7 @@
           previewAudio.play().catch(() => {});
         });
         const voiceData = data?.voice || {};
-        const label = pageLocale === 'ar' && voiceData.label_ar ? cleanSpeakerLabel(voiceData.label_ar) : cleanSpeakerLabel(voiceData.label || i18n.selected_speaker);
+        const label = voiceDisplayLabel(voiceData || { label: i18n.selected_speaker, label_ar: i18n.selected_speaker });
         const quality = data?.voice_tier_label ? ` - ${formatTierLabel(data.voice_tier_label)}` : '';
         audioMeta.textContent = `${i18n.speaker_prefix} ${label}${quality} - ${data.translate_note}`;
       } catch (err) {

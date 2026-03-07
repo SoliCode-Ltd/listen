@@ -538,12 +538,20 @@
     /* Card body */
     .sample-card-body {
       padding: 1.05rem 1.4rem 1rem;
-      background: linear-gradient(180deg, color-mix(in oklab, var(--surface2) 72%, var(--a) 28%), color-mix(in oklab, var(--surface) 80%, var(--b) 20%));
-      border-top: 1px solid color-mix(in oklab, rgba(255,255,255,.1) 40%, transparent);
+      background: linear-gradient(180deg, color-mix(in oklab, var(--surface2) 40%, transparent), color-mix(in oklab, var(--surface) 90%, transparent));
+      position: relative;
       display: flex;
       flex-direction: column;
       gap: .55rem;
       flex: 1;
+    }
+    .sample-card-body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--a) 80%, white), color-mix(in oklab, var(--b) 80%, white), transparent);
+      opacity: 0.8;
     }
     .sample-card-title {
       margin: 0;
@@ -1273,6 +1281,30 @@
       100% { opacity: 0.6; transform: translate(-50%, -50%) translateZ(-50px) scale(1.2); }
     }
 
+    @media (max-width: 980px) {
+      .hero-grid {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .hero-cta {
+        justify-content: center;
+      }
+      .hero-art {
+        justify-content: center;
+      }
+      .apps-grid,
+      .premium-grid {
+        grid-template-columns: 1fr;
+      }
+      .apps-intro {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      .apps-points {
+        justify-content: center;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .hero-audio-btn,
       .hero-audio-btn::before,
@@ -1298,37 +1330,82 @@
         padding-inline: .5rem;
       }
       .tts-illustration {
-        aspect-ratio: 1 / 1.05;
+        aspect-ratio: 1 / 1.18;
         width: 100%;
-        max-width: 100%;
-      }
-      .hero-audio-captions-wrapper {
-        margin-top: 1rem;
+        max-width: min(380px, 92vw);
+        animation: none;
       }
       .tts-card {
         width: 100%;
+        min-height: 100%;
         margin-inline: auto;
-        transform: rotateX(8deg);
+        transform: none;
         transform-origin: center center;
       }
+      .tts-body {
+        padding: 1.35rem 1rem 1.85rem;
+        gap: 1.2rem;
+      }
+      .hero-audio-player {
+        min-height: 9.5rem;
+        justify-content: flex-start;
+        align-items: center;
+
+      }
+      .hero-audio-content {
+        width: min(260px, 88vw);
+        margin-inline: auto;
+        align-items: center;
+        margin-top: 25%;
+      }
+      .hero-audio-captions-wrapper {
+        position: relative;
+        top: auto;
+        left: auto;
+        right: auto;
+        margin-top: 1rem;
+        min-height: 2.9rem;
+        width: 100%;
+        justify-content: center;
+      }
       .hero-audio-caption {
-        font-size: 0.75rem;
+        font-size: 0.72rem;
         letter-spacing: 0.1em;
-        margin-top: 0.85rem;
+        margin-top: 0;
+        white-space: normal;
+        width: 100%;
+        max-width: none;
+        text-align: center;
+        line-height: 1.4;
+        left: 50%;
+        right: auto;
+        transform: translate(-50%, 0);
       }
       html[dir="rtl"] .hero-audio-caption {
         letter-spacing: 0;
-        font-size: 0.85rem;
+        font-size: 0.82rem;
       }
-      .tts-body {
-        padding: 1.25rem 1rem 1.75rem;
+      .active-caption {
+        transform: translate(-50%, -8px);
+      }
+      .tts-body.is-playing .active-caption {
+        transform: translate(-50%, 0);
+      }
+      .tts-body.is-playing .active-caption.is-switching {
+        transform: translate(-50%, 4px);
+      }
+      .idle-caption {
+        transform: translate(-50%, 0);
+      }
+      .tts-body.is-playing .idle-caption {
+        transform: translate(-50%, 8px);
       }
       .tts-audio-wave {
         gap: 4px;
       }
       .tts-body.is-playing .tts-audio-wave {
         height: 48px;
-        margin-top: 2rem;
+        margin-top: 1.4rem;
       }
       .tts-bar {
         width: 6px;

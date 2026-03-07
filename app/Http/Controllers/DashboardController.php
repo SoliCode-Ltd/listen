@@ -37,6 +37,11 @@ class DashboardController extends Controller
         'storytelling',
         'ad_style',
         'news',
+        'sports_commentator',
+        'meditation',
+        'audiobook',
+        'children_story',
+        'radio_host',
     ];
 
     /** @var array<int, string> */
@@ -48,6 +53,11 @@ class DashboardController extends Controller
         'formal',
         'calm',
         'angry',
+        'hopeful',
+        'serious',
+        'playful',
+        'mysterious',
+        'confident',
     ];
 
     public function __construct(
@@ -128,6 +138,16 @@ class DashboardController extends Controller
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+        $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $planTier));
+
+        if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
+            return $this->rejectTierAccess($request);
+        }
+
+        $this->ensureRequiredStudioSelections($requestedTier, [
+            'performance_style' => $request->input('performance_style'),
+            'emotion' => $request->input('emotion'),
+        ]);
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
@@ -149,12 +169,12 @@ class DashboardController extends Controller
             'dialogue_speakers' => ['nullable', 'array', 'max:6'],
             'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
             'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
+        ], [
+            'performance_style.in' => __('ui.backend.performance_style_invalid'),
+            'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
-        if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
-            return $this->rejectTierAccess($request);
-        }
 
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
@@ -405,7 +425,7 @@ class DashboardController extends Controller
             'status' => (string) $job->status,
             'source_language' => $job->source_language ?: '-',
             'target_language' => (string) $job->target_language,
-            'voice_label' => $voiceNameMap[$job->voice_name]['label'] ?? __('ui.dashboard.default_speaker'),
+            'voice_label' => $this->localizedVoiceLabel($job->voice_name, $voiceNameMap),
             'voice_tier' => VoiceTier::label((string) ($job->voice_tier ?: VoiceTier::STANDARD)),
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
@@ -413,6 +433,45 @@ class DashboardController extends Controller
             'error_message' => $job->error_message,
             'created_human' => $job->created_at?->diffForHumans(),
         ];
+    }
+
+    private function localizedVoiceLabel(?string $voiceName, array $voiceNameMap): string
+    {
+        $entry = $voiceNameMap[(string) $voiceName] ?? null;
+        if (! is_array($entry)) {
+            return __('ui.dashboard.default_speaker');
+        }
+
+        $isArabicLocale = app()->getLocale() === 'ar';
+        $label = $isArabicLocale
+            ? ($entry['label_ar'] ?? $entry['label'] ?? __('ui.dashboard.default_speaker'))
+            : ($entry['label'] ?? __('ui.dashboard.default_speaker'));
+
+        return ltrim(trim((string) $label), '+');
+    }
+
+    /**
+     * @param array{performance_style:mixed,emotion:mixed} $input
+     */
+    private function ensureRequiredStudioSelections(string $tier, array $input): void
+    {
+        if (VoiceTier::normalize($tier) !== VoiceTier::HD) {
+            return;
+        }
+
+        $errors = [];
+
+        if (! is_string($input['performance_style'] ?? null) || trim((string) $input['performance_style']) === '') {
+            $errors['performance_style'] = [__('ui.backend.performance_style_required')];
+        }
+
+        if (! is_string($input['emotion'] ?? null) || trim((string) $input['emotion']) === '') {
+            $errors['emotion'] = [__('ui.backend.emotion_required')];
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 
     /**

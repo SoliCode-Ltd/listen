@@ -40,6 +40,11 @@ class GenerateAudioJob implements ShouldQueue
         'storytelling',
         'ad_style',
         'news',
+        'sports_commentator',
+        'meditation',
+        'audiobook',
+        'children_story',
+        'radio_host',
     ];
 
     /** @var array<int, string> */
@@ -51,6 +56,11 @@ class GenerateAudioJob implements ShouldQueue
         'formal',
         'calm',
         'angry',
+        'hopeful',
+        'serious',
+        'playful',
+        'mysterious',
+        'confident',
     ];
 
     public int $tries = 3;

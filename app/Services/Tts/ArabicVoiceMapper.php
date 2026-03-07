@@ -57,6 +57,11 @@ class ArabicVoiceMapper
         'inspirational'  => ['name' => 'Inspirational',     'name_ar' => 'تحفيزي (مُلهم وحماسي)',   'icon' => '🔥'],
         'cinematic'      => ['name' => 'Cinematic',         'name_ar' => 'سينمائي (درامي وعاطفي)',  'icon' => '🎥'],
         'documentary'    => ['name' => 'Documentary',       'name_ar' => 'وثائقي (رصين وموضوعي)', 'icon' => '🌟'],
+        'sports_commentator' => ['name' => 'Sports Commentator', 'name_ar' => 'معلق رياضي (حماسي ومثير)', 'icon' => '⚽'],
+        'meditation'     => ['name' => 'Meditation',        'name_ar' => 'تأمل (هادئ وروحاني)',      'icon' => '🧘'],
+        'audiobook'      => ['name' => 'Audiobook',         'name_ar' => 'كتاب مسموع (احترافي)',    'icon' => '📚'],
+        'children_story' => ['name' => 'Children Story',    'name_ar' => 'قصة أطفال (مرح وساحر)',   'icon' => '🧸'],
+        'radio_host'     => ['name' => 'Radio Host',        'name_ar' => 'مذيع راديو (أنيق وجذاب)', 'icon' => '📻'],
     ];
 
     /**
@@ -65,16 +70,21 @@ class ArabicVoiceMapper
      * Includes legacy entries (storytelling/ad_style/news) for backward compatibility.
      */
     public const EMOTIONS = [
-        'neutral' => ['name' => 'Neutral', 'name_ar' => 'Neutral', 'icon' => 'neutral'],
-        'warm' => ['name' => 'Warm', 'name_ar' => 'Warm', 'icon' => 'warm'],
-        'sad' => ['name' => 'Sad', 'name_ar' => 'Sad', 'icon' => 'sad'],
-        'excited' => ['name' => 'Excited', 'name_ar' => 'Excited', 'icon' => 'excited'],
-        'formal' => ['name' => 'Formal', 'name_ar' => 'Formal', 'icon' => 'formal'],
-        'storytelling' => ['name' => 'Storytelling', 'name_ar' => 'Storytelling', 'icon' => 'storytelling'],
-        'ad_style' => ['name' => 'Ad Style', 'name_ar' => 'Ad Style', 'icon' => 'ad_style'],
-        'news' => ['name' => 'News', 'name_ar' => 'News', 'icon' => 'news'],
-        'calm' => ['name' => 'Calm', 'name_ar' => 'Calm', 'icon' => 'calm'],
-        'angry' => ['name' => 'Angry', 'name_ar' => 'Angry', 'icon' => 'angry'],
+        'neutral' => ['name' => 'Neutral', 'name_ar' => 'محايد', 'icon' => 'neutral'],
+        'warm' => ['name' => 'Warm', 'name_ar' => 'دافئ', 'icon' => 'warm'],
+        'sad' => ['name' => 'Sad', 'name_ar' => 'حزين', 'icon' => 'sad'],
+        'excited' => ['name' => 'Excited', 'name_ar' => 'متحمس', 'icon' => 'excited'],
+        'formal' => ['name' => 'Formal', 'name_ar' => 'رسمي', 'icon' => 'formal'],
+        'storytelling' => ['name' => 'Storytelling', 'name_ar' => 'سرد قصصي', 'icon' => 'storytelling'],
+        'ad_style' => ['name' => 'Ad Style', 'name_ar' => 'أسلوب إعلاني', 'icon' => 'ad_style'],
+        'news' => ['name' => 'News', 'name_ar' => 'أخبار', 'icon' => 'news'],
+        'calm' => ['name' => 'Calm', 'name_ar' => 'هادئ', 'icon' => 'calm'],
+        'angry' => ['name' => 'Angry', 'name_ar' => 'غاضب', 'icon' => 'angry'],
+        'hopeful' => ['name' => 'Hopeful', 'name_ar' => 'متفائل', 'icon' => 'hopeful'],
+        'serious' => ['name' => 'Serious', 'name_ar' => 'جاد', 'icon' => 'serious'],
+        'playful' => ['name' => 'Playful', 'name_ar' => 'مرح', 'icon' => 'playful'],
+        'mysterious' => ['name' => 'Mysterious', 'name_ar' => 'غامض', 'icon' => 'mysterious'],
+        'confident' => ['name' => 'Confident', 'name_ar' => 'واثق', 'icon' => 'confident'],
     ];
 
     /**

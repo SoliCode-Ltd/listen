@@ -59,6 +59,8 @@ class DemoPremiumRoutingTest extends TestCase
             'translate' => false,
             'voice_tier' => 'hd',
             'voice_key' => VoiceCatalog::keyFromId((int) $premiumVoice->id),
+            'performance_style' => 'promo',
+            'emotion' => 'excited',
         ]);
 
         $response->assertOk()

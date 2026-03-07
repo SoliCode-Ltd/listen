@@ -35,6 +35,11 @@ class TtsService
         'storytelling',
         'ad_style',
         'news',
+        'sports_commentator',
+        'meditation',
+        'audiobook',
+        'children_story',
+        'radio_host',
     ];
 
     /** @var array<int, string> */
@@ -46,6 +51,11 @@ class TtsService
         'formal',
         'calm',
         'angry',
+        'hopeful',
+        'serious',
+        'playful',
+        'mysterious',
+        'confident',
     ];
 
     /**

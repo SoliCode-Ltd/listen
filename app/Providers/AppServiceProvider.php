@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Contracts\TtsProviderInterface;
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
+use App\Models\SiteSetting;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
@@ -56,6 +57,22 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         RouteServiceProvider::loadCachedRoutesUsing(fn () => $this->loadCachedRoutes());
+
+        if (! $this->app->runningInConsole()) {
+            $mainLanguage = strtolower(trim((string) SiteSetting::get('site_main_language', config('app.locale', 'ar'))));
+            if (! in_array($mainLanguage, ['ar', 'en'], true)) {
+                $mainLanguage = config('app.locale', 'ar');
+            }
+
+            config([
+                'app.locale' => $mainLanguage,
+                'laravellocalization.hideDefaultLocaleInURL' => false,
+            ]);
+
+            if (! request()->route()?->parameter('locale')) {
+                $this->app->setLocale($mainLanguage);
+            }
+        }
 
         Cashier::useSubscriptionModel(BillingSubscription::class);
         Cashier::useSubscriptionItemModel(BillingSubscriptionItem::class);

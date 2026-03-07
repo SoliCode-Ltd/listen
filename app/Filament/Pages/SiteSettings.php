@@ -32,6 +32,7 @@ class SiteSettings extends Page implements HasForms
             'site_name' => SiteSetting::get('site_name', config('app.name')),
             'site_description' => SiteSetting::get('site_description', ''),
             'contact_email' => SiteSetting::get('contact_email', ''),
+            'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
             'custom_css' => SiteSetting::get('custom_css', ''),
             'favicon_url' => SiteSetting::get('favicon_url', ''),
@@ -59,6 +60,15 @@ class SiteSettings extends Page implements HasForms
                             ->label('Contact Email')
                             ->email()
                             ->maxLength(255),
+                        Forms\Components\Select::make('site_main_language')
+                            ->label('Main Website Language')
+                            ->options([
+                                'ar' => 'Arabic (/ar)',
+                                'en' => 'English (/en)',
+                            ])
+                            ->required()
+                            ->native(false)
+                            ->helperText('Controls the default public website language when visitors open the site without a locale in the URL.'),
                         Forms\Components\Textarea::make('site_description')
                             ->label('Site Description')
                             ->rows(3)
