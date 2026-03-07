@@ -1,5 +1,13 @@
 <?php
 
+use App\Console\Commands\EnforceBillingGraceCommand;
+use App\Console\Commands\GenerateVoiceSamples;
+use App\Console\Commands\ListenSyncExtensionCommand;
+use App\Console\Commands\SendBillingRemindersCommand;
+use App\Console\Commands\SyncArabicTranslationsCommand;
+use App\Console\Commands\SyncBillingSubscriptionsCommand;
+use App\Console\Commands\SyncStripePlansCommand;
+use App\Console\Commands\ValidateVoiceCatalogCommand;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,6 +20,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        EnforceBillingGraceCommand::class,
+        GenerateVoiceSamples::class,
+        ListenSyncExtensionCommand::class,
+        SendBillingRemindersCommand::class,
+        SyncArabicTranslationsCommand::class,
+        SyncBillingSubscriptionsCommand::class,
+        SyncStripePlansCommand::class,
+        ValidateVoiceCatalogCommand::class,
         __DIR__.'/../app/Console/Commands',
     ])
     ->withMiddleware(function (Middleware $middleware): void {
