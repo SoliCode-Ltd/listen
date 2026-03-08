@@ -160,7 +160,7 @@ html[dir="rtl"] h6 {
 .brand-icon svg {
   width: 100%;
   height: 100%;
-  fill: currentColor;
+  fill: var(--brand-accent);
 }
 
 .brand-text {
@@ -234,9 +234,9 @@ html[dir="rtl"] h6 {
   width: calc(50% - 4px);
   height: calc(100% - 8px);
   border-radius: var(--radius-full);
-  background: var(--surface2);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow-sm);
+  background: var(--brand-accent);
+  border: 1px solid var(--brand-accent);
+  box-shadow: 0 4px 12px var(--brand-accent-glow);
   transition: transform .25s cubic-bezier(.4, 0, .2, 1);
   z-index: 0;
   pointer-events: none;
@@ -288,7 +288,7 @@ html[dir="rtl"] h6 {
 }
 
 .locale-link.active {
-  color: var(--text);
+  color: #ffffff;
   font-weight: 800;
 }
 

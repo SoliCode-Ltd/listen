@@ -81,7 +81,7 @@
                 <div class="header-logo-container">
                     <div class="header-logo">
                         <div class="header-icon">
-                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+                            <svg viewBox="0 0 128 128" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="50" width="14" height="28" rx="7"/><rect x="33" y="30" width="14" height="68" rx="7"/><rect x="57" y="14" width="14" height="100" rx="7"/><rect x="81" y="30" width="14" height="68" rx="7"/><rect x="105" y="50" width="14" height="28" rx="7"/></svg>
                         </div>
                         <div class="header-text">LISTEN STUDIO</div>
                     </div>
@@ -139,7 +139,7 @@
                 <div class="footer-brand">
                     <div class="footer-brand-inner">
                         <div class="footer-brand-icon">
-                            <svg viewBox="0 0 24 24" role="img" aria-hidden="true"><path d="M12 3a8 8 0 0 0-8 8v6a3 3 0 0 0 3 3h1.5a2.5 2.5 0 0 0 2.5-2.5v-3A2.5 2.5 0 0 0 8.5 12H6a6 6 0 1 1 12 0h-2.5a2.5 2.5 0 0 0-2.5 2.5v3a2.5 2.5 0 0 0 2.5 2.5H17a3 3 0 0 0 3-3v-6a8 8 0 0 0-8-8Z"/></svg>
+                            <svg viewBox="0 0 128 128" role="img" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="50" width="14" height="28" rx="7"/><rect x="33" y="30" width="14" height="68" rx="7"/><rect x="57" y="14" width="14" height="100" rx="7"/><rect x="81" y="30" width="14" height="68" rx="7"/><rect x="105" y="50" width="14" height="28" rx="7"/></svg>
                         </div>
                         <div class="footer-brand-text">LISTEN STUDIO</div>
                     </div>
