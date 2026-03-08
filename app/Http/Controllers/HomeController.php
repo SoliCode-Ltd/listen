@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\DemoGuestUsage;
+use App\Models\DemoIdentityLink;
+use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class HomeController extends Controller
@@ -324,7 +327,19 @@ class HomeController extends Controller
                 $demoRoutingPlan,
                 null,
             );
+            $audio['audio_path'] = $this->storeDemoAudioCopy((string) ($audio['audio_path'] ?? ''));
             $estimate = UsageEstimator::estimate($textForSpeech);
+            $this->storeDemoVoiceGeneration(
+                $request,
+                $validated,
+                $text,
+                $textForSpeech,
+                $sourceLanguage,
+                $voiceName,
+                $studioOptions,
+                $audio,
+                $quota
+            );
 
             return response()->json([
                 'ok' => true,
@@ -1092,6 +1107,157 @@ class HomeController extends Controller
         }
 
         return redirect()->route('dashboard');
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @param  array<string, mixed>  $studioOptions
+     * @param  array<string, mixed>  $audio
+     * @param  array<string, mixed>  $quota
+     */
+    private function storeDemoVoiceGeneration(
+        Request $request,
+        array $validated,
+        string $inputText,
+        string $speechText,
+        string $sourceLanguage,
+        ?string $voiceName,
+        array $studioOptions,
+        array $audio,
+        array $quota,
+    ): void {
+        try {
+            $identityContext = $this->demoTrackingContext($request);
+            $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
+            $voiceLabel = null;
+
+            if (is_array($voiceMeta)) {
+                $voiceLabel = trim((string) ($voiceMeta['label'] ?? $voiceMeta['label_ar'] ?? $voiceMeta['name'] ?? ''));
+            }
+
+            DemoVoiceGeneration::query()->create([
+                'primary_identity_hash' => $identityContext['primary_identity_hash'],
+                'link_group' => $identityContext['link_group'],
+                'input_text' => $inputText,
+                'speech_text' => $speechText,
+                'source_language' => $sourceLanguage,
+                'target_language' => (string) ($validated['target_language'] ?? ''),
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'voice_key' => isset($validated['voice_key']) ? (string) $validated['voice_key'] : null,
+                'voice_name' => $voiceName,
+                'voice_label' => $voiceLabel !== '' ? $voiceLabel : $voiceName,
+                'voice_provider' => isset($audio['provider']) ? (string) $audio['provider'] : VoiceCatalog::providerForName($voiceName),
+                'voice_tier' => isset($validated['voice_tier']) ? VoiceTier::normalize((string) $validated['voice_tier']) : null,
+                'audio_path' => isset($audio['audio_path']) ? (string) $audio['audio_path'] : null,
+                'duration_seconds' => isset($audio['duration_seconds']) ? (int) $audio['duration_seconds'] : null,
+                'billable_chars' => UsageEstimator::estimate($speechText)['chars'],
+                'dialect' => isset($studioOptions['dialect']) ? (string) $studioOptions['dialect'] : null,
+                'performance_style' => isset($studioOptions['performance_style']) ? (string) $studioOptions['performance_style'] : null,
+                'style_prompt' => isset($studioOptions['style_prompt']) ? (string) $studioOptions['style_prompt'] : null,
+                'emotion' => isset($studioOptions['emotion']) ? (string) $studioOptions['emotion'] : null,
+                'speed' => isset($studioOptions['speed']) ? (float) $studioOptions['speed'] : null,
+                'pitch' => isset($studioOptions['pitch']) ? (float) $studioOptions['pitch'] : null,
+                'tts_model' => isset($audio['model']) ? (string) $audio['model'] : null,
+                'tts_latency_ms' => isset($audio['latency_ms']) ? (int) $audio['latency_ms'] : null,
+                'tts_fallback_used' => (bool) ($audio['fallback_used'] ?? false),
+                'tts_cost_estimate_usd' => isset($audio['cost_estimate_usd']) ? (float) $audio['cost_estimate_usd'] : null,
+                'quota_limit_chars' => isset($quota['limit_chars']) ? (int) $quota['limit_chars'] : null,
+                'quota_remaining_chars' => isset($quota['remaining_chars']) ? (int) $quota['remaining_chars'] : null,
+                'metadata' => [
+                    'identities' => $identityContext['identities'],
+                    'identity_types' => $identityContext['identity_types'],
+                    'fraud_signal_types' => $identityContext['fraud_signal_types'],
+                    'voice_meta' => is_array($voiceMeta) ? [
+                        'gender' => $voiceMeta['gender'] ?? null,
+                        'language' => $voiceMeta['language'] ?? null,
+                        'provider' => $voiceMeta['provider'] ?? null,
+                    ] : null,
+                    'quota' => $quota,
+                    'routing_mode' => $audio['routing_mode'] ?? null,
+                    'plan_slug' => $audio['plan_slug'] ?? 'free',
+                ],
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to store demo voice generation.', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * @return array{
+     *   primary_identity_hash:string,
+     *   link_group:string|null,
+     *   identities:array<int,string>,
+     *   identity_types:array<string,string>,
+     *   fraud_signal_types:array<int,string>
+     * }
+     */
+    private function demoTrackingContext(Request $request): array
+    {
+        $extracted = $this->fraudService->extractIdentities($request);
+        $identities = array_values(array_filter(
+            array_map(static fn ($value) => trim((string) $value), (array) ($extracted['identities'] ?? [])),
+            static fn (string $value) => $value !== ''
+        ));
+
+        $linkGroup = null;
+        if ($identities !== []) {
+            $linkGroup = DemoIdentityLink::query()
+                ->whereIn('identity_hash', $identities)
+                ->value('link_group');
+        }
+
+        $fraudSignalTypes = [];
+        foreach ((array) ($extracted['fraud_signals'] ?? []) as $signal) {
+            if (is_array($signal) && isset($signal['type']) && is_string($signal['type'])) {
+                $fraudSignalTypes[] = $signal['type'];
+            }
+        }
+
+        return [
+            'primary_identity_hash' => trim((string) ($extracted['primary'] ?? 'unknown')) ?: 'unknown',
+            'link_group' => $linkGroup ? (string) $linkGroup : null,
+            'identities' => $identities,
+            'identity_types' => array_map(
+                static fn ($value) => trim((string) $value),
+                array_filter((array) ($extracted['identity_types'] ?? []), static fn ($value) => trim((string) $value) !== '')
+            ),
+            'fraud_signal_types' => array_values(array_unique($fraudSignalTypes)),
+        ];
+    }
+
+    private function storeDemoAudioCopy(string $sourcePath): string
+    {
+        $sourcePath = ltrim(trim($sourcePath), '/');
+        if ($sourcePath === '') {
+            return $sourcePath;
+        }
+
+        if (str_starts_with($sourcePath, 'audio/demo/')) {
+            return $sourcePath;
+        }
+
+        $disk = Storage::disk('public');
+        if (! $disk->exists($sourcePath)) {
+            return $sourcePath;
+        }
+
+        $extension = strtolower((string) pathinfo($sourcePath, PATHINFO_EXTENSION));
+        if ($extension === '') {
+            $extension = 'mp3';
+        }
+
+        $targetPath = 'audio/demo/'.now()->format('Ymd_His').'_'.Str::random(12).'.'.$extension;
+
+        if (! $disk->exists('audio/demo')) {
+            $disk->makeDirectory('audio/demo');
+        }
+
+        $disk->copy($sourcePath, $targetPath);
+
+        return $targetPath;
     }
 
     /**

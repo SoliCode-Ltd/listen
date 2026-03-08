@@ -479,7 +479,10 @@
       content: "";
       position: absolute;
       inset: 0;
-      background: var(--surface2);
+      background:
+        linear-gradient(145deg, rgba(3, 7, 18, .12), rgba(3, 7, 18, .34)),
+        var(--sample-flag-image, linear-gradient(135deg, color-mix(in oklab, var(--a) 12%, transparent), transparent 65%)),
+        var(--surface2);
       background-position: center;
       background-repeat: no-repeat;
       background-size: cover;
@@ -488,7 +491,7 @@
       z-index: 1;
     }
     .sample-card-hero.has-inline-art::after {
-      background: var(--surface2);
+      background: linear-gradient(145deg, rgba(3, 7, 18, .08), rgba(3, 7, 18, .26));
     }
     .sample-card-hero-svg {
       position: absolute;
