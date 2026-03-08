@@ -79,7 +79,7 @@
     .browser-card p {
       margin: 0 0 1.25rem;
       color: var(--muted);
-      font-size: .9rem;
+      font-size: .95rem;
     }
 
     .coming-soon-badge {
@@ -280,7 +280,7 @@
       border: 1px dashed var(--line);
       background: var(--surface);
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .copy-btn-wrap {
       margin-top: .75rem;
@@ -329,7 +329,7 @@
     .feature-card p {
       margin: 0;
       color: var(--muted);
-      font-size: .88rem;
+      font-size: .95rem;
       line-height: 1.5;
     }
 
@@ -462,7 +462,7 @@
             <li>{{ $installStep4 }}</li>
             <li>{{ $installStep5 }}</li>
           </ol>
-          <p id="extensionsOpenHint" style="display: none; margin-top: .75rem; color: var(--muted); font-size: .88rem;"></p>
+          <p id="extensionsOpenHint" style="display: none; margin-top: .75rem; color: var(--muted); font-size: .95rem;"></p>
         </article>
 
         <article class="page-card">

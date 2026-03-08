@@ -119,7 +119,8 @@
       transform: translateX(-100%);
     }
     .billing-savings {
-      font-size: .78rem;
+      font-size: .90rem;
+      font-weight: 600;
       color: color-mix(in oklab, var(--ok) 88%, var(--text));
       background: color-mix(in oklab, var(--ok) 14%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--ok) 45%, var(--line));
@@ -272,7 +273,7 @@
       justify-content: space-between;
       padding: .55rem 0;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .plan-features li:first-child {
       padding-top: 0;
@@ -374,7 +375,7 @@
     }
     .feature-card p {
       color: var(--muted);
-      font-size: .88rem;
+      font-size: .95rem;
       margin: 0;
       line-height: 1.55;
     }
@@ -406,7 +407,7 @@
     }
     .faq-item p {
       color: var(--muted);
-      font-size: .88rem;
+      font-size: .95rem;
       margin: 0;
       line-height: 1.55;
     }
@@ -499,7 +500,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: .88rem;
+      font-size: .95rem;
       padding: .3rem 0;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 50%, transparent);
     }

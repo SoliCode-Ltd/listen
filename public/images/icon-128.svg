@@ -1,41 +1,9 @@
 <svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="grad-listen" gradientUnits="userSpaceOnUse" x1="20" y1="20" x2="110" y2="110">
-      <stop offset="0%" stop-color="#C08FFF"/>
-      <stop offset="50%" stop-color="#8054FF"/>
-      <stop offset="100%" stop-color="#5522E8"/>
-    </linearGradient>
-
-    <filter id="glass-3d" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="6" stdDeviation="5" flood-color="#4B20C8" flood-opacity="0.3" result="shadow"/>
-      
-      <feOffset dx="1.5" dy="1.5" in="SourceAlpha" result="offsetA1"/>
-      <feComposite operator="out" in="SourceAlpha" in2="offsetA1" result="mask1"/>
-      <feGaussianBlur stdDeviation="1" in="mask1" result="blur1"/>
-      <feFlood flood-color="#FFFFFF" flood-opacity="0.9" result="color1"/>
-      <feComposite operator="in" in="color1" in2="blur1" result="highlight"/>
-      
-      <feOffset dx="-2" dy="-2" in="SourceAlpha" result="offsetA2"/>
-      <feComposite operator="out" in="SourceAlpha" in2="offsetA2" result="mask2"/>
-      <feGaussianBlur stdDeviation="1.5" in="mask2" result="blur2"/>
-      <feFlood flood-color="#3A10A3" flood-opacity="0.8" result="color2"/>
-      <feComposite operator="in" in="color2" in2="blur2" result="inner-shadow"/>
-      
-      <feMerge>
-        <feMergeNode in="shadow"/>
-        <feMergeNode in="SourceGraphic"/>
-        <feMergeNode in="inner-shadow"/>
-        <feMergeNode in="highlight"/>
-      </feMerge>
-    </filter>
-  </defs>
-
-  <g filter="url(#glass-3d)" stroke="url(#grad-listen)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M 28 40 C 44 12, 84 12, 100 40" />
-    <path d="M 28 60 L 28 88 Q 28 100 38 100 L 46 100" />
-    <line x1="46" y1="72" x2="46" y2="82" />
-    <line x1="64" y1="52" x2="64" y2="96" />
-    <line x1="82" y1="62" x2="82" y2="86" />
-    <line x1="100" y1="70" x2="100" y2="80" />
-  </g>
+  <rect x="5" y="59" width="10" height="10" rx="5" fill="#7659FA"/>
+  <rect x="23" y="42" width="10" height="44" rx="5" fill="#7659FA"/>
+  <rect x="41" y="28" width="10" height="72" rx="5" fill="#7659FA"/>
+  <rect x="59" y="14" width="10" height="100" rx="5" fill="#7659FA"/>
+  <rect x="77" y="28" width="10" height="72" rx="5" fill="#7659FA"/>
+  <rect x="95" y="42" width="10" height="44" rx="5" fill="#7659FA"/>
+  <rect x="113" y="59" width="10" height="10" rx="5" fill="#7659FA"/>
 </svg>

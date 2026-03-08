@@ -46,7 +46,7 @@
     .card-header p {
       margin: 0;
       color: var(--muted);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .status-grid {
       display: grid;
@@ -148,7 +148,7 @@
       border-radius: var(--radius);
       background: color-mix(in oklab, var(--success) 12%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
-      font-size: .88rem;
+      font-size: .95rem;
       color: var(--fg);
     }
     .saved-card-notice .saved-card-icon {
@@ -192,7 +192,7 @@
       padding: .6rem .75rem;
       border-radius: var(--radius);
       cursor: pointer;
-      font-size: .88rem;
+      font-size: .95rem;
       color: var(--fg);
       transition: border-color 0.15s ease;
     }
@@ -328,7 +328,7 @@
       align-items: center;
       padding: .7rem .9rem;
       border-bottom: 1px dashed color-mix(in oklab, var(--line) 65%, transparent);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .quote-row:last-child {
       border-bottom: none;

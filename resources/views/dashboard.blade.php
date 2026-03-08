@@ -376,7 +376,7 @@
       display: flex;
       align-items: center;
       gap: .4rem;
-      font-size: .88rem;
+      font-size: .95rem;
       font-weight: 700;
       color: color-mix(in oklab, var(--a) 55%, var(--text));
       margin-bottom: 1rem;
@@ -584,7 +584,7 @@
     }
     label {
       display: block;
-      font-size: .88rem;
+      font-size: .95rem;
       color: color-mix(in oklab, var(--text) 86%, var(--muted));
       margin-bottom: .35rem;
     }
@@ -820,7 +820,7 @@
       align-items: center;
       padding: .8rem 0;
       border-bottom: 1px dashed color-mix(in oklab, var(--line) 60%, transparent);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .info-row:last-child {
       border-bottom: none;
@@ -1100,7 +1100,7 @@
     .new-job-row td {
       animation: rowHighlight 3.5s ease-out forwards;
     }
-    
+
     .s-card {
       background: color-mix(in oklab, var(--surface) 72%, transparent);
       backdrop-filter: blur(18px);
@@ -1136,7 +1136,7 @@
       display: flex;
       align-items: center;
       gap: .5rem;
-      font-size: .88rem;
+      font-size: .95rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .04em;

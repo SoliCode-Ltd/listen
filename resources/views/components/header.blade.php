@@ -49,10 +49,13 @@
       @if($logoUrl)
         <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 40px; width: auto;" />
       @else
-        <span class="brand-icon" aria-hidden="true">
-          <svg viewBox="0 0 128 128" role="img" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="50" width="14" height="28" rx="7"/><rect x="33" y="30" width="14" height="68" rx="7"/><rect x="57" y="14" width="14" height="100" rx="7"/><rect x="81" y="30" width="14" height="68" rx="7"/><rect x="105" y="50" width="14" height="28" rx="7"/></svg>
-        </span>
-        <span class="brand-text">{{ $brandName }}</span>
+        @if($currentLocale === 'ar')
+          <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="إسمع" class="site-logo logo-dark">
+          <img src="{{ asset('images/logo-ar-light.svg') }}" alt="إسمع" class="site-logo logo-light">
+        @else
+          <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
+          <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
+        @endif
       @endif
     </a>
 
@@ -174,10 +177,13 @@
         @if($logoUrl)
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}" />
         @else
-          <span class="brand-icon" aria-hidden="true">
-            <svg viewBox="0 0 128 128" role="img" xmlns="http://www.w3.org/2000/svg"><rect x="9" y="50" width="14" height="28" rx="7"/><rect x="33" y="30" width="14" height="68" rx="7"/><rect x="57" y="14" width="14" height="100" rx="7"/><rect x="81" y="30" width="14" height="68" rx="7"/><rect x="105" y="50" width="14" height="28" rx="7"/></svg>
-          </span>
-          <span class="brand-text">{{ $brandName }}</span>
+          @if($currentLocale === 'ar')
+            <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="إسمع" class="site-logo logo-dark">
+            <img src="{{ asset('images/logo-ar-light.svg') }}" alt="إسمع" class="site-logo logo-light">
+          @else
+            <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
+            <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
+          @endif
         @endif
       </a>
       <div class="mobile-nav-tools">

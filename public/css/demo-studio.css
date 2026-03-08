@@ -182,7 +182,7 @@
   align-items: center;
   gap: .4rem;
   margin-bottom: .55rem;
-  font-size: .88rem;
+  font-size: .95rem;
   font-weight: 700;
   color: var(--text);
   text-transform: uppercase;
@@ -545,7 +545,7 @@ html[dir="rtl"] .perf-grid select {
 }
 
 .quota-panel .q-value {
-  font-size: .88rem;
+  font-size: .95rem;
   font-weight: 700;
   color: var(--text);
   white-space: nowrap;
@@ -587,7 +587,7 @@ html[dir="rtl"] .perf-grid select {
   display: flex;
   align-items: center;
   gap: .5rem;
-  font-size: .88rem;
+  font-size: .95rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -763,7 +763,7 @@ html[dir="rtl"] .perf-grid select {
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
-  font-size: .88rem;
+  font-size: .95rem;
   font-family: var(--font-body);
   min-height: 55px;
   resize: vertical;

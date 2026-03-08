@@ -312,7 +312,7 @@
     .premium-card p {
       margin: 0 0 .75rem;
       color: var(--muted);
-      font-size: .92rem;
+      font-size: .95rem;
       line-height: 1.55;
     }
     .premium-metric {
@@ -320,7 +320,7 @@
       padding: .35rem .7rem;
       border-radius: var(--radius-full);
       border: 1px solid var(--line);
-      font-size: .8rem;
+      font-size: .9rem;
       color: var(--muted);
     }
 

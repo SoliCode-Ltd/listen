@@ -104,7 +104,7 @@
     }
     .cookie-card p {
       margin: 0;
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .legal-section a {
       color: var(--text);

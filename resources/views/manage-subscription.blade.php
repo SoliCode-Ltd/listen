@@ -114,7 +114,7 @@
       background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .detail-row dt {
       color: var(--muted);
@@ -230,7 +230,7 @@
       padding: .7rem .5rem;
       text-align: start;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
-      font-size: .88rem;
+      font-size: .95rem;
     }
     .invoice-table th:last-child,
     .invoice-table td:last-child {
