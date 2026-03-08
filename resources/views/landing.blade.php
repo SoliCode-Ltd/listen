@@ -11,19 +11,10 @@
       will-change: transform;
     }
     .bg-orb.a {
-      width: 16rem;
-      height: 16rem;
-      background: color-mix(in oklab, var(--a) 74%, white 26%);
-      left: -4rem;
-      top: 15vh;
+      display: none;
     }
     .bg-orb.b {
-      width: 20rem;
-      height: 20rem;
-      background: color-mix(in oklab, var(--b) 75%, white 25%);
-      right: -4rem;
-      bottom: 8vh;
-      animation-delay: -3s;
+      display: none;
     }
 
     .hero {
@@ -77,17 +68,7 @@
       place-items: center;
     }
     .hero-art::before {
-      content: "";
-      position: absolute;
-      width: min(420px, 82%);
-      aspect-ratio: 1/1;
-      border-radius: 999px;
-      background: radial-gradient(circle, color-mix(in oklab, var(--a) 30%, transparent), transparent 68%);
-      filter: blur(18px);
-      opacity: .45;
-      animation: pulseGlow 6s ease-in-out infinite;
-      z-index: 0;
-      will-change: transform, opacity;
+      display: none;
     }
     .hero-art img {
       width: min(520px, 100%);
@@ -115,15 +96,11 @@
     .apps-shell {
       position: relative;
       overflow: hidden;
-      border: 1px solid color-mix(in oklab, var(--line) 55%, var(--a) 45%);
-      border-top: 1px solid color-mix(in oklab, white 18%, var(--a));
-      border-radius: calc(var(--radius-lg) + .6rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
       padding: clamp(2rem, 3vw, 3rem);
-      background:
-        radial-gradient(ellipse 70% 60% at 0% 0%, color-mix(in oklab, var(--a) 20%, transparent), transparent),
-        radial-gradient(ellipse 60% 55% at 100% 100%, color-mix(in oklab, var(--b) 18%, transparent), transparent),
-        linear-gradient(150deg, color-mix(in oklab, var(--surface2) 90%, var(--a) 10%), color-mix(in oklab, var(--surface) 96%, transparent));
-      box-shadow: 0 32px 80px rgba(0,0,0,.28), inset 0 1px 0 color-mix(in oklab, white 14%, transparent);
+      background: var(--surface);
+      box-shadow: var(--shadow);
     }
     .apps-shell::after {
       content: "";
@@ -141,8 +118,8 @@
       text-transform: uppercase;
       letter-spacing: .1em;
       color: color-mix(in oklab, var(--a) 75%, var(--text));
-      border: 1px solid color-mix(in oklab, var(--a) 35%, var(--line));
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      border: 1px solid var(--line);
+      background: var(--surface2);
       border-radius: var(--radius-full);
       padding: .32rem .75rem;
       margin-bottom: .85rem;
@@ -154,8 +131,8 @@
       width: .42rem;
       height: .42rem;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--a), var(--b));
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
+      background: var(--brand-accent);
+      box-shadow: none;
     }
     .apps-intro {
       display: grid;
@@ -182,8 +159,8 @@
       gap: .45rem;
       padding: .48rem .8rem;
       border-radius: var(--radius-full);
-      border: 1px solid color-mix(in oklab, var(--line) 65%, var(--a) 35%);
-      background: color-mix(in oklab, var(--surface) 70%, transparent);
+      border: 1px solid var(--line);
+      background: var(--surface2);
       color: var(--muted);
       font-size: .8rem;
       white-space: nowrap;
@@ -195,7 +172,7 @@
       width: .42rem;
       height: .42rem;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--a), var(--b));
+      background: var(--brand-accent);
       flex-shrink: 0;
     }
     /* Two app cards */
@@ -209,11 +186,10 @@
     .app-card {
       position: relative;
       overflow: hidden;
-      border: 1px solid color-mix(in oklab, var(--line) 75%, var(--a) 25%);
-      border-radius: calc(var(--radius-lg) + .15rem);
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
       padding: 1.6rem 1.5rem;
-      background:
-        linear-gradient(175deg, color-mix(in oklab, var(--surface2) 92%, var(--a) 8%), color-mix(in oklab, var(--surface) 97%, transparent));
+      background: var(--surface2);
       display: flex;
       flex-direction: column;
       gap: 1rem;
@@ -224,13 +200,12 @@
       position: absolute;
       inset: 0 0 auto 0;
       height: 1px;
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 40%, var(--a)), transparent);
-      opacity: .7;
+      display: none;
     }
     .app-card:hover {
       transform: translateY(-5px) scale(1.005);
-      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
-      box-shadow: 0 18px 44px color-mix(in oklab, var(--a) 14%, rgba(0,0,0,.18));
+      border-color: var(--line);
+      box-shadow: var(--shadow);
     }
     .app-card-head {
       display: flex;
@@ -241,8 +216,8 @@
       width: 2.6rem;
       height: 2.6rem;
       border-radius: .9rem;
-      border: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
-      background: color-mix(in oklab, var(--surface) 50%, transparent);
+      border: 1px solid var(--line);
+      background: var(--surface);
       display: grid;
       place-items: center;
       flex-shrink: 0;
@@ -279,7 +254,7 @@
       justify-content: space-between;
       gap: .8rem;
       padding-top: .85rem;
-      border-top: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      border-top: 1px solid var(--line);
     }
     .app-tag {
       display: inline-flex;
@@ -287,9 +262,9 @@
       gap: .35rem;
       padding: .38rem .65rem;
       border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--line) 68%, var(--a) 32%);
-      color: color-mix(in oklab, var(--a) 60%, var(--muted));
+      background: var(--surface2);
+      border: 1px solid var(--line);
+      color: var(--muted);
       font-size: .74rem;
       font-weight: 600;
       white-space: nowrap;
@@ -300,7 +275,7 @@
       gap: .45rem;
       padding: .42rem .95rem;
       border-radius: var(--radius-full);
-      background: linear-gradient(90deg, var(--a), var(--b));
+      background: var(--brand-accent);
       color: #fff;
       font-size: .85rem;
       font-weight: 700;
@@ -319,7 +294,7 @@
       gap: 1rem;
     }
     .premium-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.5rem;
@@ -328,7 +303,7 @@
     }
     .premium-card:hover {
       transform: translateY(-4px);
-      border-color: color-mix(in oklab, var(--a) 45%, var(--line));
+      border-color: var(--brand-accent);
     }
     .premium-card h3 {
       margin: 0 0 .55rem;
@@ -352,7 +327,7 @@
     .cta-section {
       text-align: center;
       padding: 3rem;
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       margin: 2rem 0 3rem;
@@ -411,13 +386,13 @@
       gap: .5rem;
       padding: .32rem .75rem;
       border-radius: var(--radius-full);
-      border: 1px solid color-mix(in oklab, var(--b) 38%, var(--line));
-      background: color-mix(in oklab, var(--b) 8%, var(--surface));
+      border: 1px solid var(--line);
+      background: var(--surface2);
       font-size: .72rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: .1em;
-      color: color-mix(in oklab, var(--b) 80%, var(--text));
+      color: var(--text);
       margin-bottom: .75rem;
     }
     .voice-gallery-kicker::before {
@@ -425,8 +400,8 @@
       width: .42rem;
       height: .42rem;
       border-radius: 50%;
-      background: linear-gradient(135deg, var(--b), var(--a));
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--b) 22%, transparent);
+      background: var(--brand-accent);
+      box-shadow: none;
     }
     .voice-gallery-title {
       margin: 0 0 .45rem;
@@ -463,8 +438,8 @@
       position: relative;
       overflow: hidden;
       border-radius: calc(var(--radius-lg) + .2rem);
-      border: 1px solid color-mix(in oklab, var(--line) 78%, var(--a) 22%);
-      background: linear-gradient(160deg, color-mix(in oklab, var(--surface2) 90%, var(--a) 10%), color-mix(in oklab, var(--surface) 92%, var(--b) 8%));
+      border: 1px solid var(--line);
+      background: var(--surface);
       padding: 0;
       box-shadow: 0 8px 28px rgba(0,0,0,.15);
       transition: transform .4s cubic-bezier(.22,1,.36,1), border-color .4s ease, box-shadow .4s ease;
@@ -479,17 +454,16 @@
       position: absolute;
       inset: 0 0 auto 0;
       height: 1px;
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 35%, var(--b)), transparent);
-      pointer-events: none;
+      display: none;
     }
     .sample-card:hover {
       transform: translateY(-8px) scale(1.02);
-      border-color: color-mix(in oklab, var(--b) 45%, var(--line));
-      box-shadow: 0 24px 48px color-mix(in oklab, var(--b) 12%, rgba(0,0,0,.25));
+      border-color: var(--brand-hover);
+      box-shadow: var(--shadow);
     }
     .sample-card.is-active-card {
-      border-color: color-mix(in oklab, var(--a) 60%, var(--line));
-      box-shadow: 0 0 0 1px color-mix(in oklab, var(--a) 30%, transparent), 0 20px 50px color-mix(in oklab, var(--a) 14%, transparent);
+      border-color: var(--brand-active);
+      box-shadow: var(--shadow);
     }
     /* Card hero section with gradient bg */
     .sample-card-hero {
@@ -505,9 +479,7 @@
       content: "";
       position: absolute;
       inset: 0;
-      background:
-        linear-gradient(135deg, rgba(8, 12, 24, 0), rgba(8, 12, 24, .1)),
-        var(--sample-flag-image, linear-gradient(135deg, color-mix(in oklab, var(--a) 12%, transparent), transparent 65%));
+      background: var(--surface2);
       background-position: center;
       background-repeat: no-repeat;
       background-size: cover;
@@ -516,7 +488,7 @@
       z-index: 1;
     }
     .sample-card-hero.has-inline-art::after {
-      background: linear-gradient(135deg, rgba(8, 12, 24, .04), rgba(8, 12, 24, .16));
+      background: var(--surface2);
     }
     .sample-card-hero-svg {
       position: absolute;
@@ -540,7 +512,7 @@
     /* Card body */
     .sample-card-body {
       padding: 1.05rem 1.4rem 1rem;
-      background: linear-gradient(180deg, color-mix(in oklab, var(--surface2) 40%, transparent), color-mix(in oklab, var(--surface) 90%, transparent));
+      background: var(--surface);
       position: relative;
       display: flex;
       flex-direction: column;
@@ -548,12 +520,7 @@
       flex: 1;
     }
     .sample-card-body::before {
-      content: "";
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, var(--a) 80%, white), color-mix(in oklab, var(--b) 80%, white), transparent);
-      opacity: 0.8;
+      display: none;
     }
     .sample-card-title {
       margin: 0;
@@ -587,7 +554,7 @@
     .sample-eq-bar {
       width: 3px;
       border-radius: 6px;
-      background: linear-gradient(180deg, var(--a), var(--b));
+      background: var(--brand-accent);
       opacity: 0;
       transition: opacity .3s ease, height .4s cubic-bezier(.22, 1, .36, 1);
       will-change: height, opacity;
@@ -641,7 +608,7 @@
       height: 3.2rem;
       border-radius: 999px;
       border: none;
-      background: linear-gradient(135deg, var(--a), var(--b));
+      background: var(--brand-accent);
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -661,36 +628,20 @@
     }
     /* Inner gloss sheen */
     .sample-play-btn::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 50%);
-      opacity: 1;
-      pointer-events: none;
+      display: none;
     }
     .sample-play-btn:hover {
       transform: translateY(-4px) scale(1.08);
-      box-shadow:
-        0 14px 26px color-mix(in oklab, var(--a) 45%, rgba(0,0,0,.25)),
-        inset 0 1px 1.5px rgba(255,255,255,.5),
-        inset 0 -2px 5px color-mix(in oklab, var(--b) 90%, black);
-      filter: brightness(1.1) saturate(1.1);
+      background: var(--brand-hover);
+      box-shadow: var(--shadow);
     }
     .sample-play-btn:active {
       transform: translateY(1px) scale(0.96);
-      box-shadow:
-        0 4px 10px color-mix(in oklab, var(--a) 25%, transparent),
-        inset 0 2px 4px rgba(0,0,0,.3);
+      background: var(--brand-active);
     }
     .sample-play-btn.is-playing {
-      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 85%, black), color-mix(in oklab, var(--b) 85%, black));
-      box-shadow:
-        0 6px 16px color-mix(in oklab, var(--a) 35%, transparent),
-        inset 0 1px 1.5px rgba(255,255,255,.2),
-        inset 0 -2px 6px color-mix(in oklab, var(--b) 95%, black);
+      background: var(--brand-active);
       transform: scale(0.96);
-      filter: brightness(1) saturate(1);
     }
     .sample-play-btn > * { position: relative; z-index: 1; }
     .sample-play-icon {
@@ -726,11 +677,11 @@
     }
     /* Light-mode overrides */
     html[data-theme="light"] .sample-card {
-      background: linear-gradient(160deg, color-mix(in oklab, white 88%, var(--a) 12%), color-mix(in oklab, white 92%, var(--surface) 8%));
+      background: var(--surface);
     }
     html[data-theme="light"] .sample-card-body {
-      background: linear-gradient(180deg, color-mix(in oklab, white 86%, var(--a) 14%), color-mix(in oklab, white 92%, var(--b) 8%));
-      border-top-color: color-mix(in oklab, var(--line) 65%, white 35%);
+      background: var(--surface);
+      border-top-color: var(--line);
     }
 
     html[data-theme="light"] .sample-card-hero::after {
@@ -837,11 +788,9 @@
       height: auto;
       min-height: 75%;
       border-radius: 1.5rem;
-      background: linear-gradient(145deg, color-mix(in oklab, var(--a) 15%, transparent), color-mix(in oklab, var(--surface) 50%, transparent));
-      border: 1px solid color-mix(in oklab, var(--text) 5%, transparent);
-      box-shadow: 0 32px 64px rgba(0,0,0,0.5), inset 0 1px 1px color-mix(in oklab, var(--text) 15%, transparent);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
       transform: rotateY(-15deg) rotateX(10deg) translateZ(0);
       will-change: transform;
       display: flex;
@@ -855,7 +804,7 @@
 
     .tts-header {
       padding: 1rem 1.5rem;
-      border-bottom: 1px solid color-mix(in oklab, var(--text) 10%, transparent);
+      border-bottom: 1px solid var(--line);
       display: flex;
       gap: 8px;
     }
@@ -864,10 +813,10 @@
       width: 12px;
       height: 12px;
       border-radius: 50%;
-      background: color-mix(in oklab, var(--text) 20%, transparent);
+      background: var(--line);
     }
-    .tts-dot:nth-child(1) { background: color-mix(in oklab, var(--a) 80%, transparent); }
-    .tts-dot:nth-child(2) { background: color-mix(in oklab, var(--b) 80%, transparent); }
+    .tts-dot:nth-child(1) { background: var(--danger); }
+    .tts-dot:nth-child(2) { background: var(--ok); }
 
     .tts-body {
       flex: 1;
@@ -930,12 +879,9 @@
     }
 
     .hero-audio-btn.is-playing {
-      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 85%, black), color-mix(in oklab, var(--b) 85%, black));
-      box-shadow:
-        0 6px 16px color-mix(in oklab, var(--a) 35%, transparent),
-        inset 0 1px 1.5px rgba(255,255,255,.2),
-        inset 0 -2px 6px color-mix(in oklab, var(--b) 95%, black);
-      border-color: color-mix(in oklab, rgba(255,255,255,.1) 50%, transparent);
+      background: var(--brand-active);
+      box-shadow: var(--shadow);
+      border-color: var(--brand-active);
     }
 
     .hero-audio-btn:not(.is-playing) {
@@ -943,26 +889,11 @@
     }
 
     .hero-audio-btn::before {
-      content: "";
-      position: absolute;
-      inset: -6px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--a), var(--b));
-      opacity: 0.3;
-      z-index: -1;
-      transition: opacity .3s ease, transform .4s ease;
-      filter: blur(8px);
-      animation: idleGlow 3s ease-in-out infinite alternate;
-      will-change: transform, opacity;
+      display: none;
     }
 
     .hero-audio-btn::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      border-radius: 50%;
-      background: linear-gradient(180deg, rgba(255,255,255,.15) 0%, transparent 50%);
-      pointer-events: none;
+      display: none;
     }
 
     .hero-audio-rings {
@@ -1195,7 +1126,7 @@
       display: inline-block;
       width: 4px;
       height: 1.1em;
-      background: linear-gradient(180deg, var(--a), var(--b));
+      background: var(--brand-accent);
       margin-left: 6px;
       vertical-align: text-bottom;
       animation: blinkCaret 0.9s step-end infinite;
@@ -1238,7 +1169,7 @@
       width: 8px;
       height: 44px;
       border-radius: var(--radius-full);
-      background: linear-gradient(180deg, var(--a), var(--b));
+      background: var(--brand-accent);
       opacity: 0.5;
       transform: scaleY(0.27);
       transform-origin: bottom;
@@ -1274,18 +1205,7 @@
     }
 
     .tts-glowing-orb {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 150px;
-      height: 150px;
-      background: var(--a);
-      border-radius: 50%;
-      filter: blur(60px);
-      transform: translate(-50%, -50%) translateZ(-50px);
-      opacity: 0.4;
-      animation: pulse-glow 4s ease-in-out infinite alternate;
-      will-change: transform, opacity;
+      display: none;
     }
 
     @keyframes pulse-glow {

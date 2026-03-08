@@ -1,44 +1,46 @@
 <style id="listen-shared-styles">
-@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  --font-display: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
-  --font-display-ar: 'Cairo', sans-serif;
-  --font-body-ar: 'Cairo', sans-serif;
+  --font-display: 'IBM Plex Sans', sans-serif;
+  --font-body: 'IBM Plex Sans', sans-serif;
+  --font-display-ar: 'IBM Plex Sans Arabic', sans-serif;
+  --font-body-ar: 'IBM Plex Sans Arabic', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --btn-radius: 10px;
-  --bg: #070910;
-  --surface: #11182a;
-  --surface2: #15213a;
-  --line: #2b3a5d;
-  --text: #f4f7ff;
-  --muted: #9fb0d4;
-  --a: #FF4433;
-  --b: #8A2BE2;
-  --brand-accent: #FF4433;
-  --brand-accent-glow: rgba(255, 68, 51, 0.4);
+  --btn-radius: 8px;
+  --bg: #0B0B0F;
+  --surface: #1A1A22;
+  --surface2: #121218;
+  --line: #2A2A35;
+  --text: #FFFFFF;
+  --muted: #A1A1AA;
+  --a: #7659FA;
+  --b: #7659FA;
+  --brand-accent: #7659FA;
+  --brand-hover: #5B3DF5;
+  --brand-active: #4C2DEB;
+  --brand-subtle: #A99CFF;
+  --brand-accent-glow: rgba(118, 89, 250, 0.4);
   --ok: #32c58d;
   --danger: #ee4a77;
-  --shadow: 0 16px 46px rgba(0,0,0,.30);
-  --shadow-sm: 0 4px 12px rgba(0,0,0,.20);
-  --radius: .72rem;
-  --radius-lg: 1rem;
+  --shadow: 0 4px 16px rgba(0,0,0,.15);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.10);
+  --radius: .5rem;
+  --radius-lg: .75rem;
   --radius-full: 9999px;
 }
 html[data-theme="light"] {
-  --bg: #eff3ff;
-  --surface: #fff;
-  --surface2: #f7f9ff;
-  --line: #d8e2f1;
-  --text: #121a2d;
-  --muted: #5b6c89;
-  --shadow: 0 14px 34px rgba(35,56,97,.13);
-  --shadow-sm: 0 2px 8px rgba(35,56,97,.08);
-  /* Make the mesh gradients much softer in light mode for a sleek look */
-  --a: #ff786b;
-  --b: #a461e8;
-  --brand-accent-glow: rgba(255, 68, 51, 0.15);
+  --bg: #FFFFFF;
+  --surface: #FFFFFF;
+  --surface2: #F5F6FB;
+  --line: #E6E8F0;
+  --text: #0F172A;
+  --muted: #6B7280;
+  --shadow: 0 4px 12px rgba(0,0,0,.06);
+  --shadow-sm: 0 2px 6px rgba(0,0,0,.04);
+  --a: #7659FA;
+  --b: #7659FA;
+  --brand-accent-glow: rgba(118, 89, 250, 0.15);
 }
 
 * { box-sizing: border-box; }
@@ -54,9 +56,7 @@ body.mobile-menu-open {
 }
 body {
   font-family: var(--font-body);
-  background: radial-gradient(1200px 500px at 92% -20%, color-mix(in oklab,var(--b) 25%,transparent), transparent 60%),
-              radial-gradient(900px 420px at -5% 0%, color-mix(in oklab,var(--a) 18%,transparent), transparent 58%),
-              var(--bg);
+  background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
@@ -164,10 +164,7 @@ html[dir="rtl"] h6 {
 }
 
 .brand-text {
-  background: linear-gradient(135deg, var(--a), var(--b));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--brand-accent);
   white-space: nowrap;
 }
 
@@ -237,8 +234,9 @@ html[dir="rtl"] h6 {
   width: calc(50% - 4px);
   height: calc(100% - 8px);
   border-radius: var(--radius-full);
-  background: linear-gradient(135deg, var(--a), var(--b));
-  box-shadow: 0 2px 8px color-mix(in oklab, var(--a) 30%, transparent);
+  background: var(--surface2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
   transition: transform .25s cubic-bezier(.4, 0, .2, 1);
   z-index: 0;
   pointer-events: none;
@@ -290,8 +288,7 @@ html[dir="rtl"] h6 {
 }
 
 .locale-link.active {
-  color: #fff;
-  text-shadow: 0 1px 8px rgba(255,255,255,0.3);
+  color: var(--text);
   font-weight: 800;
 }
 
@@ -317,20 +314,27 @@ html[dir="rtl"] h6 {
 
 .btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px color-mix(in oklab, var(--line) 40%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--a), var(--b));
+  background: var(--brand-accent);
   border: none;
   color: #fff;
-  box-shadow: 0 4px 12px color-mix(in oklab, var(--a) 25%, transparent);
+  box-shadow: var(--shadow-sm);
 }
 
 .btn.btn-primary:hover,
 .btn-primary:hover {
+  background: var(--brand-hover);
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 45%, transparent);
+  box-shadow: var(--shadow);
+}
+
+.btn.btn-primary:active,
+.btn-primary:active {
+  background: var(--brand-active);
+  transform: translateY(0);
 }
 
 .btn-ghost {
@@ -404,7 +408,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--a) 45%, transparent), color-mix(in oklab, var(--b) 45%, transparent));
+  background: var(--brand-accent);
   font-size: .75rem;
   font-weight: 700;
   color: #fff;
@@ -482,7 +486,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--a) 50%, transparent), color-mix(in oklab, var(--b) 50%, transparent));
+  background: var(--brand-accent);
   font-size: .95rem;
   font-weight: 700;
   color: #fff;
@@ -732,7 +736,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, color-mix(in oklab, var(--a) 50%, transparent), color-mix(in oklab, var(--b) 50%, transparent));
+  background: var(--brand-accent);
   font-size: .95rem;
   font-weight: 700;
   color: #fff;
@@ -951,18 +955,7 @@ form:has(button.mobile-nav-link) {
 }
 
 .hero-bg-accent {
-  position: absolute;
-  top: -40%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100vw;
-  height: 100vw;
-  max-width: 1200px;
-  max-height: 1200px;
-  background: radial-gradient(circle, color-mix(in oklab, var(--b) 25%, transparent) 0%, transparent 50%);
-  z-index: -1;
-  pointer-events: none;
-  animation: heroPulse 10s ease-in-out infinite alternate;
+  display: none;
 }
 
 @keyframes heroPulse {
@@ -1065,19 +1058,12 @@ form:has(button.mobile-nav-link) {
   position: relative;
   overflow: hidden;
   z-index: 1;
-  background: linear-gradient(135deg, var(--a), var(--b));
+  background: var(--brand-accent);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .contact-submit-btn::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: linear-gradient(135deg, var(--b), var(--a));
-  opacity: 0;
-  z-index: -1;
-  transition: opacity 0.4s ease;
+  display: none;
 }
 
 .contact-submit-btn:hover::before {
@@ -1086,7 +1072,8 @@ form:has(button.mobile-nav-link) {
 
 .contact-submit-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 45%, transparent);
+  box-shadow: var(--shadow-sm);
+  background: var(--brand-hover);
 }
 
 .btn-icon-right {
@@ -1245,7 +1232,7 @@ form:has(button.mobile-nav-link) {
   box-shadow: var(--shadow-sm);
 }
 .toggle-switch input:checked + .toggle-slider {
-  background: linear-gradient(135deg, var(--a), var(--b));
+  background: var(--brand-accent);
 }
 .toggle-switch input:focus-visible + .toggle-slider {
   outline: 2px solid var(--text);
@@ -1365,12 +1352,12 @@ form:has(button.mobile-nav-link) {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--a), var(--b));
+  background: var(--brand-accent);
   color: #fff;
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px color-mix(in oklab, var(--a) 35%, transparent);
+  box-shadow: none;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
 }
 .custom-audio-play:hover {
@@ -1429,7 +1416,7 @@ form:has(button.mobile-nav-link) {
   top: 0;
   left: 0;
   bottom: 0;
-  background: linear-gradient(90deg, var(--a), var(--b));
+  background: var(--brand-accent);
   width: 0%;
   border-radius: 99px;
   pointer-events: none;

@@ -3,16 +3,17 @@
  * (c) 2024-2026 SoliCode Ltd. All rights reserved.
  * https://solicode.co.uk
  */
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --bg: #070910;
-  --panel: #11182a;
-  --line: #2b3a5d;
-  --text: #f4f7ff;
-  --muted: #9fb0d4;
-  --primaryA: #FF4433;
-  --primaryB: #8A2BE2;
+  --bg: #0B0B0F;
+  --panel: #1A1A22;
+  --line: #2A2A35;
+  --text: #FFFFFF;
+  --muted: #A1A1AA;
+  --primaryA: #7659FA;
+  --primaryB: #5B3DF5;
+  --active: #4C2DEB;
   --ok: #2bb673;
   --error: #d9534f;
   --radius: 12px;
@@ -24,10 +25,8 @@
 
 body {
   margin: 0;
-  font: 13px/1.4 'Inter', Segoe UI, sans-serif;
-  background: radial-gradient(400px 300px at 90% -10%, rgba(138, 43, 226, 0.15), transparent 60%),
-    radial-gradient(300px 200px at -10% -10%, rgba(255, 68, 51, 0.12), transparent 60%),
-    var(--bg);
+  font: 13px/1.4 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
+  background: var(--bg);
   color: var(--text);
   min-width: 390px;
 }
@@ -40,14 +39,11 @@ body {
 
 .head h1 {
   margin: 0;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
   font-size: 18px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--primaryA);
 }
 
 .head p {
@@ -56,9 +52,7 @@ body {
 }
 
 .panel {
-  background:
-    linear-gradient(135deg, rgba(255, 68, 51, 0.08), rgba(138, 43, 226, 0.1)),
-    color-mix(in oklab, var(--panel) 92%, transparent);
+  background: var(--panel);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 12px;
@@ -85,8 +79,8 @@ body {
   place-items: center;
   font-weight: 700;
   color: #fff;
-  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
-  box-shadow: 0 2px 8px rgba(255, 68, 51, 0.3);
+  background: var(--primaryA);
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--primaryA) 30%, transparent);
 }
 
 .name {
@@ -115,7 +109,7 @@ body {
   display: block;
   height: 100%;
   width: 0;
-  background: linear-gradient(90deg, var(--primaryA), var(--primaryB));
+  background: var(--primaryA);
   border-radius: 99px;
 }
 
@@ -153,7 +147,7 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: var(--primaryB);
+  border-color: var(--primaryA);
 }
 
 input[dir="auto"],
@@ -181,7 +175,7 @@ textarea[dir="auto"] {
   transition: all .2s ease;
 }
 .setting-card:hover {
-  border-color: rgba(255, 68, 51, 0.3);
+  border-color: var(--primaryA);
 }
 .setting-info {
   display: flex;
@@ -232,7 +226,7 @@ textarea[dir="auto"] {
   box-shadow: 0 2px 4px rgba(0,0,0,.2);
 }
 .toggle-switch input:checked + .toggle-slider {
-  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
+  background: var(--primaryA);
 }
 .toggle-switch input:focus-visible + .toggle-slider {
   outline: 2px solid var(--text);
@@ -260,14 +254,19 @@ textarea[dir="auto"] {
 
 .btn.primary {
   border: 0;
-  background: linear-gradient(135deg, var(--primaryA), var(--primaryB));
+  background: var(--primaryA);
   color: #fff;
-  box-shadow: 0 4px 12px rgba(255, 68, 51, 0.25);
+  box-shadow: none;
 }
 
 .btn.primary:hover {
-  box-shadow: 0 8px 24px rgba(255, 68, 51, 0.4);
+  background: var(--primaryB);
+  box-shadow: none;
   transform: translateY(-1px);
+}
+.btn.primary:active {
+  background: var(--active);
+  transform: translateY(1px);
 }
 
 .status {
@@ -315,8 +314,8 @@ textarea[dir="auto"] {
 
 /* ===== STUDIO PANEL ===== */
 .studio-panel {
-  background: linear-gradient(135deg, rgba(138, 43, 226, 0.15), rgba(255, 68, 51, 0.1));
-  border: 1px solid rgba(138, 43, 226, 0.3);
+  background: color-mix(in oklab, var(--primaryA) 8%, var(--bg));
+  border: 1px solid color-mix(in oklab, var(--primaryA) 20%, var(--line));
   border-radius: 10px;
   padding: 12px;
 }
@@ -371,8 +370,8 @@ textarea[dir="auto"] {
   transition: all 0.2s;
 }
 .lang-btn:hover {
-  background: rgba(138, 43, 226, 0.3);
-  border-color: rgba(138, 43, 226, 0.5);
+  background: color-mix(in oklab, var(--primaryA) 15%, transparent);
+  border-color: var(--primaryA);
 }
 
 /* ===== RTL SUPPORT ===== */

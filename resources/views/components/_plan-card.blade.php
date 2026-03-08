@@ -55,7 +55,7 @@
           'users' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
           'heart' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
           'sliders' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
-          default => '<defs><linearGradient id="planCheckGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="var(--a)"/><stop offset="100%" stop-color="var(--b)"/></linearGradient></defs><circle cx="12" cy="12" r="12" style="fill:url(#planCheckGrad);stroke:none;" opacity="0.15"/><circle cx="12" cy="12" r="9" style="fill:url(#planCheckGrad);stroke:none;"/><path d="M8.5 12L10.5 14.5L16 9" style="stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;"/>',
+          default => '<circle cx="12" cy="12" r="12" style="fill:var(--brand-accent);stroke:none;" opacity="0.15"/><circle cx="12" cy="12" r="9" style="fill:var(--brand-accent);stroke:none;"/><path d="M8.5 12L10.5 14.5L16 9" style="stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;"/>',
         };
       @endphp
     <li>

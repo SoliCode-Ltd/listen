@@ -22,7 +22,7 @@
       margin-top: 2.5rem;
     }
     .browser-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 2rem 1.5rem;
@@ -99,7 +99,7 @@
       justify-content: center;
       padding: .65rem 1.2rem;
       border-radius: var(--radius);
-      background: linear-gradient(135deg, var(--a), var(--b));
+      background: var(--brand-accent);
       color: #fff;
       font-weight: 600;
       font-size: .92rem;
@@ -109,7 +109,8 @@
     }
     .download-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 20px color-mix(in oklab, var(--b) 30%, transparent);
+      box-shadow: var(--shadow);
+      background: var(--brand-hover);
     }
     .download-actions {
       display: inline-flex;
@@ -137,7 +138,7 @@
       gap: 1.5rem;
     }
     .page-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.75rem;
@@ -175,7 +176,7 @@
       margin-bottom: 3rem;
     }
     .api-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 2rem;
@@ -238,8 +239,8 @@
       margin-top: 1.25rem;
       padding: 1rem 1.25rem;
       border-radius: var(--radius);
-      border: 1px solid color-mix(in oklab, var(--a) 35%, var(--line));
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      border: 1px solid var(--line);
+      background: var(--surface2);
     }
     .key-display-label {
       font-size: .8rem;
@@ -319,7 +320,7 @@
       width: 2.5rem;
       height: 2.5rem;
       margin: 0 auto .75rem;
-      color: var(--a);
+      color: var(--brand-accent);
     }
     .feature-card h3 {
       margin: 0 0 .4rem;
@@ -605,14 +606,14 @@
           if (state.api_key_created_human) {
             keyMask.textContent += '  (' + i18n.created_prefix + ' ' + state.api_key_created_human + ')';
           }
-          keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--ok) 35%, var(--line))';
-          keyDisplayBox.style.background = 'color-mix(in oklab, var(--ok) 8%, var(--surface))';
+          keyDisplayBox.style.borderColor = 'var(--line)';
+          keyDisplayBox.style.background = 'var(--surface2)';
         } else {
           keyBadge.className = 'badge inactive';
           keyBadge.innerHTML = '<span class="badge-dot"></span>' + i18n.no_api_key;
           keyMask.textContent = i18n.not_generated;
-          keyDisplayBox.style.borderColor = 'color-mix(in oklab, var(--a) 35%, var(--line))';
-          keyDisplayBox.style.background = 'color-mix(in oklab, var(--a) 8%, var(--surface))';
+          keyDisplayBox.style.borderColor = 'var(--line)';
+          keyDisplayBox.style.background = 'var(--surface2)';
         }
       revokeBtn.disabled = !hasKey;
     }

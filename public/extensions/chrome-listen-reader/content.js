@@ -128,14 +128,14 @@
     style.id = STYLE_ID;
     style.textContent = `
       #${PANEL_ID} {
-        --bg: #070910;
-        --surface: #11182a;
-        --surface2: #15213a;
-        --line: #2b3a5d;
-        --text: #f4f7ff;
-        --muted: #9fb0d4;
-        --brandA: #FF4433;
-        --brandB: #8A2BE2;
+        --bg: #0B0B0F;
+        --surface: #1A1A22;
+        --surface2: #121218;
+        --line: #2A2A35;
+        --text: #FFFFFF;
+        --muted: #A1A1AA;
+        --brandA: #7659FA;
+        --brandB: #5B3DF5;
         position: fixed;
         right: 8px;
         top: 50%;
@@ -144,13 +144,10 @@
         width: min(380px, calc(100vw - 16px));
         border-radius: 14px;
         border: 1px solid rgba(43, 58, 93, 0.85);
-        background:
-          radial-gradient(90% 80% at 94% -15%, rgba(138, 43, 226, 0.16), transparent 65%),
-          radial-gradient(95% 85% at -15% -20%, rgba(255, 68, 51, 0.14), transparent 62%),
-          linear-gradient(180deg, rgba(17, 24, 42, 0.98), rgba(10, 16, 29, 0.98));
+        background: var(--surface);
         box-shadow: 0 22px 52px rgba(0, 0, 0, 0.42);
         color: var(--text);
-        font-family: Inter, Segoe UI, Roboto, Arial, sans-serif;
+        font-family: IBM Plex Sans, Inter, sans-serif;
         overflow: hidden;
         backdrop-filter: blur(9px);
         opacity: 0;
@@ -168,8 +165,8 @@
         justify-content: space-between;
         gap: 10px;
         padding: 11px 12px 10px;
-        border-bottom: 1px solid rgba(43, 58, 93, 0.65);
-        background: linear-gradient(135deg, rgba(255, 68, 51, 0.17), rgba(138, 43, 226, 0.22));
+        border-bottom: 1px solid var(--line);
+        background: var(--surface2);
         cursor: grab;
         touch-action: none;
       }
@@ -179,16 +176,13 @@
       #${PANEL_ID} .listen-brand {
         font-size: 13px;
         font-weight: 800;
-        background: linear-gradient(135deg, var(--brandA), var(--brandB));
-        -webkit-background-clip: text;
-        background-clip: text;
-        color: transparent;
+        color: var(--brandA);
       }
       #${PANEL_ID} .listen-close {
         width: 30px;
         height: 30px;
-        border: 1px solid rgba(43, 58, 93, 0.7);
-        background: rgba(21, 33, 58, 0.92);
+        border: 1px solid var(--line);
+        background: var(--surface);
         color: var(--text);
         border-radius: 8px;
         display: inline-grid;
@@ -197,8 +191,8 @@
         transition: background 160ms ease, border-color 160ms ease, transform 120ms ease;
       }
       #${PANEL_ID} .listen-close:hover {
-        background: rgba(26, 39, 68, 0.98);
-        border-color: rgba(255, 68, 51, 0.45);
+        background: var(--surface2);
+        border-color: var(--brandA);
       }
       #${PANEL_ID} .listen-close:active {
         transform: scale(0.97);
@@ -236,8 +230,8 @@
       #${PANEL_ID} .listen-wave {
         height: 40px;
         border-radius: 10px;
-        border: 1px solid rgba(43, 58, 93, 0.7);
-        background: rgba(17, 24, 42, 0.88);
+        border: 1px solid var(--line);
+        background: var(--surface);
         display: flex;
         align-items: center;
         justify-content: center;
@@ -248,7 +242,7 @@
         width: 4px;
         height: 8px;
         border-radius: 999px;
-        background: linear-gradient(180deg, var(--brandA), var(--brandB));
+        background: var(--brandA);
         transition: height 100ms linear;
       }
       #${PANEL_ID} .listen-progress {
@@ -273,34 +267,34 @@
         font-size: 12px;
         font-weight: 600;
         color: #fff;
-        background: linear-gradient(135deg, var(--brandA), var(--brandB));
-        box-shadow: 0 6px 16px rgba(255, 68, 51, 0.3);
+        background: var(--brandA);
+        box-shadow: none;
         cursor: pointer;
       }
       #${PANEL_ID} .listen-speed {
-        border: 1px solid rgba(43, 58, 93, 0.75);
+        border: 1px solid var(--line);
         border-radius: 8px;
         padding: 7px 10px;
         min-width: 52px;
         font-size: 12px;
         font-weight: 700;
         color: var(--text);
-        background: rgba(21, 33, 58, 0.92);
+        background: var(--surface);
         cursor: pointer;
       }
       #${PANEL_ID} .listen-speed:hover {
-        border-color: rgba(255, 68, 51, 0.45);
-        background: rgba(26, 39, 68, 0.98);
+        border-color: var(--brandA);
+        background: var(--surface2);
       }
       #${PANEL_ID} .listen-download {
-        border: 1px solid rgba(43, 58, 93, 0.7);
+        border: 1px solid var(--line);
         border-radius: 8px;
         padding: 7px 10px;
         font-size: 12px;
         font-weight: 600;
         color: var(--text);
         text-decoration: none;
-        background: rgba(21, 33, 58, 0.92);
+        background: var(--surface);
       }
       #${PANEL_ID} .listen-download[aria-disabled='true'] {
         opacity: 0.45;
