@@ -1,0 +1,27 @@
+<svg width="440" height="280" viewBox="0 0 440 280" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#7659FA" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="440" height="280" fill="#0F172A"/>
+  <rect width="440" height="280" fill="url(#glow)"/>
+
+  <!-- Icon centered at (220, 88) — icon is 96x96 so top-left at (172, 40) -->
+  <g transform="translate(172, 40)">
+    <rect width="96" height="96" rx="20" fill="#7659FA"/>
+    <!-- 7 bars: 6px wide, 4px gap = 7*6+6*4 = 66. offset = (96-66)/2 = 15 -->
+    <rect x="15" y="44" width="6" height="8" rx="3" fill="#FFFFFF"/>
+    <rect x="25" y="36" width="6" height="24" rx="3" fill="#FFFFFF"/>
+    <rect x="35" y="28" width="6" height="40" rx="3" fill="#FFFFFF"/>
+    <rect x="45" y="18" width="6" height="60" rx="3" fill="#FFFFFF"/>
+    <rect x="55" y="28" width="6" height="40" rx="3" fill="#FFFFFF"/>
+    <rect x="65" y="36" width="6" height="24" rx="3" fill="#FFFFFF"/>
+    <rect x="75" y="44" width="6" height="8" rx="3" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Text centered -->
+  <text x="220" y="180" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="36" font-weight="700" fill="#FFFFFF">Listen</text>
+  <text x="220" y="210" text-anchor="middle" font-family="IBM Plex Sans, sans-serif" font-size="14" fill="rgba(255,255,255,0.7)">Turn text into human voice.</text>
+</svg>

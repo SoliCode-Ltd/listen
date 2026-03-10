@@ -1,0 +1,34 @@
+<svg width="1400" height="560" viewBox="0 0 1400 560" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="glow1" cx="35%" cy="50%" r="40%">
+      <stop offset="0%" stop-color="#7659FA" stop-opacity="0.25"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="80%" cy="70%" r="30%">
+      <stop offset="0%" stop-color="#7659FA" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0F172A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1400" height="560" fill="#0F172A"/>
+  <rect width="1400" height="560" fill="url(#glow1)"/>
+  <rect width="1400" height="560" fill="url(#glow2)"/>
+
+  <!-- Icon centered at (350, 280) — 128x128, top-left at (286, 216) -->
+  <g transform="translate(286, 216)">
+    <rect width="128" height="128" rx="24" fill="#7659FA"/>
+    <!-- 7 bars: 8px wide, 6px gap = 7*8+6*6 = 92. offset = (128-92)/2 = 18 -->
+    <rect x="18" y="59" width="8" height="10" rx="4" fill="#FFFFFF"/>
+    <rect x="32" y="46" width="8" height="36" rx="4" fill="#FFFFFF"/>
+    <rect x="46" y="35" width="8" height="58" rx="4" fill="#FFFFFF"/>
+    <rect x="60" y="24" width="8" height="80" rx="4" fill="#FFFFFF"/>
+    <rect x="74" y="35" width="8" height="58" rx="4" fill="#FFFFFF"/>
+    <rect x="88" y="46" width="8" height="36" rx="4" fill="#FFFFFF"/>
+    <rect x="102" y="59" width="8" height="10" rx="4" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Text left-aligned next to icon -->
+  <text x="480" y="258" font-family="IBM Plex Sans, sans-serif" font-size="14" font-weight="400" fill="rgba(255,255,255,0.5)" letter-spacing="3">AI VOICE PLATFORM</text>
+  <text x="480" y="310" font-family="IBM Plex Sans, sans-serif" font-size="64" font-weight="700" fill="#FFFFFF">Listen</text>
+  <text x="480" y="355" font-family="IBM Plex Sans, sans-serif" font-size="22" fill="rgba(255,255,255,0.7)">Turn any text into crystal-clear</text>
+  <text x="480" y="385" font-family="IBM Plex Sans, sans-serif" font-size="22" fill="rgba(255,255,255,0.7)">synthesized voice instantly.</text>
+</svg>

@@ -1,0 +1,109 @@
+<svg width="1280" height="800" viewBox="0 0 1280 800" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <style>
+      .browser-bar { fill: #1E293B; }
+      .browser-dot { fill: #334155; }
+      .browser-url-bg { fill: #0F172A; }
+      .browser-url { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; fill: #64748B; }
+      .page-title { font-family: 'IBM Plex Sans', sans-serif; font-size: 32px; font-weight: 700; fill: #0F172A; }
+      .page-text { font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; fill: #475569; }
+      .highlight { fill: rgba(118,89,250,0.15); }
+      .highlight-text { font-family: 'IBM Plex Sans', sans-serif; font-size: 15px; fill: #0F172A; }
+      .popup-bg { fill: #1E293B; }
+      .popup-title { font-family: 'IBM Plex Sans', sans-serif; font-size: 16px; font-weight: 600; fill: #FFFFFF; }
+      .popup-label { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; fill: #94A3B8; }
+      .btn-play { fill: #7659FA; }
+      .btn-text { font-family: 'IBM Plex Sans', sans-serif; font-size: 13px; font-weight: 600; fill: #FFFFFF; }
+      .cta-text { font-family: 'IBM Plex Sans', sans-serif; font-size: 18px; font-weight: 600; fill: #7659FA; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="800" fill="#F8FAFC"/>
+
+  <!-- Browser window -->
+  <g transform="translate(80, 40)">
+    <rect width="1120" height="640" rx="12" class="browser-bar"/>
+    <circle cx="24" cy="20" r="6" class="browser-dot"/>
+    <circle cx="44" cy="20" r="6" class="browser-dot"/>
+    <circle cx="64" cy="20" r="6" class="browser-dot"/>
+    <rect x="120" y="10" width="480" height="22" rx="6" class="browser-url-bg"/>
+    <text x="136" y="26" class="browser-url">https://example.com/article</text>
+
+    <!-- Page content -->
+    <rect x="0" y="40" width="1120" height="600" fill="#FFFFFF"/>
+
+    <text x="60" y="100" class="page-title">The Future of Voice Synthesis</text>
+    <text x="60" y="140" class="page-text">In modern web development, seamless accessibility is paramount.</text>
+    <text x="60" y="165" class="page-text">Advanced voice synthesis has crossed the threshold from robotic</text>
+
+    <rect x="56" y="178" width="560" height="24" rx="3" class="highlight"/>
+    <text x="60" y="195" class="highlight-text">reading to natural, human-like speech with perfect inflection and tone.</text>
+
+    <text x="60" y="230" class="page-text">This allows readers to consume long-form content effortlessly while</text>
+    <text x="60" y="255" class="page-text">multitasking across devices and applications.</text>
+
+    <!-- Extension popup -->
+    <g transform="translate(660, 100)">
+      <rect width="380" height="320" rx="16" class="popup-bg"/>
+
+      <!-- Popup header with centered mini icon -->
+      <g transform="translate(20, 20)">
+        <!-- Mini icon 32x32, waveform centered: 5 bars, 4px wide, 2px gap = 5*4+4*2=28, offset=(32-28)/2=2 -->
+        <rect width="32" height="32" rx="8" fill="#7659FA"/>
+        <rect x="2" y="14" width="4" height="4" rx="2" fill="#FFFFFF"/>
+        <rect x="8" y="10" width="4" height="12" rx="2" fill="#FFFFFF"/>
+        <rect x="14" y="6" width="4" height="20" rx="2" fill="#FFFFFF"/>
+        <rect x="20" y="10" width="4" height="12" rx="2" fill="#FFFFFF"/>
+        <rect x="26" y="14" width="4" height="4" rx="2" fill="#FFFFFF"/>
+        <text x="44" y="22" class="popup-title">Listen Voice</text>
+        <text x="330" y="22" font-family="IBM Plex Sans" font-size="18" fill="#64748B">x</text>
+      </g>
+
+      <g transform="translate(20, 72)">
+        <text x="0" y="0" class="popup-label">Voice: Sara</text>
+        <text x="0" y="28" font-family="IBM Plex Sans" font-size="13" fill="#64748B">Turn any text on the web into natural voice.</text>
+      </g>
+
+      <!-- Waveform visualization -->
+      <g transform="translate(20, 130)">
+        <rect width="340" height="60" rx="8" fill="#0F172A"/>
+        <rect x="15" y="24" width="3" height="12" rx="1.5" fill="#7659FA"/>
+        <rect x="22" y="18" width="3" height="24" rx="1.5" fill="#7659FA"/>
+        <rect x="29" y="14" width="3" height="32" rx="1.5" fill="#7659FA"/>
+        <rect x="36" y="20" width="3" height="20" rx="1.5" fill="#7659FA"/>
+        <rect x="43" y="10" width="3" height="40" rx="1.5" fill="#7659FA"/>
+        <rect x="50" y="16" width="3" height="28" rx="1.5" fill="#7659FA"/>
+        <rect x="57" y="22" width="3" height="16" rx="1.5" fill="#7659FA"/>
+        <rect x="64" y="12" width="3" height="36" rx="1.5" fill="#7659FA"/>
+        <rect x="71" y="18" width="3" height="24" rx="1.5" fill="#7659FA"/>
+        <rect x="78" y="8" width="3" height="44" rx="1.5" fill="#7659FA"/>
+        <rect x="85" y="14" width="3" height="32" rx="1.5" fill="#7659FA"/>
+        <rect x="92" y="20" width="3" height="20" rx="1.5" fill="#7659FA"/>
+        <rect x="99" y="24" width="3" height="12" rx="1.5" fill="#7659FA"/>
+        <rect x="106" y="16" width="3" height="28" rx="1.5" fill="#7659FA"/>
+        <rect x="113" y="10" width="3" height="40" rx="1.5" fill="#7659FA"/>
+        <rect x="120" y="18" width="3" height="24" rx="1.5" fill="#7659FA"/>
+        <rect x="127" y="22" width="3" height="16" rx="1.5" fill="#7659FA"/>
+        <rect x="134" y="14" width="3" height="32" rx="1.5" fill="#7659FA" opacity="0.5"/>
+        <rect x="141" y="20" width="3" height="20" rx="1.5" fill="#7659FA" opacity="0.35"/>
+        <rect x="148" y="24" width="3" height="12" rx="1.5" fill="#7659FA" opacity="0.25"/>
+        <rect x="155" y="18" width="3" height="24" rx="1.5" fill="#7659FA" opacity="0.2"/>
+        <line x1="130" y1="4" x2="130" y2="56" stroke="#FFFFFF" stroke-width="2" opacity="0.8"/>
+        <text x="270" y="35" font-family="IBM Plex Sans" font-size="12" fill="#64748B">00:08 / 00:09</text>
+      </g>
+
+      <!-- Controls -->
+      <g transform="translate(20, 210)">
+        <rect width="80" height="36" rx="8" class="btn-play"/>
+        <text x="22" y="23" class="btn-text">Pause</text>
+        <rect x="92" y="0" width="50" height="36" rx="8" fill="#0F172A"/>
+        <text x="109" y="23" font-family="IBM Plex Sans" font-size="13" fill="#94A3B8">1x</text>
+        <rect x="154" y="0" width="100" height="36" rx="8" fill="#0F172A"/>
+        <text x="170" y="23" font-family="IBM Plex Sans" font-size="13" fill="#94A3B8">Download</text>
+      </g>
+    </g>
+  </g>
+
+  <text x="640" y="760" text-anchor="middle" class="cta-text">Read any text aloud instantly with Premium AI</text>
+</svg>

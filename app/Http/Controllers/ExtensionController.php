@@ -162,6 +162,19 @@ class ExtensionController extends Controller
             }
         }
 
+        // Replace icons with admin-uploaded versions if available
+        $iconSizes = [16, 32, 48, 128];
+        foreach ($iconSizes as $size) {
+            $uploadedPath = trim((string) SiteSetting::get("extension_icon_{$size}", ''));
+            if ($uploadedPath !== '' && \Illuminate\Support\Facades\Storage::disk('public')->exists($uploadedPath)) {
+                $source = \Illuminate\Support\Facades\Storage::disk('public')->path($uploadedPath);
+                $target = $buildDir."/icon-{$size}.png";
+                if (is_file($source)) {
+                    copy($source, $target);
+                }
+            }
+        }
+
         $zipPath = $targetDir.'/listen-chrome-extension.zip';
         $this->buildZip($buildDir, $zipPath, 'listen-chrome-extension');
 
