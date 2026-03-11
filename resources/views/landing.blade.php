@@ -18,8 +18,8 @@
     }
 
     :root {
-      --landing-section-space: 4rem;
-      --landing-section-space-mobile: 2.5rem;
+      --landing-section-space: 3rem;
+      --landing-section-space-mobile: 2rem;
     }
 
     .hero {
@@ -142,7 +142,6 @@
     }
 
     .apps-copy {
-      max-width: 44rem;
       margin: 0 auto;
       text-align: center;
     }
@@ -370,7 +369,7 @@
       margin-bottom: 2rem;
     }
     .voice-gallery-copy {
-      width: min(100%, 34rem);
+      width: min(100%, 60rem);
       margin: 0 auto;
       text-align: center;
     }
@@ -1423,8 +1422,13 @@
         <div class="voice-gallery-inner">
           <div class="voice-gallery-head">
             <div class="voice-gallery-copy">
-              <h2 class="voice-gallery-title">{{ __('ui.landing.voice_samples_title') }}</h2>
-              <p class="voice-gallery-subtitle">{{ __('ui.landing.voice_samples_subtitle') }}</p>
+              @if(str_starts_with(strtolower((string) app()->getLocale()), 'ar'))
+                <h2 class="voice-gallery-title">لهجات من جميع أنحاء العالم العربي</h2>
+                <p class="voice-gallery-subtitle">نماذج صوتية من بلدان متعددة بلهجات طبيعية وأداء احترافي يناسب مختلف أنواع المحتوى.</p>
+              @else
+                <h2 class="voice-gallery-title">Voices from Across the English-Speaking World</h2>
+                <p class="voice-gallery-subtitle">Explore voice samples from different countries with natural accents and professional delivery for all types of content.</p>
+              @endif
             </div>
           </div>
           <div class="sample-showcase-track">
