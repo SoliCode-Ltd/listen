@@ -17,8 +17,13 @@
       display: none;
     }
 
+    :root {
+      --landing-section-space: 4rem;
+      --landing-section-space-mobile: 2.5rem;
+    }
+
     .hero {
-      padding: 4rem 0 3rem;
+      padding: var(--landing-section-space) 0;
     }
     .hero-grid {
       display: grid;
@@ -80,27 +85,28 @@
     }
 
     .section {
-      padding: 4rem 0;
+      padding: var(--landing-section-space) 0;
     }
     .section h2 {
       margin: 0 0 .5rem;
       font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      text-align: center;
     }
     .section .section-lead {
       margin: 0 0 2rem;
       color: var(--muted);
       font-size: 1.05rem;
+      text-align: center;
+      margin-left: auto;
+      margin-right: auto;
     }
 
     /* ─── Listen Anywhere Section ─── */
     .apps-shell {
       position: relative;
       overflow: hidden;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
       padding: clamp(2rem, 3vw, 3rem);
-      background: var(--surface);
-      box-shadow: var(--shadow);
+
     }
     .apps-shell::after {
       content: "";
@@ -134,16 +140,12 @@
       background: var(--brand-accent);
       box-shadow: none;
     }
-    .apps-intro {
-      display: grid;
-      grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
-      gap: 1.5rem;
-      align-items: end;
-      margin-bottom: 1.75rem;
-      position: relative;
-      z-index: 1;
+
+    .apps-copy {
+      max-width: 44rem;
+      margin: 0 auto;
+      text-align: center;
     }
-    .apps-copy { max-width: 44rem; }
     .apps-copy h2 { margin-bottom: .6rem; }
     .apps-points {
       display: flex;
@@ -330,7 +332,7 @@
       background: var(--surface2);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      margin: 2rem 0 3rem;
+      margin: 0;
     }
     .cta-section h2 {
       margin: 0 0 .65rem;
@@ -369,16 +371,8 @@
     }
     .voice-gallery-copy {
       width: min(100%, 34rem);
-    }
-    html[dir="rtl"] .voice-gallery-copy {
-      margin-left: auto;
-      margin-right: 0;
-      text-align: right;
-    }
-    html[dir="ltr"] .voice-gallery-copy {
-      margin-right: auto;
-      margin-left: 0;
-      text-align: left;
+      margin: 0 auto;
+      text-align: center;
     }
     .voice-gallery-kicker {
       display: inline-flex;
@@ -411,7 +405,6 @@
       margin: 0;
       color: var(--muted);
       font-size: 1rem;
-      max-width: 46ch;
     }
     /* Scrollable track with snap */
     .sample-showcase-track {
@@ -715,7 +708,7 @@
         grid-template-columns: 1fr;
       }
       .hero {
-        padding: 1.6rem 0 2rem;
+        padding: var(--landing-section-space-mobile) 0;
         text-align: center;
       }
       .hero-grid {
@@ -735,7 +728,7 @@
         justify-content: center;
       }
       .section {
-        padding: 2.5rem 0;
+        padding: var(--landing-section-space-mobile) 0;
       }
       .apps-points {
         justify-content: flex-start;
@@ -759,7 +752,7 @@
 
     @media (max-width: 640px) {
       .hero {
-        padding: 1.1rem 0 1.6rem;
+        padding: var(--landing-section-space-mobile) 0;
       }
       .hero-cta {
         flex-direction: column;
@@ -1697,14 +1690,16 @@ SVG;
       </div>
     </section>
 
-    <section class="cta-section reveal">
-      <h2>{{ __('ui.landing.cta_title') }}</h2>
-      <p>{{ __('ui.landing.cta_subtitle') }}</p>
-      @auth
-        <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
-      @else
-        <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.landing.get_started_free') }}</a>
-      @endauth
+    <section class="section reveal">
+      <div class="cta-section">
+        <h2>{{ __('ui.landing.cta_title') }}</h2>
+        <p>{{ __('ui.landing.cta_subtitle') }}</p>
+        @auth
+          <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
+        @else
+          <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.landing.get_started_free') }}</a>
+        @endauth
+      </div>
     </section>
   </main>
 
