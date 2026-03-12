@@ -10,6 +10,7 @@ use App\Models\UsageCounter;
 use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
+use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -19,47 +20,6 @@ use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
-    /** @var array<int, string> */
-    private const PERFORMANCE_STYLE_VALUES = [
-        'neutral',
-        'educational',
-        'commercial',
-        'promo',
-        'podcast',
-        'assistant',
-        'narrative',
-        'comedic',
-        'corporate',
-        'conversational',
-        'inspirational',
-        'cinematic',
-        'documentary',
-        'storytelling',
-        'ad_style',
-        'news',
-        'sports_commentator',
-        'meditation',
-        'audiobook',
-        'children_story',
-        'radio_host',
-    ];
-
-    /** @var array<int, string> */
-    private const EMOTION_VALUES = [
-        'neutral',
-        'warm',
-        'sad',
-        'excited',
-        'formal',
-        'calm',
-        'angry',
-        'hopeful',
-        'serious',
-        'playful',
-        'mysterious',
-        'confident',
-    ];
-
     public function __construct(
         private readonly PlanAccessService $planAccessService,
     ) {}
@@ -123,6 +83,21 @@ class DashboardController extends Controller
             'voiceNameMap' => VoiceCatalog::mapByName(),
             'defaultVoiceAr' => VoiceCatalog::defaultForLanguageAndProvider('ar', $planTier, $preferredProvider),
             'defaultVoiceEn' => VoiceCatalog::defaultForLanguageAndProvider('en', $planTier, $preferredProvider),
+            'studioPerformanceStyles' => TtsStudioConfig::performanceStyleCatalog(),
+            'studioEmotions' => TtsStudioConfig::emotionCatalog(),
+            'studioDialectsByLanguage' => TtsStudioConfig::dialectCatalogByLanguage(),
+            'studioDefaultsByLanguage' => [
+                'ar' => [
+                    'performance_style' => TtsStudioConfig::defaultPerformanceStyle('ar'),
+                    'emotion' => TtsStudioConfig::defaultEmotion('ar'),
+                    'dialect' => TtsStudioConfig::defaultDialect('ar'),
+                ],
+                'en' => [
+                    'performance_style' => TtsStudioConfig::defaultPerformanceStyle('en'),
+                    'emotion' => TtsStudioConfig::defaultEmotion('en'),
+                    'dialect' => TtsStudioConfig::defaultDialect('en'),
+                ],
+            ],
             // Hybrid TTS studio data
             'dialogueEnabled' => $dialogueEnabled,
             'customPromptEnabled' => $customPromptEnabled,
@@ -148,6 +123,8 @@ class DashboardController extends Controller
             'performance_style' => $request->input('performance_style'),
             'emotion' => $request->input('emotion'),
         ]);
+        $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
+        $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
@@ -159,9 +136,9 @@ class DashboardController extends Controller
             'voice_tier' => ['nullable', 'in:standard,hd'],
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
-            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
             'style_prompt' => ['nullable', 'string', 'max:2000'],
-            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
             // Dialogue parameters
@@ -502,7 +479,11 @@ class DashboardController extends Controller
             : '';
 
         // Backward compatibility for old clients that used emotion for style.
-        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+        if (
+            $performanceStyle === ''
+            && in_array($emotion, TtsStudioConfig::performanceStyleValues(), true)
+            && ! in_array($emotion, TtsStudioConfig::emotionValues(), true)
+        ) {
             $performanceStyle = $emotion;
             $emotion = 'neutral';
         }

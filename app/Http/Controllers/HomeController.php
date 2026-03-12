@@ -13,6 +13,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
+use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -26,47 +27,6 @@ use Illuminate\Validation\ValidationException;
 
 class HomeController extends Controller
 {
-    /** @var array<int, string> */
-    private const PERFORMANCE_STYLE_VALUES = [
-        'neutral',
-        'educational',
-        'commercial',
-        'promo',
-        'podcast',
-        'assistant',
-        'narrative',
-        'comedic',
-        'corporate',
-        'conversational',
-        'inspirational',
-        'cinematic',
-        'documentary',
-        'storytelling',
-        'ad_style',
-        'news',
-        'sports_commentator',
-        'meditation',
-        'audiobook',
-        'children_story',
-        'radio_host',
-    ];
-
-    /** @var array<int, string> */
-    private const EMOTION_VALUES = [
-        'neutral',
-        'warm',
-        'sad',
-        'excited',
-        'formal',
-        'calm',
-        'angry',
-        'hopeful',
-        'serious',
-        'playful',
-        'mysterious',
-        'confident',
-    ];
-
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly TtsRoutingService $ttsRoutingService,
@@ -138,6 +98,24 @@ class HomeController extends Controller
         $freePlan = $this->planAccessService->freePlan();
         $defaultTier = $this->planAccessService->resolveTierForPlan($freePlan);
         $defaultProvider = $this->demoPreferredProviderForTier($defaultTier);
+        $defaultVoiceKeysByTier = [];
+
+        foreach (VoiceTier::all() as $tier) {
+            $provider = $this->demoPreferredProviderForTier($tier);
+            $defaultVoiceKeysByTier[$tier] = [
+                'ar' => (string) data_get(
+                    VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $tier, $provider)),
+                    'key',
+                    ''
+                ),
+                'en' => (string) data_get(
+                    VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('en', $tier, $provider)),
+                    'key',
+                    ''
+                ),
+            ];
+        }
+
         $upgradePlanSlug = (string) (Plan::query()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
@@ -149,6 +127,22 @@ class HomeController extends Controller
             'defaultTier' => $defaultTier,
             'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $defaultTier, $defaultProvider)),
             'defaultVoiceEn' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('en', $defaultTier, $defaultProvider)),
+            'defaultVoiceKeysByTier' => $defaultVoiceKeysByTier,
+            'studioPerformanceStyles' => TtsStudioConfig::performanceStyleCatalog(),
+            'studioEmotions' => TtsStudioConfig::emotionCatalog(),
+            'studioDialectsByLanguage' => TtsStudioConfig::dialectCatalogByLanguage(),
+            'studioDefaultsByLanguage' => [
+                'ar' => [
+                    'performance_style' => TtsStudioConfig::defaultPerformanceStyle('ar'),
+                    'emotion' => TtsStudioConfig::defaultEmotion('ar'),
+                    'dialect' => TtsStudioConfig::defaultDialect('ar'),
+                ],
+                'en' => [
+                    'performance_style' => TtsStudioConfig::defaultPerformanceStyle('en'),
+                    'emotion' => TtsStudioConfig::defaultEmotion('en'),
+                    'dialect' => TtsStudioConfig::defaultDialect('en'),
+                ],
+            ],
             'demoQuota' => $this->demoQuotaSnapshot($request, true),
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
@@ -170,6 +164,8 @@ class HomeController extends Controller
             'performance_style' => $request->input('performance_style'),
             'emotion' => $request->input('emotion'),
         ]);
+        $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
+        $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'max:50000'],
@@ -179,9 +175,9 @@ class HomeController extends Controller
             'voice_tier' => ['nullable', 'in:standard,hd'],
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
-            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
             'style_prompt' => ['nullable', 'string', 'max:2000'],
-            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
         ], [
@@ -239,6 +235,8 @@ class HomeController extends Controller
             'performance_style' => $request->input('performance_style'),
             'emotion' => $request->input('emotion'),
         ]);
+        $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
+        $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'max:50000'],
@@ -248,9 +246,9 @@ class HomeController extends Controller
             'voice_tier' => ['nullable', 'in:standard,hd'],
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
-            'performance_style' => ['nullable', 'string', 'in:'.implode(',', self::PERFORMANCE_STYLE_VALUES)],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
             'style_prompt' => ['nullable', 'string', 'max:2000'],
-            'emotion' => ['nullable', 'string', 'in:'.implode(',', self::EMOTION_VALUES)],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
         ], [
@@ -1160,7 +1158,11 @@ class HomeController extends Controller
             : '';
 
         // Backward compatibility for old clients that used emotion for style.
-        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+        if (
+            $performanceStyle === ''
+            && in_array($emotion, TtsStudioConfig::performanceStyleValues(), true)
+            && ! in_array($emotion, TtsStudioConfig::emotionValues(), true)
+        ) {
             $performanceStyle = $emotion;
             $emotion = 'neutral';
         }

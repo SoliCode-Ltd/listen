@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -16,47 +17,6 @@ class TtsService
 {
     private ?TtsRoutingService $routingService = null;
     private ?ArabicVoiceMapper $arabicMapper = null;
-
-    /** @var array<int, string> */
-    private const PERFORMANCE_STYLE_VALUES = [
-        'neutral',
-        'educational',
-        'commercial',
-        'promo',
-        'podcast',
-        'assistant',
-        'narrative',
-        'comedic',
-        'corporate',
-        'conversational',
-        'inspirational',
-        'cinematic',
-        'documentary',
-        'storytelling',
-        'ad_style',
-        'news',
-        'sports_commentator',
-        'meditation',
-        'audiobook',
-        'children_story',
-        'radio_host',
-    ];
-
-    /** @var array<int, string> */
-    private const EMOTION_VALUES = [
-        'neutral',
-        'warm',
-        'sad',
-        'excited',
-        'formal',
-        'calm',
-        'angry',
-        'hopeful',
-        'serious',
-        'playful',
-        'mysterious',
-        'confident',
-    ];
 
     /**
      * Inject the routing service (optional for backward compat).
@@ -243,7 +203,11 @@ class TtsService
         $emotion = trim((string) ($voiceConfig['emotion'] ?? ''));
 
         // Backward compatibility for old payloads that used emotion for style.
-        if ($performanceStyle === '' && in_array($emotion, self::PERFORMANCE_STYLE_VALUES, true) && ! in_array($emotion, self::EMOTION_VALUES, true)) {
+        if (
+            $performanceStyle === ''
+            && in_array($emotion, TtsStudioConfig::performanceStyleValues(), true)
+            && ! in_array($emotion, TtsStudioConfig::emotionValues(), true)
+        ) {
             $performanceStyle = $emotion;
             $emotion = 'neutral';
         }

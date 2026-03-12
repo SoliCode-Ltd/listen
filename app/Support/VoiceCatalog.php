@@ -428,6 +428,11 @@ class VoiceCatalog
         $provider = strtolower(trim((string) $provider));
 
         if ($normalizedTier !== null) {
+            $preferredVoice = self::preferredDefaultVoice($language, $normalizedTier, $provider !== '' ? $provider : null);
+            if ($preferredVoice) {
+                return (string) $preferredVoice->internal_voice_id;
+            }
+
             $voice = self::activeQuery($normalizedTier, $provider !== '' ? $provider : null)
                 ->where('language', $language)
                 ->orderBy('id')
@@ -447,6 +452,11 @@ class VoiceCatalog
             }
 
             return '';
+        }
+
+        $preferredVoice = self::preferredDefaultVoice($language, null, $provider !== '' ? $provider : null);
+        if ($preferredVoice) {
+            return (string) $preferredVoice->internal_voice_id;
         }
 
         $fallback = self::activeQuery(null, $provider !== '' ? $provider : null)
@@ -540,6 +550,11 @@ class VoiceCatalog
             return '';
         }
 
+        $preferredVoice = self::preferredDefaultVoice($language, $normalizedTier, $provider, $gender);
+        if ($preferredVoice) {
+            return (string) $preferredVoice->internal_voice_id;
+        }
+
         $query = Voice::query()
             ->where('is_active', true)
             ->where('language', $language)
@@ -560,6 +575,86 @@ class VoiceCatalog
             ->first();
 
         return $voice ? (string) $voice->internal_voice_id : '';
+    }
+
+    private static function preferredDefaultVoice(
+        string $language,
+        ?string $tier = null,
+        ?string $provider = null,
+        ?string $gender = null,
+    ): ?Voice {
+        $language = strtolower(trim($language));
+        $provider = strtolower(trim((string) $provider));
+        $gender = strtolower(trim((string) $gender));
+
+        // Admin override: explicit per-language default voice.
+        $adminDefaultVoiceName = TtsStudioConfig::defaultVoiceName($language);
+        if ($adminDefaultVoiceName !== '') {
+            $adminDefaultQuery = Voice::query()
+                ->where('is_active', true)
+                ->where('language', $language)
+                ->where('internal_voice_id', $adminDefaultVoiceName);
+
+            if ($tier !== null && $tier !== '') {
+                $adminDefaultQuery->where('tier', VoiceTier::normalize($tier));
+            }
+
+            if ($provider !== '') {
+                $adminDefaultQuery->where('provider', $provider);
+            }
+
+            if ($gender !== '' && in_array($gender, ['male', 'female'], true)) {
+                $adminDefaultQuery->where('gender', $gender);
+            }
+
+            $adminDefaultVoice = $adminDefaultQuery
+                ->orderBy('id')
+                ->first();
+
+            if ($adminDefaultVoice) {
+                return $adminDefaultVoice;
+            }
+        }
+
+        // Product preference: default Arabic Gemini speaker should be Fahad.
+        if ($language !== 'ar' || $provider !== 'gemini') {
+            return null;
+        }
+
+        $query = Voice::query()
+            ->where('is_active', true)
+            ->where('language', $language)
+            ->where('provider', $provider);
+
+        if ($tier !== null && $tier !== '') {
+            $query->where('tier', VoiceTier::normalize($tier));
+        }
+
+        if ($gender !== '' && in_array($gender, ['male', 'female'], true)) {
+            $query->where('gender', $gender);
+        }
+
+        foreach (['ar-gemini-hd-iapetus', 'gemini-ar-fahad', 'gemini-ar-fahd'] as $preferredInternalId) {
+            $voice = (clone $query)
+                ->whereRaw('LOWER(internal_voice_id) = ?', [$preferredInternalId])
+                ->orderBy('id')
+                ->first();
+            if ($voice) {
+                return $voice;
+            }
+        }
+
+        foreach (['fahad', 'fahd'] as $preferredDisplayName) {
+            $voice = (clone $query)
+                ->whereRaw('LOWER(display_name) = ?', [$preferredDisplayName])
+                ->orderBy('id')
+                ->first();
+            if ($voice) {
+                return $voice;
+            }
+        }
+
+        return null;
     }
 
     public static function isWaveNetVoiceName(?string $voiceName): bool

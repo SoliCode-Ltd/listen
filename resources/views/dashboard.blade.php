@@ -1446,27 +1446,11 @@
                 <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
                 <select name="performance_style" id="performance_style" required>
                   <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
-                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
-                  <option value="educational">{{ __('ui.dashboard.style_educational') }}</option>
-                  <option value="commercial">{{ __('ui.dashboard.style_commercial') }}</option>
-                  <option value="promo">{{ __('ui.dashboard.style_promo') }}</option>
-                  <option value="podcast">{{ __('ui.dashboard.style_podcast') }}</option>
-                  <option value="assistant">{{ __('ui.dashboard.style_assistant') }}</option>
-                  <option value="narrative">{{ __('ui.dashboard.style_narrative') }}</option>
-                  <option value="comedic">{{ __('ui.dashboard.style_comedic') }}</option>
-                  <option value="corporate">{{ __('ui.dashboard.style_corporate') }}</option>
-                  <option value="conversational">{{ __('ui.dashboard.style_conversational') }}</option>
-                  <option value="inspirational">{{ __('ui.dashboard.style_inspirational') }}</option>
-                  <option value="cinematic">{{ __('ui.dashboard.style_cinematic') }}</option>
-                  <option value="documentary">{{ __('ui.dashboard.style_documentary') }}</option>
-                  <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling') }}</option>
-                  <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style') }}</option>
-                  <option value="news">{{ __('ui.dashboard.emotion_news') }}</option>
-                  <option value="sports_commentator">{{ __('ui.dashboard.style_sports_commentator') }}</option>
-                  <option value="meditation">{{ __('ui.dashboard.style_meditation') }}</option>
-                  <option value="audiobook">{{ __('ui.dashboard.style_audiobook') }}</option>
-                  <option value="children_story">{{ __('ui.dashboard.style_children_story') }}</option>
-                  <option value="radio_host">{{ __('ui.dashboard.style_radio_host') }}</option>
+                  @foreach(($studioPerformanceStyles ?? []) as $styleOption)
+                    <option value="{{ $styleOption['value'] ?? '' }}">
+                      {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
+                    </option>
+                  @endforeach
                 </select>
               </div>
 
@@ -1474,18 +1458,11 @@
                 <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
                 <select name="emotion" id="emotion" required>
                   <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
-                  <option value="neutral">{{ __('ui.dashboard.emotion_neutral') }}</option>
-                  <option value="warm">{{ __('ui.dashboard.emotion_warm') }}</option>
-                  <option value="sad">{{ __('ui.dashboard.emotion_sad') }}</option>
-                  <option value="excited">{{ __('ui.dashboard.emotion_excited') }}</option>
-                  <option value="formal">{{ __('ui.dashboard.emotion_formal') }}</option>
-                  <option value="calm">{{ __('ui.dashboard.emotion_calm') }}</option>
-                  <option value="angry">{{ __('ui.dashboard.emotion_angry') }}</option>
-                  <option value="hopeful">{{ __('ui.dashboard.emotion_hopeful') }}</option>
-                  <option value="serious">{{ __('ui.dashboard.emotion_serious') }}</option>
-                  <option value="playful">{{ __('ui.dashboard.emotion_playful') }}</option>
-                  <option value="mysterious">{{ __('ui.dashboard.emotion_mysterious') }}</option>
-                  <option value="confident">{{ __('ui.dashboard.emotion_confident') }}</option>
+                  @foreach(($studioEmotions ?? []) as $emotionOption)
+                    <option value="{{ $emotionOption['value'] ?? '' }}">
+                      {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
+                    </option>
+                  @endforeach
                 </select>
               </div>
             </div>
@@ -1787,6 +1764,18 @@
   <script>
     const voiceCatalog = @json($voiceCatalog);
     const oldVoice = @json(old('voice_key'));
+    const defaultVoiceKeyByLanguage = {
+      ar: String(@json((string) ($voiceNameMap[$defaultVoiceAr]['key'] ?? '')) || '').trim(),
+      en: String(@json((string) ($voiceNameMap[$defaultVoiceEn]['key'] ?? '')) || '').trim(),
+    };
+    const initialStudioValueByField = {
+      performanceStyle: String(@json(old('performance_style')) || '').trim(),
+      emotion: String(@json(old('emotion')) || '').trim(),
+      dialect: String(@json(old('dialect')) || '').trim(),
+    };
+    const studioDefaultsByLanguage = @json($studioDefaultsByLanguage ?? []);
+    const studioDialectsByLanguageRaw = @json($studioDialectsByLanguage ?? []);
+    let initialStudioValuesApplied = false;
     const queueUrl = '{{ route('dashboard.queue') }}';
     const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
     const csrfToken = '{{ csrf_token() }}';
@@ -1879,29 +1868,22 @@
       if (generateBtn) generateBtn.innerHTML = `<span>${icon}${escapeHtml(text)}</span>`;
     }
 
+    const autoDialectLabel = '{{ __("ui.dashboard.dialect_auto") }}';
     const dialectsByLanguage = {
-      ar: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto") }}' },
-        { value: 'ar-XA', label: '{{ __("ui.dialects.msa") }}' },
-        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi") }}' },
-        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati") }}' },
-        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian") }}' },
-        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese") }}' },
-        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian") }}' },
-        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian") }}' },
-        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi") }}' },
-        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan") }}' },
-        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti") }}' },
-        { value: 'ar-TN', label: '{{ __("ui.dialects.tunisian") }}' },
-        { value: 'ar-OM', label: '{{ __("ui.dialects.omani") }}' },
-      ],
-      en: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto") }}' },
-        { value: 'en-US', label: '{{ __("ui.dialects.american") }}' },
-        { value: 'en-GB', label: '{{ __("ui.dialects.british") }}' },
-        { value: 'en-AU', label: '{{ __("ui.dialects.australian") }}' },
-      ],
+      ar: [{ value: '', label: autoDialectLabel }],
+      en: [{ value: '', label: autoDialectLabel }],
     };
+    ['ar', 'en'].forEach((langCode) => {
+      const rows = Array.isArray(studioDialectsByLanguageRaw?.[langCode]) ? studioDialectsByLanguageRaw[langCode] : [];
+      rows.forEach((row) => {
+        const value = String(row?.value || '').trim();
+        if (!value) return;
+        const localizedLabel = pageLocale === 'ar'
+          ? String(row?.label_ar || row?.label || value).trim()
+          : String(row?.label || row?.label_ar || value).trim();
+        dialectsByLanguage[langCode].push({ value, label: localizedLabel || value });
+      });
+    });
 
     function renderDialectOptions() {
       if (!dialectSelect || !targetLanguage) return;
@@ -1913,6 +1895,37 @@
         opt.value = d.value;
         opt.textContent = d.label;
         dialectSelect.appendChild(opt);
+      }
+    }
+
+    function setSelectValueIfAvailable(selectEl, value) {
+      const normalized = String(value || '').trim();
+      if (!selectEl || !normalized) return false;
+      const hasOption = Array.from(selectEl.options || []).some((opt) => String(opt.value || '') === normalized);
+      if (!hasOption) return false;
+      selectEl.value = normalized;
+      return true;
+    }
+
+    function applyStudioDefaults() {
+      if (!initialStudioValuesApplied) {
+        setSelectValueIfAvailable(performanceStyleSelect, initialStudioValueByField.performanceStyle);
+        setSelectValueIfAvailable(emotionSelect, initialStudioValueByField.emotion);
+        setSelectValueIfAvailable(dialectSelect, initialStudioValueByField.dialect);
+        initialStudioValuesApplied = true;
+      }
+
+      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
+      const defaults = studioDefaultsByLanguage?.[lang] || {};
+
+      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
+        setSelectValueIfAvailable(performanceStyleSelect, defaults.performance_style || 'neutral');
+      }
+      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
+        setSelectValueIfAvailable(emotionSelect, defaults.emotion || 'neutral');
+      }
+      if (dialectSelect && !String(dialectSelect.value || '').trim()) {
+        setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
     }
     let jobsCurrentPage = 1;
@@ -2103,7 +2116,8 @@
       const raw = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
       const voices = sortVoices(raw);
       const remembered = String(preferredVoiceKeyByLanguage[lang] || '').trim();
-      const current = String(remembered || '').trim();
+      const defaultVoiceKey = String(defaultVoiceKeyByLanguage?.[lang] || '').trim();
+      const current = String(remembered || defaultVoiceKey || '').trim();
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
       if (!voices.length) {
@@ -2133,6 +2147,8 @@
         rememberCurrentVoiceSelection(currentLanguage);
         targetLanguage.value = fallback;
         renderVoiceOptions();
+        renderDialectOptions();
+        applyStudioDefaults();
         return true;
       }
       const sourceLanguage = detectSourceLanguage(text);
@@ -2141,6 +2157,8 @@
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = sourceLanguage;
       renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioDefaults();
       return true;
     }
 
@@ -2152,6 +2170,8 @@
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = desiredLanguage;
       renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioDefaults();
       return true;
     }
 
@@ -2516,6 +2536,7 @@
       }
       renderVoiceOptions();
       renderDialectOptions();
+      applyStudioDefaults();
     });
     voiceSelect?.addEventListener('change', function() {
       rememberCurrentVoiceSelection();
@@ -2544,6 +2565,7 @@
     renderGenerateButtonContent(i18n.generate_voice_now);
     renderVoiceOptions();
     renderDialectOptions();
+    applyStudioDefaults();
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();

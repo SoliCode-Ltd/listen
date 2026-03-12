@@ -119,45 +119,22 @@
                   <div class="perf-section-label">🎭 {{ __('ui.demo.performance_style', ['default' => 'Performance Style']) }}</div>
                   <select name="performance_style" id="performance_style" required>
                     <option value="">-- {{ __('ui.demo.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
-                    <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
-                    <option value="educational">{{ __('ui.demo.style_educational', ['default' => 'Educational']) }}</option>
-                    <option value="commercial">{{ __('ui.demo.style_commercial', ['default' => 'Commercial']) }}</option>
-                    <option value="promo">{{ __('ui.demo.style_promo', ['default' => 'Promotional']) }}</option>
-                    <option value="podcast">{{ __('ui.demo.style_podcast', ['default' => 'Podcast']) }}</option>
-                    <option value="assistant">{{ __('ui.demo.style_assistant', ['default' => 'Virtual Assistant']) }}</option>
-                    <option value="narrative">{{ __('ui.demo.style_narrative', ['default' => 'Narrative']) }}</option>
-                    <option value="comedic">{{ __('ui.demo.style_comedic', ['default' => 'Comedic']) }}</option>
-                    <option value="corporate">{{ __('ui.demo.style_corporate', ['default' => 'Corporate']) }}</option>
-                    <option value="conversational">{{ __('ui.demo.style_conversational', ['default' => 'Conversational']) }}</option>
-                    <option value="inspirational">{{ __('ui.demo.style_inspirational', ['default' => 'Inspirational']) }}</option>
-                    <option value="cinematic">{{ __('ui.demo.style_cinematic', ['default' => 'Cinematic']) }}</option>
-                    <option value="documentary">{{ __('ui.demo.style_documentary', ['default' => 'Documentary']) }}</option>
-                    <option value="storytelling">{{ __('ui.dashboard.emotion_storytelling', ['default' => 'Storytelling']) }}</option>
-                    <option value="ad_style">{{ __('ui.dashboard.emotion_ad_style', ['default' => 'Ad Style']) }}</option>
-                    <option value="news">{{ __('ui.dashboard.emotion_news', ['default' => 'News']) }}</option>
-                    <option value="sports_commentator">{{ __('ui.dashboard.style_sports_commentator', ['default' => 'Sports Commentator']) }}</option>
-                    <option value="meditation">{{ __('ui.dashboard.style_meditation', ['default' => 'Meditation']) }}</option>
-                    <option value="audiobook">{{ __('ui.dashboard.style_audiobook', ['default' => 'Audiobook']) }}</option>
-                    <option value="children_story">{{ __('ui.dashboard.style_children_story', ['default' => 'Children Story']) }}</option>
-                    <option value="radio_host">{{ __('ui.dashboard.style_radio_host', ['default' => 'Radio Host']) }}</option>
+                    @foreach(($studioPerformanceStyles ?? []) as $styleOption)
+                      <option value="{{ $styleOption['value'] ?? '' }}">
+                        {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
+                      </option>
+                    @endforeach
                   </select>
                 </div>
                 <div class="perf-section">
                   <div class="perf-section-label">💫 {{ __('ui.demo.emotion', ['default' => 'Emotion']) }}</div>
                   <select name="emotion" id="emotion" required>
                     <option value="">-- {{ __('ui.demo.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
-                    <option value="neutral">{{ __('ui.dashboard.emotion_neutral', ['default' => 'Neutral']) }}</option>
-                    <option value="warm">{{ __('ui.dashboard.emotion_warm', ['default' => 'Warm']) }}</option>
-                    <option value="sad">{{ __('ui.dashboard.emotion_sad', ['default' => 'Sad']) }}</option>
-                    <option value="excited">{{ __('ui.dashboard.emotion_excited', ['default' => 'Excited']) }}</option>
-                    <option value="formal">{{ __('ui.dashboard.emotion_formal', ['default' => 'Formal']) }}</option>
-                    <option value="calm">{{ __('ui.dashboard.emotion_calm', ['default' => 'Calm']) }}</option>
-                    <option value="angry">{{ __('ui.dashboard.emotion_angry', ['default' => 'Angry']) }}</option>
-                    <option value="hopeful">{{ __('ui.dashboard.emotion_hopeful', ['default' => 'Hopeful']) }}</option>
-                    <option value="serious">{{ __('ui.dashboard.emotion_serious', ['default' => 'Serious']) }}</option>
-                    <option value="playful">{{ __('ui.dashboard.emotion_playful', ['default' => 'Playful']) }}</option>
-                    <option value="mysterious">{{ __('ui.dashboard.emotion_mysterious', ['default' => 'Mysterious']) }}</option>
-                    <option value="confident">{{ __('ui.dashboard.emotion_confident', ['default' => 'Confident']) }}</option>
+                    @foreach(($studioEmotions ?? []) as $emotionOption)
+                      <option value="{{ $emotionOption['value'] ?? '' }}">
+                        {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
+                      </option>
+                    @endforeach
                   </select>
                 </div>
               </div>
@@ -281,6 +258,14 @@
   @endphp
   <script>
     const voiceCatalogByTier = @json($voiceCatalog);
+    const defaultVoiceKeyByTierAndLanguage = @json($defaultVoiceKeysByTier ?? []);
+    const fallbackDefaultVoiceKeyByLanguage = {
+      ar: String(@json((string) data_get($defaultVoiceAr, 'key', '')) || '').trim(),
+      en: String(@json((string) data_get($defaultVoiceEn, 'key', '')) || '').trim(),
+    };
+    const studioDefaultsByLanguage = @json($studioDefaultsByLanguage ?? []);
+    const studioDialectsByLanguageRaw = @json($studioDialectsByLanguage ?? []);
+    const uiLocale = @json(app()->getLocale());
     const form = document.getElementById('demoForm');
     const voiceTier = document.getElementById('voice_tier');
     const targetLanguage = document.getElementById('target_language');
@@ -314,29 +299,22 @@
     const textInput = document.getElementById('text');
     const outputPlaceholder = document.getElementById('outputPlaceholder');
 
+    const autoDialectLabel = '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}';
     const dialectsByLanguage = {
-      ar: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
-        { value: 'ar-XA', label: '{{ __("ui.dialects.msa", ["default" => "Modern Standard Arabic"]) }}' },
-        { value: 'ar-SA', label: '{{ __("ui.dialects.saudi", ["default" => "Saudi"]) }}' },
-        { value: 'ar-AE', label: '{{ __("ui.dialects.emirati", ["default" => "Emirati"]) }}' },
-        { value: 'ar-EG', label: '{{ __("ui.dialects.egyptian", ["default" => "Egyptian"]) }}' },
-        { value: 'ar-LB', label: '{{ __("ui.dialects.lebanese", ["default" => "Lebanese"]) }}' },
-        { value: 'ar-SY', label: '{{ __("ui.dialects.syrian", ["default" => "Syrian"]) }}' },
-        { value: 'ar-JO', label: '{{ __("ui.dialects.jordanian", ["default" => "Jordanian"]) }}' },
-        { value: 'ar-IQ', label: '{{ __("ui.dialects.iraqi", ["default" => "Iraqi"]) }}' },
-        { value: 'ar-MA', label: '{{ __("ui.dialects.moroccan", ["default" => "Moroccan"]) }}' },
-        { value: 'ar-KW', label: '{{ __("ui.dialects.kuwaiti", ["default" => "Kuwaiti"]) }}' },
-        { value: 'ar-TN', label: '{{ __("ui.dialects.tunisian", ["default" => "Tunisian"]) }}' },
-        { value: 'ar-OM', label: '{{ __("ui.dialects.omani", ["default" => "Omani"]) }}' },
-      ],
-      en: [
-        { value: '', label: '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}' },
-        { value: 'en-US', label: '{{ __("ui.dialects.american", ["default" => "American"]) }}' },
-        { value: 'en-GB', label: '{{ __("ui.dialects.british", ["default" => "British"]) }}' },
-        { value: 'en-AU', label: '{{ __("ui.dialects.australian", ["default" => "Australian"]) }}' },
-      ],
+      ar: [{ value: '', label: autoDialectLabel }],
+      en: [{ value: '', label: autoDialectLabel }],
     };
+    ['ar', 'en'].forEach((langCode) => {
+      const rows = Array.isArray(studioDialectsByLanguageRaw?.[langCode]) ? studioDialectsByLanguageRaw[langCode] : [];
+      rows.forEach((row) => {
+        const value = String(row?.value || '').trim();
+        if (!value) return;
+        const localizedLabel = uiLocale === 'ar'
+          ? String(row?.label_ar || row?.label || value).trim()
+          : String(row?.label || row?.label_ar || value).trim();
+        dialectsByLanguage[langCode].push({ value, label: localizedLabel || value });
+      });
+    });
 
     function renderDialectOptions() {
       if (!dialectSelect || !targetLanguage) return;
@@ -348,6 +326,32 @@
         opt.value = d.value;
         opt.textContent = d.label;
         dialectSelect.appendChild(opt);
+      }
+    }
+
+    function setSelectValueIfAvailable(selectEl, value) {
+      const normalized = String(value || '').trim();
+      if (!selectEl || !normalized) return false;
+      const hasOption = Array.from(selectEl.options || []).some((opt) => String(opt.value || '') === normalized);
+      if (!hasOption) return false;
+      selectEl.value = normalized;
+      return true;
+    }
+
+    function applyConfiguredStudioDefaults() {
+      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
+      const tier = normalizeTier(voiceTier?.value || 'standard');
+      if (tier !== 'hd') return;
+      const defaults = studioDefaultsByLanguage?.[lang] || {};
+
+      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
+        setSelectValueIfAvailable(performanceStyleSelect, defaults.performance_style || 'neutral');
+      }
+      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
+        setSelectValueIfAvailable(emotionSelect, defaults.emotion || 'neutral');
+      }
+      if (dialectSelect && !String(dialectSelect.value || '').trim()) {
+        setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
     }
 
@@ -389,6 +393,8 @@
         const pv = document.getElementById('pitchVal');
         if (sv) sv.textContent = '1.0';
         if (pv) pv.textContent = '0';
+      } else {
+        applyConfiguredStudioDefaults();
       }
     }
     const demoQuota = @json($demoQuota ?? null);
@@ -446,7 +452,7 @@
       is_exhausted: false,
     });
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
-    const preferredVoiceKeyByLanguage = { ar: '', en: '' };
+    const preferredVoiceKeyByLanguageAndTier = {};
     let clientFingerprint = '';
     let fingerprintPromise = null;
 
@@ -465,10 +471,13 @@
     function oppositeLanguage(value) { return normalizeLanguage(value) === 'en' ? 'ar' : 'en'; }
     function detectSourceLanguage(value) { return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en'; }
     function isTranslateEnabled() { return String(translateSelect?.value || '1') === '1'; }
-    function rememberCurrentVoiceSelection(language = normalizeLanguage(targetLanguage?.value)) {
+    function voicePreferenceBucket(language = normalizeLanguage(targetLanguage?.value), tier = normalizeTier(voiceTier?.value || 'standard')) {
+      return `${normalizeLanguage(language)}:${normalizeTier(tier)}`;
+    }
+    function rememberCurrentVoiceSelection(language = normalizeLanguage(targetLanguage?.value), tier = normalizeTier(voiceTier?.value || 'standard')) {
       const selectedVoiceKey = String(voiceSelect?.value || '').trim();
       if (!selectedVoiceKey) return;
-      preferredVoiceKeyByLanguage[normalizeLanguage(language)] = selectedVoiceKey;
+      preferredVoiceKeyByLanguageAndTier[voicePreferenceBucket(language, tier)] = selectedVoiceKey;
     }
 
     function hideAudioPreview() {
@@ -829,30 +838,51 @@
       });
     }
 
+    function findPreferredArabicGeminiVoiceKey(voices, language, tier) {
+      if (normalizeLanguage(language) !== 'ar' || normalizeTier(tier) !== 'hd') return '';
+      const preferredLabels = ['fahad', 'fahd', 'فهد'];
+      const match = (Array.isArray(voices) ? voices : []).find((voice) => {
+        const label = String(voice?.label || '').trim().toLowerCase();
+        const labelAr = String(voice?.label_ar || '').trim().toLowerCase();
+        return preferredLabels.some((candidate) => label === candidate || labelAr === candidate || label.includes(candidate) || labelAr.includes(candidate));
+      });
+      return String(match?.key || '').trim();
+    }
+
     function renderVoiceOptions() {
       if (!voiceSelect || !targetLanguage) return;
       const voices = getFilteredVoices();
       const lang = normalizeLanguage(targetLanguage.value);
-      const remembered = String(preferredVoiceKeyByLanguage[lang]||'').trim();
-      const current = String(remembered||'').trim();
+      const tier = normalizeTier(voiceTier?.value || 'standard');
+      const preferenceBucket = voicePreferenceBucket(lang, tier);
+      const remembered = String(preferredVoiceKeyByLanguageAndTier[preferenceBucket]||'').trim();
+      const defaultVoiceKey = String(
+        defaultVoiceKeyByTierAndLanguage?.[tier]?.[lang]
+        || fallbackDefaultVoiceKeyByLanguage?.[lang]
+        || ''
+      ).trim();
+      const preferredArabicGeminiVoiceKey = findPreferredArabicGeminiVoiceKey(voices, lang, tier);
+      const current = String(remembered || defaultVoiceKey || preferredArabicGeminiVoiceKey || '').trim();
       voiceSelect.innerHTML = '';
-      if (!voices.length) { voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>'; preferredVoiceKeyByLanguage[lang] = ''; return; }
+      if (!voices.length) { voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>'; preferredVoiceKeyByLanguageAndTier[preferenceBucket] = ''; return; }
       for (const voice of voices) { const option = document.createElement('option'); option.value = voice.key; option.textContent = voiceDisplayLabel(voice); voiceSelect.appendChild(option); }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
       else voiceSelect.value = voices[0].key;
-      preferredVoiceKeyByLanguage[lang] = String(voiceSelect.value||'').trim();
+      preferredVoiceKeyByLanguageAndTier[preferenceBucket] = String(voiceSelect.value||'').trim();
     }
 
     function syncLanguageToCurrentTextWhenTranslationOff(fallbackLanguage = null) {
       if (!targetLanguage || !textInput || isTranslateEnabled()) return false;
       const text = String(textInput.value||'').trim();
-      if (!text) { const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null; if (!fallback) return false; const currentLanguage = normalizeLanguage(targetLanguage.value); if (currentLanguage === fallback) return false; rememberCurrentVoiceSelection(currentLanguage); targetLanguage.value = fallback; renderVoiceOptions(); return true; }
+      if (!text) { const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null; if (!fallback) return false; const currentLanguage = normalizeLanguage(targetLanguage.value); if (currentLanguage === fallback) return false; rememberCurrentVoiceSelection(currentLanguage); targetLanguage.value = fallback; renderVoiceOptions(); renderDialectOptions(); applyStudioTierState(); return true; }
       const sourceLanguage = detectSourceLanguage(text);
       const currentLanguage = normalizeLanguage(targetLanguage.value);
       if (sourceLanguage === currentLanguage) return false;
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = sourceLanguage;
       renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioTierState();
       return true;
     }
 
@@ -864,6 +894,8 @@
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = desiredLanguage;
       renderVoiceOptions();
+      renderDialectOptions();
+      applyStudioTierState();
       return true;
     }
 

@@ -12,6 +12,7 @@ use App\Services\PlanAccessService;
 use App\Models\SiteSetting;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
+use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -97,6 +98,23 @@ class MessageReaderController extends Controller
                         'ar' => $defaultAr['key'] ?? null,
                         'en' => $defaultEn['key'] ?? null,
                     ],
+                    'studio' => [
+                        'performance_styles' => TtsStudioConfig::performanceStyleCatalog(),
+                        'emotions' => TtsStudioConfig::emotionCatalog(),
+                        'dialects' => TtsStudioConfig::dialectCatalogByLanguage(),
+                        'defaults' => [
+                            'ar' => [
+                                'performance_style' => TtsStudioConfig::defaultPerformanceStyle('ar'),
+                                'emotion' => TtsStudioConfig::defaultEmotion('ar'),
+                                'dialect' => TtsStudioConfig::defaultDialect('ar'),
+                            ],
+                            'en' => [
+                                'performance_style' => TtsStudioConfig::defaultPerformanceStyle('en'),
+                                'emotion' => TtsStudioConfig::defaultEmotion('en'),
+                                'dialect' => TtsStudioConfig::defaultDialect('en'),
+                            ],
+                        ],
+                    ],
                 ],
             ],
         ]);
@@ -111,6 +129,8 @@ class MessageReaderController extends Controller
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
         $processingMode = strtolower((string) config('listen.audio.processing', 'sync'));
+        $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
+        $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
@@ -124,8 +144,8 @@ class MessageReaderController extends Controller
             'prefer_sync' => ['nullable', 'boolean'],
             // Studio parameters
             'dialect' => ['nullable', 'string', 'max:10'],
-            'emotion' => ['nullable', 'string', 'in:neutral,warm,sad,excited,formal,calm,angry'],
-            'performance_style' => ['nullable', 'string', 'max:50'],
+            'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
+            'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
             // Dialogue parameters
@@ -421,14 +441,26 @@ class MessageReaderController extends Controller
             ];
         }
 
+        $performanceStyle = isset($options['performance_style']) && is_string($options['performance_style'])
+            ? trim((string) $options['performance_style'])
+            : '';
+        $emotion = isset($options['emotion']) && is_string($options['emotion'])
+            ? trim((string) $options['emotion'])
+            : '';
+
+        if (
+            $performanceStyle === ''
+            && in_array($emotion, TtsStudioConfig::performanceStyleValues(), true)
+            && ! in_array($emotion, TtsStudioConfig::emotionValues(), true)
+        ) {
+            $performanceStyle = $emotion;
+            $emotion = 'neutral';
+        }
+
         return [
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
-            'emotion' => isset($options['emotion']) && is_string($options['emotion']) && trim($options['emotion']) !== ''
-                ? trim($options['emotion'])
-                : 'neutral',
-            'performance_style' => isset($options['performance_style']) && is_string($options['performance_style'])
-                ? trim($options['performance_style']) ?: null
-                : null,
+            'emotion' => $emotion !== '' ? $emotion : 'neutral',
+            'performance_style' => $performanceStyle !== '' ? $performanceStyle : null,
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];

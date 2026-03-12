@@ -4,6 +4,10 @@ namespace App\Filament\Pages;
 
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Voice;
+use App\Support\TtsStudioConfig;
+use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -47,12 +51,42 @@ class TtsSettings extends Page implements HasForms
 
             // Per-plan overrides
             'plan_overrides' => $planOverrides,
+
+            // Studio defaults used by Dashboard + Demo
+            'tts_default_voice_ar' => $this->resolveStoredOrFallbackDefaultVoice('ar'),
+            'tts_default_voice_en' => $this->resolveStoredOrFallbackDefaultVoice('en'),
+            'tts_default_performance_style_ar' => TtsStudioConfig::defaultPerformanceStyle('ar'),
+            'tts_default_performance_style_en' => TtsStudioConfig::defaultPerformanceStyle('en'),
+            'tts_default_emotion_ar' => TtsStudioConfig::defaultEmotion('ar'),
+            'tts_default_emotion_en' => TtsStudioConfig::defaultEmotion('en'),
+            'tts_default_dialect_ar' => TtsStudioConfig::defaultDialect('ar'),
+            'tts_default_dialect_en' => TtsStudioConfig::defaultDialect('en'),
+
+            // Admin-extensible catalogs
+            'tts_performance_styles_catalog' => $this->decodeJsonCatalogSetting('tts_performance_styles_catalog'),
+            'tts_emotions_catalog' => $this->decodeJsonCatalogSetting('tts_emotions_catalog'),
+            'tts_dialects_catalog_ar' => $this->decodeJsonCatalogSetting('tts_dialects_catalog_ar'),
+            'tts_dialects_catalog_en' => $this->decodeJsonCatalogSetting('tts_dialects_catalog_en'),
         ]);
     }
 
     public function form(Form $form): Form
     {
         $plans = Plan::where('is_active', true)->pluck('name', 'slug')->toArray();
+        $performanceStyleOptions = collect(TtsStudioConfig::performanceStyleCatalog())
+            ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
+            ->all();
+        $emotionOptions = collect(TtsStudioConfig::emotionCatalog())
+            ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
+            ->all();
+        $arabicDialectOptions = collect(TtsStudioConfig::dialectCatalogForLanguage('ar'))
+            ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
+            ->all();
+        $englishDialectOptions = collect(TtsStudioConfig::dialectCatalogForLanguage('en'))
+            ->mapWithKeys(fn (array $row): array => [$row['value'] => $row['label']])
+            ->all();
+        $arabicVoiceOptions = $this->voiceOptionsForLanguage('ar');
+        $englishVoiceOptions = $this->voiceOptionsForLanguage('en');
 
         return $form
             ->schema([
@@ -127,6 +161,87 @@ class TtsSettings extends Page implements HasForms
                         )->values()->toArray()
                     ),
 
+                Forms\Components\Section::make('Studio Defaults (Demo + Dashboard)')
+                    ->description('These defaults are used when the user has not chosen a custom value yet.')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Select::make('tts_default_voice_ar')
+                            ->label('Default Arabic Speaker')
+                            ->options($arabicVoiceOptions)
+                            ->searchable()
+                            ->placeholder('Use automatic fallback'),
+                        Forms\Components\Select::make('tts_default_voice_en')
+                            ->label('Default English Speaker')
+                            ->options($englishVoiceOptions)
+                            ->searchable()
+                            ->placeholder('Use automatic fallback'),
+                        Forms\Components\Select::make('tts_default_performance_style_ar')
+                            ->label('Default Arabic Performance Style')
+                            ->options($performanceStyleOptions)
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('tts_default_performance_style_en')
+                            ->label('Default English Performance Style')
+                            ->options($performanceStyleOptions)
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('tts_default_emotion_ar')
+                            ->label('Default Arabic Emotion')
+                            ->options($emotionOptions)
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('tts_default_emotion_en')
+                            ->label('Default English Emotion')
+                            ->options($emotionOptions)
+                            ->searchable()
+                            ->required(),
+                        Forms\Components\Select::make('tts_default_dialect_ar')
+                            ->label('Default Arabic Dialect')
+                            ->options(['' => 'Auto-detect'] + $arabicDialectOptions)
+                            ->searchable(),
+                        Forms\Components\Select::make('tts_default_dialect_en')
+                            ->label('Default English Dialect')
+                            ->options(['' => 'Auto-detect'] + $englishDialectOptions)
+                            ->searchable(),
+                    ]),
+
+                Forms\Components\Section::make('Custom Studio Catalogs')
+                    ->description('Add custom options that become available in Demo, Dashboard, and API validation.')
+                    ->schema([
+                        Forms\Components\Repeater::make('tts_performance_styles_catalog')
+                            ->label('Custom Performance Styles')
+                            ->schema($this->catalogRowSchema())
+                            ->default([])
+                            ->collapsed()
+                            ->reorderableWithButtons()
+                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                            ->addActionLabel('Add performance style'),
+                        Forms\Components\Repeater::make('tts_emotions_catalog')
+                            ->label('Custom Emotions')
+                            ->schema($this->catalogRowSchema())
+                            ->default([])
+                            ->collapsed()
+                            ->reorderableWithButtons()
+                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                            ->addActionLabel('Add emotion'),
+                        Forms\Components\Repeater::make('tts_dialects_catalog_ar')
+                            ->label('Custom Arabic Dialects')
+                            ->schema($this->catalogRowSchema())
+                            ->default([])
+                            ->collapsed()
+                            ->reorderableWithButtons()
+                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                            ->addActionLabel('Add Arabic dialect'),
+                        Forms\Components\Repeater::make('tts_dialects_catalog_en')
+                            ->label('Custom English Dialects')
+                            ->schema($this->catalogRowSchema())
+                            ->default([])
+                            ->collapsed()
+                            ->reorderableWithButtons()
+                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                            ->addActionLabel('Add English dialect'),
+                    ]),
+
                 Forms\Components\Section::make('API Keys Status')
                     ->description('Manage API keys in the dedicated Gemini API Keys page.')
                     ->schema([
@@ -158,6 +273,14 @@ class TtsSettings extends Page implements HasForms
             'tts_fallback_enabled',
             'gemini_default_voice',
             'gemini_timeout_seconds',
+            'tts_default_voice_ar',
+            'tts_default_voice_en',
+            'tts_default_performance_style_ar',
+            'tts_default_performance_style_en',
+            'tts_default_emotion_ar',
+            'tts_default_emotion_en',
+            'tts_default_dialect_ar',
+            'tts_default_dialect_en',
         ];
 
         foreach ($scalarKeys as $key) {
@@ -172,6 +295,18 @@ class TtsSettings extends Page implements HasForms
             foreach ($data['plan_overrides'] as $slug => $provider) {
                 SiteSetting::set("tts_plan_provider_{$slug}", (string) $provider, $group);
             }
+        }
+
+        $jsonCatalogKeys = [
+            'tts_performance_styles_catalog',
+            'tts_emotions_catalog',
+            'tts_dialects_catalog_ar',
+            'tts_dialects_catalog_en',
+        ];
+
+        foreach ($jsonCatalogKeys as $key) {
+            $rows = $data[$key] ?? [];
+            SiteSetting::set($key, json_encode(is_array($rows) ? array_values($rows) : [], JSON_UNESCAPED_UNICODE), $group);
         }
 
         SiteSetting::flushGroupCache($group);
@@ -202,5 +337,83 @@ class TtsSettings extends Page implements HasForms
             ->body('All Gemini API key counters have been reset.')
             ->success()
             ->send();
+    }
+
+    /**
+     * @return array<int, Forms\Components\Component>
+     */
+    private function catalogRowSchema(): array
+    {
+        return [
+            Forms\Components\TextInput::make('value')
+                ->label('Value')
+                ->required()
+                ->helperText('Slug/code (letters, numbers, underscore, dash). Examples: confident_plus, ar-EG')
+                ->regex('/^[A-Za-z0-9_-]+$/')
+                ->maxLength(50),
+            Forms\Components\TextInput::make('label')
+                ->label('Label (EN)')
+                ->required()
+                ->maxLength(120),
+            Forms\Components\TextInput::make('label_ar')
+                ->label('Label (AR)')
+                ->maxLength(120),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function decodeJsonCatalogSetting(string $key): array
+    {
+        $raw = SiteSetting::get($key, '');
+        if (! is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($raw, true);
+
+        return is_array($decoded) ? array_values($decoded) : [];
+    }
+
+    private function resolveStoredOrFallbackDefaultVoice(string $language): string
+    {
+        $language = strtolower(trim($language)) === 'en' ? 'en' : 'ar';
+        $stored = trim((string) SiteSetting::get("tts_default_voice_{$language}", ''));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        $preferredProvider = VoiceCatalog::preferredProviderForTier(VoiceTier::HD);
+
+        return VoiceCatalog::defaultForLanguageAndProvider($language, VoiceTier::HD, $preferredProvider);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function voiceOptionsForLanguage(string $language): array
+    {
+        $language = strtolower(trim($language)) === 'en' ? 'en' : 'ar';
+
+        return Voice::query()
+            ->where('is_active', true)
+            ->where('language', $language)
+            ->orderBy('provider')
+            ->orderBy('tier')
+            ->orderBy('display_name')
+            ->get(['internal_voice_id', 'display_name', 'provider', 'tier'])
+            ->mapWithKeys(function (Voice $voice): array {
+                $provider = trim((string) $voice->provider);
+                $tier = VoiceTier::label((string) $voice->tier);
+                $label = trim((string) $voice->display_name) !== ''
+                    ? (string) $voice->display_name
+                    : (string) $voice->internal_voice_id;
+
+                return [
+                    (string) $voice->internal_voice_id => "{$label} ({$provider}, {$tier})",
+                ];
+            })
+            ->all();
     }
 }

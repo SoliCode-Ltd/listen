@@ -717,6 +717,8 @@ class GeminiTtsProvider implements TtsProviderInterface
             $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? null;
             if ($dialectName !== null) {
                 $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
+            } else {
+                $dialectInstruction = "Voice dialect/language variant: {$dialect}. Keep pronunciation consistent with this dialect setting. ";
             }
         }
 
@@ -733,8 +735,12 @@ class GeminiTtsProvider implements TtsProviderInterface
             $prompt .= $dialectInstruction;
         }
 
-        if ($emotionDesc !== '' && $emotion !== 'neutral') {
-            $prompt .= "Emotional tone: {$emotionDesc}. ";
+        if ($emotion !== 'neutral') {
+            $normalizedEmotionDesc = trim((string) $emotionDesc);
+            if ($normalizedEmotionDesc === '') {
+                $normalizedEmotionDesc = str_replace(['_', '-'], ' ', $emotion);
+            }
+            $prompt .= "Emotional tone: {$normalizedEmotionDesc}. ";
         }
 
         if ($styleDesc !== '') {
@@ -814,6 +820,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return match ($style) {
+            'neutral'        => '',
             'warm'           => 'Speak with genuine heartfelt warmth, like a trusted friend sharing something meaningful. Let your smile come through your voice with rich, inviting tones.',
             'sad'            => 'Read with deep, aching sadness and raw vulnerability. Let your voice tremble slightly with emotion. Slow down and let sorrow fill the pauses between phrases.',
             'excited'        => 'Read BURSTING with infectious, high-energy excitement! Raise your voice with genuine enthusiasm on key words. Let your passion overflow!',
@@ -845,7 +852,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'playful'        => 'Read with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
             'mysterious'     => 'Speak with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
             'confident'      => 'Deliver with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
-            default          => '',
+            default          => 'Performance style: '.str_replace(['_', '-'], ' ', $style).'. Keep this style clear and consistent throughout.',
         };
     }
 

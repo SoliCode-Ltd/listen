@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Models\SiteSetting;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 
 /**
@@ -261,7 +262,27 @@ class ArabicVoiceMapper
      */
     public static function getDialects(): array
     {
-        return self::DIALECTS;
+        $catalog = TtsStudioConfig::dialectCatalogForLanguage('ar');
+        if ($catalog === []) {
+            return self::DIALECTS;
+        }
+
+        $mapped = [];
+        foreach ($catalog as $row) {
+            $code = trim((string) ($row['value'] ?? ''));
+            if ($code === '') {
+                continue;
+            }
+
+            $legacy = self::DIALECTS[$code] ?? [];
+            $mapped[$code] = [
+                'name' => trim((string) ($row['label'] ?? $code)),
+                'name_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? $code)),
+                'region' => (string) ($legacy['region'] ?? 'custom'),
+            ];
+        }
+
+        return $mapped;
     }
 
     /**
@@ -282,7 +303,27 @@ class ArabicVoiceMapper
      */
     public static function getPerformanceStyles(): array
     {
-        return self::PERFORMANCE_STYLES;
+        $catalog = TtsStudioConfig::performanceStyleCatalog();
+        if ($catalog === []) {
+            return self::PERFORMANCE_STYLES;
+        }
+
+        $mapped = [];
+        foreach ($catalog as $row) {
+            $value = trim((string) ($row['value'] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $legacy = self::PERFORMANCE_STYLES[$value] ?? [];
+            $mapped[$value] = [
+                'name' => trim((string) ($row['label'] ?? $value)),
+                'name_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? $value)),
+                'icon' => (string) ($legacy['icon'] ?? 'custom'),
+            ];
+        }
+
+        return $mapped;
     }
 
     /**
@@ -290,6 +331,26 @@ class ArabicVoiceMapper
      */
     public static function getEmotions(): array
     {
-        return self::EMOTIONS;
+        $catalog = TtsStudioConfig::emotionCatalog();
+        if ($catalog === []) {
+            return self::EMOTIONS;
+        }
+
+        $mapped = [];
+        foreach ($catalog as $row) {
+            $value = trim((string) ($row['value'] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $legacy = self::EMOTIONS[$value] ?? [];
+            $mapped[$value] = [
+                'name' => trim((string) ($row['label'] ?? $value)),
+                'name_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? $value)),
+                'icon' => (string) ($legacy['icon'] ?? 'custom'),
+            ];
+        }
+
+        return $mapped;
     }
 }
