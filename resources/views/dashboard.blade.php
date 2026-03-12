@@ -705,8 +705,7 @@
       padding: .25rem .5rem;
       font-size: .8rem;
       color: var(--muted);
-      border-radius: var(--radius);
-      background: color-mix(in oklab, var(--surface) 50%, transparent);
+
     }
     .char-counter.warning {
       color: var(--warning, #f59e0b);
@@ -960,9 +959,7 @@
     .control-pair > div {
       padding: .95rem;
       border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--line) 74%, var(--b) 26%);
-      background: color-mix(in oklab, var(--surface) 80%, transparent);
-    }
+}
     /* Duplicate studio-panel definitions removed since we consolidated into perf-panel above */
     .plan-card {
       position: sticky;
