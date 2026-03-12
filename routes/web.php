@@ -64,10 +64,6 @@ Route::group([
     Route::post('/contact', [\App\Http\Controllers\ContactController::class, 'submit']);
 
     Route::middleware('guest')->group(function () {
-        Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
-        Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
-        Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
-
         Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
         Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
 
@@ -79,6 +75,12 @@ Route::group([
         // Backward-compatible aliases for existing OAuth app callback URLs.
         Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle']);
         Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+    });
+
+    Route::middleware('auth')->group(function () {
+        Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
+        Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
+        Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
     });
 
     Route::middleware(['auth', 'subscription.sync'])->group(function () {

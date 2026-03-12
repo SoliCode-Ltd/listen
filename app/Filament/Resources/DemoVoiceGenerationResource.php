@@ -29,6 +29,12 @@ class DemoVoiceGenerationResource extends Resource
                 Forms\Components\Section::make('Generation')
                     ->columns(2)
                     ->schema([
+                        Forms\Components\TextInput::make('user.name')
+                            ->label('User')
+                            ->disabled(),
+                        Forms\Components\TextInput::make('user.email')
+                            ->label('Email')
+                            ->disabled(),
                         Forms\Components\TextInput::make('primary_identity_hash')
                             ->label('Primary Identity')
                             ->disabled(),
@@ -116,10 +122,16 @@ class DemoVoiceGenerationResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('user.email')
+                    ->label('User')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('primary_identity_hash')
                     ->label('Identity')
                     ->searchable()
                     ->limit(18)
+                    ->toggleable()
                     ->tooltip(fn (DemoVoiceGeneration $record): string => $record->primary_identity_hash),
                 Tables\Columns\TextColumn::make('link_group')
                     ->label('Link Group')

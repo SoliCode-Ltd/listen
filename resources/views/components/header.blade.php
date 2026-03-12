@@ -37,6 +37,7 @@
   $authNavLinks = [
     ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
+    ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => false],
     ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
     ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],

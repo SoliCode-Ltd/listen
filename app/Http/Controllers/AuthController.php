@@ -76,7 +76,9 @@ class AuthController extends Controller
         Auth::login($user);
         $request->session()->regenerate();
 
-        return redirect()->route('dashboard');
+        $intended = $request->session()->pull('url.intended', route('dashboard'));
+
+        return redirect()->to($intended);
     }
 
     public function redirectToGoogle()

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
+use App\Models\User;
 use App\Models\Voice;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -36,6 +37,9 @@ class DemoVoiceGenerationTrackingTest extends TestCase
             'custom_prompt_enabled' => false,
             'is_active' => true,
         ]);
+
+        $user = User::factory()->create();
+        $this->actingAs($user);
 
         $voice = Voice::query()->create([
             'language' => 'en',
@@ -103,7 +107,8 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertStringStartsWith('audio/demo/', $generation->audio_path);
         Storage::disk('public')->assertExists($generation->audio_path);
         $this->assertSame(4, $generation->duration_seconds);
-        $this->assertSame(UsageEstimator::estimate('Translated demo text')['chars'], $generation->billable_chars);
+        $billableChars = UsageEstimator::estimate('Translated demo text')['chars'];
+        $this->assertSame($billableChars, $generation->billable_chars);
         $this->assertSame('promo', $generation->performance_style);
         $this->assertSame('excited', $generation->emotion);
         $this->assertNull($generation->style_prompt);
@@ -112,8 +117,14 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertSame('gemini-2.5-flash-preview-tts', $generation->tts_model);
         $this->assertSame(842, $generation->tts_latency_ms);
         $this->assertStringStartsWith('cv:', $generation->primary_identity_hash);
+        $this->assertSame(300, $generation->quota_limit_chars);
+        $this->assertSame(300 - $billableChars, $generation->quota_remaining_chars);
         $this->assertIsArray($generation->metadata);
+        $this->assertSame(300 - $billableChars, data_get($generation->metadata, 'quota.remaining_chars'));
         $this->assertSame('hybrid', $generation->metadata['routing_mode']);
         $this->assertContains($generation->primary_identity_hash, $generation->metadata['identities']);
+
+        $response->assertJsonPath('quota.limit_chars', 300);
+        $response->assertJsonPath('quota.remaining_chars', 300 - $billableChars);
     }
 }

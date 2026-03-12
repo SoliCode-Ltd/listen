@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class DemoVoiceGeneration extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'primary_identity_hash',
         'link_group',
         'input_text',
@@ -39,6 +41,11 @@ class DemoVoiceGeneration extends Model
         'quota_remaining_chars',
         'metadata',
     ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 
     protected $casts = [
         'translate' => 'boolean',

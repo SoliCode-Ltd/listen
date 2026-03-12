@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx --yes sharp-cli --help)"
+      "Bash(npx --yes sharp-cli --help)",
+      "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Services' -type f -name *.php)",
+      "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Filament' -name *.php)",
+      "Bash(php -l app/Http/Controllers/HomeController.php)",
+      "Bash(php -l app/Http/Controllers/AuthController.php)",
+      "Bash(php -l app/Models/DemoVoiceGeneration.php)",
+      "Bash(php artisan:*)"
     ]
   }
 }

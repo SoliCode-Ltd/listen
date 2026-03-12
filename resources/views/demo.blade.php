@@ -48,15 +48,15 @@
           <div class="s-card reveal" id="quotaBox" style="padding:1rem 1.25rem">
             <div class="quota-panel">
               <div class="q-head">
-                <span class="q-label">{{ __('ui.demo.guest_starter_allowance') }}</span>
+                <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
                 <strong class="q-value" id="quotaValue" dir="ltr">
-                  {{ number_format((int) ($demoQuota['remaining_chars'] ?? $guestAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $guestAllowanceChars)) }} {{ __('ui.demo.chars_left') }}
+                  {{ number_format((int) ($demoQuota['remaining_chars'] ?? $trialAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $trialAllowanceChars)) }} {{ __('ui.demo.chars_left') }}
                 </strong>
               </div>
               <div class="quota-track">
                 <div class="quota-fill" id="quotaFill"></div>
               </div>
-              <div class="quota-note">{{ __('ui.demo.one_time_guest_credit', ['chars' => number_format((int) $starterPlanChars)]) }}</div>
+              <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
             </div>
           </div>
 
@@ -227,8 +227,8 @@
         <aside class="studio-sidebar">
 
           <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
-            <p id="upgradeText">{{ __('ui.demo.upgrade_text', ['chars' => number_format((int) $starterPlanChars)]) }}</p>
-            <a class="btn btn-primary" href="{{ route('register') }}" style="width:100%;justify-content:center">{{ __('ui.demo.create_free_account') }}</a>
+            <p id="upgradeText">{{ __('ui.demo.trial_exhausted_text') }}</p>
+            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" style="width:100%;justify-content:center">{{ __('ui.demo.upgrade_plan') }}</a>
           </div>
 
           <div class="s-card output-panel" id="audioWrap" style="display:none;">
@@ -255,7 +255,7 @@
   @include('components.scripts')
   @php
     $demoI18n = [
-      'upgrade_text' => __('ui.demo.upgrade_text_raw'),
+      'upgrade_text' => __('ui.demo.trial_exhausted_text'),
       'chars_left' => __('ui.demo.chars_left'),
       'quota_total_start' => __('ui.demo.quota_total_start'),
       'translate_enabled_hint' => __('ui.demo.translate_enabled_hint'),
@@ -271,7 +271,7 @@
       'preview_failed' => __('ui.demo.preview_failed'),
       'server_overload' => __('ui.dashboard.server_overload'),
       'generate_voice' => __('ui.demo.generate_voice'),
-      'create_account_unlock' => __('ui.demo.create_account_unlock'),
+      'trial_exhausted' => __('ui.demo.trial_exhausted_text'),
       'speaker_prefix' => __('ui.demo.speaker_prefix'),
       'performance_style_required' => __('ui.backend.performance_style_required'),
       'emotion_required' => __('ui.backend.emotion_required'),
@@ -392,7 +392,7 @@
       }
     }
     const demoQuota = @json($demoQuota ?? null);
-    const starterPlanChars = Number(@json((int) $starterPlanChars));
+    const trialAllowanceChars = Number(@json((int) $trialAllowanceChars));
     const i18n = @json($demoI18n);
     const pageLocale = document.documentElement.lang || 'en';
 
@@ -402,12 +402,49 @@
       'X-Requested-With': 'XMLHttpRequest',
     };
 
-    let currentQuota = {
-      limit_chars: Number(demoQuota?.limit_chars || 300),
-      remaining_chars: Number(demoQuota?.remaining_chars || 300),
-      used_chars: Number(demoQuota?.used_chars || 0),
-      is_exhausted: Boolean(demoQuota?.is_exhausted),
-    };
+    function toFiniteNumber(value, fallback) {
+      const num = Number(value);
+      return Number.isFinite(num) ? num : fallback;
+    }
+
+    function toBoolean(value) {
+      if (typeof value === 'boolean') return value;
+      if (typeof value === 'number') return value !== 0;
+      const normalized = String(value ?? '').trim().toLowerCase();
+      if (!normalized) return false;
+      return normalized === '1' || normalized === 'true' || normalized === 'yes';
+    }
+
+    function normalizeQuotaState(quota, fallback = null) {
+      const fallbackLimit = Math.max(1, toFiniteNumber(fallback?.limit_chars, trialAllowanceChars || 300));
+      const limit = Math.max(1, toFiniteNumber(quota?.limit_chars, fallbackLimit));
+      let remaining = Math.max(0, toFiniteNumber(quota?.remaining_chars, toFiniteNumber(fallback?.remaining_chars, limit)));
+      let used = Math.max(0, toFiniteNumber(quota?.used_chars, limit - remaining));
+      let exhausted = toBoolean(quota?.is_exhausted);
+
+      if (remaining <= 0) exhausted = true;
+      if (exhausted) {
+        remaining = 0;
+        used = limit;
+      } else {
+        used = Math.min(limit, used);
+      }
+
+      return {
+        ...quota,
+        limit_chars: limit,
+        remaining_chars: remaining,
+        used_chars: used,
+        is_exhausted: exhausted,
+      };
+    }
+
+    let currentQuota = normalizeQuotaState(demoQuota, {
+      limit_chars: trialAllowanceChars || 300,
+      remaining_chars: trialAllowanceChars || 300,
+      used_chars: 0,
+      is_exhausted: false,
+    });
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
     const preferredVoiceKeyByLanguage = { ar: '', en: '' };
     let clientFingerprint = '';
@@ -496,14 +533,13 @@
       if (!upgradeBox) return;
       upgradeBox.style.display = show ? 'block' : 'none';
       if (show && upgradeText) {
-        const fallback = i18n.upgrade_text.replace(':chars', formatNumber(starterPlanChars));
-        upgradeText.textContent = customMessage || fallback;
+        upgradeText.textContent = customMessage || i18n.upgrade_text;
       }
     }
 
     function renderQuota(quota, applyLivePreview = false) {
       if (!quota || typeof quota !== 'object') return;
-      currentQuota = { ...currentQuota, ...quota };
+      currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
       
       // Display the actual quota from server (no live preview adjustment)
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
@@ -530,7 +566,7 @@
         const pending = countBillableChars(textInput?.value || '');
         if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
       }
-      setUpgradeVisible(Boolean(currentQuota.is_exhausted), i18n.quota_total_start.replace(':total', formatNumber(currentQuota.limit_chars)).replace(':chars', formatNumber(starterPlanChars)));
+      setUpgradeVisible(Boolean(currentQuota.is_exhausted || remaining <= 0));
     }
 
     // Enhanced fingerprinting system
@@ -924,7 +960,7 @@
           hideAudioPreview();
           const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(currentQuota.remaining_chars));
           setError(message);
-          setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
+          setUpgradeVisible(true);
           return;
         }
         previewBtn.disabled = true;
@@ -962,7 +998,7 @@
         if (secondsMatch) {
           startCooldownCountdown(parseInt(secondsMatch[1], 10));
         } else if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
-          setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
+          setUpgradeVisible(true);
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0 });
           // Re-enable button on quota errors (user might want to try with less text)
           previewBtn.disabled = false;
@@ -996,7 +1032,7 @@
       updateTranslateHint();
     });
     textInput?.addEventListener('input', () => {
-      if (currentQuota.remaining_chars <= 0) setUpgradeVisible(true, i18n.create_account_unlock.replace(':chars', formatNumber(starterPlanChars)));
+      if (currentQuota.remaining_chars <= 0) setUpgradeVisible(true);
       updateCharCount();
     });
 
