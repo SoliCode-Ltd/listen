@@ -189,7 +189,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private const ARABIC_DIALECT_PROMPTS = [
         'ar-SA' => 'Saudi Arabic (Gulf dialect)',
-        'ar-AE' => 'Emirati Arabic (Gulf dialect)', 
+        'ar-AE' => 'Emirati Arabic (Gulf dialect)',
         'ar-KW' => 'Kuwaiti Arabic (Gulf dialect)',
         'ar-QA' => 'Qatari Arabic (Gulf dialect)',
         'ar-BH' => 'Bahraini Arabic (Gulf dialect)',
@@ -317,12 +317,12 @@ class GeminiTtsProvider implements TtsProviderInterface
         if ($this->currentKeyInfo !== null) {
             $this->getKeyManager()->markKeyExhausted($this->currentKeyInfo['name']);
         }
-        
+
         $keyInfo = $this->getKeyManager()->getAvailableKey();
         if ($keyInfo === null) {
             return false;
         }
-        
+
         $this->currentKeyInfo = $keyInfo;
         return true;
     }
@@ -542,7 +542,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                     'key' => $keyInfo['name'],
                     'attempts' => $attempts,
                 ]);
-                
+
                 if (!$this->rotateToNextKey()) {
                     break; // No more keys available
                 }
@@ -785,12 +785,12 @@ class GeminiTtsProvider implements TtsProviderInterface
     private function isArabicLanguage(string $targetLanguage): bool
     {
         $lang = strtolower(trim($targetLanguage));
-        
+
         // Check if it starts with 'ar' (covers ar, ar-XA, ar-EG, ar-SA, etc.)
         if (str_starts_with($lang, 'ar')) {
             return true;
         }
-        
+
         return false;
     }
 

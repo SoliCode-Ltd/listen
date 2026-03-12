@@ -549,12 +549,12 @@
     function renderQuota(quota, applyLivePreview = false) {
       if (!quota || typeof quota !== 'object') return;
       currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
-      
+
       // Display the actual quota from server (no live preview adjustment)
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
       const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
-      
+
       if (quotaFill) {
         quotaFill.style.width = `${percent}%`;
         quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
@@ -562,7 +562,7 @@
       if (quotaValue) {
         quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
       }
-      
+
       // Only apply live preview if explicitly requested (e.g., on initial load)
       if (applyLivePreview) {
         const pending = countBillableChars(textInput?.value || '');
@@ -570,7 +570,7 @@
           updateQuotaMeterLive(pending);
         }
       }
-      
+
       if (quotaBox) {
         const pending = countBillableChars(textInput?.value || '');
         if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
