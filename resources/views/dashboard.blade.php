@@ -952,9 +952,9 @@
     }
     .editor-panel {
       padding: 1rem;
-      border-radius: 1.1rem;
+      /* border-radius: 1.1rem;
       border: 1px solid color-mix(in oklab, var(--line) 75%, var(--a) 25%);
-      background: color-mix(in oklab, var(--surface) 82%, transparent);
+      background: color-mix(in oklab, var(--surface) 82%, transparent); */
     }
     .control-pair > div {
       padding: .95rem;
