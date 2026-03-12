@@ -60,4 +60,9 @@ class AudioGeneration extends Model
     {
         return $this->belongsTo(TextItem::class);
     }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
 }

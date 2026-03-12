@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AudioGenerationResource\Pages;
 use App\Models\AudioGeneration;
+use App\Support\AudioUrl;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -29,6 +30,10 @@ class AudioGenerationResource extends Resource
                 Forms\Components\Section::make('Generation Info')
                     ->columns(2)
                     ->schema([
+                        Forms\Components\TextInput::make('user.email')
+                            ->label('User Email')
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('user_id')
                             ->numeric(),
                         Forms\Components\TextInput::make('text_item_id')
@@ -57,6 +62,12 @@ class AudioGenerationResource extends Resource
                             ->numeric(),
                         Forms\Components\TextInput::make('audio_path')
                             ->maxLength(255),
+                        Forms\Components\TextInput::make('public_audio_url')
+                            ->label('Public Audio URL')
+                            ->formatStateUsing(fn (?AudioGeneration $record): string => self::resolvePublicAudioUrl($record))
+                            ->readOnly()
+                            ->dehydrated(false)
+                            ->columnSpanFull(),
                     ]),
                 Forms\Components\Section::make('Content')
                     ->schema([
@@ -76,6 +87,11 @@ class AudioGenerationResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('user.email')
+                    ->label('User')
+                    ->searchable()
+                    ->sortable()
+                    ->placeholder('-'),
                 Tables\Columns\TextColumn::make('user_id')
                     ->label('User ID')
                     ->sortable(),
@@ -106,6 +122,13 @@ class AudioGenerationResource extends Resource
                     ->sortable(),
                 Tables\Columns\IconColumn::make('translate')
                     ->boolean(),
+                Tables\Columns\TextColumn::make('public_audio_url')
+                    ->label('Public URL')
+                    ->state(fn (AudioGeneration $record): string => self::resolvePublicAudioUrl($record))
+                    ->url(fn (AudioGeneration $record): ?string => $record->audio_path ? AudioUrl::fromPath($record->audio_path) : null, true)
+                    ->copyable()
+                    ->wrap()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
                     ->sortable(),
@@ -128,6 +151,12 @@ class AudioGenerationResource extends Resource
                     ->label('Translated'),
             ])
             ->actions([
+                Tables\Actions\Action::make('audio')
+                    ->label('Open Audio')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->url(fn (AudioGeneration $record): ?string => $record->audio_path ? AudioUrl::fromPath($record->audio_path) : null)
+                    ->openUrlInNewTab()
+                    ->visible(fn (AudioGeneration $record): bool => filled($record->audio_path)),
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
             ])
@@ -147,5 +176,21 @@ class AudioGenerationResource extends Resource
             'view' => Pages\ViewAudioGeneration::route('/{record}'),
             'edit' => Pages\EditAudioGeneration::route('/{record}/edit'),
         ];
+    }
+
+    private static function resolvePublicAudioUrl(?AudioGeneration $record): string
+    {
+        if (! $record || ! filled($record->audio_path)) {
+            return 'N/A';
+        }
+
+        $relativePath = 'storage/' . ltrim($record->audio_path, '/');
+        $request = request();
+
+        if ($request) {
+            return $request->getSchemeAndHttpHost() . '/' . ltrim($relativePath, '/');
+        }
+
+        return url($relativePath);
     }
 }
