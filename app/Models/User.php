@@ -3,12 +3,14 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Services\PlanAccessService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Billable;
 
@@ -16,6 +18,21 @@ class User extends Authenticatable implements FilamentUser
 {
     /** @use HasFactory<\Database\Factories\UserFactory> */
     use Billable, HasFactory, Notifiable;
+
+    protected static function booted(): void
+    {
+        static::created(static function (self $user): void {
+            try {
+                app(PlanAccessService::class)->ensureFreePlanForUser($user);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to auto-assign free plan for new user.', [
+                    'user_id' => $user->id,
+                    'exception_class' => get_class($e),
+                    'exception_message' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
 
     /**
      * The attributes that are mass assignable.
@@ -104,4 +121,3 @@ class User extends Authenticatable implements FilamentUser
         ])->save();
     }
 }
-
