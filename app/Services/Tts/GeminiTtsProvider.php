@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\TtsStudioConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -723,7 +724,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         // Build emotion description
-        $emotionDesc = $this->getEmotionDescription($emotion);
+        $emotionDesc = $this->getEmotionDescription($emotion, $isArabic);
 
         // Build style description
         $styleDesc = $this->getPerformanceStyleDescription($style, $isArabic);
@@ -797,8 +798,13 @@ class GeminiTtsProvider implements TtsProviderInterface
     /**
      * Get human-readable emotion description for the style prompt.
      */
-    private function getEmotionDescription(string $emotion): string
+    private function getEmotionDescription(string $emotion, bool $isArabic): string
     {
+        $customInstruction = trim((string) TtsStudioConfig::emotionInstruction($emotion, $isArabic ? 'ar' : 'en'));
+        if ($customInstruction !== '') {
+            return $customInstruction;
+        }
+
         return match ($emotion) {
             'warm' => 'warm, friendly, and approachable',
             'sad' => 'melancholic, sorrowful, with deep emotional weight',
@@ -815,6 +821,11 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function getPerformanceStyleDescription(string $style, bool $isArabic): string
     {
+        $customInstruction = trim((string) TtsStudioConfig::performanceStyleInstruction($style, $isArabic ? 'ar' : 'en'));
+        if ($customInstruction !== '') {
+            return $customInstruction;
+        }
+
         if ($isArabic && isset(self::ARABIC_STYLE_HINTS[$style])) {
             return self::ARABIC_STYLE_HINTS[$style];
         }

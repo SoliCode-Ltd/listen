@@ -121,7 +121,7 @@ class TtsStudioConfig
     }
 
     /**
-     * @return array<int, array{value:string,label:string,label_ar:string}>
+     * @return array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>
      */
     public static function performanceStyleCatalog(): array
     {
@@ -131,7 +131,7 @@ class TtsStudioConfig
     }
 
     /**
-     * @return array<int, array{value:string,label:string,label_ar:string}>
+     * @return array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>
      */
     public static function emotionCatalog(): array
     {
@@ -141,7 +141,7 @@ class TtsStudioConfig
     }
 
     /**
-     * @return array<string, array<int, array{value:string,label:string,label_ar:string}>>
+     * @return array<string, array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>>
      */
     public static function dialectCatalogByLanguage(): array
     {
@@ -152,7 +152,7 @@ class TtsStudioConfig
     }
 
     /**
-     * @return array<int, array{value:string,label:string,label_ar:string}>
+     * @return array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>
      */
     public static function dialectCatalogForLanguage(string $language): array
     {
@@ -206,9 +206,45 @@ class TtsStudioConfig
         return trim((string) SiteSetting::get("tts_default_voice_{$normalizedLanguage}", ''));
     }
 
+    public static function performanceStyleInstruction(string $value, ?string $language = null): string
+    {
+        $targetValue = self::normalizeSlug($value);
+        if ($targetValue === '') {
+            return '';
+        }
+
+        foreach (self::performanceStyleCatalog() as $row) {
+            if (self::normalizeSlug((string) ($row['value'] ?? '')) !== $targetValue) {
+                continue;
+            }
+
+            return self::resolveInstruction($row, $language);
+        }
+
+        return '';
+    }
+
+    public static function emotionInstruction(string $value, ?string $language = null): string
+    {
+        $targetValue = self::normalizeSlug($value);
+        if ($targetValue === '') {
+            return '';
+        }
+
+        foreach (self::emotionCatalog() as $row) {
+            if (self::normalizeSlug((string) ($row['value'] ?? '')) !== $targetValue) {
+                continue;
+            }
+
+            return self::resolveInstruction($row, $language);
+        }
+
+        return '';
+    }
+
     /**
      * @param  array<int, mixed>  $rows
-     * @return array<int, array{value:string,label:string,label_ar:string}>
+     * @return array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>
      */
     private static function normalizeCatalogRows(array $rows): array
     {
@@ -227,6 +263,8 @@ class TtsStudioConfig
                     'value' => $value,
                     'label' => self::humanizeValue($value),
                     'label_ar' => self::humanizeValue($value),
+                    'instruction_en' => '',
+                    'instruction_ar' => '',
                 ];
                 continue;
             }
@@ -242,11 +280,16 @@ class TtsStudioConfig
 
             $label = trim((string) ($row['label'] ?? $row['name'] ?? ''));
             $labelAr = trim((string) ($row['label_ar'] ?? $row['name_ar'] ?? ''));
+            $instructionEn = trim((string) ($row['instruction_en'] ?? $row['instruction'] ?? $row['description'] ?? $row['prompt'] ?? $row['prompt_en'] ?? ''));
+            $instructionAr = trim((string) ($row['instruction_ar'] ?? $row['description_ar'] ?? $row['prompt_ar'] ?? ''));
             if ($label === '') {
                 $label = self::humanizeValue($value);
             }
             if ($labelAr === '') {
                 $labelAr = $label;
+            }
+            if ($instructionAr === '') {
+                $instructionAr = $instructionEn;
             }
 
             $seen[$value] = true;
@@ -254,6 +297,8 @@ class TtsStudioConfig
                 'value' => $value,
                 'label' => $label,
                 'label_ar' => $labelAr,
+                'instruction_en' => $instructionEn,
+                'instruction_ar' => $instructionAr,
             ];
         }
 
@@ -262,8 +307,8 @@ class TtsStudioConfig
 
     /**
      * @param  array<int, array{value:string,label:string,translation_key:?string}>  $defaults
-     * @param  array<int, array{value:string,label:string,label_ar:string}>  $custom
-     * @return array<int, array{value:string,label:string,label_ar:string}>
+     * @param  array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>  $custom
+     * @return array<int, array{value:string,label:string,label_ar:string,instruction_en:string,instruction_ar:string}>
      */
     private static function mergeCatalogRows(array $defaults, array $custom): array
     {
@@ -288,6 +333,8 @@ class TtsStudioConfig
                 'value' => $value,
                 'label' => $translated,
                 'label_ar' => $translated,
+                'instruction_en' => '',
+                'instruction_ar' => '',
             ];
         }
 
@@ -301,6 +348,8 @@ class TtsStudioConfig
                 'value' => $value,
                 'label' => trim((string) ($row['label'] ?? self::humanizeValue($value))),
                 'label_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? self::humanizeValue($value))),
+                'instruction_en' => trim((string) ($row['instruction_en'] ?? '')),
+                'instruction_ar' => trim((string) ($row['instruction_ar'] ?? $row['instruction_en'] ?? '')),
             ];
         }
 
@@ -347,5 +396,24 @@ class TtsStudioConfig
         }
 
         return ucwords(str_replace(['_', '-'], ' ', $normalized));
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private static function resolveInstruction(array $row, ?string $language = null): string
+    {
+        $normalizedLanguage = $language !== null && trim($language) !== ''
+            ? self::normalizeLanguage($language)
+            : self::normalizeLanguage((string) app()->getLocale());
+
+        $instructionEn = trim((string) ($row['instruction_en'] ?? ''));
+        $instructionAr = trim((string) ($row['instruction_ar'] ?? ''));
+
+        if ($normalizedLanguage === 'ar') {
+            return $instructionAr !== '' ? $instructionAr : $instructionEn;
+        }
+
+        return $instructionEn !== '' ? $instructionEn : $instructionAr;
     }
 }

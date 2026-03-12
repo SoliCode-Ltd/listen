@@ -46,6 +46,12 @@
       $logoUrl = Storage::disk('public')->url($logoPath);
     }
   }
+
+  $showDemoFooterLink = true;
+  if (auth()->check()) {
+    $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
+    $showDemoFooterLink = strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free';
+  }
 @endphp
 
 <footer class="app-footer">
@@ -76,7 +82,9 @@
           <h4>{{ __('ui.footer.product') }}</h4>
           <ul>
             <li><a href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a></li>
-            <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
+            @if($showDemoFooterLink)
+              <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
+            @endif
             <li><a href="{{ route('browsers-extension.page') }}">{{ __('ui.nav.extension') }}</a></li>
           </ul>
         </div>
@@ -116,4 +124,3 @@
     </div>
   </div>
 </footer>
-

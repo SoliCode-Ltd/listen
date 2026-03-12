@@ -77,7 +77,7 @@ Route::group([
         Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
     });
 
-    Route::middleware('auth')->group(function () {
+    Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {
         Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
         Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
         Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');

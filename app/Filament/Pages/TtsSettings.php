@@ -161,85 +161,93 @@ class TtsSettings extends Page implements HasForms
                         )->values()->toArray()
                     ),
 
-                Forms\Components\Section::make('Studio Defaults (Demo + Dashboard)')
-                    ->description('These defaults are used when the user has not chosen a custom value yet.')
-                    ->columns(2)
-                    ->schema([
-                        Forms\Components\Select::make('tts_default_voice_ar')
-                            ->label('Default Arabic Speaker')
-                            ->options($arabicVoiceOptions)
-                            ->searchable()
-                            ->placeholder('Use automatic fallback'),
-                        Forms\Components\Select::make('tts_default_voice_en')
-                            ->label('Default English Speaker')
-                            ->options($englishVoiceOptions)
-                            ->searchable()
-                            ->placeholder('Use automatic fallback'),
-                        Forms\Components\Select::make('tts_default_performance_style_ar')
-                            ->label('Default Arabic Performance Style')
-                            ->options($performanceStyleOptions)
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('tts_default_performance_style_en')
-                            ->label('Default English Performance Style')
-                            ->options($performanceStyleOptions)
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('tts_default_emotion_ar')
-                            ->label('Default Arabic Emotion')
-                            ->options($emotionOptions)
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('tts_default_emotion_en')
-                            ->label('Default English Emotion')
-                            ->options($emotionOptions)
-                            ->searchable()
-                            ->required(),
-                        Forms\Components\Select::make('tts_default_dialect_ar')
-                            ->label('Default Arabic Dialect')
-                            ->options(['' => 'Auto-detect'] + $arabicDialectOptions)
-                            ->searchable(),
-                        Forms\Components\Select::make('tts_default_dialect_en')
-                            ->label('Default English Dialect')
-                            ->options(['' => 'Auto-detect'] + $englishDialectOptions)
-                            ->searchable(),
-                    ]),
-
-                Forms\Components\Section::make('Custom Studio Catalogs')
-                    ->description('Add custom options that become available in Demo, Dashboard, and API validation.')
-                    ->schema([
-                        Forms\Components\Repeater::make('tts_performance_styles_catalog')
-                            ->label('Custom Performance Styles')
-                            ->schema($this->catalogRowSchema())
-                            ->default([])
-                            ->collapsed()
-                            ->reorderableWithButtons()
-                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
-                            ->addActionLabel('Add performance style'),
-                        Forms\Components\Repeater::make('tts_emotions_catalog')
-                            ->label('Custom Emotions')
-                            ->schema($this->catalogRowSchema())
-                            ->default([])
-                            ->collapsed()
-                            ->reorderableWithButtons()
-                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
-                            ->addActionLabel('Add emotion'),
-                        Forms\Components\Repeater::make('tts_dialects_catalog_ar')
-                            ->label('Custom Arabic Dialects')
-                            ->schema($this->catalogRowSchema())
-                            ->default([])
-                            ->collapsed()
-                            ->reorderableWithButtons()
-                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
-                            ->addActionLabel('Add Arabic dialect'),
-                        Forms\Components\Repeater::make('tts_dialects_catalog_en')
-                            ->label('Custom English Dialects')
-                            ->schema($this->catalogRowSchema())
-                            ->default([])
-                            ->collapsed()
-                            ->reorderableWithButtons()
-                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
-                            ->addActionLabel('Add English dialect'),
+                Forms\Components\Tabs::make('studio_focus_tabs')
+                    ->tabs([
+                        Forms\Components\Tabs\Tab::make('Studio Defaults')
+                            ->schema([
+                                Forms\Components\Section::make('Studio Defaults (Demo + Dashboard)')
+                                    ->description('These defaults are used when the user has not chosen a custom value yet.')
+                                    ->columns(2)
+                                    ->schema([
+                                        Forms\Components\Select::make('tts_default_voice_ar')
+                                            ->label('Default Arabic Speaker')
+                                            ->options($arabicVoiceOptions)
+                                            ->searchable()
+                                            ->placeholder('Use automatic fallback'),
+                                        Forms\Components\Select::make('tts_default_voice_en')
+                                            ->label('Default English Speaker')
+                                            ->options($englishVoiceOptions)
+                                            ->searchable()
+                                            ->placeholder('Use automatic fallback'),
+                                        Forms\Components\Select::make('tts_default_performance_style_ar')
+                                            ->label('Default Arabic Performance Style')
+                                            ->options($performanceStyleOptions)
+                                            ->searchable()
+                                            ->required(),
+                                        Forms\Components\Select::make('tts_default_performance_style_en')
+                                            ->label('Default English Performance Style')
+                                            ->options($performanceStyleOptions)
+                                            ->searchable()
+                                            ->required(),
+                                        Forms\Components\Select::make('tts_default_emotion_ar')
+                                            ->label('Default Arabic Emotion')
+                                            ->options($emotionOptions)
+                                            ->searchable()
+                                            ->required(),
+                                        Forms\Components\Select::make('tts_default_emotion_en')
+                                            ->label('Default English Emotion')
+                                            ->options($emotionOptions)
+                                            ->searchable()
+                                            ->required(),
+                                        Forms\Components\Select::make('tts_default_dialect_ar')
+                                            ->label('Default Arabic Dialect')
+                                            ->options(['' => 'Auto-detect'] + $arabicDialectOptions)
+                                            ->searchable(),
+                                        Forms\Components\Select::make('tts_default_dialect_en')
+                                            ->label('Default English Dialect')
+                                            ->options(['' => 'Auto-detect'] + $englishDialectOptions)
+                                            ->searchable(),
+                                    ]),
+                            ]),
+                        Forms\Components\Tabs\Tab::make('Custom Studio Catalogs')
+                            ->schema([
+                                Forms\Components\Section::make('Custom Studio Catalogs')
+                                    ->description('Add custom options and optional Gemini instruction prompts.')
+                                    ->schema([
+                                        Forms\Components\Repeater::make('tts_performance_styles_catalog')
+                                            ->label('Custom Performance Styles')
+                                            ->schema($this->styleCatalogRowSchema())
+                                            ->default([])
+                                            ->collapsed()
+                                            ->reorderableWithButtons()
+                                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                                            ->addActionLabel('Add performance style'),
+                                        Forms\Components\Repeater::make('tts_emotions_catalog')
+                                            ->label('Custom Emotions')
+                                            ->schema($this->emotionCatalogRowSchema())
+                                            ->default([])
+                                            ->collapsed()
+                                            ->reorderableWithButtons()
+                                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                                            ->addActionLabel('Add emotion'),
+                                        Forms\Components\Repeater::make('tts_dialects_catalog_ar')
+                                            ->label('Custom Arabic Dialects')
+                                            ->schema($this->catalogRowSchema())
+                                            ->default([])
+                                            ->collapsed()
+                                            ->reorderableWithButtons()
+                                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                                            ->addActionLabel('Add Arabic dialect'),
+                                        Forms\Components\Repeater::make('tts_dialects_catalog_en')
+                                            ->label('Custom English Dialects')
+                                            ->schema($this->catalogRowSchema())
+                                            ->default([])
+                                            ->collapsed()
+                                            ->reorderableWithButtons()
+                                            ->itemLabel(fn (array $state): ?string => $state['value'] ?? null)
+                                            ->addActionLabel('Add English dialect'),
+                                    ]),
+                            ]),
                     ]),
 
                 Forms\Components\Section::make('API Keys Status')
@@ -359,6 +367,46 @@ class TtsSettings extends Page implements HasForms
                 ->label('Label (AR)')
                 ->maxLength(120),
         ];
+    }
+
+    /**
+     * @return array<int, Forms\Components\Component>
+     */
+    private function styleCatalogRowSchema(): array
+    {
+        $base = $this->catalogRowSchema();
+        $base[] = Forms\Components\Textarea::make('instruction_en')
+            ->label('Instruction Prompt (EN)')
+            ->rows(3)
+            ->maxLength(2000)
+            ->helperText('Optional detailed instruction used by Gemini for this style when custom prompt is empty.');
+        $base[] = Forms\Components\Textarea::make('instruction_ar')
+            ->label('Instruction Prompt (AR)')
+            ->rows(3)
+            ->maxLength(2000)
+            ->helperText('Arabic variant of instruction prompt (optional).');
+
+        return $base;
+    }
+
+    /**
+     * @return array<int, Forms\Components\Component>
+     */
+    private function emotionCatalogRowSchema(): array
+    {
+        $base = $this->catalogRowSchema();
+        $base[] = Forms\Components\Textarea::make('instruction_en')
+            ->label('Instruction Prompt (EN)')
+            ->rows(3)
+            ->maxLength(2000)
+            ->helperText('Optional detailed instruction used by Gemini for this emotion when custom prompt is empty.');
+        $base[] = Forms\Components\Textarea::make('instruction_ar')
+            ->label('Instruction Prompt (AR)')
+            ->rows(3)
+            ->maxLength(2000)
+            ->helperText('Arabic variant of instruction prompt (optional).');
+
+        return $base;
     }
 
     /**
