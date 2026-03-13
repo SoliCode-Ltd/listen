@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminManualPaymentProofController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
+use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
@@ -16,6 +18,9 @@ use Spatie\Sitemap\Tags\Url;
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->name('media.file');
+
+Route::middleware('auth')->get('/admin/manual-payments/{manualPaymentRequest}/proof', AdminManualPaymentProofController::class)
+    ->name('admin.manual-payments.proof');
 
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
@@ -92,6 +97,8 @@ Route::group([
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
 
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
+        Route::get('/billing/manual', [ManualPaymentController::class, 'instructions'])->name('billing.manual.instructions');
+        Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
         Route::post('/billing/payment-method', [BillingController::class, 'updatePaymentMethod'])->name('billing.payment-method');

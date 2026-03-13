@@ -5,8 +5,10 @@ namespace App\Http\Controllers;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\BillingSyncService;
+use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\StripeWebhookEmailService;
 use App\Support\VoiceTier;
@@ -23,6 +25,7 @@ class BillingController extends Controller
 {
     public function __construct(
         private readonly BillingSyncService $billingSyncService,
+        private readonly LocalizedPricingService $localizedPricingService,
         private readonly PlanAccessService $planAccessService,
         private readonly StripeWebhookEmailService $stripeWebhookEmailService,
     ) {}
@@ -40,6 +43,7 @@ class BillingController extends Controller
         $stripeReady = trim($stripeKey) !== '' && trim($stripeSecret) !== '';
 
         $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
         $selectedPlan = trim((string) $request->query('plan', ''));
         $validPlanSlugs = Plan::query()
             ->where('is_active', true)
@@ -51,11 +55,13 @@ class BillingController extends Controller
             'activePlan' => $activePlan,
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
-            'plans' => $this->resolveCheckoutPlans($stripeReady),
+            'plans' => $this->resolveCheckoutPlans($stripeReady, $countryContext),
             'selectedPlan' => in_array($selectedPlan, $validPlanSlugs, true) ? $selectedPlan : '',
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
             'defaultPaymentMethod' => $defaultPaymentMethod,
+            'countryContext' => $countryContext,
+            'paymentBrandAssets' => $this->localizedPricingService->paymentBrandAssets(),
         ]);
     }
 
@@ -220,6 +226,7 @@ class BillingController extends Controller
             ], 422);
         }
 
+        $this->clearApprovedManualOverride($user);
         $this->billingSyncService->syncIfStale($user, true);
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
 
@@ -494,8 +501,10 @@ class BillingController extends Controller
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function resolveCheckoutPlans(bool $stripeReady): array
+    private function resolveCheckoutPlans(bool $stripeReady, array $countryContext): array
     {
+        $locale = app()->getLocale();
+
         return Plan::query()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
@@ -508,7 +517,7 @@ class BillingController extends Controller
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
                 return $monthlyPriceId !== '' || $yearlyPriceId !== '';
             })
-            ->map(function (Plan $plan) use ($stripeReady) {
+            ->map(function (Plan $plan) use ($stripeReady, $countryContext, $locale) {
                 $slug = (string) $plan->slug;
 
                 $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
@@ -517,8 +526,42 @@ class BillingController extends Controller
                 $monthlyFallback = max(0, (int) $plan->price_cents);
                 $yearlyFallback = max(0, (int) round($monthlyFallback * 12 * 0.8));
 
-                $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $monthlyFallback, 'month');
-                $yearly = $this->resolvePriceMeta($yearlyPriceId, $stripeReady, $yearlyFallback, 'year');
+                $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $monthlyFallback, 'monthly', $countryContext, $locale);
+                $yearly = $this->resolvePriceMeta($yearlyPriceId, $stripeReady, $yearlyFallback, 'yearly', $countryContext, $locale);
+                $monthly['method'] = 'stripe';
+                $yearly['method'] = 'stripe';
+
+                $paymentMethods = [
+                    'stripe' => [
+                        'key' => 'stripe',
+                        'available' => true,
+                        'label' => $this->localizedPricingService->paymentMethodMeta('stripe')['label'],
+                        'description' => $this->localizedPricingService->paymentMethodMeta('stripe')['description'],
+                        'monthly' => $monthly,
+                        'yearly' => $yearly,
+                    ],
+                ];
+
+                foreach ($this->localizedPricingService->enabledManualMethods((string) ($countryContext['country_code'] ?? '')) as $method) {
+                    $manualMonthly = $this->localizedPricingService->manualQuoteForPlan($plan, 'monthly', $countryContext, $method, $locale);
+                    $manualYearly = $this->localizedPricingService->manualQuoteForPlan($plan, 'yearly', $countryContext, $method, $locale);
+                    $methodMeta = $this->localizedPricingService->paymentMethodMeta($method);
+
+                    $paymentMethods[$method] = [
+                        'key' => $method,
+                        'available' => $manualMonthly !== null && $manualYearly !== null,
+                        'label' => $methodMeta['label'],
+                        'description' => $methodMeta['description'],
+                        'destination' => $this->localizedPricingService->manualPaymentDestination($method, $locale),
+                        'monthly' => $manualMonthly,
+                        'yearly' => $manualYearly,
+                    ];
+                }
+
+                $preferredMethod = $this->localizedPricingService->preferredManualMethodForPlan($plan, $countryContext) ?? 'stripe';
+                if (($paymentMethods[$preferredMethod]['available'] ?? false) !== true) {
+                    $preferredMethod = 'stripe';
+                }
 
                 return [
                     'slug' => $slug,
@@ -526,6 +569,8 @@ class BillingController extends Controller
                     'voice_tier' => VoiceTier::label((string) $plan->voice_tier),
                     'monthly' => $monthly,
                     'yearly' => $yearly,
+                    'payment_methods' => $paymentMethods,
+                    'preferred_payment_method' => $preferredMethod,
                 ];
             })
             ->values()
@@ -538,31 +583,50 @@ class BillingController extends Controller
      *
      * @return array<string, mixed>
      */
-    private function resolvePriceMeta(string $priceId, bool $stripeReady, int $fallbackAmountCents, string $fallbackInterval): array
+    private function resolvePriceMeta(
+        string $priceId,
+        bool $stripeReady,
+        int $fallbackAmountCents,
+        string $cycle,
+        array $countryContext,
+        string $locale,
+    ): array
     {
-        $currency = 'USD';
-        $interval = $fallbackInterval;
+        $chargeCurrency = 'USD';
+        $interval = $cycle === 'yearly' ? 'year' : 'month';
         $intervalCount = 1;
-        // Always use the DB price — the admin dashboard is the source of truth.
-        $amountCents = $fallbackAmountCents;
+        // Always use the DB USD amount as the canonical base.
+        $baseUsdAmountCents = $fallbackAmountCents;
 
         if ($stripeReady && $priceId !== '') {
             $stripePrice = $this->fetchStripePrice($priceId);
             if ($stripePrice) {
-                // Only take interval/currency from Stripe, NOT the amount.
-                $currency = (string) $stripePrice['currency'];
+                // Only take interval/currency metadata from Stripe, NOT the display amount.
+                $chargeCurrency = (string) $stripePrice['currency'];
                 $interval = (string) $stripePrice['interval'];
                 $intervalCount = (int) $stripePrice['interval_count'];
             }
         }
 
+        $displayQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+            $baseUsdAmountCents,
+            $cycle,
+            $countryContext,
+            'stripe',
+            $locale,
+        );
+
         return [
             'price_id' => $priceId,
-            'amount_cents' => $amountCents,
-            'amount_formatted' => Cashier::formatAmount($amountCents, strtolower($currency)),
-            'currency' => $currency,
+            'amount_cents' => (int) $displayQuote['amount_minor'],
+            'amount_formatted' => (string) $displayQuote['amount_formatted'],
+            'currency' => (string) $displayQuote['currency'],
             'interval' => $interval,
             'interval_count' => $intervalCount,
+            'base_usd_cents' => $baseUsdAmountCents,
+            'base_usd_formatted' => (string) $displayQuote['base_usd_formatted'],
+            'is_converted' => (bool) $displayQuote['is_converted'],
+            'charge_currency' => strtoupper($chargeCurrency),
         ];
     }
 
@@ -896,5 +960,16 @@ class BillingController extends Controller
 
         // 3. Fall back to .env / config - LEGACY FALLBACK
         return trim((string) config("services.stripe.prices.{$planSlug}.{$cycle}", ''));
+    }
+
+    private function clearApprovedManualOverride(User $user): void
+    {
+        Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('billing_payment_state', 'manual_override')
+            ->update([
+                'billing_payment_state' => 'ok',
+            ]);
     }
 }

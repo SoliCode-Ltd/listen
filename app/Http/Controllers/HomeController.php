@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Services\DemoFraudService;
+use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
@@ -29,6 +30,7 @@ class HomeController extends Controller
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
+        private readonly LocalizedPricingService $localizedPricingService,
         private readonly TtsRoutingService $ttsRoutingService,
         private readonly DemoFraudService $fraudService,
     ) {
@@ -36,6 +38,7 @@ class HomeController extends Controller
 
     public function index()
     {
+        $countryContext = $this->localizedPricingService->resolveCountryContext(request());
         $pricingPlans = $this->pricingPlans();
         $highlightPlans = array_slice($pricingPlans, 0, 3);
         $sampleLanguage = $this->sampleLanguageForLocale(app()->getLocale());
@@ -76,6 +79,7 @@ class HomeController extends Controller
             'highlightPlans' => $highlightPlans,
             'heroVoiceSample' => $heroVoiceSample,
             'voiceSamples' => $voiceSamples,
+            'countryContext' => $countryContext,
         ]);
     }
 
@@ -90,6 +94,7 @@ class HomeController extends Controller
         return view('pricing', [
             'pricingPlans' => $this->pricingPlans(),
             'activePlanSlug' => $activePlanSlug,
+            'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
         ]);
     }
 
@@ -566,13 +571,38 @@ class HomeController extends Controller
             ->get();
 
         $locale = app()->getLocale();
+        $countryContext = $this->localizedPricingService->resolveCountryContext(request());
 
-        $mapped = $plans->map(function (Plan $plan) use ($locale): array {
+        $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext): array {
             $monthlyCents = max(0, (int) $plan->price_cents);
             $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
             $monthly = round($monthlyCents / 100, 2);
             $yearly = round($yearlyCents / 100, 2);
             $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
+            $stripeMonthlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+                $monthlyCents,
+                'monthly',
+                $countryContext,
+                'stripe',
+                $locale
+            );
+            $stripeYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+                $yearlyCents,
+                'yearly',
+                $countryContext,
+                'stripe',
+                $locale
+            );
+            $manualMethod = $this->localizedPricingService->preferredManualMethodForPlan($plan, $countryContext);
+            $manualMonthlyQuote = $manualMethod
+                ? $this->localizedPricingService->manualQuoteForPlan($plan, 'monthly', $countryContext, $manualMethod, $locale)
+                : null;
+            $manualYearlyQuote = $manualMethod
+                ? $this->localizedPricingService->manualQuoteForPlan($plan, 'yearly', $countryContext, $manualMethod, $locale)
+                : null;
+            $displayMonthlyQuote = $manualMonthlyQuote ?? $stripeMonthlyQuote;
+            $displayYearlyQuote = $manualYearlyQuote ?? $stripeYearlyQuote;
+            $savingsMinor = max(0, ($displayMonthlyQuote['equivalent_monthly_minor'] * 12) - $displayYearlyQuote['amount_minor']);
 
             $premiumMinutes = (int) ($plan->premium_voice_minutes ?? 0);
             $recentDays = (int) ($plan->recent_voices_days ?? 7);
@@ -598,6 +628,19 @@ class HomeController extends Controller
                 'price_monthly_cents' => $monthlyCents,
                 'price_yearly' => $yearly,
                 'price_yearly_cents' => $yearlyCents,
+                'display_payment_method' => $manualMethod ?? 'stripe',
+                'display_currency' => (string) $displayMonthlyQuote['currency'],
+                'display_price_monthly_minor' => (int) $displayMonthlyQuote['amount_minor'],
+                'display_price_monthly_formatted' => (string) $displayMonthlyQuote['amount_formatted'],
+                'display_price_yearly_total_minor' => (int) $displayYearlyQuote['amount_minor'],
+                'display_price_yearly_total_formatted' => (string) $displayYearlyQuote['amount_formatted'],
+                'display_price_yearly_monthly_formatted' => (string) $displayYearlyQuote['equivalent_monthly_formatted'],
+                'display_savings_formatted' => $this->localizedPricingService->formatAmount(
+                    $savingsMinor,
+                    (string) $displayMonthlyQuote['currency'],
+                    $locale
+                ),
+                'display_is_manual' => $manualMethod !== null,
                 'monthly_minutes' => (int) $plan->monthly_minutes,
                 'monthly_chars' => (int) $plan->monthly_chars,
                 'monthly_requests' => (int) $plan->monthly_requests,

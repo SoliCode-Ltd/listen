@@ -6,6 +6,10 @@
   if ($yearlyCents <= 0 && $monthlyCents > 0) {
     $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
   }
+  $displayMonthlyFormatted = (string) ($plan['display_price_monthly_formatted'] ?? '$0.00');
+  $displayYearlyMonthlyFormatted = (string) ($plan['display_price_yearly_monthly_formatted'] ?? $displayMonthlyFormatted);
+  $displayYearlyTotalFormatted = (string) ($plan['display_price_yearly_total_formatted'] ?? $displayYearlyMonthlyFormatted);
+  $displaySavingsFormatted = (string) ($plan['display_savings_formatted'] ?? '');
   $isFree = $monthlyCents <= 0;
   $savingsCents = $monthlyCents > 0 ? max(0, ($monthlyCents * 12) - $yearlyCents) : 0;
 @endphp
@@ -14,7 +18,12 @@
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-monthly-cents="{{ $monthlyCents }}"
      data-yearly-cents="{{ $yearlyCents }}"
-     data-savings-cents="{{ $savingsCents }}">
+     data-savings-cents="{{ $savingsCents }}"
+     data-display-monthly="{{ e($displayMonthlyFormatted) }}"
+     data-display-yearly-monthly="{{ e($displayYearlyMonthlyFormatted) }}"
+     data-display-yearly-total="{{ e($displayYearlyTotalFormatted) }}"
+     data-display-savings="{{ e($displaySavingsFormatted) }}"
+     data-display-manual="{{ !empty($plan['display_is_manual']) ? '1' : '0' }}">
 
   @if($plan['is_popular'] && !$isCurrent)
     <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
@@ -28,8 +37,7 @@
   <div class="plan-pricing">
     <div class="price-row">
       <span class="price-main" dir="ltr">
-        <span class="price-currency">$</span>
-        <span class="price-amount price-value">0</span>
+        <span class="price-amount price-value">{{ $displayMonthlyFormatted }}</span>
       </span>
       <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
     </div>

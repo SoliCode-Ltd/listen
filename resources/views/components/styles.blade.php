@@ -4,8 +4,8 @@
 :root {
   --font-display: 'IBM Plex Sans', sans-serif;
   --font-body: 'IBM Plex Sans', sans-serif;
-  --font-display-ar: 'IBM Plex Sans Arabic', sans-serif;
-  --font-body-ar: 'IBM Plex Sans Arabic', sans-serif;
+  --font-display-ar: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
+  --font-body-ar: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --btn-radius: 8px;
   --bg: #0B0B0F;

@@ -57,7 +57,6 @@
       font-size: 1.05rem;
       line-height: 1.6;
     }
-
     .billing-wrapper {
       display: flex;
       flex-direction: column;
@@ -230,6 +229,7 @@
     .price-amount {
       font-size: 2.75rem;
       font-weight: 800;
+      font-family: 'IBM Plex Sans', sans-serif;
       line-height: 1;
       transition: transform .16s ease, opacity .16s ease;
     }
@@ -568,7 +568,6 @@
       <!-- <span class="eyebrow">Flexible pricing</span> -->
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
-
       <div class="billing-wrapper">
         <div class="billing-toggle" id="billingToggle">
           <span class="billing-indicator" aria-hidden="true"></span>
@@ -700,42 +699,27 @@
       var isYearly = false;
       var i18n = @json($pricingI18n);
 
-      function formatUsd(cents) {
-        var dollars = (Number(cents || 0) / 100);
-        return dollars.toLocaleString('en-US', {
-          minimumFractionDigits: dollars % 1 === 0 ? 0 : 2,
-          maximumFractionDigits: 2
-        });
-      }
-
-      function formatUsdLabel(cents) {
-        return '\u2066$' + formatUsd(cents) + '\u2069';
-      }
-
       function updatePrices() {
         planCards.forEach(function(card) {
           var isFree = card.getAttribute('data-is-free') === '1';
-          var monthlyCents = parseInt(card.getAttribute('data-monthly-cents'), 10) || 0;
-          var yearlyCents = parseInt(card.getAttribute('data-yearly-cents'), 10) || 0;
-          var savingsCents = parseInt(card.getAttribute('data-savings-cents'), 10) || 0;
-          var yearlyMonthlyCents = yearlyCents > 0 ? Math.round(yearlyCents / 12) : 0;
-
+          var displayMonthly = String(card.getAttribute('data-display-monthly') || '0');
+          var displayYearlyMonthly = String(card.getAttribute('data-display-yearly-monthly') || displayMonthly);
+          var displayYearlyTotal = String(card.getAttribute('data-display-yearly-total') || displayYearlyMonthly);
+          var displaySavings = String(card.getAttribute('data-display-savings') || '');
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
 
           if (isFree) {
-            priceValue.textContent = '0';
+            priceValue.textContent = displayMonthly;
             priceNote.textContent = i18n.free_forever;
             priceNote.className = 'price-note price-note-text';
           } else if (isYearly) {
-            priceValue.textContent = formatUsd(yearlyMonthlyCents);
-            var yearlyLabel = formatUsdLabel(yearlyCents);
-            var savingsLabel = formatUsdLabel(savingsCents);
-            priceNote.textContent = i18n.billed_yearly_save + ' ' + yearlyLabel + '/' + i18n.year + ' (' + i18n.save + ' ' + savingsLabel + ')';
+            priceValue.textContent = displayYearlyMonthly;
+            priceNote.textContent = i18n.billed_yearly_save + ' ' + displayYearlyTotal + '/' + i18n.year + (displaySavings ? ' (' + i18n.save + ' ' + displaySavings + ')' : '');
             priceNote.className = 'price-note price-note-text savings';
           } else {
-            priceValue.textContent = formatUsd(monthlyCents);
+            priceValue.textContent = displayMonthly;
             priceNote.textContent = i18n.billed_monthly;
             priceNote.className = 'price-note price-note-text';
           }
