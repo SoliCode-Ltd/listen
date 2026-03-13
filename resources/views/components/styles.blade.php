@@ -225,7 +225,8 @@ html[data-theme="light"] .site-logo.logo-light {
   padding: 4px;
   isolation: isolate;
   overflow: hidden;
-  width: 7.5rem;
+  width: auto;
+  min-width: 13rem;
   font-family: var(--font-body), var(--font-body-ar), sans-serif;
 }
 
@@ -279,6 +280,7 @@ html[data-theme="light"] .site-logo.logo-light {
   position: relative;
   z-index: 1;
   width: 100%;
+  white-space: nowrap;
   text-align: center;
   letter-spacing: .01em;
   line-height: 1.25;
@@ -714,53 +716,14 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 
 .mobile-locale-switch {
   align-self: flex-start;
-  width: 9rem;
+  width: auto;
+  min-width: 13rem;
 }
 
 .mobile-locale-switch .locale-link {
   padding: .55rem 0;
   font-size: .95rem;
   min-height: 1.8rem;
-}
-
-.mobile-user {
-  display: flex;
-  align-items: center;
-  gap: .75rem;
-  padding: 1rem;
-  background: var(--surface);
-  border-radius: var(--radius);
-  border: 1px solid var(--line);
-}
-
-.mobile-user-avatar {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: var(--radius-full);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--brand-accent);
-  font-size: .95rem;
-  font-weight: 700;
-  color: #fff;
-  overflow: hidden;
-}
-
-.mobile-user-avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.mobile-user-info strong {
-  display: block;
-  font-size: .9rem;
-}
-
-.mobile-user-info span {
-  font-size: .8rem;
-  color: var(--muted);
 }
 
 .mobile-cta {
@@ -1574,7 +1537,7 @@ html[dir="rtl"] .locale-switch {
 
 html[dir="rtl"] .mobile-locale-switch {
   direction: ltr !important;
-  align-self: flex-end;
+  align-self: flex-start;
 }
 
 input[dir="auto"],

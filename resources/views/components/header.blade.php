@@ -16,13 +16,17 @@
   }
 
   $currentRoute = Route::currentRouteName() ?? '';
+  $isArabicUi = str_starts_with(strtolower((string) $currentLocale), 'ar');
   $languageLinks = [];
   foreach (['en', 'ar'] as $localeCode) {
     $supportedLocales = \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getSupportedLocales();
     if (!isset($supportedLocales[$localeCode])) continue;
+    $localeLabel = $localeCode === 'ar'
+      ? ($isArabicUi ? 'العربية' : 'Arabic')
+      : ($isArabicUi ? 'الإنجليزية' : 'English');
     $languageLinks[] = [
       'code' => $localeCode,
-      'label' => strtoupper($localeCode),
+      'label' => $localeLabel,
       'url' => \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getLocalizedURL($localeCode, null, [], true),
       'active' => $currentLocale === $localeCode,
     ];
@@ -222,20 +226,6 @@
     <div class="mobile-nav-divider"></div>
 
     @auth
-      <div class="mobile-user">
-        <div class="mobile-user-avatar">
-          @if(auth()->user()->google_avatar)
-            <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
-          @else
-            {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
-          @endif
-        </div>
-        <div class="mobile-user-info">
-          <strong>{{ auth()->user()->name }}</strong>
-          <span>{{ auth()->user()->email }}</span>
-        </div>
-      </div>
-      <div class="mobile-nav-divider"></div>
       @foreach($authNavLinks as $link)
         <a href="{{ route($link['route']) }}" class="mobile-nav-link {{ $currentRoute === $link['route'] ? 'active' : '' }}">{{ $link['label'] }}</a>
       @endforeach
