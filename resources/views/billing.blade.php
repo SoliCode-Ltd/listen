@@ -329,8 +329,9 @@
       align-items: center;
       gap: .75rem;
       background: transparent;
-      width: 320px;
-      max-width: 100%;
+      width: 100%;
+      max-width: 320px;
+      box-sizing: border-box;
     }
     .manual-qr-wrap.show {
       display: flex;
@@ -345,8 +346,9 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      width: 320px;
-      max-width: 100%;
+      width: 100%;
+      max-width: 320px;
+      box-sizing: border-box;
       padding: .7rem 1rem;
       border-radius: var(--radius);
       border: none;
@@ -633,6 +635,7 @@
       }
       .quote-section {
         position: static;
+        order: -1;
       }
       .form-row {
         grid-template-columns: 1fr;
@@ -651,12 +654,25 @@
     @media (max-width: 640px) {
       .main-content {
         padding: 1.25rem 0 2rem;
+        overflow-x: hidden;
       }
       .page-header h1 {
         font-size: 1.35rem;
       }
       .card {
         padding: 1rem;
+      }
+      .grid-layout,
+      .checkout-panel,
+      .manual-panel,
+      .manual-proof-card,
+      .manual-pay-actions {
+        min-width: 0;
+      }
+      .manual-qr-wrap,
+      .manual-pay-link {
+        width: 100%;
+        max-width: 100%;
       }
       .status-grid {
         grid-template-columns: 1fr;
