@@ -452,6 +452,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   top: calc(100% + .5rem);
   right: 0;
   left: auto;
+  z-index: 180;
   width: 260px;
   max-width: calc(100vw - 1rem);
   background: color-mix(in oklab, var(--surface) 100%, transparent);
@@ -1248,7 +1249,6 @@ form:has(button.mobile-nav-link) {
 @media (max-width: 960px) {
   .desktop-nav,
   .header-actions .auth-buttons,
-  .user-menu,
   .locale-switch {
     display: none;
   }
@@ -1261,6 +1261,21 @@ form:has(button.mobile-nav-link) {
   .header-actions {
     margin-inline-start: auto;
     gap: .45rem;
+  }
+
+  .user-trigger {
+    padding: .3rem;
+  }
+
+  .user-trigger .user-name,
+  .user-trigger .chevron {
+    display: none;
+  }
+
+  .user-dropdown {
+    right: 0;
+    left: auto;
+    width: min(280px, calc(100vw - 1rem));
   }
 
   .mobile-toggle {
