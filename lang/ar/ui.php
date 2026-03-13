@@ -338,6 +338,7 @@ return [
         'manual_step_confirm_body' => 'بعد إتمام التحويل اضغط زر التأكيد أدناه. ويمكنك إضافة صورة إثبات اختيارية لتسريع المراجعة.',
         'manual_confirm_title' => 'تأكيد الدفع',
         'manual_confirm_subtitle' => 'لن يتم تفعيل الخطة إلا بعد مراجعة مسؤول الدفع للطلب.',
+        'no_upgrade_plans_available' => 'لا توجد خطط ترقية متاحة حالياً.',
         'upload_proof_prompt' => 'انقر لاختيار صورة إثبات الدفع',
         'upload_proof_hint' => 'PNG, JPG',
         'proof_image_required' => 'يرجى رفع صورة إثبات الدفع قبل الإرسال.',

@@ -709,8 +709,17 @@
       $plan['localized_voice_tier'] = $normalizeTierLabel((string) ($plan['voice_tier'] ?? ''));
       return $plan;
     })->values()->all();
+    $upgradePlansForUi = collect($plansForUi)
+      ->reject(fn (array $plan): bool => (string) ($plan['slug'] ?? '') === (string) ($currentPlanSlug ?? ''))
+      ->values()
+      ->all();
+    $upgradePlanSlugs = collect($upgradePlansForUi)->pluck('slug')->all();
     $showEgyptManualMethods = (bool) ($countryContext['is_egypt'] ?? false);
     $selectedPlanValue = old('plan', $selectedPlan);
+    if (!in_array((string) $selectedPlanValue, $upgradePlanSlugs, true)) {
+      $selectedPlanValue = (string) ($upgradePlanSlugs[0] ?? '');
+    }
+    $hasUpgradePlans = !empty($upgradePlansForUi);
     $selectedBillingCycle = old('billing_cycle', (string) request('billing_cycle', 'monthly'));
     $selectedPaymentMethod = old('payment_method', (string) request('payment_method', ''));
     $initialMessageText = session('manual_payment_success')
@@ -765,17 +774,21 @@
           <div class="form-row">
             <div class="form-group">
               <label for="plan">{{ __('ui.billing.plan') }}</label>
-              <select id="plan">
-                @foreach($plansForUi as $plan)
-                  <option value="{{ $plan['slug'] }}" {{ $selectedPlanValue === $plan['slug'] ? 'selected' : '' }}>
-                    {{ $plan['localized_name'] }} - {{ $plan['localized_voice_tier'] }}
-                  </option>
-                @endforeach
+              <select id="plan" {{ $hasUpgradePlans ? '' : 'disabled' }}>
+                @if($hasUpgradePlans)
+                  @foreach($upgradePlansForUi as $plan)
+                    <option value="{{ $plan['slug'] }}" {{ $selectedPlanValue === $plan['slug'] ? 'selected' : '' }}>
+                      {{ $plan['localized_name'] }} - {{ $plan['localized_voice_tier'] }}
+                    </option>
+                  @endforeach
+                @else
+                  <option value="">{{ __('ui.billing.no_upgrade_plans_available') }}</option>
+                @endif
               </select>
             </div>
             <div class="form-group">
               <label for="cycle">{{ __('ui.billing.billing_cycle') }}</label>
-              <select id="cycle">
+              <select id="cycle" {{ $hasUpgradePlans ? '' : 'disabled' }}>
                 <option value="monthly" {{ $selectedBillingCycle === 'monthly' ? 'selected' : '' }}>{{ __('ui.billing.monthly') }}</option>
                 <option value="yearly" {{ $selectedBillingCycle === 'yearly' ? 'selected' : '' }}>{{ __('ui.billing.yearly_save_20') }}</option>
               </select>
@@ -1011,6 +1024,8 @@
       'manual_exact_amount' => __('ui.billing.manual_exact_amount'),
       'amount_to_be_charged' => __('ui.billing.amount_to_be_charged'),
       'manual_submit' => __('ui.billing.i_completed_manual_payment'),
+      'manual_request_received' => __('ui.billing.manual_request_received'),
+      'no_upgrade_plans_available' => __('ui.billing.no_upgrade_plans_available'),
       'proof_image_required' => __('ui.billing.proof_image_required'),
     ];
   @endphp
@@ -1020,12 +1035,11 @@
     const userName = @json((string) auth()->user()->name);
     const userEmail = @json((string) auth()->user()->email);
     const hasDefaultPaymentMethod = @json((bool) $defaultPaymentMethod);
-    const planCatalog = @json(collect($plansForUi)->keyBy('slug')->all());
+    const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
     const initialPaymentMethod = @json($selectedPaymentMethod);
 
     const messageBox = document.getElementById('message');
     const subscribeBtn = document.getElementById('subscribeBtn');
-    const billingForm = document.getElementById('billingForm');
     const planSelect = document.getElementById('plan');
     const cycleSelect = document.getElementById('cycle');
     const cardError = document.getElementById('card-error');
@@ -1212,7 +1226,8 @@
 
       if (subscribeBtn) {
         subscribeBtn.textContent = usingStripe ? subscribeBtnDefaultText : i18n.manual_submit;
-        subscribeBtn.disabled = usingStripe ? !stripe : false;
+        const hasPlan = Boolean(currentPlan());
+        subscribeBtn.disabled = !hasPlan || (usingStripe ? !stripe : false);
       }
     }
 
@@ -1271,7 +1286,7 @@
         quotePlan.textContent = '-';
         quoteMethod.textContent = '-';
         quoteCycle.textContent = '-';
-        quoteHint.textContent = i18n.payment_method_unavailable;
+        quoteHint.textContent = currentPlan() ? i18n.payment_method_unavailable : i18n.no_upgrade_plans_available;
         renderManualPanel(null);
         return;
       }
@@ -1314,6 +1329,37 @@
 
       const data = await res.json().catch(() => ({}));
       return { ok: res.ok, status: res.status, data };
+    }
+
+    async function postForm(url, formData) {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'X-CSRF-TOKEN': csrfToken,
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+        body: formData,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      return { ok: res.ok, status: res.status, data };
+    }
+
+    function responseMessage(response, fallback) {
+      const data = response?.data || {};
+      const direct = String(data.message || '').trim();
+      if (direct !== '') return direct;
+
+      const errors = data.errors && typeof data.errors === 'object' ? data.errors : null;
+      if (errors) {
+        for (const key of Object.keys(errors)) {
+          const first = Array.isArray(errors[key]) ? String(errors[key][0] || '').trim() : '';
+          if (first !== '') return first;
+        }
+      }
+
+      return fallback;
     }
 
     const stripe = stripeKey ? Stripe(stripeKey) : null;
@@ -1389,12 +1435,27 @@
           if (!proofInput || !proofInput.files || proofInput.files.length === 0) {
             throw new Error(i18n.proof_image_required);
           }
-          syncManualFields();
           setSubscribeButtonBusy(true, i18n.manual_submit);
-          billingForm.setAttribute('action', '{{ route('billing.manual.confirm') }}');
-          billingForm.setAttribute('method', 'POST');
-          billingForm.setAttribute('enctype', 'multipart/form-data');
-          billingForm.submit();
+          const formData = new FormData();
+          formData.set('plan', String(selected.plan.slug || ''));
+          formData.set('billing_cycle', String(selected.cycle || 'monthly'));
+          formData.set('payment_method', String(selected.method || 'instapay'));
+          formData.set('proof_image', proofInput.files[0]);
+
+          const response = await postForm('{{ route('billing.manual.confirm') }}', formData);
+          if (!response.ok || response.data?.ok === false) {
+            throw new Error(responseMessage(response, i18n.upgrade_failed));
+          }
+
+          setMessage('ok', response.data?.message || i18n.manual_request_received);
+          proofInput.value = '';
+          proofUploadArea?.classList.remove('has-file');
+          if (proofUploadText) {
+            proofUploadText.textContent = proofUploadArea?.dataset.defaultText || proofUploadText.textContent;
+          }
+          if (proofUploadHint) {
+            proofUploadHint.style.display = '';
+          }
           return;
         }
 
@@ -1470,6 +1531,9 @@
     const proofUploadText = document.getElementById('proofUploadText');
     const proofUploadHint = document.getElementById('proofUploadHint');
     if (proofUploadArea && proofImage) {
+      if (!proofUploadArea.dataset.defaultText) {
+        proofUploadArea.dataset.defaultText = proofUploadText ? proofUploadText.textContent : '';
+      }
       proofUploadArea.addEventListener('click', function() {
         proofImage.click();
       });

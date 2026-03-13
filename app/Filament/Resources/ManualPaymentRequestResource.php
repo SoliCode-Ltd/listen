@@ -193,7 +193,42 @@ class ManualPaymentRequestResource extends Resource
                                 ->send();
                         }
                     }),
+                Tables\Actions\Action::make('delete_request')
+                    ->label('Delete')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Delete manual payment request')
+                    ->modalDescription(function (ManualPaymentRequest $record): string {
+                        if ($record->status === ManualPaymentRequest::STATUS_APPROVED) {
+                            return 'Deleting an approved request will rollback the user plan to the previous plan snapshot, or to Free if no previous snapshot is available.';
+                        }
+
+                        return 'This action permanently deletes the request record and any uploaded proof file.';
+                    })
+                    ->action(function (ManualPaymentRequest $record): void {
+                        $result = app(ManualPaymentService::class)->deleteRequest($record);
+
+                        if (($result['rolled_back'] ?? false) === true) {
+                            $message = ($result['used_fallback_plan'] ?? false) === true
+                                ? 'Request deleted. User plan rolled back to Free fallback.'
+                                : 'Request deleted. User plan rolled back to previous plan.';
+
+                            Notification::make()
+                                ->title($message)
+                                ->success()
+                                ->send();
+
+                            return;
+                        }
+
+                        Notification::make()
+                            ->title('Manual payment request deleted')
+                            ->success()
+                            ->send();
+                    }),
             ])
+            ->bulkActions([])
             ->defaultSort('submitted_at', 'desc');
     }
 

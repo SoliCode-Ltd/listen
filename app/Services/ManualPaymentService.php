@@ -5,9 +5,11 @@ namespace App\Services;
 use App\Models\BillingSubscription;
 use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
+use App\Models\Subscription;
 use App\Models\User;
 use DomainException;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
@@ -80,6 +82,14 @@ class ManualPaymentService
                 throw new DomainException(__('ui.billing.manual_active_stripe_conflict'));
             }
 
+            $currentSubscription = Subscription::query()
+                ->where('user_id', $request->user->id)
+                ->latest('id')
+                ->first();
+
+            $priceSnapshot = is_array($request->price_snapshot) ? $request->price_snapshot : [];
+            $priceSnapshot['approval_context'] = $this->snapshotApprovalContext($currentSubscription);
+
             $periodEnd = strtolower($request->billing_cycle) === 'yearly'
                 ? now()->addYear()
                 : now()->addMonth();
@@ -97,6 +107,7 @@ class ManualPaymentService
 
             $request->forceFill([
                 'status' => ManualPaymentRequest::STATUS_APPROVED,
+                'price_snapshot' => $priceSnapshot,
                 'reviewed_at' => now(),
                 'reviewed_by' => $reviewer->id,
                 'reviewer_notes' => $reviewerNotes,
@@ -104,6 +115,44 @@ class ManualPaymentService
             ])->save();
 
             return $request->fresh(['user', 'plan', 'reviewer']);
+        });
+    }
+
+    /**
+     * Delete a manual payment request safely.
+     *
+     * If the request was approved and still controls the user's active manual-overridden
+     * subscription, rollback to the previous plan snapshot (or free plan fallback).
+     *
+     * @return array{rolled_back:bool,used_fallback_plan:bool}
+     */
+    public function deleteRequest(ManualPaymentRequest $manualPaymentRequest): array
+    {
+        return DB::transaction(function () use ($manualPaymentRequest): array {
+            /** @var ManualPaymentRequest $request */
+            $request = ManualPaymentRequest::query()
+                ->whereKey($manualPaymentRequest->id)
+                ->lockForUpdate()
+                ->with(['user', 'plan'])
+                ->firstOrFail();
+
+            $rolledBack = false;
+            $usedFallbackPlan = false;
+
+            if ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->user) {
+                [$rolledBack, $usedFallbackPlan] = $this->rollbackApprovedRequestPlan($request);
+            }
+
+            if (is_string($request->proof_path) && trim($request->proof_path) !== '') {
+                Storage::disk('local')->delete($request->proof_path);
+            }
+
+            $request->delete();
+
+            return [
+                'rolled_back' => $rolledBack,
+                'used_fallback_plan' => $usedFallbackPlan,
+            ];
         });
     }
 
@@ -175,5 +224,98 @@ class ManualPaymentService
             ->first();
 
         return (bool) ($billingSubscription?->valid() ?? false);
+    }
+
+    /**
+     * @return array{
+     *   previous_subscription_id:?int,
+     *   previous_plan_id:?int,
+     *   previous_status:?string,
+     *   previous_period_start:?string,
+     *   previous_period_end:?string,
+     *   captured_at:string
+     * }
+     */
+    private function snapshotApprovalContext(?Subscription $subscription): array
+    {
+        return [
+            'previous_subscription_id' => $subscription?->id ? (int) $subscription->id : null,
+            'previous_plan_id' => $subscription?->plan_id ? (int) $subscription->plan_id : null,
+            'previous_status' => $subscription?->status ? (string) $subscription->status : null,
+            'previous_period_start' => $subscription?->current_period_start?->toDateTimeString(),
+            'previous_period_end' => $subscription?->current_period_end?->toDateTimeString(),
+            'captured_at' => now()->toDateTimeString(),
+        ];
+    }
+
+    /**
+     * @return array{0:bool,1:bool}
+     */
+    private function rollbackApprovedRequestPlan(ManualPaymentRequest $request): array
+    {
+        $latestSubscription = Subscription::query()
+            ->where('user_id', $request->user_id)
+            ->latest('id')
+            ->first();
+
+        if (! $latestSubscription) {
+            return [false, false];
+        }
+
+        // Only rollback when this request still controls the active manual override.
+        if (
+            (int) ($request->approved_subscription_id ?? 0) !== (int) $latestSubscription->id
+            || (string) ($latestSubscription->billing_payment_state ?? '') !== 'manual_override'
+        ) {
+            return [false, false];
+        }
+
+        $approvalContext = is_array($request->price_snapshot)
+            ? (array) ($request->price_snapshot['approval_context'] ?? [])
+            : [];
+
+        $targetPlan = null;
+        $usedFallbackPlan = false;
+        $previousPlanId = (int) ($approvalContext['previous_plan_id'] ?? 0);
+        if ($previousPlanId > 0) {
+            $targetPlan = Plan::query()->find($previousPlanId);
+        }
+
+        if (! $targetPlan) {
+            $targetPlan = $this->planAccessService->freePlan();
+            $usedFallbackPlan = true;
+        }
+
+        if (! $targetPlan) {
+            return [false, false];
+        }
+
+        $targetStatusRaw = trim((string) ($approvalContext['previous_status'] ?? ''));
+        $targetStatus = in_array($targetStatusRaw, ['active', 'expired', 'canceled'], true)
+            ? $targetStatusRaw
+            : 'active';
+
+        $periodEnd = null;
+        $periodEndRaw = trim((string) ($approvalContext['previous_period_end'] ?? ''));
+        if ($periodEndRaw !== '') {
+            try {
+                $periodEnd = Carbon::parse($periodEndRaw);
+            } catch (\Throwable) {
+                $periodEnd = null;
+            }
+        }
+
+        $subscription = $this->planAccessService->assignPlan(
+            $request->user,
+            $targetPlan,
+            $targetStatus,
+            $periodEnd,
+        );
+
+        $subscription->forceFill([
+            'billing_payment_state' => 'ok',
+        ])->save();
+
+        return [true, $usedFallbackPlan];
     }
 }

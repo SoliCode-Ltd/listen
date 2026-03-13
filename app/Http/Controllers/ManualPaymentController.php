@@ -82,6 +82,13 @@ class ManualPaymentController extends Controller
         );
 
         if ($quote === null) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => __('ui.billing.manual_payment_not_available'),
+                ], 422);
+            }
+
             return redirect()
                 ->route('billing.page')
                 ->withInput([
@@ -106,6 +113,13 @@ class ManualPaymentController extends Controller
                 $request->file('proof_image'),
             );
         } catch (DomainException $exception) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => $exception->getMessage(),
+                ], 422);
+            }
+
             return redirect()
                 ->route('billing.page', [
                     'plan' => $validated['plan'],
@@ -113,6 +127,13 @@ class ManualPaymentController extends Controller
                     'payment_method' => $validated['payment_method'],
                 ])
                 ->withErrors(['manual_payment' => $exception->getMessage()]);
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'message' => __('ui.billing.manual_request_received'),
+            ]);
         }
 
         return redirect()

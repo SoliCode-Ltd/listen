@@ -338,6 +338,7 @@ return [
         'manual_step_confirm_body' => 'After you complete the transfer, submit the confirmation button below. An optional proof image can help speed up review.',
         'manual_confirm_title' => 'Confirm Your Payment',
         'manual_confirm_subtitle' => 'We only activate the plan after an admin reviews the payment request.',
+        'no_upgrade_plans_available' => 'No upgrade plans are available right now.',
         'upload_proof_prompt' => 'Click to select payment proof image',
         'upload_proof_hint' => 'PNG, JPG',
         'proof_image_required' => 'Please upload a payment proof image before submitting.',
