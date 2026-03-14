@@ -353,13 +353,36 @@ html[data-theme="light"] .wa-panel {
   }
 
   .wa-panel {
-    width: calc(100vw - 2rem);
-    right: calc(-1rem + 52px / 2 - (100vw - 2rem) / 2 + 1rem);
+    position: fixed;
+    bottom: calc(52px + 1rem + 0.75rem);
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+    max-width: none;
+    transform-origin: bottom right;
   }
 
   html[dir="rtl"] .wa-panel {
-    right: auto;
-    left: calc(-1rem + 52px / 2 - (100vw - 2rem) / 2 + 1rem);
+    right: 1rem;
+    left: 1rem;
+    transform-origin: bottom left;
+  }
+
+  .wa-panel-header {
+    padding: 1rem;
+  }
+
+  .wa-panel-body {
+    padding: 1rem;
+  }
+
+  .wa-panel-footer {
+    padding: 0 1rem 1rem;
+  }
+
+  .wa-cta-btn {
+    font-size: 0.9rem;
+    padding: 0.8rem 1rem;
   }
 }
 
