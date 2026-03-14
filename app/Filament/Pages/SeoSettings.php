@@ -46,6 +46,8 @@ class SeoSettings extends Page implements HasForms
             'twitter_creator' => SiteSetting::get('twitter_creator', ''),
 
             'google_analytics_id' => SiteSetting::get('google_analytics_id', ''),
+            'google_tag_id' => SiteSetting::get('google_tag_id', ''),
+            'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
 
             'google_site_verification' => SiteSetting::get('google_site_verification', ''),
@@ -168,6 +170,15 @@ class SeoSettings extends Page implements HasForms
                             ->label('Google Analytics ID')
                             ->placeholder('G-XXXXXXXXXX')
                             ->maxLength(30),
+                        Forms\Components\TextInput::make('google_tag_id')
+                            ->label('Google Tag ID')
+                            ->placeholder('AW-XXXXXXXXXX')
+                            ->maxLength(30),
+                        Forms\Components\Textarea::make('google_tag_head_code')
+                            ->label('Google Tag Head Code')
+                            ->helperText('Optional: paste the full Google tag snippet (including <script> tags). If provided, it is used instead of generated scripts from IDs.')
+                            ->rows(8)
+                            ->columnSpanFull(),
                         Forms\Components\Toggle::make('enable_structured_data')
                             ->label('Enable Schema.org Structured Data')
                             ->helperText('Outputs Organization, WebSite, and SoftwareApplication JSON-LD.'),

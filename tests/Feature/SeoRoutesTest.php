@@ -57,4 +57,46 @@ class SeoRoutesTest extends TestCase
             ->assertSee('<meta name="robots" content="index,follow">', false)
             ->assertSee('<meta name="keywords" content="tts,ai voice,text to speech">', false);
     }
+
+    public function test_google_analytics_id_is_rendered_when_configured(): void
+    {
+        SiteSetting::set('google_analytics_id', 'G-TEST123456', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('https://www.googletagmanager.com/gtag/js?id=G-TEST123456', false)
+            ->assertSee("gtag('config', 'G-TEST123456');", false);
+    }
+
+    public function test_google_tag_id_is_rendered_when_configured(): void
+    {
+        SiteSetting::set('google_tag_id', 'AW-18014537634', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('https://www.googletagmanager.com/gtag/js?id=AW-18014537634', false)
+            ->assertSee("gtag('config', 'AW-18014537634');", false);
+    }
+
+    public function test_both_ids_are_rendered_when_configured_together(): void
+    {
+        SiteSetting::set('google_analytics_id', 'G-TEST123456', 'seo');
+        SiteSetting::set('google_tag_id', 'AW-18014537634', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee("gtag('config', 'G-TEST123456');", false)
+            ->assertSee("gtag('config', 'AW-18014537634');", false);
+    }
+
+    public function test_custom_google_tag_head_code_overrides_analytics_id_script(): void
+    {
+        SiteSetting::set('google_analytics_id', 'G-TEST123456', 'seo');
+        SiteSetting::set('google_tag_head_code', '<script>window.customGoogleTag = true;</script>', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('<script>window.customGoogleTag = true;</script>', false)
+            ->assertDontSee('https://www.googletagmanager.com/gtag/js?id=G-TEST123456', false);
+    }
 }

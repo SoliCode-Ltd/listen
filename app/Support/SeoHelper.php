@@ -642,22 +642,56 @@ class SeoHelper
     }
 
     /**
+     * Get Google Tag ID.
+     */
+    public static function googleTagId(): string
+    {
+        return trim((string) SiteSetting::get('google_tag_id', ''));
+    }
+
+    /**
+     * Get custom Google tag code to inject into <head>.
+     */
+    public static function googleTagHeadCode(): string
+    {
+        return trim((string) SiteSetting::get('google_tag_head_code', ''));
+    }
+
+    /**
      * Generate Google Analytics script tag.
      */
     public static function analyticsScript(): string
     {
-        $id = self::analyticsId();
-        if ($id === '') {
+        $customCode = self::googleTagHeadCode();
+        if ($customCode !== '') {
+            return $customCode;
+        }
+
+        $analyticsId = self::analyticsId();
+        $googleTagId = self::googleTagId();
+
+        $ids = array_values(array_unique(array_filter([
+            $analyticsId,
+            $googleTagId,
+        ], static fn (string $id): bool => $id !== '')));
+
+        if ($ids === []) {
             return '';
         }
 
+        $primaryId = $ids[0];
+        $configLines = implode("\n", array_map(
+            static fn (string $id): string => "  gtag('config', '{$id}');",
+            $ids
+        ));
+
         return <<<HTML
-<script async src="https://www.googletagmanager.com/gtag/js?id={$id}"></script>
+<script async src="https://www.googletagmanager.com/gtag/js?id={$primaryId}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', '{$id}');
+{$configLines}
 </script>
 HTML;
     }
