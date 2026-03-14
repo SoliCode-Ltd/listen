@@ -23,7 +23,7 @@
     if (!isset($supportedLocales[$localeCode])) continue;
     $localeLabel = $localeCode === 'ar'
       ? ($isArabicUi ? 'العربية' : 'Arabic')
-      : ($isArabicUi ? 'الإنجليزية' : 'English');
+      : 'English';
     $languageLinks[] = [
       'code' => $localeCode,
       'label' => $localeLabel,
