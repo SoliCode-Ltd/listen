@@ -663,3 +663,4 @@
   }
 })();
 </script>
+@include('components.whatsapp-widget')
