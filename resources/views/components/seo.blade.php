@@ -47,6 +47,7 @@
 {!! SeoHelper::verificationTags() !!}
 {!! SeoHelper::structuredData() !!}
 {!! SeoHelper::analyticsScript() !!}
+{!! SeoHelper::facebookPixelScript() !!}
 {!! SeoHelper::llmsDiscoveryTag() !!}
 
 @if(SeoHelper::customCss())

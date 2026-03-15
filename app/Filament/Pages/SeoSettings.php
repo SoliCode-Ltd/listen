@@ -48,6 +48,7 @@ class SeoSettings extends Page implements HasForms
             'google_analytics_id' => SiteSetting::get('google_analytics_id', ''),
             'google_tag_id' => SiteSetting::get('google_tag_id', ''),
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
+            'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
 
             'google_site_verification' => SiteSetting::get('google_site_verification', ''),
@@ -177,6 +178,11 @@ class SeoSettings extends Page implements HasForms
                         Forms\Components\Textarea::make('google_tag_head_code')
                             ->label('Google Tag Head Code')
                             ->helperText('Optional: paste the full Google tag snippet (including <script> tags). If provided, it is used instead of generated scripts from IDs.')
+                            ->rows(8)
+                            ->columnSpanFull(),
+                        Forms\Components\Textarea::make('facebook_pixel_code')
+                            ->label('Facebook Pixel Code')
+                            ->helperText('Optional: paste the full Meta Pixel snippet (including <script> and <noscript> tags).')
                             ->rows(8)
                             ->columnSpanFull(),
                         Forms\Components\Toggle::make('enable_structured_data')

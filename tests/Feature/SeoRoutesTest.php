@@ -99,4 +99,14 @@ class SeoRoutesTest extends TestCase
             ->assertSee('<script>window.customGoogleTag = true;</script>', false)
             ->assertDontSee('https://www.googletagmanager.com/gtag/js?id=G-TEST123456', false);
     }
+
+    public function test_facebook_pixel_code_is_rendered_when_configured(): void
+    {
+        SiteSetting::set('facebook_pixel_code', '<script>window.fbPixelTest = true;</script><noscript><img src="https://www.facebook.com/tr?id=123&ev=PageView&noscript=1" /></noscript>', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('<script>window.fbPixelTest = true;</script>', false)
+            ->assertSee('https://www.facebook.com/tr?id=123&ev=PageView&noscript=1', false);
+    }
 }

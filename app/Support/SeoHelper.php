@@ -697,6 +697,14 @@ HTML;
     }
 
     /**
+     * Get Facebook Pixel snippet to inject into <head>.
+     */
+    public static function facebookPixelScript(): string
+    {
+        return trim((string) SiteSetting::get('facebook_pixel_code', ''));
+    }
+
+    /**
      * Normalize media path into absolute URL.
      */
     private static function normalizeMediaUrl(string $value): string
