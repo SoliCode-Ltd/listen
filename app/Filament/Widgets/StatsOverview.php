@@ -3,6 +3,7 @@
 namespace App\Filament\Widgets;
 
 use App\Models\AudioGeneration;
+use App\Models\DemoVoiceGeneration;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Voice;
@@ -15,6 +16,11 @@ class StatsOverview extends BaseWidget
 
     protected function getStats(): array
     {
+        $currentMonthRange = [now()->startOfMonth(), now()->endOfMonth()];
+        $monthlyAudioGenerations =
+            AudioGeneration::whereBetween('created_at', $currentMonthRange)->count()
+            + DemoVoiceGeneration::whereBetween('created_at', $currentMonthRange)->count();
+
         return [
             Stat::make('Total Users', User::count())
                 ->description('All registered users')
@@ -25,7 +31,7 @@ class StatsOverview extends BaseWidget
                 ->description('Currently active')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color('success'),
-            Stat::make('Audio Generations', AudioGeneration::whereMonth('created_at', now()->month)->count())
+            Stat::make('Audio Generations', $monthlyAudioGenerations)
                 ->description('This month')
                 ->descriptionIcon('heroicon-m-musical-note')
                 ->color('warning'),
