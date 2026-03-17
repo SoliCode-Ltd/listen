@@ -16,10 +16,9 @@ class StatsOverview extends BaseWidget
 
     protected function getStats(): array
     {
-        $currentMonthRange = [now()->startOfMonth(), now()->endOfMonth()];
-        $monthlyAudioGenerations =
-            AudioGeneration::whereBetween('created_at', $currentMonthRange)->count()
-            + DemoVoiceGeneration::whereBetween('created_at', $currentMonthRange)->count();
+        $totalAudioGenerations =
+            AudioGeneration::count()
+            + DemoVoiceGeneration::count();
 
         return [
             Stat::make('Total Users', User::count())
@@ -31,8 +30,8 @@ class StatsOverview extends BaseWidget
                 ->description('Currently active')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color('success'),
-            Stat::make('Audio Generations', $monthlyAudioGenerations)
-                ->description('This month')
+            Stat::make('Audio Generations', $totalAudioGenerations)
+                ->description('Total (demo + user)')
                 ->descriptionIcon('heroicon-m-musical-note')
                 ->color('warning'),
             Stat::make('Active Voices', Voice::where('is_active', true)->count())
