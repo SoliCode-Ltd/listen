@@ -428,6 +428,16 @@ class SeoHelper
         ));
     }
 
+    public static function defaultSitemapExcludedPathsText(): string
+    {
+        return '';
+    }
+
+    public static function includeNonIndexablePagesInSitemap(): bool
+    {
+        return (string) SiteSetting::get('sitemap_include_non_indexable', '1') === '1';
+    }
+
     /**
      * Parse sitemap entries from dashboard setting.
      *
@@ -469,6 +479,10 @@ class SeoHelper
                 $path = '/' . ltrim($path, '/');
             }
 
+            if (! self::isSitemapEntryAllowed($path)) {
+                continue;
+            }
+
             $entries[] = [
                 'path' => $path,
                 'priority' => $priority,
@@ -485,27 +499,44 @@ class SeoHelper
     public static function publicSitemapEntries(): array
     {
         $entries = [];
+        $seenUrls = [];
+        $append = static function (array $entry) use (&$entries, &$seenUrls): void {
+            $url = trim((string) ($entry['url'] ?? ''));
+            if ($url === '') {
+                return;
+            }
+
+            $key = self::sitemapUrlKey($url);
+            if (isset($seenUrls[$key])) {
+                return;
+            }
+
+            $seenUrls[$key] = true;
+            $entries[] = $entry;
+        };
+
+        $includeNonIndexable = self::includeNonIndexablePagesInSitemap();
 
         foreach (self::pageDefinitions() as $page => $definition) {
-            if (! ($definition['indexable'] ?? false)) {
+            if (! $includeNonIndexable && ! ($definition['indexable'] ?? false)) {
                 continue;
             }
 
             foreach (self::pageLocales($page) as $locale) {
-                $entries[] = [
+                $append([
                     'page' => $page,
                     'locale' => $locale,
                     'url' => self::pageUrl($page, $locale),
-                    'priority' => (float) ($definition['sitemap_priority'] ?? 0.5),
-                    'change_frequency' => (string) ($definition['sitemap_change_frequency'] ?? 'weekly'),
+                    'priority' => self::sitemapPriorityForPage($page, $definition),
+                    'change_frequency' => self::sitemapChangeFrequencyForPage($page, $definition),
                     'lastmod' => self::pageLastModified($page),
                     'alternates' => self::hreflangMap($page),
-                ];
+                ]);
             }
         }
 
         foreach (self::sitemapEntries() as $entry) {
-            $entries[] = [
+            $append([
                 'page' => '',
                 'locale' => '',
                 'url' => Str::startsWith($entry['path'], ['http://', 'https://']) ? $entry['path'] : self::canonicalUrl($entry['path']),
@@ -513,7 +544,7 @@ class SeoHelper
                 'change_frequency' => (string) $entry['change_frequency'],
                 'lastmod' => self::siteLastModified(),
                 'alternates' => [],
-            ];
+            ]);
         }
 
         return $entries;
@@ -1291,6 +1322,129 @@ HTML;
         $stripped = self::stripLocaleFromPath($path);
 
         return $stripped === '/' ? '/' . $locale : '/' . $locale . $stripped;
+    }
+
+    private static function isSitemapEntryAllowed(string $path): bool
+    {
+        $path = trim($path);
+        if ($path === '') {
+            return false;
+        }
+
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            $entryHost = strtolower((string) parse_url($path, PHP_URL_HOST));
+            $canonicalBase = rtrim((string) SiteSetting::get('canonical_url', config('app.url')), '/');
+            $canonicalHost = strtolower((string) parse_url($canonicalBase, PHP_URL_HOST));
+
+            // Only enforce private-path filtering for this primary domain.
+            if ($entryHost !== '' && $canonicalHost !== '' && $entryHost === $canonicalHost) {
+                $entryPath = (string) parse_url($path, PHP_URL_PATH);
+                return ! self::isExcludedSitemapPath($entryPath);
+            }
+
+            return true;
+        }
+
+        return ! self::isExcludedSitemapPath($path);
+    }
+
+    private static function isExcludedSitemapPath(string $path): bool
+    {
+        $path = '/' . ltrim(trim($path), '/');
+        $stripped = self::stripLocaleFromPath($path);
+
+        foreach (self::sitemapExcludedPaths() as $excluded) {
+            $excluded = self::stripLocaleFromPath('/' . ltrim($excluded, '/'));
+            if ($excluded === '/') {
+                continue;
+            }
+
+            if ($stripped === $excluded || Str::startsWith($stripped, rtrim($excluded, '/') . '/')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function sitemapExcludedPaths(): array
+    {
+        $raw = trim((string) SiteSetting::get('sitemap_excluded_paths', self::defaultSitemapExcludedPathsText()));
+        if ($raw === '') {
+            return [];
+        }
+
+        $items = [];
+        $lines = preg_split('/\r\n|\r|\n/', $raw) ?: [];
+        foreach ($lines as $line) {
+            $line = trim($line);
+            if ($line === '' || str_starts_with($line, '#')) {
+                continue;
+            }
+
+            $items[] = '/' . ltrim($line, '/');
+        }
+
+        return array_values(array_unique($items));
+    }
+
+    private static function sitemapUrlKey(string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        $scheme = strtolower((string) parse_url($url, PHP_URL_SCHEME));
+        $host = strtolower((string) parse_url($url, PHP_URL_HOST));
+        $path = '/' . ltrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $path = $path === '/' ? '/' : rtrim($path, '/');
+
+        if ($host === '') {
+            return strtolower($path);
+        }
+
+        if ($scheme === '') {
+            $scheme = 'https';
+        }
+
+        return $scheme . '://' . $host . $path;
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private static function sitemapPriorityForPage(string $page, array $definition): float
+    {
+        $fallback = max(0.0, min(1.0, (float) ($definition['sitemap_priority'] ?? 0.5)));
+        $configured = trim((string) SiteSetting::get("seo_{$page}_sitemap_priority", ''));
+
+        if ($configured === '' || ! is_numeric($configured)) {
+            return $fallback;
+        }
+
+        return max(0.0, min(1.0, (float) $configured));
+    }
+
+    /**
+     * @param array<string, mixed> $definition
+     */
+    private static function sitemapChangeFrequencyForPage(string $page, array $definition): string
+    {
+        $fallback = strtolower((string) ($definition['sitemap_change_frequency'] ?? 'weekly'));
+        if (! in_array($fallback, self::ALLOWED_CHANGE_FREQUENCIES, true)) {
+            $fallback = 'weekly';
+        }
+
+        $configured = strtolower(trim((string) SiteSetting::get("seo_{$page}_sitemap_change_frequency", '')));
+        if ($configured === '' || ! in_array($configured, self::ALLOWED_CHANGE_FREQUENCIES, true)) {
+            return $fallback;
+        }
+
+        return $configured;
     }
 
     private static function stripLocaleFromPath(string $path): string

@@ -49,6 +49,51 @@ class SeoRoutesTest extends TestCase
             ->assertSee('https://example.org/docs', false);
     }
 
+    public function test_sitemap_keeps_manual_entries_when_not_excluded(): void
+    {
+        SiteSetting::set('sitemap_paths', "/ar/demo|0.8|weekly\n/en/dashboard|0.8|weekly\n/en/private-docs|0.5|monthly", 'seo');
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('/ar/demo', false)
+            ->assertSee('/en/dashboard', false)
+            ->assertSee('/en/private-docs', false);
+    }
+
+    public function test_sitemap_excluded_paths_setting_blocks_matching_urls(): void
+    {
+        SiteSetting::set('sitemap_paths', "/en/private-docs|0.5|monthly\n/en/open-docs|0.5|monthly", 'seo');
+        SiteSetting::set('sitemap_excluded_paths', "/private-docs\n/internal", 'seo');
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertDontSee('/en/private-docs', false)
+            ->assertSee('/en/open-docs', false);
+    }
+
+    public function test_sitemap_can_switch_back_to_indexable_only_mode(): void
+    {
+        SiteSetting::set('sitemap_include_non_indexable', '0', 'seo');
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertDontSee('/en/demo', false)
+            ->assertDontSee('/ar/demo', false)
+            ->assertSee('/en/pricing', false);
+    }
+
+    public function test_sitemap_per_page_overrides_can_be_set_from_dashboard(): void
+    {
+        SiteSetting::set('seo_pricing_sitemap_priority', '0.4', 'seo');
+        SiteSetting::set('seo_pricing_sitemap_change_frequency', 'monthly', 'seo');
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('/en/pricing', false)
+            ->assertSee('<changefreq>monthly</changefreq>', false)
+            ->assertSee('<priority>0.4</priority>', false);
+    }
+
     public function test_home_seo_meta_can_be_overridden_from_dashboard_settings(): void
     {
         SiteSetting::set('seo_home_description_en', 'Custom home description for SEO.', 'seo');

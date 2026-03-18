@@ -73,6 +73,8 @@ class SeoSettings extends Page implements HasForms
 
             'robots_txt' => SiteSetting::get('robots_txt', SeoHelper::defaultRobotsTxt()),
             'sitemap_paths' => SiteSetting::get('sitemap_paths', SeoHelper::defaultSitemapEntriesText()),
+            'sitemap_excluded_paths' => SiteSetting::get('sitemap_excluded_paths', SeoHelper::defaultSitemapExcludedPathsText()),
+            'sitemap_include_non_indexable' => (string) SiteSetting::get('sitemap_include_non_indexable', '1') === '1',
 
             'enable_llms_txt' => (string) SiteSetting::get('enable_llms_txt', '1') === '1',
             'llms_txt' => SiteSetting::get('llms_txt', SeoHelper::defaultLlmsTxt()),
@@ -92,6 +94,16 @@ class SeoSettings extends Page implements HasForms
                 SiteSetting::get("seo_{$page}_keywords", '')
             );
             $state["seo_{$page}_robots"] = SiteSetting::get("seo_{$page}_robots", (string) ($meta['robots'] ?? ''));
+            if ((bool) ($meta['indexable'] ?? false)) {
+                $state["seo_{$page}_sitemap_priority"] = SiteSetting::get(
+                    "seo_{$page}_sitemap_priority",
+                    (string) ($meta['sitemap_priority'] ?? '0.5')
+                );
+                $state["seo_{$page}_sitemap_change_frequency"] = SiteSetting::get(
+                    "seo_{$page}_sitemap_change_frequency",
+                    (string) ($meta['sitemap_change_frequency'] ?? 'weekly')
+                );
+            }
 
             if (in_array('ar', SeoHelper::pageLocales($page), true)) {
                 $state["seo_{$page}_title_ar"] = SiteSetting::get(
@@ -317,6 +329,14 @@ class SeoSettings extends Page implements HasForms
                             ->helperText('Optional extra public URLs. Format: /path|priority|change_frequency. Core public pages are added automatically.')
                             ->rows(8)
                             ->columnSpanFull(),
+                        Forms\Components\Toggle::make('sitemap_include_non_indexable')
+                            ->label('Include Non-Indexable Pages In Sitemap')
+                            ->helperText('When enabled, pages like demo/login/dashboard can appear in sitemap. Turn off to include only indexable public pages.'),
+                        Forms\Components\Textarea::make('sitemap_excluded_paths')
+                            ->label('Sitemap Excluded Paths')
+                            ->helperText('One path per line. Optional manual blocklist for sitemap URLs.')
+                            ->rows(6)
+                            ->columnSpanFull(),
                         Forms\Components\Toggle::make('enable_llms_txt')
                             ->label('Enable llms.txt Endpoint')
                             ->helperText('Served at /llms.txt for AI crawler guidance.'),
@@ -372,6 +392,26 @@ class SeoSettings extends Page implements HasForms
                     ->helperText('Comma-separated keywords. Optional.')
                     ->columnSpanFull(),
             ];
+
+            if ((bool) ($meta['indexable'] ?? false)) {
+                $fields[] = Forms\Components\TextInput::make("seo_{$page}_sitemap_priority")
+                    ->label('Sitemap Priority')
+                    ->numeric()
+                    ->minValue(0)
+                    ->maxValue(1)
+                    ->step(0.1);
+                $fields[] = Forms\Components\Select::make("seo_{$page}_sitemap_change_frequency")
+                    ->label('Sitemap Change Frequency')
+                    ->options([
+                        'always' => 'always',
+                        'hourly' => 'hourly',
+                        'daily' => 'daily',
+                        'weekly' => 'weekly',
+                        'monthly' => 'monthly',
+                        'yearly' => 'yearly',
+                        'never' => 'never',
+                    ]);
+            }
 
             if (in_array('ar', SeoHelper::pageLocales($page), true)) {
                 $fields[] = Forms\Components\TextInput::make("seo_{$page}_title_ar")
