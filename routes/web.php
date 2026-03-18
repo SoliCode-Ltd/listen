@@ -10,10 +10,9 @@ use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Route;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
-use Spatie\Sitemap\Sitemap;
-use Spatie\Sitemap\Tags\Url;
 
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
@@ -24,22 +23,48 @@ Route::middleware('auth')->get('/admin/manual-payments/{manualPaymentRequest}/pr
 
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
-    $sitemap = Sitemap::create();
+    $dom = new \DOMDocument('1.0', 'UTF-8');
+    $dom->formatOutput = true;
+
+    $urlset = $dom->createElementNS('http://www.sitemaps.org/schemas/sitemap/0.9', 'urlset');
+    $urlset->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
+    $dom->appendChild($urlset);
 
     foreach (SeoHelper::publicSitemapEntries() as $entry) {
-        $tag = Url::create($entry['url'])
-            ->setPriority((float) $entry['priority'])
-            ->setChangeFrequency($entry['change_frequency'])
-            ->setLastModificationDate($entry['lastmod']);
+        $urlNode = $dom->createElement('url');
+        $urlset->appendChild($urlNode);
 
-        foreach ($entry['alternates'] as $locale => $alternateUrl) {
-            $tag->addAlternate($alternateUrl, $locale);
+        $locNode = $dom->createElement('loc');
+        $locNode->appendChild($dom->createTextNode((string) $entry['url']));
+        $urlNode->appendChild($locNode);
+
+        foreach ((array) ($entry['alternates'] ?? []) as $locale => $alternateUrl) {
+            $alternateNode = $dom->createElementNS('http://www.w3.org/1999/xhtml', 'xhtml:link');
+            $alternateNode->setAttribute('rel', 'alternate');
+            $alternateNode->setAttribute('hreflang', (string) $locale);
+            $alternateNode->setAttribute('href', (string) $alternateUrl);
+            $urlNode->appendChild($alternateNode);
         }
 
-        $sitemap->add($tag);
+        $lastmodNode = $dom->createElement('lastmod');
+        $lastmodValue = $entry['lastmod'] instanceof Carbon
+            ? $entry['lastmod']->toAtomString()
+            : Carbon::parse((string) $entry['lastmod'])->toAtomString();
+        $lastmodNode->appendChild($dom->createTextNode($lastmodValue));
+        $urlNode->appendChild($lastmodNode);
+
+        $changeFreqNode = $dom->createElement('changefreq');
+        $changeFreqNode->appendChild($dom->createTextNode((string) $entry['change_frequency']));
+        $urlNode->appendChild($changeFreqNode);
+
+        $priorityNode = $dom->createElement('priority');
+        $priorityNode->appendChild($dom->createTextNode(number_format((float) $entry['priority'], 1, '.', '')));
+        $urlNode->appendChild($priorityNode);
     }
 
-    return $sitemap->toResponse(request());
+    return response($dom->saveXML(), 200, [
+        'Content-Type' => 'application/xml; charset=UTF-8',
+    ]);
 })->name('sitemap');
 
 // SEO: robots.txt

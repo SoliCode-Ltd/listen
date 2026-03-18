@@ -19,8 +19,11 @@ class SeoRoutesTest extends TestCase
 
         $this->get('/sitemap.xml')
             ->assertOk()
+            ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
             ->assertSee('/en/pricing', false)
             ->assertSee('/ar/pricing', false)
+            ->assertSee('<urlset', false)
+            ->assertSee('<url>', false)
             ->assertSee('<lastmod>', false)
             ->assertSee('hreflang="ar"', false);
     }
