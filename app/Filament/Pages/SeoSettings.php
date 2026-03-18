@@ -108,7 +108,10 @@ class SeoSettings extends Page implements HasForms
 
         foreach ($this->landingPageLocales() as $page => $locales) {
             foreach ($locales as $locale) {
-                $state["seo_landing_{$page}_content_{$locale}"] = SiteSetting::get("seo_landing_{$page}_content_{$locale}", '');
+                $state["seo_landing_{$page}_content_{$locale}"] = SiteSetting::get(
+                    "seo_landing_{$page}_content_{$locale}",
+                    $this->landingPageDefaultJson($page, $locale)
+                );
             }
         }
 
@@ -414,7 +417,7 @@ class SeoSettings extends Page implements HasForms
                 $fields[] = Forms\Components\Textarea::make("seo_landing_{$page}_content_{$locale}")
                     ->label($label)
                     ->rows(18)
-                    ->helperText('Optional JSON override. Supported keys: eyebrow, h1, intro, highlights, use_cases, faqs, cta_title, cta_body, cta_primary.')
+                    ->helperText('Preloaded with production defaults. Supported keys: eyebrow, h1, intro, highlights_title, highlights_intro, highlights, use_cases_title, use_cases_intro, use_cases, faq_title, faqs, cta_title, cta_body, cta_primary.')
                     ->columnSpanFull();
             }
 
@@ -436,6 +439,19 @@ class SeoSettings extends Page implements HasForms
             'ai_voice_generator' => ['en', 'ar'],
             'text_to_speech_arabic' => ['en'],
         ];
+    }
+
+    private function landingPageDefaultJson(string $page, string $locale): string
+    {
+        $content = SeoHelper::landingPageContentDefaults()[$page][$locale] ?? null;
+        if (! is_array($content) || $content === []) {
+            return '';
+        }
+
+        return (string) (json_encode(
+            $content,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
+        ) ?: '');
     }
 
     private function pageDefault(string $page, string $field, string $locale, string $fallback = ''): string

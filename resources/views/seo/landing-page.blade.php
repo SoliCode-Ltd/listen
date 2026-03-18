@@ -166,6 +166,9 @@
   @php
     $relatedLinks = [
       ['label' => __('ui.nav.home'), 'url' => route('home')],
+      ['label' => __('ui.nav.ai_text_to_speech'), 'url' => route('seo.ai-text-to-speech')],
+      ['label' => __('ui.nav.ai_voice_generator'), 'url' => route('seo.ai-voice-generator')],
+      ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic')],
       ['label' => __('ui.nav.pricing'), 'url' => route('pricing')],
       ['label' => __('ui.nav.demo'), 'url' => route('demo.page')],
       ['label' => __('ui.nav.extension'), 'url' => route('browsers-extension.page')],
@@ -196,8 +199,8 @@
     </section>
 
     <section class="seo-section">
-      <h2>{{ __('ui.pricing.included_title') }}</h2>
-      <p class="seo-lead">{{ $pageContent['intro'] ?? '' }}</p>
+      <h2>{{ $pageContent['highlights_title'] ?? __('ui.pricing.included_title') }}</h2>
+      <p class="seo-lead">{{ $pageContent['highlights_intro'] ?? ($pageContent['intro'] ?? '') }}</p>
       <div class="seo-grid">
         @foreach($pageContent['highlights'] ?? [] as $item)
           <article class="seo-card seo-feature">
@@ -209,20 +212,26 @@
     </section>
 
     <section class="seo-section">
-      <h2>{{ __('ui.pricing.feature3_title') }}</h2>
-      <p class="seo-lead">{{ __('ui.footer.tagline') }}</p>
+      <h2>{{ $pageContent['use_cases_title'] ?? __('ui.pricing.feature3_title') }}</h2>
+      <p class="seo-lead">{{ $pageContent['use_cases_intro'] ?? __('ui.footer.tagline') }}</p>
       <div class="seo-grid">
         @foreach($pageContent['use_cases'] ?? [] as $useCase)
+          @php
+            $useCaseTitle = is_array($useCase) ? (string) ($useCase['title'] ?? '') : (string) $useCase;
+            $useCaseBody = is_array($useCase)
+              ? (string) ($useCase['body'] ?? '')
+              : (string) ($pageContent['intro'] ?? '');
+          @endphp
           <article class="seo-card seo-use-case">
-            <h3>{{ $useCase }}</h3>
-            <p>{{ $pageContent['intro'] ?? '' }}</p>
+            <h3>{{ $useCaseTitle }}</h3>
+            <p>{{ $useCaseBody }}</p>
           </article>
         @endforeach
       </div>
     </section>
 
     <section class="seo-section">
-      <h2>{{ __('ui.pricing.faq_title') }}</h2>
+      <h2>{{ $pageContent['faq_title'] ?? __('ui.pricing.faq_title') }}</h2>
       <div class="seo-grid">
         @foreach($faqItems ?? [] as $faq)
           <article class="seo-card seo-faq-item">

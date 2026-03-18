@@ -32,11 +32,11 @@ return [
         'extension_title' => 'Browser Extension',
         'extension_description' => 'Use the Listen browser extension to convert web pages into natural Arabic and English audio.',
         'ai_text_to_speech_title' => 'AI Text to Speech',
-        'ai_text_to_speech_description' => 'Convert scripts, articles, support content, and product copy into natural Arabic and English AI speech.',
+        'ai_text_to_speech_description' => 'AI text to speech for Arabic and English websites, apps, support docs, and marketing content with natural voice quality.',
         'ai_voice_generator_title' => 'AI Voice Generator',
-        'ai_voice_generator_description' => 'Generate premium AI voiceovers for demos, explainers, social media, onboarding, and multilingual campaigns.',
+        'ai_voice_generator_description' => 'Generate AI voiceovers for demos, ads, onboarding, courses, and product communication in Arabic and English.',
         'text_to_speech_arabic_title' => 'Arabic Text to Speech',
-        'text_to_speech_arabic_description' => 'Create natural Arabic text-to-speech audio for products, accessibility, training, and content production.',
+        'text_to_speech_arabic_description' => 'Convert Arabic text to natural speech for onboarding, accessibility, training, support, and publish-ready media.',
     ],
 
     // ===== HEADER / NAV =====

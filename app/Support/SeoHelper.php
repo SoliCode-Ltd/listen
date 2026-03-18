@@ -241,6 +241,173 @@ class SeoHelper
     }
 
     /**
+     * Default SEO landing page content used by public pages and prefilled in admin SEO settings.
+     *
+     * @return array<string, array<string, array<string, mixed>>>
+     */
+    public static function landingPageContentDefaults(): array
+    {
+        return [
+            'ai_text_to_speech' => [
+                'en' => [
+                    'eyebrow' => 'AI Text to Speech',
+                    'h1' => 'AI Text to Speech for Arabic and English Content Teams',
+                    'intro' => 'Listen helps teams turn scripts, articles, help-center content, and product copy into natural audio with reliable quality and fast production turnaround.',
+                    'highlights_title' => 'Why teams choose this workflow',
+                    'highlights_intro' => 'Built for real production output, not one-off experiments.',
+                    'highlights' => [
+                        ['title' => 'Natural bilingual output', 'body' => 'Generate polished Arabic and English speech from one platform with consistent tone and clarity.'],
+                        ['title' => 'Production-ready speed', 'body' => 'Move from text draft to publishable audio quickly when campaigns, product copy, or docs change.'],
+                        ['title' => 'Designed for modern teams', 'body' => 'Support product, growth, support, and education teams with one shared voice workflow.'],
+                    ],
+                    'use_cases_title' => 'Practical use cases',
+                    'use_cases_intro' => 'Use the same pipeline across core customer touchpoints.',
+                    'use_cases' => [
+                        ['title' => 'Product onboarding audio', 'body' => 'Turn onboarding steps and walkthrough scripts into clear voice guidance for faster product adoption.'],
+                        ['title' => 'Marketing and landing pages', 'body' => 'Add voice narration to campaigns, feature pages, and launch content with a premium branded tone.'],
+                        ['title' => 'Support and knowledge bases', 'body' => 'Convert help-center articles into audio to improve accessibility and reduce reading friction.'],
+                        ['title' => 'Internal training content', 'body' => 'Create consistent voiceovers for SOPs, team training, and operational documentation.'],
+                    ],
+                    'faq_title' => 'Frequently asked questions',
+                    'faqs' => [
+                        ['question' => 'What is AI text to speech used for?', 'answer' => 'Teams use AI text to speech to convert written content into spoken audio for products, marketing, support, and training.'],
+                        ['question' => 'Does Listen support Arabic and English?', 'answer' => 'Yes. Listen is built for premium Arabic and English voice generation in one unified workflow.'],
+                        ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. You can start with the demo flow and free path, then upgrade when your production volume grows.'],
+                        ['question' => 'Who is this page for?', 'answer' => 'It is ideal for creators, startups, product teams, agencies, and organizations that publish multilingual audio content.'],
+                    ],
+                    'cta_title' => 'Start generating production-ready audio',
+                    'cta_body' => 'Launch your next voice workflow with Listen and move from text to publishable audio in minutes.',
+                    'cta_primary' => 'Create your free account',
+                ],
+                'ar' => [
+                    'eyebrow' => 'تحويل النص إلى صوت',
+                    'h1' => 'تحويل النص إلى صوت بالذكاء الاصطناعي لفرق المحتوى العربية والإنجليزية',
+                    'intro' => 'تساعدك منصة إسمع على تحويل النصوص والمقالات ورسائل المنتج ومحتوى الدعم إلى صوت طبيعي بجودة ثابتة وسرعة مناسبة للإنتاج الفعلي.',
+                    'highlights_title' => 'لماذا تعتمد الفرق هذا المسار',
+                    'highlights_intro' => 'مناسب للتنفيذ اليومي داخل فرق المنتج والمحتوى، وليس مجرد تجربة مؤقتة.',
+                    'highlights' => [
+                        ['title' => 'مخرجات ثنائية اللغة بطابع طبيعي', 'body' => 'أنشئ صوتاً احترافياً بالعربية والإنجليزية من منصة واحدة مع نبرة متناسقة ووضوح عالٍ.'],
+                        ['title' => 'سرعة مناسبة للإنتاج', 'body' => 'انتقل من النص إلى صوت قابل للنشر بسرعة عند تحديث الحملات أو محتوى المنتج أو التوثيق.'],
+                        ['title' => 'مصمم لفرق العمل الحديثة', 'body' => 'خدم فرق المنتج والنمو والدعم والتدريب عبر سير عمل واحد قابل للتوسع.'],
+                    ],
+                    'use_cases_title' => 'حالات استخدام عملية',
+                    'use_cases_intro' => 'طبّق نفس المسار على أهم نقاط التواصل مع المستخدم.',
+                    'use_cases' => [
+                        ['title' => 'الصوت داخل تجربة البدء بالمنتج', 'body' => 'حوّل خطوات الإعداد والشروحات إلى صوت واضح يساعد المستخدمين على الفهم السريع.'],
+                        ['title' => 'محتوى التسويق وصفحات الهبوط', 'body' => 'أضف تعليقاً صوتياً احترافياً للحملات وصفحات الميزات ومحتوى الإطلاق.'],
+                        ['title' => 'الدعم وقاعدة المعرفة', 'body' => 'حوّل مقالات المساعدة إلى صوت لتحسين الوصول وتقليل الجهد على المستخدم.'],
+                        ['title' => 'التدريب الداخلي والتشغيلي', 'body' => 'أنشئ مقاطع صوتية موحدة لعمليات التدريب والإجراءات الداخلية.'],
+                    ],
+                    'faq_title' => 'الأسئلة الشائعة',
+                    'faqs' => [
+                        ['question' => 'في ماذا يُستخدم تحويل النص إلى صوت بالذكاء الاصطناعي؟', 'answer' => 'يُستخدم لتحويل المحتوى المكتوب إلى صوت في المنتجات، والتسويق، والدعم، والتدريب، وتجارب الوصول الرقمي.'],
+                        ['question' => 'هل تدعم منصة إسمع العربية والإنجليزية؟', 'answer' => 'نعم، منصة إسمع مصممة لتقديم مخرجات عربية وإنجليزية عالية الجودة ضمن سير عمل واحد.'],
+                        ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يمكنك البدء عبر الديمو أو المسار المجاني ثم الترقية عند زيادة الاحتياج الإنتاجي.'],
+                        ['question' => 'لمن تناسب هذه الصفحة؟', 'answer' => 'تناسب صناع المحتوى، والشركات الناشئة، وفرق المنتجات، والجهات التعليمية، والفرق التي تعمل بلغتين.'],
+                    ],
+                    'cta_title' => 'ابدأ إنتاج صوت جاهز للنشر',
+                    'cta_body' => 'ابدأ مع منصة إسمع وحوّل النص إلى صوت احترافي خلال دقائق.',
+                    'cta_primary' => 'أنشئ حسابك المجاني',
+                ],
+            ],
+            'ai_voice_generator' => [
+                'en' => [
+                    'eyebrow' => 'AI Voice Generator',
+                    'h1' => 'AI Voice Generator for Demos, Ads, Courses, and Product UX',
+                    'intro' => 'Create natural AI voiceovers for launches, explainers, social campaigns, and customer education with a workflow built for high-output teams.',
+                    'highlights_title' => 'What makes this generator different',
+                    'highlights_intro' => 'Optimized for quality, speed, and repeatable production.',
+                    'highlights' => [
+                        ['title' => 'Consistent brand voice', 'body' => 'Keep tone and quality aligned across campaigns, onboarding, training, and customer communication.'],
+                        ['title' => 'Arabic + English from one stack', 'body' => 'Serve regional and global audiences without splitting your production flow across multiple tools.'],
+                        ['title' => 'Fast revision cycles', 'body' => 'Regenerate clips quickly when scripts change, offers update, or product messaging evolves.'],
+                    ],
+                    'use_cases_title' => 'Where teams use it most',
+                    'use_cases_intro' => 'A practical generator for growth, product, and operations.',
+                    'use_cases' => [
+                        ['title' => 'Product demos and launch videos', 'body' => 'Create clear narration for feature launches, onboarding walkthroughs, and in-app education.'],
+                        ['title' => 'Performance marketing creatives', 'body' => 'Produce voiceovers for paid ads, social media variants, and multilingual campaign assets.'],
+                        ['title' => 'Training and enablement', 'body' => 'Generate voice content for sales onboarding, support training, and internal learning paths.'],
+                        ['title' => 'Customer communication content', 'body' => 'Use high-quality voice in help content, updates, and product explainers for better retention.'],
+                    ],
+                    'faq_title' => 'Frequently asked questions',
+                    'faqs' => [
+                        ['question' => 'What does an AI voice generator do?', 'answer' => 'It converts written scripts into spoken audio that can be used in media, product experiences, onboarding, and operations.'],
+                        ['question' => 'Why use Listen instead of generic tools?', 'answer' => 'Listen focuses on premium Arabic and English output, production-ready speed, and a workflow built for teams.'],
+                        ['question' => 'Can I use this for marketing content?', 'answer' => 'Yes. It is built for ads, explainers, social campaigns, and landing page media.'],
+                        ['question' => 'Can this connect with the rest of the product flow?', 'answer' => 'Yes. It fits naturally with the demo path, pricing journey, dashboard, and browser extension experience.'],
+                    ],
+                    'cta_title' => 'Generate your next campaign voiceover faster',
+                    'cta_body' => 'Start with Listen and produce premium AI voice content without slowing your release cycle.',
+                    'cta_primary' => 'Try Listen now',
+                ],
+                'ar' => [
+                    'eyebrow' => 'مولد الأصوات بالذكاء الاصطناعي',
+                    'h1' => 'مولد أصوات بالذكاء الاصطناعي للشروحات والحملات وتجارب المنتج',
+                    'intro' => 'أنشئ تعليقات صوتية طبيعية للإطلاقات والمحتوى التسويقي وتجارب العملاء عبر سير عمل سريع يناسب الفرق ذات الإنتاج المرتفع.',
+                    'highlights_title' => 'ما الذي يميز هذا المولد',
+                    'highlights_intro' => 'مبني على جودة ثابتة وسرعة تنفيذ وتحديثات متكررة بلا تعقيد.',
+                    'highlights' => [
+                        ['title' => 'نبرة متناسقة للعلامة التجارية', 'body' => 'حافظ على نفس الطابع والجودة عبر الحملات ورسائل المنتج ومحتوى التدريب والدعم.'],
+                        ['title' => 'العربية والإنجليزية من منصة واحدة', 'body' => 'اخدم الجمهور المحلي والدولي بدون تقسيم مسار الإنتاج بين أدوات متعددة.'],
+                        ['title' => 'دورات تعديل سريعة', 'body' => 'أعد توليد المقاطع فوراً عند تحديث النصوص أو تغيّر العروض أو تطوير الرسائل.'],
+                    ],
+                    'use_cases_title' => 'أين تستخدمه الفرق غالباً',
+                    'use_cases_intro' => 'أداة عملية لفرق النمو والمنتج والعمليات.',
+                    'use_cases' => [
+                        ['title' => 'فيديوهات الشرح وإطلاق الميزات', 'body' => 'أنشئ صوتاً واضحاً لفيديوهات التعريف بالميزات وتجربة البدء داخل المنتج.'],
+                        ['title' => 'محتوى الحملات التسويقية', 'body' => 'أنتج تعليقات صوتية للإعلانات المدفوعة والمحتوى الاجتماعي والنسخ متعددة اللغة.'],
+                        ['title' => 'التدريب والتمكين الداخلي', 'body' => 'ولّد محتوى صوتياً لمسارات التدريب الداخلي وتأهيل فرق المبيعات والدعم.'],
+                        ['title' => 'محتوى التواصل مع العملاء', 'body' => 'استخدم صوتاً احترافياً في الشروحات والتحديثات ومحتوى المساعدة لرفع جودة التجربة.'],
+                    ],
+                    'faq_title' => 'الأسئلة الشائعة',
+                    'faqs' => [
+                        ['question' => 'ما وظيفة مولد الأصوات بالذكاء الاصطناعي؟', 'answer' => 'يحوّل النصوص المكتوبة إلى صوت قابل للاستخدام في الفيديوهات والمنتجات والتدريب والمحتوى التشغيلي.'],
+                        ['question' => 'لماذا أستخدم منصة إسمع بدلاً من الأدوات العامة؟', 'answer' => 'لأن منصة إسمع تركّز على جودة عربية وإنجليزية مرتفعة وسير عمل مناسب للتشغيل الحقيقي داخل الفرق.'],
+                        ['question' => 'هل يصلح للمحتوى التسويقي؟', 'answer' => 'نعم، مناسب للإعلانات، وفيديوهات الشرح، والمحتوى الاجتماعي، وصفحات الهبوط.'],
+                        ['question' => 'هل يتكامل مع باقي مسار المنتج؟', 'answer' => 'نعم، يرتبط بشكل طبيعي بمسار الديمو والأسعار ولوحة التحكم وصفحة إضافة المتصفح.'],
+                    ],
+                    'cta_title' => 'أنشئ الصوت التالي لحملتك بسرعة أكبر',
+                    'cta_body' => 'ابدأ مع منصة إسمع وأنشئ مخرجات صوتية احترافية دون تعطيل سرعة التنفيذ داخل فريقك.',
+                    'cta_primary' => 'ابدأ الآن مع منصة إسمع',
+                ],
+            ],
+            'text_to_speech_arabic' => [
+                'en' => [
+                    'eyebrow' => 'Arabic Text to Speech',
+                    'h1' => 'Arabic Text to Speech for Clear, Natural, Product-Ready Audio',
+                    'intro' => 'Create Arabic audio for onboarding, education, media, and accessibility with a reliable workflow built for modern product and content teams.',
+                    'highlights_title' => 'Built for Arabic-first quality',
+                    'highlights_intro' => 'Deliver Arabic audio that sounds polished and ready for public use.',
+                    'highlights' => [
+                        ['title' => 'Natural Arabic delivery', 'body' => 'Generate Arabic output with clear pronunciation and a professional listening experience.'],
+                        ['title' => 'Ready for production workflows', 'body' => 'Use one platform across product content, support assets, and customer-facing media.'],
+                        ['title' => 'Fast path from text to audio', 'body' => 'Go from written Arabic to publishable voice quickly without a complex pipeline.'],
+                    ],
+                    'use_cases_title' => 'Common Arabic TTS use cases',
+                    'use_cases_intro' => 'Useful across education, product, media, and support.',
+                    'use_cases' => [
+                        ['title' => 'Arabic onboarding and explainers', 'body' => 'Turn product walkthroughs and onboarding instructions into high-quality Arabic narration.'],
+                        ['title' => 'Learning and training content', 'body' => 'Publish Arabic lessons, internal training modules, and educational voice content efficiently.'],
+                        ['title' => 'Accessible website content', 'body' => 'Provide spoken Arabic versions of written pages to improve accessibility and engagement.'],
+                        ['title' => 'Customer support playback', 'body' => 'Convert key Arabic support content into audio for easier consumption and faster resolution.'],
+                    ],
+                    'faq_title' => 'Frequently asked questions',
+                    'faqs' => [
+                        ['question' => 'Is this page focused on Arabic audio generation?', 'answer' => 'Yes. This page targets Arabic text to speech use cases where quality and production reliability matter.'],
+                        ['question' => 'Can Listen also support English?', 'answer' => 'Yes. Listen supports both Arabic and English, while this page is focused on Arabic-first intent.'],
+                        ['question' => 'Who benefits most from Arabic text to speech?', 'answer' => 'Product teams, educators, media creators, customer-support teams, and businesses serving Arabic-speaking audiences.'],
+                        ['question' => 'Can I compare plans before starting?', 'answer' => 'Yes. You can review pricing, try the demo flow, and choose the plan that fits your usage volume.'],
+                    ],
+                    'cta_title' => 'Launch Arabic voice content with confidence',
+                    'cta_body' => 'Use Listen to transform written Arabic into premium voice output for products, content, and customer communication.',
+                    'cta_primary' => 'Start with Listen',
+                ],
+            ],
+        ];
+    }
+
+    /**
      * Build default sitemap entries.
      *
      * @return array<int, array{path:string,priority:float,change_frequency:string}>
