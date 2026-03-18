@@ -3,9 +3,10 @@
   $page = $page ?? null;
   $faqItems = $faqItems ?? [];
   $theme = $theme ?? \App\Support\SeoHelper::defaultTheme();
+  $htmlLocale = \App\Support\SeoHelper::currentLocale();
 @endphp
 <!doctype html>
-<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}" data-theme="{{ $theme }}">
+<html lang="{{ $htmlLocale }}" dir="{{ $htmlLocale === 'ar' ? 'rtl' : 'ltr' }}" data-theme="{{ $theme }}">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />

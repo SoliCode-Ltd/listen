@@ -1259,9 +1259,20 @@ HTML;
 
     private static function normalizeLocale(?string $locale): string
     {
-        $locale = strtolower(trim((string) $locale));
+        $locale = trim((string) $locale);
 
-        return in_array($locale, self::supportedLocales(), true) ? $locale : self::defaultHreflangLocale();
+        if ($locale === '') {
+            $locale = (string) app()->getLocale();
+        }
+
+        $locale = strtolower(str_replace('_', '-', trim($locale)));
+        $primary = trim((string) explode('-', $locale)[0]);
+
+        if (in_array($primary, self::supportedLocales(), true)) {
+            return $primary;
+        }
+
+        return self::defaultHreflangLocale();
     }
 
     private static function normalizePath(string $path, ?string $locale = null): string

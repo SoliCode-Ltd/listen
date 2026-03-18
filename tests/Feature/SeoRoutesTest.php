@@ -175,4 +175,51 @@ class SeoRoutesTest extends TestCase
             ->assertSee('<script>window.fbPixelTest = true;</script>', false)
             ->assertSee('https://www.facebook.com/tr?id=123&ev=PageView&noscript=1', false);
     }
+
+    public function test_title_without_explicit_locale_uses_current_arabic_locale(): void
+    {
+        app()->setLocale('ar');
+
+        SiteSetting::set('seo_home_title_en', 'English Home Title', 'seo');
+        SiteSetting::set('seo_home_title_ar', 'عنوان الصفحة الرئيسية', 'seo');
+        SiteSetting::set('meta_title_template_en', '%page_title% - Listen', 'seo');
+        SiteSetting::set('meta_title_template_ar', '%page_title% - منصة إسمع', 'seo');
+
+        $title = SeoHelper::title('', 'home');
+
+        $this->assertStringContainsString('عنوان الصفحة الرئيسية', $title);
+        $this->assertStringContainsString('منصة إسمع', $title);
+        $this->assertStringNotContainsString('English Home Title', $title);
+    }
+
+    public function test_arabic_locale_variants_use_arabic_seo_metadata(): void
+    {
+        app()->setLocale('ar_EG');
+
+        SiteSetting::set('seo_pricing_title_en', 'Pricing', 'seo');
+        SiteSetting::set('seo_pricing_title_ar', 'أسعار منصة إسمع', 'seo');
+        SiteSetting::set('meta_title_template_ar', '%page_title% - منصة إسمع', 'seo');
+
+        $this->assertSame('ar', SeoHelper::currentLocale());
+
+        $title = SeoHelper::title('', 'pricing');
+
+        $this->assertStringContainsString('أسعار منصة إسمع', $title);
+        $this->assertStringContainsString('منصة إسمع', $title);
+        $this->assertStringNotContainsString('Pricing - Listen', $title);
+    }
+
+    public function test_arabic_locale_variant_renders_arabic_title_in_response(): void
+    {
+        app()->setLocale('ar_EG');
+
+        SiteSetting::set('seo_home_title_en', 'English Home Title', 'seo');
+        SiteSetting::set('seo_home_title_ar', 'عنوان الصفحة الرئيسية', 'seo');
+        SiteSetting::set('meta_title_template_ar', '%page_title% - منصة إسمع', 'seo');
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('<title>عنوان الصفحة الرئيسية - منصة إسمع</title>', false)
+            ->assertDontSee('<title>English Home Title - Listen</title>', false);
+    }
 }

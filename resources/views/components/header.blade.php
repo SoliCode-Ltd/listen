@@ -2,8 +2,10 @@
   use Illuminate\Support\Facades\Storage;
 
   $siteName = \App\Models\SiteSetting::get('site_name', 'Listen');
-  $currentLocale = app()->getLocale();
-  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'منصة إسمع' : $siteName;
+  $currentLocale = strtolower((string) app()->getLocale());
+  $currentLocaleCode = str_starts_with($currentLocale, 'ar') ? 'ar' : 'en';
+  $isArabicUi = $currentLocaleCode === 'ar';
+  $brandName = $isArabicUi ? 'منصة إسمع' : $siteName;
   $logoPath = trim((string) \App\Models\SiteSetting::get('logo_url', ''));
   $logoUrl = null;
 
@@ -16,7 +18,6 @@
   }
 
   $currentRoute = Route::currentRouteName() ?? '';
-  $isArabicUi = str_starts_with(strtolower((string) $currentLocale), 'ar');
   $languageLinks = [];
   foreach (['en', 'ar'] as $localeCode) {
     $supportedLocales = \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getSupportedLocales();
@@ -28,7 +29,7 @@
       'code' => $localeCode,
       'label' => $localeLabel,
       'url' => \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getLocalizedURL($localeCode, null, [], true),
-      'active' => $currentLocale === $localeCode,
+      'active' => $currentLocaleCode === $localeCode,
     ];
   }
   $navLinks = [
@@ -65,7 +66,7 @@
       @if($logoUrl)
         <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 40px; width: auto;" />
       @else
-        @if($currentLocale === 'ar')
+        @if($isArabicUi)
           <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
           <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
         @else
@@ -90,7 +91,7 @@
     </nav>
 
     <div class="header-actions">
-      <div class="locale-switch {{ $currentLocale === 'ar' ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
+      <div class="locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
         <span class="locale-indicator" aria-hidden="true"></span>
         @foreach($languageLinks as $language)
           <a
@@ -193,7 +194,7 @@
         @if($logoUrl)
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}" />
         @else
-          @if($currentLocale === 'ar')
+          @if($isArabicUi)
             <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
             <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
           @else
@@ -213,7 +214,7 @@
       </div>
     </div>
     <div class="mobile-nav-divider"></div>
-    <div class="mobile-locale-switch {{ $currentLocale === 'ar' ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
+    <div class="mobile-locale-switch {{ $isArabicUi ? 'ar-active' : '' }}" aria-label="{{ __('ui.locale.switch') }}">
       <span class="locale-indicator" aria-hidden="true"></span>
       @foreach($languageLinks as $language)
         <a
