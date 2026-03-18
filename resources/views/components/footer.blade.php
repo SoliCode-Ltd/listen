@@ -1,10 +1,12 @@
 @php
+  use App\Support\SeoHelper;
   use Illuminate\Support\Facades\Storage;
 
   $currentYear = date('Y');
   $siteName = \App\Models\SiteSetting::get('site_name', 'Listen');
   $currentLocale = app()->getLocale();
-  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'إسمع' : $siteName;
+  $seoLocale = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'ar' : 'en';
+  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'منصة إسمع' : $siteName;
   $logoPath = trim((string) \App\Models\SiteSetting::get('logo_url', ''));
   $logoUrl = null;
   $showSocial = (string) \App\Models\SiteSetting::get('footer_social_enabled', '1') === '1';
@@ -52,6 +54,12 @@
     $activePlan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id());
     $showDemoFooterLink = strtolower(trim((string) ($activePlan?->slug ?? 'free'))) === 'free';
   }
+
+  $solutionLinks = [
+    ['label' => __('ui.nav.ai_text_to_speech'), 'url' => SeoHelper::pageUrl('ai_text_to_speech', $seoLocale)],
+    ['label' => __('ui.nav.ai_voice_generator'), 'url' => SeoHelper::pageUrl('ai_voice_generator', $seoLocale)],
+    ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => SeoHelper::pageUrl('text_to_speech_arabic', 'en')],
+  ];
 @endphp
 
 <footer class="app-footer">
@@ -66,8 +74,8 @@
             <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 32px; width: auto;" />
           @else
             @if($currentLocale === 'ar')
-              <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="إسمع" class="site-logo logo-dark">
-              <img src="{{ asset('images/logo-ar-light.svg') }}" alt="إسمع" class="site-logo logo-light">
+              <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+              <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
             @else
               <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
               <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
@@ -86,6 +94,15 @@
               <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
             @endif
             <li><a href="{{ route('browsers-extension.page') }}">{{ __('ui.nav.extension') }}</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>{{ __('ui.footer.solutions') }}</h4>
+          <ul>
+            @foreach($solutionLinks as $link)
+              <li><a href="{{ $link['url'] }}">{{ $link['label'] }}</a></li>
+            @endforeach
           </ul>
         </div>
 

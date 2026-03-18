@@ -3,7 +3,7 @@
 
   $siteName = \App\Models\SiteSetting::get('site_name', 'Listen');
   $currentLocale = app()->getLocale();
-  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'إسمع' : $siteName;
+  $brandName = str_starts_with(strtolower((string) $currentLocale), 'ar') ? 'منصة إسمع' : $siteName;
   $logoPath = trim((string) \App\Models\SiteSetting::get('logo_url', ''));
   $logoUrl = null;
 
@@ -66,8 +66,8 @@
         <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 40px; width: auto;" />
       @else
         @if($currentLocale === 'ar')
-          <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="إسمع" class="site-logo logo-dark">
-          <img src="{{ asset('images/logo-ar-light.svg') }}" alt="إسمع" class="site-logo logo-light">
+          <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+          <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
         @else
           <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
           <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
@@ -194,8 +194,8 @@
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}" />
         @else
           @if($currentLocale === 'ar')
-            <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="إسمع" class="site-logo logo-dark">
-            <img src="{{ asset('images/logo-ar-light.svg') }}" alt="إسمع" class="site-logo logo-light">
+            <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+            <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
           @else
             <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
             <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">

@@ -26,12 +26,17 @@ Route::middleware('auth')->get('/admin/manual-payments/{manualPaymentRequest}/pr
 Route::get('/sitemap.xml', function () {
     $sitemap = Sitemap::create();
 
-    foreach (SeoHelper::sitemapEntries() as $entry) {
-        $sitemap->add(
-            Url::create($entry['path'])
-                ->setPriority((float) $entry['priority'])
-                ->setChangeFrequency($entry['change_frequency'])
-        );
+    foreach (SeoHelper::publicSitemapEntries() as $entry) {
+        $tag = Url::create($entry['url'])
+            ->setPriority((float) $entry['priority'])
+            ->setChangeFrequency($entry['change_frequency'])
+            ->setLastModificationDate($entry['lastmod']);
+
+        foreach ($entry['alternates'] as $locale => $alternateUrl) {
+            $tag->addAlternate($alternateUrl, $locale);
+        }
+
+        $sitemap->add($tag);
     }
 
     return $sitemap->toResponse(request());
@@ -53,15 +58,35 @@ Route::get('/llms.txt', function () {
         ->header('Content-Type', 'text/plain; charset=UTF-8');
 })->name('llms');
 
+Route::get('/site.webmanifest', function () {
+    return response()->json(
+        SeoHelper::siteWebmanifest(),
+        200,
+        ['Content-Type' => 'application/manifest+json; charset=UTF-8']
+    );
+})->name('site.webmanifest');
+
+Route::get('/favicon.ico', function () {
+    $target = SeoHelper::versionedPrimaryFaviconUrl();
+
+    abort_if($target === '', 404);
+
+    return redirect()->away($target, 301);
+})->name('favicon');
+
 Route::group([
     'prefix' => LaravelLocalization::setLocale(),
     'middleware' => ['localize', 'localeSessionRedirect', 'localizationRedirect'],
 ], function (): void {
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
+    Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
+    Route::get('/ai-voice-generator', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_voice_generator')->name('seo.ai-voice-generator');
+    Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
+    Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
 
     Route::get('/contact-us', [\App\Http\Controllers\ContactController::class, 'show'])->name('contact');
     Route::post('/contact-us', [\App\Http\Controllers\ContactController::class, 'submit'])->name('contact.submit');
@@ -108,7 +133,6 @@ Route::group([
         Route::get('/billing/invoices/{invoiceId}/view', [BillingController::class, 'viewInvoice'])->name('billing.invoice.view');
         Route::get('/billing/invoices/{invoiceId}/download', [BillingController::class, 'downloadInvoice'])->name('billing.invoice.download');
 
-        Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
         Route::post('/browsers-extension/api-key/regenerate', [ExtensionController::class, 'regenerateApiKey'])->name('browsers-extension.key.regenerate');
         Route::post('/browsers-extension/api-key/revoke', [ExtensionController::class, 'revokeApiKey'])->name('browsers-extension.key.revoke');
         Route::get('/browsers-extension/download', [ExtensionController::class, 'download'])->name('browsers-extension.download');

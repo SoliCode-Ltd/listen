@@ -30,17 +30,32 @@ class SeoSettings extends Page implements HasForms
     public function mount(): void
     {
         $state = [
-            'meta_title_template' => SiteSetting::get('meta_title_template', '%page_title% - Listen'),
-            'meta_description' => SiteSetting::get('meta_description', 'Listen - Convert text to natural speech with AI-powered TTS.'),
-            'meta_keywords' => SiteSetting::get('meta_keywords', ''),
-            'meta_robots' => SiteSetting::get('meta_robots', 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'),
-            'meta_author' => SiteSetting::get('meta_author', ''),
             'canonical_url' => SiteSetting::get('canonical_url', config('app.url')),
+            'meta_author' => SiteSetting::get('meta_author', ''),
+            'meta_robots' => SiteSetting::get('meta_robots', 'index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1'),
+            'meta_title_template_en' => SiteSetting::get('meta_title_template_en', SiteSetting::get('meta_title_template', '%page_title% - Listen')),
+            'meta_title_template_ar' => SiteSetting::get('meta_title_template_ar', '%page_title% - منصة إسمع'),
+            'meta_description_en' => SiteSetting::get('meta_description_en', SiteSetting::get('meta_description', SeoHelper::siteDescription('en'))),
+            'meta_description_ar' => SiteSetting::get('meta_description_ar', SeoHelper::siteDescription('ar')),
+            'meta_keywords_en' => SiteSetting::get('meta_keywords_en', SiteSetting::get('meta_keywords', '')),
+            'meta_keywords_ar' => SiteSetting::get('meta_keywords_ar', ''),
+            'brand_name_ar' => SiteSetting::get('brand_name_ar', SeoHelper::siteName('ar')),
+            'site_seo_description_en' => SiteSetting::get('site_seo_description_en', SeoHelper::siteDescription('en')),
+            'site_seo_description_ar' => SiteSetting::get('site_seo_description_ar', SeoHelper::siteDescription('ar')),
+
+            'seo_favicon_svg_url' => SiteSetting::get('seo_favicon_svg_url', ''),
+            'seo_favicon_url' => SiteSetting::get('seo_favicon_url', ''),
+            'seo_apple_touch_icon_url' => SiteSetting::get('seo_apple_touch_icon_url', ''),
+            'seo_manifest_url' => SiteSetting::get('seo_manifest_url', ''),
+            'seo_manifest_short_name' => SiteSetting::get('seo_manifest_short_name', ''),
+            'seo_favicon_theme_color' => SiteSetting::get('seo_favicon_theme_color', '#0f172a'),
+            'seo_favicon_tile_color' => SiteSetting::get('seo_favicon_tile_color', '#0f172a'),
 
             'og_image_url' => SiteSetting::get('og_image_url', ''),
             'og_site_name' => SiteSetting::get('og_site_name', SiteSetting::get('site_name', config('app.name', 'Listen'))),
             'og_type' => SiteSetting::get('og_type', 'website'),
-            'og_locale' => SiteSetting::get('og_locale', 'en_US'),
+            'og_locale_en' => SiteSetting::get('og_locale_en', 'en_US'),
+            'og_locale_ar' => SiteSetting::get('og_locale_ar', 'ar_AE'),
             'twitter_card_type' => SiteSetting::get('twitter_card_type', 'summary_large_image'),
             'twitter_handle' => SiteSetting::get('twitter_handle', ''),
             'twitter_creator' => SiteSetting::get('twitter_creator', ''),
@@ -64,10 +79,37 @@ class SeoSettings extends Page implements HasForms
         ];
 
         foreach (SeoHelper::pageDefinitions() as $page => $meta) {
-            $state["seo_{$page}_title"] = SiteSetting::get("seo_{$page}_title", $meta['title']);
-            $state["seo_{$page}_description"] = SiteSetting::get("seo_{$page}_description", $meta['description']);
-            $state["seo_{$page}_keywords"] = SiteSetting::get("seo_{$page}_keywords", '');
-            $state["seo_{$page}_robots"] = SiteSetting::get("seo_{$page}_robots", $meta['robots']);
+            $state["seo_{$page}_title_en"] = SiteSetting::get(
+                "seo_{$page}_title_en",
+                SiteSetting::get("seo_{$page}_title", $this->pageDefault($page, 'title', 'en', (string) ($meta['title'] ?? '')))
+            );
+            $state["seo_{$page}_description_en"] = SiteSetting::get(
+                "seo_{$page}_description_en",
+                SiteSetting::get("seo_{$page}_description", $this->pageDefault($page, 'description', 'en', (string) ($meta['description'] ?? '')))
+            );
+            $state["seo_{$page}_keywords_en"] = SiteSetting::get(
+                "seo_{$page}_keywords_en",
+                SiteSetting::get("seo_{$page}_keywords", '')
+            );
+            $state["seo_{$page}_robots"] = SiteSetting::get("seo_{$page}_robots", (string) ($meta['robots'] ?? ''));
+
+            if (in_array('ar', SeoHelper::pageLocales($page), true)) {
+                $state["seo_{$page}_title_ar"] = SiteSetting::get(
+                    "seo_{$page}_title_ar",
+                    $this->pageDefault($page, 'title', 'ar')
+                );
+                $state["seo_{$page}_description_ar"] = SiteSetting::get(
+                    "seo_{$page}_description_ar",
+                    $this->pageDefault($page, 'description', 'ar')
+                );
+                $state["seo_{$page}_keywords_ar"] = SiteSetting::get("seo_{$page}_keywords_ar", '');
+            }
+        }
+
+        foreach ($this->landingPageLocales() as $page => $locales) {
+            foreach ($locales as $locale) {
+                $state["seo_landing_{$page}_content_{$locale}"] = SiteSetting::get("seo_landing_{$page}_content_{$locale}", '');
+            }
         }
 
         $this->form->fill($state);
@@ -77,35 +119,98 @@ class SeoSettings extends Page implements HasForms
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Global SEO Defaults')
+                Forms\Components\Section::make('Localized SEO Defaults')
+                    ->description('Global bilingual metadata defaults and brand fields for pages that do not have page-specific overrides.')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('meta_title_template')
-                            ->label('Meta Title Template')
-                            ->helperText('Use %page_title% as the page title placeholder.')
-                            ->required()
-                            ->maxLength(255),
                         Forms\Components\TextInput::make('canonical_url')
                             ->label('Canonical Base URL')
                             ->url()
                             ->maxLength(500),
-                        Forms\Components\Textarea::make('meta_description')
-                            ->label('Default Meta Description')
+                        Forms\Components\TextInput::make('meta_author')
+                            ->label('Meta Author')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('meta_title_template_en')
+                            ->label('English Title Template')
+                            ->helperText('Use %page_title% and %brand_name%.')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('meta_title_template_ar')
+                            ->label('Arabic Title Template')
+                            ->helperText('Use %page_title% and %brand_name%.')
+                            ->required()
+                            ->maxLength(255),
+                        Forms\Components\Textarea::make('meta_description_en')
+                            ->label('English Default Description')
                             ->rows(3)
-                            ->maxLength(320)
-                            ->columnSpanFull(),
-                        Forms\Components\Textarea::make('meta_keywords')
-                            ->label('Default Meta Keywords')
-                            ->rows(2)
-                            ->helperText('Comma-separated keywords. Optional.')
-                            ->columnSpanFull(),
+                            ->maxLength(320),
+                        Forms\Components\Textarea::make('meta_description_ar')
+                            ->label('Arabic Default Description')
+                            ->rows(3)
+                            ->maxLength(320),
+                        Forms\Components\Textarea::make('meta_keywords_en')
+                            ->label('English Default Keywords')
+                            ->rows(2),
+                        Forms\Components\Textarea::make('meta_keywords_ar')
+                            ->label('Arabic Default Keywords')
+                            ->rows(2),
+                        Forms\Components\TextInput::make('brand_name_ar')
+                            ->label('Arabic Brand Name')
+                            ->maxLength(255),
                         Forms\Components\TextInput::make('meta_robots')
                             ->label('Default Robots Directive')
                             ->placeholder('index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1')
                             ->maxLength(255),
-                        Forms\Components\TextInput::make('meta_author')
-                            ->label('Meta Author')
-                            ->maxLength(255),
+                        Forms\Components\Textarea::make('site_seo_description_en')
+                            ->label('English Site Description')
+                            ->helperText('Used in organization and website schema.')
+                            ->rows(3),
+                        Forms\Components\Textarea::make('site_seo_description_ar')
+                            ->label('Arabic Site Description')
+                            ->helperText('Used in organization and website schema.')
+                            ->rows(3),
+                    ]),
+
+                Forms\Components\Section::make('Favicon & Search Appearance')
+                    ->description('Keep favicon references explicit here so Google and browsers only see the latest brand icon set.')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\FileUpload::make('seo_favicon_svg_url')
+                            ->label('Primary SVG Favicon')
+                            ->acceptedFileTypes(['image/svg+xml'])
+                            ->directory('settings/seo')
+                            ->disk('public')
+                            ->maxSize(2048)
+                            ->helperText('Preferred source for modern browsers and Google Search.'),
+                        Forms\Components\FileUpload::make('seo_favicon_url')
+                            ->label('Fallback Icon / PNG')
+                            ->acceptedFileTypes(['image/png', 'image/x-icon', 'image/vnd.microsoft.icon', 'image/webp'])
+                            ->directory('settings/seo')
+                            ->disk('public')
+                            ->maxSize(2048)
+                            ->helperText('Optional fallback for platforms that do not use SVG favicons.'),
+                        Forms\Components\FileUpload::make('seo_apple_touch_icon_url')
+                            ->label('Apple Touch Icon')
+                            ->acceptedFileTypes(['image/png', 'image/webp'])
+                            ->directory('settings/seo')
+                            ->disk('public')
+                            ->maxSize(4096),
+                        Forms\Components\TextInput::make('seo_manifest_url')
+                            ->label('Custom Manifest URL')
+                            ->url()
+                            ->maxLength(500)
+                            ->helperText('Leave empty to use the auto-generated /site.webmanifest endpoint.'),
+                        Forms\Components\TextInput::make('seo_manifest_short_name')
+                            ->label('Manifest Short Name')
+                            ->maxLength(100),
+                        Forms\Components\TextInput::make('seo_favicon_theme_color')
+                            ->label('Theme Color')
+                            ->placeholder('#0f172a')
+                            ->maxLength(20),
+                        Forms\Components\TextInput::make('seo_favicon_tile_color')
+                            ->label('MS Tile Color')
+                            ->placeholder('#0f172a')
+                            ->maxLength(20),
                     ]),
 
                 Forms\Components\Section::make('Search Engine Verification')
@@ -125,13 +230,15 @@ class SeoSettings extends Page implements HasForms
                             ->maxLength(255),
                     ]),
 
-                Forms\Components\Section::make('Social Media')
+                Forms\Components\Section::make('Social Metadata')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('og_image_url')
-                            ->label('Open Graph Image URL')
-                            ->url()
-                            ->maxLength(500),
+                        Forms\Components\FileUpload::make('og_image_url')
+                            ->label('Open Graph Image')
+                            ->acceptedFileTypes(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'])
+                            ->directory('settings/seo')
+                            ->disk('public')
+                            ->maxSize(4096),
                         Forms\Components\TextInput::make('og_site_name')
                             ->label('Open Graph Site Name')
                             ->maxLength(255),
@@ -144,16 +251,20 @@ class SeoSettings extends Page implements HasForms
                                 'profile' => 'Profile',
                             ])
                             ->default('website'),
-                        Forms\Components\TextInput::make('og_locale')
-                            ->label('Open Graph Locale')
-                            ->placeholder('en_US')
-                            ->maxLength(20),
                         Forms\Components\Select::make('twitter_card_type')
                             ->label('Twitter Card Type')
                             ->options([
                                 'summary' => 'Summary',
                                 'summary_large_image' => 'Summary with Large Image',
                             ]),
+                        Forms\Components\TextInput::make('og_locale_en')
+                            ->label('OG Locale (English)')
+                            ->placeholder('en_US')
+                            ->maxLength(20),
+                        Forms\Components\TextInput::make('og_locale_ar')
+                            ->label('OG Locale (Arabic)')
+                            ->placeholder('ar_AE')
+                            ->maxLength(20),
                         Forms\Components\TextInput::make('twitter_handle')
                             ->label('Twitter Site Handle')
                             ->prefix('@')
@@ -177,17 +288,17 @@ class SeoSettings extends Page implements HasForms
                             ->maxLength(30),
                         Forms\Components\Textarea::make('google_tag_head_code')
                             ->label('Google Tag Head Code')
-                            ->helperText('Optional: paste the full Google tag snippet (including <script> tags). If provided, it is used instead of generated scripts from IDs.')
+                            ->helperText('Optional: paste the full Google tag snippet including script tags. If set, it overrides generated ID-based tags.')
                             ->rows(8)
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('facebook_pixel_code')
                             ->label('Facebook Pixel Code')
-                            ->helperText('Optional: paste the full Meta Pixel snippet (including <script> and <noscript> tags).')
+                            ->helperText('Optional: paste the full Meta Pixel snippet including script and noscript tags.')
                             ->rows(8)
                             ->columnSpanFull(),
                         Forms\Components\Toggle::make('enable_structured_data')
-                            ->label('Enable Schema.org Structured Data')
-                            ->helperText('Outputs Organization, WebSite, and SoftwareApplication JSON-LD.'),
+                            ->label('Enable Structured Data')
+                            ->helperText('Outputs Organization, WebSite, and FAQ schema where relevant.'),
                     ]),
 
                 Forms\Components\Section::make('Crawl Controls')
@@ -195,28 +306,34 @@ class SeoSettings extends Page implements HasForms
                     ->schema([
                         Forms\Components\Textarea::make('robots_txt')
                             ->label('robots.txt Content')
-                            ->helperText('Served at /robots.txt')
+                            ->helperText('Served at /robots.txt. Keep public SEO routes crawlable while private app flows remain protected.')
                             ->rows(8)
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('sitemap_paths')
-                            ->label('Sitemap Entries')
-                            ->helperText('One line per URL: /path|priority|change_frequency. Example: /pricing|0.9|weekly')
+                            ->label('Extra Sitemap Entries')
+                            ->helperText('Optional extra public URLs. Format: /path|priority|change_frequency. Core public pages are added automatically.')
                             ->rows(8)
                             ->columnSpanFull(),
                         Forms\Components\Toggle::make('enable_llms_txt')
                             ->label('Enable llms.txt Endpoint')
                             ->helperText('Served at /llms.txt for AI crawler guidance.'),
-                        Forms\Components\Placeholder::make('llms_txt_hint')
-                            ->label('llms.txt Notes')
-                            ->content('Use Markdown or plain text. Keep it concise and point to canonical documentation pages.'),
+                        Forms\Components\Placeholder::make('sitemap_notes')
+                            ->label('Sitemap Notes')
+                            ->content('The sitemap is generated dynamically from public indexable pages in both languages, then merged with any extra entries you list here.'),
                         Forms\Components\Textarea::make('llms_txt')
                             ->label('llms.txt Content')
                             ->rows(12)
                             ->columnSpanFull(),
                     ]),
 
+                Forms\Components\Section::make('SEO Landing Page Content')
+                    ->description('Optional JSON overrides for the SEO landing pages. Leave blank to keep the safe built-in defaults used by the public site.')
+                    ->collapsible()
+                    ->collapsed()
+                    ->schema($this->landingPageSchema()),
+
                 Forms\Components\Section::make('Per-Page SEO Overrides')
-                    ->description('Use these to fully control SEO by page from the dashboard.')
+                    ->description('Fine-tune titles, descriptions, keywords, and robots per page and per language without touching templates.')
                     ->collapsible()
                     ->collapsed()
                     ->schema($this->perPageSeoSchema()),
@@ -232,30 +349,108 @@ class SeoSettings extends Page implements HasForms
         $schema = [];
 
         foreach (SeoHelper::pageDefinitions() as $page => $meta) {
-            $schema[] = Forms\Components\Fieldset::make($meta['label'])
+            $fields = [
+                Forms\Components\TextInput::make("seo_{$page}_title_en")
+                    ->label('English Title')
+                    ->maxLength(255)
+                    ->helperText('Leave blank to use the translation default.'),
+                Forms\Components\TextInput::make("seo_{$page}_robots")
+                    ->label('Robots')
+                    ->placeholder((string) ($meta['robots'] ?? ''))
+                    ->maxLength(255),
+                Forms\Components\Textarea::make("seo_{$page}_description_en")
+                    ->label('English Description')
+                    ->rows(2)
+                    ->maxLength(320)
+                    ->columnSpanFull(),
+                Forms\Components\Textarea::make("seo_{$page}_keywords_en")
+                    ->label('English Keywords')
+                    ->rows(2)
+                    ->helperText('Comma-separated keywords. Optional.')
+                    ->columnSpanFull(),
+            ];
+
+            if (in_array('ar', SeoHelper::pageLocales($page), true)) {
+                $fields[] = Forms\Components\TextInput::make("seo_{$page}_title_ar")
+                    ->label('Arabic Title')
+                    ->maxLength(255)
+                    ->helperText('Leave blank to use the translation default.');
+                $fields[] = Forms\Components\Placeholder::make("seo_{$page}_locale_hint")
+                    ->label('Language Notes')
+                    ->content('Arabic fields should stay fully localized. Slugs remain in English as requested.');
+                $fields[] = Forms\Components\Textarea::make("seo_{$page}_description_ar")
+                    ->label('Arabic Description')
+                    ->rows(2)
+                    ->maxLength(320)
+                    ->columnSpanFull();
+                $fields[] = Forms\Components\Textarea::make("seo_{$page}_keywords_ar")
+                    ->label('Arabic Keywords')
+                    ->rows(2)
+                    ->helperText('Comma-separated keywords. Optional.')
+                    ->columnSpanFull();
+            }
+
+            $schema[] = Forms\Components\Fieldset::make((string) ($meta['label'] ?? $page))
                 ->columns(2)
-                ->schema([
-                    Forms\Components\TextInput::make("seo_{$page}_title")
-                        ->label('Title')
-                        ->maxLength(255),
-                    Forms\Components\TextInput::make("seo_{$page}_robots")
-                        ->label('Robots')
-                        ->placeholder($meta['robots'])
-                        ->maxLength(255),
-                    Forms\Components\Textarea::make("seo_{$page}_description")
-                        ->label('Description')
-                        ->rows(2)
-                        ->maxLength(320)
-                        ->columnSpanFull(),
-                    Forms\Components\Textarea::make("seo_{$page}_keywords")
-                        ->label('Keywords')
-                        ->rows(2)
-                        ->helperText('Comma-separated keywords. Optional.')
-                        ->columnSpanFull(),
-                ]);
+                ->schema($fields);
         }
 
         return $schema;
+    }
+
+    /**
+     * @return array<int, Forms\Components\Component>
+     */
+    private function landingPageSchema(): array
+    {
+        $schema = [];
+
+        foreach ($this->landingPageLocales() as $page => $locales) {
+            $title = (string) (SeoHelper::pageDefinitions()[$page]['label'] ?? $page);
+            $fields = [];
+
+            foreach ($locales as $locale) {
+                $label = $locale === 'ar' ? 'Arabic JSON' : 'English JSON';
+                $fields[] = Forms\Components\Textarea::make("seo_landing_{$page}_content_{$locale}")
+                    ->label($label)
+                    ->rows(18)
+                    ->helperText('Optional JSON override. Supported keys: eyebrow, h1, intro, highlights, use_cases, faqs, cta_title, cta_body, cta_primary.')
+                    ->columnSpanFull();
+            }
+
+            $schema[] = Forms\Components\Fieldset::make($title)
+                ->columns(1)
+                ->schema($fields);
+        }
+
+        return $schema;
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function landingPageLocales(): array
+    {
+        return [
+            'ai_text_to_speech' => ['en', 'ar'],
+            'ai_voice_generator' => ['en', 'ar'],
+            'text_to_speech_arabic' => ['en'],
+        ];
+    }
+
+    private function pageDefault(string $page, string $field, string $locale, string $fallback = ''): string
+    {
+        $definition = SeoHelper::pageDefinitions()[$page] ?? [];
+        $translationKey = (string) ($definition["{$field}_key"] ?? '');
+
+        if ($translationKey !== '') {
+            $translated = trim((string) __($translationKey, [], $locale));
+            if ($translated !== '' && $translated !== $translationKey) {
+                return $translated;
+            }
+        }
+
+        return $fallback;
     }
 
     public function save(): void

@@ -207,55 +207,89 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
     private function fallbackGoogleVoice(string $targetLanguage, string $tier, string $gender): string
     {
+        $normalizedTier = VoiceTier::normalize($tier);
         $lookupTier = $this->effectiveGoogleTier($tier);
 
         $voice = VoiceCatalog::defaultForLanguageByProvider($targetLanguage, 'google_cloud', $lookupTier, $gender);
         if ($voice !== '') {
-            return VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
+            $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
+
+            return $normalizedTier === VoiceTier::STANDARD
+                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                : $resolved;
         }
 
         // Final fallback: any Google voice for language.
         $voice = VoiceCatalog::defaultForLanguageByProvider($targetLanguage, 'google_cloud', null, $gender);
         if ($voice !== '') {
-            return VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
+            $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
+
+            return $normalizedTier === VoiceTier::STANDARD
+                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                : $resolved;
         }
 
-        // Let Google auto-pick if catalog is empty.
-        return '';
+        // Let Google auto-pick for non-standard tiers. Standard must stay WaveNet.
+        return $normalizedTier === VoiceTier::STANDARD
+            ? $this->coerceToWaveNetVoice('', $targetLanguage, $gender)
+            : '';
     }
 
     private function effectiveGoogleTier(string $tier): string
     {
-        $normalizedTier = VoiceTier::normalize($tier);
-
-        // Standard plan quality must still run through WaveNet for consistency.
-        return $normalizedTier === VoiceTier::STANDARD ? VoiceTier::HD : $normalizedTier;
+        return VoiceTier::normalize($tier);
     }
 
     private function enforceWaveNetForStandard(string $voiceName, string $targetLanguage, string $tier, string $gender): string
     {
-        $normalizedTier = VoiceTier::normalize($tier);
-        if ($normalizedTier !== VoiceTier::STANDARD) {
+        if (VoiceTier::normalize($tier) !== VoiceTier::STANDARD) {
             return $voiceName;
         }
 
-        $trimmed = trim($voiceName);
-        if ($trimmed === '') {
-            return $this->fallbackGoogleVoice($targetLanguage, VoiceTier::HD, $gender);
-        }
+        return $this->coerceToWaveNetVoice($voiceName, $targetLanguage, $gender);
+    }
 
-        if (str_contains(strtolower($trimmed), '-wavenet-')) {
+    private function coerceToWaveNetVoice(string $voiceName, string $targetLanguage, string $gender): string
+    {
+        $trimmed = trim($voiceName);
+        if ($trimmed !== '' && str_contains(strtolower($trimmed), '-wavenet-')) {
             return $trimmed;
         }
 
-        $converted = preg_replace('/-standard-/i', '-Wavenet-', $trimmed);
-        if (is_string($converted) && $converted !== '' && $converted !== $trimmed) {
-            return $converted;
+        if ($trimmed !== '') {
+            $converted = preg_replace('/-standard-/i', '-Wavenet-', $trimmed);
+            if (is_string($converted) && $converted !== '') {
+                return $converted;
+            }
         }
 
-        $fallback = $this->fallbackGoogleVoice($targetLanguage, VoiceTier::HD, $gender);
+        $standardVoice = VoiceCatalog::defaultForLanguageByProvider(
+            $targetLanguage,
+            'google_cloud',
+            VoiceTier::STANDARD,
+            $gender
+        );
 
-        return $fallback !== '' ? $fallback : $trimmed;
+        if ($standardVoice !== '') {
+            $resolvedStandardVoice = VoiceCatalog::providerVoiceIdForName($standardVoice) ?: $standardVoice;
+            $resolvedStandardVoice = trim($resolvedStandardVoice);
+
+            if ($resolvedStandardVoice !== '') {
+                if (str_contains(strtolower($resolvedStandardVoice), '-wavenet-')) {
+                    return $resolvedStandardVoice;
+                }
+
+                $convertedStandardVoice = preg_replace('/-standard-/i', '-Wavenet-', $resolvedStandardVoice);
+                if (is_string($convertedStandardVoice) && $convertedStandardVoice !== '') {
+                    return $convertedStandardVoice;
+                }
+            }
+        }
+
+        // Stable fallback IDs so standard quality remains explicitly WaveNet.
+        return strtolower($targetLanguage) === 'ar'
+            ? 'ar-XA-Wavenet-A'
+            : 'en-US-Wavenet-C';
     }
 
     private function resolveSsmlGender(string $voiceName): string

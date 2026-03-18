@@ -1,9 +1,10 @@
-<svg viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
-  <rect x="5" y="59" width="10" height="10" rx="5" fill="#7659FA"/>
-  <rect x="23" y="42" width="10" height="44" rx="5" fill="#7659FA"/>
-  <rect x="41" y="28" width="10" height="72" rx="5" fill="#7659FA"/>
-  <rect x="59" y="14" width="10" height="100" rx="5" fill="#7659FA"/>
-  <rect x="77" y="28" width="10" height="72" rx="5" fill="#7659FA"/>
-  <rect x="95" y="42" width="10" height="44" rx="5" fill="#7659FA"/>
-  <rect x="113" y="59" width="10" height="10" rx="5" fill="#7659FA"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Listen">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fb8308"/>
+      <stop offset="1" stop-color="#5906b2"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="#0d1424"/>
+  <path d="M32 12c-11.05 0-20 8.95-20 20v14c0 4.42 3.58 8 8 8h4c3.31 0 6-2.69 6-6V38c0-3.31-2.69-6-6-6h-4c0-6.63 5.37-12 12-12s12 5.37 12 12h-4c-3.31 0-6 2.69-6 6v10c0 3.31 2.69 6 6 6h4c4.42 0 8-3.58 8-8V32c0-11.05-8.95-20-20-20z" fill="url(#g)"/>
 </svg>
