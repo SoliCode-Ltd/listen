@@ -26,6 +26,9 @@ Route::get('/sitemap.xml', function () {
     $dom = new \DOMDocument('1.0', 'UTF-8');
     $dom->formatOutput = true;
 
+    $xsl = $dom->createProcessingInstruction('xml-stylesheet', 'type="text/xsl" href="/sitemap.xsl"');
+    $dom->appendChild($xsl);
+
     $urlset = $dom->createElementNS('http://www.sitemaps.org/schemas/sitemap/0.9', 'urlset');
     $urlset->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:xhtml', 'http://www.w3.org/1999/xhtml');
     $dom->appendChild($urlset);
