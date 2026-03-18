@@ -20,6 +20,7 @@ class SeoRoutesTest extends TestCase
         $this->get('/sitemap.xml')
             ->assertOk()
             ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertSee('/en/pricing', false)
             ->assertSee('/ar/pricing', false)
             ->assertSee('<urlset', false)

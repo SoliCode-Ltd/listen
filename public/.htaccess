@@ -23,3 +23,14 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteRule ^ index.php [L]
 </IfModule>
+
+<IfModule mod_mime.c>
+    AddType application/xml .xml
+</IfModule>
+
+<IfModule mod_headers.c>
+    <Files "sitemap.xml">
+        Header set Content-Type "application/xml; charset=UTF-8"
+        Header set X-Content-Type-Options "nosniff"
+    </Files>
+</IfModule>

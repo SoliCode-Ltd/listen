@@ -64,6 +64,7 @@ Route::get('/sitemap.xml', function () {
 
     return response($dom->saveXML(), 200, [
         'Content-Type' => 'application/xml; charset=UTF-8',
+        'X-Content-Type-Options' => 'nosniff',
     ]);
 })->name('sitemap');
 
