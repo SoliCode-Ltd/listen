@@ -696,6 +696,7 @@
       var billingToggle = document.getElementById('billingToggle');
       var billingSavings = document.getElementById('billingSavings');
       var planCards = document.querySelectorAll('.plan-card');
+      var upgradeLinks = document.querySelectorAll('[data-upgrade-link="1"]');
       var isYearly = false;
       var i18n = @json($pricingI18n);
 
@@ -726,6 +727,18 @@
         });
       }
 
+      function updateUpgradeLinks() {
+        upgradeLinks.forEach(function(link) {
+          var nextHref = isYearly
+            ? String(link.getAttribute('data-yearly-href') || link.getAttribute('href') || '')
+            : String(link.getAttribute('data-monthly-href') || link.getAttribute('href') || '');
+
+          if (nextHref !== '') {
+            link.setAttribute('href', nextHref);
+          }
+        });
+      }
+
       function setBillingMode(yearly) {
         isYearly = yearly;
         monthlyBtn.classList.toggle('active', !yearly);
@@ -733,12 +746,14 @@
         billingSavings.classList.toggle('show', yearly);
         billingToggle.classList.toggle('yearly', yearly);
         updatePrices();
+        updateUpgradeLinks();
       }
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
       yearlyBtn.addEventListener('click', function() { setBillingMode(true); });
 
       updatePrices();
+      updateUpgradeLinks();
 
       var revealElements = document.querySelectorAll('.reveal');
       var revealObserver = new IntersectionObserver(function(entries) {

@@ -83,7 +83,17 @@
       @elseif($isLower || $plan['slug'] === 'free')
         <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
       @else
-        <a class="plan-btn btn-primary" href="{{ route('billing.page', ['plan' => $plan['slug']]) }}">{{ __('ui.pricing.upgrade_now') }}</a>
+        @php
+          $monthlyBillingUrl = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly']);
+          $yearlyBillingUrl = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']);
+        @endphp
+        <a
+          class="plan-btn btn-primary"
+          href="{{ $monthlyBillingUrl }}"
+          data-upgrade-link="1"
+          data-monthly-href="{{ $monthlyBillingUrl }}"
+          data-yearly-href="{{ $yearlyBillingUrl }}"
+        >{{ __('ui.pricing.upgrade_now') }}</a>
       @endif
     @else
       <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
