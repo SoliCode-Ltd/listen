@@ -792,7 +792,7 @@ return [
         'generation_failed' => 'فشل التوليد',
         'processing_ellipsis' => 'جاري المعالجة...',
         'delete' => 'حذف',
-        'reuse_settings' => 'إعادة استخدام الإعدادات',
+        'reuse_settings' => 'إعادة الإستخدام ',
         'no_jobs_yet' => 'لم يتم توليد أصوات بعد. أنشئ أول صوت من الأعلى!',
         'any' => 'الكل',
         'no_speakers' => 'لا يوجد متحدثون متاحون',
