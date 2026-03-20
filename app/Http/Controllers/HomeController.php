@@ -7,6 +7,7 @@ use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
+use App\Rules\DoesNotContainProfanity;
 use App\Services\DemoFraudService;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
@@ -194,7 +195,7 @@ class HomeController extends Controller
         $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:50000'],
+            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -265,7 +266,7 @@ class HomeController extends Controller
         $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:50000'],
+            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],

@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\SiteSetting;
 use App\Models\UsageCounter;
 use App\Models\User;
+use App\Rules\DoesNotContainProfanity;
+use App\Services\AudioGenerationRecorder;
+use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
-use App\Models\SiteSetting;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\TtsStudioConfig;
@@ -25,6 +28,8 @@ class MessageReaderController extends Controller
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BillingSyncService $billingSyncService,
+        private readonly AudioGenerationRecorder $audioGenerationRecorder,
+        private readonly BlockedUserService $blockedUserService,
     ) {}
 
     public function profile(Request $request)
@@ -134,8 +139,8 @@ class MessageReaderController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['nullable', 'string', 'max:50000', 'required_without:text'],
-            'text' => ['nullable', 'string', 'max:50000', 'required_without:content'],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'target_language' => ['required', 'in:ar,en'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_name' => ['nullable', 'string', 'max:120'],
@@ -146,6 +151,7 @@ class MessageReaderController extends Controller
             'dialect' => ['nullable', 'string', 'max:10'],
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
+            'style_prompt' => ['nullable', 'string', 'max:2000'],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
             // Dialogue parameters
@@ -173,6 +179,7 @@ class MessageReaderController extends Controller
             'dialect' => $validated['dialect'] ?? null,
             'emotion' => $validated['emotion'] ?? 'neutral',
             'performance_style' => $validated['performance_style'] ?? null,
+            'style_prompt' => $validated['style_prompt'] ?? null,
             'speed' => $validated['speed'] ?? null,
             'pitch' => $validated['pitch'] ?? null,
         ]);
@@ -205,46 +212,47 @@ class MessageReaderController extends Controller
 
         PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
 
-        $item = \App\Models\TextItem::create([
-            'user_id' => $user->id,
-            'source_type' => 'message',
-            'title' => $validated['title'] ?? null,
-            'content' => $text,
-            'language' => $sourceLanguage,
-            'status' => $initialStatus,
-            'received_at' => now(),
-        ]);
-
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+        $recorded = $this->audioGenerationRecorder->createForUser(
+            (int) $user->id,
+            [
+                'source_type' => 'message',
+                'title' => $validated['title'] ?? null,
+                'content' => $text,
+                'language' => $sourceLanguage,
+                'status' => $initialStatus,
+                'received_at' => now(),
+            ],
+            [
+                'input_text' => $text,
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'voice_tier' => $requestedTier,
+                'voice_name' => $voiceName,
+                'tts_provider' => VoiceCatalog::providerForName($voiceName),
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'duration_seconds' => $estimate['seconds'],
+                'status' => $initialStatus,
+                'dialect' => $studioOptions['dialect'],
+                'emotion' => $studioOptions['emotion'],
+                'performance_style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+                'is_dialogue' => $dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false),
+                'dialogue_metadata' => ($dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false)
+                    && ! empty($validated['dialogue_speakers']))
+                    ? ['speakers' => $validated['dialogue_speakers']]
+                    : null,
+            ],
+        );
 
-        $job = AudioGeneration::create([
-            'user_id' => $user->id,
-            'text_item_id' => $item->id,
-            'input_text' => $text,
-            'source_language' => $sourceLanguage,
-            'target_language' => $validated['target_language'],
-            'voice_tier' => $requestedTier,
-            'voice_name' => $voiceName,
-            'translate' => (bool) ($validated['translate'] ?? false),
-            'duration_seconds' => $estimate['seconds'],
-            'status' => $initialStatus,
-            // Studio fields
-            'dialect' => $studioOptions['dialect'],
-            'emotion' => $studioOptions['emotion'],
-            'performance_style' => $studioOptions['performance_style'],
-            'speed' => $studioOptions['speed'],
-            'pitch' => $studioOptions['pitch'],
-            // Dialogue fields
-            'is_dialogue' => $dialogueEnabled
-                && $requestedTier !== VoiceTier::STANDARD
-                && ($validated['is_dialogue'] ?? false),
-            'dialogue_metadata' => ($dialogueEnabled
-                && $requestedTier !== VoiceTier::STANDARD
-                && ($validated['is_dialogue'] ?? false)
-                && ! empty($validated['dialogue_speakers']))
-                ? ['speakers' => $validated['dialogue_speakers']]
-                : null,
-        ]);
+        $item = $recorded['item'];
+        $job = $recorded['job'];
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         $counter->increment('total_requests');
@@ -321,6 +329,7 @@ class MessageReaderController extends Controller
             ->map(function (AudioGeneration $job) {
                 return [
                     'id' => $job->id,
+                    'display_number' => $job->displayNumber(),
                     'source_language' => $job->source_language,
                     'target_language' => $job->target_language,
                     'voice' => VoiceCatalog::voiceMeta($job->voice_name),
@@ -344,7 +353,14 @@ class MessageReaderController extends Controller
     private function resolveApiUser(Request $request): User
     {
         if (Auth::check()) {
-            return $request->user();
+            $user = $request->user();
+            if ($this->blockedUserService->isBlocked($user)) {
+                abort(403, $this->blockedUserService->messageFor($user));
+            }
+
+            $request->attributes->set('listen_actor_user_id', (int) $user->id);
+
+            return $user;
         }
 
         $provided = $request->header('X-Listen-Key')
@@ -361,13 +377,26 @@ class MessageReaderController extends Controller
             ->first();
 
         if ($user) {
+            if ($this->blockedUserService->isBlocked($user)) {
+                abort(403, $this->blockedUserService->messageFor($user));
+            }
+
+            $request->attributes->set('listen_actor_user_id', (int) $user->id);
+
             return $user;
         }
 
         // Backward-compatible emergency key for server-to-server integrations.
         $legacyApiKey = trim((string) env('LISTEN_API_KEY', ''));
         if ($legacyApiKey !== '' && hash_equals($legacyApiKey, $provided)) {
-            return User::query()->findOrFail(1);
+            $user = User::query()->findOrFail(1);
+            if ($this->blockedUserService->isBlocked($user)) {
+                abort(403, $this->blockedUserService->messageFor($user));
+            }
+
+            $request->attributes->set('listen_actor_user_id', (int) $user->id);
+
+            return $user;
         }
 
         abort(401, __('ui.backend.api_invalid_key'));
@@ -424,8 +453,8 @@ class MessageReaderController extends Controller
     }
 
     /**
-     * @param  array{dialect:mixed,emotion:mixed,performance_style:mixed,speed:mixed,pitch:mixed}  $options
-     * @return array{dialect:?string,emotion:string,performance_style:?string,speed:float,pitch:float}
+     * @param  array{dialect:mixed,emotion:mixed,performance_style:mixed,style_prompt:mixed,speed:mixed,pitch:mixed}  $options
+     * @return array{dialect:?string,emotion:string,performance_style:?string,style_prompt:?string,speed:float,pitch:float}
      */
     private function sanitizeStudioOptionsForTier(string $tier, array $options): array
     {
@@ -436,6 +465,7 @@ class MessageReaderController extends Controller
                 'dialect' => null,
                 'emotion' => 'neutral',
                 'performance_style' => null,
+                'style_prompt' => null,
                 'speed' => 1.0,
                 'pitch' => 0.0,
             ];
@@ -461,6 +491,7 @@ class MessageReaderController extends Controller
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'performance_style' => $performanceStyle !== '' ? $performanceStyle : null,
+            'style_prompt' => isset($options['style_prompt']) && is_string($options['style_prompt']) ? trim($options['style_prompt']) ?: null : null,
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];

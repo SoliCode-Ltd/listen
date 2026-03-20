@@ -9,6 +9,9 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class TextItemResource extends Resource
 {
@@ -19,6 +22,22 @@ class TextItemResource extends Resource
     protected static ?string $navigationGroup = 'Content';
 
     protected static ?int $navigationSort = 4;
+
+    public static function getEloquentQuery(): Builder
+    {
+        $query = parent::getEloquentQuery();
+
+        if (! Schema::hasTable('blocked_generations')) {
+            return $query;
+        }
+
+        return $query->whereNotExists(function ($subQuery) {
+            $subQuery->select(DB::raw(1))
+                ->from('blocked_generations as bg')
+                ->whereColumn('bg.user_id', 'text_items.user_id')
+                ->whereColumn('bg.input_text', 'text_items.content');
+        });
+    }
 
     public static function form(Form $form): Form
     {

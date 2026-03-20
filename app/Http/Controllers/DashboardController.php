@@ -5,8 +5,9 @@ namespace App\Http\Controllers;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
-use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Rules\DoesNotContainProfanity;
+use App\Services\AudioGenerationRecorder;
 use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
@@ -22,9 +23,10 @@ class DashboardController extends Controller
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
+        private readonly AudioGenerationRecorder $audioGenerationRecorder,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
         $userId = (int) auth()->id();
         $period = now()->format('Y-m');
@@ -40,6 +42,28 @@ class DashboardController extends Controller
             ->with(['textItem:id,title'])
             ->latest()
             ->get();
+
+        $reusePreset = null;
+        $reuseDisplayNumber = (int) $request->integer('reuse');
+        if ($reuseDisplayNumber > 0) {
+            $reuseSource = AudioGeneration::query()
+                ->with('textItem:id,title')
+                ->where('user_id', $userId)
+                ->where('user_sequence_number', $reuseDisplayNumber)
+                ->first();
+
+            if ($reuseSource?->hasReusablePremiumSettings()) {
+                $reusePreset = array_merge(
+                    $reuseSource->reusableSettings() ?? [],
+                    [
+                        'job_id' => $reuseSource->id,
+                        'display_number' => $reuseSource->displayNumber(),
+                        'title' => (string) ($reuseSource->textItem?->title ?? ''),
+                        'content' => (string) $reuseSource->input_text,
+                    ],
+                );
+            }
+        }
 
         $stats = [
             'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
@@ -103,6 +127,7 @@ class DashboardController extends Controller
             'customPromptEnabled' => $customPromptEnabled,
             'ttsProviderPolicy' => $activePlan?->tts_provider_policy ?? 'default',
             'extensionApiState' => $extensionApiState,
+            'reusePreset' => $reusePreset,
         ]);
     }
 
@@ -128,8 +153,8 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['nullable', 'string', 'max:50000', 'required_without:text'],
-            'text' => ['nullable', 'string', 'max:50000', 'required_without:content'],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'target_language' => ['required', 'in:ar,en'],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -185,46 +210,45 @@ class DashboardController extends Controller
 
         PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
 
-        $item = TextItem::create([
-            'user_id' => $userId,
-            'source_type' => 'message',
-            'title' => $validated['title'] ?? null,
-            'content' => $text,
-            'language' => $sourceLanguage,
-            'status' => 'processing',
-            'received_at' => now(),
-        ]);
+        $recorded = $this->audioGenerationRecorder->createForUser(
+            $userId,
+            [
+                'source_type' => 'message',
+                'title' => $validated['title'] ?? null,
+                'content' => $text,
+                'language' => $sourceLanguage,
+                'status' => 'processing',
+                'received_at' => now(),
+            ],
+            [
+                'input_text' => $text,
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'voice_tier' => $requestedTier,
+                'voice_name' => $voiceName,
+                'tts_provider' => $voiceProvider,
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'duration_seconds' => $estimate['seconds'],
+                'status' => 'processing',
+                'dialect' => $studioOptions['dialect'],
+                'performance_style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
+                'emotion' => $studioOptions['emotion'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+                'is_dialogue' => $dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false),
+                'dialogue_metadata' => ($dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false)
+                    && ! empty($validated['dialogue_speakers']))
+                    ? ['speakers' => $validated['dialogue_speakers']]
+                    : null,
+            ],
+        );
 
-        $job = AudioGeneration::create([
-            'user_id' => $userId,
-            'text_item_id' => $item->id,
-            'input_text' => $text,
-            'source_language' => $sourceLanguage,
-            'target_language' => $validated['target_language'],
-            'voice_tier' => $requestedTier,
-            'voice_name' => $voiceName,
-            'tts_provider' => $voiceProvider,
-            'translate' => (bool) ($validated['translate'] ?? false),
-            'duration_seconds' => $estimate['seconds'],
-            'status' => 'processing',
-            // Studio fields
-            'dialect' => $studioOptions['dialect'],
-            'performance_style' => $studioOptions['performance_style'],
-            'style_prompt' => $studioOptions['style_prompt'],
-            'emotion' => $studioOptions['emotion'],
-            'speed' => $studioOptions['speed'],
-            'pitch' => $studioOptions['pitch'],
-            // Dialogue fields
-            'is_dialogue' => $dialogueEnabled
-                && $requestedTier !== VoiceTier::STANDARD
-                && ($validated['is_dialogue'] ?? false),
-            'dialogue_metadata' => ($dialogueEnabled
-                && $requestedTier !== VoiceTier::STANDARD
-                && ($validated['is_dialogue'] ?? false)
-                && ! empty($validated['dialogue_speakers']))
-                ? ['speakers' => $validated['dialogue_speakers']]
-                : null,
-        ]);
+        $job = $recorded['job'];
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         $counter->increment('total_requests');
@@ -397,6 +421,7 @@ class DashboardController extends Controller
 
         return [
             'id' => (int) $job->id,
+            'display_number' => $job->displayNumber(),
             'title' => (string) ($job->textItem?->title ?? ''),
             'text_excerpt' => (string) Str::limit(trim((string) preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
             'status' => (string) $job->status,
@@ -409,6 +434,10 @@ class DashboardController extends Controller
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'created_human' => $job->created_at?->diffForHumans(),
+            'can_reuse_settings' => $job->hasReusablePremiumSettings(),
+            'reuse_url' => $job->hasReusablePremiumSettings()
+                ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection'
+                : null,
         ];
     }
 

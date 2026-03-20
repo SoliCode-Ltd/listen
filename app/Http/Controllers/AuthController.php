@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\User;
+use App\Services\BlockedUserService;
 use App\Services\PlanAccessService;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
@@ -17,6 +18,7 @@ class AuthController extends Controller
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
+        private readonly BlockedUserService $blockedUserService,
     ) {
     }
 
@@ -40,6 +42,15 @@ class AuthController extends Controller
             return back()->withErrors([
                 'email' => __('ui.backend.auth_invalid_credentials'),
             ])->onlyInput('email');
+        }
+
+        $user = Auth::user();
+        if ($this->blockedUserService->isBlocked($user)) {
+            Auth::logout();
+
+            return back()
+                ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
+                ->onlyInput('email');
         }
 
         $request->session()->regenerate();
@@ -148,6 +159,12 @@ class AuthController extends Controller
         }
 
         $this->attachFreePlanIfMissing($user);
+
+        if ($this->blockedUserService->isBlocked($user)) {
+            return redirect()
+                ->route('login')
+                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+        }
 
         Auth::login($user, true);
         $request->session()->regenerate();

@@ -47,11 +47,11 @@ class DashboardUsageMeterTest extends TestCase
             'total_requests' => 28,
         ]);
 
-        $response = $this->actingAs($user)->get(route('dashboard'));
+        $response = $this->actingAs($user)->getLocalizedRoute('dashboard');
 
         $response->assertOk();
-        $response->assertSee('480,000 / 500,000 chars left', false);
-        $response->assertSee('72 / 100 requests left', false);
+        $response->assertSee('480,000 / 500,000 chars remaining', false);
+        $response->assertSee('72 / 100 requests remaining', false);
         $response->assertSee('id="usageCharsMeter" style="width:96%"', false);
         $response->assertSee('id="usageRequestsMeter" style="width:72%"', false);
     }

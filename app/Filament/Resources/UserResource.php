@@ -4,11 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\User;
+use App\Services\BlockedUserService;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\Auth;
 
 class UserResource extends Resource
 {
@@ -24,7 +27,7 @@ class UserResource extends Resource
     {
         return $form
             ->schema([
-                Forms\Components\Section::make('Account Info')
+                Forms\Components\Section::make(__('ui.admin.users.account_section'))
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('name')
@@ -40,26 +43,57 @@ class UserResource extends Resource
                             ->required(fn (string $operation): bool => $operation === 'create')
                             ->maxLength(255),
                         Forms\Components\Toggle::make('is_admin')
-                            ->label('Administrator')
-                            ->helperText('Can access the admin panel'),
+                            ->label(__('ui.admin.users.is_admin'))
+                            ->helperText(__('ui.admin.users.is_admin_help')),
                     ]),
-                Forms\Components\Section::make('OAuth & API')
+                Forms\Components\Section::make(__('ui.admin.users.blocking_section'))
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Toggle::make('is_blocked')
+                            ->label(__('ui.admin.users.is_blocked'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\DateTimePicker::make('blocked_at')
+                            ->label(__('ui.admin.users.blocked_at'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Textarea::make('blocked_reason')
+                            ->label(__('ui.admin.users.blocked_reason'))
+                            ->rows(3)
+                            ->helperText(__('ui.admin.users.blocked_reason_legacy_help'))
+                            ->columnSpanFull()
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Textarea::make('blocked_reason_ar')
+                            ->label(__('ui.admin.users.blocked_reason_ar'))
+                            ->rows(3)
+                            ->columnSpanFull()
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Textarea::make('blocked_reason_en')
+                            ->label(__('ui.admin.users.blocked_reason_en'))
+                            ->rows(3)
+                            ->columnSpanFull()
+                            ->disabled()
+                            ->dehydrated(false),
+                    ]),
+                Forms\Components\Section::make(__('ui.admin.users.oauth_section'))
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('google_id')
-                            ->label('Google ID')
+                            ->label(__('ui.admin.users.google_id'))
                             ->disabled()
                             ->dehydrated(false),
                         Forms\Components\TextInput::make('google_avatar')
-                            ->label('Google Avatar URL')
+                            ->label(__('ui.admin.users.google_avatar'))
                             ->disabled()
                             ->dehydrated(false),
                         Forms\Components\TextInput::make('api_key_last4')
-                            ->label('API Key (last 4)')
+                            ->label(__('ui.admin.users.api_key_last4'))
                             ->disabled()
                             ->dehydrated(false),
                         Forms\Components\DateTimePicker::make('api_key_created_at')
-                            ->label('API Key Created')
+                            ->label(__('ui.admin.users.api_key_created_at'))
                             ->disabled()
                             ->dehydrated(false),
                     ]),
@@ -72,6 +106,14 @@ class UserResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('blocked_status')
+                    ->label(__('ui.admin.users.status'))
+                    ->badge()
+                    ->getStateUsing(fn (User $record) => $record->isBlocked()
+                        ? __('ui.admin.users.blocked')
+                        : __('ui.admin.users.active'))
+                    ->color(fn (User $record) => $record->isBlocked() ? 'danger' : 'success')
+                    ->sortable(query: fn ($query, string $direction) => $query->orderBy('is_blocked', $direction)),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
@@ -79,18 +121,26 @@ class UserResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\IconColumn::make('is_admin')
-                    ->label('Admin')
+                    ->label(__('ui.admin.users.admin'))
                     ->boolean()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('google_id')
-                    ->label('Google')
+                    ->label(__('ui.admin.users.google'))
                     ->badge()
-                    ->getStateUsing(fn (User $record) => $record->google_id ? 'Connected' : '—')
+                    ->getStateUsing(fn (User $record) => $record->google_id ? __('ui.admin.users.connected') : '-')
                     ->color(fn (User $record) => $record->google_id ? 'success' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('api_key_last4')
-                    ->label('API Key')
-                    ->getStateUsing(fn (User $record) => $record->api_key_last4 ? '••••' . $record->api_key_last4 : '—')
+                    ->label(__('ui.admin.users.api_key'))
+                    ->getStateUsing(fn (User $record) => $record->api_key_last4 ? '****'.$record->api_key_last4 : '-')
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('blocked_at')
+                    ->label(__('ui.admin.users.blocked_at'))
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('blockedBy.name')
+                    ->label(__('ui.admin.users.blocked_by'))
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime()
@@ -103,19 +153,81 @@ class UserResource extends Resource
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_admin')
-                    ->label('Admin Status'),
+                    ->label(__('ui.admin.users.admin_filter')),
+                Tables\Filters\TernaryFilter::make('is_blocked')
+                    ->label(__('ui.admin.users.blocked_filter')),
                 Tables\Filters\Filter::make('has_api_key')
-                    ->label('Has API Key')
+                    ->label(__('ui.admin.users.has_api_key'))
                     ->query(fn ($query) => $query->whereNotNull('api_key_hash')),
                 Tables\Filters\Filter::make('has_google')
-                    ->label('Google Connected')
+                    ->label(__('ui.admin.users.google_connected'))
                     ->query(fn ($query) => $query->whereNotNull('google_id')),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('blockUser')
+                    ->label(__('ui.admin.users.block'))
+                    ->icon('heroicon-o-no-symbol')
+                    ->color('danger')
+                    ->visible(fn (User $record) => ! $record->isBlocked() && Auth::id() !== $record->id)
+                    ->requiresConfirmation()
+                    ->modalHeading(__('ui.admin.users.block_confirm_title'))
+                    ->modalDescription(__('ui.admin.users.block_confirm_description'))
+                    ->modalSubmitActionLabel(__('ui.admin.users.block'))
+                    ->form([
+                        Forms\Components\Textarea::make('reason_ar')
+                            ->label(__('ui.admin.users.block_reason_label_ar'))
+                            ->placeholder(__('ui.admin.users.block_reason_placeholder_ar'))
+                            ->default(fn (): string => BlockedUserService::DEFAULT_REASON_AR)
+                            ->rows(3)
+                            ->maxLength(1000),
+                        Forms\Components\Textarea::make('reason_en')
+                            ->label(__('ui.admin.users.block_reason_label_en'))
+                            ->placeholder(__('ui.admin.users.block_reason_placeholder_en'))
+                            ->default(fn (): string => BlockedUserService::DEFAULT_REASON_EN)
+                            ->rows(4)
+                            ->maxLength(1000),
+                    ])
+                    ->action(function (User $record, array $data): void {
+                        $reasonAr = trim((string) ($data['reason_ar'] ?? '')) ?: null;
+                        $reasonEn = trim((string) ($data['reason_en'] ?? '')) ?: null;
+                        $legacyFallback = $reasonEn ?? $reasonAr;
+
+                        app(BlockedUserService::class)->block(
+                            $record,
+                            $legacyFallback,
+                            Auth::user(),
+                            [
+                                'ar' => $reasonAr,
+                                'en' => $reasonEn,
+                            ],
+                        );
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('ui.admin.users.blocked_success'))
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('unblockUser')
+                    ->label(__('ui.admin.users.unblock'))
+                    ->icon('heroicon-o-lock-open')
+                    ->color('success')
+                    ->visible(fn (User $record) => $record->isBlocked())
+                    ->requiresConfirmation()
+                    ->modalHeading(__('ui.admin.users.unblock_confirm_title'))
+                    ->modalDescription(__('ui.admin.users.unblock_confirm_description'))
+                    ->modalSubmitActionLabel(__('ui.admin.users.unblock'))
+                    ->action(function (User $record): void {
+                        app(BlockedUserService::class)->unblock($record);
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('ui.admin.users.unblocked_success'))
+                            ->send();
+                    }),
                 Tables\Actions\Action::make('revokeApiKey')
-                    ->label('Revoke API Key')
+                    ->label(__('ui.admin.users.revoke_api_key'))
                     ->icon('heroicon-o-key')
                     ->color('danger')
                     ->requiresConfirmation()

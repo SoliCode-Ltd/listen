@@ -7,6 +7,7 @@ use App\Services\PlanAccessService;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -50,6 +51,12 @@ class User extends Authenticatable implements FilamentUser
         'api_key_created_at',
         'subscription_status_checked_at',
         'is_admin',
+        'is_blocked',
+        'blocked_at',
+        'blocked_reason',
+        'blocked_reason_ar',
+        'blocked_reason_en',
+        'blocked_by',
         'email_verified_at',
     ];
 
@@ -87,12 +94,24 @@ class User extends Authenticatable implements FilamentUser
             'api_key_created_at' => 'datetime',
             'subscription_status_checked_at' => 'datetime',
             'is_admin' => 'boolean',
+            'is_blocked' => 'boolean',
+            'blocked_at' => 'datetime',
         ];
     }
 
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_admin === true;
+        return $this->is_admin === true && ! $this->isBlocked();
+    }
+
+    public function blockedBy(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'blocked_by');
+    }
+
+    public function isBlocked(): bool
+    {
+        return (bool) $this->is_blocked;
     }
 
     public static function hashApiKey(string $plainTextKey): string

@@ -356,7 +356,6 @@
     }
     #formMessage {
       justify-self: center;
-      width: min(100%, 420px);
     }
     .two-col {
       display: grid;
@@ -1067,6 +1066,33 @@
       border-color: color-mix(in oklab, var(--danger) 55%, var(--line));
       background: color-mix(in oklab, var(--danger) 12%, var(--surface));
     }
+    .job-actions {
+      display: flex;
+      align-items: center;
+      gap: .45rem;
+      flex-wrap: wrap;
+    }
+    .job-reuse-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: auto;
+      height: 1.95rem;
+      padding: 0 .7rem;
+      border-radius: 10px;
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      color: color-mix(in oklab, var(--a) 76%, var(--text));
+      font-size: .8rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all .2s ease;
+    }
+    .job-reuse-btn:hover {
+      color: var(--text);
+      border-color: color-mix(in oklab, var(--a) 48%, var(--line));
+      background: color-mix(in oklab, var(--a) 14%, var(--surface));
+    }
     .pagination-info {
       font-size: .82rem;
       color: var(--muted);
@@ -1403,17 +1429,25 @@
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
+        @php
+          $prefillValue = fn (string $key, mixed $default = null) => old($key, data_get($reusePreset ?? [], $key, $default));
+          $prefillTranslate = (string) old('translate', data_get($reusePreset ?? [], 'translate') ? '1' : '0');
+          $prefillDialogue = (string) old('is_dialogue', data_get($reusePreset ?? [], 'is_dialogue') ? '1' : '0');
+        @endphp
+        @if($reusePreset)
+          <div class="note">{{ __('ui.dashboard.reusing_settings_notice', ['number' => $reusePreset['display_number'] ?? $reusePreset['job_id']]) }}</div>
+        @endif
 
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
           @csrf
           <div class="editor-panel">
             <label>{{ __('ui.dashboard.title_optional') }}</label>
-            <input name="title" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ old('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
+            <input name="title" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ $prefillValue('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
           </div>
 
           <div class="editor-panel">
             <label>{{ __('ui.dashboard.text_content') }}</label>
-            <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ old('content') }}</textarea>
+            <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
             </div>
@@ -1423,8 +1457,8 @@
             <div>
               <label>{{ __('ui.dashboard.voice_language') }}</label>
               <select name="target_language" id="target_language">
-                <option value="ar" {{ old('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
-                <option value="en" {{ old('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
+                <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
+                <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
               </select>
             </div>
             <div>
@@ -1470,7 +1504,7 @@
             @if($customPromptEnabled ?? false)
             <div class="perf-section" style="margin-top:.6rem;">
               <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }}</div>
-              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;"></textarea>
+              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;">{{ $prefillValue('style_prompt') }}</textarea>
             </div>
             @endif
 
@@ -1485,19 +1519,19 @@
               <div class="perf-section">
                 <div class="perf-section-label">
                   ⚡ {{ __('ui.dashboard.speed') }}
-                  <span class="slider-value" id="speedVal">1.0</span>x
+                  <span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x
                 </div>
                 <div class="slider-wrap">
-                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value">
+                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value">
                 </div>
               </div>
               <div class="perf-section">
                 <div class="perf-section-label">
                   🎵 {{ __('ui.dashboard.pitch') }}
-                  <span class="slider-value" id="pitchVal">0</span>
+                  <span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span>
                 </div>
                 <div class="slider-wrap">
-                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value">
+                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value">
                 </div>
               </div>
             </div>
@@ -1509,11 +1543,11 @@
                   <div class="t-desc" id="dialogueHint">{{ __('ui.dashboard.dialogue_hint') }}</div>
                 </div>
                 <div class="toggle-switch">
-                  <input type="checkbox" id="dialogueToggle">
+                  <input type="checkbox" id="dialogueToggle" {{ $prefillDialogue === '1' ? 'checked' : '' }}>
                   <span class="toggle-slider"></span>
                 </div>
               </label>
-              <input type="hidden" name="is_dialogue" id="dialogueSelect" value="0">
+              <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
             </div>
             @endif
           </div>
@@ -1526,11 +1560,11 @@
                 <div class="t-desc" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
               </div>
               <div class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
-                <input type="checkbox" id="translateToggle" {{ old('translate') ? 'checked' : '' }}>
+                <input type="checkbox" id="translateToggle" {{ $prefillTranslate === '1' ? 'checked' : '' }}>
                 <span class="toggle-slider"></span>
               </div>
             </label>
-            <input type="hidden" name="translate" id="translateSelect" value="{{ old('translate') ? '1' : '0' }}">
+            <input type="hidden" name="translate" id="translateSelect" value="{{ $prefillTranslate }}">
           </div>
 
           <button class="dashboard-generate-btn" id="generateBtn" type="submit">
@@ -1638,13 +1672,14 @@
           <table>
             <thead>
               <tr>
-                <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_translate') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
+                <th>{{ __('ui.dashboard.table_id') }}</th><th>{{ __('ui.dashboard.table_title') }}</th><th>{{ __('ui.dashboard.table_status') }}</th><th>{{ __('ui.dashboard.table_flow') }}</th><th>{{ __('ui.dashboard.table_speaker') }}</th><th>{{ __('ui.dashboard.table_audio') }}</th><th>{{ __('ui.dashboard.table_created') }}</th><th>{{ __('ui.dashboard.table_actions') }}</th>
               </tr>
             </thead>
             <tbody id="jobsTableBody">
               @forelse($jobs as $job)
                 <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
                   'id' => $job->id,
+                  'display_number' => $job->displayNumber(),
                   'title' => $job->textItem?->title,
                   'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
                   'status' => $job->status,
@@ -1657,13 +1692,14 @@
                   'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
                   'error_message' => $job->error_message,
                   'created_human' => $job->created_at?->diffForHumans(),
+                  'can_reuse_settings' => $job->hasReusablePremiumSettings(),
+                  'reuse_url' => $job->hasReusablePremiumSettings() ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection' : null,
                 ]) }}">
-                  <td>#{{ $job->id }}</td>
+                  <td>#{{ $job->displayNumber() }}</td>
                   <td>{{ $job->textItem?->title ?: '-' }}</td>
                   <td><span class="status {{ $job->status }}">{{ $statusLabelByKey($job->status) }}</span></td>
                   <td>{{ $languageLabelByCode($job->source_language) }} -> {{ $languageLabelByCode($job->target_language) }}</td>
 	                  <td>{{ $speakerDisplayLabel($job->voice_name) }}</td>
-	                  <td>{{ $job->translate ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</td>
                   <td>
                     @if($job->audio_path)
                       <audio
@@ -1683,18 +1719,23 @@
                   </td>
                   <td>{{ $job->created_at?->diffForHumans() }}</td>
                   <td>
-                    <button
-                      type="button"
-                      class="pagination-btn job-delete-btn"
-                      data-action="delete-job"
-                      data-job-id="{{ $job->id }}"
-                    >
+                    <div class="job-actions">
+                      @if($job->hasReusablePremiumSettings())
+                        <a class="job-reuse-btn" href="{{ route('dashboard', ['reuse' => $job->displayNumber()]) }}#generateVoiceSection">{{ __('ui.dashboard.reuse_settings') }}</a>
+                      @endif
+                      <button
+                        type="button"
+                        class="pagination-btn job-delete-btn"
+                        data-action="delete-job"
+                        data-job-id="{{ $job->id }}"
+                      >
 	                      {{ __('ui.dashboard.delete') }}
 	                    </button>
+                    </div>
                   </td>
                 </tr>
               @empty
-	                <tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
+	                <tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">{{ __('ui.dashboard.no_jobs_yet') }}</td></tr>
               @endforelse
             </tbody>
           </table>
@@ -1738,6 +1779,7 @@
       'voices' => __('ui.dashboard.voices'),
       'prev' => __('ui.dashboard.prev'),
       'next' => __('ui.dashboard.next'),
+      'reuse_settings' => __('ui.dashboard.reuse_settings'),
       'language_ar' => __('ui.dashboard.arabic'),
       'language_en' => __('ui.dashboard.english'),
       'confirm_delete' => __('ui.dashboard.confirm_delete'),
@@ -1763,15 +1805,15 @@
   @endphp
   <script>
     const voiceCatalog = @json($voiceCatalog);
-    const oldVoice = @json(old('voice_key'));
+    const oldVoice = @json($prefillValue('voice_key'));
     const defaultVoiceKeyByLanguage = {
       ar: String(@json((string) ($voiceNameMap[$defaultVoiceAr]['key'] ?? '')) || '').trim(),
       en: String(@json((string) ($voiceNameMap[$defaultVoiceEn]['key'] ?? '')) || '').trim(),
     };
     const initialStudioValueByField = {
-      performanceStyle: String(@json(old('performance_style')) || '').trim(),
-      emotion: String(@json(old('emotion')) || '').trim(),
-      dialect: String(@json(old('dialect')) || '').trim(),
+      performanceStyle: String(@json($prefillValue('performance_style')) || '').trim(),
+      emotion: String(@json($prefillValue('emotion')) || '').trim(),
+      dialect: String(@json($prefillValue('dialect')) || '').trim(),
     };
     const studioDefaultsByLanguage = @json($studioDefaultsByLanguage ?? []);
     const studioDialectsByLanguageRaw = @json($studioDialectsByLanguage ?? []);
@@ -1809,6 +1851,7 @@
     const extensionKeyMessage = document.getElementById('extensionKeyMessage');
     const dashboardNavLinks = Array.from(document.querySelectorAll('[data-dashboard-nav]'));
     const dashboardSections = Array.from(document.querySelectorAll('[data-dashboard-section]'));
+    const validDashboardSectionIds = dashboardSections.map(function(section) { return section.id; });
     const generatedAudioWrap = document.getElementById('generatedAudioWrap');
     const generatedOutputPlaceholder = document.getElementById('generatedOutputPlaceholder');
     const generatedPreviewAudio = document.getElementById('generatedPreviewAudio');
@@ -2111,6 +2154,26 @@
       });
     }
 
+    function syncSectionFromHash(scroll = false) {
+      const hashSectionId = String(window.location.hash || '').replace(/^#/, '');
+      if (!validDashboardSectionIds.includes(hashSectionId)) {
+        return false;
+      }
+
+      setActiveDashboardSection(hashSectionId);
+
+      if (window.localStorage) {
+        window.localStorage.setItem('dashboard_active_section', hashSectionId);
+      }
+
+      if (scroll) {
+        const section = document.getElementById(hashSectionId);
+        section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      return true;
+    }
+
     function renderVoiceOptions() {
       const lang = normalizeLanguage(targetLanguage?.value || 'ar');
       const raw = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
@@ -2241,7 +2304,6 @@
       const voiceTierValue = String(job?.voice_tier || i18n.standard).trim();
       const voiceTier = escapeHtml(voiceTierValue);
       const textExcerpt = escapeHtml(job?.text_excerpt || job?.title || i18n.preview);
-      const translateLabel = job?.translate ? i18n.yes : i18n.no;
       const created = escapeHtml(job?.created_human || i18n.just_now);
       const errorMessage = escapeHtml(job?.error_message || i18n.generation_failed);
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
@@ -2250,16 +2312,21 @@
       if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
       else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
 
+      const actions = [];
+      if (job?.can_reuse_settings && job?.reuse_url) {
+        actions.push('<a class="job-reuse-btn" href="' + escapeHtml(job.reuse_url) + '">' + i18n.reuse_settings + '</a>');
+      }
+      actions.push('<button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button>');
+
       return '<tr data-job-id="' + Number(job?.id || 0) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
-        '<td>#' + Number(job?.id || 0) + '</td>' +
+        '<td>#' + Number(job?.display_number || job?.id || 0) + '</td>' +
         '<td>' + title + '</td>' +
         '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
         '<td>' + sourceLanguage + ' -> ' + targetLanguageValue + '</td>' +
         '<td>' + voiceLabel + '</td>' +
-        '<td>' + translateLabel + '</td>' +
         '<td>' + audioCell + '</td>' +
         '<td>' + created + '</td>' +
-        '<td><button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button></td>' +
+        '<td><div class="job-actions">' + actions.join('') + '</div></td>' +
       '</tr>';
     }
 
@@ -2284,7 +2351,7 @@
 
       jobsTableBody.innerHTML = '';
       if (pageJobs.length === 0) {
-        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="9" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
+        jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
       } else {
         pageJobs.forEach(function(job) {
           jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job));
@@ -2422,6 +2489,37 @@
       goToPage(btn.getAttribute('data-page'));
     });
     jobsTableBody?.addEventListener('click', function(e) {
+      const reuseLink = e.target.closest('.job-reuse-btn');
+      if (reuseLink instanceof HTMLAnchorElement) {
+        let parsedUrl = null;
+        try {
+          parsedUrl = new URL(reuseLink.href, window.location.origin);
+        } catch (error) {
+          parsedUrl = null;
+        }
+
+        if (
+          parsedUrl
+          && parsedUrl.pathname === window.location.pathname
+          && parsedUrl.search === window.location.search
+        ) {
+          const targetId = String(parsedUrl.hash || '').replace(/^#/, '');
+          if (validDashboardSectionIds.includes(targetId)) {
+            e.preventDefault();
+            setActiveDashboardSection(targetId);
+            if (window.localStorage) {
+              window.localStorage.setItem('dashboard_active_section', targetId);
+            }
+            if (window.location.hash !== '#' + targetId) {
+              history.replaceState(null, '', '#' + targetId);
+            }
+            const section = document.getElementById(targetId);
+            section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+          return;
+        }
+      }
+
       const deleteBtn = e.target.closest('[data-action="delete-job"]');
       if (!deleteBtn || deleteBtn.disabled) return;
       deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn);
@@ -2597,12 +2695,11 @@
     }
 
     if (dashboardNavLinks.length) {
-      const validSectionIds = dashboardSections.map(function(section) { return section.id; });
       const hashSectionId = String(window.location.hash || '').replace(/^#/, '');
       const savedSectionId = String(window.localStorage?.getItem('dashboard_active_section') || '');
-      const initialSectionId = validSectionIds.includes(hashSectionId)
+      const initialSectionId = validDashboardSectionIds.includes(hashSectionId)
         ? hashSectionId
-        : (validSectionIds.includes(savedSectionId) ? savedSectionId : (validSectionIds[0] || 'overviewSection'));
+        : (validDashboardSectionIds.includes(savedSectionId) ? savedSectionId : (validDashboardSectionIds[0] || 'overviewSection'));
 
       if (initialSectionId) {
         setActiveDashboardSection(initialSectionId);
@@ -2619,10 +2716,17 @@
           }
           if (window.location.hash !== '#' + targetId) {
             history.replaceState(null, '', '#' + targetId);
+          } else {
+            const section = document.getElementById(targetId);
+            section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
           }
         });
       });
     }
+
+    window.addEventListener('hashchange', function() {
+      syncSectionFromHash(true);
+    });
 
     copyExtensionKeyBtn?.addEventListener('click', async function() {
       const raw = String(copyExtensionKeyBtn.getAttribute('data-copy-value') || '').trim();
