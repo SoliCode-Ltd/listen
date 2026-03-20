@@ -792,7 +792,7 @@ return [
         'generation_failed' => 'Generation failed',
         'processing_ellipsis' => 'Processing...',
         'delete' => 'Delete',
-        'reuse_settings' => 'Reuse Settings',
+        'reuse_settings' => 'Reuse',
         'no_jobs_yet' => 'No voices generated yet. Create your first one above!',
         'any' => 'Any',
         'no_speakers' => 'No speakers available',
