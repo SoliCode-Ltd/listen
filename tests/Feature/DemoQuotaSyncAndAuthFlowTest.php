@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DemoGuestUsage;
+use App\Models\DemoIdentityLink;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\User;
@@ -120,5 +121,19 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
                 'last_seen_at' => now(),
             ]
         );
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $canvasIdentity,
+            'link_group' => 'lg:test-demo-sync',
+            'identity_type' => 'canvas',
+            'confidence' => 1.0,
+        ]);
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $webglIdentity,
+            'link_group' => 'lg:test-demo-sync',
+            'identity_type' => 'webgl',
+            'confidence' => 1.0,
+        ]);
     }
 }

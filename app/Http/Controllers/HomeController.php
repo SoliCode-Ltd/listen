@@ -980,7 +980,7 @@ class HomeController extends Controller
         $strongFingerprints = $this->strongDemoFingerprintIdentities($identityTypes);
 
         if (count($strongFingerprints) >= 2) {
-            $deviceUsed = $this->fraudService->getLinkedUsedChars($strongFingerprints);
+            $deviceUsed = $this->fraudService->getConfirmedLinkedUsedChars($strongFingerprints, 2);
 
             return max($ownUsed, $deviceUsed);
         }

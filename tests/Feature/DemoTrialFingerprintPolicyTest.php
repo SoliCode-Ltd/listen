@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\DemoGuestUsage;
+use App\Models\DemoIdentityLink;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\User;
@@ -24,8 +25,35 @@ class DemoTrialFingerprintPolicyTest extends TestCase
         $newUser = User::factory()->create();
 
         $sharedCanvas = 'stable-canvas-fingerprint-123';
-        $sharedIdentityHash = 'cv:'.hash('sha256', $sharedCanvas);
-        $this->storeDemoUsage($existingUser, $sharedIdentityHash, 260);
+        $sharedWebgl = 'stable-webgl-fingerprint-123';
+        $canvasIdentity = 'cv:'.hash('sha256', $sharedCanvas);
+        $webglIdentity = 'gl:'.hash('sha256', $sharedWebgl);
+        $this->storeDemoUsage($existingUser, $canvasIdentity, 260);
+        $this->storeDemoUsage($existingUser, $webglIdentity, 260);
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $canvasIdentity,
+            'link_group' => 'lg:shared-device-1',
+            'identity_type' => 'canvas',
+            'confidence' => 1.0,
+        ]);
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $webglIdentity,
+            'link_group' => 'lg:shared-device-1',
+            'identity_type' => 'webgl',
+            'confidence' => 1.0,
+        ]);
+
+        DemoGuestUsage::query()->updateOrCreate(
+            ['identity_hash' => $canvasIdentity],
+            ['link_group' => 'lg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
+        );
+
+        DemoGuestUsage::query()->updateOrCreate(
+            ['identity_hash' => $webglIdentity],
+            ['link_group' => 'lg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
+        );
 
         $this->actingAs($newUser);
 
@@ -35,7 +63,7 @@ class DemoTrialFingerprintPolicyTest extends TestCase
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
             'fp_canvas' => $sharedCanvas,
-            'fp_webgl' => 'stable-webgl-fingerprint-123',
+            'fp_webgl' => $sharedWebgl,
         ]);
 
         $response->assertStatus(422);
@@ -120,6 +148,89 @@ class DemoTrialFingerprintPolicyTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('ok', true);
         $this->assertSame(0, (int) data_get($response->json(), 'quota.used_chars'));
+    }
+
+    public function test_demo_trial_does_not_merge_unrelated_canvas_and_webgl_collisions_without_confirmed_link_group(): void
+    {
+        $voice = $this->seedFreePlanAndVoice();
+        $canvasUser = User::factory()->create();
+        $webglUser = User::factory()->create();
+        $newUser = User::factory()->create();
+
+        $sharedCanvas = 'broad-canvas-fingerprint';
+        $sharedWebgl = 'broad-webgl-fingerprint';
+
+        $this->storeDemoUsage($canvasUser, 'cv:'.hash('sha256', $sharedCanvas), 298);
+        $this->storeDemoUsage($webglUser, 'gl:'.hash('sha256', $sharedWebgl), 298);
+
+        $this->actingAs($newUser);
+
+        $response = $this->postJsonLocalizedRoute('demo.run', [
+            'text' => str_repeat('e', 20),
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+            'fp_canvas' => $sharedCanvas,
+            'fp_webgl' => $sharedWebgl,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('ok', true);
+        $this->assertSame(0, (int) data_get($response->json(), 'quota.used_chars'));
+    }
+
+    public function test_demo_trial_applies_cross_account_usage_when_two_strong_signals_are_confirmed_in_same_link_group(): void
+    {
+        $voice = $this->seedFreePlanAndVoice();
+        $existingUser = User::factory()->create();
+        $newUser = User::factory()->create();
+
+        $sharedCanvas = 'confirmed-canvas-fingerprint';
+        $sharedWebgl = 'confirmed-webgl-fingerprint';
+        $canvasIdentity = 'cv:'.hash('sha256', $sharedCanvas);
+        $webglIdentity = 'gl:'.hash('sha256', $sharedWebgl);
+
+        $this->storeDemoUsage($existingUser, $canvasIdentity, 260);
+        $this->storeDemoUsage($existingUser, $webglIdentity, 260);
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $canvasIdentity,
+            'link_group' => 'lg:confirmed-device',
+            'identity_type' => 'canvas',
+            'confidence' => 1.0,
+        ]);
+
+        DemoIdentityLink::query()->create([
+            'identity_hash' => $webglIdentity,
+            'link_group' => 'lg:confirmed-device',
+            'identity_type' => 'webgl',
+            'confidence' => 1.0,
+        ]);
+
+        DemoGuestUsage::query()->updateOrCreate(
+            ['identity_hash' => $canvasIdentity],
+            ['link_group' => 'lg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
+        );
+
+        DemoGuestUsage::query()->updateOrCreate(
+            ['identity_hash' => $webglIdentity],
+            ['link_group' => 'lg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
+        );
+
+        $this->actingAs($newUser);
+
+        $response = $this->postJsonLocalizedRoute('demo.run', [
+            'text' => str_repeat('f', 50),
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+            'fp_canvas' => $sharedCanvas,
+            'fp_webgl' => $sharedWebgl,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('text');
+        $response->assertJsonPath('errors.text.0', __('ui.backend.demo_trial_exhausted'));
     }
 
     private function seedFreePlanAndVoice(): Voice

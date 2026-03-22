@@ -562,6 +562,53 @@ class DemoFraudService
     }
 
     /**
+     * Get used chars only when the provided strong identities are already
+     * confirmed together in the same link group.
+     */
+    public function getConfirmedLinkedUsedChars(array $identities, int $minimumMatches = 2): int
+    {
+        $identities = array_values(array_unique(array_filter(
+            array_map(static fn ($value) => trim((string) $value), $identities),
+            static fn (string $value) => $value !== ''
+        )));
+
+        if (count($identities) < max(1, $minimumMatches)) {
+            return 0;
+        }
+
+        $matchingGroups = DemoIdentityLink::query()
+            ->select('link_group')
+            ->whereIn('identity_hash', $identities)
+            ->whereNotNull('link_group')
+            ->groupBy('link_group')
+            ->havingRaw('COUNT(DISTINCT identity_hash) >= ?', [$minimumMatches])
+            ->pluck('link_group')
+            ->filter(static fn ($group) => is_string($group) && trim($group) !== '')
+            ->values()
+            ->all();
+
+        if ($matchingGroups === []) {
+            return 0;
+        }
+
+        $allIdentities = DemoIdentityLink::query()
+            ->whereIn('link_group', $matchingGroups)
+            ->pluck('identity_hash')
+            ->filter(static fn ($identity) => is_string($identity) && trim($identity) !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($allIdentities === []) {
+            return 0;
+        }
+
+        return (int) (DemoGuestUsage::query()
+            ->whereIn('identity_hash', $allIdentities)
+            ->max('used_chars') ?? 0);
+    }
+
+    /**
      * Reserve chars for all linked identities.
      */
     public function reserveChars(array $identities, int $chars, int $limit): void
