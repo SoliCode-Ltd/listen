@@ -639,6 +639,8 @@ return [
         'no_audio_returned' => 'Voice generation did not return audio. Please try again.',
         'selected_speaker' => 'Selected speaker',
         'preview_failed' => 'Preview failed',
+        'checking_allowance' => 'Checking your demo allowance...',
+        'quota_sync_failed' => 'We could not verify your demo allowance. Please try again.',
         'create_account_unlock' => 'Create a free account to unlock :chars characters and continue.',
         'ready_in_seconds' => 'Ready in :seconds...',
         'preparing_next' => 'Preparing for next...',
@@ -1021,5 +1023,4 @@ return [
         'api_invalid_key' => 'Invalid API key.',
     ],
 ];
-
 

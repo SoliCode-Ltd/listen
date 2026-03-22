@@ -639,6 +639,8 @@ return [
         'no_audio_returned' => 'لم يتم إرجاع صوت. يرجى المحاولة مرة أخرى.',
         'selected_speaker' => 'المتحدث المحدد',
         'preview_failed' => 'فشلت المعاينة',
+        'checking_allowance' => 'جارٍ التحقق من رصيد التجربة...',
+        'quota_sync_failed' => 'تعذر التحقق من رصيد التجربة. يرجى المحاولة مرة أخرى.',
         'create_account_unlock' => 'أنشئ حساباً مجانياً لفتح :chars حرف والمتابعة.',
         'ready_in_seconds' => 'جاهز خلال :seconds...',
         'preparing_next' => 'جاري التحضير...',
@@ -1026,4 +1028,3 @@ return [
         'api_invalid_key' => 'مفتاح API غير صالح.',
     ],
 ];
-

@@ -180,72 +180,111 @@ class HomeController extends Controller
         ]);
     }
 
-    public function demo(Request $request)
+    public function demoQuota(Request $request)
     {
-        $maxChars = $this->demoCharAllowance($request);
-        $demoPlan = $this->planAccessService->freePlan();
-        $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
-        $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
-
-        $this->ensureRequiredStudioSelections($requestedTier, [
-            'performance_style' => $request->input('performance_style'),
-            'emotion' => $request->input('emotion'),
-        ]);
-        $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
-        $emotionValues = TtsStudioConfig::emotionValues();
-
-        $validated = $request->validate([
-            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'target_language' => ['required', 'in:ar,en'],
-            'translate' => ['nullable', 'boolean'],
-            'voice_key' => ['nullable', 'string', 'max:60'],
-            'voice_tier' => ['nullable', 'in:standard,hd'],
-            // Studio parameters
-            'dialect' => ['nullable', 'string', 'max:10'],
-            'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
-            'style_prompt' => ['nullable', 'string', 'max:2000'],
-            'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
-            'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
-            'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-        ], [
-            'performance_style.in' => __('ui.backend.performance_style_invalid'),
-            'emotion.in' => __('ui.backend.emotion_invalid'),
-        ]);
-        $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
-        $voiceName = $this->normalizeVoiceSelection(
-            $validated['target_language'],
-            $validated['voice_key'] ?? null,
-            $tier,
-        );
-
-        $text = trim($validated['text']);
-        $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
-        $estimate = UsageEstimator::estimate($text);
-        if ($estimate['chars'] > $maxChars) {
-            throw ValidationException::withMessages([
-                'text' => $this->demoLimitExceededMessage($request, $maxChars),
-            ]);
-        }
-
-        $quota = $this->enforceDemoPolicy($request, $estimate['chars'], false, false);
-
         return response()->json([
             'ok' => true,
-            'message' => __('ui.backend.demo_setup_validated'),
-            'source_language' => $sourceLanguage,
-            'target_language' => $validated['target_language'],
-            'translate' => (bool) ($validated['translate'] ?? false),
-            'translate_note' => (bool) ($validated['translate'] ?? false)
-                ? __('ui.backend.demo_translate_note_before')
-                : __('ui.backend.demo_translate_note_as_is'),
-            'voice' => VoiceCatalog::voiceMeta($voiceName),
-            'voice_tier' => $tier,
-            'voice_tier_label' => VoiceTier::label($tier),
-            'estimated_chars' => $estimate['chars'],
-            'estimated_seconds' => $estimate['seconds'],
-            'estimated_minutes' => $estimate['minutes'],
-            'quota' => $quota,
+            'quota' => $this->demoQuotaForClient($request),
         ]);
+    }
+
+    public function demo(Request $request)
+    {
+        try {
+            $maxChars = $this->demoCharAllowance($request);
+            $demoPlan = $this->planAccessService->freePlan();
+            $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
+            $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
+
+            $this->ensureRequiredStudioSelections($requestedTier, [
+                'performance_style' => $request->input('performance_style'),
+                'emotion' => $request->input('emotion'),
+            ]);
+            $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
+            $emotionValues = TtsStudioConfig::emotionValues();
+
+            $validated = $request->validate([
+                'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
+                'target_language' => ['required', 'in:ar,en'],
+                'translate' => ['nullable', 'boolean'],
+                'voice_key' => ['nullable', 'string', 'max:60'],
+                'voice_tier' => ['nullable', 'in:standard,hd'],
+                // Studio parameters
+                'dialect' => ['nullable', 'string', 'max:10'],
+                'performance_style' => ['nullable', 'string', 'in:'.implode(',', $performanceStyleValues)],
+                'style_prompt' => ['nullable', 'string', 'max:2000'],
+                'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
+                'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
+                'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            ], [
+                'performance_style.in' => __('ui.backend.performance_style_invalid'),
+                'emotion.in' => __('ui.backend.emotion_invalid'),
+            ]);
+            $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+            $voiceName = $this->normalizeVoiceSelection(
+                $validated['target_language'],
+                $validated['voice_key'] ?? null,
+                $tier,
+            );
+
+            $text = trim($validated['text']);
+            $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
+            $estimate = UsageEstimator::estimate($text);
+            if ($estimate['chars'] > $maxChars) {
+                throw ValidationException::withMessages([
+                    'text' => $this->demoLimitExceededMessage($request, $maxChars),
+                ]);
+            }
+
+            $quota = $this->enforceDemoPolicy($request, $estimate['chars'], false, false);
+
+            return response()->json([
+                'ok' => true,
+                'message' => __('ui.backend.demo_setup_validated'),
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'translate_note' => (bool) ($validated['translate'] ?? false)
+                    ? __('ui.backend.demo_translate_note_before')
+                    : __('ui.backend.demo_translate_note_as_is'),
+                'voice' => VoiceCatalog::voiceMeta($voiceName),
+                'voice_tier' => $tier,
+                'voice_tier_label' => VoiceTier::label($tier),
+                'estimated_chars' => $estimate['chars'],
+                'estimated_seconds' => $estimate['seconds'],
+                'estimated_minutes' => $estimate['minutes'],
+                'quota' => $quota,
+            ]);
+        } catch (ValidationException $e) {
+            $errors = $e->errors();
+            $firstError = '';
+            foreach ($errors as $messages) {
+                if (is_array($messages) && isset($messages[0]) && is_string($messages[0])) {
+                    $firstError = trim($messages[0]);
+                    if ($firstError !== '') {
+                        break;
+                    }
+                }
+            }
+
+            return response()->json([
+                'ok' => false,
+                'message' => $firstError !== '' ? $firstError : __('ui.backend.request_validation_failed'),
+                'errors' => $errors,
+                'quota' => $this->demoQuotaForClient($request),
+            ], 422);
+        } catch (\Throwable $e) {
+            Log::error('Demo validation failed unexpectedly.', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.request_validation_failed'),
+                'quota' => $this->demoQuotaForClient($request),
+            ], 422);
+        }
     }
 
     public function preview(
@@ -370,7 +409,7 @@ class HomeController extends Controller
             // Use original text chars to match what enforceDemoPolicy() checked.
             $this->syncDemoGuestUsage($request, $estimate['chars']);
 
-            $quota = $this->demoQuotaSnapshot($request, true);
+            $quota = $this->demoQuotaForClient($request);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
 
             return response()->json([
@@ -409,7 +448,7 @@ class HomeController extends Controller
                 'ok' => false,
                 'message' => $firstError !== '' ? $firstError : __('ui.backend.request_validation_failed'),
                 'errors' => $errors,
-                'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
+                'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
         } catch (\Throwable $e) {
             if ($quotaReserved) {
@@ -426,7 +465,7 @@ class HomeController extends Controller
             return response()->json([
                 'ok' => false,
                 'message' => __('ui.backend.demo_voice_generation_failed'),
-                'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
+                'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
         }
     }
@@ -485,7 +524,7 @@ class HomeController extends Controller
             }
         }
 
-        return $this->demoQuotaSnapshot($request, $preview);
+        return $this->demoQuotaForClient($request);
     }
 
     private function rollbackDemoPolicy(Request $request, int $chars, bool $preview): array
@@ -497,7 +536,7 @@ class HomeController extends Controller
             $this->decrementCacheCounter($globalCharKey, $chars, now()->endOfDay());
         }
 
-        return $this->demoQuotaSnapshot($request, $preview);
+        return $this->demoQuotaForClient($request);
     }
 
     private function decrementCacheCounter(string $key, int $amount, \DateTimeInterface $ttl): void
@@ -858,19 +897,38 @@ class HomeController extends Controller
      */
     private function demoQuotaForPageLoad(Request $request): array
     {
-        $userId = (int) $request->user()->id;
-        $limit = $this->demoCharAllowance($request);
-        $ownUsed = min($limit, max(0, (int) (DemoVoiceGeneration::query()
-            ->where('user_id', $userId)
-            ->sum('billable_chars') ?? 0)));
-        $remaining = max(0, $limit - $ownUsed);
+        $quota = $this->demoQuotaSnapshot($request, false);
+        $requiresClientSync = ! $this->requestHasStrongDemoFingerprint($request)
+            && (int) ($quota['remaining_chars'] ?? 0) > 0;
 
+        return $this->formatDemoQuotaForClient($quota, $requiresClientSync);
+    }
+
+    /**
+     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,requires_client_sync:bool}
+     */
+    private function demoQuotaForClient(Request $request): array
+    {
+        return $this->formatDemoQuotaForClient(
+            $this->demoQuotaSnapshot($request, false),
+            false,
+        );
+    }
+
+    /**
+     * @param  array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string}  $quota
+     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,requires_client_sync:bool}
+     */
+    private function formatDemoQuotaForClient(array $quota, bool $requiresClientSync): array
+    {
         return [
-            'scope' => 'trial',
-            'limit_chars' => $limit,
-            'used_chars' => $ownUsed,
-            'remaining_chars' => $remaining,
-            'is_exhausted' => $remaining <= 0,
+            'scope' => (string) ($quota['scope'] ?? 'trial'),
+            'limit_chars' => (int) ($quota['limit_chars'] ?? 0),
+            'used_chars' => (int) ($quota['used_chars'] ?? 0),
+            'remaining_chars' => (int) ($quota['remaining_chars'] ?? 0),
+            'is_exhausted' => (bool) ($quota['is_exhausted'] ?? false),
+            'verification_source' => (string) ($quota['verification_source'] ?? 'account_only'),
+            'requires_client_sync' => $requiresClientSync,
         ];
     }
 
@@ -880,7 +938,7 @@ class HomeController extends Controller
      * Uses trialUsedCharsWithFingerprint() which includes cross-device usage,
      * so the response reflects the full picture including fraud detection.
      *
-     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool}
+     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string}
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array
     {
@@ -888,6 +946,7 @@ class HomeController extends Controller
         $limit = $this->demoCharAllowance($request);
         $used = min($limit, max(0, $this->trialUsedCharsWithFingerprint($request, $userId)));
         $remaining = max(0, $limit - $used);
+        $hasStrongFingerprint = $this->requestHasStrongDemoFingerprint($request);
 
         return [
             'scope' => 'trial',
@@ -895,6 +954,7 @@ class HomeController extends Controller
             'used_chars' => $used,
             'remaining_chars' => $remaining,
             'is_exhausted' => $remaining <= 0,
+            'verification_source' => $hasStrongFingerprint ? 'device_verified' : 'account_only',
         ];
     }
 
@@ -917,18 +977,7 @@ class HomeController extends Controller
         // On GET, fingerprints come from the cookie; on POST, from headers/body.
         $extracted = $this->fraudService->extractIdentities($request);
         $identityTypes = (array) ($extracted['identity_types'] ?? []);
-
-        // Require at least 2 high-confidence, independent signals (canvas, webgl, audio)
-        // before applying cross-account trial aggregation. This avoids false positives
-        // from weak/single signals (e.g. only IP or user-agent).
-        $strongFingerprints = [];
-        foreach (['canvas', 'webgl', 'audio'] as $type) {
-            $identity = trim((string) ($identityTypes[$type] ?? ''));
-            if ($identity !== '') {
-                $strongFingerprints[] = $identity;
-            }
-        }
-        $strongFingerprints = array_values(array_unique($strongFingerprints));
+        $strongFingerprints = $this->strongDemoFingerprintIdentities($identityTypes);
 
         if (count($strongFingerprints) >= 2) {
             $deviceUsed = $this->fraudService->getLinkedUsedChars($strongFingerprints);
@@ -937,6 +986,32 @@ class HomeController extends Controller
         }
 
         return $ownUsed;
+    }
+
+    /**
+     * @param  array<string, string>  $identityTypes
+     * @return array<int, string>
+     */
+    private function strongDemoFingerprintIdentities(array $identityTypes): array
+    {
+        $strongFingerprints = [];
+
+        foreach (['canvas', 'webgl', 'audio'] as $type) {
+            $identity = trim((string) ($identityTypes[$type] ?? ''));
+            if ($identity !== '') {
+                $strongFingerprints[] = $identity;
+            }
+        }
+
+        return array_values(array_unique($strongFingerprints));
+    }
+
+    private function requestHasStrongDemoFingerprint(Request $request): bool
+    {
+        $extracted = $this->fraudService->extractIdentities($request);
+        $identityTypes = (array) ($extracted['identity_types'] ?? []);
+
+        return count($this->strongDemoFingerprintIdentities($identityTypes)) >= 2;
     }
 
     /**

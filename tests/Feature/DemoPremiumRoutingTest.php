@@ -20,6 +20,8 @@ class DemoPremiumRoutingTest extends TestCase
     public function test_demo_preview_uses_gemini_for_premium_quality(): void
     {
         [$freePlan, $standardVoice, $premiumVoice] = $this->seedDemoRoutingFixtures();
+        $user = \App\Models\User::factory()->create();
+        $this->actingAs($user);
 
         $translation = $this->createMock(TranslationService::class);
         $translation->expects($this->once())
@@ -73,6 +75,8 @@ class DemoPremiumRoutingTest extends TestCase
     public function test_demo_preview_uses_google_for_standard_quality(): void
     {
         [$freePlan, $standardVoice] = $this->seedDemoRoutingFixtures();
+        $user = \App\Models\User::factory()->create();
+        $this->actingAs($user);
 
         $translation = $this->createMock(TranslationService::class);
         $translation->expects($this->once())

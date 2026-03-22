@@ -57,6 +57,7 @@
                 <div class="quota-fill" id="quotaFill"></div>
               </div>
               <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
+              <div class="quota-status" id="quotaStatus" aria-live="polite"></div>
             </div>
           </div>
 
@@ -254,6 +255,8 @@
       'emotion_required' => __('ui.backend.emotion_required'),
       'ready_in_seconds' => __('ui.demo.ready_in_seconds'),
       'preparing_next' => __('ui.demo.preparing_next'),
+      'checking_allowance' => __('ui.demo.checking_allowance'),
+      'quota_sync_failed' => __('ui.demo.quota_sync_failed'),
     ];
   @endphp
   <script>
@@ -289,6 +292,7 @@
     const quotaBox = document.getElementById('quotaBox');
     const quotaValue = document.getElementById('quotaValue');
     const quotaFill = document.getElementById('quotaFill');
+    const quotaStatus = document.getElementById('quotaStatus');
     const upgradeBox = document.getElementById('upgradeBox');
     const upgradeText = document.getElementById('upgradeText');
     const translateSelect = document.getElementById('translate');
@@ -455,12 +459,19 @@
     const preferredVoiceKeyByLanguageAndTier = {};
     let clientFingerprint = '';
     let fingerprintPromise = null;
-    let lastGeneratedText = '';
+    let quotaRefreshPromise = null;
+    let isQuotaRefreshing = false;
+    let isGenerating = false;
+    let hasQuotaSynced = !toBoolean(currentQuota?.requires_client_sync);
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
     let cooldownIntervalId = null;
     const COOLDOWN_SECONDS = 6; // Seconds to wait between generations
+
+    const previewButtonIcon = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>';
+    const previewButtonSpinner = '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>';
+    const previewButtonCooldownIcon = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>';
 
     function formatNumber(value) { return new Intl.NumberFormat('en-US').format(Number(value || 0)); }
     function countBillableChars(value) {
@@ -547,6 +558,40 @@
       }
     }
 
+    function setQuotaStatus(message = '', tone = 'muted') {
+      if (!quotaStatus) return;
+      quotaStatus.textContent = String(message || '').trim();
+      quotaStatus.dataset.tone = tone;
+      quotaStatus.style.display = quotaStatus.textContent ? 'block' : 'none';
+    }
+
+    function setPreviewButtonMarkup(iconMarkup, label) {
+      if (!previewBtn) return;
+      const content = previewBtn.querySelector('span');
+      if (!content) return;
+      content.innerHTML = `${iconMarkup}${label}`;
+    }
+
+    function resetPreviewButton() {
+      if (!previewBtn) return;
+      const cooldownRemaining = getRemainingCooldown();
+      if (cooldownRemaining > 0) {
+        previewBtn.disabled = true;
+        updateCooldownDisplay();
+        return;
+      }
+
+      const shouldDisable = isQuotaRefreshing || isGenerating || Boolean(currentQuota.is_exhausted);
+      previewBtn.disabled = shouldDisable;
+      setPreviewButtonMarkup(previewButtonIcon, i18n.generate_voice);
+    }
+
+    function setPreviewButtonBusy(label) {
+      if (!previewBtn) return;
+      previewBtn.disabled = true;
+      setPreviewButtonMarkup(previewButtonSpinner, label);
+    }
+
     function renderQuota(quota) {
       if (!quota || typeof quota !== 'object') return;
       currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
@@ -556,28 +601,19 @@
     function syncQuotaDisplay() {
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const currentText = String(textInput?.value || '').trim();
-      const pending = countBillableChars(currentText);
-      // If the text hasn't changed since last generation, the server already
-      // deducted these chars — don't subtract them again (prevents double deduction).
-      const alreadyDeducted = currentText !== '' && currentText === lastGeneratedText;
-      const effectivePending = alreadyDeducted ? 0 : pending;
-      const afterGeneration = Math.max(0, remaining - effectivePending);
-      const displayRemaining = effectivePending > 0 ? afterGeneration : remaining;
-      const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / limit) * 100)));
-      const percent = displayRemaining > 0 ? Math.max(1, rawPercent) : 0;
+      const rawPercent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+      const percent = remaining > 0 ? Math.max(1, rawPercent) : 0;
 
       if (quotaFill) {
         quotaFill.style.width = `${percent}%`;
-        quotaFill.style.background = effectivePending > remaining
-          ? 'var(--error-color, #ef4444)'
-          : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+        quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       }
       if (quotaValue) {
-        quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
       }
 
       setUpgradeVisible(Boolean(currentQuota.is_exhausted || remaining <= 0));
+      resetPreviewButton();
     }
 
     function isTrialExhaustedMessage(message) {
@@ -916,10 +952,18 @@
       return true;
     }
 
-    async function callEndpoint(endpoint) {
+    async function callEndpoint(endpoint, options = {}) {
+      const includeForm = options?.includeForm !== false;
       setError('');
       setUpgradeVisible(false);
-      const fd = new FormData(form);
+      const fd = new FormData();
+
+      if (includeForm && form) {
+        const formData = new FormData(form);
+        for (const [key, value] of formData.entries()) {
+          fd.append(key, value);
+        }
+      }
 
       // Add fingerprint components to form data for enhanced tracking
       await ensureFingerprint();
@@ -950,6 +994,44 @@
       return data;
     }
 
+    async function refreshQuotaFromServer({ interactive = false } = {}) {
+      if (quotaRefreshPromise) {
+        return quotaRefreshPromise;
+      }
+
+      isQuotaRefreshing = true;
+      setQuotaStatus(i18n.checking_allowance, 'muted');
+      setPreviewButtonBusy(i18n.checking_allowance);
+
+      quotaRefreshPromise = (async () => {
+        try {
+          const data = await callEndpoint('{{ route("demo.quota") }}', { includeForm: false });
+          renderQuota(data?.quota || null);
+          currentQuota.requires_client_sync = false;
+          hasQuotaSynced = true;
+          setQuotaStatus('');
+
+          return true;
+        } catch (_error) {
+          if (interactive) {
+            setError(i18n.quota_sync_failed || i18n.request_failed);
+            setQuotaStatus(i18n.quota_sync_failed || i18n.request_failed, 'error');
+          } else {
+            setQuotaStatus(i18n.quota_sync_failed || i18n.request_failed, 'error');
+          }
+
+          return false;
+        } finally {
+          isQuotaRefreshing = false;
+          quotaRefreshPromise = null;
+          resetPreviewButton();
+          updateCharCount();
+        }
+      })();
+
+      return quotaRefreshPromise;
+    }
+
     // Cooldown UI functions for smooth rate limiting
     function getRemainingCooldown() {
       return Math.max(0, Math.ceil((cooldownEndTime - Date.now()) / 1000));
@@ -966,8 +1048,7 @@
           clearInterval(cooldownIntervalId);
           cooldownIntervalId = null;
           cooldownEndTime = 0;
-          previewBtn.disabled = false;
-          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
+          resetPreviewButton();
         } else {
           updateCooldownDisplay();
         }
@@ -977,7 +1058,7 @@
     function updateCooldownDisplay() {
       const remaining = getRemainingCooldown();
       const text = (i18n.ready_in_seconds || 'Ready in :seconds...').replace(':seconds', remaining);
-      previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>' + text;
+      setPreviewButtonMarkup(previewButtonCooldownIcon, text);
     }
 
     previewBtn?.addEventListener('click', async () => {
@@ -988,6 +1069,10 @@
       }
       heroWave?.classList.add('active');
       try {
+        if (!hasQuotaSynced || toBoolean(currentQuota?.requires_client_sync)) {
+          const synced = await refreshQuotaFromServer({ interactive: true });
+          if (!synced) return;
+        }
         if (!isTranslateEnabled()) syncLanguageToCurrentTextWhenTranslationOff();
         const rawText = String(textInput?.value || '');
         const trimmed = rawText.trim();
@@ -1012,11 +1097,10 @@
           setUpgradeVisible(true);
           return;
         }
-        previewBtn.disabled = true;
-        previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>' + i18n.generating;
+        isGenerating = true;
+        setPreviewButtonBusy(i18n.generating);
         hideAudioPreview();
         const data = await callEndpoint('{{ route("demo.preview") }}');
-        lastGeneratedText = String(trimmed);
         renderQuota(data?.quota || null);
         updateCharCount();
         if (!data?.audio_url) { hideAudioPreview(); setError(i18n.no_audio_returned); return; }
@@ -1061,13 +1145,10 @@
         } else if (serverSaysExhausted || isTrialExhaustedMessage(message)) {
           setUpgradeVisible(true);
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0, used_chars: Number(currentQuota.limit_chars || 0) });
-          previewBtn.disabled = false;
-          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
-        } else {
-          previewBtn.disabled = false;
-          previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
         }
       } finally {
+        isGenerating = false;
+        resetPreviewButton();
         setTimeout(() => heroWave?.classList.remove('active'), 900);
       }
     });
@@ -1118,7 +1199,11 @@
     updateTranslateHint();
     renderQuota(currentQuota);
     updateCharCount(); // Initialize char counter on load
-    ensureFingerprint().catch(() => {});
+    if (toBoolean(currentQuota?.requires_client_sync)) {
+      refreshQuotaFromServer().catch(() => {});
+    } else {
+      ensureFingerprint().catch(() => {});
+    }
 
     // Reveal on scroll animation
     const revealObserver = new IntersectionObserver((entries) => {
@@ -1129,4 +1214,3 @@
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </body>
 </html>
-
