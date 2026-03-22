@@ -22,6 +22,8 @@ class DemoFraudSignalResource extends Resource
 
     protected static ?string $navigationLabel = 'Fraud Signals';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     public static function form(Form $form): Form
     {
         return $form

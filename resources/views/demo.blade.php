@@ -57,7 +57,6 @@
                 <div class="quota-fill" id="quotaFill"></div>
               </div>
               <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
-              <div class="quota-status" id="quotaStatus" aria-live="polite"></div>
             </div>
           </div>
 
@@ -257,8 +256,6 @@
       'preparing_next' => __('ui.demo.preparing_next'),
       'checking_allowance' => __('ui.demo.checking_allowance'),
       'quota_sync_failed' => __('ui.demo.quota_sync_failed'),
-      'typing_preview' => __('ui.demo.typing_preview'),
-      'typing_exceeds_quota' => __('ui.demo.typing_exceeds_quota'),
     ];
   @endphp
   <script>
@@ -294,7 +291,6 @@
     const quotaBox = document.getElementById('quotaBox');
     const quotaValue = document.getElementById('quotaValue');
     const quotaFill = document.getElementById('quotaFill');
-    const quotaStatus = document.getElementById('quotaStatus');
     const upgradeBox = document.getElementById('upgradeBox');
     const upgradeText = document.getElementById('upgradeText');
     const translateSelect = document.getElementById('translate');
@@ -460,14 +456,14 @@
     });
     let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
     const preferredVoiceKeyByLanguageAndTier = {};
-    let clientFingerprint = '';
-    let fingerprintPromise = null;
     let quotaRefreshPromise = null;
     let isQuotaRefreshing = false;
     let isGenerating = false;
     let hasQuotaSynced = !toBoolean(currentQuota?.requires_client_sync);
     let liveBillableChars = 0;
     let charCountFrame = null;
+    let lastGeneratedText = '';
+    let lastGeneratedChars = 0;
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -505,6 +501,17 @@
     }
     function currentDraftBillableChars() {
       return countBillableChars(String(textInput?.value || '').trim());
+    }
+    function currentDraftText() {
+      return String(textInput?.value || '').trim();
+    }
+    function hasPendingDraftUsage() {
+      const draftText = currentDraftText();
+      if (liveBillableChars <= 0 || draftText === '') {
+        return false;
+      }
+
+      return !(draftText === lastGeneratedText && liveBillableChars === lastGeneratedChars);
     }
     function normalizeLanguage(value) { return value === 'en' ? 'en' : 'ar'; }
     function oppositeLanguage(value) { return normalizeLanguage(value) === 'en' ? 'ar' : 'en'; }
@@ -585,13 +592,6 @@
       }
     }
 
-    function setQuotaStatus(message = '', tone = 'muted') {
-      if (!quotaStatus) return;
-      quotaStatus.textContent = String(message || '').trim();
-      quotaStatus.dataset.tone = tone;
-      quotaStatus.style.display = quotaStatus.textContent ? 'block' : 'none';
-    }
-
     function setPreviewButtonMarkup(iconMarkup, label) {
       if (!previewBtn) return;
       const content = previewBtn.querySelector('span');
@@ -628,7 +628,7 @@
     function syncQuotaDisplay() {
       const baseRemaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const hasDraft = liveBillableChars > 0;
+      const hasDraft = hasPendingDraftUsage();
       const displayRemaining = hasDraft ? Math.max(0, baseRemaining - liveBillableChars) : baseRemaining;
       const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / limit) * 100)));
       const percent = displayRemaining > 0 ? Math.max(1, rawPercent) : 0;
@@ -639,25 +639,6 @@
       }
       if (quotaValue) {
         quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
-      }
-
-      if (!isQuotaRefreshing) {
-        if (hasDraft && baseRemaining > 0) {
-          if (liveBillableChars > baseRemaining) {
-            const overBy = Math.max(0, liveBillableChars - baseRemaining);
-            const message = String(i18n.typing_exceeds_quota || '')
-              .replace(':selected', formatNumber(liveBillableChars))
-              .replace(':over', formatNumber(overBy));
-            setQuotaStatus(message, 'error');
-          } else {
-            const message = String(i18n.typing_preview || '')
-              .replace(':selected', formatNumber(liveBillableChars))
-              .replace(':remaining', formatNumber(displayRemaining));
-            setQuotaStatus(message, 'muted');
-          }
-        } else if (quotaStatus?.dataset?.tone !== 'error') {
-          setQuotaStatus('');
-        }
       }
 
       setUpgradeVisible(Boolean(currentQuota.is_exhausted || baseRemaining <= 0));
@@ -679,6 +660,8 @@
       return markers.some((marker) => normalized.includes(marker.toLowerCase()));
     }
 
+    /* Legacy fingerprint code is disabled.
+       Demo quota is strictly per-user.
     // Enhanced fingerprinting system
     const fingerprintComponents = {};
 
@@ -908,6 +891,7 @@
       } catch (e) {}
     })();
 
+    */
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1' ? i18n.translate_enabled_hint : i18n.translate_disabled_hint;
@@ -1013,22 +997,7 @@
         }
       }
 
-      // Add fingerprint components to form data for enhanced tracking
-      await ensureFingerprint();
-      if (fingerprintComponents.canvas) fd.append('fp_canvas', fingerprintComponents.canvas);
-      if (fingerprintComponents.webgl) fd.append('fp_webgl', fingerprintComponents.webgl);
-      if (fingerprintComponents.audio) fd.append('fp_audio', fingerprintComponents.audio);
-      if (fingerprintComponents.fonts) fd.append('fp_fonts', fingerprintComponents.fonts);
-      if (fingerprintComponents.screen) fd.append('fp_screen', fingerprintComponents.screen);
-      if (fingerprintComponents.hardware) fd.append('fp_hardware', fingerprintComponents.hardware);
-      if (fingerprintComponents.timezone) fd.append('fp_timezone', fingerprintComponents.timezone);
-      if (fingerprintComponents.webdriver) fd.append('fp_webdriver', fingerprintComponents.webdriver);
-
       const headers = { ...csrfHeaders };
-      if (clientFingerprint) {
-        // Send full fingerprint data as base64 JSON header
-        headers['X-Listen-Fingerprint'] = btoa(JSON.stringify(fingerprintComponents));
-      }
 
       const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
       const data = await res.json().catch(() => ({}));
@@ -1048,7 +1017,6 @@
       }
 
       isQuotaRefreshing = true;
-      setQuotaStatus(i18n.checking_allowance, 'muted');
       setPreviewButtonBusy(i18n.checking_allowance);
 
       quotaRefreshPromise = (async () => {
@@ -1057,15 +1025,11 @@
           renderQuota(data?.quota || null);
           currentQuota.requires_client_sync = false;
           hasQuotaSynced = true;
-          setQuotaStatus('');
 
           return true;
         } catch (_error) {
           if (interactive) {
             setError(i18n.quota_sync_failed || i18n.request_failed);
-            setQuotaStatus(i18n.quota_sync_failed || i18n.request_failed, 'error');
-          } else {
-            setQuotaStatus(i18n.quota_sync_failed || i18n.request_failed, 'error');
           }
 
           return false;
@@ -1149,6 +1113,8 @@
         setPreviewButtonBusy(i18n.generating);
         hideAudioPreview();
         const data = await callEndpoint('{{ route("demo.preview") }}');
+        lastGeneratedText = trimmed;
+        lastGeneratedChars = selectedChars;
         renderQuota(data?.quota || null);
         updateCharCount();
         if (!data?.audio_url) { hideAudioPreview(); setError(i18n.no_audio_returned); return; }
@@ -1257,8 +1223,6 @@
     updateCharCount(); // Initialize char counter on load
     if (toBoolean(currentQuota?.requires_client_sync)) {
       refreshQuotaFromServer().catch(() => {});
-    } else {
-      ensureFingerprint().catch(() => {});
     }
 
     // Reveal on scroll animation

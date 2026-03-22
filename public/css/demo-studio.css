@@ -575,18 +575,6 @@ html[dir="rtl"] .perf-grid select {
   line-height: 1.5
 }
 
-.quota-status {
-  display: none;
-  margin-top: .4rem;
-  font-size: .78rem;
-  line-height: 1.5;
-  color: var(--muted)
-}
-
-.quota-status[data-tone="error"] {
-  color: var(--error-color, #ef4444)
-}
-
 /* Output panel */
 .output-panel {
   min-height: 120px;

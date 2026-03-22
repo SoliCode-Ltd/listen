@@ -2,13 +2,11 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\DemoIdentityLink;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
-use App\Services\DemoFraudService;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\Tts\TtsRoutingService;
@@ -34,7 +32,6 @@ class HomeController extends Controller
         private readonly PlanAccessService $planAccessService,
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly TtsRoutingService $ttsRoutingService,
-        private readonly DemoFraudService $fraudService,
     ) {
     }
 
@@ -404,12 +401,6 @@ class HomeController extends Controller
                 $speechEstimate['chars'],
             );
 
-            // Sync device-level usage in DemoGuestUsage so quota is shared
-            // across accounts on the same device (prevents multi-account abuse).
-            // Use original text chars to match what enforceDemoPolicy() checked.
-            // Disabled in production hotfix: demo quota is user-based only.
-            // $this->syncDemoGuestUsage($request, $estimate['chars']);
-
             $quota = $this->demoQuotaForClient($request);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
 
@@ -488,10 +479,9 @@ class HomeController extends Controller
         }
         RateLimiter::hit($rateKey, 60);
 
-        // Lifetime trial cap - combines user's own usage + usage from
-        // other accounts that share the same device fingerprint.
+        // Lifetime trial cap per authenticated user account.
         $lifetimeCap = $this->demoCharAllowance($request);
-        $usedChars = $this->trialUsedCharsWithFingerprint($request, $userId);
+        $usedChars = $this->trialUsedCharsByUser($userId);
 
         if (($usedChars + $chars) > $lifetimeCap) {
             throw ValidationException::withMessages([
@@ -830,71 +820,9 @@ class HomeController extends Controller
     }
 
     /**
-     * @return array{0:array<int,string>,1:string,2:array,3:array}
-     */
-    private function resolveDemoIdentities(Request $request): array
-    {
-        if ($request->user()) {
-            $identity = 'u:'.$request->user()->id;
-            return [[$identity], $identity, [], []];
-        }
-
-        // Use enhanced fraud detection service
-        $extracted = $this->fraudService->extractIdentities($request);
-
-        // For GET requests (page loads), don't link or expand identities.
-        // This prevents false positives where IP-sharing causes wrong quota display.
-        // Only POST requests (actual voice generation) should trigger linking.
-        if ($request->isMethod('GET')) {
-            return [
-                $extracted['identities'],
-                $extracted['primary'],
-                $extracted['identity_types'],
-                [], // No fraud signals on GET
-            ];
-        }
-
-        // For POST requests: Get all linked identities (catches users trying to reset via VPN/incognito)
-        $allIdentities = $this->fraudService->getLinkedIdentities($extracted['identities']);
-
-        // Link identities that appear together (only on POST)
-        if (count($extracted['identities']) >= 2) {
-            try {
-                $this->fraudService->linkIdentities($extracted['identities'], $extracted['identity_types']);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to link demo identities', ['error' => $e->getMessage()]);
-            }
-        }
-
-        // Record fraud signals if any (only on POST)
-        if (!empty($extracted['fraud_signals'])) {
-            try {
-                $this->fraudService->recordFraudSignals($allIdentities, $extracted['fraud_signals']);
-            } catch (\Throwable $e) {
-                Log::warning('Failed to record fraud signals', ['error' => $e->getMessage()]);
-            }
-        }
-
-        return [
-            $allIdentities,
-            $extracted['primary'],
-            $extracted['identity_types'],
-            $extracted['fraud_signals'],
-        ];
-    }
-
-    /**
      * Quota snapshot for the page load (GET).
      *
-     * Uses ONLY the authenticated user's own DemoVoiceGeneration records.
-     * This avoids the fingerprint asymmetry problem: on GET requests the
-     * client-side fingerprint may not be available yet (first visit, mobile
-     * cookie issues), so relying on device-level DemoGuestUsage would show
-     * inaccurate numbers. The user's own DB records are always reliable.
-     *
-     * Cross-device fraud detection still runs at generation time via
-     * enforceDemoPolicy() + trialUsedCharsWithFingerprint(), so abuse is
-     * still caught — it just won't confuse the display on page load.
+     * Source of truth is the authenticated user's own usage history.
      */
     private function demoQuotaForPageLoad(Request $request): array
     {
@@ -933,18 +861,13 @@ class HomeController extends Controller
     }
 
     /**
-     * Quota snapshot for POST responses (after generation or enforcement check).
-     *
-     * Uses trialUsedCharsWithFingerprint() which includes cross-device usage,
-     * so the response reflects the full picture including fraud detection.
-     *
      * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string}
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array
     {
         $userId = (int) $request->user()->id;
         $limit = $this->demoCharAllowance($request);
-        $used = min($limit, max(0, $this->trialUsedCharsWithFingerprint($request, $userId)));
+        $used = min($limit, max(0, $this->trialUsedCharsByUser($userId)));
         $remaining = max(0, $limit - $used);
 
         return [
@@ -957,86 +880,11 @@ class HomeController extends Controller
         ];
     }
 
-    /**
-     * Hotfix policy: trial usage is user-based only.
-     */
-    private function trialUsedCharsWithFingerprint(Request $request, int $userId): int
+    private function trialUsedCharsByUser(int $userId): int
     {
         return (int) (DemoVoiceGeneration::query()
             ->where('user_id', $userId)
             ->sum('billable_chars') ?? 0);
-    }
-
-    /**
-     * @param  array<string, string>  $identityTypes
-     * @return array<int, string>
-     */
-    private function strongDemoFingerprintIdentities(array $identityTypes): array
-    {
-        $strongFingerprints = [];
-
-        foreach (['canvas', 'webgl', 'audio'] as $type) {
-            $identity = trim((string) ($identityTypes[$type] ?? ''));
-            if ($identity !== '') {
-                $strongFingerprints[] = $identity;
-            }
-        }
-
-        return array_values(array_unique($strongFingerprints));
-    }
-
-    private function requestHasStrongDemoFingerprint(Request $request): bool
-    {
-        $extracted = $this->fraudService->extractIdentities($request);
-        $identityTypes = (array) ($extracted['identity_types'] ?? []);
-
-        return count($this->strongDemoFingerprintIdentities($identityTypes)) >= 2;
-    }
-
-    /**
-     * Update DemoGuestUsage after a successful generation so device-level
-     * quota is shared across accounts. Also links identities when 2+
-     * strong fingerprints are present.
-     */
-    private function syncDemoGuestUsage(Request $request, int $chars): void
-    {
-        try {
-            $extracted = $this->fraudService->extractIdentities($request);
-            $identities = array_values(array_filter(
-                array_map(static fn ($v) => trim((string) $v), (array) ($extracted['identities'] ?? [])),
-                static fn (string $v) => $v !== ''
-            ));
-
-            if ($identities === []) {
-                return;
-            }
-
-            // Link identities that appear together on this device
-            $identityTypes = (array) ($extracted['identity_types'] ?? []);
-            $strongIdentities = $this->strongDemoFingerprintIdentities($identityTypes);
-            if (count($strongIdentities) >= 2) {
-                $this->fraudService->linkIdentities($strongIdentities, $identityTypes);
-            }
-
-            // Record fraud signals if any
-            $fraudSignals = (array) ($extracted['fraud_signals'] ?? []);
-            if ($fraudSignals !== []) {
-                $signalIdentities = $strongIdentities !== [] ? $strongIdentities : $identities;
-                $allIdentities = $this->fraudService->getLinkedIdentities($signalIdentities);
-                $this->fraudService->recordFraudSignals($allIdentities, $fraudSignals);
-            }
-
-            // Reserve chars in device-level tracker
-            if (count($strongIdentities) >= 2) {
-                $limit = $this->demoCharAllowance($request);
-                $this->fraudService->reserveChars($strongIdentities, $chars, $limit);
-            }
-        } catch (\Throwable $e) {
-            Log::warning('Failed to sync demo guest usage.', [
-                'exception_class' => get_class($e),
-                'exception_message' => $e->getMessage(),
-            ]);
-        }
     }
 
     /**
@@ -1059,7 +907,6 @@ class HomeController extends Controller
         ?int $speechChars = null,
     ): ?DemoVoiceGeneration {
         try {
-            $identityContext = $this->demoTrackingContext($request);
             $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
             $voiceLabel = null;
 
@@ -1069,8 +916,8 @@ class HomeController extends Controller
 
             return DemoVoiceGeneration::query()->create([
                 'user_id' => $request->user()?->id,
-                'primary_identity_hash' => $identityContext['primary_identity_hash'],
-                'link_group' => $identityContext['link_group'],
+                'primary_identity_hash' => 'u:'.(int) ($request->user()?->id ?? 0),
+                'link_group' => null,
                 'input_text' => $inputText,
                 'speech_text' => $speechText,
                 'source_language' => $sourceLanguage,
@@ -1097,9 +944,6 @@ class HomeController extends Controller
                 'quota_limit_chars' => isset($quota['limit_chars']) ? (int) $quota['limit_chars'] : null,
                 'quota_remaining_chars' => isset($quota['remaining_chars']) ? (int) $quota['remaining_chars'] : null,
                 'metadata' => [
-                    'identities' => $identityContext['identities'],
-                    'identity_types' => $identityContext['identity_types'],
-                    'fraud_signal_types' => $identityContext['fraud_signal_types'],
                     'voice_meta' => is_array($voiceMeta) ? [
                         'gender' => $voiceMeta['gender'] ?? null,
                         'language' => $voiceMeta['language'] ?? null,
@@ -1146,59 +990,6 @@ class HomeController extends Controller
                 'exception_message' => $e->getMessage(),
             ]);
         }
-    }
-
-    /**
-     * @return array{
-     *   primary_identity_hash:string,
-     *   link_group:string|null,
-     *   identities:array<int,string>,
-     *   identity_types:array<string,string>,
-     *   fraud_signal_types:array<int,string>
-     * }
-     */
-    private function demoTrackingContext(Request $request): array
-    {
-        $extracted = $this->fraudService->extractIdentities($request);
-        $identities = array_values(array_filter(
-            array_map(static fn ($value) => trim((string) $value), (array) ($extracted['identities'] ?? [])),
-            static fn (string $value) => $value !== ''
-        ));
-
-        $linkGroup = null;
-        if ($identities !== []) {
-            $linkGroup = DemoIdentityLink::query()
-                ->whereIn('identity_hash', $identities)
-                ->value('link_group');
-        }
-
-        $fraudSignalTypes = [];
-        foreach ((array) ($extracted['fraud_signals'] ?? []) as $signal) {
-            if (is_array($signal) && isset($signal['type']) && is_string($signal['type'])) {
-                $fraudSignalTypes[] = $signal['type'];
-            }
-        }
-
-        // For authenticated users, use user-based identity as primary so that
-        // cross-account fingerprint matching does not falsely link records
-        // from different users who happen to share device hardware (common on
-        // mobile where many phones produce identical canvas/WebGL hashes).
-        $primary = trim((string) ($extracted['primary'] ?? 'unknown')) ?: 'unknown';
-        $user = $request->user();
-        if ($user) {
-            $primary = 'u:' . $user->id;
-        }
-
-        return [
-            'primary_identity_hash' => $primary,
-            'link_group' => $linkGroup ? (string) $linkGroup : null,
-            'identities' => $identities,
-            'identity_types' => array_map(
-                static fn ($value) => trim((string) $value),
-                array_filter((array) ($extracted['identity_types'] ?? []), static fn ($value) => trim((string) $value) !== '')
-            ),
-            'fraud_signal_types' => array_values(array_unique($fraudSignalTypes)),
-        ];
     }
 
     private function storeDemoAudioCopy(string $sourcePath): string

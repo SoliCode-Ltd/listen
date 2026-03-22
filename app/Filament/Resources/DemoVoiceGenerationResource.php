@@ -16,7 +16,7 @@ class DemoVoiceGenerationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-speaker-wave';
 
-    protected static ?string $navigationGroup = 'Demo Tracking';
+    protected static ?string $navigationGroup = 'Demo';
 
     protected static ?int $navigationSort = 4;
 
@@ -34,11 +34,6 @@ class DemoVoiceGenerationResource extends Resource
                             ->disabled(),
                         Forms\Components\TextInput::make('user.email')
                             ->label('Email')
-                            ->disabled(),
-                        Forms\Components\TextInput::make('primary_identity_hash')
-                            ->label('Primary Identity')
-                            ->disabled(),
-                        Forms\Components\TextInput::make('link_group')
                             ->disabled(),
                         Forms\Components\TextInput::make('voice_label')
                             ->disabled(),
@@ -127,16 +122,6 @@ class DemoVoiceGenerationResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('primary_identity_hash')
-                    ->label('Identity')
-                    ->searchable()
-                    ->limit(18)
-                    ->toggleable()
-                    ->tooltip(fn (DemoVoiceGeneration $record): string => $record->primary_identity_hash),
-                Tables\Columns\TextColumn::make('link_group')
-                    ->label('Link Group')
-                    ->searchable()
-                    ->toggleable(),
                 Tables\Columns\TextColumn::make('voice_label')
                     ->label('Voice')
                     ->searchable()

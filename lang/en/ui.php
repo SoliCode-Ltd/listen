@@ -641,8 +641,6 @@ return [
         'preview_failed' => 'Preview failed',
         'checking_allowance' => 'Checking your demo allowance...',
         'quota_sync_failed' => 'We could not verify your demo allowance. Please try again.',
-        'typing_preview' => 'Live preview: this text uses :selected chars. After generation you will have :remaining chars left.',
-        'typing_exceeds_quota' => 'Current text uses :selected chars and exceeds your remaining demo balance by :over chars.',
         'create_account_unlock' => 'Create a free account to unlock :chars characters and continue.',
         'ready_in_seconds' => 'Ready in :seconds...',
         'preparing_next' => 'Preparing for next...',

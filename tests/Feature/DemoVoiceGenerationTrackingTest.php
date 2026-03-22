@@ -86,7 +86,6 @@ class DemoVoiceGenerationTrackingTest extends TestCase
             'style_prompt' => 'Energetic launch ad',
             'speed' => 1.15,
             'pitch' => 1.5,
-            'fp_canvas' => 'canvas-demo-fingerprint',
         ]);
 
         $response->assertOk()
@@ -125,7 +124,7 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertSame(300 - $billableChars, data_get($generation->metadata, 'quota.remaining_chars'));
         $this->assertSame('hybrid', $generation->metadata['routing_mode']);
         $this->assertStringStartsWith('u:', $generation->primary_identity_hash);
-        $this->assertNotEmpty($generation->metadata['identities']);
+        $this->assertArrayNotHasKey('identities', $generation->metadata);
 
         $response->assertJsonPath('quota.limit_chars', 300);
         $response->assertJsonPath('quota.remaining_chars', 300 - $billableChars);
