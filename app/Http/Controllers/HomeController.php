@@ -170,7 +170,7 @@ class HomeController extends Controller
                     'dialect' => TtsStudioConfig::defaultDialect('en'),
                 ],
             ],
-            'demoQuota' => $this->demoQuotaSnapshot($request, true),
+            'demoQuota' => $this->demoQuotaForPageLoad($request),
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
             'demoTiers' => array_map(fn (string $tier) => [
@@ -844,6 +844,42 @@ class HomeController extends Controller
     }
 
     /**
+     * Quota snapshot for the page load (GET).
+     *
+     * Uses ONLY the authenticated user's own DemoVoiceGeneration records.
+     * This avoids the fingerprint asymmetry problem: on GET requests the
+     * client-side fingerprint may not be available yet (first visit, mobile
+     * cookie issues), so relying on device-level DemoGuestUsage would show
+     * inaccurate numbers. The user's own DB records are always reliable.
+     *
+     * Cross-device fraud detection still runs at generation time via
+     * enforceDemoPolicy() + trialUsedCharsWithFingerprint(), so abuse is
+     * still caught — it just won't confuse the display on page load.
+     */
+    private function demoQuotaForPageLoad(Request $request): array
+    {
+        $userId = (int) $request->user()->id;
+        $limit = $this->demoCharAllowance($request);
+        $ownUsed = min($limit, max(0, (int) (DemoVoiceGeneration::query()
+            ->where('user_id', $userId)
+            ->sum('billable_chars') ?? 0)));
+        $remaining = max(0, $limit - $ownUsed);
+
+        return [
+            'scope' => 'trial',
+            'limit_chars' => $limit,
+            'used_chars' => $ownUsed,
+            'remaining_chars' => $remaining,
+            'is_exhausted' => $remaining <= 0,
+        ];
+    }
+
+    /**
+     * Quota snapshot for POST responses (after generation or enforcement check).
+     *
+     * Uses trialUsedCharsWithFingerprint() which includes cross-device usage,
+     * so the response reflects the full picture including fraud detection.
+     *
      * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool}
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array

@@ -11,7 +11,8 @@
       "Bash(php -r \":*)",
       "Bash(xargs grep:*)",
       "Bash(find . -path \"*/config/*\" -name \"*.php\" -exec grep -l \"middleware\" {})",
-      "Bash(php -l routes/web.php)"
+      "Bash(php -l routes/web.php)",
+      "Bash(php -l bootstrap/app.php)"
     ]
   }
 }
