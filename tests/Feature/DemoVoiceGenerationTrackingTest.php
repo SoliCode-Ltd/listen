@@ -116,13 +116,14 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertSame(1.5, $generation->pitch);
         $this->assertSame('gemini-2.5-flash-preview-tts', $generation->tts_model);
         $this->assertSame(842, $generation->tts_latency_ms);
-        $this->assertStringStartsWith('cv:', $generation->primary_identity_hash);
+        $this->assertStringStartsWith('u:', $generation->primary_identity_hash);
         $this->assertSame(300, $generation->quota_limit_chars);
         $this->assertSame(300 - $billableChars, $generation->quota_remaining_chars);
         $this->assertIsArray($generation->metadata);
         $this->assertSame(300 - $billableChars, data_get($generation->metadata, 'quota.remaining_chars'));
         $this->assertSame('hybrid', $generation->metadata['routing_mode']);
-        $this->assertContains($generation->primary_identity_hash, $generation->metadata['identities']);
+        $this->assertStringStartsWith('u:', $generation->primary_identity_hash);
+        $this->assertNotEmpty($generation->metadata['identities']);
 
         $response->assertJsonPath('quota.limit_chars', 300);
         $response->assertJsonPath('quota.remaining_chars', 300 - $billableChars);

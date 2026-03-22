@@ -860,15 +860,17 @@ class HomeController extends Controller
             ->where('user_id', $userId)
             ->sum('billable_chars') ?? 0);
 
-        // On POST requests, extract device fingerprints and check cross-account usage
+        // On POST requests, extract device fingerprints and check cross-account usage.
+        // Only match against records that were stored WITHOUT a user_id (guest records)
+        // to avoid false positives on mobile where many devices share identical
+        // canvas/WebGL fingerprints (same GPU model = same hash).
         if ($request->isMethod('POST')) {
             $extracted = $this->fraudService->extractIdentities($request);
             $identityTypes = (array) ($extracted['identity_types'] ?? []);
             $fingerprints = [];
 
             // Require at least 2 high-confidence, independent signals before
-            // applying cross-account trial aggregation. This avoids mobile
-            // false positives when only one weak-ish fingerprint is available.
+            // applying cross-account trial aggregation.
             foreach (['canvas', 'webgl', 'audio'] as $type) {
                 $identity = trim((string) ($identityTypes[$type] ?? ''));
                 if ($identity !== '') {
@@ -880,7 +882,13 @@ class HomeController extends Controller
             if (count($fingerprints) >= 2) {
                 $crossAccountUsed = (int) (DemoVoiceGeneration::query()
                     ->where('user_id', '!=', $userId)
+                    ->whereNull('user_id', 'or')
                     ->whereIn('primary_identity_hash', $fingerprints)
+                    // Exclude records stored with a user identity as primary —
+                    // these are already counted via user_id and matching them
+                    // by fingerprint causes false cross-device linking on
+                    // mobile devices with identical GPU hardware.
+                    ->where('primary_identity_hash', 'not like', 'u:%')
                     ->sum('billable_chars') ?? 0);
 
                 return $ownUsed + $crossAccountUsed;
@@ -1028,8 +1036,18 @@ class HomeController extends Controller
             }
         }
 
+        // For authenticated users, use user-based identity as primary so that
+        // cross-account fingerprint matching does not falsely link records
+        // from different users who happen to share device hardware (common on
+        // mobile where many phones produce identical canvas/WebGL hashes).
+        $primary = trim((string) ($extracted['primary'] ?? 'unknown')) ?: 'unknown';
+        $user = $request->user();
+        if ($user) {
+            $primary = 'u:' . $user->id;
+        }
+
         return [
-            'primary_identity_hash' => trim((string) ($extracted['primary'] ?? 'unknown')) ?: 'unknown',
+            'primary_identity_hash' => $primary,
             'link_group' => $linkGroup ? (string) $linkGroup : null,
             'identities' => $identities,
             'identity_types' => array_map(

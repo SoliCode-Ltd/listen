@@ -455,7 +455,6 @@
     const preferredVoiceKeyByLanguageAndTier = {};
     let clientFingerprint = '';
     let fingerprintPromise = null;
-    let lastCommittedText = '';
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -547,11 +546,13 @@
       }
     }
 
-    function renderQuota(quota, applyLivePreview = false) {
+    function renderQuota(quota) {
       if (!quota || typeof quota !== 'object') return;
       currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
 
-      // Display the actual quota from server (no live preview adjustment)
+      // Display the actual quota from server — never apply speculative deductions
+      // to the progress bar. This prevents the "double deduction" perception where
+      // users see chars decrease while typing AND again after generation.
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
       const rawPercent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
@@ -563,14 +564,6 @@
       }
       if (quotaValue) {
         quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
-      }
-
-      // Only apply live preview if explicitly requested (e.g., on initial load)
-      if (applyLivePreview) {
-        const pending = countBillableChars(textInput?.value || '');
-        if (pending > 0) {
-          updateQuotaMeterLive(pending);
-        }
       }
 
       if (quotaBox) {
@@ -1017,7 +1010,6 @@
         hideAudioPreview();
         const data = await callEndpoint('{{ route("demo.preview") }}');
         renderQuota(data?.quota || null);
-        lastCommittedText = String(trimmed);
         updateCharCount();
         if (!data?.audio_url) { hideAudioPreview(); setError(i18n.no_audio_returned); return; }
         if (outputPlaceholder) outputPlaceholder.style.display = 'none';
@@ -1097,29 +1089,14 @@
       const counter = document.getElementById('charCounter');
       if (!counter || !textInput) return;
       const count = countBillableChars(textInput.value);
-      counter.textContent = count > 0 ? `${formatNumber(count)} / ${formatNumber(currentQuota.remaining_chars)}` : '';
-      // Update quota meter live to show preview of remaining after generation
-      updateQuotaMeterLive(count);
-    }
-
-    function updateQuotaMeterLive(pendingChars) {
-      if (!quotaFill || !quotaValue) return;
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
-      const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const pending = Math.max(0, Number(pendingChars || 0));
-      const normalizedText = String(textInput?.value || '').trim();
-      const effectivePending = normalizedText !== '' && normalizedText === lastCommittedText ? 0 : pending;
-      const afterGeneration = Math.max(0, remaining - effectivePending);
-      const rawPercent = Math.max(0, Math.min(100, Math.round((afterGeneration / limit) * 100)));
-      const percent = afterGeneration > 0 ? Math.max(1, rawPercent) : 0;
-      quotaFill.style.width = `${percent}%`;
-      // Show live preview in the quota text
-      if (effectivePending > 0) {
-        quotaValue.textContent = `${formatNumber(afterGeneration)} / ${formatNumber(limit)} ${i18n.chars_left}`;
-        quotaFill.style.background = effectivePending > remaining ? 'var(--error-color, #ef4444)' : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+      if (count > 0) {
+        counter.textContent = `${formatNumber(count)} / ${formatNumber(remaining)}`;
+        // Warn in red if typed chars exceed remaining quota
+        counter.style.color = count > remaining ? 'var(--error-color, #ef4444)' : '';
       } else {
-        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
-        quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+        counter.textContent = '';
+        counter.style.color = '';
       }
     }
 
@@ -1129,7 +1106,7 @@
     renderDialectOptions();
     applyStudioTierState();
     updateTranslateHint();
-    renderQuota(currentQuota, true); // Apply live preview on initial load
+    renderQuota(currentQuota);
     updateCharCount(); // Initialize char counter on load
     ensureFingerprint().catch(() => {});
 
