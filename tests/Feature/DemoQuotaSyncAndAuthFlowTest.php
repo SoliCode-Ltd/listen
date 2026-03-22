@@ -107,7 +107,7 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $canvasIdentity],
             [
-                'link_group' => 'lg:test-demo-sync',
+                'link_group' => 'sg:test-demo-sync',
                 'used_chars' => $billableChars,
                 'last_seen_at' => now(),
             ]
@@ -116,7 +116,7 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $webglIdentity],
             [
-                'link_group' => 'lg:test-demo-sync',
+                'link_group' => 'sg:test-demo-sync',
                 'used_chars' => $billableChars,
                 'last_seen_at' => now(),
             ]
@@ -124,14 +124,14 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $canvasIdentity,
-            'link_group' => 'lg:test-demo-sync',
+            'link_group' => 'sg:test-demo-sync',
             'identity_type' => 'canvas',
             'confidence' => 1.0,
         ]);
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $webglIdentity,
-            'link_group' => 'lg:test-demo-sync',
+            'link_group' => 'sg:test-demo-sync',
             'identity_type' => 'webgl',
             'confidence' => 1.0,
         ]);

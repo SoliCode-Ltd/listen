@@ -1034,20 +1034,24 @@ class HomeController extends Controller
 
             // Link identities that appear together on this device
             $identityTypes = (array) ($extracted['identity_types'] ?? []);
-            if (count($identities) >= 2) {
-                $this->fraudService->linkIdentities($identities, $identityTypes);
+            $strongIdentities = $this->strongDemoFingerprintIdentities($identityTypes);
+            if (count($strongIdentities) >= 2) {
+                $this->fraudService->linkIdentities($strongIdentities, $identityTypes);
             }
 
             // Record fraud signals if any
             $fraudSignals = (array) ($extracted['fraud_signals'] ?? []);
             if ($fraudSignals !== []) {
-                $allIdentities = $this->fraudService->getLinkedIdentities($identities);
+                $signalIdentities = $strongIdentities !== [] ? $strongIdentities : $identities;
+                $allIdentities = $this->fraudService->getLinkedIdentities($signalIdentities);
                 $this->fraudService->recordFraudSignals($allIdentities, $fraudSignals);
             }
 
             // Reserve chars in device-level tracker
-            $limit = $this->demoCharAllowance($request);
-            $this->fraudService->reserveChars($identities, $chars, $limit);
+            if (count($strongIdentities) >= 2) {
+                $limit = $this->demoCharAllowance($request);
+                $this->fraudService->reserveChars($strongIdentities, $chars, $limit);
+            }
         } catch (\Throwable $e) {
             Log::warning('Failed to sync demo guest usage.', [
                 'exception_class' => get_class($e),

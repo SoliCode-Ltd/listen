@@ -33,26 +33,26 @@ class DemoTrialFingerprintPolicyTest extends TestCase
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $canvasIdentity,
-            'link_group' => 'lg:shared-device-1',
+            'link_group' => 'sg:shared-device-1',
             'identity_type' => 'canvas',
             'confidence' => 1.0,
         ]);
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $webglIdentity,
-            'link_group' => 'lg:shared-device-1',
+            'link_group' => 'sg:shared-device-1',
             'identity_type' => 'webgl',
             'confidence' => 1.0,
         ]);
 
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $canvasIdentity],
-            ['link_group' => 'lg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
+            ['link_group' => 'sg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
         );
 
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $webglIdentity],
-            ['link_group' => 'lg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
+            ['link_group' => 'sg:shared-device-1', 'used_chars' => 260, 'last_seen_at' => now()]
         );
 
         $this->actingAs($newUser);
@@ -195,26 +195,26 @@ class DemoTrialFingerprintPolicyTest extends TestCase
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $canvasIdentity,
-            'link_group' => 'lg:confirmed-device',
+            'link_group' => 'sg:confirmed-device',
             'identity_type' => 'canvas',
             'confidence' => 1.0,
         ]);
 
         DemoIdentityLink::query()->create([
             'identity_hash' => $webglIdentity,
-            'link_group' => 'lg:confirmed-device',
+            'link_group' => 'sg:confirmed-device',
             'identity_type' => 'webgl',
             'confidence' => 1.0,
         ]);
 
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $canvasIdentity],
-            ['link_group' => 'lg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
+            ['link_group' => 'sg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
         );
 
         DemoGuestUsage::query()->updateOrCreate(
             ['identity_hash' => $webglIdentity],
-            ['link_group' => 'lg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
+            ['link_group' => 'sg:confirmed-device', 'used_chars' => 260, 'last_seen_at' => now()]
         );
 
         $this->actingAs($newUser);

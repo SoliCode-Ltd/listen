@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 class DemoFraudService
 {
     private const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+    private const STRONG_IDENTITY_TYPES = ['canvas', 'webgl', 'audio'];
+    private const STRONG_LINK_GROUP_PREFIX = 'sg:';
 
     // Known VPN/proxy ASN ranges (common providers)
     private const VPN_ASN_KEYWORDS = [
@@ -399,12 +401,14 @@ class DemoFraudService
      */
     public function linkIdentities(array $identities, array $identityTypes): void
     {
-        if (count($identities) < 2) {
+        $strongIdentities = $this->extractStrongIdentities($identityTypes);
+        if (count($strongIdentities) < 2) {
             return;
         }
 
-        // Find existing link groups for any of these identities
-        $existingLinks = DemoIdentityLink::whereIn('identity_hash', $identities)
+        // Keep demo quota linkage restricted to strong signal groups only.
+        $existingLinks = DemoIdentityLink::whereIn('identity_hash', $strongIdentities)
+            ->where('link_group', 'like', self::STRONG_LINK_GROUP_PREFIX.'%')
             ->orderBy('created_at')
             ->get();
 
@@ -414,14 +418,14 @@ class DemoFraudService
         if ($existingLinks->isNotEmpty()) {
             $linkGroup = $existingLinks->first()->link_group;
         } else {
-            $linkGroup = 'lg:' . Str::uuid()->toString();
+            $linkGroup = self::STRONG_LINK_GROUP_PREFIX.Str::uuid()->toString();
         }
 
         // Update all identities to use the same link group
-        DB::transaction(function () use ($identities, $identityTypes, $linkGroup) {
+        DB::transaction(function () use ($strongIdentities, $identityTypes, $linkGroup) {
             $now = now();
 
-            foreach ($identities as $identity) {
+            foreach ($strongIdentities as $identity) {
                 // Determine identity type from the hash prefix
                 $type = 'unknown';
                 foreach ($identityTypes as $t => $hash) {
@@ -442,9 +446,11 @@ class DemoFraudService
             }
 
             // Update demo_guest_usages to include link_group
-            DemoGuestUsage::whereIn('identity_hash', $identities)
-                ->whereNull('link_group')
-                ->update(['link_group' => $linkGroup]);
+            DemoGuestUsage::whereIn('identity_hash', $strongIdentities)
+                ->update([
+                    'link_group' => $linkGroup,
+                    'updated_at' => $now,
+                ]);
         });
     }
 
@@ -567,10 +573,7 @@ class DemoFraudService
      */
     public function getConfirmedLinkedUsedChars(array $identities, int $minimumMatches = 2): int
     {
-        $identities = array_values(array_unique(array_filter(
-            array_map(static fn ($value) => trim((string) $value), $identities),
-            static fn (string $value) => $value !== ''
-        )));
+        $identities = $this->normalizeIdentityHashes($identities);
 
         if (count($identities) < max(1, $minimumMatches)) {
             return 0;
@@ -579,7 +582,9 @@ class DemoFraudService
         $matchingGroups = DemoIdentityLink::query()
             ->select('link_group')
             ->whereIn('identity_hash', $identities)
+            ->whereIn('identity_type', self::STRONG_IDENTITY_TYPES)
             ->whereNotNull('link_group')
+            ->where('link_group', 'like', self::STRONG_LINK_GROUP_PREFIX.'%')
             ->groupBy('link_group')
             ->havingRaw('COUNT(DISTINCT identity_hash) >= ?', [$minimumMatches])
             ->pluck('link_group')
@@ -593,6 +598,7 @@ class DemoFraudService
 
         $allIdentities = DemoIdentityLink::query()
             ->whereIn('link_group', $matchingGroups)
+            ->whereIn('identity_type', self::STRONG_IDENTITY_TYPES)
             ->pluck('identity_hash')
             ->filter(static fn ($identity) => is_string($identity) && trim($identity) !== '')
             ->unique()
@@ -617,7 +623,12 @@ class DemoFraudService
             return;
         }
 
-        $allIdentities = $this->getLinkedIdentities($identities);
+        $normalized = $this->normalizeIdentityHashes($identities);
+        if (count($normalized) < 2) {
+            return;
+        }
+
+        $allIdentities = $this->getLinkedStrongIdentities($normalized);
         $now = now();
 
         DB::transaction(function () use ($allIdentities, $chars, $limit, $now) {
@@ -661,5 +672,73 @@ class DemoFraudService
                     'updated_at' => $now,
                 ]);
         });
+    }
+
+    /**
+     * @param  array<string, string>  $identityTypes
+     * @return array<int, string>
+     */
+    private function extractStrongIdentities(array $identityTypes): array
+    {
+        $strong = [];
+
+        foreach (self::STRONG_IDENTITY_TYPES as $type) {
+            $identity = trim((string) ($identityTypes[$type] ?? ''));
+            if ($identity !== '') {
+                $strong[] = $identity;
+            }
+        }
+
+        return $this->normalizeIdentityHashes($strong);
+    }
+
+    /**
+     * @param  array<int, mixed>  $identities
+     * @return array<int, string>
+     */
+    private function normalizeIdentityHashes(array $identities): array
+    {
+        return array_values(array_unique(array_filter(
+            array_map(static fn ($value) => trim((string) $value), $identities),
+            static fn (string $value) => $value !== ''
+        )));
+    }
+
+    /**
+     * Expand only through strong-signal link groups.
+     *
+     * @param  array<int, string>  $identities
+     * @return array<int, string>
+     */
+    private function getLinkedStrongIdentities(array $identities): array
+    {
+        if ($identities === []) {
+            return [];
+        }
+
+        $linkGroups = DemoIdentityLink::query()
+            ->whereIn('identity_hash', $identities)
+            ->whereIn('identity_type', self::STRONG_IDENTITY_TYPES)
+            ->where('link_group', 'like', self::STRONG_LINK_GROUP_PREFIX.'%')
+            ->pluck('link_group')
+            ->filter(static fn ($group) => is_string($group) && trim($group) !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($linkGroups === []) {
+            return $identities;
+        }
+
+        $allLinked = DemoIdentityLink::query()
+            ->whereIn('link_group', $linkGroups)
+            ->whereIn('identity_type', self::STRONG_IDENTITY_TYPES)
+            ->pluck('identity_hash')
+            ->filter(static fn ($identity) => is_string($identity) && trim($identity) !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        return array_values(array_unique(array_merge($identities, $allLinked)));
     }
 }
