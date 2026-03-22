@@ -83,7 +83,10 @@ class ProfanityFilter
                     'language' => (string) $language,
                     'spaced' => $normalized['spaced'],
                     'compact' => $compact,
-                    'check_compact' => str_contains($rawTerm, ' ') || ((string) $language === 'ar' && mb_strlen($compact) >= 4),
+                    // Compact matching is intentionally limited to phrase terms.
+                    // Substring matching for single words creates false positives
+                    // in Arabic (for example matching inside normal words).
+                    'check_compact' => str_contains($rawTerm, ' '),
                 ];
             }
         }

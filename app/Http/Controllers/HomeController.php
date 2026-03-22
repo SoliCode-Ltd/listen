@@ -865,7 +865,9 @@ class HomeController extends Controller
             $extracted = $this->fraudService->extractIdentities($request);
             $fingerprints = array_values(array_filter(
                 (array) ($extracted['identities'] ?? []),
-                static fn ($id) => is_string($id) && $id !== '' && ! str_starts_with($id, 'ip:')
+                fn ($id) => is_string($id)
+                    && $id !== ''
+                    && $this->isStrongCrossAccountIdentity($id)
             ));
 
             if ($fingerprints !== []) {
@@ -879,6 +881,19 @@ class HomeController extends Controller
         }
 
         return $ownUsed;
+    }
+
+    private function isStrongCrossAccountIdentity(string $identity): bool
+    {
+        // Restrict cross-account matching to the most stable hardware/browser
+        // signals to avoid false positives on mobile fallback identities.
+        foreach (['cv:', 'gl:', 'au:'] as $prefix) {
+            if (str_starts_with($identity, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 

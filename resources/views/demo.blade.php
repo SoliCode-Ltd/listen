@@ -553,7 +553,8 @@
       // Display the actual quota from server (no live preview adjustment)
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const percent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+      const rawPercent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
+      const percent = remaining > 0 ? Math.max(1, rawPercent) : 0;
 
       if (quotaFill) {
         quotaFill.style.width = `${percent}%`;
@@ -576,6 +577,21 @@
         if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
       }
       setUpgradeVisible(Boolean(currentQuota.is_exhausted || remaining <= 0));
+    }
+
+    function isTrialExhaustedMessage(message) {
+      const normalized = String(message || '').trim().toLowerCase();
+      if (!normalized) return false;
+
+      const markers = [
+        'trial allowance has been used',
+        'trial allowance is used',
+        'used your trial allowance',
+        'انتهى رصيدك التجريبي',
+        'انتهي رصيدك التجريبي',
+      ];
+
+      return markers.some((marker) => normalized.includes(marker.toLowerCase()));
     }
 
     // Enhanced fingerprinting system
@@ -1023,15 +1039,21 @@
       } catch (err) {
         hideAudioPreview();
         const message = String(err?.message || i18n.preview_failed);
-        if (err?.payload?.quota) renderQuota(err.payload.quota);
+        const quotaFromError = err?.payload?.quota && typeof err.payload.quota === 'object'
+          ? err.payload.quota
+          : null;
+        if (quotaFromError) renderQuota(quotaFromError);
         setError(message);
         // Check if server returned a rate limit with retry seconds
         const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);
+        const serverSaysExhausted = quotaFromError
+          ? Boolean(Number(quotaFromError.remaining_chars || 0) <= 0 || quotaFromError.is_exhausted)
+          : Boolean(Number(currentQuota.remaining_chars || 0) <= 0 || currentQuota.is_exhausted);
         if (secondsMatch) {
           startCooldownCountdown(parseInt(secondsMatch[1], 10));
-        } else if (message.toLowerCase().includes('quota') || message.toLowerCase().includes('limit')) {
+        } else if (serverSaysExhausted || isTrialExhaustedMessage(message)) {
           setUpgradeVisible(true);
-          renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0 });
+          renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0, used_chars: Number(currentQuota.limit_chars || 0) });
           // Re-enable button on quota errors (user might want to try with less text)
           previewBtn.disabled = false;
           previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>' + i18n.generate_voice;
@@ -1083,7 +1105,8 @@
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
       const pending = Math.max(0, Number(pendingChars || 0));
       const afterGeneration = Math.max(0, remaining - pending);
-      const percent = Math.max(0, Math.min(100, Math.round((afterGeneration / limit) * 100)));
+      const rawPercent = Math.max(0, Math.min(100, Math.round((afterGeneration / limit) * 100)));
+      const percent = afterGeneration > 0 ? Math.max(1, rawPercent) : 0;
       quotaFill.style.width = `${percent}%`;
       // Show live preview in the quota text
       if (pending > 0) {
@@ -1114,3 +1137,4 @@
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 </body>
 </html>
+

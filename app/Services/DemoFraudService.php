@@ -13,6 +13,8 @@ use Illuminate\Support\Str;
 
 class DemoFraudService
 {
+    private const EMPTY_SHA256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+
     // Known VPN/proxy ASN ranges (common providers)
     private const VPN_ASN_KEYWORDS = [
         'nordvpn', 'expressvpn', 'surfshark', 'cyberghost', 'protonvpn',
@@ -148,7 +150,8 @@ class DemoFraudService
         // From header (preferred)
         $fpHeader = trim((string) $request->header('X-Listen-Fingerprint', ''));
         if ($fpHeader !== '') {
-            $decoded = json_decode(base64_decode($fpHeader), true);
+            $decodedRaw = base64_decode($fpHeader, true);
+            $decoded = $decodedRaw !== false ? json_decode($decodedRaw, true) : null;
             if (is_array($decoded)) {
                 $fingerprints = $decoded;
             } else {
@@ -160,7 +163,8 @@ class DemoFraudService
         if (empty($fingerprints['primary'])) {
             $cookie = trim((string) $request->cookie('listen_demo_fp', ''));
             if ($cookie !== '') {
-                $decoded = json_decode(base64_decode($cookie), true);
+                $decodedRaw = base64_decode($cookie, true);
+                $decoded = $decodedRaw !== false ? json_decode($decodedRaw, true) : null;
                 if (is_array($decoded)) {
                     $fingerprints = array_merge($fingerprints, $decoded);
                 } else {
@@ -171,7 +175,7 @@ class DemoFraudService
 
         // Additional fingerprints from POST body (for demo requests)
         if ($request->isMethod('POST')) {
-            foreach (['canvas', 'webgl', 'audio', 'fonts', 'screen', 'hardware', 'timezone'] as $key) {
+            foreach (['canvas', 'webgl', 'audio', 'fonts', 'screen', 'hardware', 'timezone', 'webdriver'] as $key) {
                 $value = trim((string) $request->input("fp_{$key}", ''));
                 if ($value !== '' && empty($fingerprints[$key])) {
                     $fingerprints[$key] = $value;
@@ -179,7 +183,65 @@ class DemoFraudService
             }
         }
 
-        return $fingerprints;
+        $normalized = [];
+        foreach ($fingerprints as $key => $value) {
+            if (! is_string($key)) {
+                continue;
+            }
+
+            $clean = $this->normalizeFingerprintValue($key, $value);
+            if ($clean !== '') {
+                $normalized[$key] = $clean;
+            }
+        }
+
+        if (empty($normalized['primary']) && isset($normalized['canvas'])) {
+            $normalized['primary'] = $normalized['canvas'];
+        }
+
+        if (empty($normalized['primary']) && isset($normalized['webgl'])) {
+            $normalized['primary'] = $normalized['webgl'];
+        }
+
+        if (empty($normalized['primary']) && isset($normalized['audio'])) {
+            $normalized['primary'] = $normalized['audio'];
+        }
+
+        if (empty($normalized['primary']) && isset($normalized['fonts'])) {
+            $normalized['primary'] = $normalized['fonts'];
+        }
+
+        if (empty($normalized['primary'])) {
+            unset($normalized['primary']);
+        }
+
+        return $normalized;
+    }
+
+    private function normalizeFingerprintValue(string $key, mixed $value): string
+    {
+        if (! is_scalar($value)) {
+            return '';
+        }
+
+        $normalized = mb_substr(trim((string) $value), 0, 512);
+        if ($normalized === '') {
+            return '';
+        }
+
+        $lower = strtolower($normalized);
+        if (in_array($lower, ['null', 'undefined', 'nan'], true)) {
+            return '';
+        }
+
+        if (
+            in_array($key, ['primary', 'canvas', 'webgl', 'audio', 'fonts'], true)
+            && $lower === self::EMPTY_SHA256
+        ) {
+            return '';
+        }
+
+        return $normalized;
     }
 
     /**
