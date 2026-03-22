@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BlockedGeneration;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -68,6 +69,8 @@ class BlockedGenerationLogger
                     'content_length' => mb_strlen($text),
                 ],
             ]);
+
+            $this->autoBlockUserAfterRepeatedAttempts($userId);
         } catch (\Throwable $exception) {
             Log::warning('Failed to log blocked generation attempt.', [
                 'route_name' => $routeName,
@@ -91,6 +94,36 @@ class BlockedGenerationLogger
         }
 
         return null;
+    }
+
+    private function autoBlockUserAfterRepeatedAttempts(?int $userId): void
+    {
+        if (! $userId) {
+            return;
+        }
+
+        try {
+            $user = User::query()->find($userId);
+            if (! $user || (bool) $user->is_blocked) {
+                return;
+            }
+
+            $attemptCount = (int) BlockedGeneration::query()
+                ->where('user_id', $userId)
+                ->count();
+
+            if ($attemptCount < 2) {
+                return;
+            }
+
+            app(BlockedUserService::class)->block($user);
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to auto-block user after repeated blocked generations.', [
+                'user_id' => $userId,
+                'exception_class' => get_class($exception),
+                'exception_message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function isReady(): bool
