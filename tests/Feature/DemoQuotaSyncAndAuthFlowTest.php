@@ -15,7 +15,7 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_demo_page_bootstraps_with_sync_required_then_quota_endpoint_returns_authoritative_device_usage(): void
+    public function test_demo_page_and_quota_endpoint_return_user_only_quota_even_if_fingerprint_matches_another_user(): void
     {
         $this->seedFreePlan();
 
@@ -30,8 +30,8 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
         $page = $this->actingAs($newUser)->getLocalizedRoute('demo.page');
 
         $page->assertOk();
-        $page->assertSee('"requires_client_sync":true', false);
-        $page->assertSee('"verification_source":"account_only"', false);
+        $page->assertSee('"requires_client_sync":false', false);
+        $page->assertSee('"verification_source":"user_only"', false);
 
         $quota = $this->actingAs($newUser)->postJsonLocalizedRoute('demo.quota', [
             'fp_canvas' => $sharedCanvas,
@@ -40,9 +40,9 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
 
         $quota->assertOk();
         $quota->assertJsonPath('ok', true);
-        $quota->assertJsonPath('quota.used_chars', 260);
-        $quota->assertJsonPath('quota.remaining_chars', 40);
-        $quota->assertJsonPath('quota.verification_source', 'device_verified');
+        $quota->assertJsonPath('quota.used_chars', 0);
+        $quota->assertJsonPath('quota.remaining_chars', 300);
+        $quota->assertJsonPath('quota.verification_source', 'user_only');
         $quota->assertJsonPath('quota.requires_client_sync', false);
     }
 

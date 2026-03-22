@@ -407,7 +407,8 @@ class HomeController extends Controller
             // Sync device-level usage in DemoGuestUsage so quota is shared
             // across accounts on the same device (prevents multi-account abuse).
             // Use original text chars to match what enforceDemoPolicy() checked.
-            $this->syncDemoGuestUsage($request, $estimate['chars']);
+            // Disabled in production hotfix: demo quota is user-based only.
+            // $this->syncDemoGuestUsage($request, $estimate['chars']);
 
             $quota = $this->demoQuotaForClient($request);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
@@ -897,11 +898,10 @@ class HomeController extends Controller
      */
     private function demoQuotaForPageLoad(Request $request): array
     {
-        $quota = $this->demoQuotaSnapshot($request, false);
-        $requiresClientSync = ! $this->requestHasStrongDemoFingerprint($request)
-            && (int) ($quota['remaining_chars'] ?? 0) > 0;
-
-        return $this->formatDemoQuotaForClient($quota, $requiresClientSync);
+        return $this->formatDemoQuotaForClient(
+            $this->demoQuotaSnapshot($request, false),
+            false,
+        );
     }
 
     /**
@@ -946,7 +946,6 @@ class HomeController extends Controller
         $limit = $this->demoCharAllowance($request);
         $used = min($limit, max(0, $this->trialUsedCharsWithFingerprint($request, $userId)));
         $remaining = max(0, $limit - $used);
-        $hasStrongFingerprint = $this->requestHasStrongDemoFingerprint($request);
 
         return [
             'scope' => 'trial',
@@ -954,38 +953,18 @@ class HomeController extends Controller
             'used_chars' => $used,
             'remaining_chars' => $remaining,
             'is_exhausted' => $remaining <= 0,
-            'verification_source' => $hasStrongFingerprint ? 'device_verified' : 'account_only',
+            'verification_source' => 'user_only',
         ];
     }
 
     /**
-     * Get total trial chars used, considering both the user's own generations
-     * and the device-level usage tracked in DemoGuestUsage.
-     *
-     * DemoGuestUsage tracks per-device usage across all accounts, so if
-     * email A uses 300 chars on device X, email B on device X sees 0 remaining.
-     * This runs on ALL requests (GET and POST) so page-load quota always
-     * matches what the generation endpoint enforces.
+     * Hotfix policy: trial usage is user-based only.
      */
     private function trialUsedCharsWithFingerprint(Request $request, int $userId): int
     {
-        $ownUsed = (int) (DemoVoiceGeneration::query()
+        return (int) (DemoVoiceGeneration::query()
             ->where('user_id', $userId)
             ->sum('billable_chars') ?? 0);
-
-        // Check device-level usage via DemoGuestUsage (shared across accounts on same device).
-        // On GET, fingerprints come from the cookie; on POST, from headers/body.
-        $extracted = $this->fraudService->extractIdentities($request);
-        $identityTypes = (array) ($extracted['identity_types'] ?? []);
-        $strongFingerprints = $this->strongDemoFingerprintIdentities($identityTypes);
-
-        if (count($strongFingerprints) >= 2) {
-            $deviceUsed = $this->fraudService->getConfirmedLinkedUsedChars($strongFingerprints, 2);
-
-            return max($ownUsed, $deviceUsed);
-        }
-
-        return $ownUsed;
     }
 
     /**
