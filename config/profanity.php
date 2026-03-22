@@ -105,6 +105,7 @@ return [
             'عاهرة',
             'قحاب',
             'قحبة',
+            'خول',
             'كحبة',
             'لقحاب',
             'ولد القحبة',
@@ -116,6 +117,17 @@ return [
             'مخانيث',
             'مخنث',
             'زامل',
+
+            // Pimping / cuckoldry slurs (genuinely vulgar, no dual meaning)
+            'عرص',
+            'العرص',
+            'معرص',
+            'معرصين',
+            'المعرصين',
+            'عرصه',
+            'عرصة',
+            'ديوث',
+            'الديوث',
 
             // Explicit compound insults (targeted, no dual meaning)
             'ابن المرة',
