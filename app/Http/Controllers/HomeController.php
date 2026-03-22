@@ -431,34 +431,6 @@ class HomeController extends Controller
         }
     }
 
-    /**
-     * Lightweight endpoint that returns the accurate demo quota.
-     *
-     * Called by the frontend after building the device fingerprint so the
-     * displayed quota reflects cross-device/cross-account usage discovered
-     * via fingerprints that are only available after JS runs.
-     */
-    public function quotaRefresh(Request $request)
-    {
-        $user = $request->user();
-        $userId = (int) $user->id;
-        $rateKey = "demo:rate:quota_refresh:u:{$userId}";
-        $maxPerMinute = 10;
-
-        if (RateLimiter::tooManyAttempts($rateKey, $maxPerMinute)) {
-            return response()->json([
-                'ok' => true,
-                'quota' => $this->demoQuotaSnapshot($request, true),
-            ]);
-        }
-        RateLimiter::hit($rateKey, 60);
-
-        return response()->json([
-            'ok' => true,
-            'quota' => $this->demoQuotaSnapshot($request, true),
-        ]);
-    }
-
     private function enforceDemoPolicy(Request $request, int $chars, bool $preview, bool $commit = true): array
     {
         $user = $request->user();

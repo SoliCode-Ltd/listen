@@ -1118,40 +1118,7 @@
     updateTranslateHint();
     renderQuota(currentQuota);
     updateCharCount(); // Initialize char counter on load
-
-    // After building the fingerprint, refresh quota from the server.
-    // On first visit the page-load quota is based on user records only (no
-    // fingerprint cookie yet). This POST sends the fingerprint so the server
-    // can include cross-device/cross-account usage in the returned quota,
-    // ensuring the displayed remaining chars match what generate will enforce.
-    ensureFingerprint()
-      .then(() => {
-        const fd = new FormData();
-        // Attach fingerprint components so the server can evaluate device-level usage
-        if (fingerprintComponents.canvas) fd.append('fp_canvas', fingerprintComponents.canvas);
-        if (fingerprintComponents.webgl) fd.append('fp_webgl', fingerprintComponents.webgl);
-        if (fingerprintComponents.audio) fd.append('fp_audio', fingerprintComponents.audio);
-        if (fingerprintComponents.fonts) fd.append('fp_fonts', fingerprintComponents.fonts);
-        if (fingerprintComponents.screen) fd.append('fp_screen', fingerprintComponents.screen);
-        if (fingerprintComponents.hardware) fd.append('fp_hardware', fingerprintComponents.hardware);
-        if (fingerprintComponents.timezone) fd.append('fp_timezone', fingerprintComponents.timezone);
-        if (fingerprintComponents.webdriver) fd.append('fp_webdriver', fingerprintComponents.webdriver);
-
-        const headers = { ...csrfHeaders };
-        if (clientFingerprint) {
-          headers['X-Listen-Fingerprint'] = btoa(JSON.stringify(fingerprintComponents));
-        }
-
-        return fetch('{{ route("demo.quota") }}', { method: 'POST', headers, body: fd });
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data?.quota) {
-          renderQuota(data.quota);
-          updateCharCount();
-        }
-      })
-      .catch(() => { /* quota refresh is best-effort; page-load values remain */ });
+    ensureFingerprint().catch(() => {});
 
     // Reveal on scroll animation
     const revealObserver = new IntersectionObserver((entries) => {
