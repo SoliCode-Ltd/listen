@@ -34,6 +34,7 @@ class DemoTrialFingerprintPolicyTest extends TestCase
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
             'fp_canvas' => $sharedCanvas,
+            'fp_webgl' => 'stable-webgl-fingerprint-123',
         ]);
 
         $response->assertStatus(422);
@@ -60,6 +61,31 @@ class DemoTrialFingerprintPolicyTest extends TestCase
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
             'fp_canvas' => self::EMPTY_SHA256,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('ok', true);
+        $this->assertSame(0, (int) data_get($response->json(), 'quota.used_chars'));
+    }
+
+    public function test_demo_trial_does_not_link_accounts_when_only_one_strong_signal_is_present(): void
+    {
+        $voice = $this->seedFreePlanAndVoice();
+        $existingUser = User::factory()->create();
+        $newUser = User::factory()->create();
+
+        $sharedCanvas = 'single-signal-canvas-fingerprint';
+        $sharedIdentityHash = 'cv:'.hash('sha256', $sharedCanvas);
+        $this->storeDemoUsage($existingUser, $sharedIdentityHash, 260);
+
+        $this->actingAs($newUser);
+
+        $response = $this->postJsonLocalizedRoute('demo.run', [
+            'text' => str_repeat('d', 50),
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+            'fp_canvas' => $sharedCanvas,
         ]);
 
         $response->assertOk();

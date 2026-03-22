@@ -863,14 +863,21 @@ class HomeController extends Controller
         // On POST requests, extract device fingerprints and check cross-account usage
         if ($request->isMethod('POST')) {
             $extracted = $this->fraudService->extractIdentities($request);
-            $fingerprints = array_values(array_filter(
-                (array) ($extracted['identities'] ?? []),
-                fn ($id) => is_string($id)
-                    && $id !== ''
-                    && $this->isStrongCrossAccountIdentity($id)
-            ));
+            $identityTypes = (array) ($extracted['identity_types'] ?? []);
+            $fingerprints = [];
 
-            if ($fingerprints !== []) {
+            // Require at least 2 high-confidence, independent signals before
+            // applying cross-account trial aggregation. This avoids mobile
+            // false positives when only one weak-ish fingerprint is available.
+            foreach (['canvas', 'webgl', 'audio'] as $type) {
+                $identity = trim((string) ($identityTypes[$type] ?? ''));
+                if ($identity !== '') {
+                    $fingerprints[] = $identity;
+                }
+            }
+            $fingerprints = array_values(array_unique($fingerprints));
+
+            if (count($fingerprints) >= 2) {
                 $crossAccountUsed = (int) (DemoVoiceGeneration::query()
                     ->where('user_id', '!=', $userId)
                     ->whereIn('primary_identity_hash', $fingerprints)
@@ -881,19 +888,6 @@ class HomeController extends Controller
         }
 
         return $ownUsed;
-    }
-
-    private function isStrongCrossAccountIdentity(string $identity): bool
-    {
-        // Restrict cross-account matching to the most stable hardware/browser
-        // signals to avoid false positives on mobile fallback identities.
-        foreach (['cv:', 'gl:', 'au:'] as $prefix) {
-            if (str_starts_with($identity, $prefix)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
 

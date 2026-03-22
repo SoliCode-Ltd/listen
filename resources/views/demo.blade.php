@@ -455,6 +455,7 @@
     const preferredVoiceKeyByLanguageAndTier = {};
     let clientFingerprint = '';
     let fingerprintPromise = null;
+    let lastCommittedText = '';
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -1016,6 +1017,8 @@
         hideAudioPreview();
         const data = await callEndpoint('{{ route("demo.preview") }}');
         renderQuota(data?.quota || null);
+        lastCommittedText = String(trimmed);
+        updateCharCount();
         if (!data?.audio_url) { hideAudioPreview(); setError(i18n.no_audio_returned); return; }
         if (outputPlaceholder) outputPlaceholder.style.display = 'none';
         audioWrap.style.display = 'block';
@@ -1104,14 +1107,16 @@
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
       const pending = Math.max(0, Number(pendingChars || 0));
-      const afterGeneration = Math.max(0, remaining - pending);
+      const normalizedText = String(textInput?.value || '').trim();
+      const effectivePending = normalizedText !== '' && normalizedText === lastCommittedText ? 0 : pending;
+      const afterGeneration = Math.max(0, remaining - effectivePending);
       const rawPercent = Math.max(0, Math.min(100, Math.round((afterGeneration / limit) * 100)));
       const percent = afterGeneration > 0 ? Math.max(1, rawPercent) : 0;
       quotaFill.style.width = `${percent}%`;
       // Show live preview in the quota text
-      if (pending > 0) {
+      if (effectivePending > 0) {
         quotaValue.textContent = `${formatNumber(afterGeneration)} / ${formatNumber(limit)} ${i18n.chars_left}`;
-        quotaFill.style.background = pending > remaining ? 'var(--error-color, #ef4444)' : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+        quotaFill.style.background = effectivePending > remaining ? 'var(--error-color, #ef4444)' : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       } else {
         quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
         quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
