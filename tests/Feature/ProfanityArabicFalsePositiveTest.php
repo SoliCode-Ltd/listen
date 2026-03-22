@@ -37,7 +37,7 @@ class ProfanityArabicFalsePositiveTest extends TestCase
         $this->actingAs($user);
 
         $response = $this->postJsonLocalizedRoute('demo.run', [
-            'text' => 'هذا نص احا غير مقبول',
+            'text' => 'هذا نص شرموطة غير مقبول',
             'target_language' => 'ar',
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),

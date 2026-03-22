@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\DemoGuestUsage;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\User;
@@ -165,5 +166,11 @@ class DemoTrialFingerprintPolicyTest extends TestCase
             'voice_tier' => 'standard',
             'billable_chars' => $billableChars,
         ]);
+
+        // Also create DemoGuestUsage record (device-level quota tracker).
+        DemoGuestUsage::query()->updateOrCreate(
+            ['identity_hash' => $primaryIdentityHash],
+            ['used_chars' => $billableChars, 'last_seen_at' => now()]
+        );
     }
 }

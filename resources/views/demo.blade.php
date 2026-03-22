@@ -455,6 +455,7 @@
     const preferredVoiceKeyByLanguageAndTier = {};
     let clientFingerprint = '';
     let fingerprintPromise = null;
+    let lastGeneratedText = '';
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -549,27 +550,33 @@
     function renderQuota(quota) {
       if (!quota || typeof quota !== 'object') return;
       currentQuota = normalizeQuotaState({ ...currentQuota, ...quota }, currentQuota);
+      syncQuotaDisplay();
+    }
 
-      // Display the actual quota from server — never apply speculative deductions
-      // to the progress bar. This prevents the "double deduction" perception where
-      // users see chars decrease while typing AND again after generation.
+    function syncQuotaDisplay() {
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const rawPercent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
-      const percent = remaining > 0 ? Math.max(1, rawPercent) : 0;
+      const currentText = String(textInput?.value || '').trim();
+      const pending = countBillableChars(currentText);
+      // If the text hasn't changed since last generation, the server already
+      // deducted these chars — don't subtract them again (prevents double deduction).
+      const alreadyDeducted = currentText !== '' && currentText === lastGeneratedText;
+      const effectivePending = alreadyDeducted ? 0 : pending;
+      const afterGeneration = Math.max(0, remaining - effectivePending);
+      const displayRemaining = effectivePending > 0 ? afterGeneration : remaining;
+      const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / limit) * 100)));
+      const percent = displayRemaining > 0 ? Math.max(1, rawPercent) : 0;
 
       if (quotaFill) {
         quotaFill.style.width = `${percent}%`;
-        quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
+        quotaFill.style.background = effectivePending > remaining
+          ? 'var(--error-color, #ef4444)'
+          : 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       }
       if (quotaValue) {
-        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
       }
 
-      if (quotaBox) {
-        const pending = countBillableChars(textInput?.value || '');
-        if (pending > 0) quotaBox.title = `${formatNumber(pending)} billable chars selected`;
-      }
       setUpgradeVisible(Boolean(currentQuota.is_exhausted || remaining <= 0));
     }
 
@@ -1009,6 +1016,7 @@
         previewBtn.querySelector('span').innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>' + i18n.generating;
         hideAudioPreview();
         const data = await callEndpoint('{{ route("demo.preview") }}');
+        lastGeneratedText = String(trimmed);
         renderQuota(data?.quota || null);
         updateCharCount();
         if (!data?.audio_url) { hideAudioPreview(); setError(i18n.no_audio_returned); return; }
@@ -1092,12 +1100,12 @@
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       if (count > 0) {
         counter.textContent = `${formatNumber(count)} / ${formatNumber(remaining)}`;
-        // Warn in red if typed chars exceed remaining quota
         counter.style.color = count > remaining ? 'var(--error-color, #ef4444)' : '';
       } else {
         counter.textContent = '';
         counter.style.color = '';
       }
+      syncQuotaDisplay();
     }
 
     if (translateToggle && translateSelect) translateToggle.checked = translateSelect.value === '1';

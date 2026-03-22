@@ -357,6 +357,11 @@ class HomeController extends Controller
                 $audio,
                 $quota
             );
+
+            // Sync device-level usage in DemoGuestUsage so quota is shared
+            // across accounts on the same device (prevents multi-account abuse).
+            $this->syncDemoGuestUsage($request, $estimate['chars']);
+
             $quota = $this->demoQuotaSnapshot($request, true);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
 
@@ -851,8 +856,12 @@ class HomeController extends Controller
 
     /**
      * Get total trial chars used, considering both the user's own generations
-     * and generations from other accounts that share the same device fingerprint.
-     * This prevents abuse by creating multiple accounts on the same device.
+     * and the device-level usage tracked in DemoGuestUsage.
+     *
+     * DemoGuestUsage tracks per-device usage across all accounts, so if
+     * email A uses 300 chars on device X, email B on device X sees 0 remaining.
+     * This runs on ALL requests (GET and POST) so page-load quota always
+     * matches what the generation endpoint enforces.
      */
     private function trialUsedCharsWithFingerprint(Request $request, int $userId): int
     {
@@ -860,44 +869,73 @@ class HomeController extends Controller
             ->where('user_id', $userId)
             ->sum('billable_chars') ?? 0);
 
-        // On POST requests, extract device fingerprints and check cross-account usage.
-        // Only match against records that were stored WITHOUT a user_id (guest records)
-        // to avoid false positives on mobile where many devices share identical
-        // canvas/WebGL fingerprints (same GPU model = same hash).
-        if ($request->isMethod('POST')) {
-            $extracted = $this->fraudService->extractIdentities($request);
-            $identityTypes = (array) ($extracted['identity_types'] ?? []);
-            $fingerprints = [];
+        // Check device-level usage via DemoGuestUsage (shared across accounts on same device).
+        // On GET, fingerprints come from the cookie; on POST, from headers/body.
+        $extracted = $this->fraudService->extractIdentities($request);
+        $identityTypes = (array) ($extracted['identity_types'] ?? []);
 
-            // Require at least 2 high-confidence, independent signals before
-            // applying cross-account trial aggregation.
-            foreach (['canvas', 'webgl', 'audio'] as $type) {
-                $identity = trim((string) ($identityTypes[$type] ?? ''));
-                if ($identity !== '') {
-                    $fingerprints[] = $identity;
-                }
+        // Require at least 2 high-confidence, independent signals (canvas, webgl, audio)
+        // before applying cross-account trial aggregation. This avoids false positives
+        // from weak/single signals (e.g. only IP or user-agent).
+        $strongFingerprints = [];
+        foreach (['canvas', 'webgl', 'audio'] as $type) {
+            $identity = trim((string) ($identityTypes[$type] ?? ''));
+            if ($identity !== '') {
+                $strongFingerprints[] = $identity;
             }
-            $fingerprints = array_values(array_unique($fingerprints));
+        }
+        $strongFingerprints = array_values(array_unique($strongFingerprints));
 
-            if (count($fingerprints) >= 2) {
-                $crossAccountUsed = (int) (DemoVoiceGeneration::query()
-                    ->where('user_id', '!=', $userId)
-                    ->whereNull('user_id', 'or')
-                    ->whereIn('primary_identity_hash', $fingerprints)
-                    // Exclude records stored with a user identity as primary —
-                    // these are already counted via user_id and matching them
-                    // by fingerprint causes false cross-device linking on
-                    // mobile devices with identical GPU hardware.
-                    ->where('primary_identity_hash', 'not like', 'u:%')
-                    ->sum('billable_chars') ?? 0);
+        if (count($strongFingerprints) >= 2) {
+            $deviceUsed = $this->fraudService->getLinkedUsedChars($strongFingerprints);
 
-                return $ownUsed + $crossAccountUsed;
-            }
+            return max($ownUsed, $deviceUsed);
         }
 
         return $ownUsed;
     }
 
+    /**
+     * Update DemoGuestUsage after a successful generation so device-level
+     * quota is shared across accounts. Also links identities when 2+
+     * strong fingerprints are present.
+     */
+    private function syncDemoGuestUsage(Request $request, int $chars): void
+    {
+        try {
+            $extracted = $this->fraudService->extractIdentities($request);
+            $identities = array_values(array_filter(
+                array_map(static fn ($v) => trim((string) $v), (array) ($extracted['identities'] ?? [])),
+                static fn (string $v) => $v !== ''
+            ));
+
+            if ($identities === []) {
+                return;
+            }
+
+            // Link identities that appear together on this device
+            $identityTypes = (array) ($extracted['identity_types'] ?? []);
+            if (count($identities) >= 2) {
+                $this->fraudService->linkIdentities($identities, $identityTypes);
+            }
+
+            // Record fraud signals if any
+            $fraudSignals = (array) ($extracted['fraud_signals'] ?? []);
+            if ($fraudSignals !== []) {
+                $allIdentities = $this->fraudService->getLinkedIdentities($identities);
+                $this->fraudService->recordFraudSignals($allIdentities, $fraudSignals);
+            }
+
+            // Reserve chars in device-level tracker
+            $limit = $this->demoCharAllowance($request);
+            $this->fraudService->reserveChars($identities, $chars, $limit);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to sync demo guest usage.', [
+                'exception_class' => get_class($e),
+                'exception_message' => $e->getMessage(),
+            ]);
+        }
+    }
 
     /**
      * @param  array<string, mixed>  $validated

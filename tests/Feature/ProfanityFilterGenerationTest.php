@@ -24,7 +24,7 @@ class ProfanityFilterGenerationTest extends TestCase
         ]);
 
         $response = $this->actingAs($user)->postJsonLocalizedRoute('dashboard.generate', [
-            'content' => 'هذا نص احا غير مقبول',
+            'content' => 'هذا نص شرموطة غير مقبول',
             'target_language' => 'ar',
             'translate' => false,
             'voice_tier' => 'standard',
