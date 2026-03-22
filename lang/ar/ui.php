@@ -641,6 +641,8 @@ return [
         'preview_failed' => 'فشلت المعاينة',
         'checking_allowance' => 'جارٍ التحقق من رصيد التجربة...',
         'quota_sync_failed' => 'تعذر التحقق من رصيد التجربة. يرجى المحاولة مرة أخرى.',
+        'typing_preview' => 'معاينة مباشرة: هذا النص يستهلك :selected حرفاً. بعد التوليد سيتبقى :remaining حرف.',
+        'typing_exceeds_quota' => 'النص الحالي يستهلك :selected حرفاً ويتجاوز رصيدك المتبقي بمقدار :over حرف.',
         'create_account_unlock' => 'أنشئ حساباً مجانياً لفتح :chars حرف والمتابعة.',
         'ready_in_seconds' => 'جاهز خلال :seconds...',
         'preparing_next' => 'جاري التحضير...',

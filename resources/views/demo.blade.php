@@ -257,6 +257,8 @@
       'preparing_next' => __('ui.demo.preparing_next'),
       'checking_allowance' => __('ui.demo.checking_allowance'),
       'quota_sync_failed' => __('ui.demo.quota_sync_failed'),
+      'typing_preview' => __('ui.demo.typing_preview'),
+      'typing_exceeds_quota' => __('ui.demo.typing_exceeds_quota'),
     ];
   @endphp
   <script>
@@ -301,6 +303,7 @@
     let feedbackScrollFrame = null;
     const heroWave = document.getElementById('heroWave');
     const textInput = document.getElementById('text');
+    const charCounter = document.getElementById('charCounter');
     const outputPlaceholder = document.getElementById('outputPlaceholder');
 
     const autoDialectLabel = '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}';
@@ -463,6 +466,8 @@
     let isQuotaRefreshing = false;
     let isGenerating = false;
     let hasQuotaSynced = !toBoolean(currentQuota?.requires_client_sync);
+    let liveBillableChars = 0;
+    let charCountFrame = null;
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -472,12 +477,34 @@
     const previewButtonIcon = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>';
     const previewButtonSpinner = '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>';
     const previewButtonCooldownIcon = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>';
+    const supportsUnicodeProperties = (() => {
+      try {
+        return new RegExp('[\\p{L}\\p{N}]', 'u').test('A');
+      } catch (_error) {
+        return false;
+      }
+    })();
+    const unicodeBillableCharRegex = supportsUnicodeProperties ? new RegExp('[\\p{L}\\p{N}]', 'u') : null;
+    const fallbackBillableCharRegex = /[0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u052F\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F\u0980-\u09FF\u3040-\u30FF\u4E00-\u9FFF]/;
 
     function formatNumber(value) { return new Intl.NumberFormat('en-US').format(Number(value || 0)); }
     function countBillableChars(value) {
       const text = String(value || '');
-      try { return (text.match(new RegExp('[\\p{L}\\p{N}]', 'gu')) || []).length; }
-      catch (_error) { return (text.match(/[A-Za-z0-9]/g) || []).length; }
+      if (!text) return 0;
+
+      let count = 0;
+      for (const char of text) {
+        if (unicodeBillableCharRegex) {
+          if (unicodeBillableCharRegex.test(char)) count += 1;
+          continue;
+        }
+        if (fallbackBillableCharRegex.test(char)) count += 1;
+      }
+
+      return count;
+    }
+    function currentDraftBillableChars() {
+      return countBillableChars(String(textInput?.value || '').trim());
     }
     function normalizeLanguage(value) { return value === 'en' ? 'en' : 'ar'; }
     function oppositeLanguage(value) { return normalizeLanguage(value) === 'en' ? 'ar' : 'en'; }
@@ -599,20 +626,41 @@
     }
 
     function syncQuotaDisplay() {
-      const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const baseRemaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
-      const rawPercent = Math.max(0, Math.min(100, Math.round((remaining / limit) * 100)));
-      const percent = remaining > 0 ? Math.max(1, rawPercent) : 0;
+      const hasDraft = liveBillableChars > 0;
+      const displayRemaining = hasDraft ? Math.max(0, baseRemaining - liveBillableChars) : baseRemaining;
+      const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / limit) * 100)));
+      const percent = displayRemaining > 0 ? Math.max(1, rawPercent) : 0;
 
       if (quotaFill) {
         quotaFill.style.width = `${percent}%`;
         quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       }
       if (quotaValue) {
-        quotaValue.textContent = `${formatNumber(remaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
       }
 
-      setUpgradeVisible(Boolean(currentQuota.is_exhausted || remaining <= 0));
+      if (!isQuotaRefreshing) {
+        if (hasDraft && baseRemaining > 0) {
+          if (liveBillableChars > baseRemaining) {
+            const overBy = Math.max(0, liveBillableChars - baseRemaining);
+            const message = String(i18n.typing_exceeds_quota || '')
+              .replace(':selected', formatNumber(liveBillableChars))
+              .replace(':over', formatNumber(overBy));
+            setQuotaStatus(message, 'error');
+          } else {
+            const message = String(i18n.typing_preview || '')
+              .replace(':selected', formatNumber(liveBillableChars))
+              .replace(':remaining', formatNumber(displayRemaining));
+            setQuotaStatus(message, 'muted');
+          }
+        } else if (quotaStatus?.dataset?.tone !== 'error') {
+          setQuotaStatus('');
+        }
+      }
+
+      setUpgradeVisible(Boolean(currentQuota.is_exhausted || baseRemaining <= 0));
       resetPreviewButton();
     }
 
@@ -1076,7 +1124,7 @@
         if (!isTranslateEnabled()) syncLanguageToCurrentTextWhenTranslationOff();
         const rawText = String(textInput?.value || '');
         const trimmed = rawText.trim();
-        const selectedChars = countBillableChars(trimmed);
+        const selectedChars = currentDraftBillableChars();
         if (!trimmed) { hideAudioPreview(); setError(i18n.text_required); return; }
         if ((voiceTier?.value || 'standard') === 'hd' && !String(performanceStyleSelect?.value || '').trim()) {
           hideAudioPreview();
@@ -1171,22 +1219,30 @@
       else { preferredTranslateLanguage = normalizeLanguage(targetLanguage?.value); syncLanguageToCurrentTextWhenTranslationOff(oppositeLanguage(preferredTranslateLanguage)); }
       updateTranslateHint();
     });
-    textInput?.addEventListener('input', () => {
-      if (currentQuota.remaining_chars <= 0) setUpgradeVisible(true);
-      updateCharCount();
+    function scheduleCharCountUpdate() {
+      if (charCountFrame) cancelAnimationFrame(charCountFrame);
+      charCountFrame = requestAnimationFrame(() => {
+        charCountFrame = null;
+        if (currentQuota.remaining_chars <= 0) setUpgradeVisible(true);
+        updateCharCount();
+      });
+    }
+    ['input', 'change', 'keyup', 'paste', 'cut'].forEach((eventName) => {
+      textInput?.addEventListener(eventName, scheduleCharCountUpdate);
     });
+    textInput?.addEventListener('compositionend', scheduleCharCountUpdate);
 
     function updateCharCount() {
-      const counter = document.getElementById('charCounter');
-      if (!counter || !textInput) return;
-      const count = countBillableChars(textInput.value);
+      if (!charCounter || !textInput) return;
+      const count = currentDraftBillableChars();
+      liveBillableChars = count;
       const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
       if (count > 0) {
-        counter.textContent = `${formatNumber(count)} / ${formatNumber(remaining)}`;
-        counter.style.color = count > remaining ? 'var(--error-color, #ef4444)' : '';
+        charCounter.textContent = `${formatNumber(count)} / ${formatNumber(remaining)}`;
+        charCounter.style.color = count > remaining ? 'var(--error-color, #ef4444)' : '';
       } else {
-        counter.textContent = '';
-        counter.style.color = '';
+        charCounter.textContent = '';
+        charCounter.style.color = '';
       }
       syncQuotaDisplay();
     }
