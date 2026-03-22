@@ -8,7 +8,10 @@
       "Bash(php -l app/Http/Controllers/AuthController.php)",
       "Bash(php -l app/Models/DemoVoiceGeneration.php)",
       "Bash(php artisan:*)",
-      "Bash(php -r \":*)"
+      "Bash(php -r \":*)",
+      "Bash(xargs grep:*)",
+      "Bash(find . -path \"*/config/*\" -name \"*.php\" -exec grep -l \"middleware\" {})",
+      "Bash(php -l routes/web.php)"
     ]
   }
 }

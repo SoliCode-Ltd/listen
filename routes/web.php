@@ -140,6 +140,7 @@ Route::group([
         Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
         Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
         Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
+        Route::post('/demo/quota', [HomeController::class, 'quotaRefresh'])->name('demo.quota');
     });
 
     Route::middleware(['auth', 'subscription.sync'])->group(function () {

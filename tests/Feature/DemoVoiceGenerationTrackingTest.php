@@ -107,7 +107,9 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertStringStartsWith('audio/demo/', $generation->audio_path);
         Storage::disk('public')->assertExists($generation->audio_path);
         $this->assertSame(4, $generation->duration_seconds);
-        $billableChars = UsageEstimator::estimate('Translated demo text')['chars'];
+        // billable_chars is based on the original input text (what the user typed),
+        // not the translated/speech text, to keep the demo quota predictable.
+        $billableChars = UsageEstimator::estimate('Hello world')['chars'];
         $this->assertSame($billableChars, $generation->billable_chars);
         $this->assertSame('promo', $generation->performance_style);
         $this->assertSame('excited', $generation->emotion);

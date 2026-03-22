@@ -345,7 +345,12 @@ class HomeController extends Controller
                 null,
             );
             $audio['audio_path'] = $this->storeDemoAudioCopy((string) ($audio['audio_path'] ?? ''));
-            $estimate = UsageEstimator::estimate($textForSpeech);
+
+            // Use original text chars for demo quota consumption — this is what the user
+            // typed and what the frontend counted. Translated text may expand/contract,
+            // which would cause a mismatch between the UI counter and actual billing.
+            // Speech-text metrics are stored separately in metadata for analytics.
+            $speechEstimate = UsageEstimator::estimate($textForSpeech);
             $generation = $this->storeDemoVoiceGeneration(
                 $request,
                 $validated,
@@ -355,11 +360,14 @@ class HomeController extends Controller
                 $voiceName,
                 $studioOptions,
                 $audio,
-                $quota
+                $quota,
+                $estimate['chars'],
+                $speechEstimate['chars'],
             );
 
             // Sync device-level usage in DemoGuestUsage so quota is shared
             // across accounts on the same device (prevents multi-account abuse).
+            // Use original text chars to match what enforceDemoPolicy() checked.
             $this->syncDemoGuestUsage($request, $estimate['chars']);
 
             $quota = $this->demoQuotaSnapshot($request, true);
@@ -377,7 +385,7 @@ class HomeController extends Controller
                 'voice_tier' => $tier,
                 'voice_tier_label' => VoiceTier::label($tier),
                 'audio_url' => AudioUrl::fromPath($audio['audio_path']),
-                'duration_seconds' => $audio['duration_seconds'] ?? $estimate['seconds'],
+                'duration_seconds' => $audio['duration_seconds'] ?? $speechEstimate['seconds'],
                 'estimated_chars' => $estimate['chars'],
                 'quota' => $quota,
             ]);
@@ -421,6 +429,34 @@ class HomeController extends Controller
                 'quota' => $quota ?: $this->demoQuotaSnapshot($request, true),
             ], 422);
         }
+    }
+
+    /**
+     * Lightweight endpoint that returns the accurate demo quota.
+     *
+     * Called by the frontend after building the device fingerprint so the
+     * displayed quota reflects cross-device/cross-account usage discovered
+     * via fingerprints that are only available after JS runs.
+     */
+    public function quotaRefresh(Request $request)
+    {
+        $user = $request->user();
+        $userId = (int) $user->id;
+        $rateKey = "demo:rate:quota_refresh:u:{$userId}";
+        $maxPerMinute = 10;
+
+        if (RateLimiter::tooManyAttempts($rateKey, $maxPerMinute)) {
+            return response()->json([
+                'ok' => true,
+                'quota' => $this->demoQuotaSnapshot($request, true),
+            ]);
+        }
+        RateLimiter::hit($rateKey, 60);
+
+        return response()->json([
+            'ok' => true,
+            'quota' => $this->demoQuotaSnapshot($request, true),
+        ]);
     }
 
     private function enforceDemoPolicy(Request $request, int $chars, bool $preview, bool $commit = true): array
@@ -953,6 +989,8 @@ class HomeController extends Controller
         array $studioOptions,
         array $audio,
         array $quota,
+        ?int $originalChars = null,
+        ?int $speechChars = null,
     ): ?DemoVoiceGeneration {
         try {
             $identityContext = $this->demoTrackingContext($request);
@@ -979,7 +1017,7 @@ class HomeController extends Controller
                 'voice_tier' => isset($validated['voice_tier']) ? VoiceTier::normalize((string) $validated['voice_tier']) : null,
                 'audio_path' => isset($audio['audio_path']) ? (string) $audio['audio_path'] : null,
                 'duration_seconds' => isset($audio['duration_seconds']) ? (int) $audio['duration_seconds'] : null,
-                'billable_chars' => UsageEstimator::estimate($speechText)['chars'],
+                'billable_chars' => $originalChars ?? UsageEstimator::estimate($inputText)['chars'],
                 'dialect' => isset($studioOptions['dialect']) ? (string) $studioOptions['dialect'] : null,
                 'performance_style' => isset($studioOptions['performance_style']) ? (string) $studioOptions['performance_style'] : null,
                 'style_prompt' => isset($studioOptions['style_prompt']) ? (string) $studioOptions['style_prompt'] : null,
@@ -1002,6 +1040,7 @@ class HomeController extends Controller
                         'provider' => $voiceMeta['provider'] ?? null,
                     ] : null,
                     'quota' => $quota,
+                    'speech_chars' => $speechChars ?? UsageEstimator::estimate($speechText)['chars'],
                     'routing_mode' => $audio['routing_mode'] ?? null,
                     'plan_slug' => $audio['plan_slug'] ?? 'free',
                 ],
