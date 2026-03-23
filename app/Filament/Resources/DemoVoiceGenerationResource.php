@@ -4,15 +4,21 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\DemoVoiceGenerationResource\Pages;
 use App\Models\DemoVoiceGeneration;
+use App\Models\Plan;
+use App\Models\Subscription;
+use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+
 class DemoVoiceGenerationResource extends Resource
 {
     protected static ?string $model = DemoVoiceGeneration::class;
+    /** @var array<int, array{label:string,is_paid:bool}> */
+    private static array $planBadgeByUserId = [];
 
     protected static ?string $navigationIcon = 'heroicon-o-speaker-wave';
 
@@ -121,7 +127,25 @@ class DemoVoiceGenerationResource extends Resource
                     ->label('User')
                     ->searchable()
                     ->sortable()
-                    ->placeholder('—'),
+                    ->placeholder('-'),
+                Tables\Columns\TextColumn::make('paid_user_status')
+                    ->label('Plan')
+                    ->state(fn (DemoVoiceGeneration $record): string => self::resolvePlanBadge($record)['label'])
+                    ->formatStateUsing(fn (?string $state): string => self::cleanPlanLabel((string) $state))
+                    ->badge()
+                    ->extraHeaderAttributes(['class' => 'whitespace-nowrap'])
+                    ->extraAttributes(['class' => 'whitespace-nowrap'])
+                    ->weight('600')
+                    ->color(function (DemoVoiceGeneration $record): string {
+                        $badge = self::resolvePlanBadge($record);
+                        $label = strtolower(self::cleanPlanLabel((string) ($badge['label'] ?? '')));
+
+                        if ($label === 'free') {
+                            return 'gray';
+                        }
+
+                        return ($badge['is_paid'] ?? false) ? 'success' : 'gray';
+                    }),
                 Tables\Columns\TextColumn::make('voice_label')
                     ->label('Voice')
                     ->searchable()
@@ -189,6 +213,15 @@ class DemoVoiceGenerationResource extends Resource
                     ]),
                 Tables\Filters\TernaryFilter::make('translate')
                     ->label('Translated'),
+                Tables\Filters\TernaryFilter::make('paid_user')
+                    ->label('Paid User')
+                    ->queries(
+                        true: fn ($query) => $query->where('metadata->paid_user', true),
+                        false: fn ($query) => $query->where(function ($inner) {
+                            $inner->whereNull('metadata->paid_user')->orWhere('metadata->paid_user', false);
+                        }),
+                        blank: fn ($query) => $query,
+                    ),
             ])
             ->actions([
                 Tables\Actions\Action::make('audio')
@@ -229,5 +262,115 @@ class DemoVoiceGenerationResource extends Resource
         }
 
         return url($relativePath);
+    }
+
+    /**
+     * @return array{label:string,is_paid:bool}
+     */
+    private static function resolvePlanBadge(DemoVoiceGeneration $record): array
+    {
+        $userId = (int) $record->user_id;
+        if ($userId <= 0) {
+            return ['label' => 'Free User', 'is_paid' => false];
+        }
+
+        if (isset(self::$planBadgeByUserId[$userId])) {
+            return self::$planBadgeByUserId[$userId];
+        }
+
+        $metadata = is_array($record->metadata) ? $record->metadata : [];
+        $metaPlanSlug = self::cleanPlanToken((string) ($metadata['paid_plan_slug'] ?? ''));
+        $metaIsPaid = (bool) ($metadata['paid_user'] ?? false);
+
+        $activePlan = app(PlanAccessService::class)->resolveActivePlanForUserId($userId);
+        $effectivePlan = $activePlan;
+
+        $latestSubscriptionPlan = Subscription::query()
+            ->where('user_id', $userId)
+            ->latest('id')
+            ->with('plan')
+            ->first()
+            ?->plan;
+
+        $latestNonFreeSubscriptionPlan = Subscription::query()
+            ->where('user_id', $userId)
+            ->whereHas('plan', static fn ($query) => $query->where('slug', '<>', 'free'))
+            ->latest('id')
+            ->with('plan')
+            ->first()
+            ?->plan;
+
+        if (
+            ($effectivePlan === null || strtolower((string) ($effectivePlan->slug ?? 'free')) === 'free')
+            && $latestSubscriptionPlan
+            && strtolower((string) ($latestSubscriptionPlan->slug ?? '')) !== 'free'
+        ) {
+            $effectivePlan = $latestSubscriptionPlan;
+        }
+
+        if (
+            ($effectivePlan === null || strtolower((string) ($effectivePlan->slug ?? 'free')) === 'free')
+            && $latestNonFreeSubscriptionPlan
+        ) {
+            $effectivePlan = $latestNonFreeSubscriptionPlan;
+        }
+
+        if (! $effectivePlan && $metaPlanSlug !== '') {
+            $effectivePlan = Plan::query()->where('slug', $metaPlanSlug)->first();
+        }
+
+        $isPaid = (int) ($effectivePlan?->price_cents ?? 0) > 0
+            || (($effectivePlan?->slug) !== null && strtolower((string) $effectivePlan->slug) !== 'free')
+            || ($metaIsPaid && $metaPlanSlug !== 'free');
+
+        if ($effectivePlan) {
+            $planSlug = self::cleanPlanToken((string) ($effectivePlan->slug ?? ''));
+            $label = self::formatPlanBadgeLabel((string) $effectivePlan->getLocalizedName('en'), $planSlug);
+        } elseif ($isPaid) {
+            $label = $metaPlanSlug !== '' && $metaPlanSlug !== 'free'
+                ? ucfirst(str_replace('_', ' ', $metaPlanSlug))
+                : 'Paid';
+        } else {
+            $label = 'Free';
+        }
+
+        return self::$planBadgeByUserId[$userId] = [
+            'label' => self::cleanPlanLabel($label),
+            'is_paid' => $isPaid,
+        ];
+    }
+
+    private static function cleanPlanToken(string $value): string
+    {
+        $clean = str_replace("\xEF\xBB\xBF", '', $value);
+        $clean = preg_replace('/[\x{FEFF}\x{200B}\x{200C}\x{200D}\x{2060}]/u', '', $clean) ?? $clean;
+        $clean = str_replace('&#xFEFF;', '', $clean);
+
+        return strtolower(trim($clean));
+    }
+
+    private static function cleanPlanLabel(string $value): string
+    {
+        $clean = str_replace("\xEF\xBB\xBF", '', $value);
+        $clean = preg_replace('/[\x{FEFF}\x{200B}\x{200C}\x{200D}\x{2060}]/u', '', $clean) ?? $clean;
+        $clean = str_replace('&#xFEFF;', '', $clean);
+        $clean = preg_replace('/\s+/u', ' ', $clean) ?? $clean;
+        $clean = trim($clean);
+
+        return $clean !== '' ? $clean : 'Free';
+    }
+
+    private static function formatPlanBadgeLabel(string $localizedName, string $slug): string
+    {
+        $name = self::cleanPlanLabel($localizedName);
+        if ($slug === 'free') {
+            return 'Free';
+        }
+
+        if ($name === '') {
+            return 'Paid';
+        }
+
+        return $name;
     }
 }

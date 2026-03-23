@@ -511,6 +511,11 @@
         menuBtn.addEventListener('click', function(e) {
            e.preventDefault();
            e.stopPropagation();
+           var redirectUrl = String(audio.dataset.downloadRedirectUrl || audio.dataset.downloadRedirect || '').trim();
+           if (redirectUrl) {
+             window.location.href = redirectUrl;
+             return;
+           }
            var a = document.createElement('a');
            var src = audio.getAttribute('src');
            if (!src) return;

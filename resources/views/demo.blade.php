@@ -62,6 +62,47 @@
 
           {{-- Text editor --}}
           <form id="demoForm" class="studio-main" style="gap:1rem">
+            @php
+              $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
+              $demoSampleScripts = [
+                'ar' => <<<'TXT'
+(00-03ث) [هادئ + تساؤل]:
+"بقالك قد إيه بتقول هبدأ؟"
+
+(03-07ث) [خفيف + ضحكة بسيطة]:
+"(يضحك بخفة) كل مرة تقول… بكرة."
+
+(07-11ث) [أهدى + تنهيدة خفيفة]:
+"…(تنهد خفيف) بس بكرة دي مش بتيجي."
+
+(سكتة 0.5 ثانية)
+
+(11-15ث) [صادق]:
+"مش محتاج تبقى جاهز 100%…"
+
+(15-19ث) [دافئ + مشجع]:
+"ابدأ بس… والباقي هييجي."
+TXT,
+                'en' => <<<'TXT'
+(00–03s) [calm + questioning]:
+"How long have you been telling yourself you’ll start?"
+
+(03–07s) [light + soft laugh]:
+"(light chuckle) Every time you say… tomorrow."
+
+(07–11s) [softer + gentle sigh]:
+"(soft sigh)… but tomorrow never comes."
+
+(pause 0.5s)
+
+(11–15s) [honest]:
+"You don’t need to be 100% ready…"
+
+(15–19s) [warm + encouraging]:
+"Just start… and the rest will follow."
+TXT,
+              ];
+            @endphp
             <div class="s-card s-card-editor reveal">
               <div class="editor-label">
                 <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -70,8 +111,12 @@
               </div>
               <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
               <div class="sample-chips">
-                <button class="sample-chip" type="button" data-sample="Welcome to our platform. We build professional software with world-class quality.">{{ __('ui.demo.english_sample') }}</button>
-                <button class="sample-chip" type="button" data-sample="{{ __('ui.demo.arabic_sample_text') }}">{{ __('ui.demo.arabic_sample') }}</button>
+                <button class="sample-chip" type="button" data-sample-key="en">{{ __('ui.demo.english_sample') }}</button>
+                <button class="sample-chip" type="button" data-sample-key="ar">{{ __('ui.demo.arabic_sample') }}</button>
+              </div>
+              <div class="sample-human-note" role="note">
+                <strong>{{ $isArabicLocale ? 'ملاحظة احترافية' : 'Pro Tip' }}</strong>
+                <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة فورًا. هذا الأسلوب في الكتابة مع التوقفات والنبرة يعطي صوتًا بشريًا أكثر واقعية.' : 'Click the sample chips above (Arabic / English) to instantly load ready scripts. This writing style with timing, pauses, and tone cues makes the generated voice sound much more human.' }}</span>
               </div>
             </div>
 
@@ -137,10 +182,6 @@
                     @endforeach
                   </select>
                 </div>
-              </div>
-              <div class="perf-section" id="stylePromptSection" style="display:none;">
-                <div class="perf-section-label">✨ {{ __('ui.demo.style_prompt', ['default' => 'Custom Prompt']) }}</div>
-                <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.demo.style_prompt_placeholder', ['default' => 'Describe how you want the voice to sound…']) }}"></textarea>
               </div>
               <div class="perf-section">
                 <div class="perf-section-label">🌍 {{ __('ui.demo.dialect', ['default' => 'Dialect']) }}</div>
@@ -213,7 +254,12 @@
               <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               {{ __('ui.demo.hero_point_4') }}
             </div>
-            <audio id="previewAudio" controls preload="none"></audio>
+            <audio
+              id="previewAudio"
+              controls
+              preload="none"
+              data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
+            ></audio>
             <div class="audio-meta" id="audioMeta"></div>
           </div>
 
@@ -301,6 +347,7 @@
     const textInput = document.getElementById('text');
     const charCounter = document.getElementById('charCounter');
     const outputPlaceholder = document.getElementById('outputPlaceholder');
+    const sampleScripts = {!! \Illuminate\Support\Js::from($demoSampleScripts ?? ['ar' => '', 'en' => '']) !!};
 
     const autoDialectLabel = '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}';
     const dialectsByLanguage = {
@@ -404,6 +451,7 @@
     const trialAllowanceChars = Number(@json((int) $trialAllowanceChars));
     const i18n = @json($demoI18n);
     const pageLocale = document.documentElement.lang || 'en';
+    const isArabicPageLocale = String(pageLocale).toLowerCase().startsWith('ar');
 
     const csrfHeaders = {
       'X-CSRF-TOKEN': '{{ csrf_token() }}',
@@ -1167,8 +1215,14 @@
       }
     });
 
-    document.querySelectorAll('[data-sample]').forEach((btn) => {
-      btn.addEventListener('click', () => { textInput.value = btn.getAttribute('data-sample') || ''; updateCharCount(); });
+    document.querySelectorAll('[data-sample], [data-sample-key]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sampleKey = String(btn.getAttribute('data-sample-key') || '').trim().toLowerCase();
+        const mappedScript = sampleKey ? String(sampleScripts?.[sampleKey] || '').trim() : '';
+        const fallbackScript = String(btn.getAttribute('data-sample') || '').trim();
+        textInput.value = mappedScript || fallbackScript;
+        updateCharCount();
+      });
     });
     form?.addEventListener('submit', (event) => { event.preventDefault(); previewBtn?.click(); });
 
@@ -1213,6 +1267,10 @@
       syncQuotaDisplay();
     }
 
+    if (isArabicPageLocale && targetLanguage) {
+      targetLanguage.value = 'ar';
+      preferredTranslateLanguage = 'ar';
+    }
     if (translateToggle && translateSelect) translateToggle.checked = translateSelect.value === '1';
     if (!isTranslateEnabled()) preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
     renderVoiceOptions();

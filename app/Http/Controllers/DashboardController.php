@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
@@ -36,7 +37,11 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $baseQuery = AudioGeneration::query()->where('user_id', $userId);
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+
+        $baseQuery = $this->userHistoryQuery($userId);
+        $voiceNameMap = VoiceCatalog::mapByName();
+        $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
         $jobs = (clone $baseQuery)
             ->with(['textItem:id,title'])
@@ -46,9 +51,8 @@ class DashboardController extends Controller
         $reusePreset = null;
         $reuseDisplayNumber = (int) $request->integer('reuse');
         if ($reuseDisplayNumber > 0) {
-            $reuseSource = AudioGeneration::query()
+            $reuseSource = $this->userHistoryQuery($userId)
                 ->with('textItem:id,title')
-                ->where('user_id', $userId)
                 ->where('user_sequence_number', $reuseDisplayNumber)
                 ->first();
 
@@ -65,6 +69,17 @@ class DashboardController extends Controller
             }
         }
 
+        if ($reusePreset === null) {
+            $reuseDemoId = (int) $request->integer('reuse_demo');
+            if ($reuseDemoId > 0) {
+                $reuseDemoSource = DemoVoiceGeneration::query()
+                    ->where('user_id', $userId)
+                    ->whereKey($reuseDemoId)
+                    ->first();
+                $reusePreset = $this->buildDemoReusePreset($reuseDemoSource);
+            }
+        }
+
         $stats = [
             'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
             'done' => (clone $baseQuery)->where('status', 'done')->count(),
@@ -72,7 +87,6 @@ class DashboardController extends Controller
             'total' => (clone $baseQuery)->count(),
         ];
 
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
         $catalogByTier = VoiceCatalog::publicCatalogByTier();
@@ -87,7 +101,7 @@ class DashboardController extends Controller
 
         // Hybrid TTS: resolve dialogue availability per plan
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
-        $customPromptEnabled = (bool) ($activePlan?->custom_prompt_enabled ?? false);
+        $customPromptEnabled = $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
 
         return view('dashboard', [
@@ -104,7 +118,7 @@ class DashboardController extends Controller
             'usageCharsPercent' => $usageCharsPercent,
             'usageRequestsPercent' => $usageRequestsPercent,
             'voiceCatalog' => $tierCatalog,
-            'voiceNameMap' => VoiceCatalog::mapByName(),
+            'voiceNameMap' => $voiceNameMap,
             'defaultVoiceAr' => VoiceCatalog::defaultForLanguageAndProvider('ar', $planTier, $preferredProvider),
             'defaultVoiceEn' => VoiceCatalog::defaultForLanguageAndProvider('en', $planTier, $preferredProvider),
             'studioPerformanceStyles' => TtsStudioConfig::performanceStyleCatalog(),
@@ -128,6 +142,7 @@ class DashboardController extends Controller
             'ttsProviderPolicy' => $activePlan?->tts_provider_policy ?? 'default',
             'extensionApiState' => $extensionApiState,
             'reusePreset' => $reusePreset,
+            'demoHistoryJobs' => $demoHistoryJobs,
         ]);
     }
 
@@ -272,7 +287,7 @@ class DashboardController extends Controller
             $counter->refresh();
         }
 
-        $baseQuery = AudioGeneration::query()->where('user_id', $userId);
+        $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
             'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
             'done' => (clone $baseQuery)->where('status', 'done')->count(),
@@ -331,7 +346,36 @@ class DashboardController extends Controller
         $deletedId = (int) $job->id;
         $job->delete();
 
-        $baseQuery = AudioGeneration::query()->where('user_id', $userId);
+        $baseQuery = $this->userHistoryQuery($userId);
+        $stats = [
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
+            'done' => (clone $baseQuery)->where('status', 'done')->count(),
+            'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
+            'total' => (clone $baseQuery)->count(),
+        ];
+        if ($request->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'deleted_id' => $deletedId,
+                'message' => __('ui.backend.dashboard_voice_deleted'),
+                'stats' => $stats,
+            ]);
+        }
+
+        return redirect()->route('dashboard')->with('ok', __('ui.backend.dashboard_voice_deleted'));
+    }
+
+    public function destroyDemo(Request $request, DemoVoiceGeneration $generation)
+    {
+        $userId = (int) auth()->id();
+        if ((int) $generation->user_id !== $userId) {
+            abort(404);
+        }
+
+        $deletedId = (int) $generation->id;
+        $generation->delete();
+
+        $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
             'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
             'done' => (clone $baseQuery)->where('status', 'done')->count(),
@@ -434,10 +478,13 @@ class DashboardController extends Controller
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'created_human' => $job->created_at?->diffForHumans(),
+            'created_at_ts' => $job->created_at?->getTimestamp(),
             'can_reuse_settings' => $job->hasReusablePremiumSettings(),
             'reuse_url' => $job->hasReusablePremiumSettings()
                 ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection'
                 : null,
+            'is_demo_history' => false,
+            'row_key' => 'audio:'.$job->id,
         ];
     }
 
@@ -519,7 +566,7 @@ class DashboardController extends Controller
 
         // Style prompt is only allowed if the plan permits it (custom_prompt_enabled)
         $stylePrompt = null;
-        if ($plan === null || (bool) ($plan->custom_prompt_enabled ?? false)) {
+        if ($this->planAllowsCustomPrompt($plan)) {
             $stylePrompt = isset($options['style_prompt']) && is_string($options['style_prompt'])
                 ? trim($options['style_prompt']) ?: null
                 : null;
@@ -535,4 +582,180 @@ class DashboardController extends Controller
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];
     }
+
+    private function userHistoryQuery(int $userId)
+    {
+        return AudioGeneration::query()
+            ->where('user_id', $userId)
+            ->where(function ($query): void {
+                $query->whereDoesntHave('textItem')
+                    ->orWhereHas('textItem', static function ($textItemQuery): void {
+                        $textItemQuery->where('source_type', '<>', 'demo');
+                    });
+            });
+    }
+
+    private function isPaidPlan(?Plan $plan): bool
+    {
+        if (! $plan) {
+            return false;
+        }
+
+        $slug = strtolower(trim((string) ($plan->slug ?? '')));
+        $priceCents = (int) ($plan->price_cents ?? 0);
+
+        return $priceCents > 0 || ($slug !== '' && $slug !== 'free');
+    }
+
+    private function planAllowsCustomPrompt(?Plan $plan): bool
+    {
+        if (! $plan) {
+            return false;
+        }
+
+        $rawSlug = (string) ($plan->slug ?? '');
+        $slug = strtolower(trim((string) (preg_replace('/[\x{FEFF}\x{200B}\x{200C}\x{200D}\x{2060}]/u', '', $rawSlug) ?? $rawSlug)));
+        if ($slug === 'starter') {
+            return false;
+        }
+
+        return (bool) ($plan->custom_prompt_enabled ?? false);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDemoHistoryJobs(int $userId, ?Plan $activePlan, array $voiceNameMap): array
+    {
+        if (! $this->isPaidPlan($activePlan)) {
+            return [];
+        }
+
+        $sequenceByDemoId = [];
+        $demoIds = DemoVoiceGeneration::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('audio_path')
+            ->where('audio_path', '<>', '')
+            ->orderBy('id')
+            ->pluck('id')
+            ->all();
+        foreach ($demoIds as $index => $id) {
+            $sequenceByDemoId[(int) $id] = $index + 1;
+        }
+
+        $demoRows = DemoVoiceGeneration::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('audio_path')
+            ->where('audio_path', '<>', '')
+            ->latest()
+            ->limit(250)
+            ->get();
+
+        return $demoRows->map(function (DemoVoiceGeneration $demo) use ($voiceNameMap, $sequenceByDemoId): array {
+            $rawText = trim((string) ($demo->input_text ?: $demo->speech_text ?: ''));
+            $textExcerpt = Str::limit(trim((string) preg_replace('/\s+/u', ' ', $rawText)), 42, '');
+            $voiceName = trim((string) ($demo->voice_name ?? ''));
+            $voiceLabel = $voiceName !== ''
+                ? $this->localizedVoiceLabel($voiceName, $voiceNameMap)
+                : ltrim(trim((string) ($demo->voice_label ?: __('ui.dashboard.default_speaker'))), '+');
+            $displaySequence = (int) ($sequenceByDemoId[(int) $demo->id] ?? (int) $demo->id);
+            $demoReusableSettings = $this->reusableSettingsFromDemo($demo);
+            $canReuseSettings = $demoReusableSettings !== null;
+
+            return [
+                'id' => (int) $demo->id,
+                'row_key' => 'demo:'.$demo->id,
+                'display_number' => 'D-'.$displaySequence,
+                'title' => $textExcerpt !== ''
+                    ? $textExcerpt
+                    : 'From Demo',
+                'text_excerpt' => $textExcerpt,
+                'status' => 'done',
+                'source_language' => (string) ($demo->source_language ?: '-'),
+                'target_language' => (string) ($demo->target_language ?: ($demo->source_language ?: 'ar')),
+                'voice_label' => $voiceLabel,
+                'voice_tier' => VoiceTier::label((string) ($demo->voice_tier ?: VoiceTier::STANDARD)),
+                'translate' => (bool) $demo->translate,
+                'duration_seconds' => $demo->duration_seconds ? (int) $demo->duration_seconds : null,
+                'audio_url' => AudioUrl::fromPath((string) $demo->audio_path),
+                'error_message' => null,
+                'created_human' => $demo->created_at?->diffForHumans(),
+                'created_at_ts' => $demo->created_at?->getTimestamp(),
+                'can_reuse_settings' => $canReuseSettings,
+                'reuse_url' => $canReuseSettings
+                    ? route('dashboard', ['reuse_demo' => (int) $demo->id]).'#generateVoiceSection'
+                    : null,
+                'is_demo_history' => true,
+            ];
+        })->values()->all();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function reusableSettingsFromDemo(DemoVoiceGeneration $demo): ?array
+    {
+        $targetLanguage = trim((string) ($demo->target_language ?: ($demo->source_language ?: 'ar')));
+        $voiceTier = VoiceTier::normalize((string) ($demo->voice_tier ?: VoiceTier::STANDARD));
+        $voiceName = trim((string) ($demo->voice_name ?? ''));
+        $voiceMeta = $voiceName !== '' ? VoiceCatalog::voiceMeta($voiceName) : null;
+        $voiceKey = is_array($voiceMeta) ? trim((string) ($voiceMeta['key'] ?? '')) : '';
+
+        $settings = [
+            'voice_tier' => $voiceTier,
+            'voice_name' => $voiceName !== '' ? $voiceName : null,
+            'voice_key' => $voiceKey !== '' ? $voiceKey : null,
+            'target_language' => $targetLanguage !== '' ? $targetLanguage : 'ar',
+            'translate' => (bool) $demo->translate,
+            'dialect' => trim((string) ($demo->dialect ?? '')) ?: null,
+            'performance_style' => trim((string) ($demo->performance_style ?? '')) ?: null,
+            'style_prompt' => trim((string) ($demo->style_prompt ?? '')) ?: null,
+            'emotion' => trim((string) ($demo->emotion ?? '')) ?: null,
+            'speed' => $demo->speed !== null ? (float) $demo->speed : null,
+            'pitch' => $demo->pitch !== null ? (float) $demo->pitch : null,
+            'is_dialogue' => false,
+        ];
+
+        $normalized = array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
+
+        return $normalized === [] ? null : $normalized;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function buildDemoReusePreset(?DemoVoiceGeneration $demo): ?array
+    {
+        if (! $demo) {
+            return null;
+        }
+
+        $content = trim((string) ($demo->input_text ?: $demo->speech_text ?: ''));
+        if ($content === '') {
+            return null;
+        }
+
+        $settings = $this->reusableSettingsFromDemo($demo);
+        if ($settings === null) {
+            return null;
+        }
+
+        $displaySequence = (int) DemoVoiceGeneration::query()
+            ->where('user_id', (int) $demo->user_id)
+            ->whereNotNull('audio_path')
+            ->where('audio_path', '<>', '')
+            ->where('id', '<=', (int) $demo->id)
+            ->count();
+
+        return array_merge(
+            $settings,
+            [
+                'job_id' => 'demo:'.$demo->id,
+                'display_number' => 'D-'.$displaySequence,
+                'title' => (string) Str::limit(trim((string) preg_replace('/\s+/u', ' ', $content)), 90, ''),
+                'content' => $content,
+            ],
+        );
+    }
 }
+

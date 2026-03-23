@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\BillingSyncService;
+use App\Services\DemoHistoryImporter;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\StripeWebhookEmailService;
@@ -25,6 +26,7 @@ class BillingController extends Controller
 {
     public function __construct(
         private readonly BillingSyncService $billingSyncService,
+        private readonly DemoHistoryImporter $demoHistoryImporter,
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly PlanAccessService $planAccessService,
         private readonly StripeWebhookEmailService $stripeWebhookEmailService,
@@ -237,6 +239,9 @@ class BillingController extends Controller
             ], 409);
         }
 
+        // Critical: tag demo voices for paid history visibility immediately after upgrade.
+        $this->demoHistoryImporter->syncStorageForPlan((int) $user->id, $activePlan, 200);
+
         return response()->json([
             'ok' => true,
             'message' => __('ui.backend.billing_subscription_updated'),
@@ -360,6 +365,7 @@ class BillingController extends Controller
         $user = $request->user();
         $this->billingSyncService->syncIfStale($user, true);
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $this->demoHistoryImporter->syncStorageForPlan((int) $user->id, $activePlan, 200);
 
         return response()->json([
             'ok' => true,

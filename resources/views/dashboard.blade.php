@@ -1072,6 +1072,27 @@
       gap: .45rem;
       flex-wrap: wrap;
     }
+    .history-source-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-inline-start: .45rem;
+      padding: .12rem .5rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, var(--b) 35%, var(--line));
+      background: color-mix(in oklab, var(--b) 12%, var(--surface));
+      color: color-mix(in oklab, var(--b) 78%, var(--text));
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .job-actions-muted {
+      color: var(--muted);
+      font-size: .78rem;
+      font-weight: 600;
+    }
     .job-reuse-btn {
       display: inline-flex;
       align-items: center;
@@ -1679,6 +1700,7 @@
               @forelse($jobs as $job)
                 <tr data-job-id="{{ $job->id }}" data-job-data="{{ json_encode([
                   'id' => $job->id,
+                  'row_key' => 'audio:'.$job->id,
                   'display_number' => $job->displayNumber(),
                   'title' => $job->textItem?->title,
                   'text_excerpt' => \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/u', ' ', (string) $job->input_text)), 42, ''),
@@ -1692,8 +1714,10 @@
                   'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
                   'error_message' => $job->error_message,
                   'created_human' => $job->created_at?->diffForHumans(),
+                  'created_at_ts' => $job->created_at?->getTimestamp(),
                   'can_reuse_settings' => $job->hasReusablePremiumSettings(),
                   'reuse_url' => $job->hasReusablePremiumSettings() ? route('dashboard', ['reuse' => $job->displayNumber()]).'#generateVoiceSection' : null,
+                  'is_demo_history' => false,
                 ]) }}">
                   <td>#{{ $job->displayNumber() }}</td>
                   <td>{{ $job->textItem?->title ?: '-' }}</td>
@@ -1801,6 +1825,8 @@
       'used_requests_of_unlimited' => __('ui.dashboard.used_requests_of_unlimited'),
       'ready_in_seconds' => __('ui.dashboard.ready_in_seconds'),
       'preparing_next' => __('ui.dashboard.preparing_next'),
+      'demo_paid_tag' => app()->getLocale() === 'ar' ? 'ديمو مجاني' : 'Free Demo',
+      'demo_history_locked' => app()->getLocale() === 'ar' ? 'عنصر من الديمو' : 'Demo entry',
     ];
   @endphp
   <script>
@@ -1820,6 +1846,7 @@
     let initialStudioValuesApplied = false;
     const queueUrl = '{{ route('dashboard.queue') }}';
     const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
+    const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
     const csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
@@ -1856,6 +1883,7 @@
     const generatedOutputPlaceholder = document.getElementById('generatedOutputPlaceholder');
     const generatedPreviewAudio = document.getElementById('generatedPreviewAudio');
     const generatedAudioMeta = document.getElementById('generatedAudioMeta');
+    const demoHistoryJobs = @json($demoHistoryJobs ?? []);
     const i18n = @json($dashboardI18n);
     const pageLocale = document.documentElement.lang || 'en';
 
@@ -2056,6 +2084,13 @@
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+    }
+
+    function escapeCss(value) {
+      if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+        return CSS.escape(String(value ?? ''));
+      }
+      return String(value ?? '').replace(/[^a-zA-Z0-9_-]/g, '\\$&');
     }
 
     function showFormMessage(type, message) {
@@ -2290,7 +2325,44 @@
       if (kpiTotal) kpiTotal.textContent = formatNumber(stats.total);
     }
 
+    function isDemoHistoryJob(job) {
+      return Boolean(job?.is_demo_history);
+    }
+
+    function resolveJobKey(job) {
+      const explicit = String(job?.row_key || '').trim();
+      if (explicit) return explicit;
+      const rawId = String(job?.id ?? '').trim();
+      if (!rawId) return '';
+      return (isDemoHistoryJob(job) ? 'demo:' : 'audio:') + rawId;
+    }
+
+    function normalizeJob(job) {
+      if (!job || typeof job !== 'object') return null;
+      const normalized = { ...job };
+      normalized.is_demo_history = isDemoHistoryJob(normalized);
+      normalized.row_key = resolveJobKey(normalized);
+      if (!String(normalized.status || '').trim()) {
+        normalized.status = 'done';
+      }
+      return normalized;
+    }
+
+    function sortAllJobsByNewest() {
+      allJobs.sort(function(a, b) {
+        const aTs = Number(a?.created_at_ts || 0);
+        const bTs = Number(b?.created_at_ts || 0);
+        if (aTs !== bTs) return bTs - aTs;
+
+        const aId = Number(String(a?.id ?? '').replace(/[^\d]/g, '') || 0);
+        const bId = Number(String(b?.id ?? '').replace(/[^\d]/g, '') || 0);
+        return bId - aId;
+      });
+    }
+
     function renderJobRow(job) {
+      const isDemoHistory = isDemoHistoryJob(job);
+      const jobKey = resolveJobKey(job);
       const status = String(job?.status || 'processing').toLowerCase();
       const statusClass = ['queued', 'processing', 'done', 'failed'].includes(status) ? status : 'processing';
       const statusText = statusLabel(statusClass);
@@ -2307,6 +2379,10 @@
       const created = escapeHtml(job?.created_human || i18n.just_now);
       const errorMessage = escapeHtml(job?.error_message || i18n.generation_failed);
       const audioUrl = job?.audio_url ? escapeHtml(job.audio_url) : '';
+      const displayNumber = escapeHtml(String(job?.display_number ?? job?.id ?? 0));
+      const titleWithBadge = isDemoHistory
+        ? (title + '<span class="history-source-badge">' + escapeHtml(i18n.demo_paid_tag) + '</span>')
+        : title;
 
       let audioCell = '<small style="color: var(--muted);">' + i18n.processing_ellipsis + '</small>';
       if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
@@ -2316,11 +2392,12 @@
       if (job?.can_reuse_settings && job?.reuse_url) {
         actions.push('<a class="job-reuse-btn" href="' + escapeHtml(job.reuse_url) + '">' + i18n.reuse_settings + '</a>');
       }
-      actions.push('<button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button>');
+      const deleteSource = isDemoHistory ? 'demo' : 'audio';
+      actions.push('<button type="button" class="pagination-btn job-delete-btn" data-action="delete-job" data-job-source="' + deleteSource + '" data-job-id="' + Number(job?.id || 0) + '">' + i18n.delete + '</button>');
 
-      return '<tr data-job-id="' + Number(job?.id || 0) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
-        '<td>#' + Number(job?.display_number || job?.id || 0) + '</td>' +
-        '<td>' + title + '</td>' +
+      return '<tr data-job-key="' + escapeHtml(jobKey) + '" data-job-id="' + escapeHtml(String(job?.id ?? '')) + '" data-job-data="' + escapeHtml(JSON.stringify(job)) + '">' +
+        '<td>#' + displayNumber + '</td>' +
+        '<td>' + titleWithBadge + '</td>' +
         '<td><span class="status ' + statusClass + '">' + statusText + '</span></td>' +
         '<td>' + sourceLanguage + ' -> ' + targetLanguageValue + '</td>' +
         '<td>' + voiceLabel + '</td>' +
@@ -2332,13 +2409,35 @@
 
     function loadJobsFromTable() {
       const rows = jobsTableBody.querySelectorAll('tr[data-job-data]');
-      allJobs = [];
+      const mergedJobs = [];
       rows.forEach(function(row) {
         try {
           const data = JSON.parse(row.getAttribute('data-job-data'));
-          if (data && data.id) allJobs.push(data);
+          const normalized = normalizeJob(data);
+          if (normalized && normalized.id !== undefined && normalized.id !== null) {
+            mergedJobs.push(normalized);
+          }
         } catch (e) {}
       });
+
+      if (Array.isArray(demoHistoryJobs)) {
+        demoHistoryJobs.forEach(function(job) {
+          const normalized = normalizeJob(job);
+          if (!normalized || normalized.id === undefined || normalized.id === null) return;
+          normalized.is_demo_history = true;
+          normalized.row_key = resolveJobKey(normalized);
+          mergedJobs.push(normalized);
+        });
+      }
+
+      const uniqueJobs = new Map();
+      mergedJobs.forEach(function(job) {
+        const key = resolveJobKey(job);
+        if (!key || uniqueJobs.has(key)) return;
+        uniqueJobs.set(key, job);
+      });
+      allJobs = Array.from(uniqueJobs.values());
+      sortAllJobsByNewest();
     }
 
     function renderJobsPage() {
@@ -2412,25 +2511,28 @@
     }
 
     function upsertJobRow(job) {
-      if (!job || !job.id) return;
+      const normalized = normalizeJob(job);
+      if (!normalized || !normalized.id) return;
       const emptyRow = document.getElementById('jobsEmptyRow');
       if (emptyRow) emptyRow.remove();
 
-      const existingIndex = allJobs.findIndex(function(j) { return j.id === job.id; });
+      const incomingKey = resolveJobKey(normalized);
+      const existingIndex = allJobs.findIndex(function(j) { return resolveJobKey(j) === incomingKey; });
       let isNew = false;
       if (existingIndex !== -1) {
-        allJobs[existingIndex] = job;
+        allJobs[existingIndex] = normalized;
       } else {
-        allJobs.unshift(job);
+        allJobs.unshift(normalized);
         isNew = true;
       }
+      sortAllJobsByNewest();
 
       jobsCurrentPage = 1;
       renderJobsPage();
 
       if (isNew) {
         setTimeout(function() {
-          const firstRow = jobsTableBody.querySelector('tr[data-job-id="' + job.id + '"]');
+          const firstRow = jobsTableBody.querySelector('tr[data-job-key="' + escapeCss(incomingKey) + '"]');
           if (firstRow) {
             firstRow.classList.add('new-job-row');
             firstRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2439,9 +2541,10 @@
       }
     }
 
-    async function deleteJob(jobId, triggerBtn) {
+    async function deleteJob(jobId, source, triggerBtn) {
       const parsedJobId = Number(jobId || 0);
       if (!parsedJobId) return;
+      const parsedSource = source === 'demo' ? 'demo' : 'audio';
 
       if (!window.confirm(i18n.confirm_delete)) {
         return;
@@ -2453,7 +2556,8 @@
 
       let data = null;
       try {
-        const response = await fetch(`${deleteJobBaseUrl}/${parsedJobId}`, {
+        const baseUrl = parsedSource === 'demo' ? deleteDemoJobBaseUrl : deleteJobBaseUrl;
+        const response = await fetch(`${baseUrl}/${parsedJobId}`, {
           method: 'DELETE',
           headers: {
             'X-CSRF-TOKEN': csrfToken,
@@ -2468,7 +2572,7 @@
         }
 
         const deletedId = Number(data?.deleted_id || parsedJobId);
-        allJobs = allJobs.filter((job) => Number(job?.id || 0) !== deletedId);
+        allJobs = allJobs.filter((job) => !(isDemoHistoryJob(job) === (parsedSource === 'demo') && Number(job?.id || 0) === deletedId));
         if (data?.stats) updateStats(data.stats);
         const totalPages = Math.ceil(allJobs.length / jobsPerPage) || 1;
         jobsCurrentPage = Math.min(jobsCurrentPage, totalPages);
@@ -2522,7 +2626,7 @@
 
       const deleteBtn = e.target.closest('[data-action="delete-job"]');
       if (!deleteBtn || deleteBtn.disabled) return;
-      deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn);
+      deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn.getAttribute('data-job-source'), deleteBtn);
     });
 
     function extractErrorMessage(data, fallback = i18n.voice_generation_failed) {
@@ -2693,7 +2797,6 @@
       contentInput.addEventListener('input', updateCharCounter);
       updateCharCounter(); // initial count for old('content')
     }
-
     if (dashboardNavLinks.length) {
       const hashSectionId = String(window.location.hash || '').replace(/^#/, '');
       const savedSectionId = String(window.localStorage?.getItem('dashboard_active_section') || '');
@@ -2745,3 +2848,4 @@
   </script>
 </body>
 </html>
+

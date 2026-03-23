@@ -34,8 +34,6 @@ class AudioGenerationResource extends Resource
                             ->label('User Email')
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('user_id')
-                            ->numeric(),
                         Forms\Components\TextInput::make('text_item_id')
                             ->numeric(),
                         Forms\Components\TextInput::make('voice_name')
@@ -92,9 +90,6 @@ class AudioGenerationResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->placeholder('-'),
-                Tables\Columns\TextColumn::make('user_id')
-                    ->label('User ID')
-                    ->sortable(),
                 Tables\Columns\TextColumn::make('voice_name')
                     ->searchable()
                     ->sortable(),

@@ -150,6 +150,7 @@ Route::group([
         Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->name('dashboard.queue');
         Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
+        Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
 
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
         Route::get('/billing/manual', [ManualPaymentController::class, 'instructions'])->name('billing.manual.instructions');

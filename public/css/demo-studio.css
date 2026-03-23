@@ -219,7 +219,7 @@
   border-radius: 10px;
   border: 1px solid var(--line);
   background: color-mix(in oklab, var(--surface) 70%, transparent);
-  font-size: .8rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--muted);
   cursor: pointer;
@@ -230,6 +230,35 @@
   border-color: color-mix(in oklab, var(--b) 45%, var(--line));
   color: var(--text);
   transform: translateY(-1px)
+}
+
+.sample-human-note {
+  margin-top: .75rem;
+  padding: .75rem .85rem;
+  border-radius: .85rem;
+  border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
+  background:
+    linear-gradient(120deg, color-mix(in oklab, var(--a) 14%, transparent), color-mix(in oklab, var(--surface2) 82%, transparent));
+  display: grid;
+  gap: .22rem;
+}
+
+.sample-human-note strong {
+  font-size: .95rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: color-mix(in oklab, var(--a) 55%, var(--text));
+}
+
+.sample-human-note span {
+  font-size: .9rem;
+  line-height: 1.6;
+  color: color-mix(in oklab, var(--text) 88%, var(--muted));
+}
+
+html[dir="rtl"] .sample-human-note strong {
+  letter-spacing: 0;
 }
 
 /* ══════════════════════════════════════════════
@@ -537,7 +566,7 @@ html[dir="rtl"] .perf-grid select {
 }
 
 .quota-panel .q-label {
-  font-size: .82rem;
+  font-size: 1rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .04em;
@@ -570,7 +599,7 @@ html[dir="rtl"] .perf-grid select {
 
 .quota-note {
   margin-top: .45rem;
-  font-size: .78rem;
+  font-size: .9rem;
   color: var(--muted);
   line-height: 1.5
 }
