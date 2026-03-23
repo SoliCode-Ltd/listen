@@ -1468,9 +1468,7 @@ form:has(button.mobile-nav-link) {
 }
 @@container (max-width: 230px) {
   .custom-audio-time.end {
-    display: block;
-    min-width: 24px;
-    font-size: 0.7rem;
+    display: none;
   }
   .custom-audio-time {
     min-width: 30px;
@@ -1491,9 +1489,9 @@ html[data-theme="light"] .custom-audio-wrapper:hover {
 @media (max-width: 640px) {
   .custom-audio-wrapper {
     max-width: 100%;
-    min-width: 200px;
-    padding: 0.4rem 0.7rem;
-    gap: 0.6rem;
+    min-width: 240px;
+    padding: 0.4rem 0.6rem;
+    gap: 0.5rem;
   }
 }
 
