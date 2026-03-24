@@ -17,6 +17,8 @@
     'invalidCode' => __('ui.auth.phone_invalid_code'),
     'expiredCode' => __('ui.auth.phone_code_expired'),
     'recaptchaExpired' => __('ui.auth.phone_recaptcha_expired'),
+    'serviceUnavailable' => __('ui.auth.phone_service_unavailable'),
+    'configurationError' => __('ui.auth.phone_configuration_error'),
   ];
 @endphp
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/css/intlTelInput.css">
@@ -586,11 +588,12 @@
   @if($phoneEnabled)
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/intlTelInput.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
-    <script>
+    <script type="module">
+      import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+      import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
       (() => {
-        const firebaseConfig = @json($authSettings['firebase']['config'] ?? []);
+        const rawFirebaseConfig = @json($authSettings['firebase']['config'] ?? []);
         const recaptchaMode = @json($authSettings['firebase']['recaptcha_mode'] ?? 'invisible');
         const verifyEndpoint = @json(route('auth.phone.verify'));
         const csrfToken = @json(csrf_token());
@@ -604,7 +607,31 @@
         const otpRow = document.getElementById('otpRow');
         const statusBox = document.getElementById('phoneAuthStatus');
 
-        if (!sendBtn || !verifyBtn || !phoneInput || !codeInput || !otpRow || !statusBox || typeof firebase === 'undefined' || typeof window.intlTelInput !== 'function') {
+        if (!sendBtn || !verifyBtn || !phoneInput || !codeInput || !otpRow || !statusBox || typeof window.intlTelInput !== 'function') {
+          return;
+        }
+
+        const stripSpaces = (value) => String(value ?? '').replace(/\s+/g, '').trim();
+        const firebaseConfig = {
+          apiKey: stripSpaces(rawFirebaseConfig.apiKey),
+          authDomain: String(rawFirebaseConfig.authDomain || '')
+            .trim()
+            .replace(/^https?:\/\//i, '')
+            .replace(/\/+$/, '')
+            .split('/')[0]
+            .toLowerCase(),
+          projectId: stripSpaces(rawFirebaseConfig.projectId),
+          appId: stripSpaces(rawFirebaseConfig.appId),
+          messagingSenderId: stripSpaces(rawFirebaseConfig.messagingSenderId),
+          storageBucket: String(rawFirebaseConfig.storageBucket || '').trim(),
+          measurementId: stripSpaces(rawFirebaseConfig.measurementId),
+        };
+
+        const missingRequiredConfig = ['apiKey', 'authDomain', 'projectId', 'appId'].filter((key) => !firebaseConfig[key]);
+        if (missingRequiredConfig.length > 0) {
+          setStatus(i18n.configurationError, true);
+          console.error('Firebase config missing required keys', { missingRequiredConfig });
+          sendBtn.disabled = true;
           return;
         }
 
@@ -653,17 +680,18 @@
 
         let confirmationResult = null;
         let recaptchaVerifier = null;
+        let auth;
 
         try {
-          if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-          }
+          const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          const pageLang = String(document.documentElement.lang || '').toLowerCase();
+          auth.languageCode = pageLang.startsWith('ar') ? 'ar' : 'en';
         } catch (error) {
-          setStatus(i18n.genericError, true);
+          setStatus(i18n.serviceUnavailable, true);
+          console.error('Firebase init failed', error);
           return;
         }
-
-        const auth = firebase.auth();
 
         function setStatus(message, isError = false, isSuccess = false) {
           statusBox.style.display = message ? 'block' : 'none';
@@ -686,13 +714,18 @@
           if (code.includes('invalid-verification-code')) return i18n.invalidCode;
           if (code.includes('code-expired') || code.includes('session-expired')) return i18n.expiredCode;
           if (code.includes('captcha-check-failed') || code.includes('recaptcha')) return i18n.recaptchaExpired;
+          if (code.includes('operation-not-allowed')) return i18n.serviceUnavailable;
+          if (code.includes('unauthorized-domain') || code.includes('app-not-authorized')) return i18n.genericError;
+          if (code.includes('invalid-app-credential') || code.includes('missing-app-credential')) return i18n.serviceUnavailable;
+          if (code.includes('invalid-api-key')) return i18n.serviceUnavailable;
+          if (code.includes('invalid-auth-domain')) return i18n.serviceUnavailable;
           return i18n.genericError;
         }
 
         function ensureRecaptchaVerifier() {
           if (recaptchaVerifier) return recaptchaVerifier;
 
-          recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+          const recaptchaOptions = {
             size: recaptchaMode === 'normal' ? 'normal' : 'invisible',
             callback: () => {},
             'expired-callback': () => {
@@ -702,9 +735,14 @@
               }
               recaptchaVerifier = null;
             },
-          }, auth);
+          };
 
-          recaptchaVerifier.render().catch(() => setStatus(i18n.recaptchaExpired, true));
+          recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', recaptchaOptions);
+
+          recaptchaVerifier.render().catch((error) => {
+            console.error('reCAPTCHA render failed', error);
+            setStatus(i18n.recaptchaExpired, true);
+          });
 
           return recaptchaVerifier;
         }
@@ -734,11 +772,12 @@
 
           try {
             const verifier = ensureRecaptchaVerifier();
-            confirmationResult = await auth.signInWithPhoneNumber(phoneNumber, verifier);
+            confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
             otpRow.style.display = 'grid';
             if (resendBtn) resendBtn.style.display = 'inline-flex';
             setStatus(i18n.codeSent);
           } catch (error) {
+            console.error('Phone sendCode failed', error);
             setStatus(mapFirebaseError(error), true);
             if (recaptchaVerifier && typeof recaptchaVerifier.clear === 'function') {
               recaptchaVerifier.clear();
@@ -779,14 +818,15 @@
 
             const payload = await response.json();
             if (!response.ok || !payload || payload.ok !== true) {
-              throw new Error(payload && payload.message ? payload.message : i18n.genericError);
+              setStatus((payload && payload.message) ? payload.message : i18n.genericError, true);
+              return;
             }
 
             setStatus(i18n.verified, false, true);
             window.location.assign(payload.redirect || @json(route('dashboard')));
           } catch (error) {
-            const message = error instanceof Error && error.message ? error.message : mapFirebaseError(error);
-            setStatus(message, true);
+            console.error('Phone verifyCode failed', error);
+            setStatus(mapFirebaseError(error), true);
           } finally {
             setButtonsState(false);
           }

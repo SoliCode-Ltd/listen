@@ -918,6 +918,8 @@ return [
         'phone_invalid_code' => 'كود التحقق غير صحيح.',
         'phone_code_expired' => 'انتهت صلاحية كود التحقق. يرجى طلب كود جديد.',
         'phone_recaptcha_expired' => 'انتهت صلاحية reCAPTCHA. يرجى المحاولة مرة أخرى.',
+        'phone_service_unavailable' => 'تسجيل الدخول برقم الهاتف غير متاح مؤقتًا. يرجى المحاولة لاحقًا.',
+        'phone_configuration_error' => 'تسجيل الدخول برقم الهاتف غير متاح حاليًا. يرجى المحاولة لاحقًا.',
     ],
 
     'admin' => [

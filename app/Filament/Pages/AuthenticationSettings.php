@@ -38,6 +38,7 @@ class AuthenticationSettings extends Page implements HasForms
             'auth_phone_enabled' => $authSettings->phoneToggleEnabled(),
             'firebase_phone_enabled' => $authSettings->firebasePhoneEnabled(),
             'firebase_recaptcha_mode' => $authSettings->recaptchaMode(),
+            'firebase_recaptcha_site_key' => $authSettings->recaptchaSiteKey(),
             'firebase_api_key' => $firebaseConfig['apiKey'] ?? '',
             'firebase_auth_domain' => $firebaseConfig['authDomain'] ?? '',
             'firebase_project_id' => $firebaseConfig['projectId'] ?? '',
@@ -96,6 +97,11 @@ class AuthenticationSettings extends Page implements HasForms
                             ->required()
                             ->native(false)
                             ->default('invisible'),
+                        Forms\Components\TextInput::make('firebase_recaptcha_site_key')
+                            ->label('reCAPTCHA Site Key')
+                            ->maxLength(255)
+                            ->placeholder('6Lc...')
+                            ->helperText('Optional storage only. Firebase Phone Auth uses Firebase-managed reCAPTCHA and ignores custom site keys here.'),
                         Forms\Components\TextInput::make('firebase_api_key')
                             ->label('Firebase API Key')
                             ->maxLength(255)
@@ -105,6 +111,7 @@ class AuthenticationSettings extends Page implements HasForms
                             ->label('Firebase Auth Domain')
                             ->maxLength(255)
                             ->placeholder('your-project.firebaseapp.com')
+                            ->helperText('Use host only (no https:// and no trailing slash).')
                             ->required(fn (Forms\Get $get): bool => (bool) $get('auth_phone_enabled')),
                         Forms\Components\TextInput::make('firebase_project_id')
                             ->label('Firebase Project ID')
@@ -139,8 +146,9 @@ class AuthenticationSettings extends Page implements HasForms
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_PHONE_ENABLED, $this->boolToSetting($data['firebase_phone_enabled'] ?? false), AuthSettingsService::GROUP);
 
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_RECAPTCHA_MODE, $this->normalizeRecaptchaMode((string) ($data['firebase_recaptcha_mode'] ?? 'invisible')), AuthSettingsService::GROUP);
+        SiteSetting::set(AuthSettingsService::KEY_FIREBASE_RECAPTCHA_SITE_KEY, trim((string) ($data['firebase_recaptcha_site_key'] ?? '')), AuthSettingsService::GROUP);
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_API_KEY, trim((string) ($data['firebase_api_key'] ?? '')), AuthSettingsService::GROUP);
-        SiteSetting::set(AuthSettingsService::KEY_FIREBASE_AUTH_DOMAIN, trim((string) ($data['firebase_auth_domain'] ?? '')), AuthSettingsService::GROUP);
+        SiteSetting::set(AuthSettingsService::KEY_FIREBASE_AUTH_DOMAIN, $this->normalizeFirebaseAuthDomain((string) ($data['firebase_auth_domain'] ?? '')), AuthSettingsService::GROUP);
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_PROJECT_ID, trim((string) ($data['firebase_project_id'] ?? '')), AuthSettingsService::GROUP);
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_APP_ID, trim((string) ($data['firebase_app_id'] ?? '')), AuthSettingsService::GROUP);
         SiteSetting::set(AuthSettingsService::KEY_FIREBASE_MESSAGING_SENDER_ID, trim((string) ($data['firebase_messaging_sender_id'] ?? '')), AuthSettingsService::GROUP);
@@ -224,6 +232,16 @@ class AuthenticationSettings extends Page implements HasForms
         $value = strtolower(trim($value));
 
         return in_array($value, ['invisible', 'normal'], true) ? $value : 'invisible';
+    }
+
+    private function normalizeFirebaseAuthDomain(string $value): string
+    {
+        $value = trim($value);
+        $value = preg_replace('#^https?://#i', '', $value) ?? '';
+        $value = rtrim($value, '/');
+        $parts = explode('/', $value, 2);
+
+        return trim((string) ($parts[0] ?? ''));
     }
 
     private function boolToSetting(bool $value): string

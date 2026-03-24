@@ -913,6 +913,8 @@ return [
         'phone_invalid_code' => 'Invalid verification code.',
         'phone_code_expired' => 'Verification code expired. Please request a new one.',
         'phone_recaptcha_expired' => 'reCAPTCHA expired. Please try again.',
+        'phone_service_unavailable' => 'Phone sign-in is temporarily unavailable. Please try again later.',
+        'phone_configuration_error' => 'Phone sign-in is not available right now. Please try again later.',
     ],
 
     'admin' => [

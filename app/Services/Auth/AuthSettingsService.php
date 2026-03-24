@@ -20,6 +20,7 @@ class AuthSettingsService
     public const KEY_FIREBASE_STORAGE_BUCKET = 'firebase_storage_bucket';
     public const KEY_FIREBASE_MEASUREMENT_ID = 'firebase_measurement_id';
     public const KEY_FIREBASE_RECAPTCHA_MODE = 'firebase_recaptcha_mode';
+    public const KEY_FIREBASE_RECAPTCHA_SITE_KEY = 'firebase_recaptcha_site_key';
 
     public function emailEnabled(): bool
     {
@@ -113,12 +114,17 @@ class AuthSettingsService
         return in_array($value, ['invisible', 'normal'], true) ? $value : 'invisible';
     }
 
+    public function recaptchaSiteKey(): string
+    {
+        return trim((string) SiteSetting::get(self::KEY_FIREBASE_RECAPTCHA_SITE_KEY, ''));
+    }
+
     /**
      * @return array{
      *   email_enabled: bool,
      *   google_enabled: bool,
      *   phone_enabled: bool,
-     *   firebase: array{enabled: bool, recaptcha_mode: string, config: array<string, string>}
+     *   firebase: array{enabled: bool, recaptcha_mode: string, recaptcha_site_key: string, config: array<string, string>}
      * }
      */
     public function authUiPayload(): array
@@ -130,6 +136,7 @@ class AuthSettingsService
             'firebase' => [
                 'enabled' => $this->phoneEnabled(),
                 'recaptcha_mode' => $this->recaptchaMode(),
+                'recaptcha_site_key' => $this->recaptchaSiteKey(),
                 'config' => $this->phoneEnabled() ? $this->firebasePublicConfigForFrontend() : [],
             ],
         ];
@@ -142,4 +149,3 @@ class AuthSettingsService
         return (string) SiteSetting::get($key, $fallback) === '1';
     }
 }
-
