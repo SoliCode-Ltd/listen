@@ -313,7 +313,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                 // Total demo chars used by all users sharing any IP with this user (including self)
                 DemoVoiceGeneration::query()
                     ->selectRaw('COALESCE(SUM(billable_chars), 0)')
-                    ->whereIn('user_id', function ($sub) {
+                    ->whereIn('user_id', function ($sub) use ($hasDeviceColumns) {
                         $sub->select('u3.id')
                             ->from('users as u3')
                             ->where(function ($q) use ($hasDeviceColumns) {
