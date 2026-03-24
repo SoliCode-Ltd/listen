@@ -124,16 +124,30 @@ Route::group([
 
     Route::middleware('guest')->group(function () {
         Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
-        Route::post('/login', [AuthController::class, 'login'])->name('login.submit');
+        Route::post('/login', [AuthController::class, 'login'])
+            ->middleware('auth.method:email')
+            ->name('login.submit');
 
         Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
-        Route::post('/register', [AuthController::class, 'register'])->name('register.submit');
+        Route::post('/register', [AuthController::class, 'register'])
+            ->middleware('auth.method:email')
+            ->name('register.submit');
 
-        Route::get('/auth/social/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.social.redirect');
-        Route::get('/auth/social/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.social.callback');
+        Route::get('/auth/social/redirect', [AuthController::class, 'redirectToGoogle'])
+            ->middleware('auth.method:google')
+            ->name('auth.social.redirect');
+        Route::get('/auth/social/callback', [AuthController::class, 'handleGoogleCallback'])
+            ->middleware('auth.method:google')
+            ->name('auth.social.callback');
         // Backward-compatible aliases for existing OAuth app callback URLs.
-        Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle']);
-        Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
+        Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])
+            ->middleware('auth.method:google');
+        Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])
+            ->middleware('auth.method:google');
+
+        Route::post('/auth/phone/verify', [AuthController::class, 'phoneAuthenticate'])
+            ->middleware('auth.method:phone')
+            ->name('auth.phone.verify');
     });
 
     Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {

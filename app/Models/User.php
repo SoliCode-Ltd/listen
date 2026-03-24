@@ -44,6 +44,10 @@ class User extends Authenticatable implements FilamentUser
         'name',
         'email',
         'password',
+        'phone_number',
+        'phone_verified_at',
+        'firebase_uid',
+        'auth_provider',
         'google_id',
         'google_avatar',
         'api_key_hash',
@@ -90,6 +94,7 @@ class User extends Authenticatable implements FilamentUser
     {
         return [
             'email_verified_at' => 'datetime',
+            'phone_verified_at' => 'datetime',
             'password' => 'hashed',
             'api_key_created_at' => 'datetime',
             'subscription_status_checked_at' => 'datetime',

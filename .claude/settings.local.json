@@ -12,7 +12,14 @@
       "Bash(xargs grep:*)",
       "Bash(find . -path \"*/config/*\" -name \"*.php\" -exec grep -l \"middleware\" {})",
       "Bash(php -l routes/web.php)",
-      "Bash(php -l bootstrap/app.php)"
+      "Bash(php -l bootstrap/app.php)",
+      "Bash(grep -r \"intl-tel-input\\\\|phone.*input\\\\|PhoneAuth\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/app' --include=*.php)",
+      "Bash(grep -r \"phone_enabled\\\\|phoneEnabled\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen' --include=*.php --include=*.js)",
+      "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources/lang' -type f -name *.php)",
+      "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen' -path */lang/* -name *.php)",
+      "Bash(grep -r \"intl-tel-input\\\\|firebase.*phone\\\\|phone.*auth\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/config' --include=*.php)",
+      "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen' -type f \\\\\\(-name vite.config.js -o -name tailwind.config.js -o -name .env* \\\\\\))",
+      "Bash(grep -r \"\\\\.iti\\\\|intl.*tel\\\\|phone.*input\\\\|phone.*style\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources' --include=*.blade.php --include=*.css)"
     ]
   }
 }

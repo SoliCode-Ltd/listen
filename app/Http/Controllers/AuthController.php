@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\Auth\PhoneAuthBridgeRequest;
 use App\Models\User;
 use App\Services\BlockedUserService;
+use App\Services\Auth\AuthSettingsService;
+use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\PlanAccessService;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
@@ -19,16 +22,26 @@ class AuthController extends Controller
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BlockedUserService $blockedUserService,
+        private readonly AuthSettingsService $authSettings,
+        private readonly PhoneAuthBridgeService $phoneAuthBridge,
     ) {
     }
 
     public function showLogin()
     {
-        return view('auth.login');
+        return view('auth.login', [
+            'authSettings' => $this->authSettings->authUiPayload(),
+        ]);
     }
 
     public function login(Request $request)
     {
+        if (! $this->authSettings->emailEnabled()) {
+            return back()->withErrors([
+                'auth' => __('ui.backend.auth_email_disabled'),
+            ]);
+        }
+
         $credentials = $request->validate([
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
@@ -65,11 +78,19 @@ class AuthController extends Controller
 
     public function showRegister()
     {
-        return view('auth.register');
+        return view('auth.register', [
+            'authSettings' => $this->authSettings->authUiPayload(),
+        ]);
     }
 
     public function register(Request $request)
     {
+        if (! $this->authSettings->emailEnabled()) {
+            return back()->withErrors([
+                'auth' => __('ui.backend.auth_email_disabled'),
+            ]);
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
@@ -94,6 +115,12 @@ class AuthController extends Controller
 
     public function redirectToGoogle()
     {
+        if (! $this->authSettings->googleEnabled()) {
+            return redirect()->route('login')->withErrors([
+                'auth' => __('ui.backend.auth_google_disabled'),
+            ]);
+        }
+
         if (! config('services.google.client_id') || ! config('services.google.client_secret')) {
             return redirect()->route('login')->withErrors([
                 'email' => __('ui.backend.auth_social_not_configured'),
@@ -107,6 +134,12 @@ class AuthController extends Controller
 
     public function handleGoogleCallback(Request $request)
     {
+        if (! $this->authSettings->googleEnabled()) {
+            return redirect()->route('login')->withErrors([
+                'auth' => __('ui.backend.auth_google_disabled'),
+            ]);
+        }
+
         try {
             $googleUser = $this->googleProvider()->user();
         } catch (InvalidStateException) {
@@ -175,6 +208,53 @@ class AuthController extends Controller
         }
 
         return redirect()->to($intended);
+    }
+
+    public function phoneAuthenticate(PhoneAuthBridgeRequest $request)
+    {
+        if (! $this->authSettings->phoneEnabled()) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.auth_phone_disabled'),
+            ], 403);
+        }
+
+        try {
+            $user = $this->phoneAuthBridge->resolveUserFromIdToken((string) $request->string('id_token'));
+        } catch (\Throwable $exception) {
+            Log::warning('Firebase phone auth bridge failed.', [
+                'message' => $exception->getMessage(),
+                'exception' => get_class($exception),
+                'ip' => $request->ip(),
+                'intent' => (string) $request->string('intent'),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.auth_phone_verification_failed'),
+            ], 422);
+        }
+
+        if ($this->blockedUserService->isBlocked($user)) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        if (str_contains($intended, '/admin') && ! $user->is_admin) {
+            $intended = route('dashboard');
+        }
+
+        return response()->json([
+            'ok' => true,
+            'redirect' => $intended,
+        ]);
     }
 
     public function logout(Request $request)

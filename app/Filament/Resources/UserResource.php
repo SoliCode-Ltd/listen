@@ -80,6 +80,22 @@ class UserResource extends Resource
                 Forms\Components\Section::make(__('ui.admin.users.oauth_section'))
                     ->columns(2)
                     ->schema([
+                        Forms\Components\TextInput::make('phone_number')
+                            ->label(__('ui.admin.users.phone_number'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\DateTimePicker::make('phone_verified_at')
+                            ->label(__('ui.admin.users.phone_verified_at'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('firebase_uid')
+                            ->label(__('ui.admin.users.firebase_uid'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('auth_provider')
+                            ->label(__('ui.admin.users.auth_provider'))
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('google_id')
                             ->label(__('ui.admin.users.google_id'))
                             ->disabled()
@@ -120,10 +136,18 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('phone_number')
+                    ->label(__('ui.admin.users.phone_number'))
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->searchable(),
                 Tables\Columns\IconColumn::make('is_admin')
                     ->label(__('ui.admin.users.admin'))
                     ->boolean()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('auth_provider')
+                    ->label(__('ui.admin.users.auth_provider'))
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('google_id')
                     ->label(__('ui.admin.users.google'))
                     ->badge()
@@ -162,6 +186,9 @@ class UserResource extends Resource
                 Tables\Filters\Filter::make('has_google')
                     ->label(__('ui.admin.users.google_connected'))
                     ->query(fn ($query) => $query->whereNotNull('google_id')),
+                Tables\Filters\Filter::make('has_phone')
+                    ->label(__('ui.admin.users.phone_connected'))
+                    ->query(fn ($query) => $query->whereNotNull('phone_number')),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
