@@ -114,7 +114,7 @@
               @if(auth()->user()->google_avatar)
                 <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
               @else
-                {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+                {{ strtoupper(substr(preg_replace('/[^a-zA-Z]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
               @endif
             </div>
             <span class="user-name">{{ auth()->user()->name }}</span>
@@ -126,12 +126,12 @@
                 @if(auth()->user()->google_avatar)
                   <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
                 @else
-                  {{ strtoupper(substr(auth()->user()->name ?? 'U', 0, 1)) }}
+                  {{ strtoupper(substr(preg_replace('/[^a-zA-Z]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
                 @endif
               </div>
               <div class="dropdown-user-info">
                 <strong>{{ auth()->user()->name }}</strong>
-                <span>{{ auth()->user()->email }}</span>
+                <span dir="ltr">{{ auth()->user()->displayContact() }}</span>
               </div>
             </div>
             <div class="dropdown-divider"></div>

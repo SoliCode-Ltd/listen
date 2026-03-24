@@ -50,6 +50,8 @@ class User extends Authenticatable implements FilamentUser
         'auth_provider',
         'google_id',
         'google_avatar',
+        'registration_ip',
+        'last_login_ip',
         'api_key_hash',
         'api_key_last4',
         'api_key_created_at',
@@ -85,6 +87,11 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(UsageCounter::class);
     }
 
+    public function demoVoiceGenerations(): HasMany
+    {
+        return $this->hasMany(DemoVoiceGeneration::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *
@@ -117,6 +124,23 @@ class User extends Authenticatable implements FilamentUser
     public function isBlocked(): bool
     {
         return (bool) $this->is_blocked;
+    }
+
+    public function isPhoneUser(): bool
+    {
+        return $this->auth_provider === 'phone';
+    }
+
+    /**
+     * Display-friendly contact info: phone number for phone users, email otherwise.
+     */
+    public function displayContact(): string
+    {
+        if ($this->isPhoneUser() && filled($this->phone_number)) {
+            return $this->phone_number;
+        }
+
+        return $this->email;
     }
 
     public static function hashApiKey(string $plainTextKey): string

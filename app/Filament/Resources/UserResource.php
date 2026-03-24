@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
+use App\Models\DemoVoiceGeneration;
 use App\Models\User;
 use App\Services\BlockedUserService;
 use Filament\Forms;
@@ -12,6 +13,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class UserResource extends Resource
 {
@@ -77,6 +79,46 @@ class UserResource extends Resource
                             ->disabled()
                             ->dehydrated(false),
                     ]),
+                Forms\Components\Section::make(__('ui.admin.users.ip_demo_section'))
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('registration_ip')
+                            ->label(__('ui.admin.users.registration_ip'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\TextInput::make('last_login_ip')
+                            ->label(__('ui.admin.users.last_login_ip'))
+                            ->disabled()
+                            ->dehydrated(false),
+                        Forms\Components\Placeholder::make('demo_chars_used_display')
+                            ->label(__('ui.admin.users.demo_chars_used'))
+                            ->content(fn (?User $record): string => $record
+                                ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format((int) config('listen.demo.guest_char_allowance', 300))
+                                : '0'),
+                        Forms\Components\Placeholder::make('ip_linked_accounts_display')
+                            ->label(__('ui.admin.users.ip_linked_accounts'))
+                            ->content(function (?User $record): string {
+                                if (! $record) {
+                                    return '0';
+                                }
+                                $ips = array_values(array_unique(array_filter([
+                                    $record->registration_ip,
+                                    $record->last_login_ip,
+                                ])));
+                                if ($ips === []) {
+                                    return __('ui.admin.users.no_ip_data');
+                                }
+                                $linked = User::query()
+                                    ->where(fn ($q) => $q->whereIn('registration_ip', $ips)->orWhereIn('last_login_ip', $ips))
+                                    ->where('id', '!=', $record->id)
+                                    ->get(['id', 'name', 'email']);
+                                if ($linked->isEmpty()) {
+                                    return __('ui.admin.users.no_linked_accounts');
+                                }
+
+                                return $linked->map(fn ($u) => "{$u->name} ({$u->email})")->implode(', ');
+                            }),
+                    ]),
                 Forms\Components\Section::make(__('ui.admin.users.oauth_section'))
                     ->columns(2)
                     ->schema([
@@ -140,6 +182,43 @@ class UserResource extends Resource
                     ->label(__('ui.admin.users.phone_number'))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->searchable(),
+                Tables\Columns\TextColumn::make('registration_ip')
+                    ->label(__('ui.admin.users.registration_ip'))
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('last_login_ip')
+                    ->label(__('ui.admin.users.last_login_ip'))
+                    ->searchable()
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('demo_chars_used')
+                    ->label(__('ui.admin.users.demo_chars_used'))
+                    ->getStateUsing(fn (User $record) => (int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars'))
+                    ->numeric()
+                    ->sortable(query: fn ($query, string $direction) => $query
+                        ->withSum('demoVoiceGenerations as demo_chars_sum', 'billable_chars')
+                        ->orderBy('demo_chars_sum', $direction))
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('ip_linked_accounts')
+                    ->label(__('ui.admin.users.ip_linked_accounts'))
+                    ->getStateUsing(function (User $record): int {
+                        $ips = array_values(array_unique(array_filter([
+                            $record->registration_ip,
+                            $record->last_login_ip,
+                        ])));
+                        if ($ips === []) {
+                            return 0;
+                        }
+
+                        return User::query()
+                            ->where(fn ($q) => $q->whereIn('registration_ip', $ips)->orWhereIn('last_login_ip', $ips))
+                            ->where('id', '!=', $record->id)
+                            ->count();
+                    })
+                    ->badge()
+                    ->color(fn ($state) => ((int) $state) > 0 ? 'danger' : 'gray')
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('is_admin')
                     ->label(__('ui.admin.users.admin'))
                     ->boolean()
@@ -251,6 +330,25 @@ class UserResource extends Resource
                         Notification::make()
                             ->success()
                             ->title(__('ui.admin.users.unblocked_success'))
+                            ->send();
+                    }),
+                Tables\Actions\Action::make('resetDemoChars')
+                    ->label(__('ui.admin.users.reset_demo_chars'))
+                    ->icon('heroicon-o-arrow-path')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading(__('ui.admin.users.reset_demo_confirm_title'))
+                    ->modalDescription(__('ui.admin.users.reset_demo_confirm_description'))
+                    ->modalSubmitActionLabel(__('ui.admin.users.reset_demo_chars'))
+                    ->visible(fn (User $record) => DemoVoiceGeneration::where('user_id', $record->id)->exists())
+                    ->action(function (User $record): void {
+                        DemoVoiceGeneration::where('user_id', $record->id)->delete();
+                        Cache::forget("demo:ip_linked_users:{$record->id}");
+                        Cache::forget('admin:suspicious_users_count');
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('ui.admin.users.reset_demo_success'))
                             ->send();
                     }),
                 Tables\Actions\Action::make('revokeApiKey')

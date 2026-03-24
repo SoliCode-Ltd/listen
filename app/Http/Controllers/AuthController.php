@@ -11,6 +11,7 @@ use App\Services\PlanAccessService;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -66,6 +67,7 @@ class AuthController extends Controller
                 ->onlyInput('email');
         }
 
+        $this->stampLoginIp($user, $request);
         $request->session()->regenerate();
 
         $intended = $request->session()->pull('url.intended', route('dashboard'));
@@ -101,11 +103,13 @@ class AuthController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
+            'registration_ip' => $request->ip(),
         ]);
 
         $this->attachFreePlanIfMissing($user);
 
         Auth::login($user);
+        $this->stampLoginIp($user, $request);
         $request->session()->regenerate();
 
         $intended = $request->session()->pull('url.intended', route('dashboard'));
@@ -182,6 +186,7 @@ class AuthController extends Controller
                 'google_id' => $googleId,
                 'google_avatar' => is_string($avatar) ? $avatar : null,
                 'email_verified_at' => now(),
+                'registration_ip' => $request->ip(),
             ]);
         } else {
             $user->update([
@@ -199,6 +204,7 @@ class AuthController extends Controller
                 ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
         }
 
+        $this->stampLoginIp($user, $request);
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -208,6 +214,53 @@ class AuthController extends Controller
         }
 
         return redirect()->to($intended);
+    }
+
+    public function firebaseGoogleAuthenticate(PhoneAuthBridgeRequest $request)
+    {
+        if (! $this->authSettings->firebaseGoogleEnabled()) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.auth_firebase_google_disabled'),
+            ], 403);
+        }
+
+        try {
+            $user = $this->phoneAuthBridge->resolveUserFromGoogleIdToken((string) $request->string('id_token'), $request->ip());
+        } catch (\Throwable $exception) {
+            Log::warning('Firebase Google auth bridge failed.', [
+                'message' => $exception->getMessage(),
+                'exception' => get_class($exception),
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.auth_firebase_google_failed'),
+            ], 422);
+        }
+
+        if ($this->blockedUserService->isBlocked($user)) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
+        $this->stampLoginIp($user, $request);
+        Auth::login($user, true);
+        $request->session()->regenerate();
+
+        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        if (str_contains($intended, '/admin') && ! $user->is_admin) {
+            $intended = route('dashboard');
+        }
+
+        return response()->json([
+            'ok' => true,
+            'redirect' => $intended,
+        ]);
     }
 
     public function phoneAuthenticate(PhoneAuthBridgeRequest $request)
@@ -220,7 +273,7 @@ class AuthController extends Controller
         }
 
         try {
-            $user = $this->phoneAuthBridge->resolveUserFromIdToken((string) $request->string('id_token'));
+            $user = $this->phoneAuthBridge->resolveUserFromIdToken((string) $request->string('id_token'), $request->ip());
         } catch (\Throwable $exception) {
             Log::warning('Firebase phone auth bridge failed.', [
                 'message' => $exception->getMessage(),
@@ -243,6 +296,7 @@ class AuthController extends Controller
             ], 403);
         }
 
+        $this->stampLoginIp($user, $request);
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -269,6 +323,32 @@ class AuthController extends Controller
     private function attachFreePlanIfMissing(User $user): void
     {
         $this->planAccessService->ensureFreePlanForUser($user);
+    }
+
+    private function stampLoginIp($user, Request $request): void
+    {
+        $ip = $request->ip();
+        if (! $ip || ! $user instanceof User) {
+            return;
+        }
+
+        $updates = [];
+
+        if ((string) $user->last_login_ip !== (string) $ip) {
+            $updates['last_login_ip'] = $ip;
+        }
+
+        if (! filled($user->registration_ip)) {
+            $updates['registration_ip'] = $ip;
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $user->forceFill($updates)->saveQuietly();
+        Cache::forget("demo:ip_linked_users:{$user->id}");
+        Cache::forget('admin:suspicious_users_count');
     }
 
     private function googleProvider()

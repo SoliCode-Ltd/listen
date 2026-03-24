@@ -42,6 +42,7 @@ class EnsureAuthMethodEnabled
             'email' => __('ui.backend.auth_email_disabled'),
             'google' => __('ui.backend.auth_google_disabled'),
             'phone' => __('ui.backend.auth_phone_disabled'),
+            'firebase_google' => __('ui.backend.auth_firebase_google_disabled'),
             default => __('ui.backend.auth_method_disabled'),
         };
     }

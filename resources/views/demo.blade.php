@@ -708,9 +708,7 @@ TXT,
       return markers.some((marker) => normalized.includes(marker.toLowerCase()));
     }
 
-    /* Legacy fingerprint code is disabled.
-       Demo quota is strictly per-user.
-    // Enhanced fingerprinting system
+    // Browser fingerprint for quota abuse prevention
     const fingerprintComponents = {};
 
     async function sha256(str) {
@@ -939,7 +937,11 @@ TXT,
       } catch (e) {}
     })();
 
-    */
+    // Build fingerprint on load
+    let clientFingerprint = '';
+    let fingerprintPromise = null;
+    ensureFingerprint();
+
     function updateTranslateHint() {
       if (!translateHint || !translateSelect) return;
       translateHint.textContent = translateSelect.value === '1' ? i18n.translate_enabled_hint : i18n.translate_disabled_hint;
@@ -1046,6 +1048,9 @@ TXT,
       }
 
       const headers = { ...csrfHeaders };
+      if (clientFingerprint) {
+        headers['X-Client-FP'] = clientFingerprint;
+      }
 
       const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
       const data = await res.json().catch(() => ({}));

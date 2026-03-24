@@ -479,9 +479,9 @@ class HomeController extends Controller
         }
         RateLimiter::hit($rateKey, 60);
 
-        // Lifetime trial cap per authenticated user account.
+        // Lifetime trial cap — shared across IP-linked and fingerprint-linked accounts.
         $lifetimeCap = $this->demoCharAllowance($request);
-        $usedChars = $this->trialUsedCharsByUser($userId);
+        $usedChars = $this->trialUsedCharsByUser($userId, $request);
 
         if (($usedChars + $chars) > $lifetimeCap) {
             throw ValidationException::withMessages([
@@ -867,7 +867,7 @@ class HomeController extends Controller
     {
         $userId = (int) $request->user()->id;
         $limit = $this->demoCharAllowance($request);
-        $used = min($limit, max(0, $this->trialUsedCharsByUser($userId)));
+        $used = min($limit, max(0, $this->trialUsedCharsByUser($userId, $request)));
         $remaining = max(0, $limit - $used);
 
         return [
@@ -880,11 +880,97 @@ class HomeController extends Controller
         ];
     }
 
-    private function trialUsedCharsByUser(int $userId): int
+    private function trialUsedCharsByUser(int $userId, ?Request $request = null): int
     {
+        $userIds = $this->ipLinkedUserIds($userId);
+        $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
+
+        $allIds = array_values(array_unique(array_merge($userIds, $fpLinkedIds)));
+
         return (int) (DemoVoiceGeneration::query()
-            ->where('user_id', $userId)
+            ->whereIn('user_id', $allIds)
             ->sum('billable_chars') ?? 0);
+    }
+
+    /**
+     * Find all user IDs that share any known IP with the given user.
+     * Checks both registration_ip and last_login_ip for maximum coverage.
+     *
+     * @return list<int>
+     */
+    private function ipLinkedUserIds(int $userId): array
+    {
+        $cacheKey = "demo:ip_linked_users:{$userId}";
+
+        return Cache::remember($cacheKey, 120, static function () use ($userId): array {
+            $user = \App\Models\User::query()->find($userId);
+            if (! $user) {
+                return [$userId];
+            }
+
+            $ips = array_values(array_unique(array_filter([
+                $user->registration_ip,
+                $user->last_login_ip,
+            ])));
+
+            if ($ips === []) {
+                return [$userId];
+            }
+
+            $linkedIds = \App\Models\User::query()
+                ->where(function ($q) use ($ips) {
+                    $q->whereIn('registration_ip', $ips)
+                      ->orWhereIn('last_login_ip', $ips);
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            return $linkedIds !== [] ? $linkedIds : [$userId];
+        });
+    }
+
+    /**
+     * Find all user IDs whose demo generations share the same browser fingerprint.
+     * This catches multi-account abuse even through VPN/IP changes.
+     *
+     * @return list<int>
+     */
+    private function fingerprintLinkedUserIds(int $userId, ?Request $request = null): array
+    {
+        $fp = $request ? $this->extractClientFingerprint($request) : null;
+
+        if (! $fp || $fp === '') {
+            return [$userId];
+        }
+
+        $cacheKey = "demo:fp_linked_users:{$fp}";
+
+        return Cache::remember($cacheKey, 120, static function () use ($userId, $fp): array {
+            $linkedIds = DemoVoiceGeneration::query()
+                ->where('primary_identity_hash', $fp)
+                ->distinct()
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! in_array($userId, $linkedIds, true)) {
+                $linkedIds[] = $userId;
+            }
+
+            return $linkedIds;
+        });
+    }
+
+    private function extractClientFingerprint(Request $request): string
+    {
+        $fp = trim((string) $request->header('X-Client-FP', ''));
+
+        if ($fp !== '' && strlen($fp) >= 16 && strlen($fp) <= 256) {
+            return 'fp:'.$fp;
+        }
+
+        return 'u:'.(int) ($request->user()?->id ?? 0);
     }
 
     /**
@@ -916,7 +1002,7 @@ class HomeController extends Controller
 
             return DemoVoiceGeneration::query()->create([
                 'user_id' => $request->user()?->id,
-                'primary_identity_hash' => 'u:'.(int) ($request->user()?->id ?? 0),
+                'primary_identity_hash' => $this->extractClientFingerprint($request),
                 'link_group' => null,
                 'input_text' => $inputText,
                 'speech_text' => $speechText,

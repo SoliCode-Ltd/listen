@@ -19,7 +19,8 @@
       "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen' -path */lang/* -name *.php)",
       "Bash(grep -r \"intl-tel-input\\\\|firebase.*phone\\\\|phone.*auth\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/config' --include=*.php)",
       "Bash(find '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen' -type f \\\\\\(-name vite.config.js -o -name tailwind.config.js -o -name .env* \\\\\\))",
-      "Bash(grep -r \"\\\\.iti\\\\|intl.*tel\\\\|phone.*input\\\\|phone.*style\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources' --include=*.blade.php --include=*.css)"
+      "Bash(grep -r \"\\\\.iti\\\\|intl.*tel\\\\|phone.*input\\\\|phone.*style\" '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources' --include=*.blade.php --include=*.css)",
+      "Bash(grep -r \"auth_provider\\\\|provider_id\" 'd:/Faculty of Engineering/Work/SoliCode/Expirements/listen/database' --include=*.php)"
     ]
   }
 }

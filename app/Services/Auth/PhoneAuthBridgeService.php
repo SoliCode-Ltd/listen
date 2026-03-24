@@ -11,7 +11,7 @@ use RuntimeException;
 class PhoneAuthBridgeService
 {
     public function __construct(
-        private readonly FirebasePhoneTokenVerifier $firebaseTokenVerifier,
+        private readonly FirebaseTokenVerifier $firebaseTokenVerifier,
         private readonly PlanAccessService $planAccessService,
     ) {
     }
@@ -24,9 +24,9 @@ class PhoneAuthBridgeService
      * - Then match by exact phone_number
      * - Never auto-merge if phone points to a different firebase_uid
      */
-    public function resolveUserFromIdToken(string $idToken): User
+    public function resolveUserFromIdToken(string $idToken, ?string $ip = null): User
     {
-        $identity = $this->firebaseTokenVerifier->verify($idToken);
+        $identity = $this->firebaseTokenVerifier->verify($idToken, 'phone');
         $firebaseUid = $identity['uid'];
         $phoneNumber = $identity['phone_number'];
 
@@ -54,6 +54,7 @@ class PhoneAuthBridgeService
                 firebaseUid: $firebaseUid,
                 phoneNumber: $phoneNumber,
                 displayName: $identity['display_name'],
+                ip: $ip,
             );
         } else {
             $this->syncPhoneIdentity($user, $firebaseUid, $phoneNumber);
@@ -64,10 +65,54 @@ class PhoneAuthBridgeService
         return $user;
     }
 
-    private function createPhoneUser(string $firebaseUid, string $phoneNumber, ?string $displayName): User
+    /**
+     * Resolve a Laravel user from a verified Firebase Google identity.
+     *
+     * Account linking priority:
+     * 1. Match by firebase_uid (strongest — same Firebase account)
+     * 2. Match by email (links Socialite Google or email/password accounts)
+     */
+    public function resolveUserFromGoogleIdToken(string $idToken, ?string $ip = null): User
+    {
+        $identity = $this->firebaseTokenVerifier->verify($idToken, 'google.com');
+        $firebaseUid = $identity['uid'];
+        $email = $identity['email'];
+        $displayName = $identity['display_name'];
+        $photoUrl = $identity['photo_url'];
+
+        $user = User::query()->where('firebase_uid', $firebaseUid)->first();
+
+        if (! $user && $email) {
+            $user = User::query()->where('email', $email)->first();
+
+            if ($user && filled($user->firebase_uid) && $user->firebase_uid !== $firebaseUid) {
+                throw new RuntimeException('google_account_link_conflict');
+            }
+        }
+
+        if (! $user) {
+            $user = $this->createGoogleFirebaseUser(
+                firebaseUid: $firebaseUid,
+                email: $email,
+                displayName: $displayName,
+                photoUrl: $photoUrl,
+                ip: $ip,
+            );
+        } else {
+            $this->syncGoogleFirebaseIdentity($user, $firebaseUid, $email, $photoUrl);
+        }
+
+        $this->planAccessService->ensureFreePlanForUser($user);
+
+        return $user;
+    }
+
+    // ── Phone user creation ─────────────────────────────────────────
+
+    private function createPhoneUser(string $firebaseUid, string $phoneNumber, ?string $displayName, ?string $ip = null): User
     {
         return User::query()->create([
-            'name' => $this->resolveDisplayName($displayName, $phoneNumber),
+            'name' => $this->resolvePhoneDisplayName($displayName, $phoneNumber),
             'email' => $this->makePhonePlaceholderEmail($firebaseUid),
             'password' => Hash::make(Str::password(32)),
             'firebase_uid' => $firebaseUid,
@@ -75,6 +120,7 @@ class PhoneAuthBridgeService
             'phone_verified_at' => now(),
             'auth_provider' => 'phone',
             'email_verified_at' => now(),
+            'registration_ip' => $ip,
         ]);
     }
 
@@ -105,13 +151,13 @@ class PhoneAuthBridgeService
         }
     }
 
-    private function resolveDisplayName(?string $displayName, string $phoneNumber): string
+    private function resolvePhoneDisplayName(?string $displayName, string $phoneNumber): string
     {
         if ($displayName && trim($displayName) !== '') {
             return trim($displayName);
         }
 
-        return 'Phone User '.substr(preg_replace('/\D+/', '', $phoneNumber) ?? '0000', -4);
+        return $phoneNumber;
     }
 
     private function makePhonePlaceholderEmail(string $firebaseUid): string
@@ -133,5 +179,47 @@ class PhoneAuthBridgeService
 
         return $fallback;
     }
-}
 
+    // ── Google Firebase user creation ───────────────────────────────
+
+    private function createGoogleFirebaseUser(string $firebaseUid, string $email, ?string $displayName, ?string $photoUrl, ?string $ip = null): User
+    {
+        return User::query()->create([
+            'name' => ($displayName && trim($displayName) !== '') ? trim($displayName) : explode('@', $email)[0],
+            'email' => $email,
+            'password' => Hash::make(Str::password(32)),
+            'firebase_uid' => $firebaseUid,
+            'google_avatar' => ($photoUrl && $photoUrl !== '') ? $photoUrl : null,
+            'auth_provider' => 'firebase_google',
+            'email_verified_at' => now(),
+            'registration_ip' => $ip,
+        ]);
+    }
+
+    private function syncGoogleFirebaseIdentity(User $user, string $firebaseUid, ?string $email, ?string $photoUrl): void
+    {
+        $attributes = [];
+
+        if (! filled($user->firebase_uid)) {
+            $attributes['firebase_uid'] = $firebaseUid;
+        } elseif ($user->firebase_uid !== $firebaseUid) {
+            throw new RuntimeException('firebase_uid_mismatch');
+        }
+
+        if ($photoUrl && $photoUrl !== '' && $user->google_avatar !== $photoUrl) {
+            $attributes['google_avatar'] = $photoUrl;
+        }
+
+        if (! $user->email_verified_at) {
+            $attributes['email_verified_at'] = now();
+        }
+
+        if (! filled($user->auth_provider)) {
+            $attributes['auth_provider'] = 'firebase_google';
+        }
+
+        if ($attributes !== []) {
+            $user->forceFill($attributes)->save();
+        }
+    }
+}

@@ -4,6 +4,7 @@
   $emailEnabled = (bool) ($authSettings['email_enabled'] ?? true);
   $googleEnabled = (bool) ($authSettings['google_enabled'] ?? true);
   $phoneEnabled = (bool) ($authSettings['phone_enabled'] ?? false);
+  $firebaseGoogleEnabled = (bool) ($authSettings['firebase_google_enabled'] ?? false);
   $phoneI18n = [
     'missingPhone' => __('ui.auth.phone_missing_number'),
     'missingCode' => __('ui.auth.phone_missing_code'),
@@ -518,6 +519,23 @@
         </div>
       @endif
 
+      <div class="blocked-notice" id="jsBlockedNotice" role="alert" aria-live="polite" style="display:none;">
+        <div class="blocked-notice-header">
+          <div class="blocked-notice-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+          </div>
+          <div class="blocked-notice-title" id="jsBlockedTitle"></div>
+        </div>
+        <div class="blocked-notice-content">
+          <p class="blocked-notice-body" id="jsBlockedBody"></p>
+          <div class="blocked-notice-reason" id="jsBlockedReasonWrap" style="display:none;">
+            <b>{{ __('ui.auth.blocked_notice_reason_label') }}</b>
+            <span id="jsBlockedReason"></span>
+          </div>
+          <div class="blocked-notice-contact" id="jsBlockedContact"></div>
+        </div>
+      </div>
+
       @if($errors->has('auth'))
         <div class="error-box">{{ $errors->first('auth') }}</div>
       @endif
@@ -527,6 +545,14 @@
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 31.367 32"><path d="M31.367,16.368a18.825,18.825,0,0,0-.276-3.251H16v6.161h8.642a7.4,7.4,0,0,1-3.2,4.862v4H26.6A15.626,15.626,0,0,0,31.367,16.368Z" fill="#4285f4"></path><path d="M16,32a15.317,15.317,0,0,0,10.606-3.862l-5.156-4A9.7,9.7,0,0,1,7.022,19.066H1.7v4.122A16,16,0,0,0,16,32Z" fill="#34a853"></path><path d="M7.016,19.066a9.583,9.583,0,0,1,0-6.125V8.819H1.7a16.017,16.017,0,0,0,0,14.369Z" fill="#fbbc04"></path><path d="M16,6.333a8.694,8.694,0,0,1,6.138,2.4h0l4.568-4.568A15.376,15.376,0,0,0,16,0,16,16,0,0,0,1.7,8.819l5.314,4.122A9.57,9.57,0,0,1,16,6.333Z" fill="#ea4335"></path></svg>
           {{ __('ui.auth.continue_google') }}
         </a>
+      @endif
+
+      @if($firebaseGoogleEnabled)
+        <button type="button" class="google-btn" id="firebaseGoogleSignInBtn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 31.367 32"><path d="M31.367,16.368a18.825,18.825,0,0,0-.276-3.251H16v6.161h8.642a7.4,7.4,0,0,1-3.2,4.862v4H26.6A15.626,15.626,0,0,0,31.367,16.368Z" fill="#4285f4"></path><path d="M16,32a15.317,15.317,0,0,0,10.606-3.862l-5.156-4A9.7,9.7,0,0,1,7.022,19.066H1.7v4.122A16,16,0,0,0,16,32Z" fill="#34a853"></path><path d="M7.016,19.066a9.583,9.583,0,0,1,0-6.125V8.819H1.7a16.017,16.017,0,0,0,0,14.369Z" fill="#fbbc04"></path><path d="M16,6.333a8.694,8.694,0,0,1,6.138,2.4h0l4.568-4.568A15.376,15.376,0,0,0,16,0,16,16,0,0,0,1.7,8.819l5.314,4.122A9.57,9.57,0,0,1,16,6.333Z" fill="#ea4335"></path></svg>
+          {{ __('ui.auth.continue_google') }}
+        </button>
+        <div class="status-box" id="firebaseGoogleStatus" style="display:none;"></div>
       @endif
 
       @if($phoneEnabled)
@@ -585,6 +611,39 @@
     </div>
   </main>
 
+  @php($blockedI18n = [
+    'title' => __('ui.auth.blocked_notice_title'),
+    'body' => __('ui.auth.blocked_notice_body'),
+    'contact_prompt' => __('ui.auth.blocked_notice_contact_prompt'),
+    'email' => 'help@listenai.studio',
+  ])
+  <script>
+    window.__showBlockedNotice = function(notice) {
+      var wrap = document.getElementById('jsBlockedNotice');
+      if (!wrap || !notice) return;
+      var defaults = @json($blockedI18n);
+      document.getElementById('jsBlockedTitle').textContent = notice.title || defaults.title;
+      document.getElementById('jsBlockedBody').textContent = notice.body || defaults.body;
+      var reasonWrap = document.getElementById('jsBlockedReasonWrap');
+      if (notice.reason) {
+        document.getElementById('jsBlockedReason').textContent = notice.reason;
+        reasonWrap.style.display = '';
+      } else {
+        reasonWrap.style.display = 'none';
+      }
+      var email = notice.email || defaults.email;
+      var contactEl = document.getElementById('jsBlockedContact');
+      contactEl.textContent = '';
+      contactEl.appendChild(document.createTextNode(defaults.contact_prompt + ' '));
+      var a = document.createElement('a');
+      a.href = 'mailto:' + email;
+      a.textContent = email;
+      contactEl.appendChild(a);
+      wrap.style.display = '';
+      wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+  </script>
+
   @if($phoneEnabled)
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/intlTelInput.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.8.0/build/js/utils.js"></script>
@@ -595,6 +654,7 @@
       (() => {
         const rawFirebaseConfig = @json($authSettings['firebase']['config'] ?? []);
         const recaptchaMode = @json($authSettings['firebase']['recaptcha_mode'] ?? 'invisible');
+        const firebaseTestingMode = @json($authSettings['firebase']['testing_mode'] ?? false);
         const verifyEndpoint = @json(route('auth.phone.verify'));
         const csrfToken = @json(csrf_token());
         const i18n = @json($phoneI18n);
@@ -681,12 +741,19 @@
         let confirmationResult = null;
         let recaptchaVerifier = null;
         let auth;
+        const sendCooldownStorageKey = 'listen_phone_send_cooldown_until_login';
+        let sendCooldownUntil = Number(sessionStorage.getItem(sendCooldownStorageKey) || 0);
+        let sendCooldownTimer = null;
+        let requestInFlight = false;
 
         try {
           const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
           auth = getAuth(app);
           const pageLang = String(document.documentElement.lang || '').toLowerCase();
           auth.languageCode = pageLang.startsWith('ar') ? 'ar' : 'en';
+          if (firebaseTestingMode && auth.settings) {
+            auth.settings.appVerificationDisabledForTesting = true;
+          }
         } catch (error) {
           setStatus(i18n.serviceUnavailable, true);
           console.error('Firebase init failed', error);
@@ -702,9 +769,46 @@
         }
 
         function setButtonsState(disabled) {
-          sendBtn.disabled = disabled;
+          requestInFlight = disabled;
           verifyBtn.disabled = disabled;
-          if (resendBtn) resendBtn.disabled = disabled;
+          if (disabled) {
+            sendBtn.disabled = true;
+            if (resendBtn) resendBtn.disabled = true;
+            return;
+          }
+
+          const cooldownActive = Date.now() < sendCooldownUntil;
+          sendBtn.disabled = cooldownActive;
+          if (resendBtn) resendBtn.disabled = cooldownActive;
+        }
+
+        function startSendCooldown(seconds) {
+          sendCooldownUntil = Date.now() + (Math.max(0, seconds) * 1000);
+          sessionStorage.setItem(sendCooldownStorageKey, String(sendCooldownUntil));
+          sendBtn.disabled = true;
+          if (resendBtn) resendBtn.disabled = true;
+
+          if (sendCooldownTimer) {
+            clearInterval(sendCooldownTimer);
+          }
+
+          sendCooldownTimer = setInterval(() => {
+            if (Date.now() < sendCooldownUntil) return;
+            clearInterval(sendCooldownTimer);
+            sendCooldownTimer = null;
+            sendCooldownUntil = 0;
+            sessionStorage.removeItem(sendCooldownStorageKey);
+
+            if (!requestInFlight) {
+              sendBtn.disabled = false;
+              if (resendBtn) resendBtn.disabled = false;
+            }
+          }, 1000);
+        }
+
+        function isTooManyRequestsError(error) {
+          const code = String(error && error.code ? error.code : '').toLowerCase();
+          return code.includes('too-many-requests') || code.includes('quota-exceeded');
         }
 
         function mapFirebaseError(error) {
@@ -722,26 +826,24 @@
           return i18n.genericError;
         }
 
-        function ensureRecaptchaVerifier() {
-          if (recaptchaVerifier) return recaptchaVerifier;
+        function clearRecaptchaVerifier() {
+          if (recaptchaVerifier) {
+            try { recaptchaVerifier.clear(); } catch (_e) {}
+            recaptchaVerifier = null;
+          }
+          const container = document.getElementById('recaptcha-container');
+          if (container) container.innerHTML = '';
+        }
 
-          const recaptchaOptions = {
+        function createRecaptchaVerifier() {
+          clearRecaptchaVerifier();
+
+          recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', {
             size: recaptchaMode === 'normal' ? 'normal' : 'invisible',
             callback: () => {},
             'expired-callback': () => {
-              setStatus(i18n.recaptchaExpired, true);
-              if (recaptchaVerifier && typeof recaptchaVerifier.clear === 'function') {
-                recaptchaVerifier.clear();
-              }
-              recaptchaVerifier = null;
+              clearRecaptchaVerifier();
             },
-          };
-
-          recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', recaptchaOptions);
-
-          recaptchaVerifier.render().catch((error) => {
-            console.error('reCAPTCHA render failed', error);
-            setStatus(i18n.recaptchaExpired, true);
           });
 
           return recaptchaVerifier;
@@ -761,6 +863,11 @@
         }
 
         async function sendCode() {
+          if (Date.now() < sendCooldownUntil) {
+            setStatus(i18n.tooManyRequests, true);
+            return;
+          }
+
           const phoneNumber = getPhoneNumberE164();
           if (!phoneNumber || (typeof iti.isValidNumber === 'function' && !iti.isValidNumber())) {
             setStatus(i18n.invalidPhone, true);
@@ -771,18 +878,19 @@
           setStatus(i18n.sending);
 
           try {
-            const verifier = ensureRecaptchaVerifier();
+            const verifier = createRecaptchaVerifier();
             confirmationResult = await signInWithPhoneNumber(auth, phoneNumber, verifier);
             otpRow.style.display = 'grid';
             if (resendBtn) resendBtn.style.display = 'inline-flex';
             setStatus(i18n.codeSent);
+            startSendCooldown(30);
           } catch (error) {
             console.error('Phone sendCode failed', error);
-            setStatus(mapFirebaseError(error), true);
-            if (recaptchaVerifier && typeof recaptchaVerifier.clear === 'function') {
-              recaptchaVerifier.clear();
+            if (isTooManyRequestsError(error)) {
+              startSendCooldown(300);
             }
-            recaptchaVerifier = null;
+            setStatus(mapFirebaseError(error), true);
+            clearRecaptchaVerifier();
           } finally {
             setButtonsState(false);
           }
@@ -818,7 +926,12 @@
 
             const payload = await response.json();
             if (!response.ok || !payload || payload.ok !== true) {
-              setStatus((payload && payload.message) ? payload.message : i18n.genericError, true);
+              if (payload && payload.blocked_notice && typeof window.__showBlockedNotice === 'function') {
+                window.__showBlockedNotice(payload.blocked_notice);
+                setStatus('');
+              } else {
+                setStatus((payload && payload.message) ? payload.message : i18n.genericError, true);
+              }
               return;
             }
 
@@ -835,6 +948,105 @@
         sendBtn.addEventListener('click', sendCode);
         verifyBtn.addEventListener('click', verifyCode);
         if (resendBtn) resendBtn.addEventListener('click', sendCode);
+        if (Date.now() < sendCooldownUntil) {
+          startSendCooldown(Math.ceil((sendCooldownUntil - Date.now()) / 1000));
+        } else {
+          sessionStorage.removeItem(sendCooldownStorageKey);
+        }
+      })();
+    </script>
+  @endif
+
+  @if($firebaseGoogleEnabled)
+    <script type="module">
+      import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+      import { getAuth, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+      (() => {
+        const rawFirebaseConfig = @json($authSettings['firebase']['config'] ?? []);
+        const verifyEndpoint = @json(route('auth.firebase-google.verify'));
+        const csrfToken = @json(csrf_token());
+        const dashboardUrl = @json(route('dashboard'));
+
+        const btn = document.getElementById('firebaseGoogleSignInBtn');
+        const statusBox = document.getElementById('firebaseGoogleStatus');
+        if (!btn) return;
+
+        const stripSpaces = (value) => String(value ?? '').replace(/\s+/g, '').trim();
+        const firebaseConfig = {
+          apiKey: stripSpaces(rawFirebaseConfig.apiKey),
+          authDomain: String(rawFirebaseConfig.authDomain || '')
+            .trim().replace(/^https?:\/\//i, '').replace(/\/+$/, '').split('/')[0].toLowerCase(),
+          projectId: stripSpaces(rawFirebaseConfig.projectId),
+          appId: stripSpaces(rawFirebaseConfig.appId),
+          messagingSenderId: stripSpaces(rawFirebaseConfig.messagingSenderId),
+          storageBucket: String(rawFirebaseConfig.storageBucket || '').trim(),
+          measurementId: stripSpaces(rawFirebaseConfig.measurementId),
+        };
+
+        if (!firebaseConfig.apiKey || !firebaseConfig.authDomain || !firebaseConfig.projectId || !firebaseConfig.appId) {
+          btn.disabled = true;
+          return;
+        }
+
+        let auth;
+        try {
+          const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+          auth = getAuth(app);
+        } catch (e) {
+          console.error('Firebase init failed for Google', e);
+          btn.disabled = true;
+          return;
+        }
+
+        function setStatus(msg, isError = false) {
+          if (!statusBox) return;
+          statusBox.style.display = msg ? 'block' : 'none';
+          statusBox.textContent = msg || '';
+          statusBox.classList.remove('error', 'success');
+          if (isError) statusBox.classList.add('error');
+        }
+
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          setStatus('');
+          try {
+            const provider = new GoogleAuthProvider();
+            provider.addScope('email');
+            provider.addScope('profile');
+            const result = await signInWithPopup(auth, provider);
+            const idToken = await result.user.getIdToken(true);
+
+            const response = await fetch(verifyEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken,
+              },
+              body: JSON.stringify({ id_token: idToken, intent: 'login' }),
+            });
+
+            const payload = await response.json();
+            if (!response.ok || !payload?.ok) {
+              if (payload?.blocked_notice && typeof window.__showBlockedNotice === 'function') {
+                window.__showBlockedNotice(payload.blocked_notice);
+                setStatus('');
+              } else {
+                setStatus(payload?.message || @json(__('ui.backend.auth_firebase_google_failed')), true);
+              }
+              return;
+            }
+
+            window.location.assign(payload.redirect || dashboardUrl);
+          } catch (error) {
+            if (error.code === 'auth/popup-closed-by-user' || error.code === 'auth/cancelled-popup-request') return;
+            console.error('Firebase Google sign-in failed', error);
+            setStatus(@json(__('ui.backend.auth_firebase_google_failed')), true);
+          } finally {
+            btn.disabled = false;
+          }
+        });
       })();
     </script>
   @endif

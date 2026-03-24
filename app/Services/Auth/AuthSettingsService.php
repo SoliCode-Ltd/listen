@@ -12,6 +12,7 @@ class AuthSettingsService
     public const KEY_GOOGLE_ENABLED = 'auth_google_enabled';
     public const KEY_PHONE_ENABLED = 'auth_phone_enabled';
     public const KEY_FIREBASE_PHONE_ENABLED = 'firebase_phone_enabled';
+    public const KEY_FIREBASE_GOOGLE_ENABLED = 'firebase_google_enabled';
     public const KEY_FIREBASE_API_KEY = 'firebase_api_key';
     public const KEY_FIREBASE_AUTH_DOMAIN = 'firebase_auth_domain';
     public const KEY_FIREBASE_PROJECT_ID = 'firebase_project_id';
@@ -21,6 +22,7 @@ class AuthSettingsService
     public const KEY_FIREBASE_MEASUREMENT_ID = 'firebase_measurement_id';
     public const KEY_FIREBASE_RECAPTCHA_MODE = 'firebase_recaptcha_mode';
     public const KEY_FIREBASE_RECAPTCHA_SITE_KEY = 'firebase_recaptcha_site_key';
+    public const KEY_FIREBASE_PHONE_TESTING_MODE = 'firebase_phone_testing_mode';
 
     public function emailEnabled(): bool
     {
@@ -55,9 +57,15 @@ class AuthSettingsService
             && $this->firebaseConfigComplete();
     }
 
+    public function firebaseGoogleEnabled(): bool
+    {
+        return $this->settingEnabled(self::KEY_FIREBASE_GOOGLE_ENABLED, false)
+            && $this->firebaseConfigComplete();
+    }
+
     public function hasAnyEnabledMethod(): bool
     {
-        return $this->emailEnabled() || $this->googleEnabled() || $this->phoneEnabled();
+        return $this->emailEnabled() || $this->googleEnabled() || $this->phoneEnabled() || $this->firebaseGoogleEnabled();
     }
 
     public function methodEnabled(string $method): bool
@@ -66,6 +74,7 @@ class AuthSettingsService
             'email' => $this->emailEnabled(),
             'google' => $this->googleEnabled(),
             'phone' => $this->phoneEnabled(),
+            'firebase_google' => $this->firebaseGoogleEnabled(),
             default => false,
         };
     }
@@ -119,25 +128,40 @@ class AuthSettingsService
         return trim((string) SiteSetting::get(self::KEY_FIREBASE_RECAPTCHA_SITE_KEY, ''));
     }
 
+    public function firebasePhoneTestingModeEnabled(): bool
+    {
+        return $this->settingEnabled(self::KEY_FIREBASE_PHONE_TESTING_MODE, false);
+    }
+
+    public function firebasePhoneTestingModeActive(): bool
+    {
+        return $this->firebasePhoneTestingModeEnabled() && app()->environment(['local', 'testing']);
+    }
+
     /**
      * @return array{
      *   email_enabled: bool,
      *   google_enabled: bool,
      *   phone_enabled: bool,
-     *   firebase: array{enabled: bool, recaptcha_mode: string, recaptcha_site_key: string, config: array<string, string>}
+     *   firebase_google_enabled: bool,
+     *   firebase: array{enabled: bool, recaptcha_mode: string, recaptcha_site_key: string, testing_mode: bool, config: array<string, string>}
      * }
      */
     public function authUiPayload(): array
     {
+        $anyFirebase = $this->phoneEnabled() || $this->firebaseGoogleEnabled();
+
         return [
             'email_enabled' => $this->emailEnabled(),
             'google_enabled' => $this->googleEnabled(),
             'phone_enabled' => $this->phoneEnabled(),
+            'firebase_google_enabled' => $this->firebaseGoogleEnabled(),
             'firebase' => [
-                'enabled' => $this->phoneEnabled(),
+                'enabled' => $anyFirebase,
                 'recaptcha_mode' => $this->recaptchaMode(),
                 'recaptcha_site_key' => $this->recaptchaSiteKey(),
-                'config' => $this->phoneEnabled() ? $this->firebasePublicConfigForFrontend() : [],
+                'testing_mode' => $this->firebasePhoneTestingModeActive(),
+                'config' => $anyFirebase ? $this->firebasePublicConfigForFrontend() : [],
             ],
         ];
     }

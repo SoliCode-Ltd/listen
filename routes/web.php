@@ -148,6 +148,10 @@ Route::group([
         Route::post('/auth/phone/verify', [AuthController::class, 'phoneAuthenticate'])
             ->middleware('auth.method:phone')
             ->name('auth.phone.verify');
+
+        Route::post('/auth/firebase-google/verify', [AuthController::class, 'firebaseGoogleAuthenticate'])
+            ->middleware('auth.method:firebase_google')
+            ->name('auth.firebase-google.verify');
     });
 
     Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {

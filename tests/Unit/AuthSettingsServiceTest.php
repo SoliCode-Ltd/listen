@@ -39,4 +39,14 @@ class AuthSettingsServiceTest extends TestCase
 
         $this->assertSame('6LcMockSiteKey', $payload['firebase']['recaptcha_site_key'] ?? null);
     }
+
+    public function test_auth_ui_payload_enables_firebase_testing_mode_only_in_non_production_env(): void
+    {
+        SiteSetting::set(AuthSettingsService::KEY_FIREBASE_PHONE_TESTING_MODE, '1', AuthSettingsService::GROUP);
+
+        $service = app(AuthSettingsService::class);
+        $payload = $service->authUiPayload();
+
+        $this->assertTrue($payload['firebase']['testing_mode'] ?? false);
+    }
 }
