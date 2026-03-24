@@ -884,8 +884,9 @@ class HomeController extends Controller
     {
         $userIds = $this->ipLinkedUserIds($userId);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
+        $requestIpLinkedIds = $this->requestIpLinkedUserIds($userId, $request);
 
-        $allIds = array_values(array_unique(array_merge($userIds, $fpLinkedIds)));
+        $allIds = array_values(array_unique(array_merge($userIds, $fpLinkedIds, $requestIpLinkedIds)));
 
         return (int) (DemoVoiceGeneration::query()
             ->whereIn('user_id', $allIds)
@@ -927,6 +928,41 @@ class HomeController extends Controller
                 ->all();
 
             return $linkedIds !== [] ? $linkedIds : [$userId];
+        });
+    }
+
+    /**
+     * Find all user IDs linked via the current request IP.
+     * This catches VPN abuse: user registers with IP A, activates VPN,
+     * creates a second account with IP B, then turns off VPN — the
+     * current request IP (A) links them back together.
+     *
+     * @return list<int>
+     */
+    private function requestIpLinkedUserIds(int $userId, ?Request $request = null): array
+    {
+        $requestIp = $request?->ip();
+        if (! $requestIp || $requestIp === '') {
+            return [$userId];
+        }
+
+        $cacheKey = "demo:req_ip_linked:{$requestIp}";
+
+        return Cache::remember($cacheKey, 120, static function () use ($userId, $requestIp): array {
+            $linkedIds = \App\Models\User::query()
+                ->where(function ($q) use ($requestIp) {
+                    $q->where('registration_ip', $requestIp)
+                      ->orWhere('last_login_ip', $requestIp);
+                })
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if (! in_array($userId, $linkedIds, true)) {
+                $linkedIds[] = $userId;
+            }
+
+            return $linkedIds;
         });
     }
 

@@ -42,6 +42,7 @@ class SiteSettings extends Page implements HasForms
             'footer_social_github_url' => SiteSetting::get('footer_social_github_url', ''),
             'footer_social_facebook_url' => SiteSetting::get('footer_social_facebook_url', ''),
             'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
+            'max_accounts_per_ip' => (int) SiteSetting::get('max_accounts_per_ip', 2),
         ]);
     }
 
@@ -73,6 +74,18 @@ class SiteSettings extends Page implements HasForms
                             ->label('Site Description')
                             ->rows(3)
                             ->columnSpanFull(),
+                    ]),
+                Forms\Components\Section::make('Anti-Abuse')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('max_accounts_per_ip')
+                            ->label('Max Accounts Per IP')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(100)
+                            ->default(2)
+                            ->required()
+                            ->helperText('Maximum number of accounts allowed from the same IP address. Accounts beyond this limit will be automatically blocked. Admins are never auto-blocked.'),
                     ]),
                 Forms\Components\Section::make('Appearance')
                     ->columns(2)

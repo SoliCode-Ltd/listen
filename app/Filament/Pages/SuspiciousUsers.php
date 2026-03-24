@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
+use App\Services\BlockedUserService;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -15,6 +16,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class SuspiciousUsers extends Page implements HasForms, HasTable
 {
@@ -65,19 +67,19 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->label(__('ui.admin.suspicious.phone'))
                     ->placeholder('-')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('auth_provider')
+                Tables\Columns\TextColumn::make('auth_method_display')
                     ->label(__('ui.admin.suspicious.auth_method'))
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => match ($state) {
-                        'phone' => 'Phone',
-                        'firebase_google' => 'Firebase Google',
-                        null, '' => 'Email',
-                        default => ucfirst($state),
+                    ->getStateUsing(fn (User $record): string => match (true) {
+                        $record->auth_provider === 'phone' => 'Phone',
+                        $record->auth_provider === 'firebase_google' => 'Firebase Google',
+                        filled($record->google_id) => 'Google',
+                        default => 'Email',
                     })
-                    ->color(fn (?string $state): string => match ($state) {
-                        'phone' => 'info',
-                        'firebase_google' => 'warning',
-                        null, '' => 'gray',
+                    ->color(fn (User $record): string => match (true) {
+                        $record->auth_provider === 'phone' => 'info',
+                        $record->auth_provider === 'firebase_google' => 'warning',
+                        filled($record->google_id) => 'success',
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('registration_ip')
@@ -143,53 +145,50 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     )),
             ])
             ->actions([
-                Tables\Actions\Action::make('viewUser')
-                    ->label(__('ui.admin.suspicious.view_user'))
-                    ->icon('heroicon-o-eye')
-                    ->url(fn (User $record): string => \App\Filament\Resources\UserResource::getUrl('view', ['record' => $record]))
-                    ->openUrlInNewTab(),
-                Tables\Actions\Action::make('viewLinked')
-                    ->label(__('ui.admin.suspicious.view_linked'))
-                    ->icon('heroicon-o-link')
-                    ->color('warning')
-                    ->modalHeading(fn (User $record): string => __('ui.admin.suspicious.linked_modal_title', ['name' => $record->name]))
-                    ->modalContent(fn (User $record) => view('filament.pages.partials.linked-users-modal', [
-                        'users' => $this->getLinkedUsers($record),
-                        'sourceUser' => $record,
-                        'charAllowance' => (int) config('listen.demo.guest_char_allowance', 300),
-                    ]))
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel(__('ui.admin.suspicious.close')),
-                Tables\Actions\Action::make('resetDemoChars')
-                    ->label(__('ui.admin.users.reset_demo_chars'))
-                    ->icon('heroicon-o-arrow-path')
+                Tables\Actions\Action::make('deleteUser')
+                    ->label(__('ui.admin.suspicious.delete_user'))
+                    ->icon('heroicon-o-trash')
                     ->color('danger')
+                    ->visible(fn (User $record) => ! $record->is_admin && auth()->id() !== $record->id)
                     ->requiresConfirmation()
-                    ->modalHeading(__('ui.admin.users.reset_demo_confirm_title'))
-                    ->modalDescription(__('ui.admin.users.reset_demo_confirm_description'))
-                    ->visible(fn (User $record) => DemoVoiceGeneration::where('user_id', $record->id)->exists())
+                    ->modalHeading(__('ui.admin.suspicious.delete_confirm_title'))
+                    ->modalDescription(__('ui.admin.suspicious.delete_confirm_description'))
                     ->action(function (User $record): void {
-                        DemoVoiceGeneration::where('user_id', $record->id)->delete();
-                        Cache::forget("demo:ip_linked_users:{$record->id}");
+                        $userId = $record->id;
+
+                        DemoVoiceGeneration::where('user_id', $userId)->delete();
+
+                        if (Schema::hasTable(config('session.table', 'sessions'))) {
+                            DB::table(config('session.table', 'sessions'))
+                                ->where('user_id', $userId)
+                                ->delete();
+                        }
+
+                        $record->delete();
+
+                        Cache::forget("demo:ip_linked_users:{$userId}");
                         Cache::forget('admin:suspicious_users_count');
 
                         Notification::make()
                             ->success()
-                            ->title(__('ui.admin.users.reset_demo_success'))
+                            ->title(__('ui.admin.suspicious.delete_success'))
                             ->send();
                     }),
                 Tables\Actions\Action::make('blockUser')
                     ->label(__('ui.admin.users.block'))
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
-                    ->visible(fn (User $record) => ! $record->isBlocked())
+                    ->visible(fn (User $record) => ! $record->isBlocked() && ! $record->is_admin)
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
-                        app(\App\Services\BlockedUserService::class)->block(
+                        app(BlockedUserService::class)->block(
                             $record,
-                            'Suspicious multi-account abuse',
+                            \App\Services\MultiAccountEnforcementService::BLOCK_REASON_EN,
                             auth()->user(),
-                            ['en' => 'Account suspended for policy violation.', 'ar' => 'تم تعليق الحساب لمخالفة السياسات.'],
+                            [
+                                'en' => \App\Services\MultiAccountEnforcementService::BLOCK_REASON_EN,
+                                'ar' => \App\Services\MultiAccountEnforcementService::BLOCK_REASON_AR,
+                            ],
                         );
 
                         Notification::make()
@@ -197,6 +196,57 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                             ->title(__('ui.admin.users.blocked_success'))
                             ->send();
                     }),
+                Tables\Actions\Action::make('unblockUser')
+                    ->label(__('ui.admin.users.unblock'))
+                    ->icon('heroicon-o-lock-open')
+                    ->color('success')
+                    ->visible(fn (User $record) => $record->isBlocked())
+                    ->requiresConfirmation()
+                    ->action(function (User $record): void {
+                        app(BlockedUserService::class)->unblock($record);
+
+                        Notification::make()
+                            ->success()
+                            ->title(__('ui.admin.users.unblocked_success'))
+                            ->send();
+                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('viewUser')
+                        ->label(__('ui.admin.suspicious.view_user'))
+                        ->icon('heroicon-o-eye')
+                        ->url(fn (User $record): string => \App\Filament\Resources\UserResource::getUrl('view', ['record' => $record]))
+                        ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('viewLinked')
+                        ->label(__('ui.admin.suspicious.view_linked'))
+                        ->icon('heroicon-o-link')
+                        ->color('warning')
+                        ->modalHeading(fn (User $record): string => __('ui.admin.suspicious.linked_modal_title', ['name' => $record->name]))
+                        ->modalContent(fn (User $record) => view('filament.pages.partials.linked-users-modal', [
+                            'users' => $this->getLinkedUsers($record),
+                            'sourceUser' => $record,
+                            'charAllowance' => (int) config('listen.demo.guest_char_allowance', 300),
+                        ]))
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel(__('ui.admin.suspicious.close')),
+                    Tables\Actions\Action::make('resetDemoChars')
+                        ->label(__('ui.admin.users.reset_demo_chars'))
+                        ->icon('heroicon-o-arrow-path')
+                        ->color('warning')
+                        ->requiresConfirmation()
+                        ->modalHeading(__('ui.admin.users.reset_demo_confirm_title'))
+                        ->modalDescription(__('ui.admin.users.reset_demo_confirm_description'))
+                        ->visible(fn (User $record) => DemoVoiceGeneration::where('user_id', $record->id)->exists())
+                        ->action(function (User $record): void {
+                            DemoVoiceGeneration::where('user_id', $record->id)->delete();
+                            Cache::forget("demo:ip_linked_users:{$record->id}");
+                            Cache::forget('admin:suspicious_users_count');
+
+                            Notification::make()
+                                ->success()
+                                ->title(__('ui.admin.users.reset_demo_success'))
+                                ->send();
+                        }),
+                ]),
             ])
             ->defaultSort('linked_count', 'desc')
             ->striped()

@@ -58,6 +58,7 @@ class User extends Authenticatable implements FilamentUser
         'subscription_status_checked_at',
         'is_admin',
         'is_blocked',
+        'multi_account_whitelisted',
         'blocked_at',
         'blocked_reason',
         'blocked_reason_ar',

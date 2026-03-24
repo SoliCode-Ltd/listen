@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Auth\PhoneAuthBridgeRequest;
 use App\Models\User;
 use App\Services\BlockedUserService;
+use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\PlanAccessService;
@@ -25,6 +26,7 @@ class AuthController extends Controller
         private readonly BlockedUserService $blockedUserService,
         private readonly AuthSettingsService $authSettings,
         private readonly PhoneAuthBridgeService $phoneAuthBridge,
+        private readonly MultiAccountEnforcementService $multiAccountEnforcement,
     ) {
     }
 
@@ -68,6 +70,18 @@ class AuthController extends Controller
         }
 
         $this->stampLoginIp($user, $request);
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            Auth::logout();
+
+            return back()
+                ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
+                ->onlyInput('email');
+        }
+
         $request->session()->regenerate();
 
         $intended = $request->session()->pull('url.intended', route('dashboard'));
@@ -111,6 +125,18 @@ class AuthController extends Controller
         Auth::login($user);
         $this->stampLoginIp($user, $request);
         $request->session()->regenerate();
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            Auth::logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return redirect()->route('login')
+                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+        }
 
         $intended = $request->session()->pull('url.intended', route('dashboard'));
 
@@ -205,6 +231,16 @@ class AuthController extends Controller
         }
 
         $this->stampLoginIp($user, $request);
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            return redirect()
+                ->route('login')
+                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+        }
+
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -249,6 +285,18 @@ class AuthController extends Controller
         }
 
         $this->stampLoginIp($user, $request);
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
         Auth::login($user, true);
         $request->session()->regenerate();
 
@@ -297,6 +345,18 @@ class AuthController extends Controller
         }
 
         $this->stampLoginIp($user, $request);
+
+        $user->refresh();
+        $this->multiAccountEnforcement->enforceAfterAuth($user);
+
+        if ($user->isBlocked()) {
+            return response()->json([
+                'ok' => false,
+                'message' => $this->blockedUserService->messageFor($user),
+                'blocked_notice' => $this->blockedUserService->noticePayload($user),
+            ], 403);
+        }
+
         Auth::login($user, true);
         $request->session()->regenerate();
 

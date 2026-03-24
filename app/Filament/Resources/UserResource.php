@@ -223,9 +223,21 @@ class UserResource extends Resource
                     ->label(__('ui.admin.users.admin'))
                     ->boolean()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('auth_provider')
+                Tables\Columns\TextColumn::make('auth_method_display')
                     ->label(__('ui.admin.users.auth_provider'))
                     ->badge()
+                    ->getStateUsing(fn (User $record): string => match (true) {
+                        $record->auth_provider === 'phone' => 'Phone',
+                        $record->auth_provider === 'firebase_google' => 'Firebase Google',
+                        filled($record->google_id) => 'Google',
+                        default => 'Email',
+                    })
+                    ->color(fn (User $record): string => match (true) {
+                        $record->auth_provider === 'phone' => 'info',
+                        $record->auth_provider === 'firebase_google' => 'warning',
+                        filled($record->google_id) => 'success',
+                        default => 'gray',
+                    })
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('google_id')
                     ->label(__('ui.admin.users.google'))
@@ -276,7 +288,7 @@ class UserResource extends Resource
                     ->label(__('ui.admin.users.block'))
                     ->icon('heroicon-o-no-symbol')
                     ->color('danger')
-                    ->visible(fn (User $record) => ! $record->isBlocked() && Auth::id() !== $record->id)
+                    ->visible(fn (User $record) => ! $record->isBlocked() && ! $record->is_admin && Auth::id() !== $record->id)
                     ->requiresConfirmation()
                     ->modalHeading(__('ui.admin.users.block_confirm_title'))
                     ->modalDescription(__('ui.admin.users.block_confirm_description'))

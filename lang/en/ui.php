@@ -1002,6 +1002,10 @@ return [
             'close' => 'Close',
             'total_linked' => 'Total Linked',
             'shared_ips' => 'Shared IPs',
+            'delete_user' => 'Delete User',
+            'delete_confirm_title' => 'Permanently delete this user?',
+            'delete_confirm_description' => 'This will permanently delete this user account and all their demo data. This action cannot be undone.',
+            'delete_success' => 'User deleted successfully.',
         ],
         'blocked_generations' => [
             'navigation_label' => 'Blocked Generations',

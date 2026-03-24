@@ -73,6 +73,7 @@ class BlockedUserService
             'blocked_reason_ar' => $reasonAr !== '' ? $reasonAr : null,
             'blocked_reason_en' => $reasonEn !== '' ? $reasonEn : null,
             'blocked_by' => $blockedBy?->id,
+            'multi_account_whitelisted' => false,
             'remember_token' => Str::random(60),
         ])->save();
 
@@ -88,6 +89,7 @@ class BlockedUserService
             'blocked_reason_ar' => null,
             'blocked_reason_en' => null,
             'blocked_by' => null,
+            'multi_account_whitelisted' => true,
             'remember_token' => Str::random(60),
         ])->save();
 
