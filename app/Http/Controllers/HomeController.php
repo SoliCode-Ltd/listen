@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\LocalizedPricingService;
@@ -122,6 +123,8 @@ class HomeController extends Controller
 
     public function demoPage(Request $request)
     {
+        $this->syncCurrentUserDeviceIdentity($request);
+
         $defaultTier = VoiceTier::HD;
         $defaultProvider = $this->demoPreferredProviderForTier($defaultTier);
         $defaultVoiceKeysByTier = [];
@@ -183,6 +186,8 @@ class HomeController extends Controller
 
     public function demoQuota(Request $request)
     {
+        $this->syncCurrentUserDeviceIdentity($request);
+
         return response()->json([
             'ok' => true,
             'quota' => $this->demoQuotaForClient($request),
@@ -191,6 +196,8 @@ class HomeController extends Controller
 
     public function demo(Request $request)
     {
+        $this->syncCurrentUserDeviceIdentity($request);
+
         try {
             $maxChars = $this->demoCharAllowance($request);
             $demoPlan = $this->planAccessService->freePlan();
@@ -293,6 +300,8 @@ class HomeController extends Controller
         TranslationService $translationService,
         TtsService $ttsService,
     ) {
+        $this->syncCurrentUserDeviceIdentity($request);
+
         $maxChars = $this->demoCharAllowance($request);
         $demoPlan = $this->planAccessService->freePlan();
         $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
@@ -887,14 +896,63 @@ class HomeController extends Controller
     private function trialUsedCharsByUser(int $userId, ?Request $request = null): int
     {
         $userIds = $this->ipLinkedUserIds($userId);
+        $deviceLinkedIds = $this->deviceLinkedUserIds($userId, $request);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
         $requestIpLinkedIds = $this->requestIpLinkedUserIds($userId, $request);
 
-        $allIds = array_values(array_unique(array_merge($userIds, $fpLinkedIds, $requestIpLinkedIds)));
+        $allIds = array_values(array_unique(array_merge($userIds, $deviceLinkedIds, $fpLinkedIds, $requestIpLinkedIds)));
 
         return (int) (DemoVoiceGeneration::query()
             ->whereIn('user_id', $allIds)
             ->sum('billable_chars') ?? 0);
+    }
+
+    /**
+     * Find all user IDs that share a browser/device cookie identity.
+     * This blocks VPN bypass in the same browser even before IPs reconnect.
+     *
+     * @return list<int>
+     */
+    private function deviceLinkedUserIds(int $userId, ?Request $request = null): array
+    {
+        $deviceIds = [];
+
+        if ($request) {
+            $requestDeviceId = $this->demoDeviceIdFromRequest($request);
+            if ($requestDeviceId !== null) {
+                $deviceIds[] = $requestDeviceId;
+            }
+        }
+
+        $user = User::query()
+            ->select(['id', 'registration_device_id', 'last_seen_device_id'])
+            ->find($userId);
+
+        if ($user) {
+            if (filled($user->registration_device_id)) {
+                $deviceIds[] = (string) $user->registration_device_id;
+            }
+            if (filled($user->last_seen_device_id)) {
+                $deviceIds[] = (string) $user->last_seen_device_id;
+            }
+        }
+
+        $deviceIds = array_values(array_unique(array_filter($deviceIds)));
+        if ($deviceIds === []) {
+            return [$userId];
+        }
+
+        $linkedIds = User::query()
+            ->where(fn ($q) => $q->whereIn('registration_device_id', $deviceIds)->orWhereIn('last_seen_device_id', $deviceIds))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if (! in_array($userId, $linkedIds, true)) {
+            $linkedIds[] = $userId;
+        }
+
+        return $linkedIds;
     }
 
     /**
@@ -1053,6 +1111,37 @@ class HomeController extends Controller
                 'lax'
             )
         );
+    }
+
+    private function syncCurrentUserDeviceIdentity(Request $request): void
+    {
+        $user = $request->user();
+        if (! $user instanceof User) {
+            return;
+        }
+
+        $deviceId = $this->demoDeviceIdFromRequest($request);
+        if ($deviceId === null) {
+            return;
+        }
+
+        $updates = [];
+
+        if ((string) $user->last_seen_device_id !== $deviceId) {
+            $updates['last_seen_device_id'] = $deviceId;
+        }
+
+        if (! filled($user->registration_device_id)) {
+            $updates['registration_device_id'] = $deviceId;
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $user->forceFill($updates)->saveQuietly();
+        Cache::forget("demo:ip_linked_users:{$user->id}");
+        Cache::forget('admin:suspicious_users_count');
     }
 
     /**

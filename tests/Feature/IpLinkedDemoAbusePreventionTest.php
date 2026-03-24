@@ -380,6 +380,40 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $response->assertJsonValidationErrors('text');
     }
 
+    public function test_different_ips_same_device_id_share_demo_quota_immediately(): void
+    {
+        $voice = $this->seedVoice();
+        $sharedDeviceId = 'dev_shared_cookie_0123456789abcdef';
+
+        $userA = User::factory()->create([
+            'registration_ip' => '10.1.1.1',
+            'last_login_ip' => '10.1.1.1',
+            'registration_device_id' => $sharedDeviceId,
+            'last_seen_device_id' => $sharedDeviceId,
+        ]);
+        // Uses legacy identity hash style (u:{id}) and should still be counted for device-linked users.
+        $this->storeDemoUsage($userA, 280);
+
+        $userB = User::factory()->create([
+            'registration_ip' => '172.20.20.20',
+            'last_login_ip' => '172.20.20.20',
+            'registration_device_id' => $sharedDeviceId,
+            'last_seen_device_id' => $sharedDeviceId,
+        ]);
+
+        Cache::flush();
+
+        $response = $this->actingAs($userB)->postJsonLocalizedRoute('demo.run', [
+            'text' => str_repeat('z', 30), // 280 + 30 > 300
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('text');
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  4.  Quota endpoint reflects IP-linked usage
     // ──────────────────────────────────────────────────────────────────

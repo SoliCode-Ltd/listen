@@ -21,6 +21,8 @@ use Laravel\Socialite\Two\InvalidStateException;
 
 class AuthController extends Controller
 {
+    private const DEVICE_COOKIE = 'listen_demo_device';
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BlockedUserService $blockedUserService,
@@ -32,9 +34,12 @@ class AuthController extends Controller
 
     public function showLogin()
     {
-        return view('auth.login', [
+        $request = request();
+        $response = response()->view('auth.login', [
             'authSettings' => $this->authSettings->authUiPayload(),
         ]);
+
+        return $this->attachDeviceCookie($request, $response);
     }
 
     public function login(Request $request)
@@ -89,14 +94,17 @@ class AuthController extends Controller
             $intended = route('dashboard');
         }
 
-        return redirect()->to($intended);
+        return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
 
     public function showRegister()
     {
-        return view('auth.register', [
+        $request = request();
+        $response = response()->view('auth.register', [
             'authSettings' => $this->authSettings->authUiPayload(),
         ]);
+
+        return $this->attachDeviceCookie($request, $response);
     }
 
     public function register(Request $request)
@@ -113,11 +121,15 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
+        $deviceId = $this->deviceIdFromRequest($request);
+
         $user = User::create([
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'registration_ip' => $request->ip(),
+            'registration_device_id' => $deviceId,
+            'last_seen_device_id' => $deviceId,
         ]);
 
         $this->attachFreePlanIfMissing($user);
@@ -134,13 +146,16 @@ class AuthController extends Controller
             $request->session()->invalidate();
             $request->session()->regenerateToken();
 
-            return redirect()->route('login')
-                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+            return $this->attachDeviceCookie(
+                $request,
+                redirect()->route('login')
+                    ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
+            );
         }
 
         $intended = $request->session()->pull('url.intended', route('dashboard'));
 
-        return redirect()->to($intended);
+        return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
 
     public function redirectToGoogle()
@@ -169,6 +184,8 @@ class AuthController extends Controller
                 'auth' => __('ui.backend.auth_google_disabled'),
             ]);
         }
+
+        $deviceId = $this->deviceIdFromRequest($request);
 
         try {
             $googleUser = $this->googleProvider()->user();
@@ -213,6 +230,8 @@ class AuthController extends Controller
                 'google_avatar' => is_string($avatar) ? $avatar : null,
                 'email_verified_at' => now(),
                 'registration_ip' => $request->ip(),
+                'registration_device_id' => $deviceId,
+                'last_seen_device_id' => $deviceId,
             ]);
         } else {
             $user->update([
@@ -225,9 +244,12 @@ class AuthController extends Controller
         $this->attachFreePlanIfMissing($user);
 
         if ($this->blockedUserService->isBlocked($user)) {
-            return redirect()
-                ->route('login')
-                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+            return $this->attachDeviceCookie(
+                $request,
+                redirect()
+                    ->route('login')
+                    ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
+            );
         }
 
         $this->stampLoginIp($user, $request);
@@ -236,9 +258,12 @@ class AuthController extends Controller
         $this->multiAccountEnforcement->enforceAfterAuth($user);
 
         if ($user->isBlocked()) {
-            return redirect()
-                ->route('login')
-                ->with('blocked_notice', $this->blockedUserService->noticePayload($user));
+            return $this->attachDeviceCookie(
+                $request,
+                redirect()
+                    ->route('login')
+                    ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
+            );
         }
 
         Auth::login($user, true);
@@ -249,7 +274,7 @@ class AuthController extends Controller
             $intended = route('dashboard');
         }
 
-        return redirect()->to($intended);
+        return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
 
     public function firebaseGoogleAuthenticate(PhoneAuthBridgeRequest $request)
@@ -305,10 +330,10 @@ class AuthController extends Controller
             $intended = route('dashboard');
         }
 
-        return response()->json([
+        return $this->attachDeviceCookie($request, response()->json([
             'ok' => true,
             'redirect' => $intended,
-        ]);
+        ]));
     }
 
     public function phoneAuthenticate(PhoneAuthBridgeRequest $request)
@@ -365,10 +390,10 @@ class AuthController extends Controller
             $intended = route('dashboard');
         }
 
-        return response()->json([
+        return $this->attachDeviceCookie($request, response()->json([
             'ok' => true,
             'redirect' => $intended,
-        ]);
+        ]));
     }
 
     public function logout(Request $request)
@@ -387,19 +412,28 @@ class AuthController extends Controller
 
     private function stampLoginIp($user, Request $request): void
     {
-        $ip = $request->ip();
-        if (! $ip || ! $user instanceof User) {
+        if (! $user instanceof User) {
             return;
         }
 
         $updates = [];
+        $ip = trim((string) $request->ip());
 
-        if ((string) $user->last_login_ip !== (string) $ip) {
+        if ($ip !== '' && (string) $user->last_login_ip !== $ip) {
             $updates['last_login_ip'] = $ip;
         }
 
-        if (! filled($user->registration_ip)) {
+        if ($ip !== '' && ! filled($user->registration_ip)) {
             $updates['registration_ip'] = $ip;
+        }
+
+        $deviceId = $this->deviceIdFromRequest($request);
+        if ($deviceId !== null && (string) $user->last_seen_device_id !== $deviceId) {
+            $updates['last_seen_device_id'] = $deviceId;
+        }
+
+        if ($deviceId !== null && ! filled($user->registration_device_id)) {
+            $updates['registration_device_id'] = $deviceId;
         }
 
         if ($updates === []) {
@@ -409,6 +443,47 @@ class AuthController extends Controller
         $user->forceFill($updates)->saveQuietly();
         Cache::forget("demo:ip_linked_users:{$user->id}");
         Cache::forget('admin:suspicious_users_count');
+    }
+
+    private function deviceIdFromRequest(Request $request): ?string
+    {
+        $raw = trim((string) $request->cookie(self::DEVICE_COOKIE, ''));
+
+        if ($raw !== '' && preg_match('/^[A-Za-z0-9_-]{24,128}$/', $raw) === 1) {
+            return $raw;
+        }
+
+        return null;
+    }
+
+    /**
+     * @template T of \Symfony\Component\HttpFoundation\Response
+     * @param  T  $response
+     * @return T
+     */
+    private function attachDeviceCookie(Request $request, $response)
+    {
+        if (! method_exists($response, 'cookie')) {
+            return $response;
+        }
+
+        if ($this->deviceIdFromRequest($request) !== null) {
+            return $response;
+        }
+
+        return $response->cookie(
+            cookie(
+                self::DEVICE_COOKIE,
+                Str::random(48),
+                60 * 24 * 730,
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'lax'
+            )
+        );
     }
 
     private function googleProvider()

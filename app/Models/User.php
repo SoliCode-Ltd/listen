@@ -52,6 +52,8 @@ class User extends Authenticatable implements FilamentUser
         'google_avatar',
         'registration_ip',
         'last_login_ip',
+        'registration_device_id',
+        'last_seen_device_id',
         'api_key_hash',
         'api_key_last4',
         'api_key_created_at',
