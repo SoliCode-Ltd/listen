@@ -31,6 +31,15 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
 
     protected static string $view = 'filament.pages.suspicious-users';
 
+    /**
+     * @var array{
+     *   ips: array<string, true>,
+     *   device_ids: array<string, true>,
+     *   request_signatures: array<string, true>
+     * }|null
+     */
+    private ?array $sharedSignalSets = null;
+
     public static function getNavigationLabel(): string
     {
         return __('ui.admin.suspicious.navigation_label');
@@ -90,28 +99,45 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->label(__('ui.admin.suspicious.last_login_ip'))
                     ->searchable()
                     ->copyable(),
+                Tables\Columns\TextColumn::make('suspicion_signals')
+                    ->label(__('ui.admin.suspicious.suspicion_signals'))
+                    ->badge()
+                    ->getStateUsing(fn (User $record): string => $this->describeSuspicionSignals($record))
+                    ->color(function (User $record): string {
+                        $signals = $this->describeSuspicionSignals($record);
+
+                        return str_contains($signals, 'Device') || str_contains($signals, 'Signature')
+                            ? 'danger'
+                            : 'warning';
+                    }),
                 Tables\Columns\TextColumn::make('registration_device_id')
                     ->label(__('ui.admin.suspicious.registration_device_id'))
                     ->searchable()
                     ->copyable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('-')
+                    ->visible(fn () => $this->hasDeviceColumns())
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('last_seen_device_id')
                     ->label(__('ui.admin.suspicious.last_seen_device_id'))
                     ->searchable()
                     ->copyable()
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->placeholder('-')
+                    ->visible(fn () => $this->hasDeviceColumns())
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('registration_request_signature')
                     ->label(__('ui.admin.suspicious.registration_request_signature'))
                     ->searchable()
                     ->copyable()
+                    ->placeholder('-')
                     ->visible(fn () => $this->hasRequestSignatureColumns())
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('last_seen_request_signature')
                     ->label(__('ui.admin.suspicious.last_seen_request_signature'))
                     ->searchable()
                     ->copyable()
+                    ->placeholder('-')
                     ->visible(fn () => $this->hasRequestSignatureColumns())
-                    ->toggleable(isToggledHiddenByDefault: true),
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('linked_count')
                     ->label(__('ui.admin.suspicious.linked_accounts'))
                     ->badge()
@@ -745,6 +771,85 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
             ->filter()
             ->unique()
             ->values();
+    }
+
+    private function describeSuspicionSignals(User $user): string
+    {
+        $signals = [];
+        $sets = $this->sharedSignalSets();
+
+        if (
+            $this->valueInSet($sets['ips'], $user->registration_ip)
+            || $this->valueInSet($sets['ips'], $user->last_login_ip)
+        ) {
+            $signals[] = 'IP';
+        }
+
+        if (
+            $this->hasDeviceColumns()
+            && (
+                $this->valueInSet($sets['device_ids'], $user->registration_device_id)
+                || $this->valueInSet($sets['device_ids'], $user->last_seen_device_id)
+            )
+        ) {
+            $signals[] = 'Device';
+        }
+
+        if (
+            $this->hasRequestSignatureColumns()
+            && (
+                $this->valueInSet($sets['request_signatures'], $user->registration_request_signature)
+                || $this->valueInSet($sets['request_signatures'], $user->last_seen_request_signature)
+            )
+        ) {
+            $signals[] = 'Signature';
+        }
+
+        return $signals !== [] ? implode(' + ', array_unique($signals)) : 'IP';
+    }
+
+    /**
+     * @return array{
+     *   ips: array<string, true>,
+     *   device_ids: array<string, true>,
+     *   request_signatures: array<string, true>
+     * }
+     */
+    private function sharedSignalSets(): array
+    {
+        if ($this->sharedSignalSets !== null) {
+            return $this->sharedSignalSets;
+        }
+
+        $ips = $this->getSharedIps()
+            ->mapWithKeys(fn ($value) => [(string) $value => true])
+            ->all();
+
+        $deviceIds = $this->getSharedDeviceIds()
+            ->mapWithKeys(fn ($value) => [(string) $value => true])
+            ->all();
+
+        $requestSignatures = $this->getSharedRequestSignatures()
+            ->mapWithKeys(fn ($value) => [(string) $value => true])
+            ->all();
+
+        $this->sharedSignalSets = [
+            'ips' => $ips,
+            'device_ids' => $deviceIds,
+            'request_signatures' => $requestSignatures,
+        ];
+
+        return $this->sharedSignalSets;
+    }
+
+    private function valueInSet(array $set, mixed $value): bool
+    {
+        $normalized = trim((string) $value);
+        if ($normalized === '') {
+            return false;
+        }
+
+        return isset($set[$normalized]);
     }
 
     protected function hasDeviceColumns(): bool

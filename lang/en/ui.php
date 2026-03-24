@@ -988,6 +988,7 @@ return [
             'auth_method' => 'Auth Method',
             'registration_ip' => 'Registration IP',
             'last_login_ip' => 'Last Login IP',
+            'suspicion_signals' => 'Suspicious By',
             'registration_device_id' => 'Registration Device ID',
             'last_seen_device_id' => 'Last Seen Device ID',
             'registration_request_signature' => 'Registration Request Signature',

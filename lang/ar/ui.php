@@ -993,6 +993,7 @@ return [
             'auth_method' => 'طريقة التسجيل',
             'registration_ip' => 'IP التسجيل',
             'last_login_ip' => 'IP آخر دخول',
+            'suspicion_signals' => 'سبب الاشتباه',
             'registration_device_id' => 'معرّف الجهاز عند التسجيل',
             'last_seen_device_id' => 'آخر معرّف جهاز',
             'registration_request_signature' => 'بصمة الطلب عند التسجيل',
