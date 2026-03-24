@@ -1047,6 +1047,12 @@ TXT,
         }
       }
 
+      if (!clientFingerprint) {
+        try {
+          await ensureFingerprint();
+        } catch (_e) {}
+      }
+
       const headers = { ...csrfHeaders };
       if (clientFingerprint) {
         headers['X-Client-FP'] = clientFingerprint;

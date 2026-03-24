@@ -427,6 +427,47 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $quota->assertJsonPath('quota.is_exhausted', true);
     }
 
+    public function test_different_ips_still_share_quota_when_browser_fingerprint_matches(): void
+    {
+        $this->seedVoice();
+        $sharedFingerprint = 'fp_shared_browser_0123456789abcdef';
+
+        $userA = User::factory()->create([
+            'registration_ip' => '203.0.113.10',
+            'last_login_ip' => '203.0.113.10',
+        ]);
+
+        DemoVoiceGeneration::query()->create([
+            'user_id' => $userA->id,
+            'primary_identity_hash' => 'fp:'.$sharedFingerprint,
+            'input_text' => str_repeat('x', 240),
+            'speech_text' => str_repeat('x', 240),
+            'source_language' => 'en',
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_name' => 'en-US-Wavenet-C',
+            'voice_provider' => 'google_cloud',
+            'voice_tier' => 'standard',
+            'billable_chars' => 240,
+        ]);
+
+        $userB = User::factory()->create([
+            'registration_ip' => '198.51.100.77',
+            'last_login_ip' => '198.51.100.77',
+        ]);
+
+        Cache::flush();
+
+        $quota = $this->actingAs($userB)
+            ->withHeaders(['X-Client-FP' => $sharedFingerprint])
+            ->postJsonLocalizedRoute('demo.quota', []);
+
+        $quota->assertOk();
+        $quota->assertJsonPath('quota.used_chars', 240);
+        $quota->assertJsonPath('quota.remaining_chars', 60);
+        $quota->assertJsonPath('quota.is_exhausted', false);
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  5.  Edge cases
     // ──────────────────────────────────────────────────────────────────

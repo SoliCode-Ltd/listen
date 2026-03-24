@@ -28,6 +28,8 @@ use Illuminate\Validation\ValidationException;
 
 class HomeController extends Controller
 {
+    private const DEMO_DEVICE_COOKIE = 'listen_demo_device';
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly LocalizedPricingService $localizedPricingService,
@@ -146,7 +148,7 @@ class HomeController extends Controller
             ->orderBy('price_cents')
             ->value('slug') ?? 'starter');
 
-        return view('demo', [
+        $response = response()->view('demo', [
             'voiceCatalog' => $this->demoVoiceCatalog(),
             'defaultTier' => $defaultTier,
             'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $defaultTier, $defaultProvider)),
@@ -175,6 +177,8 @@ class HomeController extends Controller
                 'label' => VoiceTier::label($tier),
             ], VoiceTier::all()),
         ]);
+
+        return $this->attachDemoDeviceCookie($request, $response);
     }
 
     public function demoQuota(Request $request)
@@ -1006,7 +1010,49 @@ class HomeController extends Controller
             return 'fp:'.$fp;
         }
 
+        $deviceId = $this->demoDeviceIdFromRequest($request);
+        if ($deviceId !== null) {
+            return 'dc:'.$deviceId;
+        }
+
+        $requestIdentity = trim((string) $request->ip()).'|'.trim((string) $request->userAgent());
+        if ($requestIdentity !== '|') {
+            return 'rq:'.hash('sha256', strtolower($requestIdentity));
+        }
+
         return 'u:'.(int) ($request->user()?->id ?? 0);
+    }
+
+    private function demoDeviceIdFromRequest(Request $request): ?string
+    {
+        $raw = trim((string) $request->cookie(self::DEMO_DEVICE_COOKIE, ''));
+
+        if ($raw !== '' && preg_match('/^[A-Za-z0-9_-]{24,128}$/', $raw) === 1) {
+            return $raw;
+        }
+
+        return null;
+    }
+
+    private function attachDemoDeviceCookie(Request $request, \Illuminate\Http\Response $response): \Illuminate\Http\Response
+    {
+        if ($this->demoDeviceIdFromRequest($request) !== null) {
+            return $response;
+        }
+
+        return $response->cookie(
+            cookie(
+                self::DEMO_DEVICE_COOKIE,
+                Str::random(48),
+                60 * 24 * 730,
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'lax'
+            )
+        );
     }
 
     /**
