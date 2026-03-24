@@ -54,6 +54,8 @@ class User extends Authenticatable implements FilamentUser
         'last_login_ip',
         'registration_device_id',
         'last_seen_device_id',
+        'registration_request_signature',
+        'last_seen_request_signature',
         'api_key_hash',
         'api_key_last4',
         'api_key_created_at',

@@ -9,12 +9,14 @@ use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\PlanAccessService;
+use App\Support\RequestIdentity;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
@@ -122,15 +124,22 @@ class AuthController extends Controller
         ]);
 
         $deviceId = $this->deviceIdFromRequest($request);
-
-        $user = User::create([
+        $requestSignature = $this->requestSignatureFromRequest($request);
+        $payload = [
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make($validated['password']),
             'registration_ip' => $request->ip(),
             'registration_device_id' => $deviceId,
             'last_seen_device_id' => $deviceId,
-        ]);
+        ];
+
+        if ($requestSignature !== null) {
+            $payload['registration_request_signature'] = $requestSignature;
+            $payload['last_seen_request_signature'] = $requestSignature;
+        }
+
+        $user = User::create($payload);
 
         $this->attachFreePlanIfMissing($user);
 
@@ -186,6 +195,7 @@ class AuthController extends Controller
         }
 
         $deviceId = $this->deviceIdFromRequest($request);
+        $requestSignature = $this->requestSignatureFromRequest($request);
 
         try {
             $googleUser = $this->googleProvider()->user();
@@ -221,8 +231,7 @@ class AuthController extends Controller
 
         if (! $user) {
             $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: __('ui.backend.auth_social_default_name')));
-
-            $user = User::create([
+            $payload = [
                 'name' => $name,
                 'email' => $email,
                 'password' => Hash::make(Str::password(32)),
@@ -232,7 +241,14 @@ class AuthController extends Controller
                 'registration_ip' => $request->ip(),
                 'registration_device_id' => $deviceId,
                 'last_seen_device_id' => $deviceId,
-            ]);
+            ];
+
+            if ($requestSignature !== null) {
+                $payload['registration_request_signature'] = $requestSignature;
+                $payload['last_seen_request_signature'] = $requestSignature;
+            }
+
+            $user = User::create($payload);
         } else {
             $user->update([
                 'google_id' => $user->google_id ?: $googleId,
@@ -436,6 +452,15 @@ class AuthController extends Controller
             $updates['registration_device_id'] = $deviceId;
         }
 
+        $requestSignature = $this->requestSignatureFromRequest($request);
+        if ($requestSignature !== null && (string) $user->last_seen_request_signature !== $requestSignature) {
+            $updates['last_seen_request_signature'] = $requestSignature;
+        }
+
+        if ($requestSignature !== null && ! filled($user->registration_request_signature)) {
+            $updates['registration_request_signature'] = $requestSignature;
+        }
+
         if ($updates === []) {
             return;
         }
@@ -454,6 +479,21 @@ class AuthController extends Controller
         }
 
         return null;
+    }
+
+    private function requestSignatureFromRequest(Request $request): ?string
+    {
+        if (! $this->hasRequestSignatureColumns()) {
+            return null;
+        }
+
+        return RequestIdentity::signature($request);
+    }
+
+    private function hasRequestSignatureColumns(): bool
+    {
+        return Schema::hasColumn('users', 'registration_request_signature')
+            && Schema::hasColumn('users', 'last_seen_request_signature');
     }
 
     /**
