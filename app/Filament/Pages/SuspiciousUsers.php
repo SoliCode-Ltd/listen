@@ -100,6 +100,18 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->searchable()
                     ->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('registration_request_signature')
+                    ->label(__('ui.admin.suspicious.registration_request_signature'))
+                    ->searchable()
+                    ->copyable()
+                    ->visible(fn () => $this->hasRequestSignatureColumns())
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('last_seen_request_signature')
+                    ->label(__('ui.admin.suspicious.last_seen_request_signature'))
+                    ->searchable()
+                    ->copyable()
+                    ->visible(fn () => $this->hasRequestSignatureColumns())
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('linked_count')
                     ->label(__('ui.admin.suspicious.linked_accounts'))
                     ->badge()
@@ -268,8 +280,9 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
         // Find all IPs that are shared by more than one user.
         $sharedIps = $this->getSharedIps();
         $sharedDeviceIds = $this->getSharedDeviceIds();
+        $sharedRequestSignatures = $this->getSharedRequestSignatures();
 
-        if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty()) {
+        if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty() && $sharedRequestSignatures->isEmpty()) {
             // Return an impossible condition so the table is empty.
             return User::query()
                 ->selectRaw('users.*, 0 as linked_count, 0 as demo_chars_used, 0 as ip_group_total_chars')
@@ -277,8 +290,10 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
         }
 
         $hasDeviceColumns = $this->hasDeviceColumns();
+        $hasRequestSignatureColumns = $this->hasRequestSignatureColumns();
         $allSharedIps = $sharedIps->toArray();
         $allSharedDeviceIds = $sharedDeviceIds->toArray();
+        $allSharedRequestSignatures = $sharedRequestSignatures->toArray();
 
         return User::query()
             ->select('users.*')
@@ -288,7 +303,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->selectRaw('COUNT(DISTINCT u2.id)')
                     ->from('users as u2')
                     ->whereColumn('u2.id', '!=', 'users.id')
-                    ->where(function ($q) use ($hasDeviceColumns) {
+                    ->where(function ($q) use ($hasDeviceColumns, $hasRequestSignatureColumns) {
                         $q->whereRaw('u2.registration_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
                           ->orWhereRaw('u2.registration_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL')
                           ->orWhereRaw('u2.last_login_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
@@ -299,6 +314,13 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                                 ->orWhereRaw('u2.registration_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL')
                                 ->orWhereRaw('u2.last_seen_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
                                 ->orWhereRaw('u2.last_seen_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL');
+                        }
+
+                        if ($hasRequestSignatureColumns) {
+                            $q->orWhereRaw('u2.registration_request_signature = users.registration_request_signature AND users.registration_request_signature IS NOT NULL')
+                                ->orWhereRaw('u2.registration_request_signature = users.last_seen_request_signature AND users.last_seen_request_signature IS NOT NULL')
+                                ->orWhereRaw('u2.last_seen_request_signature = users.registration_request_signature AND users.registration_request_signature IS NOT NULL')
+                                ->orWhereRaw('u2.last_seen_request_signature = users.last_seen_request_signature AND users.last_seen_request_signature IS NOT NULL');
                         }
                     }),
                 'linked_count'
@@ -313,10 +335,10 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                 // Total demo chars used by all users sharing any IP with this user (including self)
                 DemoVoiceGeneration::query()
                     ->selectRaw('COALESCE(SUM(billable_chars), 0)')
-                    ->whereIn('user_id', function ($sub) use ($hasDeviceColumns) {
+                    ->whereIn('user_id', function ($sub) use ($hasDeviceColumns, $hasRequestSignatureColumns) {
                         $sub->select('u3.id')
                             ->from('users as u3')
-                            ->where(function ($q) use ($hasDeviceColumns) {
+                            ->where(function ($q) use ($hasDeviceColumns, $hasRequestSignatureColumns) {
                                 $q->whereRaw('u3.registration_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
                                   ->orWhereRaw('u3.registration_ip = users.last_login_ip AND users.last_login_ip IS NOT NULL')
                                   ->orWhereRaw('u3.last_login_ip = users.registration_ip AND users.registration_ip IS NOT NULL')
@@ -328,18 +350,30 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                                         ->orWhereRaw('u3.last_seen_device_id = users.registration_device_id AND users.registration_device_id IS NOT NULL')
                                         ->orWhereRaw('u3.last_seen_device_id = users.last_seen_device_id AND users.last_seen_device_id IS NOT NULL');
                                 }
+
+                                if ($hasRequestSignatureColumns) {
+                                    $q->orWhereRaw('u3.registration_request_signature = users.registration_request_signature AND users.registration_request_signature IS NOT NULL')
+                                        ->orWhereRaw('u3.registration_request_signature = users.last_seen_request_signature AND users.last_seen_request_signature IS NOT NULL')
+                                        ->orWhereRaw('u3.last_seen_request_signature = users.registration_request_signature AND users.registration_request_signature IS NOT NULL')
+                                        ->orWhereRaw('u3.last_seen_request_signature = users.last_seen_request_signature AND users.last_seen_request_signature IS NOT NULL');
+                                }
                             })
                             ->orWhereColumn('u3.id', 'users.id');
                     }),
                 'ip_group_total_chars'
             )
-            ->where(function ($q) use ($allSharedIps, $allSharedDeviceIds, $hasDeviceColumns) {
+            ->where(function ($q) use ($allSharedIps, $allSharedDeviceIds, $allSharedRequestSignatures, $hasDeviceColumns, $hasRequestSignatureColumns) {
                 $q->whereIn('users.registration_ip', $allSharedIps)
                   ->orWhereIn('users.last_login_ip', $allSharedIps);
 
                 if ($hasDeviceColumns) {
                     $q->orWhereIn('users.registration_device_id', $allSharedDeviceIds)
                         ->orWhereIn('users.last_seen_device_id', $allSharedDeviceIds);
+                }
+
+                if ($hasRequestSignatureColumns) {
+                    $q->orWhereIn('users.registration_request_signature', $allSharedRequestSignatures)
+                        ->orWhereIn('users.last_seen_request_signature', $allSharedRequestSignatures);
                 }
             });
     }
@@ -427,6 +461,56 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
     }
 
     /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    protected function getSharedRequestSignatures(): \Illuminate\Support\Collection
+    {
+        if (! $this->hasRequestSignatureColumns()) {
+            return collect();
+        }
+
+        $regSignatures = DB::table('users')
+            ->select('registration_request_signature as request_signature')
+            ->whereNotNull('registration_request_signature')
+            ->groupBy('registration_request_signature')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('request_signature');
+
+        $seenSignatures = DB::table('users')
+            ->select('last_seen_request_signature as request_signature')
+            ->whereNotNull('last_seen_request_signature')
+            ->groupBy('last_seen_request_signature')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('request_signature');
+
+        $crossRegToSeen = DB::table('users as u1')
+            ->join('users as u2', function ($join) {
+                $join->on('u1.registration_request_signature', '=', 'u2.last_seen_request_signature')
+                    ->whereColumn('u1.id', '!=', 'u2.id');
+            })
+            ->whereNotNull('u1.registration_request_signature')
+            ->distinct()
+            ->pluck('u1.registration_request_signature');
+
+        $crossSeenToReg = DB::table('users as u1')
+            ->join('users as u2', function ($join) {
+                $join->on('u1.last_seen_request_signature', '=', 'u2.registration_request_signature')
+                    ->whereColumn('u1.id', '!=', 'u2.id');
+            })
+            ->whereNotNull('u1.last_seen_request_signature')
+            ->distinct()
+            ->pluck('u1.last_seen_request_signature');
+
+        return $regSignatures
+            ->merge($seenSignatures)
+            ->merge($crossRegToSeen)
+            ->merge($crossSeenToReg)
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
+    /**
      * @return \Illuminate\Support\Collection<int, User>
      */
     protected function getLinkedUsers(User $user): \Illuminate\Support\Collection
@@ -443,12 +527,18 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
             ->values()
             ->toArray();
 
-        if ($ips === [] && $deviceIds === []) {
+        $requestSignatures = collect([$user->registration_request_signature, $user->last_seen_request_signature])
+            ->filter()
+            ->unique()
+            ->values()
+            ->toArray();
+
+        if ($ips === [] && $deviceIds === [] && $requestSignatures === []) {
             return collect();
         }
 
         return User::query()
-            ->where(function ($q) use ($ips, $deviceIds) {
+            ->where(function ($q) use ($ips, $deviceIds, $requestSignatures) {
                 if ($ips !== []) {
                     $q->whereIn('registration_ip', $ips)
                         ->orWhereIn('last_login_ip', $ips);
@@ -457,6 +547,11 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                 if ($this->hasDeviceColumns() && $deviceIds !== []) {
                     $q->orWhereIn('registration_device_id', $deviceIds)
                         ->orWhereIn('last_seen_device_id', $deviceIds);
+                }
+
+                if ($this->hasRequestSignatureColumns() && $requestSignatures !== []) {
+                    $q->orWhereIn('registration_request_signature', $requestSignatures)
+                        ->orWhereIn('last_seen_request_signature', $requestSignatures);
                 }
             })
             ->get()
@@ -472,20 +567,27 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
         $count = Cache::remember('admin:suspicious_users_count', 300, function () {
             $sharedIps = static::collectSharedIpsForBadge();
             $sharedDeviceIds = static::collectSharedDeviceIdsForBadge();
+            $sharedRequestSignatures = static::collectSharedRequestSignaturesForBadge();
             $hasDeviceColumns = static::hasDeviceColumnsStatic();
+            $hasRequestSignatureColumns = static::hasRequestSignatureColumnsStatic();
 
-            if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty()) {
+            if ($sharedIps->isEmpty() && $sharedDeviceIds->isEmpty() && $sharedRequestSignatures->isEmpty()) {
                 return 0;
             }
 
             return User::query()
-                ->where(function ($query) use ($sharedIps, $sharedDeviceIds, $hasDeviceColumns) {
+                ->where(function ($query) use ($sharedIps, $sharedDeviceIds, $sharedRequestSignatures, $hasDeviceColumns, $hasRequestSignatureColumns) {
                     $query->whereIn('registration_ip', $sharedIps)
                         ->orWhereIn('last_login_ip', $sharedIps);
 
                     if ($hasDeviceColumns) {
                         $query->orWhereIn('registration_device_id', $sharedDeviceIds)
                             ->orWhereIn('last_seen_device_id', $sharedDeviceIds);
+                    }
+
+                    if ($hasRequestSignatureColumns) {
+                        $query->orWhereIn('registration_request_signature', $sharedRequestSignatures)
+                            ->orWhereIn('last_seen_request_signature', $sharedRequestSignatures);
                     }
                 })
                 ->count();
@@ -595,14 +697,75 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
             ->values();
     }
 
+    /**
+     * @return \Illuminate\Support\Collection<int, string>
+     */
+    protected static function collectSharedRequestSignaturesForBadge(): \Illuminate\Support\Collection
+    {
+        if (! static::hasRequestSignatureColumnsStatic()) {
+            return collect();
+        }
+
+        $sharedRegistrationSignatures = DB::table('users')
+            ->select('registration_request_signature as request_signature')
+            ->whereNotNull('registration_request_signature')
+            ->groupBy('registration_request_signature')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('request_signature');
+
+        $sharedSeenSignatures = DB::table('users')
+            ->select('last_seen_request_signature as request_signature')
+            ->whereNotNull('last_seen_request_signature')
+            ->groupBy('last_seen_request_signature')
+            ->havingRaw('COUNT(*) > 1')
+            ->pluck('request_signature');
+
+        $crossRegToSeenSignatures = DB::table('users as u1')
+            ->join('users as u2', function ($join) {
+                $join->on('u1.registration_request_signature', '=', 'u2.last_seen_request_signature')
+                    ->whereColumn('u1.id', '!=', 'u2.id');
+            })
+            ->whereNotNull('u1.registration_request_signature')
+            ->distinct()
+            ->pluck('u1.registration_request_signature');
+
+        $crossSeenToRegSignatures = DB::table('users as u1')
+            ->join('users as u2', function ($join) {
+                $join->on('u1.last_seen_request_signature', '=', 'u2.registration_request_signature')
+                    ->whereColumn('u1.id', '!=', 'u2.id');
+            })
+            ->whereNotNull('u1.last_seen_request_signature')
+            ->distinct()
+            ->pluck('u1.last_seen_request_signature');
+
+        return $sharedRegistrationSignatures
+            ->merge($sharedSeenSignatures)
+            ->merge($crossRegToSeenSignatures)
+            ->merge($crossSeenToRegSignatures)
+            ->filter()
+            ->unique()
+            ->values();
+    }
+
     protected function hasDeviceColumns(): bool
     {
         return static::hasDeviceColumnsStatic();
+    }
+
+    protected function hasRequestSignatureColumns(): bool
+    {
+        return static::hasRequestSignatureColumnsStatic();
     }
 
     protected static function hasDeviceColumnsStatic(): bool
     {
         return Schema::hasColumn('users', 'registration_device_id')
             && Schema::hasColumn('users', 'last_seen_device_id');
+    }
+
+    protected static function hasRequestSignatureColumnsStatic(): bool
+    {
+        return Schema::hasColumn('users', 'registration_request_signature')
+            && Schema::hasColumn('users', 'last_seen_request_signature');
     }
 }
