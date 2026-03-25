@@ -6,12 +6,14 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
 use App\Services\BlockedUserService;
+use App\Services\MultiAccountEnforcementService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 
@@ -101,17 +103,17 @@ class UserResource extends Resource
                                 if (! $record) {
                                     return '0';
                                 }
-                                $ips = array_values(array_unique(array_filter([
-                                    $record->registration_ip,
-                                    $record->last_login_ip,
-                                ])));
-                                if ($ips === []) {
+
+                                $signals = app(MultiAccountEnforcementService::class)->linkedSignals($record);
+                                if (
+                                    ($signals['ips'] ?? []) === []
+                                    && ($signals['device_ids'] ?? []) === []
+                                    && ($signals['request_signatures'] ?? []) === []
+                                ) {
                                     return __('ui.admin.users.no_ip_data');
                                 }
-                                $linked = User::query()
-                                    ->where(fn ($q) => $q->whereIn('registration_ip', $ips)->orWhereIn('last_login_ip', $ips))
-                                    ->where('id', '!=', $record->id)
-                                    ->get(['id', 'name', 'email']);
+
+                                $linked = self::linkedUsersQuery($record)->get(['id', 'name', 'email']);
                                 if ($linked->isEmpty()) {
                                     return __('ui.admin.users.no_linked_accounts');
                                 }
@@ -203,18 +205,7 @@ class UserResource extends Resource
                 Tables\Columns\TextColumn::make('ip_linked_accounts')
                     ->label(__('ui.admin.users.ip_linked_accounts'))
                     ->getStateUsing(function (User $record): int {
-                        $ips = array_values(array_unique(array_filter([
-                            $record->registration_ip,
-                            $record->last_login_ip,
-                        ])));
-                        if ($ips === []) {
-                            return 0;
-                        }
-
-                        return User::query()
-                            ->where(fn ($q) => $q->whereIn('registration_ip', $ips)->orWhereIn('last_login_ip', $ips))
-                            ->where('id', '!=', $record->id)
-                            ->count();
+                        return self::linkedUsersQuery($record)->count();
                     })
                     ->badge()
                     ->color(fn ($state) => ((int) $state) > 0 ? 'danger' : 'gray')
@@ -394,5 +385,51 @@ class UserResource extends Resource
             'view' => Pages\ViewUser::route('/{record}'),
             'edit' => Pages\EditUser::route('/{record}/edit'),
         ];
+    }
+
+    private static function linkedUsersQuery(User $record): Builder
+    {
+        $signals = app(MultiAccountEnforcementService::class)->linkedSignals($record);
+        $ips = $signals['ips'] ?? [];
+        $deviceIds = $signals['device_ids'] ?? [];
+        $requestSignatures = $signals['request_signatures'] ?? [];
+
+        return User::query()
+            ->where('id', '!=', $record->id)
+            ->where(function ($q) use ($ips, $deviceIds, $requestSignatures): void {
+                $hasAnySignal = false;
+
+                if ($ips !== []) {
+                    $q->whereIn('registration_ip', $ips)
+                        ->orWhereIn('last_login_ip', $ips);
+                    $hasAnySignal = true;
+                }
+
+                if ($deviceIds !== []) {
+                    if ($hasAnySignal) {
+                        $q->orWhereIn('registration_device_id', $deviceIds)
+                            ->orWhereIn('last_seen_device_id', $deviceIds);
+                    } else {
+                        $q->whereIn('registration_device_id', $deviceIds)
+                            ->orWhereIn('last_seen_device_id', $deviceIds);
+                        $hasAnySignal = true;
+                    }
+                }
+
+                if ($requestSignatures !== []) {
+                    if ($hasAnySignal) {
+                        $q->orWhereIn('registration_request_signature', $requestSignatures)
+                            ->orWhereIn('last_seen_request_signature', $requestSignatures);
+                    } else {
+                        $q->whereIn('registration_request_signature', $requestSignatures)
+                            ->orWhereIn('last_seen_request_signature', $requestSignatures);
+                        $hasAnySignal = true;
+                    }
+                }
+
+                if (! $hasAnySignal) {
+                    $q->whereRaw('1 = 0');
+                }
+            });
     }
 }
