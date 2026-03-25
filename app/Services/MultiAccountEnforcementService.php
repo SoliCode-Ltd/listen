@@ -12,9 +12,11 @@ class MultiAccountEnforcementService
 {
     public const DEFAULT_MAX_ACCOUNTS = 2;
 
-    public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network. Each person is allowed one account only.';
+    public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network.';
 
-    public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة. يُسمح لكل شخص بحساب واحد فقط.';
+    public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة.';
+    public const BLOCK_REASON_EN_SETTING_KEY = 'multi_account_block_reason_en';
+    public const BLOCK_REASON_AR_SETTING_KEY = 'multi_account_block_reason_ar';
 
     public function __construct(
         private readonly BlockedUserService $blockedUserService,
@@ -66,11 +68,14 @@ class MultiAccountEnforcementService
             'max_allowed' => $maxAccounts,
         ]);
 
+        $reasonEn = $this->blockReasonEn();
+        $reasonAr = $this->blockReasonAr();
+
         $this->blockedUserService->block(
             $user,
-            self::BLOCK_REASON_EN,
+            $reasonEn,
             null,
-            ['en' => self::BLOCK_REASON_EN, 'ar' => self::BLOCK_REASON_AR],
+            ['en' => $reasonEn, 'ar' => $reasonAr],
         );
 
         Cache::forget('admin:suspicious_users_count');
@@ -79,6 +84,20 @@ class MultiAccountEnforcementService
     public function maxAccountsPerIp(): int
     {
         return max(1, (int) SiteSetting::get('max_accounts_per_ip', self::DEFAULT_MAX_ACCOUNTS));
+    }
+
+    public function blockReasonEn(): string
+    {
+        $value = trim((string) SiteSetting::get(self::BLOCK_REASON_EN_SETTING_KEY, self::BLOCK_REASON_EN));
+
+        return $value !== '' ? $value : self::BLOCK_REASON_EN;
+    }
+
+    public function blockReasonAr(): string
+    {
+        $value = trim((string) SiteSetting::get(self::BLOCK_REASON_AR_SETTING_KEY, self::BLOCK_REASON_AR));
+
+        return $value !== '' ? $value : self::BLOCK_REASON_AR;
     }
 
     /**

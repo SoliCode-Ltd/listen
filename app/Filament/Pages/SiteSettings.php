@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
+use App\Services\MultiAccountEnforcementService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -43,6 +44,14 @@ class SiteSettings extends Page implements HasForms
             'footer_social_facebook_url' => SiteSetting::get('footer_social_facebook_url', ''),
             'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
             'max_accounts_per_ip' => (int) SiteSetting::get('max_accounts_per_ip', 2),
+            'multi_account_block_reason_en' => SiteSetting::get(
+                MultiAccountEnforcementService::BLOCK_REASON_EN_SETTING_KEY,
+                MultiAccountEnforcementService::BLOCK_REASON_EN
+            ),
+            'multi_account_block_reason_ar' => SiteSetting::get(
+                MultiAccountEnforcementService::BLOCK_REASON_AR_SETTING_KEY,
+                MultiAccountEnforcementService::BLOCK_REASON_AR
+            ),
         ]);
     }
 
@@ -86,6 +95,16 @@ class SiteSettings extends Page implements HasForms
                             ->default(2)
                             ->required()
                             ->helperText('Maximum number of accounts allowed from the same IP address. Accounts beyond this limit will be automatically blocked. Admins are never auto-blocked.'),
+                        Forms\Components\Textarea::make('multi_account_block_reason_en')
+                            ->label('Auto-Block Reason (English)')
+                            ->rows(3)
+                            ->required()
+                            ->helperText('Message shown to users blocked automatically for multi-account abuse.'),
+                        Forms\Components\Textarea::make('multi_account_block_reason_ar')
+                            ->label('Auto-Block Reason (Arabic)')
+                            ->rows(3)
+                            ->required()
+                            ->helperText('الرسالة التي تظهر للمستخدم عند الحظر التلقائي بسبب إساءة استخدام تعدد الحسابات.'),
                     ]),
                 Forms\Components\Section::make('Appearance')
                     ->columns(2)

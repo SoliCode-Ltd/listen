@@ -229,13 +229,17 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->visible(fn (User $record) => ! $record->isBlocked() && ! $record->is_admin)
                     ->requiresConfirmation()
                     ->action(function (User $record): void {
+                        $enforcement = app(\App\Services\MultiAccountEnforcementService::class);
+                        $reasonEn = $enforcement->blockReasonEn();
+                        $reasonAr = $enforcement->blockReasonAr();
+
                         app(BlockedUserService::class)->block(
                             $record,
-                            \App\Services\MultiAccountEnforcementService::BLOCK_REASON_EN,
+                            $reasonEn,
                             auth()->user(),
                             [
-                                'en' => \App\Services\MultiAccountEnforcementService::BLOCK_REASON_EN,
-                                'ar' => \App\Services\MultiAccountEnforcementService::BLOCK_REASON_AR,
+                                'en' => $reasonEn,
+                                'ar' => $reasonAr,
                             ],
                         );
 
