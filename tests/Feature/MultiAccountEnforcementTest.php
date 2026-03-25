@@ -82,6 +82,38 @@ class MultiAccountEnforcementTest extends TestCase
         $this->assertFalse($user->isBlocked(), 'Second account should NOT be blocked');
     }
 
+    public function test_third_account_from_same_request_signature_is_auto_blocked_even_with_different_ips(): void
+    {
+        $sharedSignature = hash('sha256', 'same-browser-signature');
+
+        User::factory()->create([
+            'registration_ip' => '10.1.0.1',
+            'last_login_ip' => '10.1.0.1',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+
+        User::factory()->create([
+            'registration_ip' => '10.1.0.2',
+            'last_login_ip' => '10.1.0.2',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+
+        $abuser = User::factory()->create([
+            'registration_ip' => '10.1.0.3',
+            'last_login_ip' => '10.1.0.3',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+
+        $service = app(MultiAccountEnforcementService::class);
+        $service->enforceAfterAuth($abuser);
+
+        $abuser->refresh();
+        $this->assertTrue($abuser->isBlocked(), 'Third same-signature account should be auto-blocked');
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  2.  Admin protection — admins are NEVER auto-blocked
     // ──────────────────────────────────────────────────────────────────
@@ -473,6 +505,48 @@ class MultiAccountEnforcementTest extends TestCase
         $service->enforceAfterAuth($user);
         $user->refresh();
         $this->assertTrue($user->isBlocked());
+    }
+
+    public function test_backfill_command_blocks_existing_users_exceeding_linked_limit(): void
+    {
+        SiteSetting::set('max_accounts_per_ip', '2', 'general');
+        Cache::forget('site_setting.max_accounts_per_ip');
+
+        $sharedSignature = hash('sha256', 'backfill-shared-signature');
+
+        $u1 = User::factory()->create([
+            'registration_ip' => '172.16.10.1',
+            'last_login_ip' => '172.16.10.1',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+        $u2 = User::factory()->create([
+            'registration_ip' => '172.16.10.2',
+            'last_login_ip' => '172.16.10.2',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+        $u3 = User::factory()->create([
+            'registration_ip' => '172.16.10.3',
+            'last_login_ip' => '172.16.10.3',
+            'registration_request_signature' => $sharedSignature,
+            'last_seen_request_signature' => $sharedSignature,
+        ]);
+
+        $this->artisan('listen:multi-account-backfill --dry-run')
+            ->assertExitCode(0);
+
+        $this->assertSame(0, User::query()->whereIn('id', [$u1->id, $u2->id, $u3->id])->where('is_blocked', true)->count());
+
+        $this->artisan('listen:multi-account-backfill')
+            ->assertExitCode(0);
+
+        $blockedCount = User::query()
+            ->whereIn('id', [$u1->id, $u2->id, $u3->id])
+            ->where('is_blocked', true)
+            ->count();
+
+        $this->assertSame(3, $blockedCount);
     }
 
     public function test_service_skips_user_with_no_ips(): void

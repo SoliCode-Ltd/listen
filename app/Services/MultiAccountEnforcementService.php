@@ -6,6 +6,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class MultiAccountEnforcementService
 {
@@ -21,11 +22,11 @@ class MultiAccountEnforcementService
     }
 
     /**
-     * Check if the given user exceeds the max-accounts-per-IP limit and
-     * auto-block them if so.  Admins are never auto-blocked.
+     * Check if the given user exceeds the max linked-account limit and
+     * auto-block them if so. Admins are never auto-blocked.
      *
-     * Should be called after every successful registration or login
-     * (once IPs have been stamped).
+     * Linked accounts are detected by shared IP and, when available,
+     * shared device IDs and request signatures.
      */
     public function enforceAfterAuth(User $user): void
     {
@@ -42,21 +43,13 @@ class MultiAccountEnforcementService
         }
 
         $maxAccounts = $this->maxAccountsPerIp();
+        $signals = $this->linkedSignals($user);
 
-        $ips = array_values(array_unique(array_filter([
-            $user->registration_ip,
-            $user->last_login_ip,
-        ])));
-
-        if ($ips === []) {
+        if ($signals['ips'] === [] && $signals['device_ids'] === [] && $signals['request_signatures'] === []) {
             return;
         }
 
-        // Count non-admin accounts sharing any of this user's IPs.
-        $accountCount = User::query()
-            ->where('is_admin', false)
-            ->where(fn ($q) => $q->whereIn('registration_ip', $ips)->orWhereIn('last_login_ip', $ips))
-            ->count();
+        $accountCount = $this->linkedAccountCountFromSignals($signals);
 
         if ($accountCount <= $maxAccounts) {
             return;
@@ -66,7 +59,9 @@ class MultiAccountEnforcementService
         Log::warning('Multi-account auto-block triggered.', [
             'user_id' => $user->id,
             'email' => $user->email,
-            'ips' => $ips,
+            'ips' => $signals['ips'],
+            'device_ids' => $signals['device_ids'],
+            'request_signatures' => $signals['request_signatures'],
             'account_count' => $accountCount,
             'max_allowed' => $maxAccounts,
         ]);
@@ -84,5 +79,97 @@ class MultiAccountEnforcementService
     public function maxAccountsPerIp(): int
     {
         return max(1, (int) SiteSetting::get('max_accounts_per_ip', self::DEFAULT_MAX_ACCOUNTS));
+    }
+
+    /**
+     * @return array{
+     *   ips: list<string>,
+     *   device_ids: list<string>,
+     *   request_signatures: list<string>
+     * }
+     */
+    public function linkedSignals(User $user): array
+    {
+        $ips = array_values(array_unique(array_filter([
+            $user->registration_ip,
+            $user->last_login_ip,
+        ])));
+
+        $deviceIds = [];
+        if ($this->hasDeviceColumns()) {
+            $deviceIds = array_values(array_unique(array_filter([
+                $user->registration_device_id,
+                $user->last_seen_device_id,
+            ])));
+        }
+
+        $requestSignatures = [];
+        if ($this->hasRequestSignatureColumns()) {
+            $requestSignatures = array_values(array_unique(array_filter([
+                $user->registration_request_signature,
+                $user->last_seen_request_signature,
+            ])));
+        }
+
+        return [
+            'ips' => $ips,
+            'device_ids' => $deviceIds,
+            'request_signatures' => $requestSignatures,
+        ];
+    }
+
+    public function linkedAccountCount(User $user): int
+    {
+        return $this->linkedAccountCountFromSignals($this->linkedSignals($user));
+    }
+
+    /**
+     * @param  array{
+     *   ips: list<string>,
+     *   device_ids: list<string>,
+     *   request_signatures: list<string>
+     * }  $signals
+     */
+    private function linkedAccountCountFromSignals(array $signals): int
+    {
+        $ips = $signals['ips'] ?? [];
+        $deviceIds = $signals['device_ids'] ?? [];
+        $requestSignatures = $signals['request_signatures'] ?? [];
+
+        if ($ips === [] && $deviceIds === [] && $requestSignatures === []) {
+            return 0;
+        }
+
+        return (int) User::query()
+            ->where('is_admin', false)
+            ->where(function ($q) use ($ips, $deviceIds, $requestSignatures) {
+                if ($ips !== []) {
+                    $q->whereIn('registration_ip', $ips)
+                        ->orWhereIn('last_login_ip', $ips);
+                }
+
+                if ($deviceIds !== [] && $this->hasDeviceColumns()) {
+                    $q->orWhereIn('registration_device_id', $deviceIds)
+                        ->orWhereIn('last_seen_device_id', $deviceIds);
+                }
+
+                if ($requestSignatures !== [] && $this->hasRequestSignatureColumns()) {
+                    $q->orWhereIn('registration_request_signature', $requestSignatures)
+                        ->orWhereIn('last_seen_request_signature', $requestSignatures);
+                }
+            })
+            ->count();
+    }
+
+    private function hasDeviceColumns(): bool
+    {
+        return Schema::hasColumn('users', 'registration_device_id')
+            && Schema::hasColumn('users', 'last_seen_device_id');
+    }
+
+    private function hasRequestSignatureColumns(): bool
+    {
+        return Schema::hasColumn('users', 'registration_request_signature')
+            && Schema::hasColumn('users', 'last_seen_request_signature');
     }
 }
