@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\Voice;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Database\Eloquent\Builder;
 
 class StatsOverview extends BaseWidget
 {
@@ -26,7 +27,14 @@ class StatsOverview extends BaseWidget
                 ->descriptionIcon('heroicon-m-users')
                 ->color('primary')
                 ->chart($this->getUserGrowthChart()),
-            Stat::make('Active Subscriptions', Subscription::where('status', 'active')->count())
+            Stat::make(
+                'Active Subscriptions',
+                Subscription::query()
+                    ->where('status', 'active')
+                    ->whereHas('user', fn (Builder $query) => $query->where('is_blocked', false))
+                    ->distinct('user_id')
+                    ->count('user_id')
+            )
                 ->description('Currently active')
                 ->descriptionIcon('heroicon-m-credit-card')
                 ->color('success'),
