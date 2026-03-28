@@ -25,7 +25,10 @@
       "Bash(php -l app/Services/MultiAccountEnforcementService.php)",
       "Bash(php -l app/Services/BlockedUserService.php)",
       "Bash(php -l app/Services/Auth/FirebaseTokenVerifier.php)",
-      "Bash(php -l app/Services/Auth/PhoneAuthBridgeService.php)"
+      "Bash(php -l app/Services/Auth/PhoneAuthBridgeService.php)",
+      "Bash(while read:*)",
+      "Bash(do echo:*)",
+      "Bash(done)"
     ]
   }
 }

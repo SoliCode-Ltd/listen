@@ -181,6 +181,9 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $newHeaders = [
             'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/132.0.0.0 Safari/537.36',
             'Accept-Language' => 'fr-FR,fr;q=0.9',
+            'Sec-CH-UA' => '"Chromium";v="132", "Google Chrome";v="132"',
+            'Sec-CH-UA-Platform' => '"macOS"',
+            'Sec-CH-UA-Mobile' => '?0',
         ];
 
         $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
@@ -410,6 +413,9 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $request = $this->fakeRequest([
             'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
             'HTTP_ACCEPT_LANGUAGE' => 'en-US',
+            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
+            'HTTP_SEC_CH_UA_MOBILE' => '?0',
         ]);
 
         $sig = RequestIdentity::signature($request);
@@ -444,18 +450,28 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     {
         $sig1 = RequestIdentity::signature($this->fakeRequest([
             'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
+            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
         ]));
 
         $sig2 = RequestIdentity::signature($this->fakeRequest([
             'HTTP_USER_AGENT' => 'Mozilla/5.0 Firefox/120',
+            'HTTP_SEC_CH_UA' => '"Firefox";v="120"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
         ]));
 
+        $this->assertNotNull($sig1);
+        $this->assertNotNull($sig2);
         $this->assertNotSame($sig1, $sig2);
     }
 
     public function test_different_accept_language_produces_different_signature(): void
     {
-        $base = ['HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131'];
+        $base = [
+            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
+            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
+        ];
 
         $sig1 = RequestIdentity::signature($this->fakeRequest(array_merge($base, [
             'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.9',
@@ -465,6 +481,8 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'HTTP_ACCEPT_LANGUAGE' => 'ar-EG,ar;q=0.9',
         ])));
 
+        $this->assertNotNull($sig1);
+        $this->assertNotNull($sig2);
         $this->assertNotSame($sig1, $sig2);
     }
 
@@ -472,13 +490,29 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     {
         $sig1 = RequestIdentity::signature($this->fakeRequest([
             'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
+            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
         ]));
 
         $sig2 = RequestIdentity::signature($this->fakeRequest([
             'HTTP_USER_AGENT' => 'mozilla/5.0 chrome/131',
+            'HTTP_SEC_CH_UA' => '"chromium";v="131"',
+            'HTTP_SEC_CH_UA_PLATFORM' => '"windows"',
         ]));
 
+        $this->assertNotNull($sig1);
+        $this->assertNotNull($sig2);
         $this->assertSame($sig1, $sig2);
+    }
+
+    public function test_signature_returns_null_without_client_hints(): void
+    {
+        $request = $this->fakeRequest([
+            'HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0; rv:125.0) Gecko/20100101 Firefox/125.0',
+            'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.5',
+        ]);
+
+        $this->assertNull(RequestIdentity::signature($request), 'Without Client Hints, signature must be null to prevent false linking');
     }
 
     // ══════════════════════════════════════════════════════════════════════

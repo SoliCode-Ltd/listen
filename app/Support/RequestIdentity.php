@@ -9,6 +9,12 @@ class RequestIdentity
     /**
      * Build a stable browser/request signature that survives VPN IP changes
      * and cookie clears, but still varies across different browser setups.
+     *
+     * Returns null when the available headers lack sufficient entropy to
+     * distinguish individual browser instances (e.g. no Client Hints).
+     * Without this guard, popular UA+language combos (Firefox on Windows
+     * with en-US) would hash to the same value for millions of users,
+     * causing false account linking.
      */
     public static function signature(Request $request): ?string
     {
@@ -23,6 +29,19 @@ class RequestIdentity
         $secChUaMobile = self::normalizeHeader($request->header('Sec-CH-UA-Mobile', ''), 20);
         $secChUaArch = self::normalizeHeader($request->header('Sec-CH-UA-Arch', ''), 80);
         $secChUaPlatformVersion = self::normalizeHeader($request->header('Sec-CH-UA-Platform-Version', ''), 80);
+
+        // Require at least one Client Hint header for sufficient entropy.
+        // Without them the signature degrades to just UA + Accept-Language,
+        // which collides across millions of users with popular browsers.
+        $hasClientHints = ($secChUa !== '')
+            || ($secChUaPlatform !== '')
+            || ($secChUaMobile !== '')
+            || ($secChUaArch !== '')
+            || ($secChUaPlatformVersion !== '');
+
+        if (! $hasClientHints) {
+            return null;
+        }
 
         $raw = implode('|', [
             $userAgent,
