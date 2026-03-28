@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 
 class AuditBlockedUsersCommand extends Command
@@ -140,6 +141,8 @@ class AuditBlockedUsersCommand extends Command
         }
 
         if ($fix && $unblockedEmails !== []) {
+            Cache::forget('admin:suspicious_users_count');
+
             $this->newLine();
             $this->info("Unblocked {$falsePositives} user(s). Their request signatures were cleared.");
 

@@ -160,10 +160,24 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                 Tables\Columns\TextColumn::make('blocked_status')
                     ->label(__('ui.admin.suspicious.status'))
                     ->badge()
-                    ->getStateUsing(fn (User $record) => $record->isBlocked()
-                        ? __('ui.admin.users.blocked')
-                        : __('ui.admin.users.active'))
-                    ->color(fn (User $record) => $record->isBlocked() ? 'danger' : 'success'),
+                    ->getStateUsing(function (User $record): string {
+                        if ($record->isBlocked()) {
+                            return __('ui.admin.users.blocked');
+                        }
+
+                        if ($record->multi_account_whitelisted) {
+                            return __('ui.admin.users.active').' (Whitelisted)';
+                        }
+
+                        return __('ui.admin.users.active');
+                    })
+                    ->color(function (User $record): string {
+                        if ($record->isBlocked()) {
+                            return 'danger';
+                        }
+
+                        return $record->multi_account_whitelisted ? 'info' : 'success';
+                    }),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label(__('ui.admin.suspicious.registered_at'))
                     ->dateTime()
@@ -191,6 +205,12 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         '>=',
                         (int) config('listen.demo.guest_char_allowance', 300)
                     )),
+                Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
+                    ->label(__('ui.admin.suspicious.whitelisted_filter'))
+                    ->queries(
+                        true: fn (Builder $query) => $query->where('users.multi_account_whitelisted', true),
+                        false: fn (Builder $query) => $query->where(fn ($q) => $q->where('users.multi_account_whitelisted', false)->orWhereNull('users.multi_account_whitelisted')),
+                    ),
             ])
             ->actions([
                 Tables\Actions\Action::make('deleteUser')

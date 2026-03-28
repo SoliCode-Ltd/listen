@@ -982,6 +982,9 @@ return [
             'reset_demo_confirm_title' => 'إعادة تعيين أحرف التجربة لهذا المستخدم؟',
             'reset_demo_confirm_description' => 'سيتم حذف سجل التوليدات التجريبية لهذا المستخدم فقط واستعادة حصته التجريبية.',
             'reset_demo_success' => 'تم إعادة تعيين أحرف التجربة بنجاح.',
+            'whitelisted_filter' => 'القائمة البيضاء',
+            'whitelisted_label' => 'مستثنى من حظر الحسابات المتعددة',
+            'whitelisted_help' => 'المستخدمون المستثنون لن يتم حظرهم تلقائياً بواسطة نظام مراقبة الحسابات المتعددة.',
         ],
         'suspicious' => [
             'navigation_label' => 'مستخدمون مشبوهون',
@@ -1006,6 +1009,7 @@ return [
             'min_linked_filter' => 'الحد الأدنى للحسابات المرتبطة',
             'has_demo_usage' => 'لديه استخدام تجريبي',
             'exceeded_limit' => 'تجاوز حصة التجربة',
+            'whitelisted_filter' => 'القائمة البيضاء',
             'view_user' => 'عرض المستخدم',
             'view_linked' => 'عرض المرتبطين',
             'linked_modal_title' => 'المستخدمون المرتبطون بـ :name',

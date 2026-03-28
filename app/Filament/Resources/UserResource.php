@@ -81,6 +81,11 @@ class UserResource extends Resource
                             ->columnSpanFull()
                             ->disabled()
                             ->dehydrated(false),
+                        Forms\Components\Toggle::make('multi_account_whitelisted')
+                            ->label(__('ui.admin.users.whitelisted_label'))
+                            ->helperText(__('ui.admin.users.whitelisted_help'))
+                            ->disabled()
+                            ->dehydrated(false),
                     ]),
                 Forms\Components\Section::make(__('ui.admin.users.ip_demo_section'))
                     ->columns(2)
@@ -213,10 +218,24 @@ HTML;
                 Tables\Columns\TextColumn::make('blocked_status')
                     ->label(__('ui.admin.users.status'))
                     ->badge()
-                    ->getStateUsing(fn (User $record) => $record->isBlocked()
-                        ? __('ui.admin.users.blocked')
-                        : __('ui.admin.users.active'))
-                    ->color(fn (User $record) => $record->isBlocked() ? 'danger' : 'success')
+                    ->getStateUsing(function (User $record): string {
+                        if ($record->isBlocked()) {
+                            return __('ui.admin.users.blocked');
+                        }
+
+                        if ($record->multi_account_whitelisted) {
+                            return __('ui.admin.users.active').' (Whitelisted)';
+                        }
+
+                        return __('ui.admin.users.active');
+                    })
+                    ->color(function (User $record): string {
+                        if ($record->isBlocked()) {
+                            return 'danger';
+                        }
+
+                        return $record->multi_account_whitelisted ? 'info' : 'success';
+                    })
                     ->sortable(query: fn ($query, string $direction) => $query->orderBy('is_blocked', $direction)),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
@@ -306,6 +325,8 @@ HTML;
                     ->label(__('ui.admin.users.admin_filter')),
                 Tables\Filters\TernaryFilter::make('is_blocked')
                     ->label(__('ui.admin.users.blocked_filter')),
+                Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
+                    ->label(__('ui.admin.users.whitelisted_filter')),
                 Tables\Filters\Filter::make('has_api_key')
                     ->label(__('ui.admin.users.has_api_key'))
                     ->query(fn ($query) => $query->whereNotNull('api_key_hash')),

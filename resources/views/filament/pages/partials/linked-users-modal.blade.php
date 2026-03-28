@@ -106,6 +106,8 @@
                         <td class="px-3 py-2">
                             @if ($user->isBlocked())
                                 <span class="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">{{ __('ui.admin.users.blocked') }}</span>
+                            @elseif ($user->multi_account_whitelisted)
+                                <span class="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">{{ __('ui.admin.users.active') }} (Whitelisted)</span>
                             @else
                                 <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900 dark:text-green-200">{{ __('ui.admin.users.active') }}</span>
                             @endif

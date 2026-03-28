@@ -977,6 +977,9 @@ return [
             'reset_demo_confirm_title' => 'Reset demo characters for this user?',
             'reset_demo_confirm_description' => 'This deletes this user demo generation history only and restores their demo allowance.',
             'reset_demo_success' => 'User demo characters reset successfully.',
+            'whitelisted_filter' => 'Whitelisted',
+            'whitelisted_label' => 'Multi-Account Whitelisted',
+            'whitelisted_help' => 'Whitelisted users will not be auto-blocked by the multi-account enforcement system.',
         ],
         'suspicious' => [
             'navigation_label' => 'Suspicious Users',
@@ -1001,6 +1004,7 @@ return [
             'min_linked_filter' => 'Minimum linked accounts',
             'has_demo_usage' => 'Has demo usage',
             'exceeded_limit' => 'Exceeded demo allowance',
+            'whitelisted_filter' => 'Whitelisted',
             'view_user' => 'View User',
             'view_linked' => 'View Linked',
             'linked_modal_title' => 'Linked users for :name',
