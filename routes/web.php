@@ -8,6 +8,7 @@ use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\VoiceCloningController;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
 use Carbon\Carbon;
@@ -185,5 +186,18 @@ Route::group([
         Route::post('/browsers-extension/api-key/regenerate', [ExtensionController::class, 'regenerateApiKey'])->name('browsers-extension.key.regenerate');
         Route::post('/browsers-extension/api-key/revoke', [ExtensionController::class, 'revokeApiKey'])->name('browsers-extension.key.revoke');
         Route::get('/browsers-extension/download', [ExtensionController::class, 'download'])->name('browsers-extension.download');
+
+        // Voice Cloning lives under dashboard for signed-in users.
+        Route::prefix('dashboard/voice-cloning')->group(function (): void {
+            // Page accessible to all auth users (free users see upgrade prompt).
+            Route::get('/', [VoiceCloningController::class, 'index'])->name('voice-cloning.index');
+            // Actions require paid plan (enforced in controller).
+            Route::post('/', [VoiceCloningController::class, 'store'])->name('voice-cloning.store');
+            Route::get('/status/{id}', [VoiceCloningController::class, 'status'])->name('voice-cloning.status');
+            Route::delete('/{id}', [VoiceCloningController::class, 'destroy'])->name('voice-cloning.destroy');
+        });
+
+        // Legacy user URL kept as redirect to dashboard voice-cloning section.
+        Route::get('/voice-cloning', fn () => redirect()->to(route('dashboard') . '#voiceCloningSection', 301));
     });
 });

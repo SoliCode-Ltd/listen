@@ -248,6 +248,23 @@ class PlanResource extends Resource
                             ->default(0)
                             ->helperText('Higher weight = higher priority in job queue (0-1000).'),
                     ]),
+                Forms\Components\Section::make('Voice Cloning')
+                    ->description('Control voice cloning access and limits for this plan.')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\Toggle::make('voice_cloning_enabled')
+                            ->label('Enable Voice Cloning')
+                            ->helperText('Allow users on this plan to clone voices. The global voice cloning feature must also be enabled.')
+                            ->default(false)
+                            ->columnSpan(2),
+                        Forms\Components\TextInput::make('voice_cloning_max_voices')
+                            ->label('Max Cloned Voices')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(100)
+                            ->default(0)
+                            ->helperText('Max cloned voices for users on this plan. The dashboard uses this exact number.'),
+                    ]),
                 Forms\Components\Section::make('Plan Features (English)')
                     ->description('Features shown on the English pricing card. Auto-populated from plan data, edit as needed.')
                     ->collapsed()
@@ -447,6 +464,10 @@ class PlanResource extends Resource
                     ->label('Commercial')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('voice_cloning_enabled')
+                    ->label('Voice Cloning')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('stripe_synced')
                     ->label('Stripe')
                     ->state(fn (Plan $record): bool => $record->hasStripeConfig())
@@ -587,6 +608,12 @@ class PlanResource extends Resource
             $features[] = ['label' => 'Custom Prompt', 'value' => 'Included', 'icon' => 'star'];
         }
 
+        // Voice Cloning
+        if ((bool) ($record->voice_cloning_enabled ?? false)) {
+            $maxVoices = (int) ($record->voice_cloning_max_voices ?? 0);
+            $features[] = ['label' => 'Voice Cloning', 'value' => "Up to {$maxVoices} voices", 'icon' => 'mic'];
+        }
+
         return $features;
     }
 
@@ -637,6 +664,16 @@ class PlanResource extends Resource
             $features[] = ['label' => 'التعليمات المخصصة', 'value' => 'متاح', 'icon' => 'star'];
         }
 
+        // Voice Cloning
+        if ((bool) ($record->voice_cloning_enabled ?? false)) {
+            $maxVoices = (int) ($record->voice_cloning_max_voices ?? 0);
+            $features[] = [
+                'label' => "\u{0627}\u{0633}\u{062A}\u{0646}\u{0633}\u{0627}\u{062E} \u{0627}\u{0644}\u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",
+                'value' => "\u{062D}\u{062A}\u{0649} {$maxVoices} \u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",
+                'icon' => 'mic',
+            ];
+        }
+
         return $features;
     }
 
@@ -655,3 +692,4 @@ class PlanResource extends Resource
         return array_values(array_filter($items, fn ($item) => is_array($item)));
     }
 }
+

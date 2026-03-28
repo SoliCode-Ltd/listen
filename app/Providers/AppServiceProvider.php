@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\TtsProviderInterface;
+use App\Models\ClonedVoice;
+use App\Policies\ClonedVoicePolicy;
 use App\Console\Commands\EnforceBillingGraceCommand;
 use App\Console\Commands\GenerateVoiceSamples;
 use App\Console\Commands\ListenSyncExtensionCommand;
@@ -21,6 +23,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
 use Mcamara\LaravelLocalization\Traits\LoadsTranslatedCachedRoutes;
@@ -94,6 +97,9 @@ class AppServiceProvider extends ServiceProvider
                 $this->app->setLocale($mainLanguage);
             }
         }
+
+        // Register policies
+        Gate::policy(ClonedVoice::class, ClonedVoicePolicy::class);
 
         Cashier::useSubscriptionModel(BillingSubscription::class);
         Cashier::useSubscriptionItemModel(BillingSubscriptionItem::class);

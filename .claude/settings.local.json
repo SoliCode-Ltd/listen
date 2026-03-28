@@ -25,7 +25,12 @@
       "Bash(php -l app/Services/MultiAccountEnforcementService.php)",
       "Bash(php -l app/Services/BlockedUserService.php)",
       "Bash(php -l app/Services/Auth/FirebaseTokenVerifier.php)",
-      "Bash(php -l app/Services/Auth/PhoneAuthBridgeService.php)"
+      "Bash(php -l app/Services/Auth/PhoneAuthBridgeService.php)",
+      "WebSearch",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:colab.research.google.com)",
+      "Bash(wc -l \"/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Filament/Pages\"/*.php)",
+      "Bash(grep -r voice-cloning '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources/views' --include=*.blade.php)"
     ]
   }
 }

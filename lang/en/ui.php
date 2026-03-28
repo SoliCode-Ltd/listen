@@ -65,6 +65,7 @@ return [
         'sign_out' => 'Sign Out',
         'get_started' => 'Get Started',
         'get_started_free' => 'Get Started Free',
+        'voice_cloning' => 'Voice Cloning',
     ],
 
     'locale' => [
@@ -1115,5 +1116,115 @@ return [
         'billing_subscription_resumed' => 'Subscription resumed successfully.',
         'api_missing_key' => 'Missing API key.',
         'api_invalid_key' => 'Invalid API key.',
+    ],
+
+    // ===== VOICE CLONING =====
+    'voice_cloning' => [
+        'page_title' => 'Voice Cloning',
+        'page_subtitle' => 'Create a custom AI voice from your own recording',
+        'seo_title' => 'Voice Cloning — Listen',
+        'seo_description' => 'Clone your voice with AI and use it to generate natural speech.',
+
+        // Feature state
+        'feature_disabled' => 'Voice cloning is currently unavailable. Please check back later.',
+        'upgrade_required' => 'Voice cloning is a premium feature. Upgrade your plan to unlock it.',
+        'upgrade_title' => 'Unlock Voice Cloning',
+        'upgrade_subtitle' => 'Voice cloning is available exclusively for paid plan subscribers.',
+        'upgrade_cta' => 'View Plans & Upgrade',
+        'upgrade_feature_1' => 'Clone your voice with a short recording',
+        'upgrade_feature_2' => 'Use your custom voice in all future generations',
+        'upgrade_feature_3' => 'Manage up to :max custom voices',
+
+        // Empty state
+        'empty_title' => 'No cloned voices yet',
+        'empty_subtitle' => 'Create your first custom AI voice by uploading a recording or recording one directly.',
+        'create_first' => 'Create Your First Voice',
+
+        // Create form
+        'create_title' => 'Create New Voice',
+        'voice_name_label' => 'Voice Name',
+        'voice_name_placeholder' => 'e.g. My Professional Voice',
+        'language_label' => 'Voice Language',
+        'language_ar' => 'Arabic',
+        'language_en_us' => 'English (US)',
+        'language_en_gb' => 'English (UK)',
+        'language_en_au' => 'English (Australia)',
+
+        // Upload
+        'upload_tab' => 'Upload File',
+        'record_tab' => 'Record Voice',
+        'upload_label' => 'Upload Voice Sample',
+        'upload_hint' => 'Drag & drop an audio file or click to browse',
+        'upload_formats' => 'Supported: WAV, MP3, MP4, M4A, OGG, WebM, FLAC',
+        'upload_max_size' => 'Maximum size: :size MB',
+        'upload_selected' => 'File selected:',
+
+        // Recording
+        'record_start' => 'Start Recording',
+        'record_stop' => 'Stop Recording',
+        'record_retry' => 'Re-record',
+        'recording_in_progress' => 'Recording...',
+        'recording_timer' => 'Duration:',
+        'mic_permission_denied' => 'Microphone access denied. Please allow microphone access in your browser settings.',
+        'mic_not_available' => 'Microphone not available on this device.',
+        'recording_too_short' => 'Recording is too short. Minimum :min seconds required.',
+
+        // Guidelines
+        'guidelines_title' => 'Recording Tips',
+        'guideline_1' => 'Record at least :min seconds of clear speech',
+        'guideline_2' => 'Use a quiet environment with minimal background noise',
+        'guideline_3' => 'Speak naturally and clearly at a consistent volume',
+        'guideline_4' => 'Use a good quality microphone if possible',
+        'guideline_5' => 'Avoid whispering, shouting, or unusual effects',
+        'min_duration_note' => 'Minimum sample duration: :min seconds',
+
+        // Consent
+        'consent_title' => 'Voice Ownership Confirmation',
+        'consent_label' => 'I confirm that I am the owner of this voice or have explicit permission to clone it, and I consent to creating a synthetic voice model based on this recording.',
+        'consent_required' => 'You must confirm voice ownership to proceed.',
+        'privacy_note' => 'Your voice sample is stored securely and used only for your personal voice cloning. It is never shared with other users.',
+
+        // Submit
+        'submit_button' => 'Create Voice',
+        'submitting' => 'Submitting...',
+        'submitted_success' => 'Voice sample submitted successfully! Processing will begin shortly.',
+        'limit_reached' => 'You have reached the maximum number of cloned voices (:max). Delete an existing voice to create a new one.',
+        'rate_limited' => 'Too many requests. Please wait before trying again.',
+
+        // Voice list / cards
+        'your_voices_title' => 'Your Cloned Voices',
+        'voice_count' => ':count of :max voices',
+        'status_pending' => 'Pending',
+        'status_validating' => 'Validating',
+        'status_processing' => 'Processing',
+        'status_ready' => 'Ready',
+        'status_failed' => 'Failed',
+        'processing_hint' => 'Your voice is being processed. This may take a few minutes.',
+        'processing_failed_generic' => 'Voice processing failed. Please try again with a different recording.',
+        'delete_voice' => 'Delete',
+        'delete_confirm' => 'Are you sure you want to delete this cloned voice? This action cannot be undone.',
+        'deleted_success' => 'Cloned voice deleted successfully.',
+        'use_in_generator' => 'Use in Generator',
+        'created_on' => 'Created:',
+
+        // Integration with generator
+        'cloned_voice_label' => 'Cloned',
+        'cloned_voice_group' => 'Your Cloned Voices',
+
+        // Validation messages
+        'validation' => [
+            'name_required' => 'Please enter a name for your cloned voice.',
+            'name_min' => 'Voice name must be at least 2 characters.',
+            'name_max' => 'Voice name cannot exceed 50 characters.',
+            'audio_required' => 'Please upload or record a voice sample.',
+            'audio_too_large' => 'Audio file is too large. Maximum size is :max MB.',
+            'audio_invalid_type' => 'Unsupported audio format. Please use WAV, MP3, MP4, M4A, OGG, WebM, or FLAC.',
+            'audio_too_short' => 'Audio sample is too short. Minimum :min seconds required.',
+            'consent_required' => 'You must confirm voice ownership before proceeding.',
+            'source_type_required' => 'Please select upload or recording mode.',
+            'source_type_invalid' => 'Invalid source type. Please select upload or recording.',
+            'language_required' => 'Please select a language for voice cloning.',
+            'language_invalid' => 'The selected language is not supported for voice cloning.',
+        ],
     ],
 ];

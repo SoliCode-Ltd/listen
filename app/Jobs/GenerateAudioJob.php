@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AudioGeneration;
+use App\Models\ClonedVoice;
 use App\Models\Plan;
 use App\Models\TtsLog;
 use App\Models\TextItem;
@@ -10,6 +11,7 @@ use App\Models\UsageCounter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
+use App\Services\VoiceCloningService;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -105,44 +107,69 @@ class GenerateAudioJob implements ShouldQueue
                 'speed' => $generation->speed ?? 1.0,
                 'pitch' => $generation->pitch ?? 0.0,
             ], $plan);
-            $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
+            // === Cloned voice detection ===
+            // If voice_name is "cloned_{id}", use VoiceCloningService for synthesis
+            // instead of the normal TTS routing pipeline.
+            $isClonedVoice = str_starts_with((string) $generation->voice_name, 'cloned_');
+            $audio = null;
 
-            $voiceOptions = [
-                'voice_name' => $generation->voice_name,
-                'provider' => $generation->tts_provider ?: VoiceCatalog::providerForName($generation->voice_name),
-                'tier' => $requestedTier,
-                'gender' => $voiceMeta['gender'] ?? null,
-                'performance_style' => $studioOptions['performance_style'],
-                'style' => $studioOptions['performance_style'],
-                'style_prompt' => $studioOptions['style_prompt'],
-                'dialect' => $studioOptions['dialect'],
-                'emotion' => $studioOptions['emotion'],
-                'speed' => $studioOptions['speed'],
-                'pitch' => $studioOptions['pitch'],
-            ];
+            if ($isClonedVoice) {
+                $clonedVoiceId = (int) str_replace('cloned_', '', $generation->voice_name);
+                $clonedVoice = ClonedVoice::where('id', $clonedVoiceId)
+                    ->where('user_id', $generation->user_id)
+                    ->ready()
+                    ->first();
 
-            // Add dialogue speakers if applicable
-            if (
-                $requestedTier !== VoiceTier::STANDARD
-                && $generation->is_dialogue
-                && is_array($generation->dialogue_metadata)
-            ) {
-                $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
-                $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
-                    $generation->dialogue_metadata['speakers'] ?? [],
+                if (! $clonedVoice) {
+                    throw new \RuntimeException('Cloned voice not found or not ready.');
+                }
+
+                $voiceCloningService = app(VoiceCloningService::class);
+                $audio = $voiceCloningService->synthesizeWithClonedVoice(
+                    $textForSpeech,
+                    $clonedVoice->language_code,
+                    $clonedVoice->provider_voice_key,
+                );
+            } else {
+                $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
+
+                $voiceOptions = [
+                    'voice_name' => $generation->voice_name,
+                    'provider' => $generation->tts_provider ?: VoiceCatalog::providerForName($generation->voice_name),
+                    'tier' => $requestedTier,
+                    'gender' => $voiceMeta['gender'] ?? null,
+                    'performance_style' => $studioOptions['performance_style'],
+                    'style' => $studioOptions['performance_style'],
+                    'style_prompt' => $studioOptions['style_prompt'],
+                    'dialect' => $studioOptions['dialect'],
+                    'emotion' => $studioOptions['emotion'],
+                    'speed' => $studioOptions['speed'],
+                    'pitch' => $studioOptions['pitch'],
+                ];
+
+                // Add dialogue speakers if applicable
+                if (
+                    $requestedTier !== VoiceTier::STANDARD
+                    && $generation->is_dialogue
+                    && is_array($generation->dialogue_metadata)
+                ) {
+                    $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
+                    $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
+                        $generation->dialogue_metadata['speakers'] ?? [],
+                        $generation->target_language,
+                        $requestedTier,
+                        $provider,
+                    );
+                }
+
+                $audio = $ttsService->synthesizeAdvanced(
+                    $textForSpeech,
                     $generation->target_language,
-                    $requestedTier,
-                    $provider,
+                    $voiceOptions,
+                    $plan,
+                    (int) $generation->user_id,
                 );
             }
-
-            $audio = $ttsService->synthesizeAdvanced(
-                $textForSpeech,
-                $generation->target_language,
-                $voiceOptions,
-                $plan,
-                (int) $generation->user_id,
-            );
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
             $actualSeconds = (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
