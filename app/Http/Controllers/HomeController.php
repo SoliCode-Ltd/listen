@@ -1176,6 +1176,9 @@ class HomeController extends Controller
                 if (! filled($user->registration_request_signature)) {
                     $updates['registration_request_signature'] = $requestSignature;
                 }
+            } elseif ($requestSignature === null && filled($user->last_seen_request_signature)) {
+                // Browser lacks Client Hints — clear stale signature to prevent false linking.
+                $updates['last_seen_request_signature'] = null;
             }
         }
 

@@ -455,6 +455,9 @@ class AuthController extends Controller
         $requestSignature = $this->requestSignatureFromRequest($request);
         if ($requestSignature !== null && (string) $user->last_seen_request_signature !== $requestSignature) {
             $updates['last_seen_request_signature'] = $requestSignature;
+        } elseif ($requestSignature === null && filled($user->last_seen_request_signature)) {
+            // Browser lacks Client Hints — clear stale signature to prevent false linking.
+            $updates['last_seen_request_signature'] = null;
         }
 
         if ($requestSignature !== null && ! filled($user->registration_request_signature)) {
