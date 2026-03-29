@@ -160,7 +160,7 @@ return [
         'plan_name_studio_max' => 'Studio Max',
         'plan_desc_free' => 'Start exploring AI voice generation',
         'plan_desc_starter' => 'Full voice controls for everyday use',
-        'plan_desc_creator' => 'Advanced voice generation for content creators',
+        'plan_desc_creator' => ' Voice generation for creators',
         'plan_desc_pro' => 'High-volume production with priority processing',
         'plan_desc_studio_max' => 'Maximum power with dialogue mode & unlimited retention',
         'per_month_short' => '/mo',

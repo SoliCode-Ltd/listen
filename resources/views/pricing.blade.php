@@ -520,9 +520,6 @@
     html[dir="ltr"] .plan-card.has-discount.popular {
       padding-top: 1.95rem;
     }
-    html[dir="ltr"] .plan-card.has-discount.popular .popular-badge {
-      top: -.95rem;
-    }
 
     .discount-ribbon {
       position: absolute;
