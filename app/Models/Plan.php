@@ -210,4 +210,20 @@ class Plan extends Model
     {
         return $this->hasActiveDiscount() ? $this->getDiscountedPriceCents() : (int) $this->price_cents;
     }
+
+    /**
+     * Get the effective yearly price in cents.
+     * Business rule: promo discount + yearly discount are both deducted from the original yearly total.
+     */
+    public function getEffectiveYearlyPriceCents(?int $yearlyDiscountPercent = null): int
+    {
+        $baseMonthlyCents = max(0, (int) $this->price_cents);
+        $promoPercent = $this->hasActiveDiscount()
+            ? max(0, min(99, (int) $this->discount_percentage))
+            : 0;
+        $yearlyPercent = max(0, min(99, (int) ($yearlyDiscountPercent ?? SiteSetting::yearlyDiscountPercent())));
+        $combinedPercent = max(0, min(99, $promoPercent + $yearlyPercent));
+
+        return (int) round(($baseMonthlyCents * 12) * (1 - ($combinedPercent / 100)));
+    }
 }

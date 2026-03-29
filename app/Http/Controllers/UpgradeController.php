@@ -26,7 +26,10 @@ class UpgradeController extends Controller
             ->orderBy('price_cents')
             ->get()
             ->map(function (Plan $plan) use ($locale): array {
-                $monthly = round((int) $plan->price_cents / 100, 2);
+                $monthlyCents = max(0, (int) $plan->getEffectivePriceCents());
+                $yearlyCents = max(0, (int) $plan->getEffectiveYearlyPriceCents(SiteSetting::yearlyDiscountPercent()));
+                $monthly = round($monthlyCents / 100, 2);
+                $yearlyMonthlyEquivalent = round(($yearlyCents / 12) / 100, 2);
                 $charTopupCents = $plan->topup_char_price_cents !== null
                     ? (int) $plan->topup_char_price_cents
                     : (
@@ -40,7 +43,7 @@ class UpgradeController extends Controller
                     'name' => $plan->getLocalizedName($locale),
                     'description' => $plan->getLocalizedDescription($locale),
                     'price_monthly' => $monthly,
-                    'price_yearly' => round($monthly * SiteSetting::yearlyDiscountMultiplier(), 2),
+                    'price_yearly' => $yearlyMonthlyEquivalent,
                     'monthly_chars' => (int) $plan->monthly_chars,
                     'monthly_requests' => (int) $plan->monthly_requests,
                     'requests_unlimited' => (int) $plan->monthly_requests <= 0,

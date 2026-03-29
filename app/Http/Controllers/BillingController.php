@@ -169,11 +169,8 @@ class BillingController extends Controller
         $paymentMethod = trim((string) ($validated['payment_method'] ?? ''));
         $saveCard = $validated['save_card'] ?? true;
 
-        // Resolve active discount coupon for this plan
-        $couponId = null;
-        if ($planRecord->hasActiveDiscount() && ! empty($planRecord->stripe_coupon_id)) {
-            $couponId = $planRecord->stripe_coupon_id;
-        }
+        // Resolve active discount coupon for this plan/cycle.
+        $couponId = $this->resolveCheckoutCouponId($planRecord, (string) $validated['billing_cycle']);
 
         try {
             $this->ensureStripeCustomer($user);
@@ -557,16 +554,13 @@ class BillingController extends Controller
             })
             ->map(function (Plan $plan) use ($stripeReady, $countryContext, $locale) {
                 $slug = (string) $plan->slug;
+                $yearlyDiscountPercent = SiteSetting::yearlyDiscountPercent();
 
                 $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
 
                 $effectiveMonthlyFallback = max(0, (int) $plan->getEffectivePriceCents());
-                $yearlyFallback = max(0, (int) round($effectiveMonthlyFallback * 12 * SiteSetting::yearlyDiscountMultiplier()));
-
-                // Manual pricing service reads plan->price_cents, so feed it the effective discounted base.
-                $pricingPlan = clone $plan;
-                $pricingPlan->price_cents = $effectiveMonthlyFallback;
+                $yearlyFallback = max(0, (int) $plan->getEffectiveYearlyPriceCents($yearlyDiscountPercent));
 
                 $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $effectiveMonthlyFallback, 'monthly', $countryContext, $locale);
                 $yearly = $this->resolvePriceMeta($yearlyPriceId, $stripeReady, $yearlyFallback, 'yearly', $countryContext, $locale);
@@ -585,13 +579,30 @@ class BillingController extends Controller
                 ];
 
                 foreach ($this->localizedPricingService->enabledManualMethods((string) ($countryContext['country_code'] ?? '')) as $method) {
-                    $manualMonthly = $this->localizedPricingService->manualQuoteForPlan($pricingPlan, 'monthly', $countryContext, $method, $locale);
-                    $manualYearly = $this->localizedPricingService->manualQuoteForPlan($pricingPlan, 'yearly', $countryContext, $method, $locale);
+                    // Keep checkout amount identical across payment methods for the same plan/cycle.
+                    $manualMonthlyAmount = max(0, (int) ($monthly['amount_cents'] ?? 0));
+                    $manualYearlyAmount = max(0, (int) ($yearly['amount_cents'] ?? 0));
+                    $manualCurrency = strtoupper((string) ($monthly['currency'] ?? 'USD'));
+
+                    $manualMonthly = $this->localizedPricingService->buildQuote(
+                        $manualMonthlyAmount,
+                        $manualCurrency,
+                        'monthly',
+                        $method,
+                        $locale,
+                    );
+                    $manualYearly = $this->localizedPricingService->buildQuote(
+                        $manualYearlyAmount,
+                        $manualCurrency,
+                        'yearly',
+                        $method,
+                        $locale,
+                    );
                     $methodMeta = $this->localizedPricingService->paymentMethodMeta($method);
 
                     $paymentMethods[$method] = [
                         'key' => $method,
-                        'available' => $manualMonthly !== null && $manualYearly !== null,
+                        'available' => $manualMonthlyAmount > 0 && $manualYearlyAmount > 0,
                         'label' => $methodMeta['label'],
                         'description' => $methodMeta['description'],
                         'destination' => $this->localizedPricingService->manualPaymentDestination($method, $locale),
@@ -679,6 +690,74 @@ class BillingController extends Controller
             'is_converted' => (bool) $displayQuote['is_converted'],
             'charge_currency' => strtoupper($chargeCurrency),
         ];
+    }
+
+    private function resolveCheckoutCouponId(Plan $plan, string $billingCycle): ?string
+    {
+        if (! $plan->hasActiveDiscount()) {
+            return null;
+        }
+
+        $baseCouponId = trim((string) $plan->stripe_coupon_id);
+        $billingCycle = strtolower(trim($billingCycle));
+        if ($billingCycle !== 'yearly') {
+            return $baseCouponId !== '' ? $baseCouponId : null;
+        }
+
+        $promoPercent = max(0, min(99, (int) $plan->discount_percentage));
+        $yearlyPercent = SiteSetting::yearlyDiscountPercent();
+        if ($promoPercent <= 0 || $yearlyPercent <= 0) {
+            return $baseCouponId !== '' ? $baseCouponId : null;
+        }
+
+        // Yearly Stripe price already includes yearly discount.
+        // Convert promo% to an equivalent coupon so total discount is additive on original total.
+        $denominator = max(1, 100 - $yearlyPercent);
+        $adjustedCouponPercent = max(0.01, min(99.99, round(($promoPercent / $denominator) * 100, 2)));
+        $couponId = 'lis_y_'.substr(sha1($plan->slug.'|'.$promoPercent.'|'.$yearlyPercent.'|'.$adjustedCouponPercent), 0, 22);
+
+        try {
+            $existing = Cashier::stripe()->coupons->retrieve($couponId, []);
+            if ($existing && (bool) ($existing->valid ?? false)) {
+                return $couponId;
+            }
+        } catch (\Throwable) {
+            // Will create coupon below.
+        }
+
+        $couponData = [
+            'id' => $couponId,
+            'percent_off' => $adjustedCouponPercent,
+            'duration' => 'once',
+            'name' => $plan->name.' - Yearly additive promo',
+            'metadata' => [
+                'listen_plan_slug' => (string) $plan->slug,
+                'listen_plan_id' => (string) $plan->id,
+                'listen_cycle' => 'yearly',
+                'listen_promo_percent' => (string) $promoPercent,
+                'listen_yearly_percent' => (string) $yearlyPercent,
+                'listen_pricing_mode' => 'additive',
+            ],
+        ];
+
+        if ($plan->discount_ends_at) {
+            $couponData['redeem_by'] = $plan->discount_ends_at->getTimestamp();
+        }
+
+        try {
+            Cashier::stripe()->coupons->create($couponData);
+
+            return $couponId;
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to create yearly additive coupon, falling back to base coupon.', [
+                'plan_slug' => $plan->slug,
+                'billing_cycle' => $billingCycle,
+                'adjusted_coupon_percent' => $adjustedCouponPercent,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return $baseCouponId !== '' ? $baseCouponId : null;
+        }
     }
 
     /**

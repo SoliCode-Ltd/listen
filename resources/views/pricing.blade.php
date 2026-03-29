@@ -896,6 +896,7 @@
           if (!ribbonText) return;
           var basePercent = parseInt(card.getAttribute('data-discount-percent') || '0', 10);
           if (basePercent <= 0) return;
+          // Business rule: show total discount as a direct deduction from the original total.
           var effectivePercent = isYearly ? Math.min(99, basePercent + yearlyDiscountPercent) : basePercent;
           ribbonText.textContent = discountI18n.badge.replace(':percent', effectivePercent);
         });

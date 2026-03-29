@@ -655,9 +655,10 @@ class HomeController extends Controller
         $countryContext = $this->localizedPricingService->resolveCountryContext(request());
 
         $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext): array {
-            $monthlyCents = max(0, (int) $plan->price_cents);
-            $yearlyMultiplier = SiteSetting::yearlyDiscountMultiplier();
-            $yearlyCents = (int) round($monthlyCents * 12 * $yearlyMultiplier);
+            $baseMonthlyCents = max(0, (int) $plan->price_cents);
+            $yearlyDiscountPercent = SiteSetting::yearlyDiscountPercent();
+            $monthlyCents = max(0, (int) $plan->getEffectivePriceCents());
+            $yearlyCents = max(0, (int) $plan->getEffectiveYearlyPriceCents($yearlyDiscountPercent));
             $monthly = round($monthlyCents / 100, 2);
             $yearly = round($yearlyCents / 100, 2);
             $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
@@ -704,27 +705,7 @@ class HomeController extends Controller
             $hasDiscount = $plan->hasActiveDiscount();
             $discountPercentage = $hasDiscount ? (int) $plan->discount_percentage : 0;
             $discountEndsAt = $hasDiscount && $plan->discount_ends_at ? $plan->discount_ends_at->toIso8601String() : null;
-            $originalMonthlyCents = $monthlyCents;
-            $originalYearlyCents = $yearlyCents;
-
-            if ($hasDiscount) {
-                $monthlyCents = $plan->getDiscountedPriceCents();
-                $yearlyCents = (int) round($monthlyCents * 12 * $yearlyMultiplier);
-                $monthly = round($monthlyCents / 100, 2);
-                $yearly = round($yearlyCents / 100, 2);
-
-                // Recalculate all localized quotes with discounted price using USD conversion
-                // (manualQuoteForPlan reads plan->price_cents directly, so we use convertedQuoteFromUsd instead)
-                $stripeMonthlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
-                    $monthlyCents, 'monthly', $countryContext, 'stripe', $locale
-                );
-                $stripeYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
-                    $yearlyCents, 'yearly', $countryContext, 'stripe', $locale
-                );
-                $displayMonthlyQuote = $stripeMonthlyQuote;
-                $displayYearlyQuote = $stripeYearlyQuote;
-                $savingsMinor = max(0, ($displayMonthlyQuote['equivalent_monthly_minor'] * 12) - $displayYearlyQuote['amount_minor']);
-            }
+            $originalMonthlyCents = $baseMonthlyCents;
 
             // Original price quotes for strikethrough display
             $originalMonthlyQuote = $hasDiscount
