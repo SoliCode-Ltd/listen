@@ -561,10 +561,14 @@ class BillingController extends Controller
                 $monthlyPriceId = $this->resolveStripePriceId($slug, 'monthly');
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
 
-                $monthlyFallback = max(0, (int) $plan->price_cents);
-                $yearlyFallback = max(0, (int) round($monthlyFallback * 12 * SiteSetting::yearlyDiscountMultiplier()));
+                $effectiveMonthlyFallback = max(0, (int) $plan->getEffectivePriceCents());
+                $yearlyFallback = max(0, (int) round($effectiveMonthlyFallback * 12 * SiteSetting::yearlyDiscountMultiplier()));
 
-                $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $monthlyFallback, 'monthly', $countryContext, $locale);
+                // Manual pricing service reads plan->price_cents, so feed it the effective discounted base.
+                $pricingPlan = clone $plan;
+                $pricingPlan->price_cents = $effectiveMonthlyFallback;
+
+                $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $effectiveMonthlyFallback, 'monthly', $countryContext, $locale);
                 $yearly = $this->resolvePriceMeta($yearlyPriceId, $stripeReady, $yearlyFallback, 'yearly', $countryContext, $locale);
                 $monthly['method'] = 'stripe';
                 $yearly['method'] = 'stripe';
@@ -581,8 +585,8 @@ class BillingController extends Controller
                 ];
 
                 foreach ($this->localizedPricingService->enabledManualMethods((string) ($countryContext['country_code'] ?? '')) as $method) {
-                    $manualMonthly = $this->localizedPricingService->manualQuoteForPlan($plan, 'monthly', $countryContext, $method, $locale);
-                    $manualYearly = $this->localizedPricingService->manualQuoteForPlan($plan, 'yearly', $countryContext, $method, $locale);
+                    $manualMonthly = $this->localizedPricingService->manualQuoteForPlan($pricingPlan, 'monthly', $countryContext, $method, $locale);
+                    $manualYearly = $this->localizedPricingService->manualQuoteForPlan($pricingPlan, 'yearly', $countryContext, $method, $locale);
                     $methodMeta = $this->localizedPricingService->paymentMethodMeta($method);
 
                     $paymentMethods[$method] = [

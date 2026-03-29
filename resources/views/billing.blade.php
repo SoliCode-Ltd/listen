@@ -1308,18 +1308,6 @@
       }
 
       let amountText = String(selected.meta.amount_formatted || '-');
-      // Apply discount to display if plan has an active discount
-      const discountPct = Number(selected.plan.discount_percentage || 0);
-      const hasDiscount = Boolean(selected.plan.has_discount) && discountPct > 0;
-      if (hasDiscount && selected.method === 'stripe') {
-        const rawCents = Number(selected.meta.amount_cents || 0);
-        if (rawCents > 0) {
-          const discountedCents = Math.round(rawCents * (1 - discountPct / 100));
-          const currency = String(selected.meta.currency || 'USD').toUpperCase();
-          const discountedMajor = (discountedCents / 100).toFixed(2);
-          amountText = (currency === 'USD' ? '$' : currency + ' ') + discountedMajor;
-        }
-      }
       const amountBidi = `\u2066${amountText}\u2069`;
       quoteAmount.textContent = amountText;
       quoteAmountLabel.textContent = selected.method === 'stripe'
