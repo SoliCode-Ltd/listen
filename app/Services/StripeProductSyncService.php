@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Log;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
@@ -42,7 +43,7 @@ class StripeProductSyncService
     }
 
     /**
-     * Sync a plan with Stripe (create product + prices).
+     * Sync a plan with Stripe (create product + prices + coupon).
      *
      * @param Plan $plan
      * @return array{success: bool, message: string, product_id?: string, price_monthly?: string, price_yearly?: string}
@@ -79,6 +80,10 @@ class StripeProductSyncService
             $yearlyPriceId = $this->syncPrice($stripe, $plan, 'year', $productId);
             $plan->stripe_price_yearly = $yearlyPriceId;
 
+            // Sync discount coupon
+            $couponId = $this->syncCoupon($stripe, $plan);
+            $plan->stripe_coupon_id = $couponId;
+
             $plan->saveQuietly(); // Avoid triggering observer loops
 
             Log::info('Plan synced with Stripe', [
@@ -86,6 +91,7 @@ class StripeProductSyncService
                 'product_id' => $productId,
                 'price_monthly' => $monthlyPriceId,
                 'price_yearly' => $yearlyPriceId,
+                'coupon_id' => $couponId,
             ]);
 
             return [
@@ -175,8 +181,7 @@ class StripeProductSyncService
         // Calculate price
         $monthlyPriceCents = $plan->price_cents;
         if ($isYearly) {
-            // 20% discount for yearly
-            $priceCents = (int) round($monthlyPriceCents * 12 * 0.8);
+            $priceCents = (int) round($monthlyPriceCents * 12 * SiteSetting::yearlyDiscountMultiplier());
         } else {
             $priceCents = $monthlyPriceCents;
         }
@@ -231,6 +236,103 @@ class StripeProductSyncService
         ]);
 
         return $price->id;
+    }
+
+    /**
+     * Sync discount coupon for a plan.
+     * Creates or updates a Stripe coupon when a plan has an active discount.
+     * Deletes the coupon when the discount is removed or expired.
+     */
+    private function syncCoupon(StripeClient $stripe, Plan $plan): ?string
+    {
+        $hasDiscount = $plan->hasActiveDiscount();
+        $existingCouponId = $plan->stripe_coupon_id;
+
+        // If no active discount, clean up existing coupon
+        if (! $hasDiscount) {
+            if (! empty($existingCouponId)) {
+                try {
+                    $stripe->coupons->delete($existingCouponId);
+                } catch (ApiErrorException $e) {
+                    // Coupon might already be deleted
+                    Log::warning('Could not delete Stripe coupon', [
+                        'coupon_id' => $existingCouponId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+            return null;
+        }
+
+        $couponData = [
+            'percent_off' => (float) $plan->discount_percentage,
+            'duration' => 'once',
+            'name' => $plan->name . ' - ' . $plan->discount_percentage . '% Off',
+            'metadata' => [
+                'listen_plan_slug' => $plan->slug,
+                'listen_plan_id' => (string) $plan->id,
+            ],
+        ];
+
+        if ($plan->discount_ends_at) {
+            $couponData['redeem_by'] = $plan->discount_ends_at->getTimestamp();
+        }
+
+        // If existing coupon, check if it matches
+        if (! empty($existingCouponId)) {
+            try {
+                $existing = $stripe->coupons->retrieve($existingCouponId);
+                if (
+                    (float) $existing->percent_off === (float) $plan->discount_percentage
+                    && $existing->valid
+                ) {
+                    return $existingCouponId; // No change needed
+                }
+                // Delete old coupon and create new
+                $stripe->coupons->delete($existingCouponId);
+            } catch (ApiErrorException $e) {
+                // Coupon doesn't exist, create new
+            }
+        }
+
+        // Create new coupon
+        $couponData['id'] = 'listen_' . $plan->slug . '_discount_' . $plan->discount_percentage;
+        try {
+            $coupon = $stripe->coupons->create($couponData);
+            return $coupon->id;
+        } catch (ApiErrorException $e) {
+            // Coupon with this ID may already exist, try retrieving it
+            if (str_contains($e->getMessage(), 'already exists')) {
+                try {
+                    $stripe->coupons->delete($couponData['id']);
+                    $coupon = $stripe->coupons->create($couponData);
+                    return $coupon->id;
+                } catch (ApiErrorException $innerE) {
+                    Log::error('Failed to recreate Stripe coupon', [
+                        'plan_slug' => $plan->slug,
+                        'error' => $innerE->getMessage(),
+                    ]);
+                    return null;
+                }
+            }
+            Log::error('Failed to create Stripe coupon', [
+                'plan_slug' => $plan->slug,
+                'error' => $e->getMessage(),
+            ]);
+            return null;
+        }
+    }
+
+    /**
+     * Get the active coupon ID for a plan (for use during checkout).
+     */
+    public function getActiveCouponId(Plan $plan): ?string
+    {
+        if (! $plan->hasActiveDiscount() || empty($plan->stripe_coupon_id)) {
+            return null;
+        }
+
+        return $plan->stripe_coupon_id;
     }
 
     /**

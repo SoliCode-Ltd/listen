@@ -651,7 +651,7 @@ class LocalizedPricingService
     private function derivedEgyptManualPriceMinor(Plan $plan, string $cycle): int
     {
         $usdMinor = $this->normalizeCycle($cycle) === 'yearly'
-            ? (int) round(max(0, (int) $plan->price_cents) * 12 * 0.8)
+            ? (int) round(max(0, (int) $plan->price_cents) * 12 * SiteSetting::yearlyDiscountMultiplier())
             : max(0, (int) $plan->price_cents);
 
         return $this->convertUsdMinorToCurrency($usdMinor, self::CURRENCY_EGP);

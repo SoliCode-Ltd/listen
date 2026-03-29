@@ -34,6 +34,25 @@ class SiteSetting extends Model
     }
 
     /**
+     * Return the yearly billing discount multiplier (e.g. 0.8 for 20 % off).
+     */
+    public static function yearlyDiscountMultiplier(): float
+    {
+        $percent = (int) static::get('billing_yearly_discount_percentage', '20');
+        $percent = max(0, min(99, $percent));
+
+        return 1 - ($percent / 100);
+    }
+
+    /**
+     * Return the yearly billing discount percentage (e.g. 20).
+     */
+    public static function yearlyDiscountPercent(): int
+    {
+        return max(0, min(99, (int) static::get('billing_yearly_discount_percentage', '20')));
+    }
+
+    /**
      * Get all settings in a group.
      */
     public static function getGroup(string $group): array

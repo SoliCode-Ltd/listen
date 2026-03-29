@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Services\StripeProductSyncService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -104,13 +105,48 @@ class PlanResource extends Resource
                                     $component->state('0.00');
                                 }
                             })
-                            ->helperText('Yearly price is auto-calculated at 20% discount'),
+                            ->helperText(fn () => 'Yearly price is auto-calculated at ' . SiteSetting::yearlyDiscountPercent() . '% discount (configurable in Billing Settings)'),
                         Forms\Components\Placeholder::make('yearly_preview')
                             ->label('Yearly Price Preview')
                             ->content(function (?Plan $record) {
                                 if (!$record || $record->price_cents <= 0) return 'Free';
-                                $yearlyDollars = round(($record->price_cents / 100) * 12 * 0.8, 2);
-                                return '$' . number_format($yearlyDollars, 2) . '/year ($' . number_format($yearlyDollars / 12, 2) . '/mo)';
+                                $multiplier = SiteSetting::yearlyDiscountMultiplier();
+                                $percent = SiteSetting::yearlyDiscountPercent();
+                                $yearlyDollars = round(($record->price_cents / 100) * 12 * $multiplier, 2);
+                                return '$' . number_format($yearlyDollars, 2) . '/year ($' . number_format($yearlyDollars / 12, 2) . '/mo) — ' . $percent . '% off';
+                            }),
+                    ]),
+                Forms\Components\Section::make('Discount / Promotion')
+                    ->description('Set a time-limited discount. The discounted price shows on the pricing page with a countdown timer. After expiry, prices revert automatically.')
+                    ->columns(2)
+                    ->schema([
+                        Forms\Components\TextInput::make('discount_percentage')
+                            ->label('Discount (%)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(99)
+                            ->suffix('%')
+                            ->nullable()
+                            ->reactive()
+                            ->helperText('Leave empty to disable discount'),
+                        Forms\Components\DateTimePicker::make('discount_ends_at')
+                            ->label('Discount Ends At')
+                            ->nullable()
+                            ->native(false)
+                            ->displayFormat('M d, Y H:i')
+                            ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
+                            ->helperText('Leave empty for an indefinite discount'),
+                        Forms\Components\Placeholder::make('discount_preview')
+                            ->label('Discounted Price Preview')
+                            ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
+                            ->content(function (Get $get, ?Plan $record) {
+                                $priceDollars = (float) ($get('price_dollars') ?? ($record ? $record->price_cents / 100 : 0));
+                                $discount = (int) ($get('discount_percentage') ?? 0);
+                                if ($priceDollars <= 0 || $discount <= 0) return 'N/A';
+                                $discounted = round($priceDollars * (1 - $discount / 100), 2);
+                                $endsAt = $get('discount_ends_at');
+                                $endLabel = $endsAt ? ' (until ' . \Carbon\Carbon::parse($endsAt)->format('M j, Y g:i A') . ')' : ' (indefinite)';
+                                return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo' . $endLabel;
                             }),
                     ]),
                 Forms\Components\Section::make('Voice & Quality')
@@ -447,6 +483,14 @@ class PlanResource extends Resource
                     ->label('Commercial')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('discount_percentage')
+                    ->label('Discount')
+                    ->formatStateUsing(fn (?int $state, Plan $record) => $record->hasActiveDiscount()
+                        ? $state . '%'
+                        : ($state ? $state . '% (expired)' : '—'))
+                    ->color(fn (Plan $record) => $record->hasActiveDiscount() ? 'success' : 'gray')
+                    ->badge()
+                    ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('stripe_synced')
                     ->label('Stripe')
                     ->state(fn (Plan $record): bool => $record->hasStripeConfig())

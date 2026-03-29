@@ -99,6 +99,7 @@ class HomeController extends Controller
             'pricingPlans' => $this->pricingPlans(),
             'activePlanSlug' => $activePlanSlug,
             'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
+            'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
         ]);
     }
 
@@ -655,7 +656,8 @@ class HomeController extends Controller
 
         $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext): array {
             $monthlyCents = max(0, (int) $plan->price_cents);
-            $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
+            $yearlyMultiplier = SiteSetting::yearlyDiscountMultiplier();
+            $yearlyCents = (int) round($monthlyCents * 12 * $yearlyMultiplier);
             $monthly = round($monthlyCents / 100, 2);
             $yearly = round($yearlyCents / 100, 2);
             $tier = VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD));
@@ -698,6 +700,37 @@ class HomeController extends Controller
             $customFeatures = $plan->getLocalizedFeatures($locale);
             $features = $customFeatures ?? self::resolveStructuredFeatures($plan, $tier, $locale);
 
+            // Discount data
+            $hasDiscount = $plan->hasActiveDiscount();
+            $discountPercentage = $hasDiscount ? (int) $plan->discount_percentage : 0;
+            $discountEndsAt = $hasDiscount && $plan->discount_ends_at ? $plan->discount_ends_at->toIso8601String() : null;
+            $originalMonthlyCents = $monthlyCents;
+            $originalYearlyCents = $yearlyCents;
+
+            if ($hasDiscount) {
+                $monthlyCents = $plan->getDiscountedPriceCents();
+                $yearlyCents = (int) round($monthlyCents * 12 * $yearlyMultiplier);
+                $monthly = round($monthlyCents / 100, 2);
+                $yearly = round($yearlyCents / 100, 2);
+
+                // Recalculate all localized quotes with discounted price using USD conversion
+                // (manualQuoteForPlan reads plan->price_cents directly, so we use convertedQuoteFromUsd instead)
+                $stripeMonthlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+                    $monthlyCents, 'monthly', $countryContext, 'stripe', $locale
+                );
+                $stripeYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+                    $yearlyCents, 'yearly', $countryContext, 'stripe', $locale
+                );
+                $displayMonthlyQuote = $stripeMonthlyQuote;
+                $displayYearlyQuote = $stripeYearlyQuote;
+                $savingsMinor = max(0, ($displayMonthlyQuote['equivalent_monthly_minor'] * 12) - $displayYearlyQuote['amount_minor']);
+            }
+
+            // Original price quotes for strikethrough display
+            $originalMonthlyQuote = $hasDiscount
+                ? $this->localizedPricingService->convertedQuoteFromUsd($originalMonthlyCents, 'monthly', $countryContext, 'stripe', $locale)
+                : null;
+
             return [
                 'slug' => $plan->slug,
                 'name' => $localizedName,
@@ -708,6 +741,11 @@ class HomeController extends Controller
                 'price_monthly_cents' => $monthlyCents,
                 'price_yearly' => $yearly,
                 'price_yearly_cents' => $yearlyCents,
+                'has_discount' => $hasDiscount,
+                'discount_percentage' => $discountPercentage,
+                'discount_ends_at' => $discountEndsAt,
+                'original_price_monthly_cents' => $originalMonthlyCents,
+                'original_price_monthly_formatted' => $originalMonthlyQuote ? (string) $originalMonthlyQuote['amount_formatted'] : null,
                 'display_payment_method' => $manualMethod ?? 'stripe',
                 'display_currency' => (string) $displayMonthlyQuote['currency'],
                 'display_price_monthly_minor' => (int) $displayMonthlyQuote['amount_minor'],

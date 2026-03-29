@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Services\PlanAccessService;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
@@ -39,7 +40,7 @@ class UpgradeController extends Controller
                     'name' => $plan->getLocalizedName($locale),
                     'description' => $plan->getLocalizedDescription($locale),
                     'price_monthly' => $monthly,
-                    'price_yearly' => round($monthly * 0.8, 2),
+                    'price_yearly' => round($monthly * SiteSetting::yearlyDiscountMultiplier(), 2),
                     'monthly_chars' => (int) $plan->monthly_chars,
                     'monthly_requests' => (int) $plan->monthly_requests,
                     'requests_unlimited' => (int) $plan->monthly_requests <= 0,

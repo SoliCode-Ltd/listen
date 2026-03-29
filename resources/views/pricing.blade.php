@@ -117,22 +117,6 @@
     html[dir="rtl"] .billing-toggle.yearly .billing-indicator {
       transform: translateX(-100%);
     }
-    .billing-savings {
-      font-size: .90rem;
-      font-weight: 600;
-      color: color-mix(in oklab, var(--ok) 88%, var(--text));
-      background: color-mix(in oklab, var(--ok) 14%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--ok) 45%, var(--line));
-      padding: .24rem .62rem;
-      border-radius: var(--radius-full);
-      opacity: .85;
-      transform: translateY(-2px);
-      transition: opacity .18s ease, transform .18s ease;
-    }
-    .billing-savings.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
 
     .plans-grid {
       --plans-max-width: 1100px;
@@ -176,9 +160,11 @@
     }
     .popular-badge {
       position: absolute;
-      top: -.65rem;
-      left: 50%;
-      transform: translateX(-50%);
+      top: -.8rem;
+      left: 0;
+      right: 0;
+      margin-inline: auto;
+      width: fit-content;
       background: linear-gradient(135deg, var(--a), var(--b));
       color: white;
       font-size: .7rem;
@@ -188,6 +174,8 @@
       text-transform: uppercase;
       letter-spacing: .06em;
       white-space: nowrap;
+      z-index: 4;
+      box-shadow: 0 2px 8px color-mix(in oklab, var(--a) 30%, transparent);
     }
 
     .plan-header {
@@ -240,13 +228,14 @@
       margin-inline-start: .1rem;
     }
     .price-note {
-      font-size: .8rem;
+        font-weight: bold;
+      font-size: .85rem;
       color: var(--muted);
       margin-top: .35rem;
       min-height: 1.2em;
     }
     .price-note.savings {
-      color: var(--ok);
+      color: #F43F5E;
     }
 
     .plan-quota {
@@ -519,6 +508,138 @@
       margin-top: .75rem;
     }
 
+    /* ── Discount styles ────────────────────────────── */
+    .plan-card.has-discount {
+      border-color: color-mix(in oklab, var(--a) 60%, var(--line));
+      box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 18%, transparent);
+      position: relative;
+    }
+
+    .discount-ribbon {
+      position: absolute;
+      top: 0; right: 0;
+      z-index: 3;
+      overflow: hidden;
+      width: 8.5rem; height: 8.5rem;
+      pointer-events: none;
+    }
+    .discount-ribbon-inner {
+      position: absolute;
+      top: 2.25rem;
+      left: -0.75rem;
+      width: 13rem;
+      background: #F43F5E;
+      color: white;
+      font-size: .9rem;
+      font-weight: 800;
+      letter-spacing: .02em;
+      text-align: center;
+      padding: .4rem 0;
+      box-shadow: 0 4px 12px color-mix(in oklab, #F43F5E 35%, transparent);
+      border-bottom: 2px solid rgba(255, 255, 255, 0.2);
+      white-space: nowrap;
+      text-transform: uppercase;
+      line-height: 1.3;
+      transform: rotate(45deg);
+    }
+    html[dir="rtl"] .discount-ribbon {
+      right: auto; left: 0;
+    }
+    html[dir="rtl"] .discount-ribbon-inner {
+      left: -3.75rem;
+      transform: rotate(-45deg);
+    }
+    .plan-card.has-discount.popular .discount-ribbon {
+      /* When popular badge is top-center, ribbon stays right/left */
+    }
+
+    .price-original-row {
+      margin-bottom: .2rem;
+    }
+    .price-original {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: line-through;
+      text-decoration-color: color-mix(in oklab, var(--a) 70%, transparent);
+      text-decoration-thickness: 2px;
+      opacity: .65;
+    }
+
+    .discount-countdown {
+      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 6%, var(--surface)), color-mix(in oklab, var(--a) 2%, var(--surface)));
+      border: 1px solid color-mix(in oklab, var(--a) 20%, var(--line));
+      border-radius: var(--radius-lg);
+      padding: .85rem .75rem;
+      margin-bottom: 1.25rem;
+      box-shadow: inset 0 2px 4px rgba(255,255,255,0.05), 0 4px 12px color-mix(in oklab, var(--a) 8%, transparent);
+    }
+    .countdown-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: .4rem;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: .75rem;
+    }
+    .countdown-label svg {
+      flex-shrink: 0;
+      stroke: var(--a);
+      width: 1.15rem;
+      height: 1.15rem;
+    }
+    .countdown-digits {
+      display: flex;
+      justify-content: center;
+      gap: .6rem;
+    }
+    .countdown-sep {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: var(--a);
+      opacity: .5;
+      align-self: flex-start;
+      padding-top: .4rem;
+    }
+    .countdown-unit {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 3rem;
+    }
+    .countdown-num {
+      font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+      font-size: 1.2rem;
+      font-weight: 800;
+      line-height: 1.1;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid color-mix(in oklab, var(--a) 25%, var(--line));
+      box-shadow: 0 2px 8px color-mix(in oklab, var(--a) 6%, transparent);
+      border-radius: .45rem;
+      padding: .35rem .5rem;
+      min-width: 2.8rem;
+      text-align: center;
+      transition: background-color .3s ease, color .3s ease;
+    }
+    .countdown-num.tick {
+      animation: digit-tick .3s ease-out;
+    }
+    @keyframes digit-tick {
+      0%   { opacity: 0.8; }
+      100% { opacity: 1; }
+    }
+    .countdown-lbl {
+      font-size: .75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      margin-top: .4rem;
+    }
+
     @keyframes float {
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-14px); }
@@ -544,6 +665,36 @@
       }
       .topups-grid {
         grid-template-columns: 1fr;
+      }
+      .discount-countdown {
+        padding: .65rem .6rem;
+      }
+      .countdown-num {
+        font-size: 1.25rem;
+        min-width: 2.4rem;
+        padding: .3rem .4rem;
+      }
+      .countdown-digits {
+        gap: .4rem;
+      }
+      .countdown-sep {
+        font-size: 1.1rem;
+        padding-top: .3rem;
+      }
+      .discount-ribbon {
+        width: 7.5rem; height: 7.5rem;
+      }
+      .discount-ribbon-inner {
+        font-size: .75rem;
+        top: 2.1rem;
+        left: -0.75rem;
+        width: 11rem;
+        padding: .35rem 0;
+        transform: rotate(45deg);
+      }
+      html[dir="rtl"] .discount-ribbon-inner {
+        left: -2.75rem;
+        transform: rotate(-45deg);
       }
     }
   </style>
@@ -574,7 +725,6 @@
           <button id="monthlyBtn" class="active">{{ __('ui.pricing.monthly') }}</button>
           <button id="yearlyBtn">{{ __('ui.pricing.yearly') }}</button>
         </div>
-        <span class="billing-savings" id="billingSavings">{{ __('ui.pricing.annual_saves') }}</span>
       </div>
     </section>
 
@@ -694,11 +844,12 @@
       var monthlyBtn = document.getElementById('monthlyBtn');
       var yearlyBtn = document.getElementById('yearlyBtn');
       var billingToggle = document.getElementById('billingToggle');
-      var billingSavings = document.getElementById('billingSavings');
       var planCards = document.querySelectorAll('.plan-card');
       var upgradeLinks = document.querySelectorAll('[data-upgrade-link="1"]');
       var isYearly = false;
       var i18n = @json($pricingI18n);
+      var discountI18n = @json(['badge' => __('ui.pricing.discount_badge')]);
+      var yearlyDiscountPercent = {{ $yearlyDiscountPercent ?? 20 }};
 
       function updatePrices() {
         planCards.forEach(function(card) {
@@ -739,14 +890,25 @@
         });
       }
 
+      function updateDiscountBadges() {
+        planCards.forEach(function(card) {
+          var ribbonText = card.querySelector('.discount-ribbon-text');
+          if (!ribbonText) return;
+          var basePercent = parseInt(card.getAttribute('data-discount-percent') || '0', 10);
+          if (basePercent <= 0) return;
+          var effectivePercent = isYearly ? Math.min(99, basePercent + yearlyDiscountPercent) : basePercent;
+          ribbonText.textContent = discountI18n.badge.replace(':percent', effectivePercent);
+        });
+      }
+
       function setBillingMode(yearly) {
         isYearly = yearly;
         monthlyBtn.classList.toggle('active', !yearly);
         yearlyBtn.classList.toggle('active', yearly);
-        billingSavings.classList.toggle('show', yearly);
         billingToggle.classList.toggle('yearly', yearly);
         updatePrices();
         updateUpgradeLinks();
+        updateDiscountBadges();
       }
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
@@ -768,6 +930,61 @@
       }, { threshold: 0.1 });
 
       revealElements.forEach(function(el) { revealObserver.observe(el); });
+    })();
+  </script>
+  <script>
+    /* ── Discount countdown timers ──────────────────── */
+    (function() {
+      var countdowns = document.querySelectorAll('.discount-countdown');
+      if (!countdowns.length) return;
+
+      function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+      function updateCountdown(el) {
+        var ends = el.getAttribute('data-ends');
+        if (!ends) return false;
+        var endTime = new Date(ends).getTime();
+        var now = Date.now();
+        var diff = Math.max(0, endTime - now);
+
+        if (diff <= 0) {
+          el.style.display = 'none';
+          return false;
+        }
+
+        var d = Math.floor(diff / 86400000);
+        var h = Math.floor((diff % 86400000) / 3600000);
+        var m = Math.floor((diff % 3600000) / 60000);
+        var s = Math.floor((diff % 60000) / 1000);
+
+        var units = el.querySelectorAll('.countdown-num');
+        units.forEach(function(unit) {
+          var key = unit.getAttribute('data-unit');
+          var val = key === 'd' ? pad(d) : key === 'h' ? pad(h) : key === 'm' ? pad(m) : pad(s);
+          if (unit.textContent !== val) {
+            unit.textContent = val;
+            unit.classList.remove('tick');
+            void unit.offsetWidth;
+            unit.classList.add('tick');
+            unit.addEventListener('animationend', function handler() {
+              unit.classList.remove('tick');
+              unit.removeEventListener('animationend', handler);
+            });
+          }
+        });
+
+        return true;
+      }
+
+      function tickAll() {
+        var anyActive = false;
+        countdowns.forEach(function(el) {
+          if (updateCountdown(el)) anyActive = true;
+        });
+        if (anyActive) requestAnimationFrame(function() { setTimeout(tickAll, 1000); });
+      }
+
+      tickAll();
     })();
   </script>
 </body>

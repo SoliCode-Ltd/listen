@@ -4,7 +4,7 @@
   $monthlyCents = max(0, (int) ($plan['price_monthly_cents'] ?? 0));
   $yearlyCents = max(0, (int) ($plan['price_yearly_cents'] ?? 0));
   if ($yearlyCents <= 0 && $monthlyCents > 0) {
-    $yearlyCents = (int) round($monthlyCents * 12 * 0.8);
+    $yearlyCents = (int) round($monthlyCents * 12 * \App\Models\SiteSetting::yearlyDiscountMultiplier());
   }
   $displayMonthlyFormatted = (string) ($plan['display_price_monthly_formatted'] ?? '$0.00');
   $displayYearlyMonthlyFormatted = (string) ($plan['display_price_yearly_monthly_formatted'] ?? $displayMonthlyFormatted);
@@ -12,8 +12,12 @@
   $displaySavingsFormatted = (string) ($plan['display_savings_formatted'] ?? '');
   $isFree = $monthlyCents <= 0;
   $savingsCents = $monthlyCents > 0 ? max(0, ($monthlyCents * 12) - $yearlyCents) : 0;
+  $hasDiscount = !empty($plan['has_discount']);
+  $discountPercent = (int) ($plan['discount_percentage'] ?? 0);
+  $discountEndsAt = $plan['discount_ends_at'] ?? null;
+  $originalFormatted = $plan['original_price_monthly_formatted'] ?? null;
 @endphp
-<div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} reveal"
+<div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} reveal"
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-monthly-cents="{{ $monthlyCents }}"
@@ -23,10 +27,22 @@
      data-display-yearly-monthly="{{ e($displayYearlyMonthlyFormatted) }}"
      data-display-yearly-total="{{ e($displayYearlyTotalFormatted) }}"
      data-display-savings="{{ e($displaySavingsFormatted) }}"
-     data-display-manual="{{ !empty($plan['display_is_manual']) ? '1' : '0' }}">
+     data-display-manual="{{ !empty($plan['display_is_manual']) ? '1' : '0' }}"
+     @if($hasDiscount)
+     data-discount-percent="{{ $discountPercent }}"
+     data-discount-ends="{{ $discountEndsAt }}"
+     data-original-monthly="{{ e($originalFormatted) }}"
+     @endif>
 
   @if($plan['is_popular'] && !$isCurrent)
     <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
+  @endif
+
+  {{-- Discount ribbon --}}
+  @if($hasDiscount && !$isFree)
+    <div class="discount-ribbon">
+      <span class="discount-ribbon-inner discount-ribbon-text">{{ __('ui.pricing.discount_badge', ['percent' => $discountPercent]) }}</span>
+    </div>
   @endif
 
   <div class="plan-header">
@@ -35,6 +51,11 @@
   </div>
 
   <div class="plan-pricing">
+    @if($hasDiscount && !$isFree && $originalFormatted)
+      <div class="price-original-row">
+        <span class="price-original" dir="ltr">{{ $originalFormatted }}</span>
+      </div>
+    @endif
     <div class="price-row">
       <span class="price-main" dir="ltr">
         <span class="price-amount price-value">{{ $displayMonthlyFormatted }}</span>
@@ -43,6 +64,37 @@
     </div>
     <div class="price-note price-note-text"></div>
   </div>
+
+  {{-- Countdown timer for discounted plans --}}
+  @if($hasDiscount && !$isFree && $discountEndsAt)
+    <div class="discount-countdown" data-ends="{{ $discountEndsAt }}">
+      <div class="countdown-label">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+        <span>{{ __('ui.pricing.discount_offer_ends') }}</span>
+      </div>
+      <div class="countdown-digits">
+        <div class="countdown-unit">
+          <span class="countdown-num" data-unit="d">00</span>
+          <span class="countdown-lbl">{{ __('ui.pricing.discount_days') }}</span>
+        </div>
+        <span class="countdown-sep">:</span>
+        <div class="countdown-unit">
+          <span class="countdown-num" data-unit="h">00</span>
+          <span class="countdown-lbl">{{ __('ui.pricing.discount_hours') }}</span>
+        </div>
+        <span class="countdown-sep">:</span>
+        <div class="countdown-unit">
+          <span class="countdown-num" data-unit="m">00</span>
+          <span class="countdown-lbl">{{ __('ui.pricing.discount_minutes') }}</span>
+        </div>
+        <span class="countdown-sep">:</span>
+        <div class="countdown-unit">
+          <span class="countdown-num" data-unit="s">00</span>
+          <span class="countdown-lbl">{{ __('ui.pricing.discount_seconds') }}</span>
+        </div>
+      </div>
+    </div>
+  @endif
 
   <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</div>
 

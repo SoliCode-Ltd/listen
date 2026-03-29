@@ -18,6 +18,8 @@ class Plan extends Model
         'description_en',
         'description_ar',
         'price_cents',
+        'discount_percentage',
+        'discount_ends_at',
         'monthly_minutes',
         'monthly_chars',
         'premium_voice_minutes',
@@ -41,6 +43,7 @@ class Plan extends Model
         'stripe_product_id',
         'stripe_price_monthly',
         'stripe_price_yearly',
+        'stripe_coupon_id',
         // Hybrid TTS fields
         'tts_provider_policy',
         'dialogue_enabled',
@@ -61,6 +64,8 @@ class Plan extends Model
         'dialogue_enabled' => 'boolean',
         'custom_prompt_enabled' => 'boolean',
         'queue_priority_weight' => 'integer',
+        'discount_percentage' => 'integer',
+        'discount_ends_at' => 'datetime',
     ];
 
     public function subscriptions(): HasMany
@@ -168,5 +173,41 @@ class Plan extends Model
 
         $field = "button_text_{$locale}";
         return !empty($this->$field) ? $this->$field : null;
+    }
+
+    /**
+     * Check if this plan has an active (non-expired) discount.
+     */
+    public function hasActiveDiscount(): bool
+    {
+        if (empty($this->discount_percentage) || $this->discount_percentage <= 0) {
+            return false;
+        }
+
+        if ($this->discount_ends_at === null) {
+            return true; // No end date means indefinite discount
+        }
+
+        return $this->discount_ends_at->isFuture();
+    }
+
+    /**
+     * Get the discounted price in cents (monthly).
+     */
+    public function getDiscountedPriceCents(): int
+    {
+        if (! $this->hasActiveDiscount()) {
+            return (int) $this->price_cents;
+        }
+
+        return (int) round($this->price_cents * (1 - $this->discount_percentage / 100));
+    }
+
+    /**
+     * Get the effective monthly price in cents (respects active discounts).
+     */
+    public function getEffectivePriceCents(): int
+    {
+        return $this->hasActiveDiscount() ? $this->getDiscountedPriceCents() : (int) $this->price_cents;
     }
 }

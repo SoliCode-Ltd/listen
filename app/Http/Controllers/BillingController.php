@@ -80,7 +80,11 @@ class BillingController extends Controller
         $stripeReady = trim($stripeKey) !== '' && trim($stripeSecret) !== '';
 
         $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
-        $invoices = $this->loadInvoices($user, $stripeReady);
+
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+        $locale = (string) app()->getLocale();
+
+        $invoices = $this->loadInvoices($user, $stripeReady, $countryContext, $locale);
 
         $periodEnd = null;
         if ($subscription && $stripeReady && $user->hasStripeId()) {
@@ -103,6 +107,9 @@ class BillingController extends Controller
 
         return view('manage-subscription', [
             'activePlan' => $activePlan,
+            'activePlanName' => $activePlan
+                ? ($activePlan->getLocalizedName($locale) ?: $activePlan->name)
+                : __('ui.dashboard.free_plan'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
@@ -115,7 +122,7 @@ class BillingController extends Controller
             'subscriptionStatus' => $this->subscriptionStatusLabel($subscription, $hasStripeCustomer),
             'subscriptionEndsAt' => $this->formatDateLabel(($subscription?->onGracePeriod() ?? false) ? $subscription?->ends_at?->toDateString() : null),
             'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
-            'upcomingCharge' => $this->resolveUpcomingCharge($subscription),
+            'upcomingCharge' => $this->resolveUpcomingCharge($subscription, $countryContext, $locale),
         ]);
     }
 
@@ -162,6 +169,12 @@ class BillingController extends Controller
         $paymentMethod = trim((string) ($validated['payment_method'] ?? ''));
         $saveCard = $validated['save_card'] ?? true;
 
+        // Resolve active discount coupon for this plan
+        $couponId = null;
+        if ($planRecord->hasActiveDiscount() && ! empty($planRecord->stripe_coupon_id)) {
+            $couponId = $planRecord->stripe_coupon_id;
+        }
+
         try {
             $this->ensureStripeCustomer($user);
 
@@ -179,13 +192,26 @@ class BillingController extends Controller
                 if (! $subscription->hasPrice($priceId)) {
                     try {
                         $subscription->swap($priceId);
+                        // Apply coupon to existing subscription swap
+                        if ($couponId && $subscription->stripe_id) {
+                            try {
+                                Cashier::stripe()->subscriptions->update($subscription->stripe_id, [
+                                    'coupon' => $couponId,
+                                ]);
+                            } catch (\Throwable $e) {
+                                Log::warning('Could not apply discount coupon to swapped subscription', [
+                                    'coupon' => $couponId,
+                                    'error' => $e->getMessage(),
+                                ]);
+                            }
+                        }
                         if ($paymentMethod !== '') {
                             $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                         }
                     } catch (SubscriptionUpdateFailure $exception) {
                         // Incomplete / stale local records must be retired before recreating.
                         $this->retireStaleSubscription($subscription);
-                        $this->createNewSubscription($user, $priceId, $paymentMethod);
+                        $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
                     }
                 } elseif ($paymentMethod !== '') {
                     $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
@@ -195,7 +221,7 @@ class BillingController extends Controller
                     $this->retireStaleSubscription($subscription);
                 }
 
-                $this->createNewSubscription($user, $priceId, $paymentMethod);
+                $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
             }
         } catch (IncompletePayment $exception) {
             return response()->json([
@@ -397,7 +423,7 @@ class BillingController extends Controller
         return $this->safeDownloadInvoice($request, $invoiceId);
     }
 
-    private function createNewSubscription(User $user, string $priceId, string $paymentMethod): void
+    private function createNewSubscription(User $user, string $priceId, string $paymentMethod, ?string $couponId = null): void
     {
         $paymentMethod = trim($paymentMethod);
         $this->ensureStripeCustomer($user);
@@ -413,7 +439,13 @@ class BillingController extends Controller
             ]);
         }
 
-        $user->newSubscription('default', $priceId)->create($paymentMethod);
+        $builder = $user->newSubscription('default', $priceId);
+
+        if ($couponId) {
+            $builder->withCoupon($couponId);
+        }
+
+        $builder->create($paymentMethod);
     }
 
     private function setSubscriptionPaymentMethod(User $user, BillingSubscription $subscription, string $paymentMethod): void
@@ -530,7 +562,7 @@ class BillingController extends Controller
                 $yearlyPriceId = $this->resolveStripePriceId($slug, 'yearly');
 
                 $monthlyFallback = max(0, (int) $plan->price_cents);
-                $yearlyFallback = max(0, (int) round($monthlyFallback * 12 * 0.8));
+                $yearlyFallback = max(0, (int) round($monthlyFallback * 12 * SiteSetting::yearlyDiscountMultiplier()));
 
                 $monthly = $this->resolvePriceMeta($monthlyPriceId, $stripeReady, $monthlyFallback, 'monthly', $countryContext, $locale);
                 $yearly = $this->resolvePriceMeta($yearlyPriceId, $stripeReady, $yearlyFallback, 'yearly', $countryContext, $locale);
@@ -569,7 +601,7 @@ class BillingController extends Controller
                     $preferredMethod = 'stripe';
                 }
 
-                return [
+                $checkoutPlan = [
                     'slug' => $slug,
                     'name' => (string) $plan->name,
                     'voice_tier' => VoiceTier::label((string) $plan->voice_tier),
@@ -578,6 +610,15 @@ class BillingController extends Controller
                     'payment_methods' => $paymentMethods,
                     'preferred_payment_method' => $preferredMethod,
                 ];
+
+                // Include discount info so the billing page can display it
+                if ($plan->hasActiveDiscount()) {
+                    $checkoutPlan['has_discount'] = true;
+                    $checkoutPlan['discount_percentage'] = (int) $plan->discount_percentage;
+                    $checkoutPlan['discount_ends_at'] = $plan->discount_ends_at?->toIso8601String();
+                }
+
+                return $checkoutPlan;
             })
             ->values()
             ->all();
@@ -680,14 +721,14 @@ class BillingController extends Controller
     /**
      * @return array<int, array<string, string>>
      */
-    private function loadInvoices(User $user, bool $stripeReady): array
+    private function loadInvoices(User $user, bool $stripeReady, array $countryContext = [], string $locale = 'en'): array
     {
         if (! $stripeReady || ! $user->hasStripeId()) {
             return [];
         }
 
         try {
-            return collect($user->invoices())->map(function ($invoice) {
+            return collect($user->invoices())->map(function ($invoice) use ($countryContext, $locale) {
                 $stripeInvoice = $invoice->asStripeInvoice();
                 $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
                 $totalCents = (int) ($stripeInvoice->total ?? 0);
@@ -697,8 +738,8 @@ class BillingController extends Controller
                     'id' => (string) $invoice->id,
                     'date' => $invoiceDate ? $this->formatCarbonDate($invoiceDate) : '-',
                     'status' => strtoupper((string) ($stripeInvoice->status ?? 'paid')),
-                    'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
-                    'purpose' => $this->resolveInvoicePurposeLabel($stripeInvoice),
+                    'total' => $this->formatLocalizedInvoiceAmount($totalCents, $currency, $countryContext, $locale),
+                    'purpose' => $this->resolveInvoicePurposeLabel($stripeInvoice, $locale),
                 ];
             })->values()->all();
         } catch (\Throwable $exception) {
@@ -734,7 +775,7 @@ class BillingController extends Controller
     /**
      * @return array{total:string,currency:string,date:?string}|null
      */
-    private function resolveUpcomingCharge(?BillingSubscription $subscription): ?array
+    private function resolveUpcomingCharge(?BillingSubscription $subscription, array $countryContext = [], string $locale = 'en'): ?array
     {
         if (! $subscription || ! $subscription->valid()) {
             return null;
@@ -752,7 +793,7 @@ class BillingController extends Controller
             $totalCents = (int) ($stripeInvoice->total ?? 0);
 
             return [
-                'total' => $this->formatInvoiceTotalLabel($totalCents, $currency),
+                'total' => $this->formatLocalizedInvoiceAmount($totalCents, $currency, $countryContext, $locale),
                 'currency' => $currency,
                 'date' => $periodEndTs > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($periodEndTs)) : null,
             ];
@@ -861,28 +902,141 @@ class BillingController extends Controller
         return $formatted;
     }
 
-    private function resolveInvoicePurposeLabel(mixed $stripeInvoice): string
+    /**
+     * Format an invoice/charge amount in the user's local currency when possible.
+     *
+     * If the Stripe charge is in USD and the user's local display currency differs
+     * (e.g. EGP for Egypt), convert and format in the local currency so prices match
+     * what was shown on the pricing page. For non-USD charges, fall back to Stripe's amount.
+     */
+    private function formatLocalizedInvoiceAmount(int $amountCents, string $stripeCurrency, array $countryContext, string $locale): string
+    {
+        $stripeCurrency = strtoupper(trim($stripeCurrency) !== '' ? $stripeCurrency : 'USD');
+
+        // When the Stripe charge is in USD and there's a local display currency, convert
+        if ($stripeCurrency === 'USD' && ! empty($countryContext)) {
+            $quote = $this->localizedPricingService->convertedQuoteFromUsd(
+                abs($amountCents),
+                'monthly', // cycle doesn't affect conversion, just formatting metadata
+                $countryContext,
+                'stripe',
+                $locale
+            );
+
+            $formatted = (string) ($quote['amount_formatted'] ?? '');
+            if ($formatted !== '') {
+                if ($amountCents < 0) {
+                    return __('ui.billing.credit_prefix').' '.$formatted;
+                }
+
+                return $formatted;
+            }
+        }
+
+        // Fallback to Stripe's native formatting
+        return $this->formatInvoiceTotalLabel($amountCents, $stripeCurrency);
+    }
+
+    private function resolveInvoicePurposeLabel(mixed $stripeInvoice, string $locale = 'en'): string
     {
         if (! is_object($stripeInvoice)) {
             return __('ui.manage_subscription.subscription');
         }
 
-        $lines = $stripeInvoice->lines->data ?? [];
-        if (is_array($lines)) {
-            foreach ($lines as $line) {
-                $description = trim((string) ($line->description ?? ''));
-                if ($description !== '') {
-                    return $description;
+        try {
+            $lines = $stripeInvoice->lines->data ?? [];
+            if (is_array($lines)) {
+                foreach ($lines as $line) {
+                    // Strategy 1: resolve from Stripe metadata (new invoices)
+                    $planSlug = $this->extractMetaValue($line, 'listen_plan_slug');
+
+                    // Strategy 2: parse plan name from Stripe description (old invoices)
+                    // e.g. "Starter Plan (at $9.00 / month) × 1"
+                    if ($planSlug === '') {
+                        $desc = trim((string) ($line->description ?? ''));
+                        $planSlug = $this->guessSlugFromDescription($desc);
+                    }
+
+                    if ($planSlug !== '') {
+                        $plan = Plan::where('slug', $planSlug)->first();
+                        if ($plan) {
+                            $localizedName = $plan->getLocalizedName($locale);
+                            $interval = $this->extractMetaValue($line, 'listen_interval');
+                            if ($interval === '') {
+                                $interval = (string) ($line->price->recurring->interval ?? 'month');
+                            }
+                            $cycleLabel = $interval === 'year'
+                                ? __('ui.pricing.yearly')
+                                : __('ui.pricing.monthly');
+
+                            return $localizedName . ' — ' . $cycleLabel;
+                        }
+                    }
                 }
             }
-        }
-
-        $description = trim((string) ($stripeInvoice->description ?? ''));
-        if ($description !== '') {
-            return $description;
+        } catch (\Throwable) {
+            // Fall through to default
         }
 
         return __('ui.manage_subscription.subscription');
+    }
+
+    /**
+     * Try to match a Stripe description like "Starter Plan (at $9.00 / month) × 1"
+     * to a known plan slug from the database.
+     */
+    private function guessSlugFromDescription(string $description): string
+    {
+        if ($description === '') {
+            return '';
+        }
+
+        // Cache plans for this request
+        static $planNames = null;
+        if ($planNames === null) {
+            $planNames = Plan::pluck('slug', 'name')->toArray(); // ['Starter Plan' => 'starter', ...]
+        }
+
+        foreach ($planNames as $name => $slug) {
+            if (stripos($description, (string) $name) !== false) {
+                return (string) $slug;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Safely extract a metadata value from a Stripe line item, checking
+     * the line metadata, then the price metadata, then the product metadata.
+     */
+    private function extractMetaValue(mixed $line, string $key): string
+    {
+        // Line-level metadata
+        $val = $line->metadata->{$key} ?? $line->metadata[$key] ?? null;
+        if ($val !== null && trim((string) $val) !== '') {
+            return trim((string) $val);
+        }
+
+        // Price-level metadata
+        try {
+            $val = $line->price->metadata->{$key} ?? $line->price->metadata[$key] ?? null;
+            if ($val !== null && trim((string) $val) !== '') {
+                return trim((string) $val);
+            }
+        } catch (\Throwable) {
+        }
+
+        // Product-level metadata (often not expanded)
+        try {
+            $val = $line->price->product->metadata->{$key} ?? $line->price->product->metadata[$key] ?? null;
+            if ($val !== null && trim((string) $val) !== '') {
+                return trim((string) $val);
+            }
+        } catch (\Throwable) {
+        }
+
+        return '';
     }
 
     private function resolveConsistentActivePlan(?Plan $activePlan, ?BillingSubscription $subscription): ?Plan

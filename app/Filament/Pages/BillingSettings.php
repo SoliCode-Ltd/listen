@@ -33,6 +33,7 @@ class BillingSettings extends Page implements HasForms
             'stripe_key_set' => ! empty(config('cashier.key', config('services.stripe.key'))),
             'stripe_secret_set' => ! empty(config('cashier.secret', config('services.stripe.secret'))),
             'stripe_webhook_secret_set' => ! empty(config('cashier.webhook.secret', config('services.stripe.webhook_secret'))),
+            'yearly_discount_percentage' => (int) SiteSetting::get('billing_yearly_discount_percentage', '20'),
             'require_saved_payment_method' => (string) SiteSetting::get('billing_require_saved_payment_method', config('listen.billing.require_saved_payment_method', '1')) === '1',
             'grace_days' => (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)),
             'webhook_emails_enabled' => (string) SiteSetting::get('billing_webhook_emails', config('listen.billing.webhook_email_enabled', '1')) === '1',
@@ -102,6 +103,23 @@ class BillingSettings extends Page implements HasForms
                 Forms\Components\Section::make('Billing Behavior')
                     ->columns(3)
                     ->schema([
+                        Forms\Components\TextInput::make('yearly_discount_percentage')
+                            ->label('Yearly Billing Discount (%)')
+                            ->numeric()
+                            ->minValue(0)
+                            ->maxValue(99)
+                            ->default(20)
+                            ->suffix('%')
+                            ->helperText('Discount applied when users choose yearly billing (e.g. 20 = 20% off). Affects pricing page, checkout, and Stripe prices.')
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(fn (Forms\Set $set, ?string $state) => $set('yearly_discount_preview', $state)),
+                        Forms\Components\Placeholder::make('yearly_discount_preview')
+                            ->label('Yearly Multiplier Preview')
+                            ->content(function (Forms\Get $get): string {
+                                $percent = max(0, min(99, (int) ($get('yearly_discount_percentage') ?? 20)));
+                                $multiplier = round(1 - ($percent / 100), 2);
+                                return "Monthly price x 12 x {$multiplier} = yearly price ({$percent}% off)";
+                            }),
                         Forms\Components\Toggle::make('require_saved_payment_method')
                             ->label('Require Saved Payment Method')
                             ->helperText('Require users to have a payment method saved before subscribing.'),
@@ -255,6 +273,10 @@ class BillingSettings extends Page implements HasForms
     {
         $data = $this->form->getState();
         $group = 'billing';
+        // Save yearly discount
+        if (array_key_exists('yearly_discount_percentage', $data)) {
+            SiteSetting::set('billing_yearly_discount_percentage', (string) max(0, min(99, (int) $data['yearly_discount_percentage'])), $group);
+        }
         // Save billing behavior settings
         if (array_key_exists('require_saved_payment_method', $data)) {
             SiteSetting::set('billing_require_saved_payment_method', $data['require_saved_payment_method'] ? '1' : '0', $group);

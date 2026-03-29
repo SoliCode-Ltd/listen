@@ -236,6 +236,15 @@ return [
         'topup_available_on' => 'Available on paid plans',
         'premium' => 'Premium',
         'feature_label_custom_prompt' => 'Custom Prompt',
+        'discount_badge' => 'saving :percent%',
+        'discount_offer_ends' => 'Offer ends in',
+        'discount_days' => 'Days',
+        'discount_hours' => 'Hours',
+        'discount_minutes' => 'Minutes',
+        'discount_seconds' => 'Seconds',
+        'discount_was' => 'was',
+        'discount_limited_offer' => 'Limited Time Offer',
+        'discount_expired' => 'Offer ended',
     ],
 
     // ===== CONTACT PAGE =====

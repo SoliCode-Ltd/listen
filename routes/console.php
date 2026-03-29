@@ -11,3 +11,4 @@ Artisan::command('inspire', function () {
 Schedule::command('listen:billing-sync')->everyFifteenMinutes();
 Schedule::command('listen:billing-reminders')->dailyAt('09:00');
 Schedule::command('listen:billing-enforce-grace')->hourly();
+Schedule::command('plans:expire-discounts')->everyFiveMinutes();

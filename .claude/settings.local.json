@@ -29,7 +29,18 @@
       "Bash(while read:*)",
       "Bash(do echo:*)",
       "Bash(done)",
-      "Bash(find 'D:/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Filament/Resources/UserResource' -type f -name *.php)"
+      "Bash(find 'D:/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Filament/Resources/UserResource' -type f -name *.php)",
+      "Bash(php -l app/Models/Plan.php)",
+      "Bash(php -l app/Filament/Resources/PlanResource.php)",
+      "Bash(php -l app/Filament/Resources/PlanResource/Pages/EditPlan.php)",
+      "Bash(php -l app/Filament/Resources/PlanResource/Pages/CreatePlan.php)",
+      "Bash(php -l app/Filament/Resources/PlanResource/Pages/ListPlans.php)",
+      "Bash(php -l app/Http/Controllers/BillingController.php)",
+      "Bash(php -l app/Filament/Pages/BillingSettings.php)",
+      "Bash(php -l app/Models/SiteSetting.php)",
+      "Bash(php -l app/Services/StripeProductSyncService.php)",
+      "Bash(php -l app/Services/LocalizedPricingService.php)",
+      "Bash(php -l app/Http/Controllers/UpgradeController.php)"
     ]
   }
 }

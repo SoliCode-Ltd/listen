@@ -236,6 +236,15 @@ return [
         'topup_available_on' => 'متاح في الخطط المدفوعة',
         'premium' => 'متميزة',
         'feature_label_custom_prompt' => 'التعليمات المخصصة',
+        'discount_badge' => 'وفّر :percent%',
+        'discount_offer_ends' => 'العرض ينتهي خلال',
+        'discount_days' => 'أيام',
+        'discount_hours' => 'ساعات',
+        'discount_minutes' => 'دقائق',
+        'discount_seconds' => 'ثواني',
+        'discount_was' => 'كان',
+        'discount_limited_offer' => 'عرض لفترة محدودة',
+        'discount_expired' => 'انتهى العرض',
     ],
 
     // ===== CONTACT PAGE =====

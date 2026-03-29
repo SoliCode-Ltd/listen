@@ -4,7 +4,9 @@ namespace App\Filament\Resources\PlanResource\Pages;
 
 use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
+use App\Services\StripeProductSyncService;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 
 class EditPlan extends EditRecord
@@ -48,17 +50,42 @@ class EditPlan extends EditRecord
             $data['topup_minute_price_cents'] = null;
         }
 
+        // Clear discount_percentage to null when empty
+        if (empty($data['discount_percentage'])) {
+            $data['discount_percentage'] = null;
+            $data['discount_ends_at'] = null;
+        }
+
         return $data;
     }
 
     protected function afterSave(): void
     {
-        if (! $this->record || ! (bool) $this->record->is_featured) {
-            return;
+        if ($this->record && (bool) $this->record->is_featured) {
+            Plan::query()
+                ->whereKeyNot($this->record->getKey())
+                ->update(['is_featured' => false]);
         }
 
-        Plan::query()
-            ->whereKeyNot($this->record->getKey())
-            ->update(['is_featured' => false]);
+        // Auto-sync to Stripe after save
+        if ($this->record && $this->record->price_cents > 0) {
+            try {
+                $syncService = app(StripeProductSyncService::class);
+                if ($syncService->isConfigured()) {
+                    $syncService->syncPlan($this->record);
+                    Notification::make()
+                        ->title('Stripe Synced')
+                        ->body('Plan automatically synced to Stripe.')
+                        ->success()
+                        ->send();
+                }
+            } catch (\Exception $e) {
+                Notification::make()
+                    ->title('Stripe Sync Failed')
+                    ->body($e->getMessage())
+                    ->warning()
+                    ->send();
+            }
+        }
     }
 }

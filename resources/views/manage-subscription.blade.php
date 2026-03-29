@@ -374,7 +374,7 @@
     <div class="status-grid">
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.current_plan') }}</small>
-        <b>{{ $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan')) }}</b>
+        <b>{{ $activePlanName ?? $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan')) }}</b>
       </div>
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.status') }}</small>

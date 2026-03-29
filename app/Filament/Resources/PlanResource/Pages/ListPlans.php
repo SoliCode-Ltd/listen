@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\PlanResource\Pages;
 
 use App\Filament\Resources\PlanResource;
+use App\Services\StripeProductSyncService;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
 
 class ListPlans extends ListRecords
@@ -13,6 +15,23 @@ class ListPlans extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('syncAllStripe')
+                ->label('Sync All to Stripe')
+                ->icon('heroicon-o-arrow-path')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalHeading('Sync All Plans to Stripe')
+                ->modalDescription('This will create or update Stripe products, prices, and coupons for all active paid plans. Continue?')
+                ->action(function () {
+                    $syncService = app(StripeProductSyncService::class);
+                    $result = $syncService->syncAllPlans();
+
+                    Notification::make()
+                        ->title('Stripe Sync Complete')
+                        ->body("Synced: {$result['synced']}, Failed: {$result['failed']}")
+                        ->when($result['failed'] > 0, fn ($n) => $n->warning(), fn ($n) => $n->success())
+                        ->send();
+                }),
             Actions\CreateAction::make(),
         ];
     }
