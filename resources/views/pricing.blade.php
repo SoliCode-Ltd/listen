@@ -229,7 +229,7 @@
     }
     .price-note {
         font-weight: bold;
-      font-size: .85rem;
+      font-size: .8rem;
       color: var(--muted);
       margin-top: .35rem;
       min-height: 1.2em;

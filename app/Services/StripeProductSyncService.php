@@ -15,7 +15,7 @@ use Stripe\StripeClient;
  *
  * Automatically creates and updates Stripe products and prices
  * when plans are created or modified in the admin panel.
- * 
+ *
  * This eliminates the need for manual Price ID management.
  */
 class StripeProductSyncService
@@ -341,15 +341,15 @@ class StripeProductSyncService
     private function buildProductDescription(Plan $plan): string
     {
         $features = [];
-        
+
         if ($plan->monthly_chars > 0) {
             $features[] = number_format($plan->monthly_chars) . ' characters/month';
         }
-        
+
         if ($plan->voice_tier === 'hd') {
             $features[] = 'HD Voice Quality';
         }
-        
+
         if ($plan->commercial_use_allowed) {
             $features[] = 'Commercial Use Allowed';
         }
