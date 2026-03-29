@@ -462,6 +462,9 @@ class AuthController extends Controller
 
         if ($requestSignature !== null && ! filled($user->registration_request_signature)) {
             $updates['registration_request_signature'] = $requestSignature;
+        } elseif ($requestSignature === null && filled($user->registration_request_signature)) {
+            // Original registration signature was also generated without Client Hints — clear it.
+            $updates['registration_request_signature'] = null;
         }
 
         if ($updates === []) {

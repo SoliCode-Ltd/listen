@@ -161,6 +161,7 @@ class MultiAccountEnforcementService
 
         return (int) User::query()
             ->where('is_admin', false)
+            ->where('multi_account_whitelisted', false)
             ->where(function ($q) use ($ips, $deviceIds, $requestSignatures) {
                 if ($ips !== []) {
                     $q->whereIn('registration_ip', $ips)
