@@ -58,6 +58,7 @@ class BillingController extends Controller
             'currentPlanSlug' => (string) ($activePlan?->slug ?? 'free'),
             'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
             'plans' => $this->resolveCheckoutPlans($stripeReady, $countryContext),
+            'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
             'selectedPlan' => in_array($selectedPlan, $validPlanSlugs, true) ? $selectedPlan : '',
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,

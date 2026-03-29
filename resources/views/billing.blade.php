@@ -806,7 +806,7 @@
               <label for="cycle">{{ __('ui.billing.billing_cycle') }}</label>
               <select id="cycle" {{ $hasUpgradePlans ? '' : 'disabled' }}>
                 <option value="monthly" {{ $selectedBillingCycle === 'monthly' ? 'selected' : '' }}>{{ __('ui.billing.monthly') }}</option>
-                <option value="yearly" {{ $selectedBillingCycle === 'yearly' ? 'selected' : '' }}>{{ __('ui.billing.yearly_save_20') }}</option>
+                <option value="yearly" {{ $selectedBillingCycle === 'yearly' ? 'selected' : '' }}>{{ __('ui.billing.yearly') }}</option>
               </select>
             </div>
           </div>
@@ -1043,6 +1043,9 @@
       'manual_request_received' => __('ui.billing.manual_request_received'),
       'no_upgrade_plans_available' => __('ui.billing.no_upgrade_plans_available'),
       'proof_image_required' => __('ui.billing.proof_image_required'),
+      'monthly_label' => __('ui.billing.monthly'),
+      'yearly_label' => __('ui.billing.yearly'),
+      'cycle_with_discount' => __('ui.billing.cycle_with_discount'),
     ];
   @endphp
   <script>
@@ -1051,6 +1054,7 @@
     const userName = @json((string) auth()->user()->name);
     const userEmail = @json((string) auth()->user()->email);
     const hasDefaultPaymentMethod = @json((bool) $defaultPaymentMethod);
+    const yearlyDiscountPercent = Number(@json((int) ($yearlyDiscountPercent ?? 0)));
     const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
     const initialPaymentMethod = @json($selectedPaymentMethod);
 
@@ -1058,6 +1062,8 @@
     const subscribeBtn = document.getElementById('subscribeBtn');
     const planSelect = document.getElementById('plan');
     const cycleSelect = document.getElementById('cycle');
+    const cycleMonthlyOption = cycleSelect?.querySelector('option[value="monthly"]') || null;
+    const cycleYearlyOption = cycleSelect?.querySelector('option[value="yearly"]') || null;
     const cardError = document.getElementById('card-error');
     const saveCardCheckbox = document.getElementById('saveCard');
     const stripeContainer = document.getElementById('stripeContainer');
@@ -1146,6 +1152,29 @@
 
     function currentPlan() {
       return planCatalog[String(planSelect?.value || '')] || null;
+    }
+
+    function cycleOptionLabel(baseLabel, discountPercent) {
+      const pct = Math.max(0, Math.min(99, Math.round(Number(discountPercent || 0))));
+      if (pct <= 0) return String(baseLabel || '');
+      return String(i18n.cycle_with_discount || ':cycle (:percent%)')
+        .replace(':cycle', String(baseLabel || ''))
+        .replace(':percent', String(pct));
+    }
+
+    function syncCycleOptionLabels() {
+      const plan = currentPlan();
+      const promoPercent = plan && Boolean(plan.has_discount)
+        ? Math.max(0, Math.min(99, Math.round(Number(plan.discount_percentage || 0))))
+        : 0;
+      const yearlyPercent = Math.max(0, Math.min(99, promoPercent + Math.max(0, Math.min(99, yearlyDiscountPercent))));
+
+      if (cycleMonthlyOption) {
+        cycleMonthlyOption.textContent = cycleOptionLabel(i18n.monthly_label, promoPercent);
+      }
+      if (cycleYearlyOption) {
+        cycleYearlyOption.textContent = cycleOptionLabel(i18n.yearly_label, yearlyPercent);
+      }
     }
 
     function preferredMethodForPlan(plan) {
@@ -1295,6 +1324,7 @@
     }
 
     function renderChargePreview() {
+      syncCycleOptionLabels();
       const selected = selectedMeta();
       if (!selected) {
         quoteAmount.textContent = '-';

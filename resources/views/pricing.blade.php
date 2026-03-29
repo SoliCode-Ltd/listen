@@ -514,6 +514,15 @@
       box-shadow: 0 8px 32px color-mix(in oklab, var(--a) 18%, transparent);
       position: relative;
     }
+    html[dir="ltr"] .plan-card.has-discount .plan-header {
+      padding-right: 5.1rem;
+    }
+    html[dir="ltr"] .plan-card.has-discount.popular {
+      padding-top: 1.95rem;
+    }
+    html[dir="ltr"] .plan-card.has-discount.popular .popular-badge {
+      top: -.95rem;
+    }
 
     .discount-ribbon {
       position: absolute;
@@ -541,6 +550,13 @@
       text-transform: uppercase;
       line-height: 1.3;
       transform: rotate(45deg);
+    }
+    html[dir="ltr"] .discount-ribbon-inner {
+      top: 1.95rem;
+      left: .15rem;
+      width: 11.6rem;
+      font-size: .82rem;
+      padding: .34rem 0;
     }
     html[dir="rtl"] .discount-ribbon {
       right: auto; left: 0;
@@ -691,6 +707,18 @@
         width: 11rem;
         padding: .35rem 0;
         transform: rotate(45deg);
+      }
+      html[dir="ltr"] .plan-card.has-discount .plan-header {
+        padding-right: 4.2rem;
+      }
+      html[dir="ltr"] .plan-card.has-discount.popular {
+        padding-top: 1.8rem;
+      }
+      html[dir="ltr"] .discount-ribbon-inner {
+        top: 1.85rem;
+        left: .1rem;
+        width: 10rem;
+        font-size: .72rem;
       }
       html[dir="rtl"] .discount-ribbon-inner {
         left: -2.75rem;
