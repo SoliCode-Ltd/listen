@@ -165,7 +165,7 @@ return [
         'plan_desc_studio_max' => 'أقصى قوة مع وضع الحوار وحفظ غير محدود',
         'per_month_short' => '/شهر',
         'characters_per_month' => 'حرف/شهر',
-        'most_popular' => 'الأكثر طلباً',
+        'most_popular' => 'الأكثر مبيعاً',
         'included_mark' => '✓',
         'current_plan' => 'الخطة الحالية',
         'downgrade' => 'تخفيض',
