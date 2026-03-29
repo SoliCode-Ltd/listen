@@ -165,7 +165,7 @@ return [
         'plan_desc_studio_max' => 'Maximum power with dialogue mode & unlimited retention',
         'per_month_short' => '/mo',
         'characters_per_month' => 'characters/month',
-        'most_popular' => 'Most Popular',
+        'most_popular' => 'Most Requested',
         'included_mark' => 'âœ“',
         'current_plan' => 'Current plan',
         'downgrade' => 'Downgrade',
