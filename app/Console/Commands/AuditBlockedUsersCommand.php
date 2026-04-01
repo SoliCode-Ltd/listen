@@ -12,11 +12,11 @@ use Illuminate\Support\Facades\Schema;
 class AuditBlockedUsersCommand extends Command
 {
     protected $signature = 'listen:audit-blocked
-        {--fix : Unblock users that were falsely blocked by the signature collision bug}
+        {--fix : Unblock false positives and whitelist them}
         {--user= : Audit a single user by ID}
         {--export= : Export unblocked emails to a file (e.g. --export=unblocked.txt)}';
 
-    protected $description = 'Identify blocked users who may have been falsely blocked due to the request-signature collision bug.';
+    protected $description = 'Re-evaluate multi-account blocked users against the current enforcement rules (device-cookie only). Users blocked by IP or signature alone are false positives.';
 
     public function handle(MultiAccountEnforcementService $enforcement, BlockedUserService $blockedService): int
     {
@@ -25,8 +25,11 @@ class AuditBlockedUsersCommand extends Command
         $singleUserId = $this->option('user');
         $exportPath = $this->option('export');
 
+        $hasDeviceColumns = Schema::hasColumn('users', 'registration_device_id')
+            && Schema::hasColumn('users', 'last_seen_device_id');
+
         $this->info("Max linked accounts allowed: {$maxAccounts}");
-        $this->info($fix ? 'MODE: FIX (will unblock falsely blocked users)' : 'MODE: DRY-RUN (preview only)');
+        $this->info($fix ? 'MODE: FIX (will unblock false positives)' : 'MODE: DRY-RUN (preview only)');
         $this->newLine();
 
         $query = User::query()
@@ -50,90 +53,60 @@ class AuditBlockedUsersCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->info("Found {$total} multi-account blocked user(s). Auditing...");
+        $this->info("Found {$total} multi-account blocked user(s). Auditing against device-only rules...");
         $this->newLine();
-
-        $hasSignatureColumns = Schema::hasColumn('users', 'registration_request_signature')
-            && Schema::hasColumn('users', 'last_seen_request_signature');
 
         $falsePositives = 0;
         $legitimateBlocks = 0;
-        $uncertain = 0;
         $unblockedEmails = [];
-
         $rows = [];
 
         $query->chunkById(100, function ($users) use (
-            $enforcement, $blockedService, $maxAccounts, $hasSignatureColumns,
-            $fix, &$falsePositives, &$legitimateBlocks, &$uncertain, &$rows, &$unblockedEmails
+            $blockedService, $maxAccounts, $hasDeviceColumns,
+            $fix, &$falsePositives, &$legitimateBlocks, &$rows, &$unblockedEmails
         ) {
             foreach ($users as $user) {
-                $signals = $enforcement->linkedSignals($user);
-                $fullCount = $enforcement->linkedAccountCount($user);
+                // The ONLY signal that matters for enforcement is the device cookie.
+                $deviceCount = $this->countAccountsSharingDevice($user, $hasDeviceColumns);
 
-                // Recount WITHOUT request_signature (the buggy signal)
-                $countWithoutSig = $this->countWithoutSignature($user, $signals, $hasSignatureColumns);
+                // For context, also show IP-linked count (not used for blocking).
+                $ipCount = $this->countAccountsSharingIp($user);
 
-                // Determine if signature was the deciding factor
-                $wasBlockedBySigAlone = $fullCount > $maxAccounts && $countWithoutSig <= $maxAccounts;
-
-                // Also check: is the user's signature shared with many users?
-                // This indicates the collision bug specifically
-                $sigUserCount = $this->signatureSharedCount($user, $hasSignatureColumns);
-
-                $verdict = 'LEGITIMATE';
-                if ($wasBlockedBySigAlone && $sigUserCount > 10) {
-                    $verdict = 'FALSE POSITIVE (signature collision)';
-                    $falsePositives++;
-                } elseif ($wasBlockedBySigAlone) {
-                    $verdict = 'LIKELY FALSE POSITIVE';
-                    $falsePositives++;
-                } elseif ($countWithoutSig > $maxAccounts) {
+                if ($deviceCount > $maxAccounts) {
                     $verdict = 'LEGITIMATE';
                     $legitimateBlocks++;
                 } else {
-                    $verdict = 'UNCERTAIN';
-                    $uncertain++;
+                    $verdict = 'FALSE POSITIVE';
+                    $falsePositives++;
                 }
 
                 $rows[] = [
                     $user->id,
                     $user->email,
                     $user->name,
-                    $fullCount,
-                    $countWithoutSig,
-                    $sigUserCount,
-                    implode(', ', $signals['ips']) ?: '-',
+                    $deviceCount,
+                    $ipCount,
+                    $user->registration_ip ?: '-',
                     $verdict,
                 ];
 
-                if ($fix && str_contains($verdict, 'FALSE POSITIVE')) {
+                if ($fix && $verdict === 'FALSE POSITIVE') {
                     $blockedService->unblock($user);
-                    $this->line("  -> UNBLOCKED user #{$user->id} ({$user->email})");
-
                     $unblockedEmails[] = $user->email;
-
-                    // Clear the bad signatures so they don't cause issues again
-                    if ($hasSignatureColumns) {
-                        $user->forceFill([
-                            'registration_request_signature' => null,
-                            'last_seen_request_signature' => null,
-                        ])->saveQuietly();
-                    }
+                    $this->line("  -> UNBLOCKED #{$user->id} ({$user->email})");
                 }
             }
         });
 
         $this->table(
-            ['ID', 'Email', 'Name', 'Full Count', 'Count (no sig)', 'Sig Shared By', 'IPs', 'Verdict'],
+            ['ID', 'Email', 'Name', 'Device-Linked', 'IP-Linked (info)', 'Registration IP', 'Verdict'],
             $rows
         );
 
         $this->newLine();
-        $this->info("Results:");
+        $this->info('Results:');
         $this->line("  False positives:   {$falsePositives}");
         $this->line("  Legitimate blocks: {$legitimateBlocks}");
-        $this->line("  Uncertain:         {$uncertain}");
 
         if ($falsePositives > 0 && ! $fix) {
             $this->newLine();
@@ -144,16 +117,16 @@ class AuditBlockedUsersCommand extends Command
             Cache::forget('admin:suspicious_users_count');
 
             $this->newLine();
-            $this->info("Unblocked {$falsePositives} user(s). Their request signatures were cleared.");
+            $this->info("Unblocked {$falsePositives} user(s). They have been whitelisted.");
 
             $this->newLine();
-            $this->info('=== UNBLOCKED EMAILS (copy for outreach) ===');
+            $this->info('=== UNBLOCKED EMAILS ===');
             foreach ($unblockedEmails as $email) {
                 $this->line($email);
             }
 
             if ($exportPath) {
-                file_put_contents($exportPath, implode("\n", $unblockedEmails) . "\n");
+                file_put_contents($exportPath, implode("\n", $unblockedEmails)."\n");
                 $this->newLine();
                 $this->info("Emails exported to: {$exportPath}");
             }
@@ -166,59 +139,52 @@ class AuditBlockedUsersCommand extends Command
     }
 
     /**
-     * Count linked accounts using only IP + Device ID, excluding request_signature.
+     * Count non-admin, non-whitelisted accounts sharing this user's device cookie.
      */
-    private function countWithoutSignature(User $user, array $signals, bool $hasSignatureColumns): int
+    private function countAccountsSharingDevice(User $user, bool $hasDeviceColumns): int
     {
-        $ips = $signals['ips'] ?? [];
-        $deviceIds = $signals['device_ids'] ?? [];
-
-        if ($ips === [] && $deviceIds === []) {
-            return 0;
+        if (! $hasDeviceColumns) {
+            return 1;
         }
 
-        $hasDeviceColumns = Schema::hasColumn('users', 'registration_device_id')
-            && Schema::hasColumn('users', 'last_seen_device_id');
+        $deviceIds = array_values(array_unique(array_filter([
+            $user->registration_device_id,
+            $user->last_seen_device_id,
+        ])));
+
+        if ($deviceIds === []) {
+            return 1;
+        }
 
         return (int) User::query()
             ->where('is_admin', false)
-            ->where(function ($q) use ($ips, $deviceIds, $hasDeviceColumns) {
-                if ($ips !== []) {
-                    $q->whereIn('registration_ip', $ips)
-                        ->orWhereIn('last_login_ip', $ips);
-                }
-
-                if ($deviceIds !== [] && $hasDeviceColumns) {
-                    $q->orWhereIn('registration_device_id', $deviceIds)
-                        ->orWhereIn('last_seen_device_id', $deviceIds);
-                }
+            ->where('multi_account_whitelisted', false)
+            ->where(function ($q) use ($deviceIds) {
+                $q->whereIn('registration_device_id', $deviceIds)
+                    ->orWhereIn('last_seen_device_id', $deviceIds);
             })
             ->count();
     }
 
     /**
-     * How many distinct users share this user's request signature?
-     * A high number (>10) strongly indicates the collision bug.
+     * Count accounts sharing this user's IP (for display context only).
      */
-    private function signatureSharedCount(User $user, bool $hasSignatureColumns): int
+    private function countAccountsSharingIp(User $user): int
     {
-        if (! $hasSignatureColumns) {
-            return 0;
-        }
-
-        $signatures = array_values(array_unique(array_filter([
-            $user->registration_request_signature,
-            $user->last_seen_request_signature,
+        $ips = array_values(array_unique(array_filter([
+            $user->registration_ip,
+            $user->last_login_ip,
         ])));
 
-        if ($signatures === []) {
-            return 0;
+        if ($ips === []) {
+            return 1;
         }
 
         return (int) User::query()
-            ->where(function ($q) use ($signatures) {
-                $q->whereIn('registration_request_signature', $signatures)
-                    ->orWhereIn('last_seen_request_signature', $signatures);
+            ->where('is_admin', false)
+            ->where(function ($q) use ($ips) {
+                $q->whereIn('registration_ip', $ips)
+                    ->orWhereIn('last_login_ip', $ips);
             })
             ->count();
     }

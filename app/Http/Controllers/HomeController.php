@@ -918,14 +918,17 @@ class HomeController extends Controller
     {
         $userIds = $this->ipLinkedUserIds($userId);
         $deviceLinkedIds = $this->deviceLinkedUserIds($userId, $request);
-        $requestSignatureLinkedIds = $this->requestSignatureLinkedUserIds($userId, $request);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
         $requestIpLinkedIds = $this->requestIpLinkedUserIds($userId, $request);
+
+        // Request signature is intentionally excluded — it is a browser-config
+        // hash (Chrome version + platform), NOT a unique fingerprint. Including
+        // it would pool demo chars across unrelated users who simply share the
+        // same browser version.
 
         $allIds = array_values(array_unique(array_merge(
             $userIds,
             $deviceLinkedIds,
-            $requestSignatureLinkedIds,
             $fpLinkedIds,
             $requestIpLinkedIds
         )));
@@ -1090,22 +1093,22 @@ class HomeController extends Controller
 
     private function extractClientFingerprint(Request $request): string
     {
+        // 1. Canvas/WebGL fingerprint — strongest signal, unique per device hardware.
         $fp = trim((string) $request->header('X-Client-FP', ''));
-
         if ($fp !== '' && strlen($fp) >= 16 && strlen($fp) <= 256) {
             return 'fp:'.$fp;
         }
 
-        $requestSignature = RequestIdentity::signature($request);
-        if ($requestSignature !== null && $requestSignature !== '') {
-            return 'rs:'.$requestSignature;
-        }
-
+        // 2. Device cookie — unique random token per browser instance.
         $deviceId = $this->demoDeviceIdFromRequest($request);
         if ($deviceId !== null) {
             return 'dc:'.$deviceId;
         }
 
+        // 3. IP + User-Agent hash — weak last resort.
+        // Request signature (Sec-CH-UA headers) is intentionally skipped:
+        // it is a browser-config hash, not a fingerprint — millions of users
+        // with the same Chrome version produce the same value.
         $requestIdentity = trim((string) $request->ip()).'|'.trim((string) $request->userAgent());
         if ($requestIdentity !== '|') {
             return 'rq:'.hash('sha256', strtolower($requestIdentity));

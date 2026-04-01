@@ -27,8 +27,19 @@ class MultiAccountEnforcementService
      * Check if the given user exceeds the max linked-account limit and
      * auto-block them if so. Admins are never auto-blocked.
      *
-     * Linked accounts are detected by shared IP and, when available,
-     * shared device IDs and request signatures.
+     * Auto-blocking uses ONLY the device cookie as evidence. The device
+     * cookie is a random 48-char token unique to each browser instance —
+     * if multiple accounts share one, it is hard proof of same-browser
+     * multi-accounting.
+     *
+     * Signals NOT used for auto-blocking (and why):
+     *  - IP address: shared by unrelated users via CGNAT / shared WiFi.
+     *  - Request signature: only a browser-config hash (Chrome version +
+     *    platform + language), shared by millions of users with the same
+     *    browser setup. NOT a fingerprint.
+     *
+     * Both IP and request signature remain visible on the admin
+     * suspicious-users page for manual investigation.
      */
     public function enforceAfterAuth(User $user): void
     {
@@ -44,26 +55,30 @@ class MultiAccountEnforcementService
             return;
         }
 
-        $maxAccounts = $this->maxAccountsPerIp();
-        $signals = $this->linkedSignals($user);
-
-        if ($signals['ips'] === [] && $signals['device_ids'] === [] && $signals['request_signatures'] === []) {
+        if (! $this->hasDeviceColumns()) {
             return;
         }
 
-        $accountCount = $this->linkedAccountCountFromSignals($signals);
+        $deviceIds = array_values(array_unique(array_filter([
+            $user->registration_device_id,
+            $user->last_seen_device_id,
+        ])));
+
+        if ($deviceIds === []) {
+            return;
+        }
+
+        $maxAccounts = $this->maxAccountsPerIp();
+        $accountCount = $this->countAccountsSharingDevice($deviceIds);
 
         if ($accountCount <= $maxAccounts) {
             return;
         }
 
-        // This user pushed the count over the limit — block them.
         Log::warning('Multi-account auto-block triggered.', [
             'user_id' => $user->id,
             'email' => $user->email,
-            'ips' => $signals['ips'],
-            'device_ids' => $signals['device_ids'],
-            'request_signatures' => $signals['request_signatures'],
+            'device_ids' => $deviceIds,
             'account_count' => $accountCount,
             'max_allowed' => $maxAccounts,
         ]);
@@ -101,6 +116,9 @@ class MultiAccountEnforcementService
     }
 
     /**
+     * Collect all identity signals for admin display / investigation.
+     * This is NOT used for enforcement decisions.
+     *
      * @return array{
      *   ips: list<string>,
      *   device_ids: list<string>,
@@ -137,20 +155,12 @@ class MultiAccountEnforcementService
         ];
     }
 
+    /**
+     * Count linked accounts using ALL signals (for admin display).
+     */
     public function linkedAccountCount(User $user): int
     {
-        return $this->linkedAccountCountFromSignals($this->linkedSignals($user));
-    }
-
-    /**
-     * @param  array{
-     *   ips: list<string>,
-     *   device_ids: list<string>,
-     *   request_signatures: list<string>
-     * }  $signals
-     */
-    private function linkedAccountCountFromSignals(array $signals): int
-    {
+        $signals = $this->linkedSignals($user);
         $ips = $signals['ips'] ?? [];
         $deviceIds = $signals['device_ids'] ?? [];
         $requestSignatures = $signals['request_signatures'] ?? [];
@@ -161,7 +171,6 @@ class MultiAccountEnforcementService
 
         return (int) User::query()
             ->where('is_admin', false)
-            ->where('multi_account_whitelisted', false)
             ->where(function ($q) use ($ips, $deviceIds, $requestSignatures) {
                 if ($ips !== []) {
                     $q->whereIn('registration_ip', $ips)
@@ -177,6 +186,28 @@ class MultiAccountEnforcementService
                     $q->orWhereIn('registration_request_signature', $requestSignatures)
                         ->orWhereIn('last_seen_request_signature', $requestSignatures);
                 }
+            })
+            ->count();
+    }
+
+    /**
+     * Count accounts sharing the same device cookie.
+     * This is the ONLY signal used for auto-blocking.
+     *
+     * @param  list<string>  $deviceIds
+     */
+    private function countAccountsSharingDevice(array $deviceIds): int
+    {
+        if ($deviceIds === []) {
+            return 0;
+        }
+
+        return (int) User::query()
+            ->where('is_admin', false)
+            ->where('multi_account_whitelisted', false)
+            ->where(function ($q) use ($deviceIds) {
+                $q->whereIn('registration_device_id', $deviceIds)
+                    ->orWhereIn('last_seen_device_id', $deviceIds);
             })
             ->count();
     }
