@@ -534,7 +534,8 @@
       top: 2.25rem;
       left: -0.75rem;
       width: 13rem;
-      background: #F43F5E;
+      background: linear-gradient(
+135deg, #F43F5E 0%, #E11D48 45%, #7659FA 100%);
       color: white;
       font-size: .9rem;
       font-weight: 800;
@@ -580,8 +581,8 @@
     }
 
     .discount-countdown {
-      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 6%, var(--surface)), color-mix(in oklab, var(--a) 2%, var(--surface)));
-      border: 1px solid color-mix(in oklab, var(--a) 20%, var(--line));
+      background: linear-gradient(
+135deg, #F43F5E 0%, #E11D48 45%, #7659FA 100%)
       border-radius: var(--radius-lg);
       padding: .85rem .75rem;
       margin-bottom: 1.25rem;
@@ -594,12 +595,12 @@
       gap: .4rem;
       font-size: .9rem;
       font-weight: 700;
-      color: var(--text);
+      color: #FFF;
       margin-bottom: .75rem;
     }
     .countdown-label svg {
       flex-shrink: 0;
-      stroke: var(--a);
+      stroke: #FFF;
       width: 1.15rem;
       height: 1.15rem;
     }
@@ -611,8 +612,7 @@
     .countdown-sep {
       font-size: 1.2rem;
       font-weight: 800;
-      color: var(--a);
-      opacity: .5;
+      color: #FFF;
       align-self: flex-start;
       padding-top: .4rem;
     }
@@ -647,7 +647,7 @@
     .countdown-lbl {
       font-size: .75rem;
       font-weight: 600;
-      color: var(--muted);
+      color:#FFF;
       text-transform: uppercase;
       letter-spacing: .02em;
       margin-top: .4rem;
