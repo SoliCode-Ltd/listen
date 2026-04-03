@@ -107,14 +107,6 @@ class UserResource extends Resource
                             ->label(__('ui.admin.suspicious.last_seen_device_id'))
                             ->disabled()
                             ->dehydrated(false),
-                        Forms\Components\TextInput::make('registration_request_signature')
-                            ->label(__('ui.admin.suspicious.registration_request_signature'))
-                            ->disabled()
-                            ->dehydrated(false),
-                        Forms\Components\TextInput::make('last_seen_request_signature')
-                            ->label(__('ui.admin.suspicious.last_seen_request_signature'))
-                            ->disabled()
-                            ->dehydrated(false),
                         Forms\Components\Placeholder::make('demo_chars_used_display')
                             ->label(__('ui.admin.users.demo_chars_used'))
                             ->content(fn (?User $record): string => $record
@@ -132,7 +124,6 @@ class UserResource extends Resource
                                 if (
                                     ($signals['ips'] ?? []) === []
                                     && ($signals['device_ids'] ?? []) === []
-                                    && ($signals['request_signatures'] ?? []) === []
                                 ) {
                                     return __('ui.admin.users.no_ip_data');
                                 }
@@ -143,8 +134,6 @@ class UserResource extends Resource
                                     'email',
                                     'registration_device_id',
                                     'last_seen_device_id',
-                                    'registration_request_signature',
-                                    'last_seen_request_signature',
                                 ]);
                                 if ($linked->isEmpty()) {
                                     return __('ui.admin.users.no_linked_accounts');
@@ -156,14 +145,11 @@ class UserResource extends Resource
                                     $email = e((string) $u->email);
                                     $regDevice = e((string) ($u->registration_device_id ?: '-'));
                                     $lastDevice = e((string) ($u->last_seen_device_id ?: '-'));
-                                    $regSig = e((string) ($u->registration_request_signature ?: '-'));
-                                    $lastSig = e((string) ($u->last_seen_request_signature ?: '-'));
 
                                     return <<<HTML
 <li style="margin-bottom: 10px;">
   <a href="{$url}" style="font-weight: 600; text-decoration: underline;">{$name} ({$email})</a>
   <div style="font-size: 12px; opacity: .85; margin-top: 2px;">Device ID: {$regDevice} / {$lastDevice}</div>
-  <div style="font-size: 12px; opacity: .85;">Signature: {$regSig} / {$lastSig}</div>
 </li>
 HTML;
                                 })->implode('');
@@ -496,11 +482,10 @@ HTML;
         $signals = app(MultiAccountEnforcementService::class)->linkedSignals($record);
         $ips = $signals['ips'] ?? [];
         $deviceIds = $signals['device_ids'] ?? [];
-        $requestSignatures = $signals['request_signatures'] ?? [];
 
         return User::query()
             ->where('id', '!=', $record->id)
-            ->where(function ($q) use ($ips, $deviceIds, $requestSignatures): void {
+            ->where(function ($q) use ($ips, $deviceIds): void {
                 $hasAnySignal = false;
 
                 if ($ips !== []) {
@@ -516,17 +501,6 @@ HTML;
                     } else {
                         $q->whereIn('registration_device_id', $deviceIds)
                             ->orWhereIn('last_seen_device_id', $deviceIds);
-                        $hasAnySignal = true;
-                    }
-                }
-
-                if ($requestSignatures !== []) {
-                    if ($hasAnySignal) {
-                        $q->orWhereIn('registration_request_signature', $requestSignatures)
-                            ->orWhereIn('last_seen_request_signature', $requestSignatures);
-                    } else {
-                        $q->whereIn('registration_request_signature', $requestSignatures)
-                            ->orWhereIn('last_seen_request_signature', $requestSignatures);
                         $hasAnySignal = true;
                     }
                 }

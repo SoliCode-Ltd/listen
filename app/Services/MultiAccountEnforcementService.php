@@ -31,15 +31,6 @@ class MultiAccountEnforcementService
      * cookie is a random 48-char token unique to each browser instance —
      * if multiple accounts share one, it is hard proof of same-browser
      * multi-accounting.
-     *
-     * Signals NOT used for auto-blocking (and why):
-     *  - IP address: shared by unrelated users via CGNAT / shared WiFi.
-     *  - Request signature: only a browser-config hash (Chrome version +
-     *    platform + language), shared by millions of users with the same
-     *    browser setup. NOT a fingerprint.
-     *
-     * Both IP and request signature remain visible on the admin
-     * suspicious-users page for manual investigation.
      */
     public function enforceAfterAuth(User $user): void
     {
@@ -116,13 +107,13 @@ class MultiAccountEnforcementService
     }
 
     /**
-     * Collect all identity signals for admin display / investigation.
-     * This is NOT used for enforcement decisions.
+     * Collect identity signals for admin display / investigation.
+     * Only IP and device cookie — request signature has been removed
+     * because it was just a browser-config hash shared by millions.
      *
      * @return array{
      *   ips: list<string>,
-     *   device_ids: list<string>,
-     *   request_signatures: list<string>
+     *   device_ids: list<string>
      * }
      */
     public function linkedSignals(User $user): array
@@ -140,38 +131,28 @@ class MultiAccountEnforcementService
             ])));
         }
 
-        $requestSignatures = [];
-        if ($this->hasRequestSignatureColumns()) {
-            $requestSignatures = array_values(array_unique(array_filter([
-                $user->registration_request_signature,
-                $user->last_seen_request_signature,
-            ])));
-        }
-
         return [
             'ips' => $ips,
             'device_ids' => $deviceIds,
-            'request_signatures' => $requestSignatures,
         ];
     }
 
     /**
-     * Count linked accounts using ALL signals (for admin display).
+     * Count linked accounts using IP + device cookie (for admin display).
      */
     public function linkedAccountCount(User $user): int
     {
         $signals = $this->linkedSignals($user);
         $ips = $signals['ips'] ?? [];
         $deviceIds = $signals['device_ids'] ?? [];
-        $requestSignatures = $signals['request_signatures'] ?? [];
 
-        if ($ips === [] && $deviceIds === [] && $requestSignatures === []) {
+        if ($ips === [] && $deviceIds === []) {
             return 0;
         }
 
         return (int) User::query()
             ->where('is_admin', false)
-            ->where(function ($q) use ($ips, $deviceIds, $requestSignatures) {
+            ->where(function ($q) use ($ips, $deviceIds) {
                 if ($ips !== []) {
                     $q->whereIn('registration_ip', $ips)
                         ->orWhereIn('last_login_ip', $ips);
@@ -180,11 +161,6 @@ class MultiAccountEnforcementService
                 if ($deviceIds !== [] && $this->hasDeviceColumns()) {
                     $q->orWhereIn('registration_device_id', $deviceIds)
                         ->orWhereIn('last_seen_device_id', $deviceIds);
-                }
-
-                if ($requestSignatures !== [] && $this->hasRequestSignatureColumns()) {
-                    $q->orWhereIn('registration_request_signature', $requestSignatures)
-                        ->orWhereIn('last_seen_request_signature', $requestSignatures);
                 }
             })
             ->count();
@@ -216,11 +192,5 @@ class MultiAccountEnforcementService
     {
         return Schema::hasColumn('users', 'registration_device_id')
             && Schema::hasColumn('users', 'last_seen_device_id');
-    }
-
-    private function hasRequestSignatureColumns(): bool
-    {
-        return Schema::hasColumn('users', 'registration_request_signature')
-            && Schema::hasColumn('users', 'last_seen_request_signature');
     }
 }

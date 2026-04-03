@@ -30,15 +30,6 @@
                     {{ $allDevices->implode(', ') ?: '-' }}
                 </span>
             </div>
-            <div class="col-span-2">
-                <span class="font-medium text-gray-500 dark:text-gray-400">{{ __('ui.admin.suspicious.shared_request_signatures') }}:</span>
-                <span class="ml-1 font-mono text-xs">
-                    @php
-                        $allSignatures = $users->flatMap(fn ($u) => array_filter([$u->registration_request_signature, $u->last_seen_request_signature]))->unique()->sort();
-                    @endphp
-                    {{ $allSignatures->implode(', ') ?: '-' }}
-                </span>
-            </div>
         </div>
     </div>
 
@@ -55,8 +46,6 @@
                     <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.last_login_ip') }}</th>
                     <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.registration_device_id') }}</th>
                     <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.last_seen_device_id') }}</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.registration_request_signature') }}</th>
-                    <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.last_seen_request_signature') }}</th>
                     <th class="px-3 py-2 text-right font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.demo_chars') }}</th>
                     <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.status') }}</th>
                     <th class="px-3 py-2 text-left font-medium text-gray-600 dark:text-gray-300">{{ __('ui.admin.suspicious.registered_at') }}</th>
@@ -96,8 +85,6 @@
                         <td class="px-3 py-2 font-mono text-xs">{{ $user->last_login_ip ?? '-' }}</td>
                         <td class="px-3 py-2 font-mono text-xs">{{ $user->registration_device_id ?? '-' }}</td>
                         <td class="px-3 py-2 font-mono text-xs">{{ $user->last_seen_device_id ?? '-' }}</td>
-                        <td class="px-3 py-2 font-mono text-xs">{{ $user->registration_request_signature ?? '-' }}</td>
-                        <td class="px-3 py-2 font-mono text-xs">{{ $user->last_seen_request_signature ?? '-' }}</td>
                         <td class="px-3 py-2 text-right font-mono">
                             <span class="{{ $user->demo_chars > 0 ? 'font-semibold' : 'text-gray-400' }}">
                                 {{ number_format($user->demo_chars) }}

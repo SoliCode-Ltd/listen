@@ -14,7 +14,6 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
-use App\Support\RequestIdentity;
 use App\Support\SeoHelper;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
@@ -24,7 +23,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -1169,27 +1167,6 @@ class HomeController extends Controller
             }
         }
 
-        if ($this->hasRequestSignatureColumns()) {
-            $requestSignature = RequestIdentity::signature($request);
-            if ($requestSignature !== null && $requestSignature !== '') {
-                if ((string) $user->last_seen_request_signature !== $requestSignature) {
-                    $updates['last_seen_request_signature'] = $requestSignature;
-                }
-
-                if (! filled($user->registration_request_signature)) {
-                    $updates['registration_request_signature'] = $requestSignature;
-                }
-            } elseif ($requestSignature === null) {
-                // Browser lacks Client Hints — clear stale signatures to prevent false linking.
-                if (filled($user->last_seen_request_signature)) {
-                    $updates['last_seen_request_signature'] = null;
-                }
-                if (filled($user->registration_request_signature)) {
-                    $updates['registration_request_signature'] = null;
-                }
-            }
-        }
-
         if ($updates === []) {
             return;
         }
@@ -1197,62 +1174,6 @@ class HomeController extends Controller
         $user->forceFill($updates)->saveQuietly();
         Cache::forget("demo:ip_linked_users:{$user->id}");
         Cache::forget('admin:suspicious_users_count');
-    }
-
-    /**
-     * @return list<int>
-     */
-    private function requestSignatureLinkedUserIds(int $userId, ?Request $request = null): array
-    {
-        if (! $this->hasRequestSignatureColumns()) {
-            return [$userId];
-        }
-
-        $signatures = [];
-
-        $requestSignature = $request ? RequestIdentity::signature($request) : null;
-        if ($requestSignature !== null && $requestSignature !== '') {
-            $signatures[] = $requestSignature;
-        }
-
-        $user = User::query()
-            ->select(['id', 'registration_request_signature', 'last_seen_request_signature'])
-            ->find($userId);
-
-        if ($user) {
-            if (filled($user->registration_request_signature)) {
-                $signatures[] = (string) $user->registration_request_signature;
-            }
-            if (filled($user->last_seen_request_signature)) {
-                $signatures[] = (string) $user->last_seen_request_signature;
-            }
-        }
-
-        $signatures = array_values(array_unique(array_filter($signatures)));
-        if ($signatures === []) {
-            return [$userId];
-        }
-
-        $linkedIds = User::query()
-            ->where(function ($q) use ($signatures) {
-                $q->whereIn('registration_request_signature', $signatures)
-                    ->orWhereIn('last_seen_request_signature', $signatures);
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        if (! in_array($userId, $linkedIds, true)) {
-            $linkedIds[] = $userId;
-        }
-
-        return $linkedIds;
-    }
-
-    private function hasRequestSignatureColumns(): bool
-    {
-        return Schema::hasColumn('users', 'registration_request_signature')
-            && Schema::hasColumn('users', 'last_seen_request_signature');
     }
 
     /**
