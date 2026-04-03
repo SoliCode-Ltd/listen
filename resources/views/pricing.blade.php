@@ -581,8 +581,7 @@
     }
 
     .discount-countdown {
-      background: linear-gradient(
-135deg, #F43F5E 0%, #E11D48 45%, #7659FA 100%)
+      background: linear-gradient(135deg, #F43F5E 0%, #E11D48 45%, #7659FA 100%);
       border-radius: var(--radius-lg);
       padding: .85rem .75rem;
       margin-bottom: 1.25rem;
