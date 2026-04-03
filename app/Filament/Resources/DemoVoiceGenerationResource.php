@@ -37,10 +37,12 @@ class DemoVoiceGenerationResource extends Resource
                     ->schema([
                         Forms\Components\TextInput::make('user.name')
                             ->label('User')
-                            ->disabled(),
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('user.email')
                             ->label('Email')
-                            ->disabled(),
+                            ->disabled()
+                            ->dehydrated(false),
                         Forms\Components\TextInput::make('voice_label')
                             ->disabled(),
                         Forms\Components\TextInput::make('voice_name')
