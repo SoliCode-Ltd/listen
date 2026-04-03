@@ -35,14 +35,16 @@ class DemoVoiceGenerationResource extends Resource
                 Forms\Components\Section::make('Generation')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('user.name')
+                        Forms\Components\TextInput::make('user_name')
                             ->label('User')
                             ->disabled()
-                            ->dehydrated(false),
-                        Forms\Components\TextInput::make('user.email')
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($record) => $record?->user?->name),
+                        Forms\Components\TextInput::make('user_email')
                             ->label('Email')
                             ->disabled()
-                            ->dehydrated(false),
+                            ->dehydrated(false)
+                            ->formatStateUsing(fn ($record) => $record?->user?->email),
                         Forms\Components\TextInput::make('voice_label')
                             ->disabled(),
                         Forms\Components\TextInput::make('voice_name')
