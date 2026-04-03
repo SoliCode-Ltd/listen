@@ -43,7 +43,9 @@
       "Bash(php -l app/Http/Controllers/UpgradeController.php)",
       "Bash(php -l app/Filament/Resources/ManualPaymentRequestResource.php)",
       "Bash(php -l app/Filament/Resources/SubscriptionResource.php)",
-      "Bash(php -l app/Filament/Resources/UserResource.php)"
+      "Bash(php -l app/Filament/Resources/UserResource.php)",
+      "Bash(php -l app/Http/Controllers/AdminManualPaymentProofController.php)",
+      "Bash(php -l app/Services/ManualPaymentService.php)"
     ]
   }
 }

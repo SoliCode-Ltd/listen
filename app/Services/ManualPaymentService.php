@@ -207,11 +207,23 @@ class ManualPaymentService
     {
         $path = trim((string) $manualPaymentRequest->proof_path);
         abort_if($path === '', 404);
-        abort_unless(Storage::disk('local')->exists($path), 404);
 
-        return Storage::disk('local')->response($path, basename($path), [
-            'Content-Disposition' => 'inline; filename="'.basename($path).'"',
-        ]);
+        // Try the configured local disk first (storage/app/private/)
+        if (Storage::disk('local')->exists($path)) {
+            return Storage::disk('local')->response($path, basename($path), [
+                'Content-Disposition' => 'inline; filename="'.basename($path).'"',
+            ]);
+        }
+
+        // Fallback: file may have been stored before the disk root changed to app/private
+        $legacyAbsolute = storage_path('app/'.$path);
+        if (is_file($legacyAbsolute)) {
+            return response()->file($legacyAbsolute, [
+                'Content-Disposition' => 'inline; filename="'.basename($path).'"',
+            ]);
+        }
+
+        abort(404);
     }
 
     private function hasActiveStripeSubscription(User $user): bool
