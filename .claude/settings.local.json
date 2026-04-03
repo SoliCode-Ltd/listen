@@ -40,7 +40,10 @@
       "Bash(php -l app/Models/SiteSetting.php)",
       "Bash(php -l app/Services/StripeProductSyncService.php)",
       "Bash(php -l app/Services/LocalizedPricingService.php)",
-      "Bash(php -l app/Http/Controllers/UpgradeController.php)"
+      "Bash(php -l app/Http/Controllers/UpgradeController.php)",
+      "Bash(php -l app/Filament/Resources/ManualPaymentRequestResource.php)",
+      "Bash(php -l app/Filament/Resources/SubscriptionResource.php)",
+      "Bash(php -l app/Filament/Resources/UserResource.php)"
     ]
   }
 }

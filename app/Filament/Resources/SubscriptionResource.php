@@ -4,11 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SubscriptionResource\Pages;
 use App\Models\Subscription;
+use App\Models\UsageCounter;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class SubscriptionResource extends Resource
 {
@@ -77,6 +79,54 @@ class SubscriptionResource extends Resource
                             ->label('Failed Notice Sent'),
                         Forms\Components\DateTimePicker::make('billing_downgraded_at')
                             ->label('Downgraded At'),
+                    ]),
+                Forms\Components\Section::make('Usage History')
+                    ->schema([
+                        Forms\Components\Placeholder::make('usage_table')
+                            ->label('')
+                            ->content(function (?Subscription $record): HtmlString|string {
+                                if (! $record || ! $record->user_id) {
+                                    return 'No subscription loaded.';
+                                }
+
+                                $counters = UsageCounter::where('user_id', $record->user_id)
+                                    ->orderByDesc('period_ym')
+                                    ->get();
+
+                                if ($counters->isEmpty()) {
+                                    return 'No usage data recorded yet.';
+                                }
+
+                                $currentYm = now()->format('Y-m');
+
+                                $rows = $counters->map(function (UsageCounter $c) use ($currentYm): string {
+                                    $isCurrent = $c->period_ym === $currentYm;
+                                    $label = $isCurrent
+                                        ? e($c->period_ym) . ' <span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:9999px;font-size:11px;margin-left:6px;">Current</span>'
+                                        : e($c->period_ym);
+                                    $bg = $isCurrent ? 'background:rgba(34,197,94,0.06);' : '';
+
+                                    return '<tr style="' . $bg . '">'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">' . $label . '</td>'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_chars) . '</td>'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_minutes, 1) . '</td>'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_requests) . '</td>'
+                                        . '</tr>';
+                                })->implode('');
+
+                                $html = '<div style="overflow-x:auto;">'
+                                    . '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+                                    . '<thead><tr style="background:rgba(0,0,0,0.03);font-weight:600;">'
+                                    . '<th style="padding:8px 12px;text-align:left;">Period</th>'
+                                    . '<th style="padding:8px 12px;text-align:right;">Characters</th>'
+                                    . '<th style="padding:8px 12px;text-align:right;">Minutes</th>'
+                                    . '<th style="padding:8px 12px;text-align:right;">Requests</th>'
+                                    . '</tr></thead>'
+                                    . '<tbody>' . $rows . '</tbody>'
+                                    . '</table></div>';
+
+                                return new HtmlString($html);
+                            }),
                     ]),
             ]);
     }

@@ -344,17 +344,23 @@ class LocalizedPricingService
             ? ($currency === self::CURRENCY_EGP ? 'ar_EG@numbers=latn' : 'ar@numbers=latn')
             : 'en_US';
 
+        $isEgp = strtoupper($currency) === self::CURRENCY_EGP;
         $amount = $amountMinor / 100;
 
         if (class_exists(NumberFormatter::class)) {
             $formatter = new NumberFormatter($formatterLocale, NumberFormatter::CURRENCY);
+            if ($isEgp) {
+                $formatter->setAttribute(NumberFormatter::FRACTION_DIGITS, 0);
+            }
             $formatted = $formatter->formatCurrency($amount, strtoupper($currency));
             if (is_string($formatted) && trim($formatted) !== '') {
                 return $this->normalizeToLatinDigits(trim($formatted));
             }
         }
 
-        return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($amount, 2));
+        $decimals = $isEgp ? 0 : 2;
+
+        return $this->normalizeToLatinDigits(strtoupper($currency).' '.number_format($amount, $decimals));
     }
 
     /**
@@ -446,7 +452,14 @@ class LocalizedPricingService
             return $usdAmountMinor;
         }
 
-        return max(0, (int) round($usdAmountMinor * $rate));
+        $converted = max(0, (int) round($usdAmountMinor * $rate));
+
+        // EGP: always round up to whole currency units (no fractions/piasters)
+        if ($targetCurrency === self::CURRENCY_EGP && $converted % 100 !== 0) {
+            $converted = (int) (ceil($converted / 100) * 100);
+        }
+
+        return $converted;
     }
 
     /**

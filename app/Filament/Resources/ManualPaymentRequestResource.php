@@ -98,14 +98,11 @@ class ManualPaymentRequestResource extends Resource
                             (string) $record->currency,
                         );
                     }),
-                Tables\Columns\ImageColumn::make('proof_path')
+                Tables\Columns\TextColumn::make('proof_path')
                     ->label('Proof')
-                    ->circular(false)
-                    ->square()
-                    ->defaultImageUrl(fn () => null)
-                    ->getStateUsing(fn (ManualPaymentRequest $record): ?string => $record->proof_path
-                        ? route('admin.manual-payments.proof', $record)
-                        : null),
+                    ->badge()
+                    ->getStateUsing(fn (ManualPaymentRequest $record): string => $record->proof_path ? 'Uploaded' : 'None')
+                    ->color(fn (ManualPaymentRequest $record): string => $record->proof_path ? 'success' : 'gray'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
@@ -134,6 +131,13 @@ class ManualPaymentRequestResource extends Resource
                     ]),
             ])
             ->actions([
+                Tables\Actions\Action::make('viewProof')
+                    ->label('View Proof')
+                    ->icon('heroicon-o-photo')
+                    ->color('info')
+                    ->visible(fn (ManualPaymentRequest $record): bool => (bool) $record->proof_path)
+                    ->url(fn (ManualPaymentRequest $record): string => route('admin.manual-payments.proof', $record))
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make('approve')
                     ->label('Approve')
                     ->icon('heroicon-o-check-circle')

@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\UserResource\Pages;
 use App\Models\DemoVoiceGeneration;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
@@ -237,6 +238,38 @@ HTML;
                         return $record->multi_account_whitelisted ? 'info' : 'success';
                     })
                     ->sortable(query: fn ($query, string $direction) => $query->orderBy('is_blocked', $direction)),
+                Tables\Columns\TextColumn::make('current_plan')
+                    ->label('Plan')
+                    ->badge()
+                    ->getStateUsing(function (User $record): string {
+                        $subscription = Subscription::where('user_id', $record->id)
+                            ->where('status', 'active')
+                            ->with('plan')
+                            ->latest('id')
+                            ->first();
+
+                        if (! $subscription || ! $subscription->plan) {
+                            return 'Free';
+                        }
+
+                        return $subscription->plan->price_cents > 0
+                            ? $subscription->plan->name
+                            : 'Free';
+                    })
+                    ->color(function (User $record): string {
+                        $subscription = Subscription::where('user_id', $record->id)
+                            ->where('status', 'active')
+                            ->with('plan')
+                            ->latest('id')
+                            ->first();
+
+                        if (! $subscription || ! $subscription->plan || $subscription->plan->price_cents <= 0) {
+                            return 'gray';
+                        }
+
+                        return 'warning';
+                    })
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
                     ->sortable(),
@@ -336,6 +369,12 @@ HTML;
                 Tables\Filters\Filter::make('has_phone')
                     ->label(__('ui.admin.users.phone_connected'))
                     ->query(fn ($query) => $query->whereNotNull('phone_number')),
+                Tables\Filters\Filter::make('paid_users')
+                    ->label('Paid Users')
+                    ->query(fn ($query) => $query->whereHas('planSubscriptions', fn ($q) => $q
+                        ->where('status', 'active')
+                        ->whereHas('plan', fn ($p) => $p->where('price_cents', '>', 0))
+                    )),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
