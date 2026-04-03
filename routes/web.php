@@ -18,7 +18,7 @@ Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->name('media.file');
 
-Route::middleware('auth')->get('/admin/manual-payments/{manualPaymentRequest}/proof', AdminManualPaymentProofController::class)
+Route::middleware('auth')->get('/manual-payment-proof/{manualPaymentRequest}', AdminManualPaymentProofController::class)
     ->name('admin.manual-payments.proof');
 
 // SEO: Sitemap
