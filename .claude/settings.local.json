@@ -45,7 +45,9 @@
       "Bash(php -l app/Filament/Resources/SubscriptionResource.php)",
       "Bash(php -l app/Filament/Resources/UserResource.php)",
       "Bash(php -l app/Http/Controllers/AdminManualPaymentProofController.php)",
-      "Bash(php -l app/Services/ManualPaymentService.php)"
+      "Bash(php -l app/Services/ManualPaymentService.php)",
+      "Bash(php -l app/Models/ManualPaymentRequest.php)",
+      "Bash(php -l database/migrations/2026_04_03_000000_add_proof_token_to_manual_payment_requests_table.php)"
     ]
   }
 }

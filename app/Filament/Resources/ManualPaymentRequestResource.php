@@ -136,7 +136,7 @@ class ManualPaymentRequestResource extends Resource
                     ->icon('heroicon-o-photo')
                     ->color('info')
                     ->visible(fn (ManualPaymentRequest $record): bool => (bool) $record->proof_path)
-                    ->url(fn (ManualPaymentRequest $record): string => route('admin.manual-payments.proof', $record))
+                    ->url(fn (ManualPaymentRequest $record): string => route('admin.manual-payments.proof', [$record->user?->email ?? 'unknown', $record->proof_token]))
                     ->openUrlInNewTab(),
                 Tables\Actions\Action::make('approve')
                     ->label('Approve')

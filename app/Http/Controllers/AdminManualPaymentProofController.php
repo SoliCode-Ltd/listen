@@ -9,9 +9,20 @@ class AdminManualPaymentProofController extends Controller
 {
     public function __invoke(
         Request $request,
-        ManualPaymentRequest $manualPaymentRequest,
+        string $email,
+        string $proof_token,
     ) {
         abort_unless((bool) $request->user()?->is_admin, 403);
+
+        $manualPaymentRequest = ManualPaymentRequest::with('user')
+            ->where('proof_token', $proof_token)
+            ->firstOrFail();
+
+        // Verify the email matches the request's user
+        abort_unless(
+            $manualPaymentRequest->user && $manualPaymentRequest->user->email === $email,
+            404,
+        );
 
         $path = trim((string) $manualPaymentRequest->proof_path);
 

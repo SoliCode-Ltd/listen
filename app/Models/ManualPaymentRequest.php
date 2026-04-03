@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 class ManualPaymentRequest extends Model
 {
@@ -12,6 +13,15 @@ class ManualPaymentRequest extends Model
     public const STATUS_APPROVED = 'approved';
 
     public const STATUS_REJECTED = 'rejected';
+
+    protected static function booted(): void
+    {
+        static::creating(static function (self $model): void {
+            if (empty($model->proof_token)) {
+                $model->proof_token = Str::uuid()->toString();
+            }
+        });
+    }
 
     protected $fillable = [
         'user_id',
