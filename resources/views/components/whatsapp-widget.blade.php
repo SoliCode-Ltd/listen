@@ -1,7 +1,7 @@
 @php
   $locale = app()->getLocale();
   $isAr = $locale === 'ar';
-  $whatsappNumber = '201553212603';
+  $whatsappNumber = \App\Models\SiteSetting::get('whatsapp_number', '201553212603');
   $whatsappMessage = $isAr
     ? 'مرحباً، أريد الاستفسار عن خدمات منصة إسمع'
     : 'Hello, I would like to ask about Listen Studio services';

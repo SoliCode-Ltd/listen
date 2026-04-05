@@ -33,6 +33,7 @@ class SiteSettings extends Page implements HasForms
             'site_name' => SiteSetting::get('site_name', config('app.name')),
             'site_description' => SiteSetting::get('site_description', ''),
             'contact_email' => SiteSetting::get('contact_email', ''),
+            'whatsapp_number' => SiteSetting::get('whatsapp_number', '201553212603'),
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
             'custom_css' => SiteSetting::get('custom_css', ''),
@@ -70,6 +71,11 @@ class SiteSettings extends Page implements HasForms
                             ->label('Contact Email')
                             ->email()
                             ->maxLength(255),
+                        Forms\Components\TextInput::make('whatsapp_number')
+                            ->label('WhatsApp Number')
+                            ->maxLength(20)
+                            ->placeholder('201553212603')
+                            ->helperText('Enter the WhatsApp number with country code, no + or spaces (e.g. 201553212603).'),
                         Forms\Components\Select::make('site_main_language')
                             ->label('Main Website Language')
                             ->options([
