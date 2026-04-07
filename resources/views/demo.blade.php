@@ -64,8 +64,7 @@
           <form id="demoForm" class="studio-main" style="gap:1rem">
             @php
               $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
-              $demoSampleScripts = [
-                'ar' => <<<'TXT'
+              $defaultDemoSampleAr = <<<'TXT'
 (00-03ث) [هادئ + تساؤل]:
 "بقالك قد إيه بتقول هبدأ؟"
 
@@ -82,8 +81,8 @@
 
 (15-19ث) [دافئ + مشجع]:
 "ابدأ بس… والباقي هييجي."
-TXT,
-                'en' => <<<'TXT'
+TXT;
+              $defaultDemoSampleEn = <<<'TXT'
 (00–03s) [calm + questioning]:
 "How long have you been telling yourself you’ll start?"
 
@@ -100,7 +99,12 @@ TXT,
 
 (15–19s) [warm + encouraging]:
 "Just start… and the rest will follow."
-TXT,
+TXT;
+              $customDemoSampleAr = trim((string) \App\Models\SiteSetting::get('demo_sample_ar', ''));
+              $customDemoSampleEn = trim((string) \App\Models\SiteSetting::get('demo_sample_en', ''));
+              $demoSampleScripts = [
+                'ar' => $customDemoSampleAr !== '' ? $customDemoSampleAr : $defaultDemoSampleAr,
+                'en' => $customDemoSampleEn !== '' ? $customDemoSampleEn : $defaultDemoSampleEn,
               ];
             @endphp
             <div class="s-card s-card-editor reveal">

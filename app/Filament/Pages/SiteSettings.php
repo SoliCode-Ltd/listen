@@ -34,6 +34,8 @@ class SiteSettings extends Page implements HasForms
             'site_description' => SiteSetting::get('site_description', ''),
             'contact_email' => SiteSetting::get('contact_email', ''),
             'whatsapp_number' => SiteSetting::get('whatsapp_number', '201553212603'),
+            'demo_sample_ar' => SiteSetting::get('demo_sample_ar', ''),
+            'demo_sample_en' => SiteSetting::get('demo_sample_en', ''),
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
             'custom_css' => SiteSetting::get('custom_css', ''),
@@ -89,6 +91,20 @@ class SiteSettings extends Page implements HasForms
                             ->label('Site Description')
                             ->rows(3)
                             ->columnSpanFull(),
+                    ]),
+                Forms\Components\Section::make('Demo Page Sample Texts')
+                    ->description('The sample texts loaded when users click the English/Arabic sample chips on the demo page. Leave empty to use the built-in default.')
+                    ->columns(1)
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\Textarea::make('demo_sample_en')
+                            ->label('English Sample Text')
+                            ->rows(10)
+                            ->helperText('Shown when the user clicks the "English sample" chip on the demo page.'),
+                        Forms\Components\Textarea::make('demo_sample_ar')
+                            ->label('Arabic Sample Text')
+                            ->rows(10)
+                            ->helperText('Shown when the user clicks the "Arabic sample" chip on the demo page.'),
                     ]),
                 Forms\Components\Section::make('Anti-Abuse')
                     ->columns(2)
