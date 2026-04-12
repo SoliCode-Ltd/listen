@@ -968,7 +968,7 @@
           </div>
 
           <div class="actions">
-            <button class="btn btn-primary" id="subscribeBtn" type="button" {{ $stripeReady ? '' : 'disabled' }}>
+            <button class="btn btn-primary" id="subscribeBtn" type="submit" {{ $stripeReady ? '' : 'disabled' }}>
               {{ __('ui.billing.confirm_and_pay') }}
             </button>
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
@@ -1465,6 +1465,10 @@
         renderMode();
         renderChargePreview();
       });
+    });
+
+    document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
     });
 
     subscribeBtn?.addEventListener('click', async () => {
