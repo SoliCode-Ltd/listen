@@ -404,7 +404,8 @@ class SeoSettings extends Page implements HasForms
                     ->numeric()
                     ->minValue(0)
                     ->maxValue(1)
-                    ->step(0.1);
+                    ->step(0.1)
+                    ->extraInputAttributes(['formnovalidate' => true]);
                 $fields[] = Forms\Components\Select::make("seo_{$page}_sitemap_change_frequency")
                     ->label('Sitemap Change Frequency')
                     ->options([
