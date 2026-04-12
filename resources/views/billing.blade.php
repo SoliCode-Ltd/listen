@@ -782,7 +782,7 @@
           <p>{{ __('ui.billing.upgrade_plan_hint') }}</p>
         </div>
 
-        <form id="billingForm" class="form-grid">
+        <form id="billingForm" class="form-grid" method="POST" action="{{ url()->current() }}">
           @csrf
           <input type="hidden" name="plan" id="manualPlanField" value="{{ $selectedPlanValue }}">
           <input type="hidden" name="billing_cycle" id="manualCycleField" value="{{ $selectedBillingCycle }}">
