@@ -62,6 +62,7 @@ class SeoSettings extends Page implements HasForms
 
             'google_analytics_id' => SiteSetting::get('google_analytics_id', ''),
             'google_tag_id' => SiteSetting::get('google_tag_id', ''),
+            'google_ads_conversion_send_to' => SiteSetting::get('google_ads_conversion_send_to', ''),
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
