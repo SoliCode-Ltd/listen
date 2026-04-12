@@ -1057,6 +1057,7 @@
     const yearlyDiscountPercent = Number(@json((int) ($yearlyDiscountPercent ?? 0)));
     const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
     const initialPaymentMethod = @json($selectedPaymentMethod);
+    const gadsConversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
 
     const messageBox = document.getElementById('message');
     const subscribeBtn = document.getElementById('subscribeBtn');
@@ -1467,14 +1468,14 @@
       });
     });
 
+    function trackPurchaseConversion() {
+      if (typeof gtag === 'function' && gadsConversionSendTo) {
+        gtag('event', 'conversion', { send_to: gadsConversionSendTo });
+      }
+    }
+
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-      if (typeof gtag === 'function') {
-        gtag('event', 'form_submit', {
-          form_id: 'billingForm',
-          form_destination: e.target.action || window.location.href,
-        });
-      }
       setMessage('', '');
 
       try {
@@ -1500,6 +1501,7 @@
             throw new Error(responseMessage(response, i18n.upgrade_failed));
           }
 
+          trackPurchaseConversion();
           setMessage('ok', response.data?.message || i18n.manual_request_received);
           proofInput.value = '';
           proofUploadArea?.classList.remove('has-file');
@@ -1537,6 +1539,7 @@
             throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
           }
 
+          trackPurchaseConversion();
           setMessage('ok', i18n.payment_confirmed_redirecting);
           window.location.href = '{{ route('manage-subscription.page') }}';
           return;
@@ -1546,6 +1549,7 @@
           throw new Error(response.data?.message || i18n.upgrade_failed);
         }
 
+        trackPurchaseConversion();
         setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {

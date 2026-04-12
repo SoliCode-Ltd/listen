@@ -301,6 +301,11 @@ class SeoSettings extends Page implements HasForms
                             ->label('Google Tag ID')
                             ->placeholder('AW-XXXXXXXXXX')
                             ->maxLength(30),
+                        Forms\Components\TextInput::make('google_ads_conversion_send_to')
+                            ->label('Google Ads Conversion Send-To')
+                            ->placeholder('AW-XXXXXXXXXX/XXXXXXXXXXX')
+                            ->helperText('Conversion ID/Label for purchase events (e.g. AW-123456789/AbCdEfGhIjK). Found in Google Ads → Goals → Conversions → Tag setup.')
+                            ->maxLength(60),
                         Forms\Components\Textarea::make('google_tag_head_code')
                             ->label('Google Tag Head Code')
                             ->helperText('Optional: paste the full Google tag snippet including script tags. If set, it overrides generated ID-based tags.')
