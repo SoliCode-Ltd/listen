@@ -401,11 +401,9 @@ class SeoSettings extends Page implements HasForms
             if ((bool) ($meta['indexable'] ?? false)) {
                 $fields[] = Forms\Components\TextInput::make("seo_{$page}_sitemap_priority")
                     ->label('Sitemap Priority')
-                    ->numeric()
-                    ->minValue(0)
-                    ->maxValue(1)
-                    ->step(0.1)
-                    ->extraInputAttributes(['formnovalidate' => true]);
+                    ->rules(['numeric', 'min:0', 'max:1'])
+                    ->inputMode('decimal')
+                    ->step(0.1);
                 $fields[] = Forms\Components\Select::make("seo_{$page}_sitemap_change_frequency")
                     ->label('Sitemap Change Frequency')
                     ->options([
