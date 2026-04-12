@@ -1469,9 +1469,6 @@
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
-    });
-
-    subscribeBtn?.addEventListener('click', async () => {
       setMessage('', '');
 
       try {
