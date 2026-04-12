@@ -266,6 +266,9 @@ class BillingController extends Controller
         // Critical: tag demo voices for paid history visibility immediately after upgrade.
         $this->demoHistoryImporter->syncStorageForPlan((int) $user->id, $activePlan, 200);
 
+        // NOTE: The frontend fires a Google Ads conversion event (gtag)
+        // when it receives { ok: true } from this endpoint. Do NOT return
+        // ok:true unless the subscription is fully active.
         return response()->json([
             'ok' => true,
             'message' => __('ui.backend.billing_subscription_updated'),

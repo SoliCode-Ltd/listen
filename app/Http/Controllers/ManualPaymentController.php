@@ -129,6 +129,9 @@ class ManualPaymentController extends Controller
                 ->withErrors(['manual_payment' => $exception->getMessage()]);
         }
 
+        // NOTE: The frontend fires a Google Ads conversion event (gtag)
+        // when it receives { ok: true } from this endpoint. Do NOT return
+        // ok:true unless the payment request was successfully created.
         if ($request->expectsJson()) {
             return response()->json([
                 'ok' => true,
