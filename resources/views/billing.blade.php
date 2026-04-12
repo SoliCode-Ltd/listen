@@ -1469,6 +1469,12 @@
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (typeof gtag === 'function') {
+        gtag('event', 'form_submit', {
+          form_id: 'billingForm',
+          form_destination: e.target.action || window.location.href,
+        });
+      }
       setMessage('', '');
 
       try {
