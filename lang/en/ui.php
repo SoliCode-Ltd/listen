@@ -726,7 +726,7 @@ return [
         'command_center' => 'Command Center',
         'command_center_subtitle' => 'Monitor your usage and generate new voices.',
         'menu_panel' => 'Dashboard Menu',
-        'characters_usage' => ':plan â€“ Characters',
+        'characters_usage' => ':plan – Characters',
         'chars' => 'chars',
         'chars_remaining_of_total' => ':remaining / :total chars remaining',
         'requests_usage' => 'Requests Usage',
