@@ -57,14 +57,37 @@ class PlanAccessService
         $periodStart = now();
         $periodEnd = $periodEnd ?: now()->addMonth();
 
+        // Capture the transition signal BEFORE the subscription row is mutated
+        // so we can detect a free->paid upgrade reliably.
+        $isFirstPaid = false;
+        if ((int) $plan->price_cents > 0) {
+            try {
+                $isFirstPaid = app(\App\Services\Referral\ReferralQualificationService::class)
+                    ->isFirstPaidPlanTransition($user, $plan);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Referral: first-paid detection failed.', [
+                    'user_id' => $user->id,
+                    'plan_id' => $plan->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        }
+
         $subscription = Subscription::query()
             ->where('user_id', $user->id)
             ->latest('id')
             ->first();
 
         if (! $subscription) {
-            return Subscription::create([
+            $subscription = Subscription::create([
                 'user_id' => $user->id,
+                'plan_id' => $plan->id,
+                'status' => $status,
+                'current_period_start' => $periodStart,
+                'current_period_end' => $periodEnd,
+            ]);
+        } else {
+            $subscription->update([
                 'plan_id' => $plan->id,
                 'status' => $status,
                 'current_period_start' => $periodStart,
@@ -72,12 +95,18 @@ class PlanAccessService
             ]);
         }
 
-        $subscription->update([
-            'plan_id' => $plan->id,
-            'status' => $status,
-            'current_period_start' => $periodStart,
-            'current_period_end' => $periodEnd,
-        ]);
+        if ($isFirstPaid) {
+            try {
+                app(\App\Services\Referral\ReferralQualificationService::class)
+                    ->evaluate($user, 'paid_plan');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Referral qualification evaluation failed on paid-plan assignment.', [
+                    'user_id' => $user->id,
+                    'plan_id' => $plan->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        }
 
         return $subscription;
     }

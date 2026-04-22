@@ -95,6 +95,21 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(DemoVoiceGeneration::class);
     }
 
+    public function referralProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(UserReferralProfile::class);
+    }
+
+    public function referralsMade(): HasMany
+    {
+        return $this->hasMany(ReferralConversion::class, 'referrer_user_id');
+    }
+
+    public function demoRewardTransactions(): HasMany
+    {
+        return $this->hasMany(DemoRewardTransaction::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

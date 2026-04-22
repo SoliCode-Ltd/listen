@@ -9,6 +9,8 @@ use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\PlanAccessService;
+use App\Services\Referral\ReferralService;
+use App\Http\Middleware\CaptureReferralVisit;
 use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -29,7 +31,30 @@ class AuthController extends Controller
         private readonly AuthSettingsService $authSettings,
         private readonly PhoneAuthBridgeService $phoneAuthBridge,
         private readonly MultiAccountEnforcementService $multiAccountEnforcement,
+        private readonly ReferralService $referralService,
     ) {
+    }
+
+    private function bindReferralFromRequest(Request $request, User $user): void
+    {
+        try {
+            $code = trim((string) $request->cookie(CaptureReferralVisit::COOKIE_NAME, ''));
+            if ($code === '') {
+                $this->referralService->ensureProfile($user);
+
+                return;
+            }
+
+            $this->referralService->attachReferrerOnRegister($user, $code, $request);
+            \Illuminate\Support\Facades\Cookie::queue(
+                \Illuminate\Support\Facades\Cookie::forget(CaptureReferralVisit::COOKIE_NAME)
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to bind referral on registration.', [
+                'user_id' => $user->id,
+                'exception' => $e->getMessage(),
+            ]);
+        }
     }
 
     public function showLogin()
@@ -134,6 +159,7 @@ class AuthController extends Controller
         $user = User::create($payload);
 
         $this->attachFreePlanIfMissing($user);
+        $this->bindReferralFromRequest($request, $user);
 
         Auth::login($user);
         $this->stampLoginIp($user, $request);
@@ -235,15 +261,21 @@ class AuthController extends Controller
             ];
 
             $user = User::create($payload);
+            $justCreated = true;
         } else {
             $user->update([
                 'google_id' => $user->google_id ?: $googleId,
                 'google_avatar' => is_string($avatar) ? $avatar : $user->google_avatar,
                 'email_verified_at' => $user->email_verified_at ?? now(),
             ]);
+            $justCreated = false;
         }
 
         $this->attachFreePlanIfMissing($user);
+
+        if ($justCreated) {
+            $this->bindReferralFromRequest($request, $user);
+        }
 
         if ($this->blockedUserService->isBlocked($user)) {
             return $this->attachDeviceCookie(

@@ -43,4 +43,39 @@ class Subscription extends Model
     {
         return $this->belongsTo(Plan::class);
     }
+
+    protected static function booted(): void
+    {
+        // When any subscription row transitions into an active paid plan
+        // (whether through Stripe webhook, manual payment approval, admin
+        // edit, or programmatic assignment), evaluate the referral program.
+        // evaluate() is idempotent: it only promotes a pending conversion
+        // once, and is a no-op if no pending conversion exists.
+        static::saved(function (Subscription $subscription): void {
+            try {
+                if (! in_array((string) $subscription->status, ['active', 'trialing'], true)) {
+                    return;
+                }
+
+                $plan = $subscription->plan()->first();
+                if (! $plan || (int) $plan->price_cents <= 0) {
+                    return;
+                }
+
+                $user = $subscription->user()->first();
+                if (! $user) {
+                    return;
+                }
+
+                app(\App\Services\Referral\ReferralQualificationService::class)
+                    ->evaluate($user, 'paid_plan');
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Referral qualification evaluation failed on subscription save.', [
+                    'subscription_id' => $subscription->id,
+                    'user_id' => $subscription->user_id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
 }

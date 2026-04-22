@@ -47,7 +47,13 @@
       "Bash(php -l app/Http/Controllers/AdminManualPaymentProofController.php)",
       "Bash(php -l app/Services/ManualPaymentService.php)",
       "Bash(php -l app/Models/ManualPaymentRequest.php)",
-      "Bash(php -l database/migrations/2026_04_03_000000_add_proof_token_to_manual_payment_requests_table.php)"
+      "Bash(php -l database/migrations/2026_04_03_000000_add_proof_token_to_manual_payment_requests_table.php)",
+      "Bash(php -l \"app/Filament/Pages/ReferralCampaignSettings.php\")",
+      "Bash(php -l \"app/Filament/Resources/ReferralConversionResource.php\")",
+      "Bash(php -l \"app/Filament/Resources/SocialShareLogResource.php\")",
+      "Bash(php -l \"tests/Feature/ReferralProgramTest.php\")",
+      "Bash(php -l \"lang/en/ui.php\")",
+      "Bash(grep -A 20 \"^.*GET.*demo$\")"
     ]
   }
 }

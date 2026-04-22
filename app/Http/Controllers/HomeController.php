@@ -10,6 +10,7 @@ use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
+use App\Services\Referral\DemoRewardLedgerService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -401,6 +402,15 @@ class HomeController extends Controller
             // which would cause a mismatch between the UI counter and actual billing.
             // Speech-text metrics are stored separately in metadata for analytics.
             $speechEstimate = UsageEstimator::estimate($textForSpeech);
+
+            // Split charge: base lifetime cap first, referral reward as overflow.
+            $userId = (int) $request->user()->id;
+            $lifetimeCap = $this->demoCharAllowance($request);
+            $usedBase = $this->trialUsedCharsByUser($userId, $request);
+            $baseAvailable = max(0, $lifetimeCap - $usedBase);
+            $baseCharge = (int) min($estimate['chars'], $baseAvailable);
+            $rewardCharge = (int) max(0, $estimate['chars'] - $baseCharge);
+
             $generation = $this->storeDemoVoiceGeneration(
                 $request,
                 $validated,
@@ -411,9 +421,32 @@ class HomeController extends Controller
                 $studioOptions,
                 $audio,
                 $quota,
-                $estimate['chars'],
+                $baseCharge,
                 $speechEstimate['chars'],
+                $rewardCharge,
+                (int) $estimate['chars'],
             );
+
+            if ($rewardCharge > 0) {
+                app(DemoRewardLedgerService::class)->consume(
+                    $request->user(),
+                    $rewardCharge,
+                    $generation,
+                    'demo_generation_overflow',
+                );
+            }
+
+            // Trigger first-demo-generation qualification check for referrals.
+            // Safe to call on every generation — idempotent via conversion status.
+            try {
+                app(\App\Services\Referral\ReferralQualificationService::class)
+                    ->evaluate($request->user(), 'first_demo_generation');
+            } catch (\Throwable $e) {
+                Log::warning('Referral qualification (first demo) evaluation failed.', [
+                    'user_id' => $userId,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
 
             $quota = $this->demoQuotaForClient($request);
             $this->syncStoredDemoVoiceGenerationQuota($generation, $quota);
@@ -494,10 +527,15 @@ class HomeController extends Controller
         RateLimiter::hit($rateKey, 60);
 
         // Lifetime trial cap — shared across IP-linked and fingerprint-linked accounts.
+        // Referral reward characters (when present) act as an overflow bucket
+        // consumed only AFTER the base lifetime cap is exhausted, so users see
+        // their base allowance drain naturally first.
         $lifetimeCap = $this->demoCharAllowance($request);
         $usedChars = $this->trialUsedCharsByUser($userId, $request);
+        $overflowNeeded = max(0, ($usedChars + $chars) - $lifetimeCap);
+        $rewardBalance = app(DemoRewardLedgerService::class)->balanceFor($user);
 
-        if (($usedChars + $chars) > $lifetimeCap) {
+        if ($overflowNeeded > $rewardBalance) {
             throw ValidationException::withMessages([
                 'text' => __('ui.backend.demo_trial_exhausted'),
             ]);
@@ -876,39 +914,54 @@ class HomeController extends Controller
     }
 
     /**
-     * @param  array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string}  $quota
-     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,requires_client_sync:bool}
+     * @param  array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,reward_chars_remaining?:int,reward_chars_earned?:int,total_remaining_chars?:int}  $quota
+     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,requires_client_sync:bool,reward_chars_remaining:int,reward_chars_earned:int,total_remaining_chars:int}
      */
     private function formatDemoQuotaForClient(array $quota, bool $requiresClientSync): array
     {
+        $remaining = (int) ($quota['remaining_chars'] ?? 0);
+        $reward = (int) ($quota['reward_chars_remaining'] ?? 0);
+
         return [
             'scope' => (string) ($quota['scope'] ?? 'trial'),
             'limit_chars' => (int) ($quota['limit_chars'] ?? 0),
             'used_chars' => (int) ($quota['used_chars'] ?? 0),
-            'remaining_chars' => (int) ($quota['remaining_chars'] ?? 0),
+            'remaining_chars' => $remaining,
             'is_exhausted' => (bool) ($quota['is_exhausted'] ?? false),
             'verification_source' => (string) ($quota['verification_source'] ?? 'account_only'),
             'requires_client_sync' => $requiresClientSync,
+            'reward_chars_remaining' => $reward,
+            'reward_chars_earned' => (int) ($quota['reward_chars_earned'] ?? 0),
+            'total_remaining_chars' => (int) ($quota['total_remaining_chars'] ?? ($remaining + $reward)),
         ];
     }
 
     /**
-     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string}
+     * @return array{scope:string,limit_chars:int,used_chars:int,remaining_chars:int,is_exhausted:bool,verification_source:string,reward_chars_remaining:int,reward_chars_earned:int,total_remaining_chars:int}
      */
     private function demoQuotaSnapshot(Request $request, bool $preview): array
     {
-        $userId = (int) $request->user()->id;
+        $user = $request->user();
+        $userId = (int) $user->id;
         $limit = $this->demoCharAllowance($request);
         $used = min($limit, max(0, $this->trialUsedCharsByUser($userId, $request)));
         $remaining = max(0, $limit - $used);
+
+        $ledger = app(DemoRewardLedgerService::class);
+        $rewardRemaining = $ledger->balanceFor($user);
+        $rewardEarned = $ledger->totalGrantedFor($user);
+        $totalRemaining = $remaining + $rewardRemaining;
 
         return [
             'scope' => 'trial',
             'limit_chars' => $limit,
             'used_chars' => $used,
             'remaining_chars' => $remaining,
-            'is_exhausted' => $remaining <= 0,
+            'is_exhausted' => $totalRemaining <= 0,
             'verification_source' => 'user_only',
+            'reward_chars_remaining' => $rewardRemaining,
+            'reward_chars_earned' => $rewardEarned,
+            'total_remaining_chars' => $totalRemaining,
         ];
     }
 
@@ -1194,6 +1247,8 @@ class HomeController extends Controller
         array $quota,
         ?int $originalChars = null,
         ?int $speechChars = null,
+        ?int $rewardCharsConsumed = null,
+        ?int $totalChars = null,
     ): ?DemoVoiceGeneration {
         try {
             $voiceMeta = VoiceCatalog::voiceMeta($voiceName);
@@ -1242,6 +1297,8 @@ class HomeController extends Controller
                     'speech_chars' => $speechChars ?? UsageEstimator::estimate($speechText)['chars'],
                     'routing_mode' => $audio['routing_mode'] ?? null,
                     'plan_slug' => $audio['plan_slug'] ?? 'free',
+                    'reward_chars_consumed' => $rewardCharsConsumed !== null ? (int) $rewardCharsConsumed : 0,
+                    'total_chars' => $totalChars !== null ? (int) $totalChars : ($originalChars ?? UsageEstimator::estimate($inputText)['chars']),
                 ],
             ]);
         } catch (\Throwable $e) {

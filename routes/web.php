@@ -154,11 +154,21 @@ Route::group([
             ->name('auth.firebase-google.verify');
     });
 
-    Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {
-        Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
-        Route::post('/demo/quota', [HomeController::class, 'demoQuota'])->name('demo.quota');
-        Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
-        Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
+    // Referral capture runs BEFORE auth so guests landing on the demo page
+    // with ?ref=CODE still record the visit and get the referral cookie set
+    // before the login redirect.
+    Route::middleware(['referral.capture'])->group(function () {
+        Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {
+            Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
+            Route::post('/demo/quota', [HomeController::class, 'demoQuota'])->name('demo.quota');
+            Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
+            Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
+        });
+    });
+
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/referral/stats', [\App\Http\Controllers\ReferralController::class, 'stats'])->name('referral.stats');
+        Route::post('/referral/share', [\App\Http\Controllers\ReferralController::class, 'share'])->name('referral.share');
     });
 
     Route::middleware(['auth', 'subscription.sync'])->group(function () {

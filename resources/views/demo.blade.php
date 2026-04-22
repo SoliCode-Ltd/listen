@@ -50,13 +50,30 @@
               <div class="q-head">
                 <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
                 <strong class="q-value" id="quotaValue" dir="ltr">
-                  {{ number_format((int) ($demoQuota['remaining_chars'] ?? $trialAllowanceChars)) }} / {{ number_format((int) ($demoQuota['limit_chars'] ?? $trialAllowanceChars)) }} {{ __('ui.demo.chars_left') }}
+                  @php
+                    $qTotalRemaining = (int) ($demoQuota['total_remaining_chars'] ?? ($demoQuota['remaining_chars'] ?? $trialAllowanceChars));
+                    $qTotalLimit = max(
+                        $qTotalRemaining,
+                        (int) ($demoQuota['limit_chars'] ?? $trialAllowanceChars) + (int) ($demoQuota['reward_chars_earned'] ?? 0)
+                    );
+                  @endphp
+                  {{ number_format($qTotalRemaining) }} / {{ number_format($qTotalLimit) }} {{ __('ui.demo.chars_left') }}
                 </strong>
               </div>
               <div class="quota-track">
                 <div class="quota-fill" id="quotaFill"></div>
               </div>
               <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
+              <div class="reward-badge" id="rewardBadge"
+                   @if ((int) ($demoQuota['reward_chars_remaining'] ?? 0) <= 0) hidden @endif
+                   aria-live="polite">
+                <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+                  <path d="M20 12v9H4v-9"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+                </svg>
+                <span>{{ __('ui.referral.reward_badge_prefix') }}</span>
+                <strong dir="ltr"><span data-reward-value>{{ number_format((int) ($demoQuota['reward_chars_remaining'] ?? 0)) }}</span></strong>
+                <span>{{ __('ui.referral.reward_badge_suffix') }}</span>
+              </div>
             </div>
           </div>
 
@@ -481,15 +498,19 @@ TXT;
       const limit = Math.max(1, toFiniteNumber(quota?.limit_chars, fallbackLimit));
       let remaining = Math.max(0, toFiniteNumber(quota?.remaining_chars, toFiniteNumber(fallback?.remaining_chars, limit)));
       let used = Math.max(0, toFiniteNumber(quota?.used_chars, limit - remaining));
+      const rewardRemaining = Math.max(0, toFiniteNumber(quota?.reward_chars_remaining, toFiniteNumber(fallback?.reward_chars_remaining, 0)));
+      const rewardEarned = Math.max(0, toFiniteNumber(quota?.reward_chars_earned, toFiniteNumber(fallback?.reward_chars_earned, 0)));
+      let totalRemaining = toFiniteNumber(quota?.total_remaining_chars, remaining + rewardRemaining);
+      if (!Number.isFinite(totalRemaining) || totalRemaining < 0) totalRemaining = remaining + rewardRemaining;
       let exhausted = toBoolean(quota?.is_exhausted);
 
-      if (remaining <= 0) exhausted = true;
+      if (totalRemaining <= 0) exhausted = true;
       if (exhausted) {
-        remaining = 0;
         used = limit;
       } else {
         used = Math.min(limit, used);
       }
+      if (remaining <= 0) remaining = 0;
 
       return {
         ...quota,
@@ -497,6 +518,9 @@ TXT;
         remaining_chars: remaining,
         used_chars: used,
         is_exhausted: exhausted,
+        reward_chars_remaining: rewardRemaining,
+        reward_chars_earned: rewardEarned,
+        total_remaining_chars: totalRemaining,
       };
     }
 
@@ -644,6 +668,20 @@ TXT;
       }
     }
 
+    // Referral popup invocation policy:
+    //   post_generation — success moment, soft (respect user dismissal), once per tab
+    //   quota_exhausted — peak conversion moment, forced, once per tab
+    //   preview_overflow — selected text exceeds remaining chars, forced, once per tab
+    const refPopupShownByReason = Object.create(null);
+    function maybeShowReferralPopup({ reason }) {
+      if (!reason || refPopupShownByReason[reason]) return;
+      if (typeof window.openReferralPopup !== 'function') return;
+      const force = reason === 'quota_exhausted' || reason === 'preview_overflow';
+      // Peak-intent moments always show, even if dismissed earlier.
+      const shown = window.openReferralPopup(force ? { force: true } : undefined);
+      if (shown !== false) refPopupShownByReason[reason] = true;
+    }
+
     function setPreviewButtonMarkup(iconMarkup, label) {
       if (!previewBtn) return;
       const content = previewBtn.querySelector('span');
@@ -679,10 +717,14 @@ TXT;
 
     function syncQuotaDisplay() {
       const baseRemaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const rewardRemaining = Math.max(0, Number(currentQuota.reward_chars_remaining || 0));
+      const rewardEarned = Math.max(0, Number(currentQuota.reward_chars_earned || 0));
       const limit = Math.max(1, Number(currentQuota.limit_chars || 1));
       const hasDraft = hasPendingDraftUsage();
-      const displayRemaining = hasDraft ? Math.max(0, baseRemaining - liveBillableChars) : baseRemaining;
-      const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / limit) * 100)));
+      const totalRemaining = Math.max(0, baseRemaining + rewardRemaining);
+      const totalLimit = Math.max(totalRemaining, limit + rewardEarned);
+      const displayRemaining = hasDraft ? Math.max(0, totalRemaining - liveBillableChars) : totalRemaining;
+      const rawPercent = Math.max(0, Math.min(100, Math.round((displayRemaining / totalLimit) * 100)));
       const percent = displayRemaining > 0 ? Math.max(1, rawPercent) : 0;
 
       if (quotaFill) {
@@ -690,11 +732,24 @@ TXT;
         quotaFill.style.background = 'linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))';
       }
       if (quotaValue) {
-        quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(limit)} ${i18n.chars_left}`;
+        quotaValue.textContent = `${formatNumber(displayRemaining)} / ${formatNumber(totalLimit)} ${i18n.chars_left}`;
       }
 
-      setUpgradeVisible(Boolean(currentQuota.is_exhausted || baseRemaining <= 0));
+      renderRewardBadge(rewardRemaining);
+      setUpgradeVisible(Boolean(currentQuota.is_exhausted || totalRemaining <= 0));
       resetPreviewButton();
+    }
+
+    function renderRewardBadge(rewardRemaining) {
+      const badge = document.getElementById('rewardBadge');
+      if (!badge) return;
+      if (rewardRemaining > 0) {
+        const valueNode = badge.querySelector('[data-reward-value]');
+        if (valueNode) valueNode.textContent = formatNumber(rewardRemaining);
+        badge.hidden = false;
+      } else {
+        badge.hidden = true;
+      }
     }
 
     function isTrialExhaustedMessage(message) {
@@ -1165,11 +1220,13 @@ TXT;
           emotionSelect?.focus();
           return;
         }
-        if (selectedChars > Number(currentQuota.remaining_chars || 0)) {
+        const totalAllowed = Number(currentQuota.remaining_chars || 0) + Number(currentQuota.reward_chars_remaining || 0);
+        if (selectedChars > totalAllowed) {
           hideAudioPreview();
-          const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(currentQuota.remaining_chars));
+          const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(totalAllowed));
           setError(message);
           setUpgradeVisible(true);
+          maybeShowReferralPopup({ reason: totalAllowed <= 0 ? 'quota_exhausted' : 'preview_overflow' });
           return;
         }
         isGenerating = true;
@@ -1200,6 +1257,9 @@ TXT;
         audioMeta.textContent = `${i18n.speaker_prefix} ${label}${quality} - ${data.translate_note}`;
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
+        // Celebrate-and-share: after a successful generation, softly invite the
+        // user to share for bonus chars. Once per tab, skipped if dismissed.
+        maybeShowReferralPopup({ reason: 'post_generation' });
       } catch (err) {
         hideAudioPreview();
         const message = String(err?.message || i18n.preview_failed);
@@ -1222,6 +1282,7 @@ TXT;
         } else if (serverSaysExhausted || isTrialExhaustedMessage(message)) {
           setUpgradeVisible(true);
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0, used_chars: Number(currentQuota.limit_chars || 0) });
+          maybeShowReferralPopup({ reason: 'quota_exhausted' });
         }
       } finally {
         isGenerating = false;
@@ -1258,7 +1319,8 @@ TXT;
       if (charCountFrame) cancelAnimationFrame(charCountFrame);
       charCountFrame = requestAnimationFrame(() => {
         charCountFrame = null;
-        if (currentQuota.remaining_chars <= 0) setUpgradeVisible(true);
+        const liveTotalRemaining = Number(currentQuota.remaining_chars || 0) + Number(currentQuota.reward_chars_remaining || 0);
+        if (liveTotalRemaining <= 0) setUpgradeVisible(true);
         updateCharCount();
       });
     }
@@ -1271,10 +1333,12 @@ TXT;
       if (!charCounter || !textInput) return;
       const count = currentDraftBillableChars();
       liveBillableChars = count;
-      const remaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const baseRemaining = Math.max(0, Number(currentQuota.remaining_chars || 0));
+      const rewardRemaining = Math.max(0, Number(currentQuota.reward_chars_remaining || 0));
+      const totalRemaining = baseRemaining + rewardRemaining;
       if (count > 0) {
-        charCounter.textContent = `${formatNumber(count)} / ${formatNumber(remaining)}`;
-        charCounter.style.color = count > remaining ? 'var(--error-color, #ef4444)' : '';
+        charCounter.textContent = `${formatNumber(count)} / ${formatNumber(totalRemaining)}`;
+        charCounter.style.color = count > totalRemaining ? 'var(--error-color, #ef4444)' : '';
       } else {
         charCounter.textContent = '';
         charCounter.style.color = '';
@@ -1305,5 +1369,8 @@ TXT;
     document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
   </script>
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+  @auth
+    @include('referral.popup')
+  @endauth
 </body>
 </html>

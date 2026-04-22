@@ -1053,6 +1053,34 @@ return [
         ],
     ],
 
+    // ===== REFERRAL =====
+    'referral' => [
+        'popup_badge' => 'Listen Studio Rewards',
+        'popup_title' => 'Invite friends and get {reward_amount} extra premium voice characters',
+        'popup_description' => 'Copy your link and share it — when your friend signs up and starts the demo, we add {reward_amount} characters instantly to your demo balance.',
+        'popup_benefit_1' => 'Instant reward for you',
+        'popup_benefit_2' => 'A premium experience for your friend',
+        'popup_benefit_3' => 'Everything happens automatically',
+        'popup_close_aria' => 'Close referral popup',
+        'banner_text' => 'Invite friends — earn {reward_amount} bonus demo characters.',
+        'banner_cta' => 'Invite',
+        'banner_aria' => 'Open referral invitation',
+        'banner_close_aria' => 'Dismiss referral banner',
+        'your_link' => 'Your referral link',
+        'copy_link' => 'Copy link',
+        'copy_success' => 'Copied!',
+        'cta_later' => 'Maybe later',
+        'share_label' => 'Share with',
+        'stat_pending' => 'Pending',
+        'stat_approved' => 'Approved',
+        'stat_earned' => 'Characters earned',
+        'reward_badge_prefix' => 'Bonus from referrals:',
+        'reward_badge_suffix' => 'characters available',
+        'share_text_template' => "I tried {brand} and was genuinely impressed by the voice quality and overall experience. If you create voiceovers, narrated content, or audio-based media, it's worth trying 🎧\n\n{link}",
+        'instagram_hint' => 'Post copied — paste it into your Instagram story, bio, or DM to share.',
+        'share_paste_hint' => 'Post copied! Paste it into the composer that just opened.',
+    ],
+
     // ===== BACKEND MESSAGES =====
     'backend' => [
         'auth_invalid_credentials' => 'Invalid email or password.',
