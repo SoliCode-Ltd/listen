@@ -1,9 +1,5 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
-  @php
-    $demoStudioCssPath = public_path('css/demo-studio.css');
-    $demoStudioCssVersion = is_file($demoStudioCssPath) ? filemtime($demoStudioCssPath) : time();
-  @endphp
-  <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ $demoStudioCssVersion }}">
+  <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v=20260423a">
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
