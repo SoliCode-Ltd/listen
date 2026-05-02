@@ -60,6 +60,14 @@ class SocialShareLogResource extends Resource
                     ->options(['en' => 'English', 'ar' => 'Arabic']),
             ])
             ->actions([
+                Tables\Actions\Action::make('open_on_platform')
+                    ->label('Open post')
+                    ->icon('heroicon-o-arrow-top-right-on-square')
+                    ->color('primary')
+                    ->url(fn (SocialShareLog $record): ?string => self::searchUrlForShare($record))
+                    ->openUrlInNewTab()
+                    ->visible(fn (SocialShareLog $record): bool => self::searchUrlForShare($record) !== null)
+                    ->tooltip('Search the platform for posts that link to this referral URL.'),
                 Tables\Actions\ViewAction::make(),
             ])
             ->bulkActions([
@@ -80,5 +88,31 @@ class SocialShareLogResource extends Resource
         return [
             'index' => Pages\ListSocialShareLogs::route('/'),
         ];
+    }
+
+    /**
+     * Build a best-effort URL to find the actual share on the platform.
+     *
+     * Public web composers (Facebook, X, LinkedIn) do not return the resulting
+     * post URL to us, so the closest we can do is open the platform's search
+     * for the unique referral link — anyone who shared it publicly will surface
+     * there. For copy_link / whatsapp / instagram / telegram there is no
+     * useful destination, so we return null and hide the action.
+     */
+    public static function searchUrlForShare(SocialShareLog $record): ?string
+    {
+        $link = (string) ($record->referral_link ?? '');
+        if ($link === '') {
+            return null;
+        }
+
+        $q = rawurlencode($link);
+
+        return match ($record->platform) {
+            'facebook' => 'https://www.facebook.com/search/posts/?q='.$q,
+            'twitter'  => 'https://x.com/search?q='.$q.'&src=typed_query&f=live',
+            'linkedin' => 'https://www.linkedin.com/search/results/content/?keywords='.$q,
+            default    => null, // copy_link, whatsapp, instagram, telegram — not searchable
+        };
     }
 }
