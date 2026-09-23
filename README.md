@@ -1,59 +1,248 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# Listen
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Listen is the Arabic-first text-to-speech platform at [listenai.studio](https://listenai.studio). It turns text into speech in Arabic and English, with translation, dialect and performance controls on HD voices, queued generation, usage plans, and a Chrome extension that reads selected text on any page.
 
-## About Laravel
+The interface is available in English and Arabic.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Live site
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+| Page | URL |
+| --- | --- |
+| Landing | https://listenai.studio/en |
+| Demo | https://listenai.studio/en/demo |
+| Pricing | https://listenai.studio/en/pricing |
+| Login | https://listenai.studio/en/login |
+| Dashboard | https://listenai.studio/en/dashboard |
+| Billing | https://listenai.studio/en/billing |
+| Browser extension | https://listenai.studio/en/browsers-extension |
+| Contact | https://listenai.studio/en/contact-us |
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Arabic pages use the `/ar` prefix, for example https://listenai.studio/ar.
 
-## Learning Laravel
+## What you can do
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+- Generate speech from the dashboard or the signed-in demo, in Arabic or English, with optional translation.
+- Choose Standard voices (Google Cloud WaveNet) or HD voices (Gemini), including Arabic dialects, emotion, and performance style.
+- Keep a history of generations, replay them, and reuse the settings from an earlier HD job.
+- Enforce plan limits: characters per request, monthly characters, monthly requests, and voice tier.
+- Subscribe with Stripe, or submit a manual payment, then view and download invoices.
+- Share a referral link and track referral rewards.
+- Read selected text in Chrome with the Listen Reader extension.
+- Administer users, plans, voices, generations, billing, and site settings in the Filament panel at `/admin`.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+## Stack
 
-## Laravel Sponsors
+- PHP 8.2+ and Laravel 12
+- SQLite by default (`database/database.sqlite`)
+- Vite, Tailwind CSS 4
+- Filament 3 admin panel
+- Laravel Cashier (Stripe) and Laravel Socialite (Google)
+- Google Cloud Text-to-Speech and Gemini TTS
+- Database queue
+- English and Arabic UI (`mcamara/laravel-localization`)
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Requirements
 
-### Premium Partners
+- PHP 8.2 or newer, with the usual Laravel extensions
+- Composer
+- Node.js and npm
+- A Google Cloud Text-to-Speech credential for Standard voices
+- One or more Gemini API keys for HD voices
+- Stripe keys if you want card billing
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+## Local setup
 
-## Contributing
+```bash
+composer install
+cp .env.example .env
+php artisan key:generate
+touch database/database.sqlite
+php artisan migrate --seed
+php artisan storage:link
+npm install
+npm run build
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+`php artisan migrate --seed` creates plans, the voice catalog, voice samples, a test user (`test@example.com` / `password`), and an admin user. Change those seeded passwords before any shared environment.
 
-## Code of Conduct
+For day-to-day development, one command starts the app, the queue worker, the log tail, and Vite:
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+```bash
+composer dev
+```
 
-## Security Vulnerabilities
+The app is then at http://localhost:8000. A health check is available at `/up`.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+Generated audio is stored under `storage/app/public/audio` and served through the public storage link.
 
-## License
+## Configuration
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Copy `.env.example` and set at least the following. Full comments live in that file and in `config/listen.php`.
+
+```env
+APP_URL=https://listenai.studio
+
+# Per-user extension keys are created in the app. This legacy key, if set,
+# authenticates API calls as user id 1.
+LISTEN_API_KEY=
+
+# Google sign-in. Register this exact URI in Google Cloud.
+# Locally, use http://localhost:8000/en/auth/social/callback.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=https://listenai.studio/en/auth/social/callback
+
+# Google Cloud Text-to-Speech (Standard / WaveNet)
+SPEECH_TTS_API_KEY=
+SPEECH_TTS_CREDENTIALS_JSON=
+SPEECH_TTS_CREDENTIALS_PATH=
+SPEECH_TTS_AUDIO_ENCODING=MP3
+SPEECH_TTS_SPEAKING_RATE=0.95
+SPEECH_TTS_PITCH=0.0
+SPEECH_TTS_TIMEOUT_SECONDS=30
+
+# Gemini TTS (HD). Add GEMINI_TTS_API_KEY_2, _3, ... for more keys.
+GEMINI_TTS_API_KEY=
+LISTEN_TTS_MODE=hybrid
+LISTEN_TTS_FALLBACK_ENABLED=true
+
+# Stripe. Price IDs are stored on plans after `php artisan stripe:sync-plans --all`.
+STRIPE_KEY=
+STRIPE_SECRET=
+STRIPE_WEBHOOK_SECRET=
+
+# sync: generate inside the request. queue: always use the worker.
+# In sync mode, texts at least this long are still queued.
+LISTEN_AUDIO_PROCESSING=sync
+LISTEN_AUDIO_FORCE_ASYNC_CHARS=2500
+```
+
+`LISTEN_TTS_MODE` accepts `google` (Google Cloud only) or `hybrid` (Free plans stay on Google Cloud, paid plans use Gemini, with fallback to Google Cloud when Gemini fails).
+
+Speech targets are `ar` and `en`. HD Arabic controls include dialect (`ar-XA` for Modern Standard Arabic, plus regional dialects), performance style (narrative, cinematic, inspirational, audiobook, and others), emotion, speed (`0.5`–`2.0`), and pitch (`-10`–`10`). Standard tier ignores those studio controls. Dialogue mode, with up to six speakers, is limited to plans that enable it (Studio Max in the seed data).
+
+## Plans
+
+`PlanSeeder` inserts these defaults. Live prices, quotas, and Stripe price IDs are edited in `/admin` and synced with `php artisan stripe:sync-plans --all`.
+
+| Plan | Monthly price | Characters | Requests | Voice | Notable limits |
+| --- | ---: | ---: | --- | --- | --- |
+| Free | $0 | 10,000 | 60 | Standard | 1,200 characters per request, personal use |
+| Starter | $9 | 500,000 | Unlimited | HD | Commercial use, emotion and dialect |
+| Creator | $22 | 1,500,000 | Unlimited | HD | Featured plan, higher queue priority |
+| Pro | $49 | 4,000,000 | Unlimited | HD | Priority queue |
+| Studio Max | $99 | 8,000,000 | Unlimited | HD | Dialogue mode, highest queue priority |
+
+A monthly request value of `0` means unlimited. Paid plans can allow overage. Character and minute top-ups are priced on the plan record.
+
+The signed-in demo is capped separately from the monthly plan. Defaults are in `.env.example` (`DEMO_GUEST_CHAR_ALLOWANCE`, `DEMO_USER_CHAR_ALLOWANCE`, and the preview rate limits).
+
+## Reader API
+
+Routes are under the `/api` prefix. Authenticate with the signed-in session, a per-user key from the extension page, or the legacy `LISTEN_API_KEY`. Send the key as `X-Listen-Key` or `X-API-Key`.
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| `GET` | `/api/reader/profile` | Plan, usage, and voice catalog for the key |
+| `POST` | `/api/reader/queue` | Create a generation |
+| `GET` | `/api/reader/jobs` | List generations |
+| `GET` | `/api/extension/config` | Public extension config. No key required |
+| `POST` | `/api/stripe/webhook` | Stripe webhooks |
+
+Queue a clip:
+
+```bash
+curl -X POST "$APP_URL/api/reader/queue" \
+  -H "X-Listen-Key: $LISTEN_KEY" \
+  -H "Accept: application/json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "content": "مرحباً، هذا اختبار قصير.",
+    "target_language": "ar",
+    "voice_tier": "hd",
+    "dialect": "ar-XA",
+    "performance_style": "cinematic",
+    "emotion": "warm",
+    "speed": 0.85,
+    "pitch": -2
+  }'
+```
+
+`content` and `text` are interchangeable. `target_language` is `ar` or `en`. A finished job returns `audio_url`. A queued job returns HTTP 202 and a `job_id`; poll `GET /api/reader/jobs`.
+
+Profanity filtering applies to generation text. Requesting a voice tier above the account plan returns HTTP 403.
+
+## Chrome extension
+
+Listen Reader lives in `public/extensions/chrome-listen-reader`. It adds **Listen Selected Text** to the right-click menu and plays audio in a side panel.
+
+1. Sign in and open **Browsers Extension**.
+2. Generate an API key and download the package.
+3. In Chrome, open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
+4. Paste the API key into the extension popup.
+
+`php artisan listen:sync-extension` writes the current `APP_URL` into the extension `config.js` before you ship a build.
+
+## Operations
+
+Run the scheduler in production (`php artisan schedule:work`, or a system cron entry for `php artisan schedule:run` every minute). It runs:
+
+| Command | When |
+| --- | --- |
+| `listen:billing-sync` | Every 15 minutes |
+| `listen:billing-enforce-grace` | Hourly |
+| `listen:billing-reminders` | Daily at 09:00 |
+| `plans:expire-discounts` | Every 5 minutes |
+
+Other commands:
+
+| Command | Purpose |
+| --- | --- |
+| `stripe:sync-plans --all` | Create or update Stripe products and prices from plans |
+| `listen:voices-validate` | Check that each language and tier has voices |
+| `tts:generate-samples` | Rebuild homepage voice samples |
+| `listen:lang-sync-ar` | Sync Arabic UI strings |
+| `referral:reconcile-rewards` | Reconcile referral rewards |
+| `referral:repair-bindings` | Repair referral bindings |
+| `listen:audit-blocked` | Audit blocked accounts |
+| `listen:multi-account-backfill` | Backfill multi-account blocks |
+
+When `LISTEN_AUDIO_PROCESSING=queue`, keep a worker running:
+
+```bash
+php artisan queue:listen --tries=1 --timeout=0
+```
+
+`composer dev` already does this locally.
+
+## Tests
+
+```bash
+composer test
+```
+
+That clears cached config and runs the PHPUnit suite in `tests/Unit` and `tests/Feature`.
+
+## Repository layout
+
+| Path | What it holds |
+| --- | --- |
+| `app/Http/Controllers` | Web, billing, demo, and reader API |
+| `app/Services/Tts` | Google Cloud and Gemini providers, routing, and Arabic voice mapping |
+| `app/Filament` | Admin panel |
+| `app/Jobs` | Audio generation |
+| `resources/views` | Landing, demo, dashboard, billing, auth, and legal pages |
+| `lang/en`, `lang/ar` | Interface copy |
+| `database/seeders` | Plans, voices, samples, and admin |
+| `public/extensions/chrome-listen-reader` | Chrome extension source |
+| `config/listen.php` | Audio processing, TTS mode, billing, and demo limits |
+
+## Support
+
+Product: [listenai.studio](https://listenai.studio)
+
+Account help: help@listenai.studio
+
+Privacy, terms, and cookies: support@listenai.studio
+
+Listen is built by SoliCode Ltd.
