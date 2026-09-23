@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\GeminiTtsModel;
 use App\Support\TtsStudioConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -12,15 +13,14 @@ use Illuminate\Support\Str;
 /**
  * Gemini TTS Provider.
  *
- * Uses the Gemini 2.5 Flash Preview TTS model for high-quality speech synthesis.
- * Supports multi-speaker dialogue mode.
+ * Uses the Gemini model selected in TTS settings.
+ * Gemini 2.5 keeps the legacy prompt. Gemini 3.8 speaks the transcript
+ * verbatim and takes delivery instructions in speech metadata.
  *
- * Model: gemini-2.5-flash-preview-tts
  * API: Google AI Generative Language API
  */
 class GeminiTtsProvider implements TtsProviderInterface
 {
-    private const MODEL = 'gemini-2.5-flash-preview-tts';
 
     /**
      * Current API key info (managed by GeminiKeyManager).
@@ -347,11 +347,12 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $speakers = $voiceConfig['speakers'] ?? null;
         $isDialogue = is_array($speakers) && count($speakers) > 1;
+        $model = GeminiTtsModel::resolve();
 
         if ($isDialogue) {
-            $result = $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, '');
+            $result = $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, $model);
         } else {
-            $result = $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, '');
+            $result = $this->synthesizeSingle($text, $targetLanguage, $voiceConfig, $model);
         }
 
         // Record successful usage for current key
@@ -361,7 +362,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         return array_merge($result, [
             'provider' => $this->name(),
-            'model' => self::MODEL,
+            'model' => $model,
             'latency_ms' => $latencyMs,
             'char_count' => $charCount,
             'cost_estimate_usd' => $this->estimateCost($charCount),
@@ -371,7 +372,7 @@ class GeminiTtsProvider implements TtsProviderInterface
     /**
      * Single-speaker synthesis using Gemini TTS.
      */
-    private function synthesizeSingle(string $text, string $targetLanguage, array $voiceConfig, string $apiKey): array
+    private function synthesizeSingle(string $text, string $targetLanguage, array $voiceConfig, string $model): array
     {
         $voiceName = $this->resolveGeminiVoice(
             (string) ($voiceConfig['voice_name'] ?? ''),
@@ -390,13 +391,84 @@ class GeminiTtsProvider implements TtsProviderInterface
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
         $stylePrompt = $customPrompt !== '' ? $customPrompt : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
-        $endpoint = $this->buildEndpoint();
+        $endpoint = $this->buildEndpoint($model);
+        $payload = $this->buildSingleSpeakerPayload($model, $text, $stylePrompt, $voiceName, $languageCode);
 
-        $payload = [
+        $response = $this->callGeminiApi($endpoint, $payload);
+        $audio = $this->extractAudioFromResponse($response);
+        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+
+        return [
+            'audio_path' => $filename,
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+        ];
+    }
+
+    /**
+     * Multi-speaker dialogue synthesis using Gemini TTS.
+     */
+    private function synthesizeDialogue(string $text, string $targetLanguage, array $speakers, array $voiceConfig, string $model): array
+    {
+        $endpoint = $this->buildEndpoint($model);
+        $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? 'neutral'));
+        $emotion = trim((string) ($voiceConfig['emotion'] ?? 'neutral'));
+        $speed = (float) ($voiceConfig['speed'] ?? 1.0);
+        $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
+        $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
+        $languageCode = $this->resolveLanguageCode($targetLanguage, $dialect);
+
+        $stylePrompt = $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
+        $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
+
+        $response = $this->callGeminiApi($endpoint, $payload);
+        $audio = $this->extractAudioFromResponse($response);
+        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+
+        return [
+            'audio_path' => $filename,
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildSingleSpeakerPayload(
+        string $model,
+        string $text,
+        string $stylePrompt,
+        string $voiceName,
+        string $languageCode,
+    ): array {
+        if (GeminiTtsModel::usesStructuredSpeech($model)) {
+            $part = ['text' => $text];
+            if (trim($stylePrompt) !== '') {
+                $part['speech_metadata'] = ['style' => $stylePrompt];
+            }
+
+            return [
+                'contents' => [
+                    [
+                        'role' => 'user',
+                        'parts' => [$part],
+                    ],
+                ],
+                'generationConfig' => [
+                    'responseModalities' => ['AUDIO'],
+                    'speechConfig' => [
+                        'voiceConfig' => [
+                            'voice' => $voiceName,
+                        ],
+                    ],
+                ],
+            ];
+        }
+
+        return [
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $stylePrompt . "\n\n" . $text],
+                        ['text' => trim($stylePrompt."\n\n".$text)],
                     ],
                 ],
             ],
@@ -412,37 +484,28 @@ class GeminiTtsProvider implements TtsProviderInterface
                 ],
             ],
         ];
-
-        $response = $this->callGeminiApi($endpoint, $payload);
-        $audio = $this->extractAudioFromResponse($response);
-        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
-
-        return [
-            'audio_path' => $filename,
-            'duration_seconds' => $this->estimateDurationSeconds($text),
-        ];
     }
 
     /**
-     * Multi-speaker dialogue synthesis using Gemini TTS.
+     * @param  array<int, array<string, mixed>>  $speakers
+     * @return array<string, mixed>
      */
-    private function synthesizeDialogue(string $text, string $targetLanguage, array $speakers, array $voiceConfig, string $apiKey): array
-    {
-        $endpoint = $this->buildEndpoint();
-        $performanceStyle = trim((string) ($voiceConfig['performance_style'] ?? $voiceConfig['style'] ?? 'neutral'));
-        $emotion = trim((string) ($voiceConfig['emotion'] ?? 'neutral'));
-        $speed = (float) ($voiceConfig['speed'] ?? 1.0);
-        $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
-        $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
-        $languageCode = $this->resolveLanguageCode($targetLanguage, $dialect);
-
-        $stylePrompt = $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
-
-        // Build multi-speaker config
+    private function buildDialoguePayload(
+        string $model,
+        string $text,
+        string $stylePrompt,
+        array $speakers,
+        string $languageCode,
+    ): array {
         $speakerVoiceConfigs = [];
         foreach ($speakers as $speaker) {
+            $speakerName = trim((string) ($speaker['name'] ?? $speaker['id'] ?? 'Speaker'));
+            if ($speakerName === '') {
+                $speakerName = 'Speaker';
+            }
+
             $speakerVoiceConfigs[] = [
-                'speaker' => $speaker['name'] ?? $speaker['id'] ?? 'Speaker',
+                'speaker' => $speakerName,
                 'voiceConfig' => [
                     'prebuiltVoiceConfig' => [
                         'voiceName' => $this->resolveGeminiVoice(
@@ -454,46 +517,103 @@ class GeminiTtsProvider implements TtsProviderInterface
             ];
         }
 
-        $payload = [
+        $parts = GeminiTtsModel::usesStructuredSpeech($model)
+            ? $this->structuredDialogueParts($text, $speakers, $stylePrompt)
+            : [['text' => trim($stylePrompt."\n\n".$text)]];
+
+        $speechConfig = [
+            'multiSpeakerVoiceConfig' => [
+                'speakerVoiceConfigs' => $speakerVoiceConfigs,
+            ],
+        ];
+        if (! GeminiTtsModel::usesStructuredSpeech($model)) {
+            $speechConfig = ['languageCode' => $languageCode] + $speechConfig;
+        }
+
+        return [
             'contents' => [
                 [
-                    'parts' => [
-                        ['text' => $stylePrompt . "\n\n" . $text],
-                    ],
+                    'role' => 'user',
+                    'parts' => $parts,
                 ],
             ],
             'generationConfig' => [
                 'responseModalities' => ['AUDIO'],
-                'speechConfig' => [
-                    'languageCode' => $languageCode,
-                    'multiSpeakerVoiceConfig' => [
-                        'speakerVoiceConfigs' => $speakerVoiceConfigs,
-                    ],
-                ],
+                'speechConfig' => $speechConfig,
             ],
         ];
+    }
 
-        $response = $this->callGeminiApi($endpoint, $payload);
-        $audio = $this->extractAudioFromResponse($response);
-        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+    /**
+     * Split a script into verbatim turns so Gemini 3.8 does not read speaker labels aloud.
+     *
+     * @param  array<int, array<string, mixed>>  $speakers
+     * @return array<int, array<string, mixed>>
+     */
+    private function structuredDialogueParts(string $text, array $speakers, string $stylePrompt): array
+    {
+        $names = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
+            if ($name !== '') {
+                $names[] = $name;
+            }
+        }
 
-        return [
-            'audio_path' => $filename,
-            'duration_seconds' => $this->estimateDurationSeconds($text),
-        ];
+        $currentSpeaker = $names[0] ?? 'Speaker';
+        $parts = [];
+        foreach (preg_split("/\r\n|\n|\r/", $text) ?: [] as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+
+            $spoken = $line;
+            foreach ($names as $name) {
+                $prefix = $name.':';
+                if (str_starts_with($line, $prefix)) {
+                    $currentSpeaker = $name;
+                    $spoken = trim(substr($line, strlen($prefix)));
+                    break;
+                }
+            }
+
+            if ($spoken === '') {
+                continue;
+            }
+
+            $part = ['text' => $spoken];
+            $metadata = ['speaker' => $currentSpeaker];
+            if (trim($stylePrompt) !== '') {
+                $metadata['style'] = $stylePrompt;
+            }
+            $part['speech_metadata'] = $metadata;
+            $parts[] = $part;
+        }
+
+        if ($parts !== []) {
+            return $parts;
+        }
+
+        $part = ['text' => $text, 'speech_metadata' => ['speaker' => $currentSpeaker]];
+        if (trim($stylePrompt) !== '') {
+            $part['speech_metadata']['style'] = $stylePrompt;
+        }
+
+        return [$part];
     }
 
     /**
      * Build the Gemini API endpoint URL.
      */
-    private function buildEndpoint(): string
+    private function buildEndpoint(string $model): string
     {
         $baseUrl = trim((string) config(
             'services.gemini_tts.endpoint',
             'https://generativelanguage.googleapis.com/v1beta'
         ));
 
-        return rtrim($baseUrl, '/') . '/models/' . self::MODEL . ':generateContent';
+        return rtrim($baseUrl, '/').'/models/'.$model.':generateContent';
     }
 
     /**
@@ -531,7 +651,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             } catch (\Throwable $e) {
                 Log::error('Gemini TTS API call failed', [
                     'error' => $e->getMessage(),
-                    'model' => self::MODEL,
+                    'endpoint' => $endpoint,
                     'key' => $keyInfo['name'],
                 ]);
                 throw new \RuntimeException('Gemini TTS API call failed: ' . $e->getMessage(), 0, $e);
@@ -635,6 +755,14 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function detectAudioMimeType(string $data, ?string $hint = null): string
     {
+        if (strlen($data) >= 12 && substr($data, 0, 4) === 'RIFF' && substr($data, 8, 4) === 'WAVE') {
+            return 'audio/wav';
+        }
+
+        if (strlen($data) >= 3 && (substr($data, 0, 3) === 'ID3' || ((unpack('n', substr($data, 0, 2))[1] ?? 0) & 0xFFE0) === 0xFFE0)) {
+            return 'audio/mpeg';
+        }
+
         $normalizedHint = strtolower(trim((string) $hint));
         if ($normalizedHint !== '') {
             if (str_starts_with($normalizedHint, 'audio/wav') || str_starts_with($normalizedHint, 'audio/x-wav')) {
@@ -648,22 +776,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
         }
 
-        if (strlen($data) >= 12) {
-            if (substr($data, 0, 4) === 'RIFF' && substr($data, 8, 4) === 'WAVE') {
-                return 'audio/wav';
-            }
-
-            if (substr($data, 0, 3) === 'ID3') {
-                return 'audio/mpeg';
-            }
-
-            $firstTwo = unpack('n', substr($data, 0, 2))[1] ?? 0;
-            if (($firstTwo & 0xFFE0) === 0xFFE0) {
-                return 'audio/mpeg';
-            }
-        }
-
-        // Gemini commonly returns raw 16-bit PCM (audio/L16) in inlineData.
+        // Gemini 2.5 commonly returns raw 16-bit PCM (audio/L16) in inlineData.
         return 'audio/l16';
     }
 

@@ -28,6 +28,17 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            foreach ([
+                'users_last_seen_request_signature_index',
+                'users_registration_request_signature_index',
+            ] as $index) {
+                if (Schema::hasIndex('users', $index)) {
+                    $table->dropIndex($index);
+                }
+            }
+        });
+
+        Schema::table('users', function (Blueprint $table) {
             if (Schema::hasColumn('users', 'last_seen_request_signature')) {
                 $table->dropColumn('last_seen_request_signature');
             }

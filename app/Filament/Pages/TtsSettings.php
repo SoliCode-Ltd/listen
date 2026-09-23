@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Voice;
+use App\Support\GeminiTtsModel;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -46,6 +47,7 @@ class TtsSettings extends Page implements HasForms
 
             // Gemini config
             'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
+            'gemini_tts_model' => GeminiTtsModel::resolve(),
             'gemini_default_voice' => SiteSetting::get('gemini_default_voice', config('services.gemini_tts.default_voice', 'Kore')),
             'gemini_timeout_seconds' => (int) SiteSetting::get('gemini_timeout_seconds', config('listen.tts.gemini_timeout_seconds', 30)),
 
@@ -101,7 +103,7 @@ class TtsSettings extends Page implements HasForms
                                 'hybrid' => 'Hybrid (Free → Google WaveNet, Paid → Gemini)',
                             ])
                             ->required()
-                            ->helperText('Google: all users get Google Cloud TTS (WaveNet + Chirp). Hybrid: free plans get Google WaveNet, paid plans get Gemini 2.5 Flash TTS with automatic fallback.')
+                            ->helperText('Google: all users get Google Cloud TTS (WaveNet + Chirp). Hybrid: free plans get Google WaveNet, paid plans get the Gemini model selected below, with automatic fallback.')
                             ->reactive(),
                         Forms\Components\Toggle::make('tts_fallback_enabled')
                             ->label('Enable Fallback')
@@ -111,10 +113,14 @@ class TtsSettings extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('Gemini TTS Configuration')
-                    ->description('Settings for the Gemini 2.5 Flash Preview TTS provider.')
+                    ->description('Choose the Gemini speech model. The next HD generation uses the model you save here.')
                     ->columns(2)
-                    ->visible(fn (Forms\Get $get): bool => $get('tts_mode') === 'hybrid')
                     ->schema([
+                        Forms\Components\Select::make('gemini_tts_model')
+                            ->label('Gemini model')
+                            ->options(GeminiTtsModel::options())
+                            ->required()
+                            ->helperText('Current keeps Gemini 2.5. Newest is Gemini 3.8 Flash. Newest Lite is Gemini 3.8 Flash-Lite. Standard voices stay on Google Cloud. HD voices, and any plan forced to Gemini, use this choice.'),
                         Forms\Components\Placeholder::make('gemini_api_key_status')
                             ->label('Gemini API Key')
                             ->content(fn (Forms\Get $get): string => $get('gemini_api_key_set')
@@ -256,6 +262,7 @@ class TtsSettings extends Page implements HasForms
                         Forms\Components\Placeholder::make('keys_info')
                             ->content(function () {
                                 $stats = app(\App\Services\Tts\GeminiKeyManager::class)->getAggregateStats();
+
                                 return "🔑 {$stats['total_keys']} API keys configured, {$stats['available_keys']} available now";
                             }),
                         Forms\Components\Actions::make([
@@ -279,6 +286,7 @@ class TtsSettings extends Page implements HasForms
         $scalarKeys = [
             'tts_mode',
             'tts_fallback_enabled',
+            'gemini_tts_model',
             'gemini_default_voice',
             'gemini_timeout_seconds',
             'tts_default_voice_ar',

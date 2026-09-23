@@ -9,6 +9,17 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('users', function (Blueprint $table) {
+            foreach ([
+                'users_registration_request_signature_index',
+                'users_last_seen_request_signature_index',
+            ] as $index) {
+                if (Schema::hasIndex('users', $index)) {
+                    $table->dropIndex($index);
+                }
+            }
+        });
+
+        Schema::table('users', function (Blueprint $table) {
             if (Schema::hasColumn('users', 'registration_request_signature')) {
                 $table->dropColumn('registration_request_signature');
             }
