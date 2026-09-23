@@ -759,7 +759,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             return 'audio/wav';
         }
 
-        if (strlen($data) >= 3 && (substr($data, 0, 3) === 'ID3' || ((unpack('n', substr($data, 0, 2))[1] ?? 0) & 0xFFE0) === 0xFFE0)) {
+        if ($this->looksLikeMpegAudio($data)) {
             return 'audio/mpeg';
         }
 
@@ -778,6 +778,31 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         // Gemini 2.5 commonly returns raw 16-bit PCM (audio/L16) in inlineData.
         return 'audio/l16';
+    }
+
+    /**
+     * PCM can start with 0xFFFF, which matches a loose MPEG sync mask.
+     * Require a real frame header so that sample is saved as WAV.
+     */
+    private function looksLikeMpegAudio(string $data): bool
+    {
+        if (strlen($data) >= 3 && substr($data, 0, 3) === 'ID3') {
+            return true;
+        }
+        if (strlen($data) < 4 || ord($data[0]) !== 0xFF || (ord($data[1]) & 0xE0) !== 0xE0) {
+            return false;
+        }
+
+        $version = (ord($data[1]) >> 3) & 0x03;
+        $layer = (ord($data[1]) >> 1) & 0x03;
+        $bitrate = (ord($data[2]) >> 4) & 0x0F;
+        $sampleRate = (ord($data[2]) >> 2) & 0x03;
+
+        return $version !== 0x01
+            && $layer !== 0x00
+            && $bitrate !== 0x00
+            && $bitrate !== 0x0F
+            && $sampleRate !== 0x03;
     }
 
     private function wrapPcmL16AsWav(

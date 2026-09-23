@@ -119,6 +119,21 @@ class GeminiTtsModelSelectionTest extends TestCase
         $this->assertSame('Charon', $voices[1]['voiceConfig']['prebuiltVoiceConfig']['voiceName']);
     }
 
+    public function test_pcm_beginning_with_mpeg_sync_bits_is_saved_as_wav(): void
+    {
+        $pcm = "\xff\xff\x00\x00".$this->pcmBytes();
+        $this->fakeAudio('audio/l16', $pcm);
+
+        $result = app(GeminiTtsProvider::class)->synthesize('مرحبا', 'ar', [
+            'voice_name' => 'Kore',
+        ]);
+
+        $saved = Storage::disk('public')->get($result['audio_path']);
+        $this->assertStringEndsWith('.wav', $result['audio_path']);
+        $this->assertStringStartsWith('RIFF', $saved);
+        $this->assertSame(1, substr_count($saved, 'RIFF'));
+    }
+
     private function fakeAudio(string $mime, string $bytes): \stdClass
     {
         $captured = new \stdClass;
