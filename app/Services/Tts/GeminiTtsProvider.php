@@ -915,6 +915,13 @@ class GeminiTtsProvider implements TtsProviderInterface
                 : 'Read the following text naturally with clear pronunciation and a balanced, professional tone.';
         }
 
+        $dialectCode = strtoupper(trim((string) $dialect));
+        if ($isArabic && $dialectCode !== '' && $dialectCode !== 'AR-XA') {
+            $prompt .= $dialectCode === 'AR-EG'
+                ? ' Stay in Cairene Egyptian colloquial Arabic, not Modern Standard Arabic. Pronounce ج like the English g, and use Cairo rhythm, the way someone from Cairo talks to a friend. Do not switch to formal Fusha or news-anchor pronunciation.'
+                : ' Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha.';
+        }
+
         return trim($prompt);
     }
 
