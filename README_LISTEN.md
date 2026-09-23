@@ -3,11 +3,11 @@
 Arabic-first voice app for messages/emails/files with translation and queued audio generation.
 
 ## Live URLs
-- Landing: https://bot.solicode.me/listen/
-- Demo Lab: https://bot.solicode.me/listen/demo
-- Pricing: https://bot.solicode.me/listen/pricing
-- Login: https://bot.solicode.me/listen/login
-- Dashboard: https://bot.solicode.me/listen/dashboard
+- Landing: https://listenai.studio/
+- Demo Lab: https://listenai.studio/demo
+- Pricing: https://listenai.studio/pricing
+- Login: https://listenai.studio/login
+- Dashboard: https://listenai.studio/dashboard
 
 ## Stack
 - Laravel 12
@@ -44,7 +44,7 @@ systemctl status listen-app.service listen-queue.service
 ## Environment
 Set in `.env`:
 ```env
-APP_URL=https://bot.solicode.me/listen
+APP_URL=https://listenai.studio
 
 # API access
 LISTEN_API_KEY=your_generated_key_here
@@ -52,7 +52,7 @@ LISTEN_API_KEY=your_generated_key_here
 # Social login
 SOCIAL_CLIENT_ID=
 SOCIAL_CLIENT_SECRET=
-SOCIAL_REDIRECT_URI=https://bot.solicode.me/listen/auth/callback
+SOCIAL_REDIRECT_URI=https://listenai.studio/auth/social/callback
 
 # Speech engine credentials
 SPEECH_API_KEY=
