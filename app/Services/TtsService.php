@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\GeminiTtsModel;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use Illuminate\Support\Facades\Cache;
@@ -143,6 +144,13 @@ class TtsService
             }
         }
 
+        // The Arabic mapper returns a provider voice config and does not carry
+        // the caller's custom prompt. Put it back so demo, dashboard, and jobs
+        // still send it to Gemini.
+        if (array_key_exists('style_prompt', $options)) {
+            $voiceConfig['style_prompt'] = $options['style_prompt'];
+        }
+
         $studio = $this->normalizeStudioStyleOptions($voiceConfig);
         $voiceConfig['performance_style'] = $studio['performance_style'];
         $voiceConfig['style'] = $studio['performance_style']; // Backward compatibility for providers expecting `style`.
@@ -155,7 +163,7 @@ class TtsService
                 'audio_path' => $cached,
                 'duration_seconds' => $this->estimateDurationSeconds($text),
                 'provider' => 'cache',
-                'model' => null,
+                'model' => $provider->name() === 'gemini' ? GeminiTtsModel::resolve() : null,
                 'latency_ms' => 0,
                 'char_count' => mb_strlen($text),
                 'cost_estimate_usd' => 0.0,
@@ -168,8 +176,11 @@ class TtsService
         // Synthesize using routing service
         $result = $this->routingService->synthesize($text, $targetLanguage, $voiceConfig, $plan, $userId);
 
-        // Cache the result
-        $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
+        // A Gemini failure falls back to Google for that one request. Caching
+        // that file would keep serving WaveNet after the saved model recovers.
+        if (! ($result['fallback_used'] ?? false)) {
+            $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
+        }
 
         return $result;
     }
@@ -190,7 +201,52 @@ class TtsService
             (string) ($config['pitch'] ?? '0.0'),
             $text,
         ];
+
+        // Extra parts are appended only when they change the audio. Leaving
+        // them off for the default Gemini 2.5 model keeps the existing cache
+        // valid, so a deploy does not regenerate every saved clip.
+        $stylePrompt = trim((string) ($config['style_prompt'] ?? ''));
+        if ($stylePrompt !== '') {
+            $parts[] = 'prompt:'.$stylePrompt;
+        }
+
+        $speakers = $config['speakers'] ?? null;
+        if (is_array($speakers) && $speakers !== []) {
+            $encoded = json_encode($this->speakerCacheFingerprint($speakers), JSON_UNESCAPED_UNICODE);
+            if (is_string($encoded) && $encoded !== '' && $encoded !== '[]') {
+                $parts[] = 'speakers:'.$encoded;
+            }
+        }
+
+        if ($provider === 'gemini') {
+            $model = GeminiTtsModel::resolve();
+            if ($model !== GeminiTtsModel::CURRENT) {
+                $parts[] = 'model:'.$model;
+            }
+        }
+
         return sha1(implode('|', $parts));
+    }
+
+    /**
+     * @param  array<int, mixed>  $speakers
+     * @return array<int, array{name:string,voice:string}>
+     */
+    private function speakerCacheFingerprint(array $speakers): array
+    {
+        $fingerprint = [];
+        foreach ($speakers as $speaker) {
+            if (! is_array($speaker)) {
+                continue;
+            }
+
+            $fingerprint[] = [
+                'name' => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')),
+                'voice' => trim((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? '')),
+            ];
+        }
+
+        return $fingerprint;
     }
 
     /**

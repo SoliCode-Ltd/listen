@@ -390,7 +390,17 @@ class GeminiTtsProvider implements TtsProviderInterface
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
-        $stylePrompt = $customPrompt !== '' ? $customPrompt : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
+        $stylePrompt = $customPrompt !== ''
+            ? $customPrompt
+            : $this->buildStylePrompt(
+                $performanceStyle,
+                $emotion,
+                $targetLanguage,
+                $speed,
+                $dialect,
+                $pitch,
+                GeminiTtsModel::usesStructuredSpeech($model),
+            );
         $endpoint = $this->buildEndpoint($model);
         $payload = $this->buildSingleSpeakerPayload($model, $text, $stylePrompt, $voiceName, $languageCode);
 
@@ -417,7 +427,18 @@ class GeminiTtsProvider implements TtsProviderInterface
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $languageCode = $this->resolveLanguageCode($targetLanguage, $dialect);
 
-        $stylePrompt = $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $dialect, $pitch);
+        $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
+        $stylePrompt = $customPrompt !== ''
+            ? $customPrompt
+            : $this->buildStylePrompt(
+                $performanceStyle,
+                $emotion,
+                $targetLanguage,
+                $speed,
+                $dialect,
+                $pitch,
+                GeminiTtsModel::usesStructuredSpeech($model),
+            );
         $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
 
         $response = $this->callGeminiApi($endpoint, $payload);
@@ -844,7 +865,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      * Note: Gemini TTS doesn't have explicit speed/pitch API parameters like Google Cloud TTS.
      * Instead, these are controlled via natural language instructions in the prompt.
      */
-    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0): string
+    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false): string
     {
         $style = strtolower(trim($style));
         $emotion = strtolower(trim($emotion));
@@ -920,6 +941,21 @@ class GeminiTtsProvider implements TtsProviderInterface
             $prompt .= $dialectCode === 'AR-EG'
                 ? ' Stay in Cairene Egyptian colloquial Arabic, not Modern Standard Arabic. Pronounce ج like the English g, and use Cairo rhythm, the way someone from Cairo talks to a friend. Do not switch to formal Fusha or news-anchor pronunciation.'
                 : ' Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha.';
+        }
+
+        // Gemini 3.8 does not accept languageCode on a single-speaker request.
+        // The English accent has to travel in the style text, or American,
+        // British, and Australian selections all sound the same.
+        if ($structuredSpeech && ! $isArabic) {
+            $accentName = match ($dialectCode) {
+                'EN-US' => 'American English',
+                'EN-GB' => 'British English',
+                'EN-AU' => 'Australian English',
+                default => '',
+            };
+            if ($accentName !== '') {
+                $prompt .= " Voice accent: {$accentName}. Keep this accent consistent and do not switch to a different English accent.";
+            }
         }
 
         return trim($prompt);
