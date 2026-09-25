@@ -31,6 +31,9 @@ class ProcessVoiceCloningJob implements ShouldQueue
 
     public function handle(VoiceCloningService $service): void
     {
+        ignore_user_abort(true);
+        set_time_limit($this->timeout);
+
         $clonedVoice = ClonedVoice::find($this->clonedVoiceId);
 
         if (! $clonedVoice || $clonedVoice->status === 'ready') {

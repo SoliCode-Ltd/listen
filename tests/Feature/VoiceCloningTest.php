@@ -430,7 +430,7 @@ class VoiceCloningTest extends TestCase
         $response->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 2])]);
     }
 
-    public function test_preview_account_can_still_create_when_plan_max_is_zero(): void
+    public function test_plan_max_of_zero_blocks_the_preview_account(): void
     {
         $this->paidPlan->update([
             'voice_cloning_enabled' => true,
@@ -441,9 +441,9 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 5]), false);
+        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 0]), false);
+        $dashboard->assertDontSee(__('ui.voice_cloning.create_title'), false);
 
-        Bus::fake([ProcessVoiceCloningJob::class]);
         $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
         $submit = $this->actingAs($this->paidUser)
             ->postJsonLocalizedRoute('voice-cloning.store', [
@@ -457,7 +457,70 @@ class VoiceCloningTest extends TestCase
                 'audio_duration' => 15,
             ]);
 
-        $submit->assertOk();
+        $submit->assertStatus(422);
+        $submit->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 0])]);
+    }
+
+    public function test_plan_toggle_off_blocks_cloning_even_for_the_preview_account(): void
+    {
+        $this->paidPlan->update([
+            'voice_cloning_enabled' => false,
+            'voice_cloning_max_voices' => 5,
+        ]);
+
+        $dashboard = $this->actingAs($this->paidUser)
+            ->getLocalizedRoute('dashboard');
+
+        $dashboard->assertOk();
+        $dashboard->assertSee(__('ui.voice_cloning.plan_disabled'), false);
+        $dashboard->assertDontSee(__('ui.voice_cloning.create_title'), false);
+
+        $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
+        $submit = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', [
+                'name' => 'Blocked Voice',
+                'language_code' => 'ar-XA',
+                'source_type' => 'upload',
+                'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
+                'consent_confirmed' => '1',
+                'consent_duration' => 8,
+                'audio_duration' => 15,
+            ]);
+
+        $submit->assertStatus(403);
+        $submit->assertJsonFragment(['error' => __('ui.voice_cloning.plan_disabled')]);
+    }
+
+    public function test_pending_status_progress_moves_forward_and_stays_in_range(): void
+    {
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'status' => 'pending',
+        ]);
+        $voice->forceFill(['created_at' => now()->subMinutes(3)])->save();
+
+        $request = fn () => $this->actingAs($this->paidUser)
+            ->withoutMiddleware([
+                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            ])
+            ->getJson($this->localizedRoute('voice-cloning.status', ['id' => $voice->id]));
+
+        $first = $request();
+        $second = $request();
+
+        $first->assertOk();
+        $second->assertOk();
+        $firstProgress = (int) $first->json('progress_percent');
+        $secondProgress = (int) $second->json('progress_percent');
+
+        $this->assertGreaterThanOrEqual(0, (int) $first->json('elapsed_seconds'));
+        $this->assertGreaterThanOrEqual(12, $firstProgress);
+        $this->assertLessThanOrEqual(36, $firstProgress);
+        $this->assertGreaterThanOrEqual($firstProgress, $secondProgress);
+        $this->assertSame('pending', $first->json('status'));
     }
 
     public function test_sample_longer_than_thirty_seconds_is_rejected(): void

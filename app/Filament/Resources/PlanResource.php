@@ -285,13 +285,14 @@ class PlanResource extends Resource
                             ->helperText('Higher weight = higher priority in job queue (0-1000).'),
                     ]),
                 Forms\Components\Section::make('Voice Cloning')
-                    ->description('Control voice cloning access and limits for this plan.')
+                    ->description('Set whether this plan includes voice cloning, and the exact number of cloned voices each subscriber can keep.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('voice_cloning_enabled')
                             ->label('Enable Voice Cloning')
-                            ->helperText('Allow users on this plan to clone voices. The global voice cloning feature must also be enabled.')
+                            ->helperText('Subscribers on this plan can clone voices only while this is on. The site-wide voice cloning switch must also be on.')
                             ->default(false)
+                            ->live()
                             ->columnSpan(2),
                         Forms\Components\TextInput::make('voice_cloning_max_voices')
                             ->label('Max Cloned Voices')
@@ -299,7 +300,9 @@ class PlanResource extends Resource
                             ->minValue(0)
                             ->maxValue(100)
                             ->default(0)
-                            ->helperText('Max cloned voices for users on this plan. The dashboard uses this exact number.'),
+                            ->required()
+                            ->suffix('voices')
+                            ->helperText('Exact limit for each user on this plan. 0 means they cannot keep any cloned voices. This is the number shown in their studio.'),
                     ]),
                 Forms\Components\Section::make('Plan Features (English)')
                     ->description('Features shown on the English pricing card. Auto-populated from plan data, edit as needed.')
@@ -511,6 +514,12 @@ class PlanResource extends Resource
                 Tables\Columns\IconColumn::make('voice_cloning_enabled')
                     ->label('Voice Cloning')
                     ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: false),
+                Tables\Columns\TextColumn::make('voice_cloning_max_voices')
+                    ->label('Clone limit')
+                    ->formatStateUsing(fn ($state, Plan $record): string => $record->voice_cloning_enabled
+                        ? ((int) $state).' voices'
+                        : 'Off')
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('stripe_synced')
                     ->label('Stripe')

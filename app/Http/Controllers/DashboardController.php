@@ -113,6 +113,7 @@ class DashboardController extends Controller
         $voiceCloningCount = $voiceCloningVisible ? $voiceCloningVoices->count() : 0;
         $voiceCloningMaxVoices = VoiceCloningService::maxVoicesForViewer(auth()->user(), $activePlan);
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
+        $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);
 
         return view('dashboard', [
             'usage' => $usage,
@@ -164,6 +165,7 @@ class DashboardController extends Controller
                 : [],
             'voiceCloningVisible' => $voiceCloningVisible,
             'voiceCloningEnabledGlobally' => $voiceCloningEnabledGlobally,
+            'voiceCloningPlanEnabled' => $voiceCloningPlanEnabled,
             'voiceCloningList' => $voiceCloningVoices,
             'voiceCloningCount' => $voiceCloningCount,
             'voiceCloningMaxVoices' => $voiceCloningMaxVoices,

@@ -119,6 +119,38 @@ class VoiceCloningServiceTest extends TestCase
         );
     }
 
+    public function test_viewer_limit_follows_the_plan_toggle_and_exact_max(): void
+    {
+        $admin = User::factory()->create(['email' => VoiceCloningAccess::PREVIEW_EMAIL]);
+        $plan = Plan::factory()->paid()->create([
+            'voice_cloning_enabled' => true,
+            'voice_cloning_max_voices' => 0,
+        ]);
+
+        $this->assertSame(0, VoiceCloningService::maxVoicesForViewer($admin, $plan));
+
+        $plan->voice_cloning_max_voices = 3;
+        $this->assertSame(3, VoiceCloningService::maxVoicesForViewer($admin, $plan));
+
+        $plan->voice_cloning_enabled = false;
+        $this->assertFalse(VoiceCloningService::planAllows($plan));
+        $this->assertSame(0, VoiceCloningService::maxVoicesForViewer($admin, $plan));
+    }
+
+    public function test_progress_advances_within_a_status_and_caps_before_completion(): void
+    {
+        $this->assertSame(12, VoiceCloningService::progressPercent('pending', 0));
+        $this->assertSame(20, VoiceCloningService::progressPercent('pending', 24));
+        $this->assertSame(36, VoiceCloningService::progressPercent('pending', 500));
+        $this->assertGreaterThan(
+            VoiceCloningService::progressPercent('pending', 10),
+            VoiceCloningService::progressPercent('validating', 10),
+        );
+        $this->assertSame(100, VoiceCloningService::progressPercent('ready', 0));
+        $this->assertSame(0, VoiceCloningService::elapsedSeconds(null));
+        $this->assertGreaterThanOrEqual(40, VoiceCloningService::elapsedSeconds(now()->subSeconds(40)));
+    }
+
     public function test_only_preview_admin_can_access_cloning(): void
     {
         $admin = User::factory()->create(['email' => 'Solicode.co.uk@gmail.com']);

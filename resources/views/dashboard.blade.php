@@ -2098,19 +2098,22 @@
             <p>{{ __('ui.voice_cloning.feature_disabled') }}</p>
           </section>
         @else
-          <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+          @if(!($voiceCloningPlanEnabled ?? false))
+            <section class="vc-disabled-banner">
+              <p>{{ __('ui.voice_cloning.plan_disabled') }}</p>
+            </section>
+          @else
+            <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+          @endif
 
           <h2 id="vcVoicesTitle" style="font-size:1.05rem;margin-bottom:.75rem;{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">{{ __('ui.voice_cloning.your_voices_title') }}</h2>
           <section class="vc-grid" id="vcVoiceGrid" style="{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">
             @foreach($voiceCloningList as $voice)
               @php
-                $vcInitialProgress = match (strtolower((string) $voice->status)) {
-                    'pending' => 15,
-                    'validating' => 45,
-                    'processing' => 75,
-                    'ready', 'failed' => 100,
-                    default => 0,
-                };
+                $vcInitialProgress = \App\Services\VoiceCloningService::progressPercent(
+                    (string) $voice->status,
+                    \App\Services\VoiceCloningService::elapsedSeconds($voice->created_at),
+                );
                 $vcLanguageLabel = match ((string) $voice->language_code) {
                     'ar-XA' => __('ui.voice_cloning.language_ar'),
                     'en-US' => __('ui.voice_cloning.language_en_us'),
@@ -2170,13 +2173,13 @@
             <section class="vc-empty" id="vcEmptyState">
               <h3>{{ __('ui.voice_cloning.empty_title') }}</h3>
               <p>{{ __('ui.voice_cloning.empty_subtitle') }}</p>
-              @if(($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
+              @if(($voiceCloningPlanEnabled ?? false) && ($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
                 <button type="button" class="btn btn-primary" onclick="document.getElementById('vcCreatePanel')?.scrollIntoView({behavior:'smooth'})">{{ __('ui.voice_cloning.create_first') }}</button>
               @endif
             </section>
           @endif
 
-          @if(($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
+          @if(($voiceCloningPlanEnabled ?? false) && ($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
             <section class="vc-create-panel" id="vcCreatePanel">
               <h2>{{ __('ui.voice_cloning.create_title') }}</h2>
 
@@ -2324,7 +2327,7 @@
                 </div>
               </form>
             </section>
-          @else
+          @elseif($voiceCloningPlanEnabled ?? false)
             <div class="vc-alert error" id="vcLimitNotice" style="margin-top:.2rem">
               {{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}
             </div>
@@ -3571,22 +3574,34 @@
         }
       }
 
-      function statusProgress(status, elapsedSeconds = 0, serverProgress = null) {
-        const normalized = String(status || '').toLowerCase();
-        const base = Number(serverProgress);
-        const statusBase = {
-          pending: 15,
-          validating: 45,
-          processing: 75,
-          ready: 100,
-          failed: 100,
-        }[normalized] ?? 0;
+      function currentDisplayedPercent(card) {
+        const node = card?.querySelector('[data-vc-progress-percent]');
+        const value = Number(String(node?.textContent || '').replace(/[^\d.]/g, ''));
+        return Number.isFinite(value) ? value : 0;
+      }
 
-        const seed = Number.isFinite(base) ? base : statusBase;
-        if (normalized === 'pending') return Math.min(34, Math.max(seed, 15 + Math.floor(elapsedSeconds / 8)));
-        if (normalized === 'validating') return Math.min(68, Math.max(seed, 45 + Math.floor(elapsedSeconds / 9)));
-        if (normalized === 'processing') return Math.min(96, Math.max(seed, 75 + Math.floor(elapsedSeconds / 10)));
-        return seed;
+      function statusProgress(status, elapsedSeconds = 0, serverProgress = null, previous = 0) {
+        const normalized = String(status || '').toLowerCase();
+        if (normalized === 'ready' || normalized === 'failed') return 100;
+
+        const elapsed = Math.max(0, Number(elapsedSeconds) || 0);
+        const range = {
+          pending: [12, 36],
+          validating: [40, 66],
+          processing: [70, 96],
+        }[normalized] || [8, 90];
+        const floor = range[0];
+        const cap = range[1];
+        let next = Math.min(cap, floor + Math.floor(elapsed / 3));
+        const server = Number(serverProgress);
+        if (Number.isFinite(server)) {
+          next = Math.max(next, Math.min(normalized === 'pending' || normalized === 'validating' || normalized === 'processing' ? cap : 100, server));
+        }
+        const prior = Number(previous);
+        if (Number.isFinite(prior) && prior > 0 && prior < 100) {
+          next = Math.max(next, Math.min(cap, prior));
+        }
+        return Math.max(floor, Math.min(cap, next));
       }
 
       function ensureProcessingHint(card, visible) {
@@ -3656,7 +3671,7 @@
         progress.classList.remove('is-hidden');
         progress.classList.toggle('is-delayed', Boolean(delayed));
 
-        const percent = statusProgress(normalized, Number(elapsedSeconds || 0), serverProgress);
+        const percent = statusProgress(normalized, Number(elapsedSeconds || 0), serverProgress, currentDisplayedPercent(card));
         const fill = progress.querySelector('[data-vc-progress-fill]');
         const statusText = progress.querySelector('[data-vc-progress-status]');
         const percentText = progress.querySelector('[data-vc-progress-percent]');
@@ -3705,7 +3720,9 @@
         const createdTs = Number(payload.created_at_ts || card.dataset.createdTs || Math.floor(Date.now() / 1000));
         card.dataset.createdTs = String(createdTs);
 
-        const elapsedSeconds = Number(payload.elapsed_seconds ?? Math.max(0, Math.floor(Date.now() / 1000) - createdTs));
+        const rawElapsed = Number(payload.elapsed_seconds);
+        const fallbackElapsed = Math.max(0, Math.floor(Date.now() / 1000) - createdTs);
+        const elapsedSeconds = Number.isFinite(rawElapsed) ? Math.max(0, rawElapsed) : fallbackElapsed;
         const serverProgress = Number(payload.progress_percent ?? NaN);
         const failureReason = String(payload.failure_reason || card.dataset.failureReason || '').trim();
         if (failureReason) {

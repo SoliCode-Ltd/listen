@@ -194,18 +194,50 @@ class VoiceCloningService
     }
 
     /**
+     * Whether this plan includes voice cloning.
+     * The global kill switch still has to be on.
+     */
+    public static function planAllows(?Plan $plan): bool
+    {
+        return self::isEnabled() && (bool) ($plan?->voice_cloning_enabled ?? false);
+    }
+
+    /**
      * Slot count for the private preview account.
-     * A plan limit of zero does not lock the preview account out.
+     * The plan's max is the exact number, including zero.
      */
     public static function maxVoicesForViewer(?User $user, ?Plan $plan): int
     {
-        if (! VoiceCloningAccess::allows($user)) {
+        if (! VoiceCloningAccess::allows($user) || ! self::planAllows($plan)) {
             return 0;
         }
 
-        $configured = self::maxVoicesForPlan($plan);
+        return self::maxVoicesForPlan($plan);
+    }
 
-        return $configured > 0 ? $configured : max(1, self::maxVoicesPerUser());
+    /**
+     * Display progress for a cloning job. It only moves forward within a status.
+     */
+    public static function progressPercent(string $status, int $elapsedSeconds): int
+    {
+        $elapsed = max(0, $elapsedSeconds);
+
+        return match (strtolower(trim($status))) {
+            'pending' => min(36, 12 + intdiv($elapsed, 3)),
+            'validating' => min(66, 40 + intdiv($elapsed, 3)),
+            'processing' => min(96, 70 + intdiv($elapsed, 3)),
+            'ready', 'failed' => 100,
+            default => 0,
+        };
+    }
+
+    public static function elapsedSeconds(mixed $from): int
+    {
+        if (! $from) {
+            return 0;
+        }
+
+        return max(0, (int) \Carbon\Carbon::parse($from)->diffInSeconds(now(), true));
     }
 
     public static function minSampleDuration(): int

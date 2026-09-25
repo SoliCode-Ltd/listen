@@ -46,6 +46,10 @@ class VoiceCloningController extends Controller
             return $this->jsonError(__('ui.voice_cloning.feature_disabled'), 403);
         }
 
+        if (! VoiceCloningService::planAllows($activePlan)) {
+            return $this->jsonError(__('ui.voice_cloning.plan_disabled'), 403);
+        }
+
         // Rate limiting: max 5 clone requests per hour per user
         $rateLimitKey = "voice_cloning:{$userId}";
         if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
@@ -177,14 +181,9 @@ class VoiceCloningController extends Controller
 
         RateLimiter::hit($rateLimitKey, 3600);
 
-        // In local/dev with database queues, users often do not run a queue worker.
-        // Fallback to sync execution so the feature always works during local testing.
-        if (app()->environment('local') && (string) config('queue.default') === 'database') {
-            ProcessVoiceCloningJob::dispatchSync($clonedVoice->id);
-            $clonedVoice->refresh();
-        } else {
-            ProcessVoiceCloningJob::dispatch($clonedVoice->id);
-        }
+        // Run after the response is sent so the studio can poll immediately,
+        // even when no queue worker is consuming the database queue.
+        ProcessVoiceCloningJob::dispatch($clonedVoice->id)->afterResponse();
 
         return response()->json([
             'success' => true,
@@ -195,7 +194,7 @@ class VoiceCloningController extends Controller
                 'language_code' => $clonedVoice->language_code,
                 'source_type' => $clonedVoice->source_type,
                 'status' => $clonedVoice->status,
-                'progress_percent' => $this->progressPercentForStatus((string) $clonedVoice->status),
+                'progress_percent' => VoiceCloningService::progressPercent((string) $clonedVoice->status, 0),
                 'is_delayed' => false,
                 'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
                 'failure_reason' => $clonedVoice->isFailed()
@@ -215,15 +214,13 @@ class VoiceCloningController extends Controller
         }
 
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
-        $elapsedSeconds = $clonedVoice->created_at
-            ? now()->diffInSeconds($clonedVoice->created_at)
-            : 0;
+        $elapsedSeconds = VoiceCloningService::elapsedSeconds($clonedVoice->created_at);
 
         return response()->json([
             'id' => $clonedVoice->id,
             'name' => $clonedVoice->name,
             'status' => $clonedVoice->status,
-            'progress_percent' => $this->progressPercentForStatus((string) $clonedVoice->status),
+            'progress_percent' => VoiceCloningService::progressPercent((string) $clonedVoice->status, $elapsedSeconds),
             'elapsed_seconds' => $elapsedSeconds,
             'is_delayed' => $clonedVoice->isProcessing() && $elapsedSeconds >= 90,
             'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
@@ -272,17 +269,5 @@ class VoiceCloningController extends Controller
     private function jsonError(string $message, int $status = 422): \Illuminate\Http\JsonResponse
     {
         return response()->json(['success' => false, 'error' => $message], $status);
-    }
-
-    private function progressPercentForStatus(string $status): int
-    {
-        return match (strtolower(trim($status))) {
-            'pending' => 15,
-            'validating' => 45,
-            'processing' => 75,
-            'ready' => 100,
-            'failed' => 100,
-            default => 0,
-        };
     }
 }

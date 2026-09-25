@@ -1167,6 +1167,7 @@ return [
         'preview_badge' => 'Private preview',
 
         'feature_disabled' => 'Voice cloning is currently unavailable. Please check back later.',
+        'plan_disabled' => 'Voice cloning is turned off on your current plan. Turn it on for this plan and set how many voices it includes.',
         'upgrade_required' => 'Voice cloning is a premium feature. Upgrade your plan to unlock it.',
         'upgrade_title' => 'Unlock Voice Cloning',
         'upgrade_subtitle' => 'Voice cloning is available exclusively for paid plan subscribers.',
