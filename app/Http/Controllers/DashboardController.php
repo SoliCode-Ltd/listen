@@ -111,7 +111,9 @@ class DashboardController extends Controller
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
             : collect();
-        $voiceCloningCount = $voiceCloningVisible ? $voiceCloningVoices->count() : 0;
+        $voiceCloningCount = $voiceCloningVisible
+            ? $voiceCloningVoices->reject(fn (ClonedVoice $voice) => $voice->isFailed())->count()
+            : 0;
         $voiceCloningMaxVoices = VoiceCloningService::maxVoicesForViewer(auth()->user(), $activePlan);
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
         $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);

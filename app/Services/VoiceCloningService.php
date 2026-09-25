@@ -474,23 +474,46 @@ class VoiceCloningService
             return null;
         }
 
-        $candidates = [
-            data_get($json, 'id'),
-            data_get($json, 'voice.id'),
-            data_get($json, 'voice.name'),
-            data_get($json, 'name'),
-        ];
+        return $this->findVoiceId($json);
+    }
 
-        foreach ($candidates as $candidate) {
-            $value = trim((string) $candidate);
+    private function findVoiceId(mixed $value): ?string
+    {
+        if (is_string($value)) {
+            $value = trim($value);
             if ($value === '') {
-                continue;
+                return null;
             }
             if (str_contains($value, '/')) {
                 $value = (string) Str::afterLast($value, '/');
             }
-            if (str_starts_with($value, 'voice_')) {
-                return $value;
+
+            return (str_starts_with($value, 'voice_') || str_starts_with($value, 'voicekey_'))
+                ? $value
+                : null;
+        }
+
+        if (! is_array($value)) {
+            return null;
+        }
+
+        foreach (['id', 'voiceId', 'voice_id', 'name', 'key'] as $key) {
+            if (! array_key_exists($key, $value)) {
+                continue;
+            }
+            $found = $this->findVoiceId($value[$key]);
+            if ($found !== null) {
+                return $found;
+            }
+        }
+
+        foreach ($value as $child) {
+            if (! is_array($child)) {
+                continue;
+            }
+            $found = $this->findVoiceId($child);
+            if ($found !== null) {
+                return $found;
             }
         }
 
@@ -673,7 +696,7 @@ class VoiceCloningService
     private function classifyError(string $message, int $status): string
     {
         $haystack = strtolower($message);
-        if (str_contains($haystack, 'consent') || str_contains($haystack, 'speaker')) {
+        if (str_contains($haystack, 'consent') || str_contains($haystack, 'speaker') || str_contains($haystack, 'verif')) {
             return 'consent';
         }
         if (str_contains($haystack, 'duration') || str_contains($haystack, 'too long') || str_contains($haystack, 'too short') || str_contains($haystack, 'audio length')) {

@@ -694,4 +694,60 @@ class VoiceCloningTest extends TestCase
         $response->assertSee('My Custom Arabic Voice');
         $response->assertSee('clonedVoiceGroupLabel');
     }
+
+    public function test_failed_clone_does_not_use_up_the_plan_slot(): void
+    {
+        $this->paidPlan->update(['voice_cloning_max_voices' => 1]);
+        ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Failed Take',
+            'language_code' => 'ar-XA',
+        ]);
+
+        $dashboard = $this->actingAs($this->paidUser)
+            ->getLocalizedRoute('dashboard');
+
+        $dashboard->assertOk();
+        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 1]), false);
+        $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
+        $html = $dashboard->getContent();
+        $this->assertDoesNotMatchRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
+
+        Bus::fake([ProcessVoiceCloningJob::class]);
+        $submit = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', [
+                'name' => 'Second Take',
+                'language_code' => 'ar-XA',
+                'source_type' => 'upload',
+                'audio_file' => UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav'),
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
+                'consent_confirmed' => '1',
+                'consent_duration' => 8,
+                'audio_duration' => 15,
+            ]);
+
+        $submit->assertOk();
+        $submit->assertJson(['success' => true]);
+    }
+
+    public function test_ready_voice_offers_a_generator_button_with_that_speaker(): void
+    {
+        $voice = ClonedVoice::factory()->ready()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Walled Voice',
+            'language_code' => 'ar-XA',
+            'provider_voice_key' => 'voice_walled',
+        ]);
+
+        $page = $this->actingAs($this->paidUser)
+            ->getLocalizedRoute('dashboard', ['cloned_voice' => $voice->id]);
+
+        $page->assertOk();
+        $page->assertSee(__('ui.voice_cloning.use_in_generator'), false);
+        $page->assertSee('data-vc-action="use"', false);
+        $page->assertSee('openClonedVoiceInGenerator', false);
+        $page->assertSee('cloned_'.$voice->id, false);
+        $page->assertSee('Walled Voice', false);
+        $page->assertSee('cloned_voice='.$voice->id, false);
+    }
 }

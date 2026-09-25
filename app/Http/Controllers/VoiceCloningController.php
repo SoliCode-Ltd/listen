@@ -60,7 +60,8 @@ class VoiceCloningController extends Controller
         }
 
         // Check the plan cap. A stored max of 0 uses the site-wide default.
-        $currentCount = ClonedVoice::forUser($userId)->count();
+        // Failed attempts do not keep a slot, so the user can record again.
+        $currentCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($currentCount >= $maxVoices) {
             return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
@@ -228,6 +229,7 @@ class VoiceCloningController extends Controller
             'is_delayed' => $clonedVoice->isProcessing() && $elapsedSeconds >= 90,
             'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
             'updated_at_ts' => $clonedVoice->updated_at?->getTimestamp(),
+            'language_code' => $clonedVoice->language_code,
             'failure_reason' => $clonedVoice->isFailed()
                 ? VoiceCloningService::publicFailureMessage($clonedVoice)
                 : null,

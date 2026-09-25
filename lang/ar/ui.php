@@ -1261,7 +1261,7 @@ return [
         'delete_voice' => 'حذف',
         'delete_confirm' => 'حذف هذا الصوت المستنسخ؟ لن تتمكن من التوليد به بعد ذلك.',
         'deleted_success' => 'تم حذف الصوت المستنسخ.',
-        'use_in_generator' => 'استخدم هذا الصوت',
+        'use_in_generator' => 'استخدمه في المولّد',
         'created_on' => 'أُنشئ',
 
         'cloned_voice_label' => 'مستنسخ',

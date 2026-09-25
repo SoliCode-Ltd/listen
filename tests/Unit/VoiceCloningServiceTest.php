@@ -205,4 +205,28 @@ class VoiceCloningServiceTest extends TestCase
                 && $request->hasHeader('x-goog-api-key', 'test-key');
         });
     }
+
+    public function test_replication_accepts_a_nested_voice_id(): void
+    {
+        Storage::fake('local');
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        Storage::disk('local')->put('voice-cloning/sample.wav', 'sample-bytes');
+        Storage::disk('local')->put('voice-cloning/consent.wav', 'consent-bytes');
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'voice' => ['name' => 'voices/voice_nested123'],
+            ], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'source_audio_path' => 'voice-cloning/sample.wav',
+            'consent_audio_path' => 'voice-cloning/consent.wav',
+        ]);
+
+        $result = app(VoiceCloningService::class)->generateVoiceCloningKey($voice);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('voice_nested123', $result['voice_cloning_key']);
+    }
 }

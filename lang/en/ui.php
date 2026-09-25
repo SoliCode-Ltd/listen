@@ -1256,7 +1256,7 @@ return [
         'delete_voice' => 'Delete',
         'delete_confirm' => 'Delete this cloned voice? You will not be able to generate with it again.',
         'deleted_success' => 'Cloned voice deleted.',
-        'use_in_generator' => 'Use this voice',
+        'use_in_generator' => 'Use in the generator',
         'created_on' => 'Created',
 
         'cloned_voice_label' => 'Cloned',

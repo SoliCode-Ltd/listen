@@ -21,7 +21,11 @@
       gap: .55rem .8rem;
       margin-top: .85rem;
     }
-    .vc-count { font-size: .9rem; color: var(--muted); margin: 0; }
+    .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
+    #voice_key.vc-speaker-picked {
+      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
+    }
     .vc-notice {
       padding: .85rem 1rem;
       border-radius: var(--radius);
@@ -2238,7 +2242,7 @@
                     ? $voice->created_at->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY')
                     : '';
               @endphp
-                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->failure_reason }}">
+                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->failure_reason }}">
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}">
@@ -2268,7 +2272,7 @@
                   </div>
                   <div class="vc-card-actions">
                     @if($voice->isReady())
-                      <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary">{{ __('ui.voice_cloning.use_in_generator') }}</a>
+                      <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">{{ __('ui.voice_cloning.use_in_generator') }}</a>
                     @endif
                     <button
                       type="button"
@@ -3477,6 +3481,44 @@
     renderVoiceOptions();
     renderDialectOptions();
     applyStudioDefaults();
+
+    function clonedVoiceLanguage(languageCode) {
+      return String(languageCode || '').toLowerCase().startsWith('en') ? 'en' : 'ar';
+    }
+
+    window.openClonedVoiceInGenerator = function(voice) {
+      const id = String(voice?.id || '').trim();
+      if (!/^\d+$/.test(id) || !voiceSelect || !targetLanguage) return false;
+      const key = `cloned_${id}`;
+      const name = String(voice?.name || '').trim() || `Voice ${id}`;
+      const languageCode = String(voice?.language_code || 'ar-XA');
+      const lang = clonedVoiceLanguage(languageCode);
+      if (!clonedVoices.some((entry) => String(entry.key) === key)) {
+        clonedVoices.push({ id: Number(id), name, language_code: languageCode, key });
+      }
+      preferredVoiceKeyByLanguage[lang] = key;
+      if (normalizeLanguage(targetLanguage.value) !== lang) {
+        targetLanguage.value = lang;
+        renderDialectOptions();
+        applyStudioDefaults();
+      }
+      renderVoiceOptions();
+      if (!setSelectValueIfAvailable(voiceSelect, key)) return false;
+      preferredVoiceKeyByLanguage[lang] = key;
+      voiceSelect.classList.add('vc-speaker-picked');
+      setTimeout(() => voiceSelect.classList.remove('vc-speaker-picked'), 2200);
+      setActiveDashboardSection('generateVoiceSection');
+      if (window.localStorage) {
+        window.localStorage.setItem('dashboard_active_section', 'generateVoiceSection');
+      }
+      const nextUrl = `${window.location.pathname}?cloned_voice=${encodeURIComponent(id)}#generateVoiceSection`;
+      if (`${window.location.pathname}${window.location.search}${window.location.hash}` !== nextUrl) {
+        history.replaceState(null, '', nextUrl);
+      }
+      document.getElementById('generateVoiceSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      voiceSelect.focus({ preventScroll: true });
+      return true;
+    };
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();
@@ -3539,6 +3581,15 @@
     window.addEventListener('hashchange', function() {
       syncSectionFromHash(true);
     });
+
+    (function openRequestedClonedVoice() {
+      const params = new URLSearchParams(window.location.search);
+      const id = String(params.get('cloned_voice') || '').trim();
+      if (!/^\d+$/.test(id) || typeof window.openClonedVoiceInGenerator !== 'function') return;
+      const match = clonedVoices.find((entry) => String(entry.id) === id);
+      if (!match) return;
+      window.openClonedVoiceInGenerator(match);
+    })();
 
     copyExtensionKeyBtn?.addEventListener('click', async function() {
       const raw = String(copyExtensionKeyBtn.getAttribute('data-copy-value') || '').trim();
@@ -3838,8 +3889,15 @@
 
       function applyStatusToCard(card, payload) {
         if (!card || !payload) return;
-        const status = String(payload.status || card.dataset.status || 'pending').toLowerCase();
+        const previousStatus = String(card.dataset.status || '').toLowerCase();
+        const status = String(payload.status || previousStatus || 'pending').toLowerCase();
+        if (payload.language_code) card.dataset.languageCode = String(payload.language_code);
+        if (payload.name) card.dataset.voiceName = String(payload.name);
         card.dataset.status = status;
+        if (status === 'failed' && previousStatus && previousStatus !== 'failed') {
+          currentVoiceCount = Math.max(0, currentVoiceCount - 1);
+          updateCountUI();
+        }
 
         const createdTs = Number(payload.created_at_ts || card.dataset.createdTs || Math.floor(Date.now() / 1000));
         card.dataset.createdTs = String(createdTs);
@@ -3927,7 +3985,7 @@
         const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
 
         return `
-          <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-failure-reason="${failureReason}">
+          <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-failure-reason="${failureReason}">
             <div class="vc-card-header">
               <h3 class="vc-card-name">${name}</h3>
               <span class="vc-status ${escapeHtml(status)}">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
@@ -4488,6 +4546,19 @@
 
       voiceGrid?.addEventListener('click', async function(event) {
         const target = event.target;
+        const useLink = target instanceof Element ? target.closest('[data-vc-action="use"]') : null;
+        if (useLink) {
+          event.preventDefault();
+          const card = useLink.closest('.vc-card');
+          if (card && typeof window.openClonedVoiceInGenerator === 'function') {
+            window.openClonedVoiceInGenerator({
+              id: card.dataset.voiceId,
+              name: card.dataset.voiceName,
+              language_code: card.dataset.languageCode,
+            });
+          }
+          return;
+        }
         const button = target instanceof Element ? target.closest('.vc-delete-btn') : null;
         if (!button) return;
         if (!confirm(button.dataset.confirm || '')) return;
@@ -4503,9 +4574,12 @@
             stopPolling(voiceId);
             const card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
             if (card) {
+              const occupying = String(card.dataset.status || '') !== 'failed';
               card.remove();
-              currentVoiceCount = Math.max(0, currentVoiceCount - 1);
-              updateCountUI();
+              if (occupying) {
+                currentVoiceCount = Math.max(0, currentVoiceCount - 1);
+                updateCountUI();
+              }
               updateEmptyStateUI();
             }
             return;
