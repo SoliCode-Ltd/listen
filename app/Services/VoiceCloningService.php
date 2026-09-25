@@ -186,11 +186,16 @@ class VoiceCloningService
 
     public static function maxVoicesForPlan(?Plan $plan): int
     {
-        if ($plan && $plan->voice_cloning_max_voices !== null) {
-            return max(0, (int) $plan->voice_cloning_max_voices);
+        $siteDefault = max(1, self::maxVoicesPerUser());
+
+        if (! $plan) {
+            return $siteDefault;
         }
 
-        return self::maxVoicesPerUser();
+        $configured = (int) ($plan->voice_cloning_max_voices ?? 0);
+
+        // The column default is 0, which means "use the site-wide limit".
+        return $configured > 0 ? $configured : $siteDefault;
     }
 
     /**
@@ -204,7 +209,7 @@ class VoiceCloningService
 
     /**
      * Slot count for the private preview account.
-     * The plan's max is the exact number, including zero.
+     * A plan max of 0 uses the site-wide default. Turning the plan toggle off still returns 0.
      */
     public static function maxVoicesForViewer(?User $user, ?Plan $plan): int
     {

@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\ProcessVoiceCloningJob;
 use App\Models\ClonedVoice;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\VoiceCloningService;
@@ -425,6 +426,17 @@ class VoiceCloningTest extends TestCase
             'user_id' => $this->paidUser->id,
         ]);
 
+        $dashboard = $this->actingAs($this->paidUser)
+            ->getLocalizedRoute('dashboard');
+
+        $dashboard->assertOk();
+        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 2, 'max' => 2]), false);
+        $dashboard->assertSee(__('ui.voice_cloning.limit_reached', ['max' => 2]), false);
+        $dashboard->assertSee('class="vc-notice" id="vcLimitNotice"', false);
+        $html = $dashboard->getContent();
+        $this->assertMatchesRegularExpression('/id="vcLimitNotice"(?!\s+style="display:none")/', $html);
+        $this->assertMatchesRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
+
         $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
 
         $response = $this->actingAs($this->paidUser)
@@ -443,8 +455,9 @@ class VoiceCloningTest extends TestCase
         $response->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 2])]);
     }
 
-    public function test_plan_max_of_zero_blocks_the_preview_account(): void
+    public function test_plan_max_of_zero_uses_the_site_default_for_the_preview_account(): void
     {
+        SiteSetting::set('voice_cloning_max_per_user', 5);
         $this->paidPlan->update([
             'voice_cloning_enabled' => true,
             'voice_cloning_max_voices' => 0,
@@ -454,9 +467,14 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 0]), false);
-        $dashboard->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 5]), false);
+        $dashboard->assertSee(__('ui.voice_cloning.create_title'), false);
+        $dashboard->assertDontSee(__('ui.voice_cloning.limit_reached', ['max' => 0]), false);
+        $html = $dashboard->getContent();
+        $this->assertDoesNotMatchRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
+        $this->assertMatchesRegularExpression('/id="vcLimitNotice"\s+style="display:none"/', $html);
 
+        Bus::fake([ProcessVoiceCloningJob::class]);
         $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
         $submit = $this->actingAs($this->paidUser)
             ->postJsonLocalizedRoute('voice-cloning.store', [
@@ -470,8 +488,9 @@ class VoiceCloningTest extends TestCase
                 'audio_duration' => 15,
             ]);
 
-        $submit->assertStatus(422);
-        $submit->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 0])]);
+        $submit->assertOk();
+        $submit->assertJson(['success' => true]);
+        Bus::assertDispatched(ProcessVoiceCloningJob::class);
     }
 
     public function test_plan_toggle_off_blocks_cloning_even_for_the_preview_account(): void

@@ -6,6 +6,7 @@ use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\StripeProductSyncService;
+use App\Services\VoiceCloningService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -285,7 +286,7 @@ class PlanResource extends Resource
                             ->helperText('Higher weight = higher priority in job queue (0-1000).'),
                     ]),
                 Forms\Components\Section::make('Voice Cloning')
-                    ->description('Set whether this plan includes voice cloning, and the exact number of cloned voices each subscriber can keep.')
+                    ->description('Turn cloning on for this plan, then set how many cloned voices each subscriber can keep. 0 uses the site-wide default.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('voice_cloning_enabled')
@@ -302,7 +303,7 @@ class PlanResource extends Resource
                             ->default(0)
                             ->required()
                             ->suffix('voices')
-                            ->helperText('Exact limit for each user on this plan. 0 means they cannot keep any cloned voices. This is the number shown in their studio.'),
+                            ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
                 Forms\Components\Section::make('Plan Features (English)')
                     ->description('Features shown on the English pricing card. Auto-populated from plan data, edit as needed.')
@@ -517,9 +518,15 @@ class PlanResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\TextColumn::make('voice_cloning_max_voices')
                     ->label('Clone limit')
-                    ->formatStateUsing(fn ($state, Plan $record): string => $record->voice_cloning_enabled
-                        ? ((int) $state).' voices'
-                        : 'Off')
+                    ->formatStateUsing(function ($state, Plan $record): string {
+                        if (! $record->voice_cloning_enabled) {
+                            return 'Off';
+                        }
+
+                        $configured = (int) $state;
+
+                        return $configured > 0 ? $configured.' voices' : 'Site default';
+                    })
                     ->toggleable(isToggledHiddenByDefault: false),
                 Tables\Columns\IconColumn::make('stripe_synced')
                     ->label('Stripe')
@@ -663,7 +670,7 @@ class PlanResource extends Resource
 
         // Voice Cloning
         if ((bool) ($record->voice_cloning_enabled ?? false)) {
-            $maxVoices = (int) ($record->voice_cloning_max_voices ?? 0);
+            $maxVoices = VoiceCloningService::maxVoicesForPlan($record);
             $features[] = ['label' => 'Voice Cloning', 'value' => "Up to {$maxVoices} voices", 'icon' => 'mic'];
         }
 
@@ -719,7 +726,7 @@ class PlanResource extends Resource
 
         // Voice Cloning
         if ((bool) ($record->voice_cloning_enabled ?? false)) {
-            $maxVoices = (int) ($record->voice_cloning_max_voices ?? 0);
+            $maxVoices = VoiceCloningService::maxVoicesForPlan($record);
             $features[] = [
                 'label' => "\u{0627}\u{0633}\u{062A}\u{0646}\u{0633}\u{0627}\u{062E} \u{0627}\u{0644}\u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",
                 'value' => "\u{062D}\u{062A}\u{0649} {$maxVoices} \u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",

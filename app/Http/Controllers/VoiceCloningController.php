@@ -59,7 +59,7 @@ class VoiceCloningController extends Controller
             return $this->jsonError(__('ui.voice_cloning.rate_limited'), 429);
         }
 
-        // Check per-plan voice limit (exact plan value).
+        // Check the plan cap. A stored max of 0 uses the site-wide default.
         $currentCount = ClonedVoice::forUser($userId)->count();
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($currentCount >= $maxVoices) {

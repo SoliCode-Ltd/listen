@@ -41,7 +41,7 @@ class VoiceCloningServiceTest extends TestCase
         $this->assertEquals(10, VoiceCloningService::maxVoicesPerUser());
     }
 
-    public function test_max_voices_for_plan_uses_exact_plan_value_including_zero(): void
+    public function test_max_voices_for_plan_uses_site_default_when_plan_max_is_zero(): void
     {
         SiteSetting::set('voice_cloning_max_per_user', 9);
 
@@ -50,7 +50,10 @@ class VoiceCloningServiceTest extends TestCase
             'voice_cloning_max_voices' => 0,
         ]);
 
-        $this->assertEquals(0, VoiceCloningService::maxVoicesForPlan($plan));
+        $this->assertEquals(9, VoiceCloningService::maxVoicesForPlan($plan));
+
+        $plan->voice_cloning_max_voices = 4;
+        $this->assertEquals(4, VoiceCloningService::maxVoicesForPlan($plan));
     }
 
     public function test_max_voices_for_plan_falls_back_to_global_only_when_plan_is_missing(): void
@@ -127,7 +130,7 @@ class VoiceCloningServiceTest extends TestCase
             'voice_cloning_max_voices' => 0,
         ]);
 
-        $this->assertSame(0, VoiceCloningService::maxVoicesForViewer($admin, $plan));
+        $this->assertSame(5, VoiceCloningService::maxVoicesForViewer($admin, $plan));
 
         $plan->voice_cloning_max_voices = 3;
         $this->assertSame(3, VoiceCloningService::maxVoicesForViewer($admin, $plan));

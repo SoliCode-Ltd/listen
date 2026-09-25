@@ -12,9 +12,26 @@
     }
 
     /* Custom voice studio */
-    .vc-shell { margin-top: .25rem; }
+    .vc-shell { margin-top: .25rem; min-width: 0; }
     .vc-intro p { margin: .4rem 0 0; color: var(--muted); }
-    .vc-count { font-size: .9rem; color: var(--muted); margin: 0 0 1rem; }
+    .vc-meta {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .55rem .8rem;
+      margin-top: .85rem;
+    }
+    .vc-count { font-size: .9rem; color: var(--muted); margin: 0; }
+    .vc-notice {
+      padding: .85rem 1rem;
+      border-radius: var(--radius);
+      margin-top: .2rem;
+      font-size: .9rem;
+      line-height: 1.5;
+      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
+      color: var(--text);
+    }
     .vc-alert { padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .9rem; display: flex; align-items: center; gap: .5rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
     .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
@@ -44,8 +61,8 @@
       border-color: color-mix(in oklab, var(--a) 55%, var(--line));
       box-shadow: 0 0 0 2px color-mix(in oklab, var(--a) 24%, transparent);
     }
-    .vc-card-header { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; margin-bottom: .7rem; }
-    .vc-card-name { margin: 0; font-size: 1rem; font-weight: 700; }
+    .vc-card-header { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; margin-bottom: .7rem; flex-wrap: wrap; }
+    .vc-card-name { margin: 0; font-size: 1rem; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .vc-card-meta { font-size: .84rem; color: var(--muted); display: grid; gap: .2rem; margin-bottom: .7rem; }
     .vc-status { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid transparent; }
     .vc-status.ready { color: #16a34a; background: color-mix(in oklab, #22c55e 14%, var(--surface)); border-color: color-mix(in oklab, #22c55e 28%, var(--line)); }
@@ -138,7 +155,8 @@
       gap: .6rem;
       font-size: .85rem;
     }
-    .vc-file-info .remove { cursor: pointer; font-weight: 700; color: var(--muted); }
+    .vc-file-info span:first-child { min-width: 0; overflow-wrap: anywhere; }
+    .vc-file-info .remove { cursor: pointer; font-weight: 700; color: var(--muted); flex-shrink: 0; }
     .vc-file-info .remove:hover { color: #dc2626; }
     .vc-recorder { text-align: center; border: 1px solid color-mix(in oklab, var(--line) 60%, transparent); border-radius: .9rem; padding: 1rem; background: color-mix(in oklab, var(--surface) 78%, transparent); }
     .vc-recorder .rec-btn { width: 68px; height: 68px; border-radius: 999px; border: 3px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
@@ -164,13 +182,13 @@
     }
     .vc-consent { margin-top: 1rem; margin-bottom: .95rem; border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--line) 70%, transparent); background: color-mix(in oklab, var(--surface2) 55%, var(--surface)); padding: .75rem .85rem; display: flex; align-items: flex-start; gap: .6rem; }
     .vc-consent input[type=checkbox] { margin-top: .1rem; width: 18px; height: 18px; accent-color: var(--a); }
-    .vc-consent label { margin: 0; font-size: .85rem; line-height: 1.45; color: var(--text); }
+    .vc-consent label { margin: 0; font-size: .85rem; line-height: 1.45; color: var(--text); min-width: 0; }
     .vc-privacy { display: flex; align-items: flex-start; gap: .4rem; color: var(--muted); font-size: .8rem; margin-bottom: .95rem; }
     .vc-privacy svg { width: 14px; height: 14px; margin-top: .1rem; opacity: .7; flex-shrink: 0; }
     .vc-preview-pill {
       display: inline-flex;
       align-items: center;
-      margin-top: .75rem;
+      margin-top: 0;
       padding: .22rem .65rem;
       border-radius: 999px;
       font-size: .75rem;
@@ -313,7 +331,57 @@
       50% { height: 16px; opacity: 1; }
     }
     @media (max-width: 720px) {
-      .vc-field-grid, .vc-actions-row, .vc-steps { grid-template-columns: 1fr; flex-direction: column; }
+      .vc-field-grid,
+      .vc-actions-row {
+        grid-template-columns: 1fr;
+        flex-direction: column;
+      }
+      .vc-steps { flex-direction: row; }
+      .vc-tab,
+      .vc-step { flex: 1 1 0; min-height: 44px; }
+      .vc-create-panel,
+      .vc-empty,
+      .vc-upgrade,
+      .vc-disabled-banner,
+      .vc-card {
+        padding: .9rem;
+      }
+      .vc-tabs,
+      .vc-script-toolbar,
+      .vc-card-actions,
+      .vc-actions-row,
+      .vc-meta {
+        flex-wrap: wrap;
+      }
+      .vc-actions-row .btn,
+      .vc-card-actions .btn,
+      .vc-upgrade .btn,
+      #vcNextStep,
+      #vcEmptyState .btn {
+        width: 100%;
+        min-height: 44px;
+      }
+      .vc-script-toolbar { align-items: flex-start; }
+      .vc-copy { min-height: 36px; }
+      #vcConsentScript,
+      #vcConsentScript[dir="rtl"] {
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+      .vc-grid { grid-template-columns: minmax(0, 1fr); }
+      .vc-upload-zone p,
+      .vc-guidelines li,
+      .vc-consent label,
+      .vc-privacy,
+      .vc-intro p,
+      .vc-notice {
+        overflow-wrap: anywhere;
+      }
+    }
+    @media (max-width: 420px) {
+      .vc-step { font-size: .8rem; padding: .5rem .6rem; }
+      .vc-recorder { padding: .85rem .6rem; }
+      .vc-shell h1 { font-size: 1.35rem; }
     }
     .bg-orb.a {
       width: 22rem;
@@ -1548,14 +1616,32 @@
       .mini {
         grid-template-columns: 1fr;
       }
-      .dashboard-menu {
+      .dashboard-menu,
+      html[dir="rtl"] .dashboard-menu {
         position: static;
+        padding: 0;
+      }
+      .dashboard-menu-link:hover,
+      html[dir="rtl"] .dashboard-menu-link:hover {
+        transform: none;
       }
       .dashboard-menu-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .dashboard-menu-link {
+        min-width: 0;
+      }
+      .dashboard-menu-link span:first-child {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
       .plan-card {
         position: static;
+      }
+      .dashboard-content,
+      .page-card {
+        min-width: 0;
+        overflow-wrap: anywhere;
       }
     }
     @media (max-width: 640px) {
@@ -2083,13 +2169,29 @@
     </section>
 
     @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
+    @php
+      $vcStudioOpen = ($voiceCloningPlanEnabled ?? false)
+          && ($voiceCloningEnabledGlobally ?? false)
+          && ($voiceCloningMaxVoices ?? 0) > 0;
+      $vcCanCreate = $vcStudioOpen && ($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0);
+      $vcAtLimit = $vcStudioOpen
+          && ($voiceCloningCount ?? 0) > 0
+          && ($voiceCloningCount ?? 0) >= ($voiceCloningMaxVoices ?? 0);
+    @endphp
     <section id="voiceCloningSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal vc-shell">
         <div class="vc-intro">
           <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
           <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
-          @if($voiceCloningVisible ?? false)
-          <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
+          @if(($voiceCloningVisible ?? false) || $vcStudioOpen)
+          <div class="vc-meta">
+            @if($voiceCloningVisible ?? false)
+            <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
+            @endif
+            @if($vcStudioOpen)
+            <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+            @endif
+          </div>
           @endif
         </div>
 
@@ -2115,8 +2217,6 @@
             <section class="vc-disabled-banner">
               <p>{{ __('ui.voice_cloning.plan_disabled') }}</p>
             </section>
-          @else
-            <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
           @endif
 
           <h2 id="vcVoicesTitle" style="font-size:1.05rem;margin-bottom:.75rem;{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">{{ __('ui.voice_cloning.your_voices_title') }}</h2>
@@ -2182,18 +2282,16 @@
                 </article>
             @endforeach
           </section>
-          @if(($voiceCloningList?->count() ?? 0) === 0)
-            <section class="vc-empty" id="vcEmptyState">
+          @if($vcStudioOpen)
+            <section class="vc-empty" id="vcEmptyState" @if(($voiceCloningList?->count() ?? 0) > 0) style="display:none" @endif>
               <h3>{{ __('ui.voice_cloning.empty_title') }}</h3>
               <p>{{ __('ui.voice_cloning.empty_subtitle') }}</p>
-              @if(($voiceCloningPlanEnabled ?? false) && ($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
-                <button type="button" class="btn btn-primary" onclick="document.getElementById('vcCreatePanel')?.scrollIntoView({behavior:'smooth'})">{{ __('ui.voice_cloning.create_first') }}</button>
-              @endif
+              <button type="button" class="btn btn-primary" onclick="document.getElementById('vcCreatePanel')?.scrollIntoView({behavior:'smooth', block:'start'})">{{ __('ui.voice_cloning.create_first') }}</button>
             </section>
           @endif
 
-          @if(($voiceCloningPlanEnabled ?? false) && ($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
-            <section class="vc-create-panel" id="vcCreatePanel">
+          @if($vcStudioOpen)
+            <section class="vc-create-panel" id="vcCreatePanel" @if(! $vcCanCreate) style="display:none" @endif>
               <h2>{{ __('ui.voice_cloning.create_title') }}</h2>
 
               <div class="vc-guidelines">
@@ -2340,8 +2438,7 @@
                 </div>
               </form>
             </section>
-          @elseif($voiceCloningPlanEnabled ?? false)
-            <div class="vc-alert error" id="vcLimitNotice" style="margin-top:.2rem">
+            <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
               {{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}
             </div>
           @endif
@@ -3578,12 +3675,13 @@
           countText.textContent = formatCount();
         }
 
-        const canCreateMore = currentVoiceCount < MAX_VOICES;
+        const canCreateMore = MAX_VOICES > 0 && currentVoiceCount < MAX_VOICES;
         if (createPanel) {
           createPanel.style.display = canCreateMore ? '' : 'none';
         }
         if (limitNotice) {
-          limitNotice.style.display = canCreateMore ? 'none' : '';
+          const atLimit = MAX_VOICES > 0 && currentVoiceCount > 0 && currentVoiceCount >= MAX_VOICES;
+          limitNotice.style.display = atLimit ? '' : 'none';
         }
       }
 
