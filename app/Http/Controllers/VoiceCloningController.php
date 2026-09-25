@@ -6,6 +6,7 @@ use App\Jobs\ProcessVoiceCloningJob;
 use App\Models\ClonedVoice;
 use App\Services\PlanAccessService;
 use App\Services\VoiceCloningService;
+use App\Support\VoiceCloningAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
@@ -22,6 +23,10 @@ class VoiceCloningController extends Controller
      */
     public function index(Request $request)
     {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            return redirect()->route('dashboard');
+        }
+
         return redirect()->to(route('dashboard') . '#voiceCloningSection');
     }
 
@@ -30,22 +35,13 @@ class VoiceCloningController extends Controller
      */
     public function store(Request $request)
     {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            abort(404);
+        }
+
         $userId = (int) auth()->id();
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
 
-        // Enforce paid plan
-        $isFree = ! $activePlan
-            || strtolower(trim($activePlan->slug ?? 'free')) === 'free'
-            || (int) $activePlan->price_cents === 0;
-
-        // Check if voice cloning is enabled for this plan
-        $planAllowsCloning = ! $isFree && (bool) ($activePlan->voice_cloning_enabled ?? false);
-
-        if ($isFree || ! $planAllowsCloning) {
-            return $this->jsonError(__('ui.voice_cloning.upgrade_required'), 403);
-        }
-
-        // Check if feature is enabled globally
         if (! VoiceCloningService::isEnabled()) {
             return $this->jsonError(__('ui.voice_cloning.feature_disabled'), 403);
         }
@@ -58,13 +54,15 @@ class VoiceCloningController extends Controller
 
         // Check per-plan voice limit (exact plan value).
         $currentCount = ClonedVoice::forUser($userId)->count();
-        $maxVoices = VoiceCloningService::maxVoicesForPlan($activePlan);
+        $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($currentCount >= $maxVoices) {
             return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
         }
 
         // Validate inputs
         $minDuration = VoiceCloningService::minSampleDuration();
+        $maxDuration = VoiceCloningService::maxSampleDuration();
+        $minConsent = VoiceCloningService::minConsentDuration();
         $maxSizeMb = VoiceCloningService::maxUploadSizeMb();
         $maxSizeKb = $maxSizeMb * 1024;
         $allowedMimes = VoiceCloningService::allowedMimeTypes();
@@ -98,8 +96,33 @@ class VoiceCloningController extends Controller
                     $fail(__('ui.voice_cloning.validation.audio_invalid_type'));
                 },
             ],
+            'consent_audio' => [
+                'required',
+                'file',
+                "max:{$maxSizeKb}",
+                function (string $attribute, mixed $value, \Closure $fail) use ($allowedExtValues, $allowedMimes): void {
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
+                        return;
+                    }
+
+                    $clientExt = strtolower((string) $value->getClientOriginalExtension());
+                    $guessedExt = strtolower((string) $value->guessExtension());
+                    $detectedMime = strtolower((string) $value->getMimeType());
+
+                    $extAllowed = in_array($clientExt, $allowedExtValues, true)
+                        || in_array($guessedExt, $allowedExtValues, true);
+                    $mimeAllowed = in_array($detectedMime, $allowedMimes, true);
+
+                    if ($extAllowed || $mimeAllowed) {
+                        return;
+                    }
+
+                    $fail(__('ui.voice_cloning.validation.audio_invalid_type'));
+                },
+            ],
             'consent_confirmed' => ['required', 'accepted'],
-            'audio_duration' => ['required', 'numeric', "min:{$minDuration}"],
+            'audio_duration' => ['required', 'numeric', "min:{$minDuration}", "max:{$maxDuration}"],
+            'consent_duration' => ['required', 'numeric', "min:{$minConsent}", "max:{$maxDuration}"],
         ], [
             'name.required' => __('ui.voice_cloning.validation.name_required'),
             'name.min' => __('ui.voice_cloning.validation.name_min'),
@@ -111,6 +134,11 @@ class VoiceCloningController extends Controller
             'consent_confirmed.required' => __('ui.voice_cloning.validation.consent_required'),
             'consent_confirmed.accepted' => __('ui.voice_cloning.validation.consent_required'),
             'audio_duration.min' => __('ui.voice_cloning.validation.audio_too_short', ['min' => $minDuration]),
+            'audio_duration.max' => __('ui.voice_cloning.validation.audio_too_long', ['max' => $maxDuration]),
+            'consent_audio.required' => __('ui.voice_cloning.validation.consent_audio_required'),
+            'consent_duration.required' => __('ui.voice_cloning.validation.consent_audio_required'),
+            'consent_duration.min' => __('ui.voice_cloning.validation.consent_too_short', ['min' => $minConsent]),
+            'consent_duration.max' => __('ui.voice_cloning.validation.audio_too_long', ['max' => $maxDuration]),
             'source_type.required' => __('ui.voice_cloning.validation.source_type_required'),
             'source_type.in' => __('ui.voice_cloning.validation.source_type_invalid'),
             'language_code.required' => __('ui.voice_cloning.validation.language_required'),
@@ -124,17 +152,27 @@ class VoiceCloningController extends Controller
         $filename = "voice-cloning/{$userId}/" . Str::uuid() . ".{$ext}";
         Storage::disk('local')->put($filename, file_get_contents($file->getRealPath()));
 
-        // Create the cloned voice record
+        $consentFile = $request->file('consent_audio');
+        $consentExt = $consentFile->getClientOriginalExtension() ?: 'wav';
+        $consentFilename = "voice-cloning/{$userId}/" . Str::uuid() . "-consent.{$consentExt}";
+        Storage::disk('local')->put($consentFilename, file_get_contents($consentFile->getRealPath()));
+
         $clonedVoice = ClonedVoice::create([
             'user_id' => $userId,
             'name' => $validated['name'],
             'source_type' => $validated['source_type'],
             'source_audio_path' => $filename,
+            'consent_audio_path' => $consentFilename,
             'source_audio_duration_seconds' => (int) $validated['audio_duration'],
             'language_code' => $validated['language_code'],
-            'provider' => 'google_cloud_chirp3',
+            'provider' => 'gemini',
             'status' => 'pending',
             'consent_confirmed' => true,
+            'metadata' => [
+                'model' => VoiceCloningService::MODEL,
+                'consent_duration_seconds' => (int) $validated['consent_duration'],
+                'consent_script' => VoiceCloningService::consentScriptFor($validated['language_code']),
+            ],
         ]);
 
         RateLimiter::hit($rateLimitKey, 3600);
@@ -161,7 +199,7 @@ class VoiceCloningController extends Controller
                 'is_delayed' => false,
                 'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
                 'failure_reason' => $clonedVoice->isFailed()
-                    ? ($clonedVoice->failure_reason ?: __('ui.voice_cloning.processing_failed_generic'))
+                    ? VoiceCloningService::publicFailureMessage($clonedVoice)
                     : null,
             ],
         ]);
@@ -172,6 +210,10 @@ class VoiceCloningController extends Controller
      */
     public function status(Request $request, int $id)
     {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            abort(404);
+        }
+
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
         $elapsedSeconds = $clonedVoice->created_at
             ? now()->diffInSeconds($clonedVoice->created_at)
@@ -187,7 +229,7 @@ class VoiceCloningController extends Controller
             'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
             'updated_at_ts' => $clonedVoice->updated_at?->getTimestamp(),
             'failure_reason' => $clonedVoice->isFailed()
-                ? ($clonedVoice->failure_reason ?: __('ui.voice_cloning.processing_failed_generic'))
+                ? VoiceCloningService::publicFailureMessage($clonedVoice)
                 : null,
             'is_ready' => $clonedVoice->isReady(),
         ]);
@@ -198,7 +240,13 @@ class VoiceCloningController extends Controller
      */
     public function destroy(Request $request, int $id)
     {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            abort(404);
+        }
+
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
+
+        app(VoiceCloningService::class)->deleteReplicatedVoice($clonedVoice->provider_voice_key);
 
         // Clean up stored audio files
         if (filled($clonedVoice->source_audio_path)) {

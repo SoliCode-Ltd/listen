@@ -198,6 +198,12 @@ Route::group([
         });
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.
-        Route::get('/voice-cloning', fn () => redirect()->to(route('dashboard') . '#voiceCloningSection', 301));
+        Route::get('/voice-cloning', function () {
+            if (! \App\Support\VoiceCloningAccess::allows(auth()->user())) {
+                return redirect()->route('dashboard');
+            }
+
+            return redirect()->to(route('dashboard') . '#voiceCloningSection', 301);
+        });
     });
 });

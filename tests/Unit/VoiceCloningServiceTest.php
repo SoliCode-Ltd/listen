@@ -5,8 +5,12 @@ namespace Tests\Unit;
 use App\Models\ClonedVoice;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\User;
 use App\Services\VoiceCloningService;
+use App\Support\VoiceCloningAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class VoiceCloningServiceTest extends TestCase
@@ -105,7 +109,59 @@ class VoiceCloningServiceTest extends TestCase
 
         $this->assertArrayHasKey('en', $scripts);
         $this->assertArrayHasKey('ar', $scripts);
-        $this->assertNotEmpty($scripts['en']);
-        $this->assertNotEmpty($scripts['ar']);
+        $this->assertSame(
+            'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
+            $scripts['en'],
+        );
+        $this->assertSame(
+            'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
+            $scripts['ar'],
+        );
+    }
+
+    public function test_only_preview_admin_can_access_cloning(): void
+    {
+        $admin = User::factory()->create(['email' => 'Solicode.co.uk@gmail.com']);
+        $other = User::factory()->create(['email' => 'listener@example.com']);
+
+        $this->assertTrue(VoiceCloningAccess::allows($admin));
+        $this->assertFalse(VoiceCloningAccess::allows($other));
+        $this->assertFalse(VoiceCloningAccess::allows(null));
+    }
+
+    public function test_replication_request_uses_gemini_38_and_separate_consent_audio(): void
+    {
+        Storage::fake('local');
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        Storage::disk('local')->put('voice-cloning/sample.wav', 'sample-bytes');
+        Storage::disk('local')->put('voice-cloning/consent.wav', 'consent-bytes');
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response(['id' => 'voice_test123'], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'source_audio_path' => 'voice-cloning/sample.wav',
+            'consent_audio_path' => 'voice-cloning/consent.wav',
+            'language_code' => 'ar-XA',
+            'name' => 'Studio',
+        ]);
+
+        $result = app(VoiceCloningService::class)->generateVoiceCloningKey($voice);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame('voice_test123', $result['voice_cloning_key']);
+
+        Http::assertSent(function ($request): bool {
+            $data = $request->data();
+
+            return str_ends_with($request->url(), '/voices')
+                && ($data['store'] ?? false) === true
+                && ($data['voice']['model'] ?? null) === VoiceCloningService::MODEL
+                && ($data['voice']['type'] ?? null) === 'replicated'
+                && filled($data['voice']['replicated']['source_audio']['data'] ?? null)
+                && filled($data['voice']['replicated']['consent_audio']['data'] ?? null)
+                && $request->hasHeader('x-goog-api-key', 'test-key');
+        });
     }
 }

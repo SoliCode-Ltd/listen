@@ -11,7 +11,7 @@
       animation: float 12s ease-in-out infinite;
     }
 
-    /* Voice Cloning (dashboard section) */
+    /* Custom voice studio */
     .vc-shell { margin-top: .25rem; }
     .vc-intro p { margin: .4rem 0 0; color: var(--muted); }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0 0 1rem; }
@@ -151,12 +151,170 @@
     .vc-recorder .rec-actions { margin-top: .7rem; display: flex; justify-content: center; gap: .4rem; }
     .vc-guidelines { border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); padding: .85rem .95rem; margin-bottom: .95rem; }
     .vc-guidelines h4 { margin: 0 0 .45rem; font-size: .86rem; color: var(--a); }
-    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .84rem; color: var(--muted); display: grid; gap: .2rem; }
+    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .84rem; color: var(--muted); display: grid; gap: .35rem; }
+    .vc-guidelines li { display: flex; align-items: flex-start; gap: .5rem; }
+    .vc-guidelines li::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      margin-top: .38rem;
+      border-radius: 99px;
+      flex-shrink: 0;
+      background: var(--a);
+    }
     .vc-consent { margin-top: 1rem; margin-bottom: .95rem; border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--line) 70%, transparent); background: color-mix(in oklab, var(--surface2) 55%, var(--surface)); padding: .75rem .85rem; display: flex; align-items: flex-start; gap: .6rem; }
     .vc-consent input[type=checkbox] { margin-top: .1rem; width: 18px; height: 18px; accent-color: var(--a); }
     .vc-consent label { margin: 0; font-size: .85rem; line-height: 1.45; color: var(--text); }
     .vc-privacy { display: flex; align-items: flex-start; gap: .4rem; color: var(--muted); font-size: .8rem; margin-bottom: .95rem; }
     .vc-privacy svg { width: 14px; height: 14px; margin-top: .1rem; opacity: .7; flex-shrink: 0; }
+    .vc-preview-pill {
+      display: inline-flex;
+      align-items: center;
+      margin-top: .75rem;
+      padding: .22rem .65rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      color: var(--a);
+      border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+    }
+    .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: .75rem; }
+    .vc-form-group input[type="text"],
+    .vc-form-group select {
+      width: 100%;
+      border-radius: .8rem;
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: color-mix(in oklab, var(--surface) 88%, transparent);
+      color: var(--text);
+      padding: .72rem .85rem;
+      font: inherit;
+    }
+    .vc-form-group input[type="text"]:focus,
+    .vc-form-group select:focus {
+      outline: none;
+      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent);
+    }
+    .vc-form-group .hint { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; font-weight: 500; }
+    .vc-steps { display: flex; gap: .55rem; margin: 0 0 1rem; }
+    .vc-step {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+      background: transparent;
+      color: var(--muted);
+      border-radius: .9rem;
+      padding: .55rem .7rem;
+      font-weight: 700;
+      font-size: .86rem;
+      cursor: pointer;
+      text-align: start;
+    }
+    .vc-step.active,
+    .vc-step.done {
+      color: var(--text);
+      border-color: color-mix(in oklab, var(--a) 46%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+    }
+    .vc-step.done .vc-step-index {
+      background: #16a34a;
+      color: #fff;
+    }
+    .vc-step-index {
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: color-mix(in oklab, var(--a) 16%, var(--surface));
+      color: var(--a);
+      font-size: .78rem;
+    }
+    .vc-step-panel[hidden] { display: none !important; }
+    .vc-script {
+      border-radius: 1rem;
+      padding: 1rem 1.05rem 1.05rem;
+      margin-bottom: .9rem;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 12%, var(--surface)), color-mix(in oklab, var(--surface) 92%, transparent));
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+    }
+    .vc-script-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+    .vc-script h3 { margin: 0; font-size: .92rem; }
+    .vc-script p { margin: .55rem 0 0; font-size: 1.08rem; line-height: 1.75; font-weight: 650; }
+    #vcConsentScript {
+      padding: .15rem 0 .1rem;
+      letter-spacing: -.01em;
+    }
+    #vcConsentScript[dir="rtl"] {
+      font-family: var(--font-body-ar);
+      font-size: 1.18rem;
+      line-height: 1.9;
+    }
+    .vc-script .hint { margin: .55rem 0 0; color: var(--muted); font-size: .8rem; }
+    .vc-or {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      margin: .85rem 0 .15rem;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .vc-or::before,
+    .vc-or::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: color-mix(in oklab, var(--line) 80%, transparent);
+    }
+    html[dir="rtl"] .vc-or {
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: .84rem;
+    }
+    .vc-copy {
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: .28rem .7rem;
+      font-size: .75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .vc-range { margin-top: .45rem; font-size: .8rem; font-weight: 700; color: var(--muted); }
+    .vc-range.ok { color: #16a34a; }
+    .vc-range.bad { color: #dc2626; }
+    .vc-actions-row { display: flex; gap: .5rem; }
+    .vc-actions-row .btn { flex: 1; }
+    .vc-consent-block { margin-top: .2rem; }
+    .vc-bars { display: none; height: 18px; align-items: flex-end; justify-content: center; gap: 3px; margin-top: .45rem; }
+    .vc-recorder.live .vc-bars { display: flex; }
+    .vc-bars span {
+      width: 3px;
+      height: 6px;
+      border-radius: 99px;
+      background: var(--a);
+      animation: vc-bar .9s ease-in-out infinite;
+    }
+    .vc-bars span:nth-child(2) { animation-delay: .12s; }
+    .vc-bars span:nth-child(3) { animation-delay: .24s; }
+    .vc-bars span:nth-child(4) { animation-delay: .08s; }
+    .vc-bars span:nth-child(5) { animation-delay: .2s; }
+    @keyframes vc-bar {
+      0%, 100% { height: 5px; opacity: .45; }
+      50% { height: 16px; opacity: 1; }
+    }
+    @media (max-width: 720px) {
+      .vc-field-grid, .vc-actions-row, .vc-steps { grid-template-columns: 1fr; flex-direction: column; }
+    }
     .bg-orb.a {
       width: 22rem;
       height: 22rem;
@@ -1524,10 +1682,12 @@
             <span></span>
           </a>
 
+          @if($voiceCloningVisible ?? false)
           <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav >
             <span>{{ __('ui.nav.voice_cloning') }}</span>
             <span></span>
           </a>
+          @endif
 
           <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
@@ -1922,36 +2082,18 @@
       </div>
     </section>
 
+    @if($voiceCloningVisible ?? false)
     <section id="voiceCloningSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal vc-shell">
         <div class="vc-intro">
           <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
           <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
+          <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
         </div>
 
         <div id="vcAlerts"></div>
 
-        @if(($voiceCloningUpgradeRequired ?? false) && !($voiceCloningPlanAllows ?? false))
-          <section class="vc-upgrade">
-            <h2>{{ __('ui.voice_cloning.upgrade_title') }}</h2>
-            <p>{{ __('ui.voice_cloning.upgrade_subtitle') }}</p>
-            <ul class="features-list">
-              <li>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                {{ __('ui.voice_cloning.upgrade_feature_1') }}
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                {{ __('ui.voice_cloning.upgrade_feature_2') }}
-              </li>
-              <li>
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                {{ __('ui.voice_cloning.upgrade_feature_3', ['max' => $voiceCloningMaxVoices]) }}
-              </li>
-            </ul>
-            <a href="{{ route('pricing') }}" class="btn btn-primary">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
-          </section>
-        @elseif(!($voiceCloningEnabledGlobally ?? false))
+        @if(!($voiceCloningEnabledGlobally ?? false))
           <section class="vc-disabled-banner">
             <p>{{ __('ui.voice_cloning.feature_disabled') }}</p>
           </section>
@@ -1969,6 +2111,16 @@
                     'ready', 'failed' => 100,
                     default => 0,
                 };
+                $vcLanguageLabel = match ((string) $voice->language_code) {
+                    'ar-XA' => __('ui.voice_cloning.language_ar'),
+                    'en-US' => __('ui.voice_cloning.language_en_us'),
+                    'en-GB' => __('ui.voice_cloning.language_en_gb'),
+                    'en-AU' => __('ui.voice_cloning.language_en_au'),
+                    default => (string) $voice->language_code,
+                };
+                $vcCreatedLabel = $voice->created_at
+                    ? $voice->created_at->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY')
+                    : '';
               @endphp
                 <article class="vc-card" data-voice-id="{{ $voice->id }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->failure_reason }}">
                   <div class="vc-card-header">
@@ -1979,11 +2131,11 @@
                     </span>
                   </div>
                   <div class="vc-card-meta">
-                    <span>{{ __('ui.voice_cloning.created_on') }} {{ $voice->created_at->format('M d, Y') }}</span>
-                    <span>{{ $voice->language_code }} &middot; {{ $voice->source_type === 'recording' ? __('ui.voice_cloning.record_tab') : __('ui.voice_cloning.upload_tab') }}</span>
+                    <span>{{ __('ui.voice_cloning.created_on') }} {{ $vcCreatedLabel }}</span>
+                    <span>{{ $vcLanguageLabel }} &middot; {{ $voice->source_type === 'recording' ? __('ui.voice_cloning.record_tab') : __('ui.voice_cloning.upload_tab') }}</span>
                   </div>
                   @if($voice->isFailed())
-                    <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ __('ui.voice_cloning.processing_failed_generic') }}</div>
+                    <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
                   @endif
                   @if($voice->isProcessing())
                     <div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">{{ __('ui.voice_cloning.processing_hint') }}</div>
@@ -2031,7 +2183,7 @@
               <div class="vc-guidelines">
                 <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
                 <ul>
-                  <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration]) }}</li>
+                  <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</li>
                   <li>{{ __('ui.voice_cloning.guideline_2') }}</li>
                   <li>{{ __('ui.voice_cloning.guideline_3') }}</li>
                   <li>{{ __('ui.voice_cloning.guideline_4') }}</li>
@@ -2039,72 +2191,137 @@
                 </ul>
               </div>
 
+              <div class="vc-steps" role="tablist">
+                <button type="button" class="vc-step active" id="vcStepSample" data-vc-step="1">
+                  <span class="vc-step-index">1</span>
+                  <span>{{ __('ui.voice_cloning.step_sample') }}</span>
+                </button>
+                <button type="button" class="vc-step" id="vcStepConsent" data-vc-step="2">
+                  <span class="vc-step-index">2</span>
+                  <span>{{ __('ui.voice_cloning.step_consent') }}</span>
+                </button>
+              </div>
+
               <form id="vcCreateForm" enctype="multipart/form-data">
                 @csrf
-
-                <div class="vc-form-group">
-                  <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
-                  <input type="text" id="vcName" name="name" required minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
-                </div>
-
-                <div class="vc-form-group">
-                  <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
-                  <select id="vcLanguage" name="language_code">
-                    <option value="ar-XA">{{ __('ui.voice_cloning.language_ar') }}</option>
-                    <option value="en-US">{{ __('ui.voice_cloning.language_en_us') }}</option>
-                    <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
-                    <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
-                  </select>
-                </div>
-
-                <div class="vc-tabs">
-                  <button type="button" class="vc-tab active" data-tab="upload">{{ __('ui.voice_cloning.upload_tab') }}</button>
-                  <button type="button" class="vc-tab" data-tab="recording">{{ __('ui.voice_cloning.record_tab') }}</button>
-                </div>
-
                 <input type="hidden" name="source_type" id="vcSourceType" value="upload">
                 <input type="hidden" name="audio_duration" id="vcAudioDuration" value="0">
+                <input type="hidden" name="consent_duration" id="vcConsentDuration" value="0">
 
-                <div class="vc-tab-panel" id="vcUploadPanel">
-                  <div class="vc-upload-zone" id="vcUploadZone">
-                    <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
-                    <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
-                    <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
-                  </div>
-                  <div class="vc-file-info" id="vcFileInfo" style="display:none">
-                    <span id="vcFileName"></span>
-                    <span class="remove" id="vcFileRemove">&times;</span>
-                  </div>
-                </div>
-
-                <div class="vc-tab-panel" id="vcRecordPanel" style="display:none">
-                  <div class="vc-recorder" id="vcRecorder">
-                    <button type="button" class="rec-btn" id="vcRecBtn">
-                      <span class="inner"></span>
-                    </button>
-                    <div class="vc-timer" id="vcTimer">00:00</div>
-                    <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
-                    <p class="hint" style="font-size:.8rem;margin-top:.3rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration]) }}</p>
-                    <div class="rec-actions" id="vcRecActions" style="display:none">
-                      <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                <div class="vc-step-panel" data-vc-step-panel="1">
+                  <div class="vc-field-grid">
+                    <div class="vc-form-group">
+                      <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
+                      <input type="text" id="vcName" name="name" required minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
+                    </div>
+                    <div class="vc-form-group">
+                      <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
+                      <select id="vcLanguage" name="language_code">
+                        <option value="ar-XA" @selected(app()->getLocale() === 'ar')>{{ __('ui.voice_cloning.language_ar') }}</option>
+                        <option value="en-US" @selected(app()->getLocale() !== 'ar')>{{ __('ui.voice_cloning.language_en_us') }}</option>
+                        <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
+                        <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
+                      </select>
+                      <p class="hint">{{ __('ui.voice_cloning.language_hint') }}</p>
                     </div>
                   </div>
+
+                  <div class="vc-tabs">
+                    <button type="button" class="vc-tab active" data-tab="upload">{{ __('ui.voice_cloning.upload_tab') }}</button>
+                    <button type="button" class="vc-tab" data-tab="recording">{{ __('ui.voice_cloning.record_tab') }}</button>
+                  </div>
+
+                  <div class="vc-tab-panel" id="vcUploadPanel">
+                    <div class="vc-upload-zone" id="vcUploadZone">
+                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                      <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
+                    </div>
+                    <div class="vc-file-info" id="vcFileInfo" style="display:none">
+                      <span id="vcFileName"></span>
+                      <span class="remove" id="vcFileRemove">&times;</span>
+                    </div>
+                    <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                  </div>
+
+                  <div class="vc-tab-panel" id="vcRecordPanel" style="display:none">
+                    <div class="vc-recorder" id="vcRecorder">
+                      <button type="button" class="rec-btn" id="vcRecBtn" aria-label="{{ __('ui.voice_cloning.record_start') }}">
+                        <span class="inner"></span>
+                      </button>
+                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                      <div class="vc-timer" id="vcTimer">00:00</div>
+                      <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                      <p class="hint" style="font-size:.8rem;margin-top:.3rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                      <div class="rec-actions" id="vcRecActions" style="display:none">
+                        <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-primary" id="vcNextStep" style="width:100%;margin-top:.9rem">{{ __('ui.voice_cloning.next_step') }}</button>
                 </div>
 
-                <div class="vc-consent">
-                  <input type="checkbox" id="vcConsent" name="consent_confirmed" value="1" required>
-                  <label for="vcConsent">{{ __('ui.voice_cloning.consent_label') }}</label>
-                </div>
+                <div class="vc-step-panel" data-vc-step-panel="2" hidden>
+                  <div class="vc-script">
+                    <div class="vc-script-toolbar">
+                      <h3>{{ __('ui.voice_cloning.consent_title') }}</h3>
+                      <button type="button" class="vc-copy" id="vcCopyConsent">{{ __('ui.voice_cloning.consent_copy') }}</button>
+                    </div>
+                    @php
+                      $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
+                      $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
+                    @endphp
+                    <p id="vcConsentScript" dir="{{ $vcConsentLocale === 'ar-XA' ? 'rtl' : 'ltr' }}">{{ $vcConsentText }}</p>
+                    <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
+                  </div>
 
-                <div class="vc-privacy">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                  {{ __('ui.voice_cloning.privacy_note') }}
-                </div>
+                  <div class="vc-consent-block">
+                    <label>{{ __('ui.voice_cloning.consent_record_label') }}</label>
+                    <div class="vc-recorder" id="vcConsentRecorder" style="margin-top:.45rem">
+                      <button type="button" class="rec-btn" id="vcConsentRecBtn" aria-label="{{ __('ui.voice_cloning.consent_record_label') }}">
+                        <span class="inner"></span>
+                      </button>
+                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                      <div class="vc-timer" id="vcConsentTimer">00:00</div>
+                      <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                      <div class="rec-actions" id="vcConsentRecActions" style="display:none">
+                        <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                      </div>
+                    </div>
+                  </div>
 
-                <button type="submit" class="btn btn-primary" id="vcSubmitBtn" style="width:100%">
-                  <span id="vcSubmitText">{{ __('ui.voice_cloning.submit_button') }}</span>
-                  <span id="vcSubmitLoading" style="display:none">{{ __('ui.voice_cloning.submitting') }}</span>
-                </button>
+                  <p class="vc-or">{{ __('ui.voice_cloning.consent_or') }}</p>
+                  <div class="vc-form-group" style="margin-top:.15rem">
+                    <label for="vcConsentFileInput">{{ __('ui.voice_cloning.consent_upload_label') }}</label>
+                    <div class="vc-upload-zone" id="vcConsentUploadZone">
+                      <input type="file" name="consent_audio" id="vcConsentFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                    </div>
+                    <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
+                      <span id="vcConsentFileName"></span>
+                      <span class="remove" id="vcConsentFileRemove">&times;</span>
+                    </div>
+                  </div>
+
+                  <div class="vc-consent">
+                    <input type="checkbox" id="vcConsent" name="consent_confirmed" value="1" required>
+                    <label for="vcConsent">{{ __('ui.voice_cloning.consent_label') }}</label>
+                  </div>
+
+                  <div class="vc-privacy">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {{ __('ui.voice_cloning.privacy_note') }}
+                  </div>
+
+                  <div class="vc-actions-row">
+                    <button type="button" class="btn btn-ghost" id="vcBackStep">{{ __('ui.voice_cloning.back_step') }}</button>
+                    <button type="submit" class="btn btn-primary" id="vcSubmitBtn">
+                      <span id="vcSubmitText">{{ __('ui.voice_cloning.submit_button') }}</span>
+                      <span id="vcSubmitLoading" style="display:none">{{ __('ui.voice_cloning.submitting') }}</span>
+                    </button>
+                  </div>
+                </div>
               </form>
             </section>
           @else
@@ -2115,6 +2332,7 @@
         @endif
       </article>
     </section>
+    @endif
       </div>
     </div>
   </main>
@@ -2179,9 +2397,9 @@
   @endphp
   <script>
     const voiceCatalog = @json($voiceCatalog);
-    const clonedVoices = @json($clonedVoices ?? []);
-    const clonedVoiceGroupLabel = @json(__('ui.voice_cloning.cloned_voice_group'));
-    const clonedVoiceBadge = @json(__('ui.voice_cloning.cloned_voice_label'));
+    const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
+    const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
+    const clonedVoiceBadge = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_label') : '');
     const oldVoice = @json($prefillValue('voice_key'));
     const defaultVoiceKeyByLanguage = {
       ar: String(@json((string) ($voiceNameMap[$defaultVoiceAr]['key'] ?? '')) || '').trim(),
@@ -3223,7 +3441,7 @@
       }
     });
   </script>
-  @if(($voiceCloningPlanAllows ?? false) && ($voiceCloningEnabledGlobally ?? false))
+  @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
   <script>
     (function() {
       'use strict';
@@ -3236,7 +3454,24 @@
       const createPanel = document.getElementById('vcCreatePanel');
       const limitNotice = document.getElementById('vcLimitNotice');
       const MIN_DURATION = {{ (int) ($voiceCloningMinDuration ?? 10) }};
+      const MAX_DURATION = {{ (int) ($voiceCloningMaxDuration ?? 30) }};
+      const MIN_CONSENT = {{ (int) ($voiceCloningMinConsent ?? 3) }};
       const MAX_VOICES = {{ (int) ($voiceCloningMaxVoices ?? 0) }};
+      const consentScripts = @json($voiceCloningConsentScripts ?? []);
+      const sampleTooShortText = @json(__('ui.voice_cloning.validation.audio_too_short', ['min' => $voiceCloningMinDuration ?? 10]));
+      const sampleTooLongText = @json(__('ui.voice_cloning.validation.audio_too_long', ['max' => $voiceCloningMaxDuration ?? 30]));
+      const consentMissingText = @json(__('ui.voice_cloning.validation.consent_audio_required'));
+      const consentTooShortText = @json(__('ui.voice_cloning.validation.consent_too_short', ['min' => $voiceCloningMinConsent ?? 3]));
+      const consentRequiredText = @json(__('ui.voice_cloning.validation.consent_required'));
+      const nameRequiredText = @json(__('ui.voice_cloning.validation.name_required'));
+      const copyLabel = @json(__('ui.voice_cloning.consent_copy'));
+      const copiedLabel = @json(__('ui.voice_cloning.consent_copied'));
+      const sampleReadyText = @json(__('ui.voice_cloning.sample_ready'));
+      const consentReadyText = @json(__('ui.voice_cloning.consent_ready'));
+      const recordStartText = @json(__('ui.voice_cloning.record_start'));
+      const recordingText = @json(__('ui.voice_cloning.recording_in_progress'));
+      const tooShortRecordText = @json(__('ui.voice_cloning.recording_too_short', ['min' => $voiceCloningMinDuration ?? 10]));
+      const tooLongRecordText = @json(__('ui.voice_cloning.recording_too_long', ['max' => $voiceCloningMaxDuration ?? 30]));
       let currentVoiceCount = {{ (int) ($voiceCloningCount ?? 0) }};
       const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
       const STORE_URL = '{{ route("voice-cloning.store") }}';
@@ -3261,9 +3496,13 @@
       const useInGeneratorText = @json(__('ui.voice_cloning.use_in_generator'));
       const deleteVoiceText = @json(__('ui.voice_cloning.delete_voice'));
       const deleteConfirmText = @json(__('ui.voice_cloning.delete_confirm'));
-      const delayedHintText = pageLocale.startsWith('ar')
-        ? 'المعالجة تأخذ وقتا أطول من المعتاد. ما زلنا نحاول إنهاء إنشاء الصوت.'
-        : 'Processing is taking longer than usual. We are still working on your voice.';
+      const delayedHintText = @json(__('ui.voice_cloning.processing_delayed'));
+      const languageLabels = {
+        'ar-XA': @json(__('ui.voice_cloning.language_ar')),
+        'en-US': @json(__('ui.voice_cloning.language_en_us')),
+        'en-GB': @json(__('ui.voice_cloning.language_en_gb')),
+        'en-AU': @json(__('ui.voice_cloning.language_en_au')),
+      };
       const pollers = new Map();
 
       function showAlert(type, message) {
@@ -3272,8 +3511,13 @@
         if (!container || !message) return;
         const alert = document.createElement('div');
         alert.className = 'vc-alert error';
+        alert.setAttribute('role', 'alert');
         alert.textContent = String(message);
         container.prepend(alert);
+        container.querySelectorAll('.vc-alert').forEach((node, index) => {
+          if (index > 2) node.remove();
+        });
+        alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         setTimeout(() => alert.remove(), 7000);
       }
 
@@ -3536,9 +3780,10 @@
         });
         const percent = statusProgress(status, 0, Number(voice?.progress_percent ?? NaN));
         const languageCode = String(voice?.language_code || 'ar-XA');
+        const languageLabel = languageLabels[languageCode] || languageCode;
         const name = escapeHtml(String(voice?.name || `Voice ${voiceId}`));
         const statusLabel = escapeHtml(statusLabels[status] || status.toUpperCase());
-        const metaLabel = `${escapeHtml(languageCode)} &middot; ${escapeHtml(sourceLabel)}`;
+        const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
 
         return `
           <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-failure-reason="${failureReason}">
@@ -3586,19 +3831,42 @@
         form?.reset();
         document.getElementById('vcSourceType').value = 'upload';
         setAudioDuration(0);
+        setConsentDuration(0);
         recordedBlob = null;
+        consentBlob = null;
 
         if (timer) timer.textContent = '00:00';
         if (recHint) {
-          recHint.textContent = '{{ __("ui.voice_cloning.record_start") }}';
+          recHint.textContent = recordStartText;
           recHint.style.color = '';
         }
         if (recActions) recActions.style.display = 'none';
         recBtn?.classList.remove('recording');
+        document.getElementById('vcRecorder')?.classList.remove('live');
 
         if (fileInput) fileInput.value = '';
         if (fileInfo) fileInfo.style.display = 'none';
         if (uploadZone) uploadZone.style.display = '';
+        const sampleRange = document.getElementById('vcSampleRange');
+        if (sampleRange) sampleRange.className = 'vc-range';
+
+        const consentTimer = document.getElementById('vcConsentTimer');
+        const consentHint = document.getElementById('vcConsentRecHint');
+        const consentActions = document.getElementById('vcConsentRecActions');
+        const consentFile = document.getElementById('vcConsentFileInput');
+        const consentInfo = document.getElementById('vcConsentFileInfo');
+        const consentZone = document.getElementById('vcConsentUploadZone');
+        if (consentTimer) consentTimer.textContent = '00:00';
+        if (consentHint) {
+          consentHint.textContent = recordStartText;
+          consentHint.style.color = '';
+        }
+        if (consentActions) consentActions.style.display = 'none';
+        document.getElementById('vcConsentRecBtn')?.classList.remove('recording');
+        document.getElementById('vcConsentRecorder')?.classList.remove('live');
+        if (consentFile) consentFile.value = '';
+        if (consentInfo) consentInfo.style.display = 'none';
+        if (consentZone) consentZone.style.display = '';
 
         document.querySelectorAll('.vc-tab').forEach((tab) => tab.classList.remove('active'));
         document.querySelector('.vc-tab[data-tab="upload"]')?.classList.add('active');
@@ -3606,6 +3874,8 @@
         const recordPanel = document.getElementById('vcRecordPanel');
         if (uploadPanel) uploadPanel.style.display = '';
         if (recordPanel) recordPanel.style.display = 'none';
+        showStep(1);
+        syncConsentScript();
       }
 
       document.querySelectorAll('.vc-tab').forEach((tab) => {
@@ -3642,8 +3912,15 @@
         audio.addEventListener('loadedmetadata', function() {
           const duration = Math.round(audio.duration || 0);
           setAudioDuration(duration);
+          const range = document.getElementById('vcSampleRange');
+          if (range) {
+            range.textContent = `${duration}s`;
+            range.className = duration >= MIN_DURATION && duration <= MAX_DURATION ? 'vc-range ok' : 'vc-range bad';
+          }
           if (duration < MIN_DURATION) {
-            showAlert('error', `{{ __('ui.voice_cloning.validation.audio_too_short', ['min' => '']) }}${MIN_DURATION}s`);
+            showAlert('error', sampleTooShortText);
+          } else if (duration > MAX_DURATION) {
+            showAlert('error', sampleTooLongText);
           }
         });
         audio.src = URL.createObjectURL(file);
@@ -3687,6 +3964,11 @@
       let recordingStart = 0;
       let timerInterval = null;
       let recordedBlob = null;
+      let consentBlob = null;
+      let consentRecorder = null;
+      let consentChunks = [];
+      let consentStarted = 0;
+      let consentTimerInterval = null;
 
       const recBtn = document.getElementById('vcRecBtn');
       const timer = document.getElementById('vcTimer');
@@ -3722,13 +4004,17 @@
             recordedBlob = new Blob(audioChunks, { type: recorderMimeType });
             const duration = Math.round((Date.now() - recordingStart) / 1000);
             setAudioDuration(duration);
+            document.getElementById('vcRecorder')?.classList.remove('live');
             if (recHint) {
               if (duration < MIN_DURATION) {
-                recHint.textContent = `{{ __('ui.voice_cloning.recording_too_short', ['min' => '']) }}${MIN_DURATION}`;
+                recHint.textContent = tooShortRecordText;
+                recHint.style.color = '#dc2626';
+              } else if (duration > MAX_DURATION) {
+                recHint.textContent = tooLongRecordText;
                 recHint.style.color = '#dc2626';
               } else {
-                recHint.textContent = `${duration}s {{ strtolower(__('ui.voice_cloning.status_ready')) }}`;
-                recHint.style.color = '';
+                recHint.textContent = `${duration}s · ${sampleReadyText}`;
+                recHint.style.color = '#16a34a';
               }
             }
             if (recActions) recActions.style.display = '';
@@ -3737,8 +4023,9 @@
           mediaRecorder.start(250);
           recordingStart = Date.now();
           if (recBtn) recBtn.classList.add('recording');
+          document.getElementById('vcRecorder')?.classList.add('live');
           if (recHint) {
-            recHint.textContent = '{{ __("ui.voice_cloning.recording_in_progress") }}';
+            recHint.textContent = recordingText;
             recHint.style.color = '';
           }
           if (recActions) recActions.style.display = 'none';
@@ -3748,6 +4035,7 @@
             const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
             const s = String(elapsed % 60).padStart(2, '0');
             if (timer) timer.textContent = `${m}:${s}`;
+            if (elapsed >= MAX_DURATION) stopRecording();
           }, 250);
         } catch (error) {
           if (error?.name === 'NotAllowedError') {
@@ -3770,7 +4058,7 @@
           recordedBlob = null;
           if (timer) timer.textContent = '00:00';
           if (recHint) {
-            recHint.textContent = '{{ __("ui.voice_cloning.record_start") }}';
+            recHint.textContent = recordStartText;
             recHint.style.color = '';
           }
           if (recActions) recActions.style.display = 'none';
@@ -3778,6 +4066,206 @@
           setAudioDuration(0);
         });
       }
+
+      function setConsentDuration(seconds) {
+        const durationEl = document.getElementById('vcConsentDuration');
+        if (durationEl) durationEl.value = String(seconds || 0);
+      }
+
+      function blobExtension(blob) {
+        const blobType = String(blob?.type || '').toLowerCase();
+        if (blobType.includes('webm')) return 'webm';
+        if (blobType.includes('ogg')) return 'ogg';
+        if (blobType.includes('wav')) return 'wav';
+        return 'mp4';
+      }
+
+      function showStep(step) {
+        document.querySelectorAll('[data-vc-step-panel]').forEach((panel) => {
+          panel.hidden = String(panel.getAttribute('data-vc-step-panel')) !== String(step);
+        });
+        document.querySelectorAll('.vc-step').forEach((button) => {
+          const stepNumber = Number(button.getAttribute('data-vc-step'));
+          button.classList.toggle('active', stepNumber === Number(step));
+          button.classList.toggle('done', stepNumber < Number(step));
+        });
+      }
+
+      function syncConsentScript() {
+        const language = document.getElementById('vcLanguage')?.value || 'ar-XA';
+        const script = document.getElementById('vcConsentScript');
+        if (!script) return;
+        script.textContent = consentScripts[language] || consentScripts['en-US'] || '';
+        script.dir = String(language).toLowerCase().startsWith('ar') ? 'rtl' : 'ltr';
+      }
+
+      function sampleIsReady() {
+        const name = String(document.getElementById('vcName')?.value || '').trim();
+        if (name.length < 2) {
+          showAlert('error', nameRequiredText);
+          return false;
+        }
+        const sourceType = String(document.getElementById('vcSourceType')?.value || 'upload');
+        const duration = Number(document.getElementById('vcAudioDuration')?.value || 0);
+        const hasFile = sourceType === 'recording' ? Boolean(recordedBlob) : Boolean(fileInput?.files?.[0]);
+        if (!hasFile) {
+          showAlert('error', sampleTooShortText);
+          return false;
+        }
+        if (duration < MIN_DURATION) {
+          showAlert('error', sampleTooShortText);
+          return false;
+        }
+        if (duration > MAX_DURATION) {
+          showAlert('error', sampleTooLongText);
+          return false;
+        }
+        return true;
+      }
+
+      document.getElementById('vcLanguage')?.addEventListener('change', syncConsentScript);
+      document.getElementById('vcNextStep')?.addEventListener('click', function() {
+        if (sampleIsReady()) showStep(2);
+      });
+      document.getElementById('vcBackStep')?.addEventListener('click', function() {
+        showStep(1);
+      });
+      document.getElementById('vcStepSample')?.addEventListener('click', function() {
+        showStep(1);
+      });
+      document.getElementById('vcStepConsent')?.addEventListener('click', function() {
+        if (sampleIsReady()) showStep(2);
+      });
+      document.getElementById('vcCopyConsent')?.addEventListener('click', async function() {
+        const text = document.getElementById('vcConsentScript')?.textContent || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          this.textContent = copiedLabel;
+          setTimeout(() => { this.textContent = copyLabel; }, 1400);
+        } catch (_error) {
+          showAlert('error', copyLabel);
+        }
+      });
+
+      const consentRecBtn = document.getElementById('vcConsentRecBtn');
+      const consentTimer = document.getElementById('vcConsentTimer');
+      const consentHint = document.getElementById('vcConsentRecHint');
+      const consentActions = document.getElementById('vcConsentRecActions');
+      const consentRetry = document.getElementById('vcConsentRecRetry');
+      const consentFileInput = document.getElementById('vcConsentFileInput');
+      const consentFileInfo = document.getElementById('vcConsentFileInfo');
+      const consentFileName = document.getElementById('vcConsentFileName');
+      const consentFileRemove = document.getElementById('vcConsentFileRemove');
+      const consentUploadZone = document.getElementById('vcConsentUploadZone');
+
+      function markConsentFile(file, duration) {
+        consentBlob = null;
+        if (consentFileName && consentFileInfo && consentUploadZone) {
+          consentFileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+          consentFileInfo.style.display = '';
+          consentUploadZone.style.display = 'none';
+        }
+        if (duration) setConsentDuration(duration);
+      }
+
+      consentFileInput?.addEventListener('change', function() {
+        const file = this.files?.[0];
+        if (!file) return;
+        const audio = new Audio();
+        audio.addEventListener('loadedmetadata', function() {
+          const duration = Math.round(audio.duration || 0);
+          setConsentDuration(duration);
+          if (duration < MIN_CONSENT) showAlert('error', consentTooShortText);
+          else if (duration > MAX_DURATION) showAlert('error', sampleTooLongText);
+        });
+        audio.src = URL.createObjectURL(file);
+        markConsentFile(file);
+      });
+      consentFileRemove?.addEventListener('click', function() {
+        if (consentFileInput) consentFileInput.value = '';
+        if (consentFileInfo) consentFileInfo.style.display = 'none';
+        if (consentUploadZone) consentUploadZone.style.display = '';
+        setConsentDuration(0);
+      });
+
+      function stopConsentRecording() {
+        if (consentRecorder && consentRecorder.state === 'recording') {
+          consentRecorder.stop();
+          consentRecBtn?.classList.remove('recording');
+          document.getElementById('vcConsentRecorder')?.classList.remove('live');
+          if (consentTimerInterval) clearInterval(consentTimerInterval);
+        }
+      }
+
+      async function startConsentRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          consentChunks = [];
+          consentRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
+          consentRecorder.ondataavailable = (event) => { if (event.data.size > 0) consentChunks.push(event.data); };
+          consentRecorder.onstop = () => {
+            stream.getTracks().forEach((track) => track.stop());
+            const recorderMimeType = String(consentRecorder.mimeType || 'audio/webm').trim() || 'audio/webm';
+            consentBlob = new Blob(consentChunks, { type: recorderMimeType });
+            if (consentFileInput) consentFileInput.value = '';
+            if (consentFileInfo) consentFileInfo.style.display = 'none';
+            if (consentUploadZone) consentUploadZone.style.display = '';
+            const duration = Math.round((Date.now() - consentStarted) / 1000);
+            setConsentDuration(duration);
+            if (consentHint) {
+              if (duration < MIN_CONSENT) {
+                consentHint.textContent = consentTooShortText;
+                consentHint.style.color = '#dc2626';
+              } else if (duration > MAX_DURATION) {
+                consentHint.textContent = tooLongRecordText;
+                consentHint.style.color = '#dc2626';
+              } else {
+                consentHint.textContent = `${duration}s · ${consentReadyText}`;
+                consentHint.style.color = '#16a34a';
+              }
+            }
+            if (consentActions) consentActions.style.display = '';
+          };
+          consentRecorder.start(250);
+          consentStarted = Date.now();
+          consentRecBtn?.classList.add('recording');
+          document.getElementById('vcConsentRecorder')?.classList.add('live');
+          if (consentHint) {
+            consentHint.textContent = recordingText;
+            consentHint.style.color = '';
+          }
+          if (consentActions) consentActions.style.display = 'none';
+          consentTimerInterval = setInterval(() => {
+            const elapsed = Math.round((Date.now() - consentStarted) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (consentTimer) consentTimer.textContent = `${m}:${s}`;
+            if (elapsed >= MAX_DURATION) stopConsentRecording();
+          }, 250);
+        } catch (error) {
+          showAlert('error', error?.name === 'NotAllowedError'
+            ? @json(__('ui.voice_cloning.mic_permission_denied'))
+            : @json(__('ui.voice_cloning.mic_not_available')));
+        }
+      }
+
+      consentRecBtn?.addEventListener('click', async function() {
+        if (consentRecorder && consentRecorder.state === 'recording') stopConsentRecording();
+        else await startConsentRecording();
+      });
+      consentRetry?.addEventListener('click', function() {
+        consentBlob = null;
+        if (consentTimer) consentTimer.textContent = '00:00';
+        if (consentHint) {
+          consentHint.textContent = recordStartText;
+          consentHint.style.color = '';
+        }
+        if (consentActions) consentActions.style.display = 'none';
+        consentRecBtn?.classList.remove('recording');
+        setConsentDuration(0);
+      });
+
+      syncConsentScript();
 
       if (form) {
         form.addEventListener('submit', async function(event) {
@@ -3794,11 +4282,32 @@
             const sourceType = String(document.getElementById('vcSourceType')?.value || 'upload');
             formData.set('source_type', sourceType);
             if (sourceType === 'recording' && recordedBlob) {
-              const blobType = String(recordedBlob.type || '').toLowerCase();
-              const ext = blobType.includes('webm')
-                ? 'webm'
-                : (blobType.includes('ogg') ? 'ogg' : (blobType.includes('wav') ? 'wav' : 'mp4'));
-              formData.set('audio_file', recordedBlob, `recording.${ext}`);
+              formData.set('audio_file', recordedBlob, `recording.${blobExtension(recordedBlob)}`);
+            }
+            if (consentBlob) {
+              formData.set('consent_audio', consentBlob, `consent.${blobExtension(consentBlob)}`);
+            }
+            const consentDuration = Number(document.getElementById('vcConsentDuration')?.value || 0);
+            const hasConsent = Boolean(consentBlob || consentFileInput?.files?.[0]);
+            if (!hasConsent) {
+              showAlert('error', consentMissingText);
+              showStep(2);
+              return;
+            }
+            if (consentDuration < MIN_CONSENT) {
+              showAlert('error', consentTooShortText);
+              showStep(2);
+              return;
+            }
+            if (consentDuration > MAX_DURATION) {
+              showAlert('error', sampleTooLongText);
+              showStep(2);
+              return;
+            }
+            if (!document.getElementById('vcConsent')?.checked) {
+              showAlert('error', consentRequiredText);
+              showStep(2);
+              return;
             }
 
             const response = await fetch(STORE_URL, {

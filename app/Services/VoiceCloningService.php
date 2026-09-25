@@ -3,224 +3,188 @@
 namespace App\Services;
 
 use App\Models\ClonedVoice;
+use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\User;
+use App\Services\Tts\GeminiKeyManager;
+use App\Support\VoiceCloningAccess;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 /**
- * Voice Cloning Service.
+ * Voice cloning through Gemini 3.8 Flash TTS voice replication.
  *
- * ┌─────────────────────────────────────────────────────────────────────┐
- * │ IMPLEMENTATION NOTE: Google API Flow Used                          │
- * ├─────────────────────────────────────────────────────────────────────┤
- * │ This service uses Google Cloud TTS Chirp 3: Instant Custom Voice   │
- * │ via the v1beta1 API. This is the ONLY officially supported path    │
- * │ for programmatic voice cloning on Google Cloud as of 2026.         │
- * │                                                                    │
- * │ - The old "Custom Voice" (studio-quality training) is CLOSED to    │
- * │   new customers.                                                   │
- * │ - Dialogflow CX voice cloning is for conversational agents, NOT    │
- * │   standalone TTS applications.                                     │
- * │ - Gemini 2.5 Flash TTS does NOT support custom/cloned voices.      │
- * │                                                                    │
- * │ Flow:                                                              │
- * │ 1. POST v1beta1/voices:generateVoiceCloningKey                     │
- * │    - Sends reference_audio + voice_talent_consent + consent_script │
- * │    - Returns a voice_cloning_key (string)                          │
- * │ 2. POST v1beta1/text:synthesize                                    │
- * │    - Uses voice.voice_clone.voice_cloning_key                      │
- * │    - Returns synthesized audio in the cloned voice                 │
- * │                                                                    │
- * │ IMPORTANT: Access to Instant Custom Voice requires the GCP project │
- * │ to be on Google's allow-list. Contact Google Cloud sales to enable.│
- * │                                                                    │
- * │ Rate limit: 10 voice cloning keys per minute per GCP project.      │
- * │ Supported regions: global, us, eu, asia-southeast1,                │
- * │                    asia-northeast1, europe-west2                    │
- * │ Supported audio: LINEAR16, PCM, MP3, M4A (single-channel)         │
- * │ Reference audio: up to ~10 seconds recommended                     │
- * └─────────────────────────────────────────────────────────────────────┘
+ * Flow:
+ * 1. POST /v1beta/voices with a reference clip and a separate consent clip.
+ * 2. Store the returned voice_... id.
+ * 3. Synthesize later by passing that id to Gemini 3.8 Flash TTS.
  */
 class VoiceCloningService
 {
+    public const MODEL = 'gemini-3.8-flash-tts';
+
     /**
-     * Consent scripts required by Google for voice cloning.
-     * The voice owner must record themselves speaking this text.
+     * Verbatim consent lines required by Gemini voice replication.
+     * The speaker must record themselves saying the matching line.
      */
     public const CONSENT_SCRIPTS = [
-        'en' => 'I, the owner of this voice, consent to the creation of a synthetic voice model based on my voice recording.',
-        'ar' => 'أنا، صاحب هذا الصوت، أوافق على إنشاء نموذج صوت اصطناعي بناءً على تسجيلي الصوتي.',
+        'en' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
+        'en-US' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
+        'en-GB' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
+        'en-AU' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
+        'ar' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
+        'ar-XA' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
     ];
 
     /**
-     * Generate a voice cloning key from Google Cloud TTS Chirp 3.
-     *
-     * @param  ClonedVoice  $clonedVoice  The cloned voice record with stored audio
-     * @return array{success: bool, voice_cloning_key?: string, error?: string}
+     * @return array{success: bool, voice_cloning_key?: string, error?: string, error_code?: string}
      */
     public function generateVoiceCloningKey(ClonedVoice $clonedVoice): array
     {
-        $region = $this->getRegion();
-        $endpoint = $this->buildEndpoint($region, 'voices:generateVoiceCloningKey');
-
         try {
-            $referenceAudioBytes = $this->loadAudioBytes($clonedVoice->source_audio_path);
-            $consentAudioBytes = $this->loadConsentAudioBytes($clonedVoice);
-
-            $languageCode = $clonedVoice->language_code ?: 'ar-XA';
-            $consentLang = str_starts_with($languageCode, 'ar') ? 'ar' : 'en';
-            $consentScript = self::CONSENT_SCRIPTS[$consentLang] ?? self::CONSENT_SCRIPTS['en'];
-
-            $audioEncoding = $this->detectAudioEncoding($clonedVoice->source_audio_path);
-
-            $payload = [
-                'reference_audio' => [
-                    'audio_config' => ['audio_encoding' => $audioEncoding],
-                    'content' => base64_encode($referenceAudioBytes),
-                ],
-                'voice_talent_consent' => [
-                    'audio_config' => ['audio_encoding' => $audioEncoding],
-                    'content' => base64_encode($consentAudioBytes),
-                ],
-                'consent_script' => $consentScript,
-                'language_code' => $languageCode,
-            ];
-
-            // Instant Custom Voice requires OAuth with x-goog-user-project.
-            $response = $this->makeAuthenticatedRequest($endpoint, $payload, 30, true);
-
-            // Some regional TTS hosts may not expose this method.
-            // Retry once on global before treating it as a hard failure.
-            if ($region !== 'global' && $this->isMethodNotFound($response)) {
-                $globalEndpoint = $this->buildEndpoint('global', 'voices:generateVoiceCloningKey');
-                Log::warning('Voice cloning key endpoint not found on regional host; retrying global endpoint.', [
-                    'cloned_voice_id' => $clonedVoice->id,
-                    'region' => $region,
-                ]);
-                $response = $this->makeAuthenticatedRequest($globalEndpoint, $payload, 30, true);
+            if (! filled($clonedVoice->consent_audio_path)) {
+                return $this->failure('A separate consent recording is required.', 'consent');
             }
 
-            if ($response->successful() && $response->json('voiceCloningKey')) {
+            $reference = $this->prepareAudio($clonedVoice->source_audio_path);
+            $consent = $this->prepareAudio($clonedVoice->consent_audio_path);
+            $languageCode = $clonedVoice->language_code ?: 'ar-XA';
+
+            $payload = [
+                'store' => true,
+                'voice' => [
+                    'model' => self::MODEL,
+                    'type' => 'replicated',
+                    'display_name' => Str::limit((string) $clonedVoice->name, 80, ''),
+                    'replicated' => [
+                        'source_audio' => [
+                            'mime_type' => $reference['mime'],
+                            'data' => base64_encode($reference['bytes']),
+                        ],
+                        'consent_audio' => [
+                            'mime_type' => $consent['mime'],
+                            'data' => base64_encode($consent['bytes']),
+                        ],
+                    ],
+                ],
+            ];
+
+            $response = $this->request('POST', '/voices', $payload, 90);
+            $voiceId = $this->extractVoiceId($response);
+
+            if ($response->successful() && $voiceId !== null) {
                 return [
                     'success' => true,
-                    'voice_cloning_key' => $response->json('voiceCloningKey'),
+                    'voice_cloning_key' => $voiceId,
                 ];
             }
 
-            $errorMessage = $response->json('error.message') ?? $response->body();
-            if ($this->isMethodNotFound($response)) {
-                $errorMessage = 'Voice cloning is not enabled for the Google Cloud project behind your current TTS API key. No new API key is required; enable/allow-list Instant Custom Voice for this same project.';
-            }
-            Log::error('Voice cloning key generation failed.', [
+            $errorMessage = $this->responseError($response);
+            Log::error('Gemini voice replication failed.', [
                 'cloned_voice_id' => $clonedVoice->id,
                 'status' => $response->status(),
                 'error' => $errorMessage,
-                'region' => $region,
-                'endpoint' => $endpoint,
+                'language_code' => $languageCode,
             ]);
 
-            return [
-                'success' => false,
-                'error' => $errorMessage,
-            ];
+            return $this->failure($errorMessage, $this->classifyError($errorMessage, $response->status()));
         } catch (\Throwable $e) {
-            Log::error('Voice cloning key generation exception.', [
+            Log::error('Gemini voice replication exception.', [
                 'cloned_voice_id' => $clonedVoice->id,
                 'exception' => $e->getMessage(),
             ]);
 
-            return [
-                'success' => false,
-                'error' => $e->getMessage(),
-            ];
+            return $this->failure($e->getMessage(), 'provider');
         }
     }
 
     /**
-     * Synthesize text using a cloned voice.
-     *
-     * This is used by the TTS pipeline when a user selects their cloned voice.
-     * Goes through Google Cloud TTS v1beta1 with voice_clone parameter.
-     *
-     * @param  string  $text          Text to synthesize
-     * @param  string  $languageCode  Language code (e.g. ar-XA, en-US)
-     * @param  string  $voiceCloningKey  The stored voice cloning key
-     * @return array{audio_content: string, audio_path: string, provider: string, model: string, latency_ms: int, cost_estimate_usd: float, char_count: int}
+     * @return array{audio_content: string, audio_path: string, provider: string, model: string, latency_ms: int, cost_estimate_usd: float, char_count: int, duration_seconds: null}
      */
     public function synthesizeWithClonedVoice(
         string $text,
         string $languageCode,
         string $voiceCloningKey,
+        string $style = '',
     ): array {
-        $region = $this->getRegion();
-        $endpoint = $this->buildEndpoint($region, 'text:synthesize');
-        $startTime = microtime(true);
-
-        $payload = [
-            'input' => ['text' => mb_substr($text, 0, 5000)],
-            'voice' => [
-                'language_code' => $languageCode,
-                'voice_clone' => [
-                    'voice_cloning_key' => $voiceCloningKey,
-                ],
-            ],
-            'audioConfig' => [
-                'audioEncoding' => 'MP3',
-                'sampleRateHertz' => 24000,
-            ],
-        ];
-
-        // Keep cloned-voice synthesis on OAuth as well for consistent project billing and access.
-        $response = $this->makeAuthenticatedRequest($endpoint, $payload, 60, true);
-
-        if (! $response->successful()) {
-            $errorMsg = $response->json('error.message') ?? 'Voice cloning synthesis failed.';
-            throw new \RuntimeException("Cloned voice synthesis failed: {$errorMsg}");
+        $text = trim(mb_substr($text, 0, 5000));
+        if ($text === '') {
+            throw new \RuntimeException('TTS text is empty.');
         }
 
-        $audioContent = base64_decode($response->json('audioContent'));
-        $latencyMs = (int) ((microtime(true) - $startTime) * 1000);
+        $startTime = microtime(true);
+        $style = trim($style);
+        $response = $this->request('POST', '/interactions', $this->interactionPayload($text, $voiceCloningKey, $style), 90);
 
-        // Store the synthesized audio
-        $filename = 'audio/cloned/' . now()->format('Ymd') . '/' . \Illuminate\Support\Str::uuid() . '.mp3';
+        if (! $response->successful() && $this->shouldFallbackToGenerateContent($response)) {
+            $response = $this->request('POST', '/models/'.self::MODEL.':generateContent', $this->generateContentPayload($text, $voiceCloningKey, $style), 90);
+        }
+
+        if (! $response->successful()) {
+            $errorMsg = $this->responseError($response);
+            throw new \RuntimeException('Cloned voice synthesis failed: '.$errorMsg);
+        }
+
+        $audioContent = $this->extractAudioBytes($response->json() ?? []);
+        if ($audioContent === '') {
+            throw new \RuntimeException('Cloned voice synthesis returned no audio.');
+        }
+
+        $audioContent = $this->ensurePlayableAudio($audioContent);
+        $extension = str_starts_with($audioContent, 'RIFF') ? 'wav' : 'mp3';
+        $filename = 'audio/cloned/'.now()->format('Ymd').'/'.Str::uuid().'.'.$extension;
         Storage::disk('public')->put($filename, $audioContent);
 
         return [
             'audio_content' => $audioContent,
             'audio_path' => $filename,
-            'provider' => 'google_cloud_chirp3',
-            'model' => 'chirp3-instant-custom-voice',
-            'latency_ms' => $latencyMs,
+            'provider' => 'gemini',
+            'model' => self::MODEL,
+            'latency_ms' => (int) ((microtime(true) - $startTime) * 1000),
             'cost_estimate_usd' => $this->estimateCost(mb_strlen($text)),
             'char_count' => mb_strlen($text),
             'duration_seconds' => null,
         ];
     }
 
-    /**
-     * Check if voice cloning is enabled globally.
-     */
+    public function deleteReplicatedVoice(?string $voiceId): void
+    {
+        $voiceId = trim((string) $voiceId);
+        if ($voiceId === '' || ! str_starts_with($voiceId, 'voice_')) {
+            return;
+        }
+
+        try {
+            $response = $this->request('DELETE', '/voices/'.rawurlencode($voiceId), [], 30);
+            if (! $response->successful() && $response->status() !== 404) {
+                Log::warning('Gemini replicated voice delete failed.', [
+                    'voice_id' => $voiceId,
+                    'status' => $response->status(),
+                    'error' => $this->responseError($response),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gemini replicated voice delete exception.', [
+                'voice_id' => $voiceId,
+                'exception' => $e->getMessage(),
+            ]);
+        }
+    }
+
     public static function isEnabled(): bool
     {
         return (string) SiteSetting::get('voice_cloning_enabled', '1') === '1';
     }
 
-    /**
-     * Get the maximum number of cloned voices per user (global fallback).
-     */
     public static function maxVoicesPerUser(): int
     {
         return (int) SiteSetting::get('voice_cloning_max_per_user', 5);
     }
 
-    /**
-     * Get the maximum number of cloned voices for a specific plan.
-     *
-     * Uses the exact per-plan value when present (including 0).
-     * Falls back to the global SiteSetting limit only when the plan value is null.
-     */
-    public static function maxVoicesForPlan(?\App\Models\Plan $plan): int
+    public static function maxVoicesForPlan(?Plan $plan): int
     {
         if ($plan && $plan->voice_cloning_max_voices !== null) {
             return max(0, (int) $plan->voice_cloning_max_voices);
@@ -230,24 +194,40 @@ class VoiceCloningService
     }
 
     /**
-     * Get the minimum required sample duration in seconds.
+     * Slot count for the private preview account.
+     * A plan limit of zero does not lock the preview account out.
      */
-    public static function minSampleDuration(): int
+    public static function maxVoicesForViewer(?User $user, ?Plan $plan): int
     {
-        return (int) SiteSetting::get('voice_cloning_min_duration', 10);
+        if (! VoiceCloningAccess::allows($user)) {
+            return 0;
+        }
+
+        $configured = self::maxVoicesForPlan($plan);
+
+        return $configured > 0 ? $configured : max(1, self::maxVoicesPerUser());
     }
 
-    /**
-     * Get the maximum upload size in MB.
-     */
+    public static function minSampleDuration(): int
+    {
+        return max(10, (int) SiteSetting::get('voice_cloning_min_duration', 10));
+    }
+
+    public static function maxSampleDuration(): int
+    {
+        return 30;
+    }
+
+    public static function minConsentDuration(): int
+    {
+        return 3;
+    }
+
     public static function maxUploadSizeMb(): int
     {
         return (int) SiteSetting::get('voice_cloning_max_upload_mb', 25);
     }
 
-    /**
-     * Get allowed audio MIME types.
-     */
     public static function allowedMimeTypes(): array
     {
         return [
@@ -262,133 +242,360 @@ class VoiceCloningService
             'audio/ogg',
             'audio/webm',
             'audio/flac',
-            'video/mp4',        // Browsers may report .mp4 files as video/mp4
-            'application/mp4',  // Some systems report .mp4 as application/mp4
-            'audio/3gpp',       // Messaging apps may export audio as 3GPP containers
-            'video/3gpp',       // Some detectors report 3GPP as video/*
+            'video/mp4',
+            'application/mp4',
+            'audio/3gpp',
+            'video/3gpp',
             'audio/3gpp2',
             'video/3gpp2',
+            'video/webm',
         ];
     }
 
-    /**
-     * Get allowed file extensions.
-     */
     public static function allowedExtensions(): array
     {
         return ['wav', 'mp3', 'mp4', 'm4a', 'ogg', 'webm', 'flac'];
+    }
+
+    public static function consentScriptFor(?string $languageCode): string
+    {
+        $languageCode = trim((string) $languageCode);
+        if (isset(self::CONSENT_SCRIPTS[$languageCode])) {
+            return self::CONSENT_SCRIPTS[$languageCode];
+        }
+
+        $prefix = strtolower(substr($languageCode, 0, 2));
+
+        return self::CONSENT_SCRIPTS[$prefix] ?? self::CONSENT_SCRIPTS['en'];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function consentScriptsByLocale(): array
+    {
+        return [
+            'ar-XA' => self::CONSENT_SCRIPTS['ar-XA'],
+            'en-US' => self::CONSENT_SCRIPTS['en-US'],
+            'en-GB' => self::CONSENT_SCRIPTS['en-GB'],
+            'en-AU' => self::CONSENT_SCRIPTS['en-AU'],
+        ];
+    }
+
+    public static function publicFailureMessage(ClonedVoice $voice): string
+    {
+        $code = (string) data_get($voice->metadata, 'failure_code', '');
+
+        return match ($code) {
+            'consent' => __('ui.voice_cloning.failure_consent'),
+            'duration' => __('ui.voice_cloning.failure_duration', [
+                'min' => self::minSampleDuration(),
+                'max' => self::maxSampleDuration(),
+            ]),
+            'audio' => __('ui.voice_cloning.failure_audio'),
+            default => __('ui.voice_cloning.processing_failed_generic'),
+        };
     }
 
     /* ------------------------------------------------------------------ */
     /*  Private helpers                                                    */
     /* ------------------------------------------------------------------ */
 
-    private function getRegion(): string
+    /**
+     * @return array{success: false, error: string, error_code: string}
+     */
+    private function failure(string $error, string $code): array
     {
-        return (string) SiteSetting::get('voice_cloning_region', 'global');
+        return [
+            'success' => false,
+            'error' => $error,
+            'error_code' => $code,
+        ];
     }
 
-    private function buildEndpoint(string $region, string $path): string
+    /**
+     * @return array<string, mixed>
+     */
+    private function interactionPayload(string $text, string $voiceId, string $style): array
     {
-        $host = $region === 'global'
-            ? 'https://texttospeech.googleapis.com'
-            : "https://{$region}-texttospeech.googleapis.com";
+        $content = [
+            'type' => 'text',
+            'text' => $text,
+        ];
+        if ($style !== '') {
+            $content['annotations'] = [[
+                'type' => 'speech_metadata',
+                'style' => $style,
+            ]];
+        }
 
-        return "{$host}/v1beta1/{$path}";
+        return [
+            'model' => self::MODEL,
+            'input' => [[
+                'type' => 'user_input',
+                'content' => [$content],
+            ]],
+            'response_format' => ['type' => 'audio'],
+            'generation_config' => [
+                'speech_config' => [
+                    ['voice' => $voiceId],
+                ],
+            ],
+        ];
     }
 
-    private function makeAuthenticatedRequest(string $url, array $payload, int $timeout = 30, bool $forceOAuth = false): \Illuminate\Http\Client\Response
+    /**
+     * @return array<string, mixed>
+     */
+    private function generateContentPayload(string $text, string $voiceId, string $style): array
     {
-        $apiKey = trim((string) config('services.google_tts.api_key', ''));
-        $verify = (bool) config('services.google_tts.verify_ssl', true);
+        $part = ['text' => $text];
+        if ($style !== '') {
+            $part['speech_metadata'] = ['style' => $style];
+        }
 
-        if (! $forceOAuth && $apiKey !== '') {
-            return $this->makeApiKeyRequest($url, $payload, $timeout, $apiKey, $verify);
+        return [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [$part],
+            ]],
+            'generationConfig' => [
+                'responseModalities' => ['AUDIO'],
+                'speechConfig' => [
+                    'voiceConfig' => [
+                        'voice' => $voiceId,
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function request(string $method, string $path, array $payload, int $timeout): Response
+    {
+        $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        $url = $baseUrl.$path;
+        $verify = (bool) config('services.gemini_tts.verify_ssl', true);
+        $keys = $this->apiKeys();
+
+        if ($keys === []) {
+            throw new \RuntimeException('Gemini API key is not configured.');
+        }
+
+        $last = null;
+        foreach ($keys as $index => $keyInfo) {
+            $pending = Http::timeout($timeout)
+                ->withOptions(['verify' => $verify])
+                ->withHeaders([
+                    'Content-Type' => 'application/json',
+                    'x-goog-api-key' => $keyInfo['key'],
+                ]);
+
+            $response = strtoupper($method) === 'DELETE'
+                ? $pending->delete($url)
+                : $pending->post($url, $payload);
+
+            $last = $response;
+            if ($response->status() !== 429 || $index === array_key_last($keys)) {
+                return $response;
+            }
+        }
+
+        if (! $last instanceof Response) {
+            throw new \RuntimeException('Gemini voice request failed.');
+        }
+
+        return $last;
+    }
+
+    /**
+     * @return array<int, array{key: string, name: string}>
+     */
+    private function apiKeys(): array
+    {
+        $configured = trim((string) config('services.gemini_tts.api_key', ''));
+        if ($configured !== '') {
+            return [['key' => $configured, 'name' => 'config']];
         }
 
         try {
-            // Preferred path for Instant Custom Voice: OAuth2 access token
-            $accessToken = $this->getAccessToken();
-            $projectId = trim((string) config('services.google_tts.project_id', ''));
-
-            $request = Http::timeout($timeout)
-                ->withToken($accessToken)
-                ->withOptions(['verify' => $verify]);
-
-            if ($projectId !== '') {
-                $request = $request->withHeaders([
-                    'x-goog-user-project' => $projectId,
-                ]);
+            $manager = app(GeminiKeyManager::class);
+            $available = $manager->getAvailableKey();
+            if (is_array($available) && filled($available['key'] ?? null)) {
+                return [$available];
             }
 
-            return $request->post($url, $payload);
-        } catch (\RuntimeException $e) {
-            // Fallback for environments configured with API key only.
-            if ($apiKey !== '') {
-                Log::warning('Voice cloning OAuth configuration unavailable, falling back to API key.', [
-                    'reason' => $e->getMessage(),
-                ]);
-
-                return $this->makeApiKeyRequest($url, $payload, $timeout, $apiKey, $verify);
-            }
-
-            throw $e;
+            return $manager->getAllKeys();
+        } catch (\Throwable) {
+            return [];
         }
     }
 
-    private function makeApiKeyRequest(string $url, array $payload, int $timeout, string $apiKey, bool $verify): \Illuminate\Http\Client\Response
+    private function extractVoiceId(Response $response): ?string
     {
-        $separator = str_contains($url, '?') ? '&' : '?';
+        $json = $response->json();
+        if (! is_array($json)) {
+            return null;
+        }
 
-        return Http::timeout($timeout)
-            ->withOptions(['verify' => $verify])
-            ->post($url . $separator . 'key=' . $apiKey, $payload);
+        $candidates = [
+            data_get($json, 'id'),
+            data_get($json, 'voice.id'),
+            data_get($json, 'voice.name'),
+            data_get($json, 'name'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $value = trim((string) $candidate);
+            if ($value === '') {
+                continue;
+            }
+            if (str_contains($value, '/')) {
+                $value = (string) Str::afterLast($value, '/');
+            }
+            if (str_starts_with($value, 'voice_')) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
-    private function getAccessToken(): string
+    /**
+     * @param  array<string, mixed>  $json
+     */
+    private function extractAudioBytes(array $json): string
     {
-        $credentialsPath = config('services.google_tts.credentials_path');
-        $credentialsJson = trim((string) config('services.google_tts.credentials_json', ''));
-
-        if ($credentialsPath && file_exists($credentialsPath)) {
-            $credentialsRaw = file_get_contents($credentialsPath);
-        } elseif ($credentialsJson !== '') {
-            $credentialsRaw = $credentialsJson;
-        } else {
-            throw new \RuntimeException('Google Cloud credentials are missing for voice cloning. Set SPEECH_TTS_CREDENTIALS_PATH or SPEECH_TTS_CREDENTIALS_JSON.');
+        $inline = data_get($json, 'output_audio.data')
+            ?? data_get($json, 'outputAudio.data');
+        $decoded = $this->decodeAudio($inline);
+        if ($decoded !== '') {
+            return $decoded;
         }
 
-        $credentials = json_decode((string) $credentialsRaw, true);
-        if (! is_array($credentials) || ! isset($credentials['client_email'], $credentials['private_key'])) {
-            throw new \RuntimeException('Invalid Google Cloud service account credentials for voice cloning.');
+        $steps = $json['steps'] ?? [];
+        if (is_array($steps)) {
+            foreach (array_reverse($steps) as $step) {
+                if (! is_array($step) || ($step['type'] ?? '') !== 'model_output') {
+                    continue;
+                }
+                foreach ($step['content'] ?? [] as $part) {
+                    if (! is_array($part)) {
+                        continue;
+                    }
+                    if (($part['type'] ?? '') === 'audio') {
+                        $decoded = $this->decodeAudio($part['data'] ?? null);
+                        if ($decoded !== '') {
+                            return $decoded;
+                        }
+                    }
+                }
+            }
         }
 
-        $now = time();
-        $header = $this->base64UrlEncode((string) json_encode(['alg' => 'RS256', 'typ' => 'JWT']));
-        $claim = $this->base64UrlEncode((string) json_encode([
-            'iss' => $credentials['client_email'],
-            'scope' => 'https://www.googleapis.com/auth/cloud-platform',
-            'aud' => 'https://oauth2.googleapis.com/token',
-            'iat' => $now,
-            'exp' => $now + 3600,
-        ]));
-
-        openssl_sign("{$header}.{$claim}", $signature, $credentials['private_key'], OPENSSL_ALGO_SHA256);
-        $jwt = "{$header}.{$claim}." . $this->base64UrlEncode($signature);
-
-        $tokenResponse = Http::asForm()->post('https://oauth2.googleapis.com/token', [
-            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-            'assertion' => $jwt,
-        ]);
-
-        if (! $tokenResponse->successful() || ! filled($tokenResponse->json('access_token'))) {
-            $errorMessage = $tokenResponse->json('error_description')
-                ?? $tokenResponse->json('error')
-                ?? $tokenResponse->body();
-            throw new \RuntimeException('Failed to obtain Google OAuth access token: ' . $errorMessage);
+        foreach (data_get($json, 'candidates.0.content.parts', []) as $part) {
+            if (! is_array($part)) {
+                continue;
+            }
+            $decoded = $this->decodeAudio(data_get($part, 'inlineData.data'));
+            if ($decoded !== '') {
+                return $decoded;
+            }
         }
 
-        return (string) $tokenResponse->json('access_token');
+        return '';
+    }
+
+    private function decodeAudio(mixed $value): string
+    {
+        if (! is_string($value) || $value === '') {
+            return '';
+        }
+
+        $decoded = base64_decode($value, true);
+
+        return is_string($decoded) ? $decoded : '';
+    }
+
+    private function ensurePlayableAudio(string $audio): string
+    {
+        if (str_starts_with($audio, 'RIFF') || str_starts_with($audio, 'ID3') || str_starts_with($audio, "\xFF\xFB")) {
+            return $audio;
+        }
+
+        if ((strlen($audio) % 2) !== 0) {
+            $audio = substr($audio, 0, -1);
+        }
+
+        $dataLength = strlen($audio);
+        $sampleRate = 24000;
+        $channels = 1;
+        $bitsPerSample = 16;
+        $byteRate = $sampleRate * $channels * ($bitsPerSample / 8);
+        $blockAlign = $channels * ($bitsPerSample / 8);
+
+        return 'RIFF'
+            .pack('V', 36 + $dataLength)
+            .'WAVE'
+            .'fmt '
+            .pack('V', 16)
+            .pack('v', 1)
+            .pack('v', $channels)
+            .pack('V', $sampleRate)
+            .pack('V', $byteRate)
+            .pack('v', $blockAlign)
+            .pack('v', $bitsPerSample)
+            .'data'
+            .pack('V', $dataLength)
+            .$audio;
+    }
+
+    /**
+     * @return array{bytes: string, mime: string}
+     */
+    private function prepareAudio(string $path): array
+    {
+        $bytes = $this->loadAudioBytes($path);
+        $converted = $this->convertToWav($bytes, $path);
+        if ($converted !== null) {
+            return ['bytes' => $converted, 'mime' => 'audio/wav'];
+        }
+
+        return [
+            'bytes' => $bytes,
+            'mime' => $this->mimeForPath($path),
+        ];
+    }
+
+    private function convertToWav(string $bytes, string $path): ?string
+    {
+        $ffmpeg = trim((string) shell_exec('command -v ffmpeg 2>/dev/null'));
+        if ($ffmpeg === '') {
+            return null;
+        }
+
+        $sourceExt = strtolower(pathinfo($path, PATHINFO_EXTENSION) ?: 'bin');
+        $tempDir = storage_path('app/voice-cloning-tmp');
+        if (! is_dir($tempDir)) {
+            mkdir($tempDir, 0775, true);
+        }
+
+        $source = $tempDir.'/'.Str::uuid().'.'.$sourceExt;
+        $target = $tempDir.'/'.Str::uuid().'.wav';
+        file_put_contents($source, $bytes);
+
+        $command = sprintf(
+            '%s -y -i %s -ac 1 -ar 24000 -sample_fmt s16 %s 2>&1',
+            escapeshellarg($ffmpeg),
+            escapeshellarg($source),
+            escapeshellarg($target),
+        );
+        exec($command, $output, $code);
+        $wav = ($code === 0 && is_file($target)) ? file_get_contents($target) : false;
+
+        @unlink($source);
+        @unlink($target);
+
+        return is_string($wav) && $wav !== '' ? $wav : null;
     }
 
     private function loadAudioBytes(string $path): string
@@ -404,52 +611,61 @@ class VoiceCloningService
         throw new \RuntimeException("Audio file not found: {$path}");
     }
 
-    private function loadConsentAudioBytes(ClonedVoice $clonedVoice): string
+    private function mimeForPath(string $path): string
     {
-        // If a separate consent audio was recorded, use that
-        if (filled($clonedVoice->consent_audio_path)) {
-            return $this->loadAudioBytes($clonedVoice->consent_audio_path);
-        }
-
-        // Otherwise, use the reference audio as consent audio too.
-        // This is valid when the user reads the consent script as their
-        // reference sample (simplified flow).
-        return $this->loadAudioBytes($clonedVoice->source_audio_path);
-    }
-
-    private function detectAudioEncoding(string $path): string
-    {
-        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-
-        return match ($ext) {
-            'wav' => 'LINEAR16',
-            'mp3' => 'MP3',
-            'mp4', 'm4a' => 'M4A',
-            'ogg', 'webm' => 'OGG_OPUS',
-            'flac' => 'FLAC',
-            default => 'LINEAR16',
+        return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+            'wav' => 'audio/wav',
+            'mp3' => 'audio/mpeg',
+            'mp4', 'm4a' => 'audio/mp4',
+            'ogg' => 'audio/ogg',
+            'webm' => 'audio/webm',
+            'flac' => 'audio/flac',
+            default => 'application/octet-stream',
         };
     }
 
-    private function base64UrlEncode(string $value): string
+    private function responseError(Response $response): string
     {
-        return rtrim(strtr(base64_encode($value), '+/', '-_'), '=');
+        $message = $response->json('error.message')
+            ?? $response->json('error.status')
+            ?? $response->body();
+
+        return mb_substr(trim((string) $message), 0, 500);
     }
 
-    private function isMethodNotFound(\Illuminate\Http\Client\Response $response): bool
+    private function classifyError(string $message, int $status): string
     {
-        if ($response->status() !== 404) {
+        $haystack = strtolower($message);
+        if (str_contains($haystack, 'consent') || str_contains($haystack, 'speaker')) {
+            return 'consent';
+        }
+        if (str_contains($haystack, 'duration') || str_contains($haystack, 'too long') || str_contains($haystack, 'too short') || str_contains($haystack, 'audio length')) {
+            return 'duration';
+        }
+        if ($status === 400) {
+            return 'audio';
+        }
+
+        return 'provider';
+    }
+
+    private function shouldFallbackToGenerateContent(Response $response): bool
+    {
+        if (! in_array($response->status(), [404, 400], true)) {
             return false;
         }
 
-        $message = strtolower((string) ($response->json('error.message') ?? $response->body()));
+        $message = strtolower($this->responseError($response));
 
-        return str_contains($message, 'method not found');
+        return str_contains($message, 'not found')
+            || str_contains($message, 'unknown')
+            || str_contains($message, 'interaction');
     }
 
     private function estimateCost(int $charCount): float
     {
-        // Google Cloud TTS Chirp 3 pricing: ~$0.000016 per character
-        return round($charCount * 0.000016, 6);
+        $ratePerMillion = (float) config('services.gemini_tts.cost_per_million_chars', 0.0);
+
+        return round(($charCount / 1_000_000) * $ratePerMillion, 6);
     }
 }

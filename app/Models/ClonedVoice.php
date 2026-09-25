@@ -8,12 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Represents a user's cloned voice created via Google Cloud TTS Chirp 3
- * Instant Custom Voice API.
+ * A user's cloned voice created with Gemini 3.8 Flash voice replication.
  *
- * The provider_voice_key stores the voice_cloning_key returned by the
- * Google Cloud TTS v1beta1 generateVoiceCloningKey endpoint. This key
- * is then passed in synthesis requests via voice.voice_clone.voice_cloning_key.
+ * provider_voice_key stores the persistent voice_... id returned by
+ * POST /v1beta/voices. Synthesis passes that id back to Gemini.
  */
 class ClonedVoice extends Model
 {

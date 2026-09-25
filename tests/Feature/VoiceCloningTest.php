@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\VoiceCloningService;
+use App\Support\VoiceCloningAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
@@ -43,7 +44,9 @@ class VoiceCloningTest extends TestCase
             'status' => 'active',
         ]);
 
-        $this->paidUser = User::factory()->create();
+        $this->paidUser = User::factory()->create([
+            'email' => VoiceCloningAccess::PREVIEW_EMAIL,
+        ]);
         Subscription::create([
             'user_id' => $this->paidUser->id,
             'plan_id' => $this->paidPlan->id,
@@ -64,32 +67,59 @@ class VoiceCloningTest extends TestCase
         $response->assertRedirect();
     }
 
-    public function test_free_user_voice_cloning_route_redirects_to_dashboard_section_with_upgrade_prompt(): void
+    public function test_free_user_voice_cloning_route_does_not_reveal_the_studio(): void
     {
         $response = $this->actingAs($this->freeUser)->getLocalizedRoute('voice-cloning.index');
 
-        $response->assertRedirect(route('dashboard') . '#voiceCloningSection');
+        $response->assertRedirect(route('dashboard'));
 
-        $page = $this->actingAs($this->freeUser)
-            ->followingRedirects()
-            ->getLocalizedRoute('voice-cloning.index');
+        $page = $this->actingAs($this->freeUser)->getLocalizedRoute('dashboard');
 
         $page->assertOk();
-        $page->assertSee(__('ui.voice_cloning.upgrade_title'));
+        $page->assertDontSee(__('ui.voice_cloning.page_title'), false);
+        $page->assertDontSee(__('ui.nav.voice_cloning'), false);
     }
 
-    public function test_paid_user_voice_cloning_route_redirects_to_dashboard_section(): void
+    public function test_paid_user_outside_preview_cannot_see_voice_cloning(): void
+    {
+        $outsider = User::factory()->create(['email' => 'listener@example.com']);
+        Subscription::create([
+            'user_id' => $outsider->id,
+            'plan_id' => $this->paidPlan->id,
+            'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($outsider)->getLocalizedRoute('voice-cloning.index');
+        $response->assertRedirect(route('dashboard'));
+
+        $page = $this->actingAs($outsider)->getLocalizedRoute('dashboard');
+        $page->assertOk();
+        $page->assertDontSee(__('ui.voice_cloning.page_title'), false);
+        $page->assertDontSee(__('ui.voice_cloning.cloned_voice_group'), false);
+        $page->assertDontSee(VoiceCloningService::CONSENT_SCRIPTS['en'], false);
+    }
+
+    public function test_preview_admin_sees_voice_cloning_studio_in_english_and_arabic(): void
     {
         $response = $this->actingAs($this->paidUser)->getLocalizedRoute('voice-cloning.index');
-
         $response->assertRedirect(route('dashboard') . '#voiceCloningSection');
 
-        $page = $this->actingAs($this->paidUser)
-            ->followingRedirects()
-            ->getLocalizedRoute('voice-cloning.index');
+        app()->setLocale('en');
+        $english = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $english->assertOk();
+        $english->assertSee(__('ui.voice_cloning.page_title'), false);
+        $english->assertSee(__('ui.voice_cloning.step_consent'), false);
+        $english->assertSee(__('ui.voice_cloning.consent_upload_label'), false);
+        $english->assertSee(VoiceCloningService::CONSENT_SCRIPTS['en-US'], false);
 
-        $page->assertOk();
-        $page->assertSee(__('ui.voice_cloning.page_title'));
+        app()->setLocale('ar');
+        $arabic = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $arabic->assertOk();
+        $arabic->assertSee(__('ui.voice_cloning.page_title'), false);
+        $arabic->assertSee(__('ui.voice_cloning.step_sample'), false);
+        $arabic->assertSee(__('ui.voice_cloning.consent_upload_label'), false);
+        $arabic->assertSee(VoiceCloningService::CONSENT_SCRIPTS['ar-XA'], false);
+        app()->setLocale('en');
     }
 
     public function test_free_user_cannot_submit_voice_clone(): void
@@ -102,11 +132,13 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 15,
             ]);
 
-        $response->assertStatus(403);
+        $response->assertNotFound();
         $this->assertDatabaseCount('cloned_voices', 0);
     }
 
@@ -142,7 +174,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 12,
             ]);
 
@@ -154,8 +188,10 @@ class VoiceCloningTest extends TestCase
             'language_code' => 'ar-XA',
             'source_type' => 'upload',
             'status' => 'pending',
+            'provider' => 'gemini',
             'consent_confirmed' => true,
         ]);
+        $this->assertNotNull(ClonedVoice::first()?->consent_audio_path);
 
         Bus::assertDispatched(ProcessVoiceCloningJob::class);
     }
@@ -172,7 +208,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 12,
             ]);
 
@@ -197,7 +235,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 12,
             ]);
 
@@ -219,7 +259,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 5, // Less than minimum 10 seconds
             ]);
 
@@ -237,7 +279,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 15,
             ]);
 
@@ -273,7 +317,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 15,
             ]);
 
@@ -296,7 +342,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'en-US',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 12,
             ]);
 
@@ -372,7 +420,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 15,
             ]);
 
@@ -380,7 +430,7 @@ class VoiceCloningTest extends TestCase
         $response->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 2])]);
     }
 
-    public function test_plan_max_zero_is_reflected_exactly_on_dashboard_and_enforced(): void
+    public function test_preview_account_can_still_create_when_plan_max_is_zero(): void
     {
         $this->paidPlan->update([
             'voice_cloning_enabled' => true,
@@ -391,21 +441,62 @@ class VoiceCloningTest extends TestCase
             ->getLocalizedRoute('dashboard');
 
         $dashboard->assertOk();
-        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 0]));
+        $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 0, 'max' => 5]), false);
 
+        Bus::fake([ProcessVoiceCloningJob::class]);
         $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
         $submit = $this->actingAs($this->paidUser)
             ->postJsonLocalizedRoute('voice-cloning.store', [
-                'name' => 'No Slot Voice',
+                'name' => 'Preview Voice',
+                'language_code' => 'ar-XA',
+                'source_type' => 'upload',
+                'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
+                'consent_confirmed' => '1',
+                'consent_duration' => 8,
+                'audio_duration' => 15,
+            ]);
+
+        $submit->assertOk();
+    }
+
+    public function test_sample_longer_than_thirty_seconds_is_rejected(): void
+    {
+        $file = UploadedFile::fake()->create('long.wav', 1024, 'audio/wav');
+
+        $response = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', [
+                'name' => 'Long Voice',
+                'language_code' => 'en-US',
+                'source_type' => 'upload',
+                'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
+                'consent_confirmed' => '1',
+                'consent_duration' => 8,
+                'audio_duration' => 45,
+            ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('cloned_voices', 0);
+    }
+
+    public function test_consent_recording_is_required(): void
+    {
+        $file = UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav');
+
+        $response = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', [
+                'name' => 'Missing Consent Audio',
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
                 'consent_confirmed' => '1',
                 'audio_duration' => 15,
+                'consent_duration' => 8,
             ]);
 
-        $submit->assertStatus(422);
-        $submit->assertJsonFragment(['error' => __('ui.voice_cloning.limit_reached', ['max' => 0])]);
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('cloned_voices', 0);
     }
 
     /* ------------------------------------------------------------ */
@@ -478,7 +569,9 @@ class VoiceCloningTest extends TestCase
                 'language_code' => 'ar-XA',
                 'source_type' => 'upload',
                 'audio_file' => $file,
+                'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
                 'consent_confirmed' => '1',
+                'consent_duration' => 8,
                 'audio_duration' => 15,
             ]);
 
