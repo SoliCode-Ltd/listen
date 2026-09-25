@@ -40,13 +40,16 @@ class VoiceCloningService
     ];
 
     /**
-     * @return array{success: bool, voice_cloning_key?: string, error?: string, error_code?: string}
+     * @return array{success: bool, voice_cloning_key?: string, error?: string, error_code?: string, http_status?: int|null, response_body?: string}
      */
     public function generateVoiceCloningKey(ClonedVoice $clonedVoice): array
     {
         try {
             if (! filled($clonedVoice->consent_audio_path)) {
                 return $this->failure('A separate consent recording is required.', 'consent');
+            }
+            if ($this->apiKeys() === []) {
+                return $this->failure('No Gemini API key is configured (GEMINI_TTS_API_KEY).', 'key');
             }
 
             $reference = $this->prepareAudio($clonedVoice->source_audio_path);
@@ -82,22 +85,38 @@ class VoiceCloningService
                 ];
             }
 
-            $errorMessage = $this->responseError($response);
+            $errorMessage = $response->successful()
+                ? 'Gemini accepted the request but returned no voice id.'
+                : $this->responseError($response);
+            $body = mb_substr((string) $response->body(), 0, 2000);
             Log::error('Gemini voice replication failed.', [
                 'cloned_voice_id' => $clonedVoice->id,
                 'status' => $response->status(),
                 'error' => $errorMessage,
+                'body' => $body,
                 'language_code' => $languageCode,
+                'source_mime' => $reference['mime'],
+                'source_bytes' => strlen($reference['bytes']),
+                'consent_mime' => $consent['mime'],
+                'consent_bytes' => strlen($consent['bytes']),
             ]);
 
-            return $this->failure($errorMessage, $this->classifyError($errorMessage, $response->status()));
+            return $this->failure(
+                $errorMessage,
+                $this->classifyError($errorMessage.' '.$body, $response->status()),
+                $response->status(),
+                $body,
+            );
         } catch (\Throwable $e) {
             Log::error('Gemini voice replication exception.', [
                 'cloned_voice_id' => $clonedVoice->id,
-                'exception' => $e->getMessage(),
+                'exception' => get_class($e).': '.$e->getMessage(),
             ]);
 
-            return $this->failure($e->getMessage(), 'provider');
+            $message = $e->getMessage();
+            $code = str_contains(strtolower($message), 'audio file not found') ? 'audio' : 'network';
+
+            return $this->failure($message, $code);
         }
     }
 
@@ -148,6 +167,32 @@ class VoiceCloningService
             'char_count' => mb_strlen($text),
             'duration_seconds' => null,
         ];
+    }
+
+    /**
+     * Cheap read-only call that proves the key, network, and region can reach
+     * the Voices API before any audio is sent.
+     *
+     * @return array{ok: bool, status: int|null, body: string}
+     */
+    public function probeVoicesApi(): array
+    {
+        try {
+            $response = $this->request('GET', '/voices', ['type' => 'replicated', 'pageSize' => 1], 30);
+
+            return [
+                'ok' => $response->successful(),
+                'status' => $response->status(),
+                'body' => mb_substr((string) $response->body(), 0, 1500),
+            ];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'status' => null, 'body' => get_class($e).': '.$e->getMessage()];
+        }
+    }
+
+    public function configuredKeyCount(): int
+    {
+        return count($this->apiKeys());
     }
 
     public function deleteReplicatedVoice(?string $voiceId): void
@@ -330,8 +375,39 @@ class VoiceCloningService
                 'max' => self::maxSampleDuration(),
             ]),
             'audio' => __('ui.voice_cloning.failure_audio'),
+            'region' => __('ui.voice_cloning.failure_region'),
+            'key' => __('ui.voice_cloning.failure_key'),
+            'quota' => __('ui.voice_cloning.failure_quota'),
+            'network' => __('ui.voice_cloning.failure_network'),
             default => __('ui.voice_cloning.processing_failed_generic'),
         };
+    }
+
+    /**
+     * Raw provider detail for the private preview account only.
+     */
+    public static function technicalFailureDetail(ClonedVoice $voice): string
+    {
+        $status = data_get($voice->metadata, 'http_status');
+        $error = trim((string) (data_get($voice->metadata, 'provider_error') ?: $voice->failure_reason));
+        if ($error === '') {
+            return '';
+        }
+
+        return ($status ? "HTTP {$status}: " : '').mb_substr($error, 0, 400);
+    }
+
+    /**
+     * Whether a failed voice can be sent again without recording.
+     * Only browser WAV uploads qualify; older WebM files need ffmpeg.
+     */
+    public static function canRetry(ClonedVoice $voice): bool
+    {
+        return $voice->isFailed()
+            && filled($voice->source_audio_path)
+            && filled($voice->consent_audio_path)
+            && str_ends_with(strtolower((string) $voice->source_audio_path), '.wav')
+            && str_ends_with(strtolower((string) $voice->consent_audio_path), '.wav');
     }
 
     /* ------------------------------------------------------------------ */
@@ -339,14 +415,16 @@ class VoiceCloningService
     /* ------------------------------------------------------------------ */
 
     /**
-     * @return array{success: false, error: string, error_code: string}
+     * @return array{success: false, error: string, error_code: string, http_status: int|null, response_body: string}
      */
-    private function failure(string $error, string $code): array
+    private function failure(string $error, string $code, ?int $status = null, string $body = ''): array
     {
         return [
             'success' => false,
             'error' => $error,
             'error_code' => $code,
+            'http_status' => $status,
+            'response_body' => $body,
         ];
     }
 
@@ -418,18 +496,27 @@ class VoiceCloningService
             throw new \RuntimeException('Gemini API key is not configured.');
         }
 
+        $options = ['verify' => $verify];
+        $proxy = trim((string) config('services.gemini_tts.voice_proxy', ''));
+        if ($proxy !== '') {
+            $options['proxy'] = $proxy;
+        }
+
         $last = null;
         foreach ($keys as $index => $keyInfo) {
             $pending = Http::timeout($timeout)
-                ->withOptions(['verify' => $verify])
+                ->connectTimeout(20)
+                ->withOptions($options)
                 ->withHeaders([
                     'Content-Type' => 'application/json',
                     'x-goog-api-key' => $keyInfo['key'],
                 ]);
 
-            $response = strtoupper($method) === 'DELETE'
-                ? $pending->delete($url)
-                : $pending->post($url, $payload);
+            $response = match (strtoupper($method)) {
+                'DELETE' => $pending->delete($url),
+                'GET' => $pending->get($url, $payload),
+                default => $pending->post($url, $payload),
+            };
 
             $last = $response;
             if ($response->status() !== 429 || $index === array_key_last($keys)) {
@@ -769,6 +856,15 @@ class VoiceCloningService
     private function classifyError(string $message, int $status): string
     {
         $haystack = strtolower($message);
+        if (str_contains($haystack, 'location') || str_contains($haystack, 'region') || str_contains($haystack, 'country') || str_contains($haystack, 'not available in your')) {
+            return 'region';
+        }
+        if (str_contains($haystack, 'api key') || str_contains($haystack, 'api_key') || $status === 401 || ($status === 403 && str_contains($haystack, 'permission'))) {
+            return 'key';
+        }
+        if ($status === 429 || str_contains($haystack, 'quota') || str_contains($haystack, 'resource_exhausted') || str_contains($haystack, 'rate limit')) {
+            return 'quota';
+        }
         if (str_contains($haystack, 'consent') || str_contains($haystack, 'speaker') || str_contains($haystack, 'verif')) {
             return 'consent';
         }

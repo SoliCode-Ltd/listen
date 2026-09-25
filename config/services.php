@@ -75,6 +75,10 @@ return [
         'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
         'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),
         'cost_per_million_chars' => env('GEMINI_TTS_COST_PER_MILLION_CHARS', 0),
+        // Optional HTTP(S) proxy for voice replication only, e.g. when the
+        // server's country is not supported. Example: http://user:pass@host:3128
+        'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),
+        'ffmpeg_path' => env('FFMPEG_PATH', ''),
     ],
 
     'stripe' => [

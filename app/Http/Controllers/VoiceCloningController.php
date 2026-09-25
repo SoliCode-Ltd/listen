@@ -233,7 +233,69 @@ class VoiceCloningController extends Controller
             'failure_reason' => $clonedVoice->isFailed()
                 ? VoiceCloningService::publicFailureMessage($clonedVoice)
                 : null,
+            'failure_detail' => $clonedVoice->isFailed()
+                ? VoiceCloningService::technicalFailureDetail($clonedVoice)
+                : null,
+            'can_retry' => VoiceCloningService::canRetry($clonedVoice),
             'is_ready' => $clonedVoice->isReady(),
+        ]);
+    }
+
+    /**
+     * Send a failed voice to Gemini again with the recordings already saved.
+     */
+    public function retry(Request $request, int $id)
+    {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            abort(404);
+        }
+
+        $userId = (int) auth()->id();
+        $clonedVoice = ClonedVoice::forUser($userId)->findOrFail($id);
+
+        if (! VoiceCloningService::isEnabled()) {
+            return $this->jsonError(__('ui.voice_cloning.feature_disabled'), 403);
+        }
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        if (! VoiceCloningService::planAllows($activePlan)) {
+            return $this->jsonError(__('ui.voice_cloning.plan_disabled'), 403);
+        }
+        if (! VoiceCloningService::canRetry($clonedVoice)) {
+            return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
+        }
+
+        $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
+        $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
+        if ($activeCount >= $maxVoices) {
+            return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
+        }
+
+        $clonedVoice->update([
+            'status' => 'pending',
+            'failure_reason' => null,
+            'metadata' => array_merge($clonedVoice->metadata ?? [], [
+                'failure_code' => null,
+                'retried_at' => now()->toIso8601String(),
+            ]),
+        ]);
+        $clonedVoice->refresh();
+
+        ProcessVoiceCloningJob::dispatch($clonedVoice->id)->afterResponse();
+
+        return response()->json([
+            'success' => true,
+            'voice' => [
+                'id' => $clonedVoice->id,
+                'name' => $clonedVoice->name,
+                'language_code' => $clonedVoice->language_code,
+                'source_type' => $clonedVoice->source_type,
+                'status' => $clonedVoice->status,
+                'progress_percent' => VoiceCloningService::progressPercent('pending', 0),
+                'elapsed_seconds' => 0,
+                'is_delayed' => false,
+                'created_at_ts' => now()->getTimestamp(),
+                'failure_reason' => null,
+            ],
         ]);
     }
 

@@ -22,6 +22,20 @@
       margin-top: .85rem;
     }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
+    .vc-tech-detail { margin: -.25rem 0 .7rem; font-size: .76rem; color: var(--muted); }
+    .vc-tech-detail summary { cursor: pointer; font-weight: 700; }
+    .vc-tech-detail code {
+      display: block;
+      margin-top: .35rem;
+      padding: .5rem .6rem;
+      border-radius: .5rem;
+      background: color-mix(in oklab, var(--surface2) 70%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      text-align: left;
+      font-family: var(--font-mono);
+    }
     #voice_key.vc-speaker-picked {
       border-color: color-mix(in oklab, var(--a) 55%, var(--line));
       box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
@@ -2256,6 +2270,13 @@
                   </div>
                   @if($voice->isFailed())
                     <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
+                    @php $vcDetail = \App\Services\VoiceCloningService::technicalFailureDetail($voice); @endphp
+                    @if($vcDetail !== '')
+                      <details class="vc-tech-detail">
+                        <summary>{{ __('ui.voice_cloning.technical_details') }}</summary>
+                        <code dir="ltr">{{ $vcDetail }}</code>
+                      </details>
+                    @endif
                   @endif
                   @if($voice->isProcessing())
                     <div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">{{ __('ui.voice_cloning.processing_hint') }}</div>
@@ -2271,6 +2292,9 @@
                     <div class="vc-progress-delay" data-vc-progress-delay></div>
                   </div>
                   <div class="vc-card-actions">
+                    @if(\App\Services\VoiceCloningService::canRetry($voice))
+                      <button type="button" class="btn btn-primary vc-retry-btn" data-voice-id="{{ $voice->id }}">{{ __('ui.voice_cloning.retry_button') }}</button>
+                    @endif
                     @if($voice->isReady())
                       <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">{{ __('ui.voice_cloning.use_in_generator') }}</a>
                     @endif
@@ -3642,6 +3666,9 @@
       const STORE_URL = '{{ route("voice-cloning.store") }}';
       const STATUS_URL_BASE = '{{ route("voice-cloning.status", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
       const DELETE_URL_BASE = '{{ route("voice-cloning.destroy", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
+      const RETRY_URL_TEMPLATE = '{{ route("voice-cloning.retry", ["id" => "__VOICE_ID__"]) }}';
+      const retryText = @json(__('ui.voice_cloning.retry_button'));
+      const techDetailsText = @json(__('ui.voice_cloning.technical_details'));
       const GENERATOR_URL_BASE = '{{ route("dashboard") }}';
       const pageLocale = String(document.documentElement.lang || '{{ app()->getLocale() }}').toLowerCase();
       const statusLabels = {
@@ -3811,6 +3838,47 @@
         }
       }
 
+      function ensureTechDetail(card, detail) {
+        let box = card.querySelector('.vc-tech-detail');
+        const text = String(detail || '').trim();
+        if (!text) {
+          box?.remove();
+          return;
+        }
+        if (!box) {
+          box = document.createElement('details');
+          box.className = 'vc-tech-detail';
+          const summary = document.createElement('summary');
+          summary.textContent = techDetailsText;
+          const code = document.createElement('code');
+          code.setAttribute('dir', 'ltr');
+          box.append(summary, code);
+          const hint = card.querySelector('.vc-failure-hint');
+          if (hint) hint.after(box);
+          else card.insertBefore(box, card.querySelector('.vc-card-actions') || null);
+        }
+        box.querySelector('code').textContent = text;
+      }
+
+      function setRetryButton(card, voiceId, show) {
+        const actions = card.querySelector('.vc-card-actions');
+        if (!actions) return;
+        let button = actions.querySelector('.vc-retry-btn');
+        if (!show) {
+          button?.remove();
+          return;
+        }
+        if (!button) {
+          button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn btn-primary vc-retry-btn';
+          button.textContent = retryText;
+          actions.insertBefore(button, actions.firstChild || null);
+        }
+        button.dataset.voiceId = String(voiceId);
+        button.disabled = false;
+      }
+
       function ensureProgressUI(card) {
         let progress = card.querySelector('[data-vc-progress]');
         if (!progress) {
@@ -3920,8 +3988,12 @@
 
         ensureProcessingHint(card, ['pending', 'validating', 'processing'].includes(status));
         ensureFailureHint(card, status === 'failed', failureReason);
+        if (status !== 'failed') ensureTechDetail(card, '');
+        else if (payload.failure_detail !== undefined) ensureTechDetail(card, payload.failure_detail);
         updateProgressUI(card, status, elapsedSeconds, isDelayed, serverProgress);
         setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
+        if (status !== 'failed') setRetryButton(card, payload.id || card.dataset.voiceId, false);
+        else if (payload.can_retry !== undefined) setRetryButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_retry));
       }
 
       function startPolling(voiceId) {
@@ -4629,6 +4701,42 @@
               name: card.dataset.voiceName,
               language_code: card.dataset.languageCode,
             });
+          }
+          return;
+        }
+        const retryButton = target instanceof Element ? target.closest('.vc-retry-btn') : null;
+        if (retryButton) {
+          const retryId = String(retryButton.dataset.voiceId || '').trim();
+          if (!retryId) return;
+          retryButton.disabled = true;
+          try {
+            const response = await fetch(RETRY_URL_TEMPLATE.replace('__VOICE_ID__', encodeURIComponent(retryId)), {
+              method: 'POST',
+              headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && data?.success && data.voice) {
+              const card = retryButton.closest('.vc-card');
+              if (card) {
+                card.dataset.createdTs = String(data.voice.created_at_ts || Math.floor(Date.now() / 1000));
+                card.dataset.failureReason = '';
+                const progressFill = card.querySelector('[data-vc-progress-fill]');
+                const progressPercent = card.querySelector('[data-vc-progress-percent]');
+                if (progressFill) progressFill.style.width = '0%';
+                if (progressPercent) progressPercent.textContent = '0%';
+                currentVoiceCount += 1;
+                updateCountUI();
+                card.dataset.status = 'pending';
+                applyStatusToCard(card, data.voice);
+              }
+              startPolling(retryId);
+              return;
+            }
+            retryButton.disabled = false;
+            showAlert('error', data?.error || data?.message || 'Error');
+          } catch (error) {
+            retryButton.disabled = false;
+            showAlert('error', error?.message || 'Network error');
           }
           return;
         }

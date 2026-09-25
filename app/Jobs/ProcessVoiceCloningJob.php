@@ -36,7 +36,7 @@ class ProcessVoiceCloningJob implements ShouldQueue
 
         $clonedVoice = ClonedVoice::find($this->clonedVoiceId);
 
-        if (! $clonedVoice || $clonedVoice->status === 'ready') {
+        if (! $clonedVoice || $clonedVoice->status === 'ready' || $clonedVoice->status === 'failed') {
             return;
         }
 
@@ -78,6 +78,8 @@ class ProcessVoiceCloningJob implements ShouldQueue
                 $clonedVoice,
                 $result['error'] ?? 'Unknown error from Gemini.',
                 $result['error_code'] ?? 'provider',
+                $result['http_status'] ?? null,
+                (string) ($result['response_body'] ?? ''),
             );
         }
     }
@@ -118,20 +120,30 @@ class ProcessVoiceCloningJob implements ShouldQueue
         return true;
     }
 
-    private function markFailed(ClonedVoice $clonedVoice, string $reason, string $code = 'provider'): void
-    {
+    private function markFailed(
+        ClonedVoice $clonedVoice,
+        string $reason,
+        string $code = 'provider',
+        ?int $httpStatus = null,
+        string $responseBody = '',
+    ): void {
         $clonedVoice->update([
             'status' => 'failed',
             'failure_reason' => mb_substr($reason, 0, 1000),
             'metadata' => array_merge($clonedVoice->metadata ?? [], [
                 'failure_code' => $code,
                 'provider_error' => mb_substr($reason, 0, 500),
+                'http_status' => $httpStatus,
+                'provider_response' => mb_substr($responseBody, 0, 2000),
+                'failed_at' => now()->toIso8601String(),
             ]),
         ]);
 
         Log::warning('Voice cloning failed.', [
             'cloned_voice_id' => $clonedVoice->id,
             'user_id' => $clonedVoice->user_id,
+            'code' => $code,
+            'http_status' => $httpStatus,
             'reason' => $reason,
         ]);
     }

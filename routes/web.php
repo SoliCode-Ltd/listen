@@ -204,6 +204,7 @@ Route::group([
             // Actions require paid plan (enforced in controller).
             Route::post('/', [VoiceCloningController::class, 'store'])->name('voice-cloning.store');
             Route::get('/status/{id}', [VoiceCloningController::class, 'status'])->name('voice-cloning.status');
+            Route::post('/{id}/retry', [VoiceCloningController::class, 'retry'])->name('voice-cloning.retry');
             Route::delete('/{id}', [VoiceCloningController::class, 'destroy'])->name('voice-cloning.destroy');
         });
 

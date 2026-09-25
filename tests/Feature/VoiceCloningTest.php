@@ -730,7 +730,7 @@ class VoiceCloningTest extends TestCase
         $submit->assertJson(['success' => true]);
     }
 
-    public function test_failed_card_shows_a_friendly_message_not_the_server_error(): void
+    public function test_failed_card_shows_a_friendly_message_and_keeps_the_raw_error_in_details(): void
     {
         ClonedVoice::factory()->failed()->create([
             'user_id' => $this->paidUser->id,
@@ -741,8 +741,104 @@ class VoiceCloningTest extends TestCase
         $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
 
         $page->assertOk();
-        $page->assertSee(__('ui.voice_cloning.processing_failed_generic'), false);
-        $page->assertDontSee('shell_exec', false);
+        $html = $page->getContent();
+        $this->assertMatchesRegularExpression(
+            '/class="vc-alert error vc-failure-hint"[^>]*>\s*'.preg_quote(e(__('ui.voice_cloning.processing_failed_generic')), '/').'\s*</',
+            $html,
+        );
+        $this->assertMatchesRegularExpression('/<details class="vc-tech-detail">.*shell_exec/s', $html);
+        $this->assertStringNotContainsString('data-failure-reason="Call to undefined', $html);
+    }
+
+    public function test_region_block_from_gemini_is_explained_and_can_be_retried(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::sequence()
+                ->push(['error' => ['code' => 400, 'message' => 'User location is not supported for the API use.', 'status' => 'FAILED_PRECONDITION']], 400)
+                ->push(['id' => 'voice_after_retry'], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'provider' => 'gemini',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        $voice->refresh();
+
+        $this->assertSame('failed', $voice->status);
+        $this->assertSame('region', data_get($voice->metadata, 'failure_code'));
+        $this->assertSame(400, data_get($voice->metadata, 'http_status'));
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $page->assertSee(__('ui.voice_cloning.failure_region'), false);
+        $page->assertSee(__('ui.voice_cloning.technical_details'), false);
+        $page->assertSee('User location is not supported', false);
+        $page->assertSee('vc-retry-btn', false);
+
+        $status = $this->actingAs($this->paidUser)
+            ->getJson($this->localizedRoute('voice-cloning.status', ['id' => $voice->id]));
+        $status->assertJson(['status' => 'failed', 'can_retry' => true]);
+
+        $retry = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.retry', [], ['id' => $voice->id]);
+        $retry->assertOk()->assertJson(['success' => true, 'voice' => ['status' => 'pending']]);
+
+        $voice->refresh();
+        $this->assertTrue($voice->isReady());
+        $this->assertSame('voice_after_retry', $voice->provider_voice_key);
+    }
+
+    public function test_old_webm_recordings_cannot_be_retried(): void
+    {
+        $voice = ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/old.webm',
+            'consent_audio_path' => 'voice-cloning/1/old-consent.webm',
+        ]);
+
+        $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.retry', [], ['id' => $voice->id])
+            ->assertStatus(422)
+            ->assertJsonFragment(['error' => __('ui.voice_cloning.retry_not_possible')]);
+    }
+
+    public function test_retry_is_hidden_from_other_accounts(): void
+    {
+        $other = User::factory()->create();
+        $voice = ClonedVoice::factory()->failed()->create([
+            'user_id' => $other->id,
+            'source_audio_path' => 'voice-cloning/2/a.wav',
+            'consent_audio_path' => 'voice-cloning/2/b.wav',
+        ]);
+
+        $this->actingAs($other)
+            ->postJsonLocalizedRoute('voice-cloning.retry', [], ['id' => $voice->id])
+            ->assertNotFound();
+    }
+
+    public function test_diagnose_command_reports_the_gemini_reply(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response(
+                ['error' => ['message' => 'User location is not supported for the API use.']],
+                400,
+            ),
+        ]);
+
+        $this->artisan('voice-cloning:diagnose')
+            ->expectsOutputToContain('Gemini API keys found: 1')
+            ->expectsOutputToContain('User location is not supported')
+            ->assertFailed();
     }
 
     public function test_ready_voice_offers_a_generator_button_with_that_speaker(): void
