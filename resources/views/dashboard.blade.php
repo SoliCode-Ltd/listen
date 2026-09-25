@@ -2242,7 +2242,7 @@
                     ? $voice->created_at->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY')
                     : '';
               @endphp
-                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->failure_reason }}">
+                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}">
@@ -4271,11 +4271,77 @@
         if (durationEl) durationEl.value = String(seconds || 0);
       }
 
+      function encodeWav(samples, sampleRate) {
+        const buffer = new ArrayBuffer(44 + samples.length * 2);
+        const view = new DataView(buffer);
+        const writeText = (offset, text) => {
+          for (let i = 0; i < text.length; i += 1) view.setUint8(offset + i, text.charCodeAt(i));
+        };
+        writeText(0, 'RIFF');
+        view.setUint32(4, 36 + samples.length * 2, true);
+        writeText(8, 'WAVE');
+        writeText(12, 'fmt ');
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeText(36, 'data');
+        view.setUint32(40, samples.length * 2, true);
+        let offset = 44;
+        for (let i = 0; i < samples.length; i += 1) {
+          const s = Math.max(-1, Math.min(1, samples[i]));
+          view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+          offset += 2;
+        }
+        return new Blob([view], { type: 'audio/wav' });
+      }
+
+      // Gemini wants 24 kHz mono 16-bit WAV. Converting here means the server
+      // never needs ffmpeg or exec(), which many hosts disable.
+      async function toGeminiWav(blob) {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+        if (!blob || !AudioCtx || !OfflineCtx) return blob;
+        let context = null;
+        try {
+          const raw = await blob.arrayBuffer();
+          context = new AudioCtx();
+          const decoded = await new Promise((resolve, reject) => {
+            const pending = context.decodeAudioData(raw.slice(0), resolve, reject);
+            if (pending && typeof pending.then === 'function') pending.then(resolve, reject);
+          });
+          const sampleRate = 24000;
+          const length = Math.max(1, Math.ceil(decoded.duration * sampleRate));
+          const offline = new OfflineCtx(1, length, sampleRate);
+          const source = offline.createBufferSource();
+          source.buffer = decoded;
+          source.connect(offline.destination);
+          source.start(0);
+          const rendered = await offline.startRendering();
+          return encodeWav(rendered.getChannelData(0), sampleRate);
+        } catch (_error) {
+          return blob;
+        } finally {
+          try { await context?.close?.(); } catch (_error) {}
+        }
+      }
+
+      function wavName(base, blob) {
+        return `${base}.${blobExtension(blob)}`;
+      }
+
       function blobExtension(blob) {
         const blobType = String(blob?.type || '').toLowerCase();
+        if (blobType.includes('wav')) return 'wav';
         if (blobType.includes('webm')) return 'webm';
         if (blobType.includes('ogg')) return 'ogg';
-        if (blobType.includes('wav')) return 'wav';
+        if (blobType.includes('flac')) return 'flac';
+        if (blobType.includes('mpeg') || blobType.includes('mp3')) return 'mp3';
+        const fileExt = String(blob?.name || '').split('.').pop().toLowerCase();
+        if (['wav', 'mp3', 'm4a', 'mp4', 'ogg', 'webm', 'flac'].includes(fileExt)) return fileExt;
         return 'mp4';
       }
 
@@ -4480,12 +4546,6 @@
             const formData = new FormData(form);
             const sourceType = String(document.getElementById('vcSourceType')?.value || 'upload');
             formData.set('source_type', sourceType);
-            if (sourceType === 'recording' && recordedBlob) {
-              formData.set('audio_file', recordedBlob, `recording.${blobExtension(recordedBlob)}`);
-            }
-            if (consentBlob) {
-              formData.set('consent_audio', consentBlob, `consent.${blobExtension(consentBlob)}`);
-            }
             const consentDuration = Number(document.getElementById('vcConsentDuration')?.value || 0);
             const hasConsent = Boolean(consentBlob || consentFileInput?.files?.[0]);
             if (!hasConsent) {
@@ -4507,6 +4567,19 @@
               showAlert('error', consentRequiredText);
               showStep(2);
               return;
+            }
+
+            const sampleSource = sourceType === 'recording'
+              ? recordedBlob
+              : (document.getElementById('vcFileInput')?.files?.[0] || null);
+            if (sampleSource) {
+              const sampleWav = await toGeminiWav(sampleSource);
+              formData.set('audio_file', sampleWav, wavName('sample', sampleWav));
+            }
+            const consentSource = consentBlob || consentFileInput?.files?.[0] || null;
+            if (consentSource) {
+              const consentWav = await toGeminiWav(consentSource);
+              formData.set('consent_audio', consentWav, wavName('consent', consentWav));
             }
 
             const response = await fetch(STORE_URL, {

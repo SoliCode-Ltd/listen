@@ -730,6 +730,21 @@ class VoiceCloningTest extends TestCase
         $submit->assertJson(['success' => true]);
     }
 
+    public function test_failed_card_shows_a_friendly_message_not_the_server_error(): void
+    {
+        ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'failure_reason' => 'Call to undefined function App\\Services\\shell_exec()',
+            'metadata' => ['failure_code' => 'provider'],
+        ]);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+
+        $page->assertOk();
+        $page->assertSee(__('ui.voice_cloning.processing_failed_generic'), false);
+        $page->assertDontSee('shell_exec', false);
+    }
+
     public function test_ready_voice_offers_a_generator_button_with_that_speaker(): void
     {
         $voice = ClonedVoice::factory()->ready()->create([

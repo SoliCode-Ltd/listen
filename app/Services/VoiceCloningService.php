@@ -622,40 +622,100 @@ class VoiceCloningService
 
         return [
             'bytes' => $bytes,
-            'mime' => $this->mimeForPath($path),
+            'mime' => $this->mimeForPath($path, $bytes),
         ];
     }
 
+    /**
+     * Best-effort resample to 24 kHz mono WAV. Many shared hosts disable
+     * exec(), so this must never throw; the browser already uploads WAV.
+     */
     private function convertToWav(string $bytes, string $path): ?string
     {
-        $ffmpeg = trim((string) shell_exec('command -v ffmpeg 2>/dev/null'));
-        if ($ffmpeg === '') {
+        if (! self::canRunCommands()) {
             return null;
         }
 
-        $sourceExt = strtolower(pathinfo($path, PATHINFO_EXTENSION) ?: 'bin');
-        $tempDir = storage_path('app/voice-cloning-tmp');
-        if (! is_dir($tempDir)) {
-            mkdir($tempDir, 0775, true);
+        $ffmpeg = self::ffmpegPath();
+        if ($ffmpeg === null) {
+            return null;
         }
 
-        $source = $tempDir.'/'.Str::uuid().'.'.$sourceExt;
-        $target = $tempDir.'/'.Str::uuid().'.wav';
-        file_put_contents($source, $bytes);
+        $source = null;
+        $target = null;
 
-        $command = sprintf(
-            '%s -y -i %s -ac 1 -ar 24000 -sample_fmt s16 %s 2>&1',
-            escapeshellarg($ffmpeg),
-            escapeshellarg($source),
-            escapeshellarg($target),
-        );
-        exec($command, $output, $code);
-        $wav = ($code === 0 && is_file($target)) ? file_get_contents($target) : false;
+        try {
+            $sourceExt = strtolower(pathinfo($path, PATHINFO_EXTENSION) ?: 'bin');
+            $tempDir = storage_path('app/voice-cloning-tmp');
+            if (! is_dir($tempDir)) {
+                @mkdir($tempDir, 0775, true);
+            }
 
-        @unlink($source);
-        @unlink($target);
+            $source = $tempDir.'/'.Str::uuid().'.'.$sourceExt;
+            $target = $tempDir.'/'.Str::uuid().'.wav';
+            if (@file_put_contents($source, $bytes) === false) {
+                return null;
+            }
 
-        return is_string($wav) && $wav !== '' ? $wav : null;
+            $command = sprintf(
+                '%s -y -i %s -ac 1 -ar 24000 -sample_fmt s16 %s 2>&1',
+                escapeshellarg($ffmpeg),
+                escapeshellarg($source),
+                escapeshellarg($target),
+            );
+            $output = [];
+            $code = 1;
+            exec($command, $output, $code);
+            $wav = ($code === 0 && is_file($target)) ? file_get_contents($target) : false;
+
+            return is_string($wav) && $wav !== '' ? $wav : null;
+        } catch (\Throwable $e) {
+            Log::info('Voice cloning audio conversion skipped.', ['reason' => $e->getMessage()]);
+
+            return null;
+        } finally {
+            if ($source) {
+                @unlink($source);
+            }
+            if ($target) {
+                @unlink($target);
+            }
+        }
+    }
+
+    private static function canRunCommands(): bool
+    {
+        if (! function_exists('exec') || ! function_exists('escapeshellarg')) {
+            return false;
+        }
+
+        $disabled = array_map('trim', explode(',', strtolower((string) ini_get('disable_functions'))));
+
+        return ! in_array('exec', $disabled, true) && ! in_array('escapeshellarg', $disabled, true);
+    }
+
+    private static function ffmpegPath(): ?string
+    {
+        $configured = trim((string) config('services.gemini_tts.ffmpeg_path', ''));
+        $candidates = array_filter([
+            $configured,
+            '/usr/bin/ffmpeg',
+            '/usr/local/bin/ffmpeg',
+            '/opt/homebrew/bin/ffmpeg',
+            '/opt/bin/ffmpeg',
+        ]);
+
+        foreach ($candidates as $candidate) {
+            try {
+                if (@is_file($candidate) && @is_executable($candidate)) {
+                    return $candidate;
+                }
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
     }
 
     private function loadAudioBytes(string $path): string
@@ -671,8 +731,21 @@ class VoiceCloningService
         throw new \RuntimeException("Audio file not found: {$path}");
     }
 
-    private function mimeForPath(string $path): string
+    private function mimeForPath(string $path, string $bytes = ''): string
     {
+        if (str_starts_with($bytes, 'RIFF') && substr($bytes, 8, 4) === 'WAVE') {
+            return 'audio/wav';
+        }
+        if (str_starts_with($bytes, 'fLaC')) {
+            return 'audio/flac';
+        }
+        if (str_starts_with($bytes, 'OggS')) {
+            return 'audio/ogg';
+        }
+        if (str_starts_with($bytes, 'ID3') || str_starts_with($bytes, "\xFF\xFB") || str_starts_with($bytes, "\xFF\xF3")) {
+            return 'audio/mpeg';
+        }
+
         return match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
             'wav' => 'audio/wav',
             'mp3' => 'audio/mpeg',

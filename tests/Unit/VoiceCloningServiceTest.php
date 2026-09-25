@@ -206,6 +206,40 @@ class VoiceCloningServiceTest extends TestCase
         });
     }
 
+    public function test_browser_wav_is_sent_to_gemini_as_wav(): void
+    {
+        Storage::fake('local');
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        $wav = $this->silentWav(12);
+        Storage::disk('local')->put('voice-cloning/sample.wav', $wav);
+        Storage::disk('local')->put('voice-cloning/consent.wav', $this->silentWav(4));
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response(['id' => 'voice_wav123'], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'source_audio_path' => 'voice-cloning/sample.wav',
+            'consent_audio_path' => 'voice-cloning/consent.wav',
+        ]);
+
+        $result = app(VoiceCloningService::class)->generateVoiceCloningKey($voice);
+
+        $this->assertTrue($result['success'], (string) ($result['error'] ?? ''));
+        Http::assertSent(fn ($request): bool => ($request->data()['voice']['replicated']['source_audio']['mime_type'] ?? null) === 'audio/wav'
+            && ($request->data()['voice']['replicated']['consent_audio']['mime_type'] ?? null) === 'audio/wav');
+    }
+
+    private function silentWav(int $seconds): string
+    {
+        $rate = 24000;
+        $data = str_repeat("\x00\x00", $rate * $seconds);
+
+        return 'RIFF'.pack('V', 36 + strlen($data)).'WAVEfmt '
+            .pack('VvvVVvv', 16, 1, 1, $rate, $rate * 2, 2, 16)
+            .'data'.pack('V', strlen($data)).$data;
+    }
+
     public function test_replication_accepts_a_nested_voice_id(): void
     {
         Storage::fake('local');
