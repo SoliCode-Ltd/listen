@@ -45,6 +45,7 @@ return [
     'google_tts' => [
         'endpoint' => env('SPEECH_TTS_ENDPOINT', env('GOOGLE_TTS_ENDPOINT', 'https://texttospeech.googleapis.com/v1/text:synthesize')),
         'api_key' => env('SPEECH_TTS_API_KEY', env('GOOGLE_TTS_API_KEY', '')),
+        'project_id' => env('SPEECH_TTS_PROJECT_ID', env('GOOGLE_TTS_PROJECT_ID', env('GOOGLE_CLOUD_PROJECT', ''))),
         'token_uri' => env('SPEECH_TTS_TOKEN_URI', env('GOOGLE_TTS_TOKEN_URI', 'https://oauth2.googleapis.com/token')),
         'credentials_json' => env('SPEECH_TTS_CREDENTIALS_JSON', env('GOOGLE_TTS_CREDENTIALS_JSON', '')),
         'credentials_path' => env('SPEECH_TTS_CREDENTIALS_PATH', env('GOOGLE_TTS_CREDENTIALS_PATH', '')),
@@ -69,9 +70,11 @@ return [
     'gemini_tts' => [
         'endpoint' => env('GEMINI_TTS_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta'),
         'model' => env('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
+        'api_key' => env('GEMINI_TTS_API_KEY', ''),
         'timeout_seconds' => (int) env('GEMINI_TTS_TIMEOUT', 60),
         'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
         'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),
+        'cost_per_million_chars' => env('GEMINI_TTS_COST_PER_MILLION_CHARS', 0),
     ],
 
     'stripe' => [

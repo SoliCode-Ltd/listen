@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\AudioGeneration;
+use App\Models\ClonedVoice;
 use App\Models\Plan;
 use App\Models\TtsLog;
 use App\Models\TextItem;
@@ -10,7 +11,9 @@ use App\Models\UsageCounter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
+use App\Services\VoiceCloningService;
 use App\Support\UsageEstimator;
+use App\Support\VoiceCloningAccess;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -105,44 +108,70 @@ class GenerateAudioJob implements ShouldQueue
                 'speed' => $generation->speed ?? 1.0,
                 'pitch' => $generation->pitch ?? 0.0,
             ], $plan);
-            $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
+            // === Cloned voice detection ===
+            // If voice_name is "cloned_{id}", use VoiceCloningService for synthesis
+            // instead of the normal TTS routing pipeline.
+            $isClonedVoice = str_starts_with((string) $generation->voice_name, 'cloned_');
+            $audio = null;
 
-            $voiceOptions = [
-                'voice_name' => $generation->voice_name,
-                'provider' => $generation->tts_provider ?: VoiceCatalog::providerForName($generation->voice_name),
-                'tier' => $requestedTier,
-                'gender' => $voiceMeta['gender'] ?? null,
-                'performance_style' => $studioOptions['performance_style'],
-                'style' => $studioOptions['performance_style'],
-                'style_prompt' => $studioOptions['style_prompt'],
-                'dialect' => $studioOptions['dialect'],
-                'emotion' => $studioOptions['emotion'],
-                'speed' => $studioOptions['speed'],
-                'pitch' => $studioOptions['pitch'],
-            ];
+            if ($isClonedVoice) {
+                $clonedVoiceId = (int) str_replace('cloned_', '', $generation->voice_name);
+                $clonedVoice = ClonedVoice::where('id', $clonedVoiceId)
+                    ->where('user_id', $generation->user_id)
+                    ->ready()
+                    ->first();
 
-            // Add dialogue speakers if applicable
-            if (
-                $requestedTier !== VoiceTier::STANDARD
-                && $generation->is_dialogue
-                && is_array($generation->dialogue_metadata)
-            ) {
-                $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
-                $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
-                    $generation->dialogue_metadata['speakers'] ?? [],
+                if (! $clonedVoice || ! VoiceCloningAccess::allows($clonedVoice->user)) {
+                    throw new \RuntimeException('Cloned voice not found or not ready.');
+                }
+
+                $voiceCloningService = app(VoiceCloningService::class);
+                $audio = $voiceCloningService->synthesizeWithClonedVoice(
+                    $textForSpeech,
+                    $clonedVoice->language_code,
+                    $clonedVoice->provider_voice_key,
+                    $this->clonedVoiceStyle($studioOptions),
+                );
+            } else {
+                $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
+
+                $voiceOptions = [
+                    'voice_name' => $generation->voice_name,
+                    'provider' => $generation->tts_provider ?: VoiceCatalog::providerForName($generation->voice_name),
+                    'tier' => $requestedTier,
+                    'gender' => $voiceMeta['gender'] ?? null,
+                    'performance_style' => $studioOptions['performance_style'],
+                    'style' => $studioOptions['performance_style'],
+                    'style_prompt' => $studioOptions['style_prompt'],
+                    'dialect' => $studioOptions['dialect'],
+                    'emotion' => $studioOptions['emotion'],
+                    'speed' => $studioOptions['speed'],
+                    'pitch' => $studioOptions['pitch'],
+                ];
+
+                // Add dialogue speakers if applicable
+                if (
+                    $requestedTier !== VoiceTier::STANDARD
+                    && $generation->is_dialogue
+                    && is_array($generation->dialogue_metadata)
+                ) {
+                    $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
+                    $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
+                        $generation->dialogue_metadata['speakers'] ?? [],
+                        $generation->target_language,
+                        $requestedTier,
+                        $provider,
+                    );
+                }
+
+                $audio = $ttsService->synthesizeAdvanced(
+                    $textForSpeech,
                     $generation->target_language,
-                    $requestedTier,
-                    $provider,
+                    $voiceOptions,
+                    $plan,
+                    (int) $generation->user_id,
                 );
             }
-
-            $audio = $ttsService->synthesizeAdvanced(
-                $textForSpeech,
-                $generation->target_language,
-                $voiceOptions,
-                $plan,
-                (int) $generation->user_id,
-            );
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
             $actualSeconds = (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
@@ -314,6 +343,35 @@ class GenerateAudioJob implements ShouldQueue
                 'total_minutes' => $nextMinutes,
             ]);
         });
+    }
+
+    /**
+     * @param  array{dialect?:mixed,performance_style?:mixed,style_prompt?:mixed,emotion?:mixed,speed?:mixed,pitch?:mixed}  $options
+     */
+    private function clonedVoiceStyle(array $options): string
+    {
+        $parts = [];
+        $style = trim((string) ($options['style_prompt'] ?? ''));
+        if ($style !== '') {
+            $parts[] = $style;
+        }
+
+        $performance = strtolower(trim((string) ($options['performance_style'] ?? '')));
+        if ($performance !== '' && $performance !== 'neutral') {
+            $parts[] = 'Performance style: '.str_replace(['_', '-'], ' ', $performance).'.';
+        }
+
+        $emotion = strtolower(trim((string) ($options['emotion'] ?? '')));
+        if ($emotion !== '' && $emotion !== 'neutral') {
+            $parts[] = 'Emotional tone: '.str_replace(['_', '-'], ' ', $emotion).'.';
+        }
+
+        $speed = (float) ($options['speed'] ?? 1);
+        if ($speed > 0 && abs($speed - 1) >= 0.15) {
+            $parts[] = $speed < 1 ? 'Speak a little more slowly.' : 'Speak a little more quickly.';
+        }
+
+        return trim(implode(' ', $parts));
     }
 
     /**

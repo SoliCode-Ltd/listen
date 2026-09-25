@@ -4,17 +4,20 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
+use App\Models\ClonedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
 use App\Services\PlanAccessService;
+use App\Services\VoiceCloningService;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceCloningAccess;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -103,6 +106,13 @@ class DashboardController extends Controller
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         $customPromptEnabled = $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
+        $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user());
+        $voiceCloningVoices = $voiceCloningVisible
+            ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
+            : collect();
+        $voiceCloningCount = $voiceCloningVisible ? $voiceCloningVoices->count() : 0;
+        $voiceCloningMaxVoices = VoiceCloningService::maxVoicesForViewer(auth()->user(), $activePlan);
+        $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
 
         return view('dashboard', [
             'usage' => $usage,
@@ -143,6 +153,25 @@ class DashboardController extends Controller
             'extensionApiState' => $extensionApiState,
             'reusePreset' => $reusePreset,
             'demoHistoryJobs' => $demoHistoryJobs,
+            // Cloned voices for voice selection dropdown
+            'clonedVoices' => $voiceCloningVisible
+                ? $voiceCloningVoices->filter(fn (ClonedVoice $v) => $v->isReady())->map(fn (ClonedVoice $v) => [
+                    'id' => $v->id,
+                    'name' => $v->name,
+                    'language_code' => $v->language_code,
+                    'key' => 'cloned_' . $v->id,
+                ])->values()->all()
+                : [],
+            'voiceCloningVisible' => $voiceCloningVisible,
+            'voiceCloningEnabledGlobally' => $voiceCloningEnabledGlobally,
+            'voiceCloningList' => $voiceCloningVoices,
+            'voiceCloningCount' => $voiceCloningCount,
+            'voiceCloningMaxVoices' => $voiceCloningMaxVoices,
+            'voiceCloningMinDuration' => VoiceCloningService::minSampleDuration(),
+            'voiceCloningMaxDuration' => VoiceCloningService::maxSampleDuration(),
+            'voiceCloningMinConsent' => VoiceCloningService::minConsentDuration(),
+            'voiceCloningConsentScripts' => VoiceCloningService::consentScriptsByLocale(),
+            'voiceCloningMaxUploadMb' => VoiceCloningService::maxUploadSizeMb(),
         ]);
     }
 
@@ -193,12 +222,36 @@ class DashboardController extends Controller
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
 
-        $voiceName = $this->normalizeVoiceSelection(
-            $validated['target_language'],
-            $validated['voice_key'] ?? null,
-            $requestedTier,
-        );
-        $voiceProvider = VoiceCatalog::providerForName($voiceName);
+        // Check if user selected a cloned voice (key format: cloned_{id})
+        $voiceKey = $validated['voice_key'] ?? null;
+        $clonedVoiceId = null;
+        if ($voiceKey && str_starts_with($voiceKey, 'cloned_')) {
+            if (! VoiceCloningAccess::allows($request->user())) {
+                throw ValidationException::withMessages([
+                    'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
+                ]);
+            }
+
+            $clonedVoiceId = (int) str_replace('cloned_', '', $voiceKey);
+            $clonedVoice = ClonedVoice::where('id', $clonedVoiceId)
+                ->where('user_id', $userId)
+                ->ready()
+                ->first();
+            if (! $clonedVoice) {
+                throw ValidationException::withMessages([
+                    'voice_key' => __('ui.voice_cloning.processing_failed_generic'),
+                ]);
+            }
+        }
+
+        $voiceName = $clonedVoiceId
+            ? ('cloned_' . $clonedVoiceId)
+            : $this->normalizeVoiceSelection(
+                $validated['target_language'],
+                $voiceKey,
+                $requestedTier,
+            );
+        $voiceProvider = $clonedVoiceId ? 'gemini' : VoiceCatalog::providerForName($voiceName);
         $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
             'dialect' => $validated['dialect'] ?? null,
             'performance_style' => $validated['performance_style'] ?? null,
@@ -758,4 +811,3 @@ class DashboardController extends Controller
         );
     }
 }
-

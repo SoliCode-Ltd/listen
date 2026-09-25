@@ -110,6 +110,16 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(DemoRewardTransaction::class);
     }
 
+    public function clonedVoices(): HasMany
+    {
+        return $this->hasMany(ClonedVoice::class);
+    }
+
+    public function readyClonedVoices(): HasMany
+    {
+        return $this->hasMany(ClonedVoice::class)->ready();
+    }
+
     /**
      * Get the attributes that should be cast.
      *

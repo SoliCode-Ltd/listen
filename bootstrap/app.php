@@ -46,6 +46,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'user.not_blocked' => \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             'auth.method' => \App\Http\Middleware\EnsureAuthMethodEnabled::class,
             'referral.capture' => \App\Http\Middleware\CaptureReferralVisit::class,
+            'paid.plan' => \App\Http\Middleware\EnsurePaidPlan::class,
             'localize' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRoutes::class,
             'localizationRedirect' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
             'localeSessionRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,

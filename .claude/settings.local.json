@@ -53,7 +53,12 @@
       "Bash(php -l \"app/Filament/Resources/SocialShareLogResource.php\")",
       "Bash(php -l \"tests/Feature/ReferralProgramTest.php\")",
       "Bash(php -l \"lang/en/ui.php\")",
-      "Bash(grep -A 20 \"^.*GET.*demo$\")"
+      "Bash(grep -A 20 \"^.*GET.*demo$\")",
+      "WebSearch",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:colab.research.google.com)",
+      "Bash(wc -l \"/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/app/Filament/Pages\"/*.php)",
+      "Bash(grep -r voice-cloning '/d/Faculty of Engineering/Work/SoliCode/Expirements/listen/resources/views' --include=*.blade.php)"
     ]
   }
 }

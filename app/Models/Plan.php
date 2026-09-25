@@ -51,6 +51,9 @@ class Plan extends Model
         'quality_tier',
         'queue_priority_weight',
         'recent_voices_days',
+        // Voice cloning
+        'voice_cloning_enabled',
+        'voice_cloning_max_voices',
     ];
 
     protected $casts = [
@@ -66,6 +69,8 @@ class Plan extends Model
         'queue_priority_weight' => 'integer',
         'discount_percentage' => 'integer',
         'discount_ends_at' => 'datetime',
+        'voice_cloning_enabled' => 'boolean',
+        'voice_cloning_max_voices' => 'integer',
     ];
 
     public function subscriptions(): HasMany

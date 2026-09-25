@@ -10,6 +10,311 @@
       opacity: .18;
       animation: float 12s ease-in-out infinite;
     }
+
+    /* Custom voice studio */
+    .vc-shell { margin-top: .25rem; }
+    .vc-intro p { margin: .4rem 0 0; color: var(--muted); }
+    .vc-count { font-size: .9rem; color: var(--muted); margin: 0 0 1rem; }
+    .vc-alert { padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .9rem; display: flex; align-items: center; gap: .5rem; }
+    .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
+    .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
+    .vc-upgrade,
+    .vc-disabled-banner {
+      padding: 1.4rem;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 70%, transparent);
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .vc-upgrade h2 { margin: 0 0 .4rem; font-size: 1.1rem; }
+    .vc-upgrade p { margin: 0 0 .9rem; color: var(--muted); }
+    .vc-upgrade .features-list { list-style: none; margin: 0 0 1rem; padding: 0; display: inline-grid; gap: .35rem; text-align: start; }
+    .vc-upgrade .features-list li { display: flex; align-items: center; gap: .45rem; font-size: .9rem; }
+    .vc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .85rem; margin-bottom: 1rem; }
+    .vc-card {
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 72%, transparent);
+      padding: 1rem;
+      scroll-margin-top: 7rem;
+      transition: box-shadow .28s ease, border-color .28s ease;
+    }
+    .vc-card.vc-card-highlight {
+      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 0 0 2px color-mix(in oklab, var(--a) 24%, transparent);
+    }
+    .vc-card-header { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; margin-bottom: .7rem; }
+    .vc-card-name { margin: 0; font-size: 1rem; font-weight: 700; }
+    .vc-card-meta { font-size: .84rem; color: var(--muted); display: grid; gap: .2rem; margin-bottom: .7rem; }
+    .vc-status { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 700; border: 1px solid transparent; }
+    .vc-status.ready { color: #16a34a; background: color-mix(in oklab, #22c55e 14%, var(--surface)); border-color: color-mix(in oklab, #22c55e 28%, var(--line)); }
+    .vc-status.processing, .vc-status.pending, .vc-status.validating { color: var(--a); background: color-mix(in oklab, var(--a) 14%, var(--surface)); border-color: color-mix(in oklab, var(--a) 28%, var(--line)); }
+    .vc-status.failed { color: #dc2626; background: color-mix(in oklab, #ef4444 14%, var(--surface)); border-color: color-mix(in oklab, #ef4444 28%, var(--line)); }
+    .vc-status .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: pulse-dot 1.4s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.35} }
+    .vc-card-actions { display: flex; flex-wrap: wrap; gap: .45rem; }
+    .vc-card-actions .btn { font-size: .82rem; padding: .38rem .72rem; }
+    .vc-progress { margin: .45rem 0 .7rem; }
+    .vc-progress.is-hidden { display: none; }
+    .vc-progress-track {
+      width: 100%;
+      height: 8px;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--line) 55%, transparent);
+      overflow: hidden;
+      border: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+    }
+    .vc-progress-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--a), var(--b));
+      transition: width .35s ease;
+    }
+    .vc-progress-meta {
+      margin-top: .38rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: .5rem;
+      font-size: .78rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .vc-progress-delay {
+      margin-top: .35rem;
+      font-size: .76rem;
+      color: color-mix(in oklab, #d97706 82%, var(--text));
+      display: none;
+    }
+    .vc-progress.is-delayed .vc-progress-delay { display: block; }
+    .vc-empty {
+      text-align: center;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 72%, transparent);
+      padding: 1.5rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .vc-empty h3 { margin: 0 0 .35rem; }
+    .vc-empty p { margin: 0 0 .9rem; color: var(--muted); }
+    .vc-create-panel {
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+      background: color-mix(in oklab, var(--surface) 72%, transparent);
+      padding: 1.1rem;
+      margin-top: 1rem;
+    }
+    .vc-create-panel h2 { margin: 0 0 .9rem; font-size: 1.08rem; }
+    .vc-form-group { margin-bottom: 1rem; }
+    .vc-form-group label { display: block; margin-bottom: .35rem; font-size: .88rem; font-weight: 700; }
+    .vc-tabs { display: flex; gap: .45rem; margin-bottom: .8rem; }
+    .vc-tab { border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem .95rem; background: var(--surface); color: var(--muted); font-weight: 700; font-size: .82rem; cursor: pointer; }
+    .vc-tab.active { color: var(--text); border-color: color-mix(in oklab, var(--a) 40%, var(--line)); background: color-mix(in oklab, var(--a) 10%, var(--surface)); }
+    .vc-upload-zone {
+      border: 2px dashed color-mix(in oklab, var(--line) 80%, transparent);
+      border-radius: .9rem;
+      padding: 1.1rem;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+      transition: border-color .2s, background .2s;
+    }
+    .vc-upload-zone.dragover,
+    .vc-upload-zone:hover { border-color: var(--a); background: color-mix(in oklab, var(--a) 6%, var(--surface)); }
+    .vc-upload-zone input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .vc-upload-zone p { margin: 0; color: var(--muted); font-size: .86rem; }
+    .vc-upload-zone .formats { margin-top: .35rem; font-size: .8rem; opacity: .8; }
+    .vc-file-info {
+      margin-top: .65rem;
+      border-radius: .7rem;
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      padding: .65rem .8rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: .6rem;
+      font-size: .85rem;
+    }
+    .vc-file-info .remove { cursor: pointer; font-weight: 700; color: var(--muted); }
+    .vc-file-info .remove:hover { color: #dc2626; }
+    .vc-recorder { text-align: center; border: 1px solid color-mix(in oklab, var(--line) 60%, transparent); border-radius: .9rem; padding: 1rem; background: color-mix(in oklab, var(--surface) 78%, transparent); }
+    .vc-recorder .rec-btn { width: 68px; height: 68px; border-radius: 999px; border: 3px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
+    .vc-recorder .rec-btn:hover { border-color: var(--a); }
+    .vc-recorder .rec-btn.recording { border-color: #ef4444; box-shadow: 0 0 0 10px rgba(239,68,68,.14); }
+    .vc-recorder .rec-btn .inner { width: 24px; height: 24px; border-radius: 999px; background: #ef4444; transition: all .2s; }
+    .vc-recorder .rec-btn.recording .inner { border-radius: 4px; width: 20px; height: 20px; }
+    .vc-timer { margin: .7rem 0 .25rem; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .vc-recorder .hint { margin: 0; color: var(--muted); font-size: .84rem; }
+    .vc-recorder .rec-actions { margin-top: .7rem; display: flex; justify-content: center; gap: .4rem; }
+    .vc-guidelines { border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); padding: .85rem .95rem; margin-bottom: .95rem; }
+    .vc-guidelines h4 { margin: 0 0 .45rem; font-size: .86rem; color: var(--a); }
+    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .84rem; color: var(--muted); display: grid; gap: .35rem; }
+    .vc-guidelines li { display: flex; align-items: flex-start; gap: .5rem; }
+    .vc-guidelines li::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      margin-top: .38rem;
+      border-radius: 99px;
+      flex-shrink: 0;
+      background: var(--a);
+    }
+    .vc-consent { margin-top: 1rem; margin-bottom: .95rem; border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--line) 70%, transparent); background: color-mix(in oklab, var(--surface2) 55%, var(--surface)); padding: .75rem .85rem; display: flex; align-items: flex-start; gap: .6rem; }
+    .vc-consent input[type=checkbox] { margin-top: .1rem; width: 18px; height: 18px; accent-color: var(--a); }
+    .vc-consent label { margin: 0; font-size: .85rem; line-height: 1.45; color: var(--text); }
+    .vc-privacy { display: flex; align-items: flex-start; gap: .4rem; color: var(--muted); font-size: .8rem; margin-bottom: .95rem; }
+    .vc-privacy svg { width: 14px; height: 14px; margin-top: .1rem; opacity: .7; flex-shrink: 0; }
+    .vc-preview-pill {
+      display: inline-flex;
+      align-items: center;
+      margin-top: .75rem;
+      padding: .22rem .65rem;
+      border-radius: 999px;
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .01em;
+      color: var(--a);
+      border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+    }
+    .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: .75rem; }
+    .vc-form-group input[type="text"],
+    .vc-form-group select {
+      width: 100%;
+      border-radius: .8rem;
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: color-mix(in oklab, var(--surface) 88%, transparent);
+      color: var(--text);
+      padding: .72rem .85rem;
+      font: inherit;
+    }
+    .vc-form-group input[type="text"]:focus,
+    .vc-form-group select:focus {
+      outline: none;
+      border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent);
+    }
+    .vc-form-group .hint { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; font-weight: 500; }
+    .vc-steps { display: flex; gap: .55rem; margin: 0 0 1rem; }
+    .vc-step {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: .55rem;
+      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+      background: transparent;
+      color: var(--muted);
+      border-radius: .9rem;
+      padding: .55rem .7rem;
+      font-weight: 700;
+      font-size: .86rem;
+      cursor: pointer;
+      text-align: start;
+    }
+    .vc-step.active,
+    .vc-step.done {
+      color: var(--text);
+      border-color: color-mix(in oklab, var(--a) 46%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+    }
+    .vc-step.done .vc-step-index {
+      background: #16a34a;
+      color: #fff;
+    }
+    .vc-step-index {
+      width: 1.55rem;
+      height: 1.55rem;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+      background: color-mix(in oklab, var(--a) 16%, var(--surface));
+      color: var(--a);
+      font-size: .78rem;
+    }
+    .vc-step-panel[hidden] { display: none !important; }
+    .vc-script {
+      border-radius: 1rem;
+      padding: 1rem 1.05rem 1.05rem;
+      margin-bottom: .9rem;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 12%, var(--surface)), color-mix(in oklab, var(--surface) 92%, transparent));
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+    }
+    .vc-script-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
+    .vc-script h3 { margin: 0; font-size: .92rem; }
+    .vc-script p { margin: .55rem 0 0; font-size: 1.08rem; line-height: 1.75; font-weight: 650; }
+    #vcConsentScript {
+      padding: .15rem 0 .1rem;
+      letter-spacing: -.01em;
+    }
+    #vcConsentScript[dir="rtl"] {
+      font-family: var(--font-body-ar);
+      font-size: 1.18rem;
+      line-height: 1.9;
+    }
+    .vc-script .hint { margin: .55rem 0 0; color: var(--muted); font-size: .8rem; }
+    .vc-or {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      margin: .85rem 0 .15rem;
+      color: var(--muted);
+      font-size: .75rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+    .vc-or::before,
+    .vc-or::after {
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: color-mix(in oklab, var(--line) 80%, transparent);
+    }
+    html[dir="rtl"] .vc-or {
+      letter-spacing: 0;
+      text-transform: none;
+      font-size: .84rem;
+    }
+    .vc-copy {
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: .28rem .7rem;
+      font-size: .75rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .vc-range { margin-top: .45rem; font-size: .8rem; font-weight: 700; color: var(--muted); }
+    .vc-range.ok { color: #16a34a; }
+    .vc-range.bad { color: #dc2626; }
+    .vc-actions-row { display: flex; gap: .5rem; }
+    .vc-actions-row .btn { flex: 1; }
+    .vc-consent-block { margin-top: .2rem; }
+    .vc-bars { display: none; height: 18px; align-items: flex-end; justify-content: center; gap: 3px; margin-top: .45rem; }
+    .vc-recorder.live .vc-bars { display: flex; }
+    .vc-bars span {
+      width: 3px;
+      height: 6px;
+      border-radius: 99px;
+      background: var(--a);
+      animation: vc-bar .9s ease-in-out infinite;
+    }
+    .vc-bars span:nth-child(2) { animation-delay: .12s; }
+    .vc-bars span:nth-child(3) { animation-delay: .24s; }
+    .vc-bars span:nth-child(4) { animation-delay: .08s; }
+    .vc-bars span:nth-child(5) { animation-delay: .2s; }
+    @keyframes vc-bar {
+      0%, 100% { height: 5px; opacity: .45; }
+      50% { height: 16px; opacity: 1; }
+    }
+    @media (max-width: 720px) {
+      .vc-field-grid, .vc-actions-row, .vc-steps { grid-template-columns: 1fr; flex-direction: column; }
+    }
     .bg-orb.a {
       width: 22rem;
       height: 22rem;
@@ -1376,6 +1681,14 @@
             <span>{{ __('ui.dashboard.generate_new_voice') }}</span>
             <span></span>
           </a>
+
+          @if($voiceCloningVisible ?? false)
+          <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav >
+            <span>{{ __('ui.nav.voice_cloning') }}</span>
+            <span></span>
+          </a>
+          @endif
+
           <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
             <span></span>
@@ -1384,6 +1697,7 @@
             <span>{{ __('ui.dashboard.recent_voices') }}</span>
             <span></span>
           </a>
+
         </nav>
       </aside>
 
@@ -1767,6 +2081,258 @@
         <div class="pagination" id="jobsPagination"></div>
       </div>
     </section>
+
+    @if($voiceCloningVisible ?? false)
+    <section id="voiceCloningSection" class="dashboard-panel" data-dashboard-section>
+      <article class="page-card reveal vc-shell">
+        <div class="vc-intro">
+          <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
+          <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
+          <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
+        </div>
+
+        <div id="vcAlerts"></div>
+
+        @if(!($voiceCloningEnabledGlobally ?? false))
+          <section class="vc-disabled-banner">
+            <p>{{ __('ui.voice_cloning.feature_disabled') }}</p>
+          </section>
+        @else
+          <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+
+          <h2 id="vcVoicesTitle" style="font-size:1.05rem;margin-bottom:.75rem;{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">{{ __('ui.voice_cloning.your_voices_title') }}</h2>
+          <section class="vc-grid" id="vcVoiceGrid" style="{{ ($voiceCloningList?->count() ?? 0) > 0 ? '' : 'display:none;' }}">
+            @foreach($voiceCloningList as $voice)
+              @php
+                $vcInitialProgress = match (strtolower((string) $voice->status)) {
+                    'pending' => 15,
+                    'validating' => 45,
+                    'processing' => 75,
+                    'ready', 'failed' => 100,
+                    default => 0,
+                };
+                $vcLanguageLabel = match ((string) $voice->language_code) {
+                    'ar-XA' => __('ui.voice_cloning.language_ar'),
+                    'en-US' => __('ui.voice_cloning.language_en_us'),
+                    'en-GB' => __('ui.voice_cloning.language_en_gb'),
+                    'en-AU' => __('ui.voice_cloning.language_en_au'),
+                    default => (string) $voice->language_code,
+                };
+                $vcCreatedLabel = $voice->created_at
+                    ? $voice->created_at->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY')
+                    : '';
+              @endphp
+                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->failure_reason }}">
+                  <div class="vc-card-header">
+                    <h3 class="vc-card-name">{{ $voice->name }}</h3>
+                    <span class="vc-status {{ $voice->status }}">
+                      @if($voice->isProcessing())<span class="dot"></span>@endif
+                      {{ __('ui.voice_cloning.status_' . $voice->status) }}
+                    </span>
+                  </div>
+                  <div class="vc-card-meta">
+                    <span>{{ __('ui.voice_cloning.created_on') }} {{ $vcCreatedLabel }}</span>
+                    <span>{{ $vcLanguageLabel }} &middot; {{ $voice->source_type === 'recording' ? __('ui.voice_cloning.record_tab') : __('ui.voice_cloning.upload_tab') }}</span>
+                  </div>
+                  @if($voice->isFailed())
+                    <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
+                  @endif
+                  @if($voice->isProcessing())
+                    <div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">{{ __('ui.voice_cloning.processing_hint') }}</div>
+                  @endif
+                  <div class="vc-progress {{ $voice->isProcessing() ? '' : 'is-hidden' }}" data-vc-progress>
+                    <div class="vc-progress-track">
+                      <div class="vc-progress-fill" data-vc-progress-fill style="width: {{ $vcInitialProgress }}%"></div>
+                    </div>
+                    <div class="vc-progress-meta">
+                      <span data-vc-progress-status>{{ __('ui.voice_cloning.status_' . $voice->status) }}</span>
+                      <span data-vc-progress-percent>{{ $vcInitialProgress }}%</span>
+                    </div>
+                    <div class="vc-progress-delay" data-vc-progress-delay></div>
+                  </div>
+                  <div class="vc-card-actions">
+                    @if($voice->isReady())
+                      <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary">{{ __('ui.voice_cloning.use_in_generator') }}</a>
+                    @endif
+                    <button
+                      type="button"
+                      class="btn btn-ghost vc-delete-btn"
+                      data-voice-id="{{ $voice->id }}"
+                      data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}"
+                    >
+                      {{ __('ui.voice_cloning.delete_voice') }}
+                    </button>
+                  </div>
+                </article>
+            @endforeach
+          </section>
+          @if(($voiceCloningList?->count() ?? 0) === 0)
+            <section class="vc-empty" id="vcEmptyState">
+              <h3>{{ __('ui.voice_cloning.empty_title') }}</h3>
+              <p>{{ __('ui.voice_cloning.empty_subtitle') }}</p>
+              @if(($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
+                <button type="button" class="btn btn-primary" onclick="document.getElementById('vcCreatePanel')?.scrollIntoView({behavior:'smooth'})">{{ __('ui.voice_cloning.create_first') }}</button>
+              @endif
+            </section>
+          @endif
+
+          @if(($voiceCloningCount ?? 0) < ($voiceCloningMaxVoices ?? 0))
+            <section class="vc-create-panel" id="vcCreatePanel">
+              <h2>{{ __('ui.voice_cloning.create_title') }}</h2>
+
+              <div class="vc-guidelines">
+                <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
+                <ul>
+                  <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</li>
+                  <li>{{ __('ui.voice_cloning.guideline_2') }}</li>
+                  <li>{{ __('ui.voice_cloning.guideline_3') }}</li>
+                  <li>{{ __('ui.voice_cloning.guideline_4') }}</li>
+                  <li>{{ __('ui.voice_cloning.guideline_5') }}</li>
+                </ul>
+              </div>
+
+              <div class="vc-steps" role="tablist">
+                <button type="button" class="vc-step active" id="vcStepSample" data-vc-step="1">
+                  <span class="vc-step-index">1</span>
+                  <span>{{ __('ui.voice_cloning.step_sample') }}</span>
+                </button>
+                <button type="button" class="vc-step" id="vcStepConsent" data-vc-step="2">
+                  <span class="vc-step-index">2</span>
+                  <span>{{ __('ui.voice_cloning.step_consent') }}</span>
+                </button>
+              </div>
+
+              <form id="vcCreateForm" enctype="multipart/form-data">
+                @csrf
+                <input type="hidden" name="source_type" id="vcSourceType" value="upload">
+                <input type="hidden" name="audio_duration" id="vcAudioDuration" value="0">
+                <input type="hidden" name="consent_duration" id="vcConsentDuration" value="0">
+
+                <div class="vc-step-panel" data-vc-step-panel="1">
+                  <div class="vc-field-grid">
+                    <div class="vc-form-group">
+                      <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
+                      <input type="text" id="vcName" name="name" required minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
+                    </div>
+                    <div class="vc-form-group">
+                      <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
+                      <select id="vcLanguage" name="language_code">
+                        <option value="ar-XA" @selected(app()->getLocale() === 'ar')>{{ __('ui.voice_cloning.language_ar') }}</option>
+                        <option value="en-US" @selected(app()->getLocale() !== 'ar')>{{ __('ui.voice_cloning.language_en_us') }}</option>
+                        <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
+                        <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
+                      </select>
+                      <p class="hint">{{ __('ui.voice_cloning.language_hint') }}</p>
+                    </div>
+                  </div>
+
+                  <div class="vc-tabs">
+                    <button type="button" class="vc-tab active" data-tab="upload">{{ __('ui.voice_cloning.upload_tab') }}</button>
+                    <button type="button" class="vc-tab" data-tab="recording">{{ __('ui.voice_cloning.record_tab') }}</button>
+                  </div>
+
+                  <div class="vc-tab-panel" id="vcUploadPanel">
+                    <div class="vc-upload-zone" id="vcUploadZone">
+                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                      <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
+                    </div>
+                    <div class="vc-file-info" id="vcFileInfo" style="display:none">
+                      <span id="vcFileName"></span>
+                      <span class="remove" id="vcFileRemove">&times;</span>
+                    </div>
+                    <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                  </div>
+
+                  <div class="vc-tab-panel" id="vcRecordPanel" style="display:none">
+                    <div class="vc-recorder" id="vcRecorder">
+                      <button type="button" class="rec-btn" id="vcRecBtn" aria-label="{{ __('ui.voice_cloning.record_start') }}">
+                        <span class="inner"></span>
+                      </button>
+                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                      <div class="vc-timer" id="vcTimer">00:00</div>
+                      <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                      <p class="hint" style="font-size:.8rem;margin-top:.3rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                      <div class="rec-actions" id="vcRecActions" style="display:none">
+                        <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button type="button" class="btn btn-primary" id="vcNextStep" style="width:100%;margin-top:.9rem">{{ __('ui.voice_cloning.next_step') }}</button>
+                </div>
+
+                <div class="vc-step-panel" data-vc-step-panel="2" hidden>
+                  <div class="vc-script">
+                    <div class="vc-script-toolbar">
+                      <h3>{{ __('ui.voice_cloning.consent_title') }}</h3>
+                      <button type="button" class="vc-copy" id="vcCopyConsent">{{ __('ui.voice_cloning.consent_copy') }}</button>
+                    </div>
+                    @php
+                      $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
+                      $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
+                    @endphp
+                    <p id="vcConsentScript" dir="{{ $vcConsentLocale === 'ar-XA' ? 'rtl' : 'ltr' }}">{{ $vcConsentText }}</p>
+                    <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
+                  </div>
+
+                  <div class="vc-consent-block">
+                    <label>{{ __('ui.voice_cloning.consent_record_label') }}</label>
+                    <div class="vc-recorder" id="vcConsentRecorder" style="margin-top:.45rem">
+                      <button type="button" class="rec-btn" id="vcConsentRecBtn" aria-label="{{ __('ui.voice_cloning.consent_record_label') }}">
+                        <span class="inner"></span>
+                      </button>
+                      <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+                      <div class="vc-timer" id="vcConsentTimer">00:00</div>
+                      <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                      <div class="rec-actions" id="vcConsentRecActions" style="display:none">
+                        <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p class="vc-or">{{ __('ui.voice_cloning.consent_or') }}</p>
+                  <div class="vc-form-group" style="margin-top:.15rem">
+                    <label for="vcConsentFileInput">{{ __('ui.voice_cloning.consent_upload_label') }}</label>
+                    <div class="vc-upload-zone" id="vcConsentUploadZone">
+                      <input type="file" name="consent_audio" id="vcConsentFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
+                    </div>
+                    <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
+                      <span id="vcConsentFileName"></span>
+                      <span class="remove" id="vcConsentFileRemove">&times;</span>
+                    </div>
+                  </div>
+
+                  <div class="vc-consent">
+                    <input type="checkbox" id="vcConsent" name="consent_confirmed" value="1" required>
+                    <label for="vcConsent">{{ __('ui.voice_cloning.consent_label') }}</label>
+                  </div>
+
+                  <div class="vc-privacy">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    {{ __('ui.voice_cloning.privacy_note') }}
+                  </div>
+
+                  <div class="vc-actions-row">
+                    <button type="button" class="btn btn-ghost" id="vcBackStep">{{ __('ui.voice_cloning.back_step') }}</button>
+                    <button type="submit" class="btn btn-primary" id="vcSubmitBtn">
+                      <span id="vcSubmitText">{{ __('ui.voice_cloning.submit_button') }}</span>
+                      <span id="vcSubmitLoading" style="display:none">{{ __('ui.voice_cloning.submitting') }}</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </section>
+          @else
+            <div class="vc-alert error" id="vcLimitNotice" style="margin-top:.2rem">
+              {{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}
+            </div>
+          @endif
+        @endif
+      </article>
+    </section>
+    @endif
       </div>
     </div>
   </main>
@@ -1831,6 +2397,9 @@
   @endphp
   <script>
     const voiceCatalog = @json($voiceCatalog);
+    const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
+    const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
+    const clonedVoiceBadge = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_label') : '');
     const oldVoice = @json($prefillValue('voice_key'));
     const defaultVoiceKeyByLanguage = {
       ar: String(@json((string) ($voiceNameMap[$defaultVoiceAr]['key'] ?? '')) || '').trim(),
@@ -2218,19 +2787,45 @@
       const current = String(remembered || defaultVoiceKey || '').trim();
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
-      if (!voices.length) {
+
+      // Inject cloned voices at the top as an optgroup (if any match this language)
+      const langPrefix = lang === 'ar' ? 'ar' : 'en';
+      const matchingCloned = (clonedVoices || []).filter(v => v.language_code && v.language_code.startsWith(langPrefix));
+      if (matchingCloned.length > 0) {
+        const group = document.createElement('optgroup');
+        group.label = clonedVoiceGroupLabel;
+        for (const cv of matchingCloned) {
+          const opt = document.createElement('option');
+          opt.value = cv.key;
+          opt.textContent = `${cv.name} (${clonedVoiceBadge})`;
+          group.appendChild(opt);
+        }
+        voiceSelect.appendChild(group);
+      }
+
+      if (!voices.length && !matchingCloned.length) {
         voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>';
         preferredVoiceKeyByLanguage[lang] = '';
         return;
       }
-      for (const voice of voices) {
-        const option = document.createElement('option');
-        option.value = voice.key;
-        option.textContent = voiceDisplayLabel(voice);
-        voiceSelect.appendChild(option);
+
+      // Built-in voices
+      if (voices.length) {
+        const builtInGroup = document.createElement('optgroup');
+        builtInGroup.label = lang === 'ar' ? 'الأصوات المتاحة' : 'Available Voices';
+        for (const voice of voices) {
+          const option = document.createElement('option');
+          option.value = voice.key;
+          option.textContent = voiceDisplayLabel(voice);
+          builtInGroup.appendChild(option);
+        }
+        voiceSelect.appendChild(builtInGroup);
       }
-      if (voices.some((v) => v.key === current)) voiceSelect.value = current;
-      else voiceSelect.value = voices[0].key;
+
+      // Select appropriate default
+      const allKeys = [...matchingCloned.map(c => c.key), ...voices.map(v => v.key)];
+      if (allKeys.includes(current)) voiceSelect.value = current;
+      else voiceSelect.value = allKeys[0] || '';
       preferredVoiceKeyByLanguage[lang] = String(voiceSelect.value || '').trim();
     }
 
@@ -2846,6 +3441,967 @@
       }
     });
   </script>
+  @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
+  <script>
+    (function() {
+      'use strict';
+
+      const form = document.getElementById('vcCreateForm');
+      const voiceGrid = document.getElementById('vcVoiceGrid');
+      const voicesTitle = document.getElementById('vcVoicesTitle');
+      const emptyState = document.getElementById('vcEmptyState');
+      const countText = document.querySelector('.vc-count');
+      const createPanel = document.getElementById('vcCreatePanel');
+      const limitNotice = document.getElementById('vcLimitNotice');
+      const MIN_DURATION = {{ (int) ($voiceCloningMinDuration ?? 10) }};
+      const MAX_DURATION = {{ (int) ($voiceCloningMaxDuration ?? 30) }};
+      const MIN_CONSENT = {{ (int) ($voiceCloningMinConsent ?? 3) }};
+      const MAX_VOICES = {{ (int) ($voiceCloningMaxVoices ?? 0) }};
+      const consentScripts = @json($voiceCloningConsentScripts ?? []);
+      const sampleTooShortText = @json(__('ui.voice_cloning.validation.audio_too_short', ['min' => $voiceCloningMinDuration ?? 10]));
+      const sampleTooLongText = @json(__('ui.voice_cloning.validation.audio_too_long', ['max' => $voiceCloningMaxDuration ?? 30]));
+      const consentMissingText = @json(__('ui.voice_cloning.validation.consent_audio_required'));
+      const consentTooShortText = @json(__('ui.voice_cloning.validation.consent_too_short', ['min' => $voiceCloningMinConsent ?? 3]));
+      const consentRequiredText = @json(__('ui.voice_cloning.validation.consent_required'));
+      const nameRequiredText = @json(__('ui.voice_cloning.validation.name_required'));
+      const copyLabel = @json(__('ui.voice_cloning.consent_copy'));
+      const copiedLabel = @json(__('ui.voice_cloning.consent_copied'));
+      const sampleReadyText = @json(__('ui.voice_cloning.sample_ready'));
+      const consentReadyText = @json(__('ui.voice_cloning.consent_ready'));
+      const recordStartText = @json(__('ui.voice_cloning.record_start'));
+      const recordingText = @json(__('ui.voice_cloning.recording_in_progress'));
+      const tooShortRecordText = @json(__('ui.voice_cloning.recording_too_short', ['min' => $voiceCloningMinDuration ?? 10]));
+      const tooLongRecordText = @json(__('ui.voice_cloning.recording_too_long', ['max' => $voiceCloningMaxDuration ?? 30]));
+      let currentVoiceCount = {{ (int) ($voiceCloningCount ?? 0) }};
+      const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || '{{ csrf_token() }}';
+      const STORE_URL = '{{ route("voice-cloning.store") }}';
+      const STATUS_URL_BASE = '{{ route("voice-cloning.status", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
+      const DELETE_URL_BASE = '{{ route("voice-cloning.destroy", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
+      const GENERATOR_URL_BASE = '{{ route("dashboard") }}';
+      const pageLocale = String(document.documentElement.lang || '{{ app()->getLocale() }}').toLowerCase();
+      const statusLabels = {
+        pending: @json(__('ui.voice_cloning.status_pending')),
+        validating: @json(__('ui.voice_cloning.status_validating')),
+        processing: @json(__('ui.voice_cloning.status_processing')),
+        ready: @json(__('ui.voice_cloning.status_ready')),
+        failed: @json(__('ui.voice_cloning.status_failed')),
+      };
+      const sourceTypeLabels = {
+        upload: @json(__('ui.voice_cloning.upload_tab')),
+        recording: @json(__('ui.voice_cloning.record_tab')),
+      };
+      const countTemplate = @json(__('ui.voice_cloning.voice_count', ['count' => '__COUNT__', 'max' => '__MAX__']));
+      const processingHintText = @json(__('ui.voice_cloning.processing_hint'));
+      const failedHintText = @json(__('ui.voice_cloning.processing_failed_generic'));
+      const useInGeneratorText = @json(__('ui.voice_cloning.use_in_generator'));
+      const deleteVoiceText = @json(__('ui.voice_cloning.delete_voice'));
+      const deleteConfirmText = @json(__('ui.voice_cloning.delete_confirm'));
+      const delayedHintText = @json(__('ui.voice_cloning.processing_delayed'));
+      const languageLabels = {
+        'ar-XA': @json(__('ui.voice_cloning.language_ar')),
+        'en-US': @json(__('ui.voice_cloning.language_en_us')),
+        'en-GB': @json(__('ui.voice_cloning.language_en_gb')),
+        'en-AU': @json(__('ui.voice_cloning.language_en_au')),
+      };
+      const pollers = new Map();
+
+      function showAlert(type, message) {
+        if (type !== 'error') return;
+        const container = document.getElementById('vcAlerts');
+        if (!container || !message) return;
+        const alert = document.createElement('div');
+        alert.className = 'vc-alert error';
+        alert.setAttribute('role', 'alert');
+        alert.textContent = String(message);
+        container.prepend(alert);
+        container.querySelectorAll('.vc-alert').forEach((node, index) => {
+          if (index > 2) node.remove();
+        });
+        alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        setTimeout(() => alert.remove(), 7000);
+      }
+
+      function escapeHtml(value) {
+        return String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
+
+      function escapeSelector(value) {
+        const input = String(value ?? '');
+        if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+          return CSS.escape(input);
+        }
+        return input.replace(/[^a-zA-Z0-9_-]/g, '\\$&');
+      }
+
+      function formatCount() {
+        return countTemplate
+          .replace('__COUNT__', String(currentVoiceCount))
+          .replace('__MAX__', String(MAX_VOICES));
+      }
+
+      function updateCountUI() {
+        if (countText) {
+          countText.textContent = formatCount();
+        }
+
+        const canCreateMore = currentVoiceCount < MAX_VOICES;
+        if (createPanel) {
+          createPanel.style.display = canCreateMore ? '' : 'none';
+        }
+        if (limitNotice) {
+          limitNotice.style.display = canCreateMore ? 'none' : '';
+        }
+      }
+
+      function updateEmptyStateUI() {
+        const hasCards = Boolean(voiceGrid && voiceGrid.querySelector('.vc-card'));
+        if (voiceGrid) {
+          voiceGrid.style.display = hasCards ? '' : 'none';
+        }
+        if (voicesTitle) {
+          voicesTitle.style.display = hasCards ? '' : 'none';
+        }
+        if (emptyState) {
+          emptyState.style.display = hasCards ? 'none' : '';
+        }
+      }
+
+      function statusProgress(status, elapsedSeconds = 0, serverProgress = null) {
+        const normalized = String(status || '').toLowerCase();
+        const base = Number(serverProgress);
+        const statusBase = {
+          pending: 15,
+          validating: 45,
+          processing: 75,
+          ready: 100,
+          failed: 100,
+        }[normalized] ?? 0;
+
+        const seed = Number.isFinite(base) ? base : statusBase;
+        if (normalized === 'pending') return Math.min(34, Math.max(seed, 15 + Math.floor(elapsedSeconds / 8)));
+        if (normalized === 'validating') return Math.min(68, Math.max(seed, 45 + Math.floor(elapsedSeconds / 9)));
+        if (normalized === 'processing') return Math.min(96, Math.max(seed, 75 + Math.floor(elapsedSeconds / 10)));
+        return seed;
+      }
+
+      function ensureProcessingHint(card, visible) {
+        let hint = card.querySelector('.vc-processing-hint');
+        if (visible) {
+          if (!hint) {
+            hint = document.createElement('div');
+            hint.className = 'vc-processing-hint';
+            hint.style.cssText = 'font-size:.83rem;color:var(--muted);margin-bottom:.6rem';
+            const actions = card.querySelector('.vc-card-actions');
+            card.insertBefore(hint, actions || null);
+          }
+          hint.textContent = processingHintText;
+        } else if (hint) {
+          hint.remove();
+        }
+      }
+
+      function ensureFailureHint(card, visible, message = null) {
+        let hint = card.querySelector('.vc-failure-hint');
+        if (visible) {
+          if (!hint) {
+            hint = document.createElement('div');
+            hint.className = 'vc-alert error vc-failure-hint';
+            hint.style.cssText = 'margin-bottom:.6rem;font-size:.82rem';
+            const actions = card.querySelector('.vc-card-actions');
+            card.insertBefore(hint, actions || null);
+          }
+          hint.textContent = String(message || failedHintText);
+        } else if (hint) {
+          hint.remove();
+        }
+      }
+
+      function ensureProgressUI(card) {
+        let progress = card.querySelector('[data-vc-progress]');
+        if (!progress) {
+          progress = document.createElement('div');
+          progress.className = 'vc-progress';
+          progress.setAttribute('data-vc-progress', '1');
+          progress.innerHTML = `
+            <div class="vc-progress-track">
+              <div class="vc-progress-fill" data-vc-progress-fill></div>
+            </div>
+            <div class="vc-progress-meta">
+              <span data-vc-progress-status></span>
+              <span data-vc-progress-percent></span>
+            </div>
+            <div class="vc-progress-delay" data-vc-progress-delay></div>
+          `;
+          const actions = card.querySelector('.vc-card-actions');
+          card.insertBefore(progress, actions || null);
+        }
+        return progress;
+      }
+
+      function updateProgressUI(card, status, elapsedSeconds, delayed = false, serverProgress = null) {
+        const progress = ensureProgressUI(card);
+        const normalized = String(status || '').toLowerCase();
+        const isProcessing = ['pending', 'validating', 'processing'].includes(normalized);
+        if (!isProcessing) {
+          progress.classList.add('is-hidden');
+          progress.classList.remove('is-delayed');
+          return;
+        }
+
+        progress.classList.remove('is-hidden');
+        progress.classList.toggle('is-delayed', Boolean(delayed));
+
+        const percent = statusProgress(normalized, Number(elapsedSeconds || 0), serverProgress);
+        const fill = progress.querySelector('[data-vc-progress-fill]');
+        const statusText = progress.querySelector('[data-vc-progress-status]');
+        const percentText = progress.querySelector('[data-vc-progress-percent]');
+        const delayText = progress.querySelector('[data-vc-progress-delay]');
+        if (fill) fill.style.width = `${percent}%`;
+        if (statusText) statusText.textContent = statusLabels[normalized] || normalized.toUpperCase();
+        if (percentText) percentText.textContent = `${Math.round(percent)}%`;
+        if (delayText) delayText.textContent = delayed ? delayedHintText : '';
+      }
+
+      function setUseButton(card, voiceId, show) {
+        const actions = card.querySelector('.vc-card-actions');
+        if (!actions) return;
+        let link = actions.querySelector('[data-vc-action="use"]');
+
+        if (!show) {
+          link?.remove();
+          return;
+        }
+
+        const href = `${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(String(voiceId))}#generateVoiceSection`;
+        if (!link) {
+          link = document.createElement('a');
+          link.className = 'btn btn-primary';
+          link.setAttribute('data-vc-action', 'use');
+          link.textContent = useInGeneratorText;
+          actions.insertBefore(link, actions.firstChild || null);
+        }
+        link.setAttribute('href', href);
+      }
+
+      function focusCard(voiceId) {
+        if (!voiceGrid || !voiceId) return;
+        const card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(String(voiceId))}"]`);
+        if (!card) return;
+        card.classList.add('vc-card-highlight');
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => card.classList.remove('vc-card-highlight'), 1800);
+      }
+
+      function applyStatusToCard(card, payload) {
+        if (!card || !payload) return;
+        const status = String(payload.status || card.dataset.status || 'pending').toLowerCase();
+        card.dataset.status = status;
+
+        const createdTs = Number(payload.created_at_ts || card.dataset.createdTs || Math.floor(Date.now() / 1000));
+        card.dataset.createdTs = String(createdTs);
+
+        const elapsedSeconds = Number(payload.elapsed_seconds ?? Math.max(0, Math.floor(Date.now() / 1000) - createdTs));
+        const serverProgress = Number(payload.progress_percent ?? NaN);
+        const failureReason = String(payload.failure_reason || card.dataset.failureReason || '').trim();
+        if (failureReason) {
+          card.dataset.failureReason = failureReason;
+        }
+        const isDelayed = Boolean(payload.is_delayed || (['pending', 'validating', 'processing'].includes(status) && elapsedSeconds >= 90));
+
+        const statusBadge = card.querySelector('.vc-status');
+        if (statusBadge) {
+          statusBadge.className = `vc-status ${status}`;
+          statusBadge.innerHTML = `${['pending', 'validating', 'processing'].includes(status) ? '<span class="dot"></span>' : ''}${escapeHtml(statusLabels[status] || status.toUpperCase())}`;
+        }
+
+        ensureProcessingHint(card, ['pending', 'validating', 'processing'].includes(status));
+        ensureFailureHint(card, status === 'failed', failureReason);
+        updateProgressUI(card, status, elapsedSeconds, isDelayed, serverProgress);
+        setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
+      }
+
+      function startPolling(voiceId) {
+        const id = String(voiceId || '').trim();
+        if (!id || pollers.has(id)) return;
+
+        const run = async () => {
+          const card = document.querySelector(`.vc-card[data-voice-id="${escapeSelector(id)}"]`);
+          if (!card) {
+            stopPolling(id);
+            return;
+          }
+          try {
+            const response = await fetch(`${STATUS_URL_BASE}${id}`, {
+              headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
+            });
+            if (!response.ok) return;
+            const data = await response.json().catch(() => ({}));
+            applyStatusToCard(card, data);
+            if (String(data?.status || '').toLowerCase() === 'ready' || String(data?.status || '').toLowerCase() === 'failed') {
+              stopPolling(id);
+            }
+          } catch (_error) {
+            // Keep polling on transient errors.
+          }
+        };
+
+        run();
+        const timerId = setInterval(run, 4500);
+        pollers.set(id, timerId);
+      }
+
+      function stopPolling(voiceId) {
+        const id = String(voiceId || '').trim();
+        if (!id) return;
+        const timerId = pollers.get(id);
+        if (timerId) {
+          clearInterval(timerId);
+          pollers.delete(id);
+        }
+      }
+
+      function buildVoiceCardHtml(voice) {
+        const voiceId = String(voice?.id || '').trim();
+        const status = String(voice?.status || 'pending').toLowerCase();
+        const isProcessing = ['pending', 'validating', 'processing'].includes(status);
+        const failureReason = escapeHtml(String(voice?.failure_reason || failedHintText));
+        const sourceType = String(voice?.source_type || 'upload').toLowerCase();
+        const sourceLabel = sourceTypeLabels[sourceType] || sourceTypeLabels.upload;
+        const createdTs = Number(voice?.created_at_ts || Math.floor(Date.now() / 1000));
+        const createdLabel = new Date(createdTs * 1000).toLocaleDateString(pageLocale.startsWith('ar') ? 'ar-EG' : 'en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: '2-digit',
+        });
+        const percent = statusProgress(status, 0, Number(voice?.progress_percent ?? NaN));
+        const languageCode = String(voice?.language_code || 'ar-XA');
+        const languageLabel = languageLabels[languageCode] || languageCode;
+        const name = escapeHtml(String(voice?.name || `Voice ${voiceId}`));
+        const statusLabel = escapeHtml(statusLabels[status] || status.toUpperCase());
+        const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
+
+        return `
+          <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-failure-reason="${failureReason}">
+            <div class="vc-card-header">
+              <h3 class="vc-card-name">${name}</h3>
+              <span class="vc-status ${escapeHtml(status)}">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
+            </div>
+            <div class="vc-card-meta">
+              <span>{{ __('ui.voice_cloning.created_on') }} ${escapeHtml(createdLabel)}</span>
+              <span>${metaLabel}</span>
+            </div>
+            ${status === 'failed' ? `<div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">${failureReason}</div>` : ''}
+            ${isProcessing ? `<div class="vc-processing-hint" style="font-size:.83rem;color:var(--muted);margin-bottom:.6rem">${escapeHtml(processingHintText)}</div>` : ''}
+            <div class="vc-progress ${isProcessing ? '' : 'is-hidden'}" data-vc-progress>
+              <div class="vc-progress-track">
+                <div class="vc-progress-fill" data-vc-progress-fill style="width: ${Math.round(percent)}%"></div>
+              </div>
+              <div class="vc-progress-meta">
+                <span data-vc-progress-status>${statusLabel}</span>
+                <span data-vc-progress-percent>${Math.round(percent)}%</span>
+              </div>
+              <div class="vc-progress-delay" data-vc-progress-delay></div>
+            </div>
+            <div class="vc-card-actions">
+              ${status === 'ready' ? `<a href="${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(voiceId)}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">${escapeHtml(useInGeneratorText)}</a>` : ''}
+              <button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="${escapeHtml(voiceId)}" data-confirm="${escapeHtml(deleteConfirmText)}">${escapeHtml(deleteVoiceText)}</button>
+            </div>
+          </article>
+        `;
+      }
+
+      function upsertVoiceCard(voice) {
+        if (!voiceGrid || !voice?.id) return;
+        const voiceId = String(voice.id);
+        let card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
+        if (!card) {
+          voiceGrid.insertAdjacentHTML('afterbegin', buildVoiceCardHtml(voice));
+          card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
+        }
+        if (!card) return;
+        applyStatusToCard(card, voice);
+      }
+
+      function resetCreateFormUi() {
+        form?.reset();
+        document.getElementById('vcSourceType').value = 'upload';
+        setAudioDuration(0);
+        setConsentDuration(0);
+        recordedBlob = null;
+        consentBlob = null;
+
+        if (timer) timer.textContent = '00:00';
+        if (recHint) {
+          recHint.textContent = recordStartText;
+          recHint.style.color = '';
+        }
+        if (recActions) recActions.style.display = 'none';
+        recBtn?.classList.remove('recording');
+        document.getElementById('vcRecorder')?.classList.remove('live');
+
+        if (fileInput) fileInput.value = '';
+        if (fileInfo) fileInfo.style.display = 'none';
+        if (uploadZone) uploadZone.style.display = '';
+        const sampleRange = document.getElementById('vcSampleRange');
+        if (sampleRange) sampleRange.className = 'vc-range';
+
+        const consentTimer = document.getElementById('vcConsentTimer');
+        const consentHint = document.getElementById('vcConsentRecHint');
+        const consentActions = document.getElementById('vcConsentRecActions');
+        const consentFile = document.getElementById('vcConsentFileInput');
+        const consentInfo = document.getElementById('vcConsentFileInfo');
+        const consentZone = document.getElementById('vcConsentUploadZone');
+        if (consentTimer) consentTimer.textContent = '00:00';
+        if (consentHint) {
+          consentHint.textContent = recordStartText;
+          consentHint.style.color = '';
+        }
+        if (consentActions) consentActions.style.display = 'none';
+        document.getElementById('vcConsentRecBtn')?.classList.remove('recording');
+        document.getElementById('vcConsentRecorder')?.classList.remove('live');
+        if (consentFile) consentFile.value = '';
+        if (consentInfo) consentInfo.style.display = 'none';
+        if (consentZone) consentZone.style.display = '';
+
+        document.querySelectorAll('.vc-tab').forEach((tab) => tab.classList.remove('active'));
+        document.querySelector('.vc-tab[data-tab="upload"]')?.classList.add('active');
+        const uploadPanel = document.getElementById('vcUploadPanel');
+        const recordPanel = document.getElementById('vcRecordPanel');
+        if (uploadPanel) uploadPanel.style.display = '';
+        if (recordPanel) recordPanel.style.display = 'none';
+        showStep(1);
+        syncConsentScript();
+      }
+
+      document.querySelectorAll('.vc-tab').forEach((tab) => {
+        tab.addEventListener('click', function() {
+          document.querySelectorAll('.vc-tab').forEach((t) => t.classList.remove('active'));
+          this.classList.add('active');
+          const mode = this.dataset.tab || 'upload';
+          const sourceType = document.getElementById('vcSourceType');
+          const uploadPanel = document.getElementById('vcUploadPanel');
+          const recordPanel = document.getElementById('vcRecordPanel');
+          if (sourceType) sourceType.value = mode;
+          if (uploadPanel) uploadPanel.style.display = mode === 'upload' ? '' : 'none';
+          if (recordPanel) recordPanel.style.display = mode === 'recording' ? '' : 'none';
+        });
+      });
+
+      const uploadZone = document.getElementById('vcUploadZone');
+      const fileInput = document.getElementById('vcFileInput');
+      const fileInfo = document.getElementById('vcFileInfo');
+      const fileName = document.getElementById('vcFileName');
+      const fileRemove = document.getElementById('vcFileRemove');
+
+      function setAudioDuration(seconds) {
+        const durationEl = document.getElementById('vcAudioDuration');
+        if (durationEl) durationEl.value = String(seconds || 0);
+      }
+
+      function handleFileSelect(file) {
+        if (!file || !fileName || !fileInfo || !uploadZone) return;
+        fileName.textContent = `{{ __('ui.voice_cloning.upload_selected') }} ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+        fileInfo.style.display = '';
+        uploadZone.style.display = 'none';
+        const audio = new Audio();
+        audio.addEventListener('loadedmetadata', function() {
+          const duration = Math.round(audio.duration || 0);
+          setAudioDuration(duration);
+          const range = document.getElementById('vcSampleRange');
+          if (range) {
+            range.textContent = `${duration}s`;
+            range.className = duration >= MIN_DURATION && duration <= MAX_DURATION ? 'vc-range ok' : 'vc-range bad';
+          }
+          if (duration < MIN_DURATION) {
+            showAlert('error', sampleTooShortText);
+          } else if (duration > MAX_DURATION) {
+            showAlert('error', sampleTooLongText);
+          }
+        });
+        audio.src = URL.createObjectURL(file);
+      }
+
+      if (uploadZone && fileInput && fileInfo) {
+        ['dragover', 'dragenter'].forEach((eventName) => {
+          uploadZone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            uploadZone.classList.add('dragover');
+          });
+        });
+        ['dragleave', 'drop'].forEach((eventName) => {
+          uploadZone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            uploadZone.classList.remove('dragover');
+          });
+        });
+        uploadZone.addEventListener('drop', (event) => {
+          const dropped = event.dataTransfer?.files?.[0];
+          if (!dropped) return;
+          fileInput.files = event.dataTransfer.files;
+          handleFileSelect(dropped);
+        });
+        fileInput.addEventListener('change', function() {
+          if (this.files?.[0]) handleFileSelect(this.files[0]);
+        });
+      }
+
+      if (fileRemove && fileInput && fileInfo && uploadZone) {
+        fileRemove.addEventListener('click', function() {
+          fileInput.value = '';
+          fileInfo.style.display = 'none';
+          uploadZone.style.display = '';
+          setAudioDuration(0);
+        });
+      }
+
+      let mediaRecorder = null;
+      let audioChunks = [];
+      let recordingStart = 0;
+      let timerInterval = null;
+      let recordedBlob = null;
+      let consentBlob = null;
+      let consentRecorder = null;
+      let consentChunks = [];
+      let consentStarted = 0;
+      let consentTimerInterval = null;
+
+      const recBtn = document.getElementById('vcRecBtn');
+      const timer = document.getElementById('vcTimer');
+      const recHint = document.getElementById('vcRecHint');
+      const recActions = document.getElementById('vcRecActions');
+      const recRetry = document.getElementById('vcRecRetry');
+
+      function getSupportedMime() {
+        const mimes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'];
+        for (const mime of mimes) {
+          if (MediaRecorder.isTypeSupported(mime)) return mime;
+        }
+        return '';
+      }
+
+      function stopRecording() {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+          mediaRecorder.stop();
+          if (recBtn) recBtn.classList.remove('recording');
+          if (timerInterval) clearInterval(timerInterval);
+        }
+      }
+
+      async function startRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          audioChunks = [];
+          mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
+          mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunks.push(event.data); };
+          mediaRecorder.onstop = () => {
+            stream.getTracks().forEach((track) => track.stop());
+            const recorderMimeType = String(mediaRecorder.mimeType || 'audio/webm').trim() || 'audio/webm';
+            recordedBlob = new Blob(audioChunks, { type: recorderMimeType });
+            const duration = Math.round((Date.now() - recordingStart) / 1000);
+            setAudioDuration(duration);
+            document.getElementById('vcRecorder')?.classList.remove('live');
+            if (recHint) {
+              if (duration < MIN_DURATION) {
+                recHint.textContent = tooShortRecordText;
+                recHint.style.color = '#dc2626';
+              } else if (duration > MAX_DURATION) {
+                recHint.textContent = tooLongRecordText;
+                recHint.style.color = '#dc2626';
+              } else {
+                recHint.textContent = `${duration}s · ${sampleReadyText}`;
+                recHint.style.color = '#16a34a';
+              }
+            }
+            if (recActions) recActions.style.display = '';
+          };
+
+          mediaRecorder.start(250);
+          recordingStart = Date.now();
+          if (recBtn) recBtn.classList.add('recording');
+          document.getElementById('vcRecorder')?.classList.add('live');
+          if (recHint) {
+            recHint.textContent = recordingText;
+            recHint.style.color = '';
+          }
+          if (recActions) recActions.style.display = 'none';
+
+          timerInterval = setInterval(() => {
+            const elapsed = Math.round((Date.now() - recordingStart) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (timer) timer.textContent = `${m}:${s}`;
+            if (elapsed >= MAX_DURATION) stopRecording();
+          }, 250);
+        } catch (error) {
+          if (error?.name === 'NotAllowedError') {
+            showAlert('error', '{{ __("ui.voice_cloning.mic_permission_denied") }}');
+          } else {
+            showAlert('error', '{{ __("ui.voice_cloning.mic_not_available") }}');
+          }
+        }
+      }
+
+      if (recBtn) {
+        recBtn.addEventListener('click', async function() {
+          if (mediaRecorder && mediaRecorder.state === 'recording') stopRecording();
+          else await startRecording();
+        });
+      }
+
+      if (recRetry) {
+        recRetry.addEventListener('click', function() {
+          recordedBlob = null;
+          if (timer) timer.textContent = '00:00';
+          if (recHint) {
+            recHint.textContent = recordStartText;
+            recHint.style.color = '';
+          }
+          if (recActions) recActions.style.display = 'none';
+          if (recBtn) recBtn.classList.remove('recording');
+          setAudioDuration(0);
+        });
+      }
+
+      function setConsentDuration(seconds) {
+        const durationEl = document.getElementById('vcConsentDuration');
+        if (durationEl) durationEl.value = String(seconds || 0);
+      }
+
+      function blobExtension(blob) {
+        const blobType = String(blob?.type || '').toLowerCase();
+        if (blobType.includes('webm')) return 'webm';
+        if (blobType.includes('ogg')) return 'ogg';
+        if (blobType.includes('wav')) return 'wav';
+        return 'mp4';
+      }
+
+      function showStep(step) {
+        document.querySelectorAll('[data-vc-step-panel]').forEach((panel) => {
+          panel.hidden = String(panel.getAttribute('data-vc-step-panel')) !== String(step);
+        });
+        document.querySelectorAll('.vc-step').forEach((button) => {
+          const stepNumber = Number(button.getAttribute('data-vc-step'));
+          button.classList.toggle('active', stepNumber === Number(step));
+          button.classList.toggle('done', stepNumber < Number(step));
+        });
+      }
+
+      function syncConsentScript() {
+        const language = document.getElementById('vcLanguage')?.value || 'ar-XA';
+        const script = document.getElementById('vcConsentScript');
+        if (!script) return;
+        script.textContent = consentScripts[language] || consentScripts['en-US'] || '';
+        script.dir = String(language).toLowerCase().startsWith('ar') ? 'rtl' : 'ltr';
+      }
+
+      function sampleIsReady() {
+        const name = String(document.getElementById('vcName')?.value || '').trim();
+        if (name.length < 2) {
+          showAlert('error', nameRequiredText);
+          return false;
+        }
+        const sourceType = String(document.getElementById('vcSourceType')?.value || 'upload');
+        const duration = Number(document.getElementById('vcAudioDuration')?.value || 0);
+        const hasFile = sourceType === 'recording' ? Boolean(recordedBlob) : Boolean(fileInput?.files?.[0]);
+        if (!hasFile) {
+          showAlert('error', sampleTooShortText);
+          return false;
+        }
+        if (duration < MIN_DURATION) {
+          showAlert('error', sampleTooShortText);
+          return false;
+        }
+        if (duration > MAX_DURATION) {
+          showAlert('error', sampleTooLongText);
+          return false;
+        }
+        return true;
+      }
+
+      document.getElementById('vcLanguage')?.addEventListener('change', syncConsentScript);
+      document.getElementById('vcNextStep')?.addEventListener('click', function() {
+        if (sampleIsReady()) showStep(2);
+      });
+      document.getElementById('vcBackStep')?.addEventListener('click', function() {
+        showStep(1);
+      });
+      document.getElementById('vcStepSample')?.addEventListener('click', function() {
+        showStep(1);
+      });
+      document.getElementById('vcStepConsent')?.addEventListener('click', function() {
+        if (sampleIsReady()) showStep(2);
+      });
+      document.getElementById('vcCopyConsent')?.addEventListener('click', async function() {
+        const text = document.getElementById('vcConsentScript')?.textContent || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          this.textContent = copiedLabel;
+          setTimeout(() => { this.textContent = copyLabel; }, 1400);
+        } catch (_error) {
+          showAlert('error', copyLabel);
+        }
+      });
+
+      const consentRecBtn = document.getElementById('vcConsentRecBtn');
+      const consentTimer = document.getElementById('vcConsentTimer');
+      const consentHint = document.getElementById('vcConsentRecHint');
+      const consentActions = document.getElementById('vcConsentRecActions');
+      const consentRetry = document.getElementById('vcConsentRecRetry');
+      const consentFileInput = document.getElementById('vcConsentFileInput');
+      const consentFileInfo = document.getElementById('vcConsentFileInfo');
+      const consentFileName = document.getElementById('vcConsentFileName');
+      const consentFileRemove = document.getElementById('vcConsentFileRemove');
+      const consentUploadZone = document.getElementById('vcConsentUploadZone');
+
+      function markConsentFile(file, duration) {
+        consentBlob = null;
+        if (consentFileName && consentFileInfo && consentUploadZone) {
+          consentFileName.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+          consentFileInfo.style.display = '';
+          consentUploadZone.style.display = 'none';
+        }
+        if (duration) setConsentDuration(duration);
+      }
+
+      consentFileInput?.addEventListener('change', function() {
+        const file = this.files?.[0];
+        if (!file) return;
+        const audio = new Audio();
+        audio.addEventListener('loadedmetadata', function() {
+          const duration = Math.round(audio.duration || 0);
+          setConsentDuration(duration);
+          if (duration < MIN_CONSENT) showAlert('error', consentTooShortText);
+          else if (duration > MAX_DURATION) showAlert('error', sampleTooLongText);
+        });
+        audio.src = URL.createObjectURL(file);
+        markConsentFile(file);
+      });
+      consentFileRemove?.addEventListener('click', function() {
+        if (consentFileInput) consentFileInput.value = '';
+        if (consentFileInfo) consentFileInfo.style.display = 'none';
+        if (consentUploadZone) consentUploadZone.style.display = '';
+        setConsentDuration(0);
+      });
+
+      function stopConsentRecording() {
+        if (consentRecorder && consentRecorder.state === 'recording') {
+          consentRecorder.stop();
+          consentRecBtn?.classList.remove('recording');
+          document.getElementById('vcConsentRecorder')?.classList.remove('live');
+          if (consentTimerInterval) clearInterval(consentTimerInterval);
+        }
+      }
+
+      async function startConsentRecording() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          consentChunks = [];
+          consentRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
+          consentRecorder.ondataavailable = (event) => { if (event.data.size > 0) consentChunks.push(event.data); };
+          consentRecorder.onstop = () => {
+            stream.getTracks().forEach((track) => track.stop());
+            const recorderMimeType = String(consentRecorder.mimeType || 'audio/webm').trim() || 'audio/webm';
+            consentBlob = new Blob(consentChunks, { type: recorderMimeType });
+            if (consentFileInput) consentFileInput.value = '';
+            if (consentFileInfo) consentFileInfo.style.display = 'none';
+            if (consentUploadZone) consentUploadZone.style.display = '';
+            const duration = Math.round((Date.now() - consentStarted) / 1000);
+            setConsentDuration(duration);
+            if (consentHint) {
+              if (duration < MIN_CONSENT) {
+                consentHint.textContent = consentTooShortText;
+                consentHint.style.color = '#dc2626';
+              } else if (duration > MAX_DURATION) {
+                consentHint.textContent = tooLongRecordText;
+                consentHint.style.color = '#dc2626';
+              } else {
+                consentHint.textContent = `${duration}s · ${consentReadyText}`;
+                consentHint.style.color = '#16a34a';
+              }
+            }
+            if (consentActions) consentActions.style.display = '';
+          };
+          consentRecorder.start(250);
+          consentStarted = Date.now();
+          consentRecBtn?.classList.add('recording');
+          document.getElementById('vcConsentRecorder')?.classList.add('live');
+          if (consentHint) {
+            consentHint.textContent = recordingText;
+            consentHint.style.color = '';
+          }
+          if (consentActions) consentActions.style.display = 'none';
+          consentTimerInterval = setInterval(() => {
+            const elapsed = Math.round((Date.now() - consentStarted) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            if (consentTimer) consentTimer.textContent = `${m}:${s}`;
+            if (elapsed >= MAX_DURATION) stopConsentRecording();
+          }, 250);
+        } catch (error) {
+          showAlert('error', error?.name === 'NotAllowedError'
+            ? @json(__('ui.voice_cloning.mic_permission_denied'))
+            : @json(__('ui.voice_cloning.mic_not_available')));
+        }
+      }
+
+      consentRecBtn?.addEventListener('click', async function() {
+        if (consentRecorder && consentRecorder.state === 'recording') stopConsentRecording();
+        else await startConsentRecording();
+      });
+      consentRetry?.addEventListener('click', function() {
+        consentBlob = null;
+        if (consentTimer) consentTimer.textContent = '00:00';
+        if (consentHint) {
+          consentHint.textContent = recordStartText;
+          consentHint.style.color = '';
+        }
+        if (consentActions) consentActions.style.display = 'none';
+        consentRecBtn?.classList.remove('recording');
+        setConsentDuration(0);
+      });
+
+      syncConsentScript();
+
+      if (form) {
+        form.addEventListener('submit', async function(event) {
+          event.preventDefault();
+          const submitBtn = document.getElementById('vcSubmitBtn');
+          const submitText = document.getElementById('vcSubmitText');
+          const submitLoading = document.getElementById('vcSubmitLoading');
+          if (submitBtn) submitBtn.disabled = true;
+          if (submitText) submitText.style.display = 'none';
+          if (submitLoading) submitLoading.style.display = '';
+
+          try {
+            const formData = new FormData(form);
+            const sourceType = String(document.getElementById('vcSourceType')?.value || 'upload');
+            formData.set('source_type', sourceType);
+            if (sourceType === 'recording' && recordedBlob) {
+              formData.set('audio_file', recordedBlob, `recording.${blobExtension(recordedBlob)}`);
+            }
+            if (consentBlob) {
+              formData.set('consent_audio', consentBlob, `consent.${blobExtension(consentBlob)}`);
+            }
+            const consentDuration = Number(document.getElementById('vcConsentDuration')?.value || 0);
+            const hasConsent = Boolean(consentBlob || consentFileInput?.files?.[0]);
+            if (!hasConsent) {
+              showAlert('error', consentMissingText);
+              showStep(2);
+              return;
+            }
+            if (consentDuration < MIN_CONSENT) {
+              showAlert('error', consentTooShortText);
+              showStep(2);
+              return;
+            }
+            if (consentDuration > MAX_DURATION) {
+              showAlert('error', sampleTooLongText);
+              showStep(2);
+              return;
+            }
+            if (!document.getElementById('vcConsent')?.checked) {
+              showAlert('error', consentRequiredText);
+              showStep(2);
+              return;
+            }
+
+            const response = await fetch(STORE_URL, {
+              method: 'POST',
+              headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+              body: formData,
+            });
+            const data = await response.json().catch(() => ({}));
+            if (response.ok && data?.success) {
+              if (data.voice?.id) {
+                const exists = Boolean(voiceGrid?.querySelector(`.vc-card[data-voice-id="${escapeSelector(String(data.voice.id))}"]`));
+                upsertVoiceCard(data.voice);
+                if (!exists) {
+                  currentVoiceCount += 1;
+                  updateCountUI();
+                }
+                updateEmptyStateUI();
+                focusCard(data.voice.id);
+                if (['pending', 'validating', 'processing'].includes(String(data.voice.status || '').toLowerCase())) {
+                  startPolling(data.voice.id);
+                }
+              }
+              resetCreateFormUi();
+              return;
+            }
+            const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
+            showAlert('error', errorText);
+          } catch (error) {
+            showAlert('error', error?.message || 'Network error');
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+            if (submitText) submitText.style.display = '';
+            if (submitLoading) submitLoading.style.display = 'none';
+          }
+        });
+      }
+
+      voiceGrid?.addEventListener('click', async function(event) {
+        const target = event.target;
+        const button = target instanceof Element ? target.closest('.vc-delete-btn') : null;
+        if (!button) return;
+        if (!confirm(button.dataset.confirm || '')) return;
+        const voiceId = String(button.dataset.voiceId || '').trim();
+        if (!voiceId) return;
+        try {
+          const response = await fetch(`${DELETE_URL_BASE}${voiceId}`, {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+          });
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data?.success) {
+            stopPolling(voiceId);
+            const card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
+            if (card) {
+              card.remove();
+              currentVoiceCount = Math.max(0, currentVoiceCount - 1);
+              updateCountUI();
+              updateEmptyStateUI();
+            }
+            return;
+          }
+          showAlert('error', data?.error || 'Failed');
+        } catch (error) {
+          showAlert('error', error?.message || 'Failed');
+        }
+      });
+
+      voiceGrid?.querySelectorAll('.vc-card[data-status="pending"], .vc-card[data-status="validating"], .vc-card[data-status="processing"]').forEach((card) => {
+        const voiceId = String(card.getAttribute('data-voice-id') || '').trim();
+        if (voiceId) startPolling(voiceId);
+      });
+
+      setInterval(() => {
+        voiceGrid?.querySelectorAll('.vc-card[data-status="pending"], .vc-card[data-status="validating"], .vc-card[data-status="processing"]').forEach((card) => {
+          const status = String(card.getAttribute('data-status') || '').toLowerCase();
+          const createdTs = Number(card.getAttribute('data-created-ts') || Math.floor(Date.now() / 1000));
+          const elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - createdTs);
+          const delayed = elapsedSeconds >= 90;
+          updateProgressUI(card, status, elapsedSeconds, delayed);
+        });
+      }, 1000);
+
+      updateCountUI();
+      updateEmptyStateUI();
+
+      document.querySelectorAll('.vc-card').forEach((card) => {
+        applyStatusToCard(card, {
+          id: card.getAttribute('data-voice-id'),
+          status: card.getAttribute('data-status'),
+          created_at_ts: Number(card.getAttribute('data-created-ts') || 0),
+        });
+      });
+    })();
+  </script>
+  @endif
 </body>
 </html>
-
