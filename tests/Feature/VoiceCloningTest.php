@@ -67,17 +67,30 @@ class VoiceCloningTest extends TestCase
         $response->assertRedirect();
     }
 
-    public function test_free_user_voice_cloning_route_does_not_reveal_the_studio(): void
+    public function test_free_user_sees_upgrade_prompt_instead_of_the_studio(): void
     {
         $response = $this->actingAs($this->freeUser)->getLocalizedRoute('voice-cloning.index');
 
-        $response->assertRedirect(route('dashboard'));
+        $response->assertRedirect(route('dashboard') . '#voiceCloningSection');
 
+        app()->setLocale('en');
         $page = $this->actingAs($this->freeUser)->getLocalizedRoute('dashboard');
 
         $page->assertOk();
-        $page->assertDontSee(__('ui.voice_cloning.page_title'), false);
-        $page->assertDontSee(__('ui.nav.voice_cloning'), false);
+        $page->assertSee(__('ui.nav.voice_cloning'), false);
+        $page->assertSee(__('ui.voice_cloning.upgrade_title'), false);
+        $page->assertSee(__('ui.voice_cloning.upgrade_cta'), false);
+        $page->assertSee(route('billing.page'), false);
+        $page->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $page->assertDontSee(__('ui.voice_cloning.preview_badge'), false);
+        $page->assertDontSee(VoiceCloningService::CONSENT_SCRIPTS['en'], false);
+
+        app()->setLocale('ar');
+        $arabic = $this->actingAs($this->freeUser)->getLocalizedRoute('dashboard');
+        $arabic->assertOk();
+        $arabic->assertSee(__('ui.voice_cloning.upgrade_title'), false);
+        $arabic->assertSee(__('ui.voice_cloning.upgrade_cta'), false);
+        app()->setLocale('en');
     }
 
     public function test_paid_user_outside_preview_cannot_see_voice_cloning(): void

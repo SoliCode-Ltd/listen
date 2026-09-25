@@ -209,7 +209,10 @@ Route::group([
 
         // Legacy user URL kept as redirect to dashboard voice-cloning section.
         Route::get('/voice-cloning', function () {
-            if (! \App\Support\VoiceCloningAccess::allows(auth()->user())) {
+            $user = auth()->user();
+            $plan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
+
+            if (! \App\Support\VoiceCloningAccess::allows($user) && ! \App\Support\VoiceCloningAccess::showsUpgrade($user, $plan)) {
                 return redirect()->route('dashboard');
             }
 

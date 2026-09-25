@@ -15,7 +15,7 @@
     .vc-shell { margin-top: .25rem; }
     .vc-intro p { margin: .4rem 0 0; color: var(--muted); }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0 0 1rem; }
-    .vc-alert { padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .9rem; display: flex; align-items: center; gap: .5rem; }
+    .vc-alert { padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .9rem; display: flex; align-items: center; gap: .5rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
     .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
     .vc-upgrade,
@@ -1682,7 +1682,7 @@
             <span></span>
           </a>
 
-          @if($voiceCloningVisible ?? false)
+          @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
           <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav >
             <span>{{ __('ui.nav.voice_cloning') }}</span>
             <span></span>
@@ -2082,15 +2082,28 @@
       </div>
     </section>
 
-    @if($voiceCloningVisible ?? false)
+    @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
     <section id="voiceCloningSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal vc-shell">
         <div class="vc-intro">
           <h1><span class="grad-text">{{ __('ui.voice_cloning.page_title') }}</span></h1>
           <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
+          @if($voiceCloningVisible ?? false)
           <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
+          @endif
         </div>
 
+        @if($voiceCloningUpgrade ?? false)
+          <section class="vc-upgrade">
+            <h2>{{ __('ui.voice_cloning.upgrade_title') }}</h2>
+            <p>{{ __('ui.voice_cloning.upgrade_subtitle') }}</p>
+            <ul class="features-list">
+              <li>{{ __('ui.voice_cloning.upgrade_feature_1') }}</li>
+              <li>{{ __('ui.voice_cloning.upgrade_feature_2') }}</li>
+            </ul>
+            <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
+          </section>
+        @else
         <div id="vcAlerts"></div>
 
         @if(!($voiceCloningEnabledGlobally ?? false))
@@ -2205,7 +2218,7 @@
                 </button>
               </div>
 
-              <form id="vcCreateForm" enctype="multipart/form-data">
+              <form id="vcCreateForm" enctype="multipart/form-data" novalidate>
                 @csrf
                 <input type="hidden" name="source_type" id="vcSourceType" value="upload">
                 <input type="hidden" name="audio_duration" id="vcAudioDuration" value="0">
@@ -2215,7 +2228,7 @@
                   <div class="vc-field-grid">
                     <div class="vc-form-group">
                       <label for="vcName">{{ __('ui.voice_cloning.voice_name_label') }}</label>
-                      <input type="text" id="vcName" name="name" required minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
+                      <input type="text" id="vcName" name="name" minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
                     </div>
                     <div class="vc-form-group">
                       <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
@@ -2332,6 +2345,7 @@
               {{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}
             </div>
           @endif
+        @endif
         @endif
       </article>
     </section>
@@ -3508,20 +3522,32 @@
       };
       const pollers = new Map();
 
+      function scrollAlertIntoView(alert) {
+        if (!alert) return;
+        alert.style.scrollMarginTop = '6.5rem';
+        alert.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+      }
+
       function showAlert(type, message) {
         if (type !== 'error') return;
         const container = document.getElementById('vcAlerts');
         if (!container || !message) return;
+        const text = String(message);
+        const current = container.querySelector('.vc-alert');
+        if (current && current.textContent === text) {
+          scrollAlertIntoView(current);
+          return;
+        }
+        container.replaceChildren();
         const alert = document.createElement('div');
         alert.className = 'vc-alert error';
         alert.setAttribute('role', 'alert');
-        alert.textContent = String(message);
-        container.prepend(alert);
-        container.querySelectorAll('.vc-alert').forEach((node, index) => {
-          if (index > 2) node.remove();
-        });
-        alert.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        setTimeout(() => alert.remove(), 7000);
+        alert.textContent = text;
+        container.appendChild(alert);
+        scrollAlertIntoView(alert);
+        setTimeout(() => {
+          if (alert.isConnected) alert.remove();
+        }, 7000);
       }
 
       function escapeHtml(value) {

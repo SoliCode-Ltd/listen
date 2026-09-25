@@ -23,11 +23,14 @@ class VoiceCloningController extends Controller
      */
     public function index(Request $request)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
-            return redirect()->route('dashboard');
+        $user = $request->user();
+        $plan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+
+        if (VoiceCloningAccess::allows($user) || VoiceCloningAccess::showsUpgrade($user, $plan)) {
+            return redirect()->to(route('dashboard') . '#voiceCloningSection');
         }
 
-        return redirect()->to(route('dashboard') . '#voiceCloningSection');
+        return redirect()->route('dashboard');
     }
 
     /**

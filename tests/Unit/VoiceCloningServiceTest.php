@@ -159,6 +159,12 @@ class VoiceCloningServiceTest extends TestCase
         $this->assertTrue(VoiceCloningAccess::allows($admin));
         $this->assertFalse(VoiceCloningAccess::allows($other));
         $this->assertFalse(VoiceCloningAccess::allows(null));
+
+        $freePlan = Plan::factory()->free()->create();
+        $paidPlan = Plan::factory()->paid()->create(['price_cents' => 1999]);
+        $this->assertTrue(VoiceCloningAccess::showsUpgrade($other, $freePlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($other, $paidPlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($admin, $freePlan));
     }
 
     public function test_replication_request_uses_gemini_38_and_separate_consent_audio(): void

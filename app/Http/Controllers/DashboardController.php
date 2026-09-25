@@ -107,6 +107,7 @@ class DashboardController extends Controller
         $customPromptEnabled = $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
         $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user());
+        $voiceCloningUpgrade = VoiceCloningAccess::showsUpgrade(auth()->user(), $activePlan);
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
             : collect();
@@ -164,6 +165,7 @@ class DashboardController extends Controller
                 ])->values()->all()
                 : [],
             'voiceCloningVisible' => $voiceCloningVisible,
+            'voiceCloningUpgrade' => $voiceCloningUpgrade,
             'voiceCloningEnabledGlobally' => $voiceCloningEnabledGlobally,
             'voiceCloningPlanEnabled' => $voiceCloningPlanEnabled,
             'voiceCloningList' => $voiceCloningVoices,
