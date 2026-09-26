@@ -134,9 +134,11 @@ class VoiceCloningServiceTest extends TestCase
             $scripts['en'],
         );
         $this->assertSame(
-            'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
+            'أنا مالك هذا الصوت وأوافق على أن تستخدم جوجل هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
             $scripts['ar'],
         );
+        $this->assertSame($scripts['ar'], $scripts['ar-XA']);
+        $this->assertStringNotContainsString('Google', $scripts['ar']);
     }
 
     public function test_viewer_limit_follows_the_plan_toggle_and_exact_max(): void

@@ -27,16 +27,16 @@ class VoiceCloningService
     public const MODEL = 'gemini-3.8-flash-tts';
 
     /**
-     * Verbatim consent lines required by Gemini voice replication.
-     * The speaker must record themselves saying the matching line.
+     * Consent lines the speaker records.
+     * English stays the official sentence. Arabic writes Google as جوجل.
      */
     public const CONSENT_SCRIPTS = [
         'en' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
         'en-US' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
         'en-GB' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
         'en-AU' => 'I am the owner of this voice and I consent to Google using this voice to create a synthetic voice model.',
-        'ar' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
-        'ar-XA' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم Google هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
+        'ar' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم جوجل هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
+        'ar-XA' => 'أنا مالك هذا الصوت وأوافق على أن تستخدم جوجل هذا الصوت لإنشاء نموذج صوتي اصطناعي.',
     ];
 
     /**

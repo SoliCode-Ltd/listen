@@ -138,6 +138,8 @@ class VoiceCloningTest extends TestCase
         $arabic->assertSee(__('ui.voice_cloning.step_sample'), false);
         $arabic->assertSee(__('ui.voice_cloning.consent_upload_label'), false);
         $arabic->assertSee(VoiceCloningService::CONSENT_SCRIPTS['ar-XA'], false);
+        $arabic->assertSee('تستخدم جوجل', false);
+        $arabic->assertDontSee('تستخدم Google', false);
         $arabic->assertSee('id="vcLanguage" value="ar-XA"', false);
         $arabic->assertDontSee('<select id="vcLanguage"', false);
         $arabic->assertDontSee(__('ui.voice_cloning.language_hint'), false);
