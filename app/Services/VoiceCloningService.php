@@ -93,7 +93,7 @@ class VoiceCloningService
                 }
 
                 $serverSide = $response->serverError() || $response->successful();
-                if (! $serverSide) {
+                if (! $serverSide || self::isConsentRejection((string) $response->body())) {
                     break;
                 }
 
@@ -116,7 +116,7 @@ class VoiceCloningService
 
             $errorMessage = $response->successful()
                 ? 'Gemini accepted the request but returned no voice id.'
-                : $this->responseError($response);
+                : (self::consentRejectionMessage((string) $response->body()) ?? $this->responseError($response));
             $body = mb_substr((string) $response->body(), 0, 2000);
             Log::error('Gemini voice replication failed.', [
                 'cloned_voice_id' => $clonedVoice->id,
@@ -291,6 +291,22 @@ class VoiceCloningService
         }
 
         return null;
+    }
+
+    /**
+     * Remove a cloned voice everywhere: the Gemini voice, both recordings, and the row.
+     */
+    public function purge(ClonedVoice $voice): void
+    {
+        $this->deleteReplicatedVoice($voice->provider_voice_key);
+
+        foreach ([$voice->source_audio_path, $voice->consent_audio_path] as $path) {
+            if (filled($path)) {
+                Storage::disk('local')->delete((string) $path);
+            }
+        }
+
+        $voice->delete();
     }
 
     public function deleteReplicatedVoice(?string $voiceId): void
@@ -478,6 +494,7 @@ class VoiceCloningService
             'quota' => __('ui.voice_cloning.failure_quota'),
             'network' => __('ui.voice_cloning.failure_network'),
             'server' => __('ui.voice_cloning.failure_server'),
+            'consent_phrase' => __('ui.voice_cloning.failure_consent_phrase'),
             default => __('ui.voice_cloning.processing_failed_generic'),
         };
     }
@@ -509,10 +526,28 @@ class VoiceCloningService
     public static function canRetry(ClonedVoice $voice): bool
     {
         return $voice->isFailed()
+            && ! self::needsNewConsent($voice)
             && filled($voice->source_audio_path)
             && filled($voice->consent_audio_path)
             && str_ends_with(strtolower((string) $voice->source_audio_path), '.wav')
             && str_ends_with(strtolower((string) $voice->consent_audio_path), '.wav');
+    }
+
+    public static function needsNewConsent(ClonedVoice $voice): bool
+    {
+        return in_array((string) data_get($voice->metadata, 'failure_code'), ['consent', 'consent_phrase'], true);
+    }
+
+    /**
+     * A consent rejection keeps the voice sample, so only the sentence needs
+     * recording again.
+     */
+    public static function canReplaceConsent(ClonedVoice $voice): bool
+    {
+        return $voice->isFailed()
+            && self::needsNewConsent($voice)
+            && filled($voice->source_audio_path)
+            && str_ends_with(strtolower((string) $voice->source_audio_path), '.wav');
     }
 
     /* ------------------------------------------------------------------ */
@@ -958,9 +993,39 @@ class VoiceCloningService
         return mb_substr(trim((string) $message), 0, 500);
     }
 
+    /**
+     * Gemini can wrap a consent rejection (really a 400) inside a 500
+     * "Error translating server response to JSON" DebugInfo detail.
+     */
+    public static function isConsentRejection(string $body): bool
+    {
+        $haystack = strtolower($body);
+
+        return str_contains($haystack, 'consent flow failed')
+            || str_contains($haystack, "phrase didn't match")
+            || str_contains($haystack, 'phrase didn\\\'t match')
+            || str_contains($haystack, 'finish_reason_input_vr');
+    }
+
+    public static function consentRejectionMessage(string $body): ?string
+    {
+        if (! self::isConsentRejection($body)) {
+            return null;
+        }
+
+        if (preg_match('/The recorded phrase didn.{1,3}t match[^"\\\\\[]*/i', $body, $match)) {
+            return 'Consent flow failed: '.trim(str_replace("\\'", "'", $match[0]));
+        }
+
+        return 'Consent flow failed: Gemini could not verify the consent sentence.';
+    }
+
     private function classifyError(string $message, int $status): string
     {
         $haystack = strtolower($message);
+        if (self::isConsentRejection($message)) {
+            return 'consent_phrase';
+        }
         if ($status >= 500) {
             return 'server';
         }

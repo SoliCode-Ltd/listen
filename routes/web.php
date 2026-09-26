@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\AdminClonedVoiceAudioController;
 use App\Http\Controllers\AdminManualPaymentProofController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
@@ -21,6 +22,11 @@ Route::get('/media/{path}', [MediaController::class, 'show'])
 
 Route::middleware('auth')->get('/manual-payment-proof/{email}/{proof_token}', AdminManualPaymentProofController::class)
     ->name('admin.manual-payments.proof');
+
+Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', AdminClonedVoiceAudioController::class)
+    ->whereNumber('voice')
+    ->whereIn('kind', ['sample', 'consent'])
+    ->name('admin.cloned-voices.audio');
 
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
@@ -205,6 +211,7 @@ Route::group([
             Route::post('/', [VoiceCloningController::class, 'store'])->name('voice-cloning.store');
             Route::get('/status/{id}', [VoiceCloningController::class, 'status'])->name('voice-cloning.status');
             Route::post('/{id}/retry', [VoiceCloningController::class, 'retry'])->name('voice-cloning.retry');
+            Route::post('/{id}/consent', [VoiceCloningController::class, 'replaceConsent'])->name('voice-cloning.consent');
             Route::delete('/{id}', [VoiceCloningController::class, 'destroy'])->name('voice-cloning.destroy');
         });
 

@@ -22,6 +22,45 @@
       margin-top: .85rem;
     }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
+    .vc-reconsent-banner {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .75rem;
+      padding: .85rem 1rem;
+      margin-bottom: 1rem;
+      border-radius: .8rem;
+      border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
+      background: color-mix(in oklab, var(--a) 9%, var(--surface));
+    }
+    .vc-reconsent-banner[hidden] { display: none; }
+    .vc-reconsent-banner strong { display: block; font-size: .95rem; overflow-wrap: anywhere; }
+    .vc-reconsent-banner p { margin: .25rem 0 0; color: var(--muted); font-size: .84rem; }
+    .vc-segmented {
+      display: inline-flex;
+      padding: .2rem;
+      gap: .2rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      background: color-mix(in oklab, var(--surface2) 55%, var(--surface));
+    }
+    .vc-segment {
+      border: 0;
+      background: transparent;
+      color: var(--muted);
+      font: inherit;
+      font-weight: 700;
+      font-size: .84rem;
+      padding: .42rem .95rem;
+      min-height: 36px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .vc-segment.active { background: var(--a); color: #fff; }
+    .vc-consent-tips { margin: .6rem 0 0; padding-inline-start: 1.1rem; color: var(--muted); font-size: .8rem; display: grid; gap: .2rem; }
+    .vc-preview-audio { display: block; width: 100%; max-width: 360px; margin: .7rem auto 0; }
+    .vc-preview-audio[hidden] { display: none; }
+    .vc-recorder.countdown .vc-timer { color: var(--a); }
     .vc-tech-detail { margin: -.25rem 0 .7rem; font-size: .76rem; color: var(--muted); }
     .vc-tech-detail summary { cursor: pointer; font-weight: 700; }
     .vc-tech-detail code {
@@ -2295,6 +2334,9 @@
                     @if(\App\Services\VoiceCloningService::canRetry($voice))
                       <button type="button" class="btn btn-primary vc-retry-btn" data-voice-id="{{ $voice->id }}">{{ __('ui.voice_cloning.retry_button') }}</button>
                     @endif
+                    @if(\App\Services\VoiceCloningService::canReplaceConsent($voice))
+                      <button type="button" class="btn btn-primary vc-reconsent-btn" data-voice-id="{{ $voice->id }}">{{ __('ui.voice_cloning.replace_consent_button') }}</button>
+                    @endif
                     @if($voice->isReady())
                       <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">{{ __('ui.voice_cloning.use_in_generator') }}</a>
                     @endif
@@ -2320,9 +2362,17 @@
 
           @if($vcStudioOpen)
             <section class="vc-create-panel" id="vcCreatePanel" @if(! $vcCanCreate) style="display:none" @endif>
-              <h2>{{ __('ui.voice_cloning.create_title') }}</h2>
+              <h2 id="vcCreateTitle">{{ __('ui.voice_cloning.create_title') }}</h2>
 
-              <div class="vc-guidelines">
+              <div class="vc-reconsent-banner" id="vcReconsentBanner" hidden>
+                <div>
+                  <strong id="vcReconsentTitle"></strong>
+                  <p>{{ __('ui.voice_cloning.replace_consent_hint') }}</p>
+                </div>
+                <button type="button" class="btn btn-ghost" id="vcReconsentCancel">{{ __('ui.voice_cloning.cancel') }}</button>
+              </div>
+
+              <div class="vc-guidelines" id="vcGuidelines">
                 <h4>{{ __('ui.voice_cloning.guidelines_title') }}</h4>
                 <ul>
                   <li>{{ __('ui.voice_cloning.guideline_1', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</li>
@@ -2395,6 +2445,7 @@
                       <div class="vc-timer" id="vcTimer">00:00</div>
                       <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
                       <p class="hint" style="font-size:.8rem;margin-top:.3rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                      <audio class="vc-preview-audio" id="vcRecPreview" controls preload="metadata" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
                       <div class="rec-actions" id="vcRecActions" style="display:none">
                         <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
                       </div>
@@ -2405,17 +2456,32 @@
                 </div>
 
                 <div class="vc-step-panel" data-vc-step-panel="2" hidden>
+                  @php
+                    $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
+                    $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
+                  @endphp
+                  <div class="vc-form-group vc-consent-language">
+                    <label for="vcConsentLanguage">{{ __('ui.voice_cloning.consent_language_label') }}</label>
+                    <div class="vc-segmented" role="radiogroup" aria-label="{{ __('ui.voice_cloning.consent_language_label') }}">
+                      <button type="button" class="vc-segment {{ $vcConsentLocale === 'ar-XA' ? 'active' : '' }}" data-consent-lang="ar-XA" role="radio" aria-checked="{{ $vcConsentLocale === 'ar-XA' ? 'true' : 'false' }}">العربية</button>
+                      <button type="button" class="vc-segment {{ $vcConsentLocale === 'en-US' ? 'active' : '' }}" data-consent-lang="en-US" role="radio" aria-checked="{{ $vcConsentLocale === 'en-US' ? 'true' : 'false' }}">English</button>
+                    </div>
+                    <input type="hidden" name="consent_language" id="vcConsentLanguage" value="{{ $vcConsentLocale }}">
+                    <p class="hint">{{ __('ui.voice_cloning.consent_language_hint') }}</p>
+                  </div>
+
                   <div class="vc-script">
                     <div class="vc-script-toolbar">
                       <h3>{{ __('ui.voice_cloning.consent_title') }}</h3>
                       <button type="button" class="vc-copy" id="vcCopyConsent">{{ __('ui.voice_cloning.consent_copy') }}</button>
                     </div>
-                    @php
-                      $vcConsentLocale = app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US';
-                      $vcConsentText = $voiceCloningConsentScripts[$vcConsentLocale] ?? '';
-                    @endphp
                     <p id="vcConsentScript" dir="{{ $vcConsentLocale === 'ar-XA' ? 'rtl' : 'ltr' }}">{{ $vcConsentText }}</p>
                     <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
+                    <ul class="vc-consent-tips">
+                      <li>{{ __('ui.voice_cloning.consent_tip_1') }}</li>
+                      <li>{{ __('ui.voice_cloning.consent_tip_2') }}</li>
+                      <li>{{ __('ui.voice_cloning.consent_tip_3') }}</li>
+                    </ul>
                   </div>
 
                   <div class="vc-consent-block">
@@ -2427,6 +2493,7 @@
                       <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
                       <div class="vc-timer" id="vcConsentTimer">00:00</div>
                       <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
+                      <audio class="vc-preview-audio" id="vcConsentPreview" controls preload="metadata" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
                       <div class="rec-actions" id="vcConsentRecActions" style="display:none">
                         <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
                       </div>
@@ -3667,6 +3734,47 @@
       const STATUS_URL_BASE = '{{ route("voice-cloning.status", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
       const DELETE_URL_BASE = '{{ route("voice-cloning.destroy", ["id" => "__VOICE_ID__"]) }}'.replace('__VOICE_ID__', '');
       const RETRY_URL_TEMPLATE = '{{ route("voice-cloning.retry", ["id" => "__VOICE_ID__"]) }}';
+      const CONSENT_URL_TEMPLATE = '{{ route("voice-cloning.consent", ["id" => "__VOICE_ID__"]) }}';
+      const reconsentTitleTemplate = @json(__('ui.voice_cloning.replace_consent_title', ['name' => '__NAME__']));
+      const reconsentButtonText = @json(__('ui.voice_cloning.replace_consent_button'));
+      const reconsentSubmitText = @json(__('ui.voice_cloning.replace_consent_submit'));
+      const createSubmitText = @json(__('ui.voice_cloning.submit_button'));
+      const getReadyTemplate = @json(__('ui.voice_cloning.get_ready', ['n' => '__N__']));
+      const speakNowText = @json(__('ui.voice_cloning.speak_now'));
+      const MIC_CONSTRAINTS = {
+        audio: {
+          channelCount: 1,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: true,
+        },
+      };
+      let reconsentVoiceId = null;
+
+      async function openMicrophone() {
+        try {
+          return await navigator.mediaDevices.getUserMedia(MIC_CONSTRAINTS);
+        } catch (error) {
+          if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') throw error;
+          return navigator.mediaDevices.getUserMedia({ audio: true });
+        }
+      }
+
+      function showPreview(audioId, blob) {
+        const audio = document.getElementById(audioId);
+        if (!audio) return;
+        if (audio.dataset.url) URL.revokeObjectURL(audio.dataset.url);
+        if (!blob) {
+          audio.removeAttribute('src');
+          audio.dataset.url = '';
+          audio.hidden = true;
+          return;
+        }
+        const url = URL.createObjectURL(blob);
+        audio.dataset.url = url;
+        audio.src = url;
+        audio.hidden = false;
+      }
       const retryText = @json(__('ui.voice_cloning.retry_button'));
       const techDetailsText = @json(__('ui.voice_cloning.technical_details'));
       const GENERATOR_URL_BASE = '{{ route("dashboard") }}';
@@ -3879,6 +3987,60 @@
         button.disabled = false;
       }
 
+      function setReconsentButton(card, voiceId, show) {
+        const actions = card.querySelector('.vc-card-actions');
+        if (!actions) return;
+        let button = actions.querySelector('.vc-reconsent-btn');
+        if (!show) {
+          button?.remove();
+          return;
+        }
+        if (!button) {
+          button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'btn btn-primary vc-reconsent-btn';
+          button.textContent = reconsentButtonText;
+          actions.insertBefore(button, actions.firstChild || null);
+        }
+        button.dataset.voiceId = String(voiceId);
+      }
+
+      function setReconsentMode(voiceId, voiceName) {
+        reconsentVoiceId = voiceId ? String(voiceId) : null;
+        const active = Boolean(reconsentVoiceId);
+        const banner = document.getElementById('vcReconsentBanner');
+        const title = document.getElementById('vcReconsentTitle');
+        const createTitle = document.getElementById('vcCreateTitle');
+        const guidelines = document.getElementById('vcGuidelines');
+        const steps = document.querySelector('.vc-steps');
+        const backButton = document.getElementById('vcBackStep');
+        const submitText = document.getElementById('vcSubmitText');
+        if (banner) banner.hidden = !active;
+        if (title) title.textContent = active ? reconsentTitleTemplate.replace('__NAME__', String(voiceName || '')) : '';
+        if (createTitle) createTitle.hidden = active;
+        if (guidelines) guidelines.hidden = active;
+        if (steps) steps.hidden = active;
+        if (backButton) backButton.hidden = active;
+        if (submitText) submitText.textContent = active ? reconsentSubmitText : createSubmitText;
+        consentBlob = null;
+        showPreview('vcConsentPreview', null);
+        setConsentDuration(0);
+        const consentTimerEl = document.getElementById('vcConsentTimer');
+        if (consentTimerEl) consentTimerEl.textContent = '00:00';
+        const consentFile = document.getElementById('vcConsentFileInput');
+        if (consentFile) consentFile.value = '';
+        const consentCheckbox = document.getElementById('vcConsent');
+        if (consentCheckbox) consentCheckbox.checked = false;
+        if (active) {
+          if (createPanel) createPanel.style.display = '';
+          showStep(2);
+          createPanel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+          showStep(1);
+          updateCountUI();
+        }
+      }
+
       function ensureProgressUI(card) {
         let progress = card.querySelector('[data-vc-progress]');
         if (!progress) {
@@ -3994,6 +4156,8 @@
         setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
         if (status !== 'failed') setRetryButton(card, payload.id || card.dataset.voiceId, false);
         else if (payload.can_retry !== undefined) setRetryButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_retry));
+        if (status !== 'failed') setReconsentButton(card, payload.id || card.dataset.voiceId, false);
+        else if (payload.can_replace_consent !== undefined) setReconsentButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_replace_consent));
       }
 
       function startPolling(voiceId) {
@@ -4100,6 +4264,9 @@
 
       function resetCreateFormUi() {
         form?.reset();
+        showPreview('vcRecPreview', null);
+        showPreview('vcConsentPreview', null);
+        setConsentLanguage(document.getElementById('vcLanguage')?.value || 'ar-XA');
         document.getElementById('vcSourceType').value = 'upload';
         setAudioDuration(0);
         setConsentDuration(0);
@@ -4255,17 +4422,27 @@
         return '';
       }
 
+      const STOP_TAIL_MS = 700;
+      let sampleStopping = false;
+      let consentStopping = false;
+      let consentCountdownTimer = null;
+
+      // Keep recording briefly after the tap so the last word is not cut off.
       function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-          mediaRecorder.stop();
-          if (recBtn) recBtn.classList.remove('recording');
+        if (!mediaRecorder || mediaRecorder.state !== 'recording' || sampleStopping) return;
+        sampleStopping = true;
+        if (recBtn) recBtn.classList.remove('recording');
+        const recorder = mediaRecorder;
+        setTimeout(() => {
           if (timerInterval) clearInterval(timerInterval);
-        }
+          if (recorder.state === 'recording') recorder.stop();
+          sampleStopping = false;
+        }, STOP_TAIL_MS);
       }
 
       async function startRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const stream = await openMicrophone();
           audioChunks = [];
           mediaRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
           mediaRecorder.ondataavailable = (event) => { if (event.data.size > 0) audioChunks.push(event.data); };
@@ -4273,6 +4450,7 @@
             stream.getTracks().forEach((track) => track.stop());
             const recorderMimeType = String(mediaRecorder.mimeType || 'audio/webm').trim() || 'audio/webm';
             recordedBlob = new Blob(audioChunks, { type: recorderMimeType });
+            showPreview('vcRecPreview', recordedBlob);
             const duration = Math.round((Date.now() - recordingStart) / 1000);
             setAudioDuration(duration);
             document.getElementById('vcRecorder')?.classList.remove('live');
@@ -4293,6 +4471,7 @@
 
           mediaRecorder.start(250);
           recordingStart = Date.now();
+          showPreview('vcRecPreview', null);
           if (recBtn) recBtn.classList.add('recording');
           document.getElementById('vcRecorder')?.classList.add('live');
           if (recHint) {
@@ -4327,6 +4506,7 @@
       if (recRetry) {
         recRetry.addEventListener('click', function() {
           recordedBlob = null;
+          showPreview('vcRecPreview', null);
           if (timer) timer.textContent = '00:00';
           if (recHint) {
             recHint.textContent = recordStartText;
@@ -4428,13 +4608,44 @@
         });
       }
 
+      function setConsentLanguage(language) {
+        const value = String(language || '').toLowerCase().startsWith('ar') ? 'ar-XA' : 'en-US';
+        const input = document.getElementById('vcConsentLanguage');
+        if (input) input.value = value;
+        document.querySelectorAll('[data-consent-lang]').forEach((button) => {
+          const active = button.getAttribute('data-consent-lang') === value;
+          button.classList.toggle('active', active);
+          button.setAttribute('aria-checked', active ? 'true' : 'false');
+        });
+        syncConsentScript();
+      }
+
       function syncConsentScript() {
-        const language = document.getElementById('vcLanguage')?.value || 'ar-XA';
+        const language = document.getElementById('vcConsentLanguage')?.value || 'ar-XA';
         const script = document.getElementById('vcConsentScript');
         if (!script) return;
         script.textContent = consentScripts[language] || consentScripts['en-US'] || '';
         script.dir = String(language).toLowerCase().startsWith('ar') ? 'rtl' : 'ltr';
       }
+
+      document.querySelectorAll('[data-consent-lang]').forEach((button) => {
+        button.addEventListener('click', function() {
+          const next = button.getAttribute('data-consent-lang');
+          if (next === document.getElementById('vcConsentLanguage')?.value) return;
+          setConsentLanguage(next);
+          if (consentBlob) {
+            consentBlob = null;
+            showPreview('vcConsentPreview', null);
+            setConsentDuration(0);
+            if (consentTimer) consentTimer.textContent = '00:00';
+            if (consentHint) {
+              consentHint.textContent = recordStartText;
+              consentHint.style.color = '';
+            }
+            if (consentActions) consentActions.style.display = 'none';
+          }
+        });
+      });
 
       function sampleIsReady() {
         const name = String(document.getElementById('vcName')?.value || '').trim();
@@ -4460,7 +4671,9 @@
         return true;
       }
 
-      document.getElementById('vcLanguage')?.addEventListener('change', syncConsentScript);
+      document.getElementById('vcLanguage')?.addEventListener('change', function() {
+        setConsentLanguage(this.value);
+      });
       document.getElementById('vcNextStep')?.addEventListener('click', function() {
         if (sampleIsReady()) showStep(2);
       });
@@ -4517,26 +4730,59 @@
         });
         audio.src = URL.createObjectURL(file);
         markConsentFile(file);
+        showPreview('vcConsentPreview', file);
       });
       consentFileRemove?.addEventListener('click', function() {
         if (consentFileInput) consentFileInput.value = '';
+        showPreview('vcConsentPreview', null);
         if (consentFileInfo) consentFileInfo.style.display = 'none';
         if (consentUploadZone) consentUploadZone.style.display = '';
         setConsentDuration(0);
       });
 
       function stopConsentRecording() {
-        if (consentRecorder && consentRecorder.state === 'recording') {
-          consentRecorder.stop();
-          consentRecBtn?.classList.remove('recording');
-          document.getElementById('vcConsentRecorder')?.classList.remove('live');
+        if (!consentRecorder || consentRecorder.state !== 'recording' || consentStopping) return;
+        consentStopping = true;
+        if (consentCountdownTimer) clearInterval(consentCountdownTimer);
+        consentRecBtn?.classList.remove('recording');
+        const recorder = consentRecorder;
+        setTimeout(() => {
+          document.getElementById('vcConsentRecorder')?.classList.remove('live', 'countdown');
           if (consentTimerInterval) clearInterval(consentTimerInterval);
-        }
+          if (recorder.state === 'recording') recorder.stop();
+          consentStopping = false;
+        }, STOP_TAIL_MS);
+      }
+
+      // The recorder is already running during the countdown, so the first
+      // word of the consent sentence is never clipped.
+      function runConsentCountdown() {
+        const box = document.getElementById('vcConsentRecorder');
+        let remaining = 3;
+        box?.classList.add('countdown');
+        const render = () => {
+          if (!consentHint) return;
+          consentHint.style.color = '';
+          consentHint.textContent = remaining > 0
+            ? getReadyTemplate.replace('__N__', String(remaining))
+            : speakNowText;
+          if (remaining <= 0) {
+            consentHint.style.color = '#16a34a';
+            box?.classList.remove('countdown');
+          }
+        };
+        render();
+        if (consentCountdownTimer) clearInterval(consentCountdownTimer);
+        consentCountdownTimer = setInterval(() => {
+          remaining -= 1;
+          render();
+          if (remaining <= 0) clearInterval(consentCountdownTimer);
+        }, 1000);
       }
 
       async function startConsentRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const stream = await openMicrophone();
           consentChunks = [];
           consentRecorder = new MediaRecorder(stream, { mimeType: getSupportedMime() });
           consentRecorder.ondataavailable = (event) => { if (event.data.size > 0) consentChunks.push(event.data); };
@@ -4544,6 +4790,7 @@
             stream.getTracks().forEach((track) => track.stop());
             const recorderMimeType = String(consentRecorder.mimeType || 'audio/webm').trim() || 'audio/webm';
             consentBlob = new Blob(consentChunks, { type: recorderMimeType });
+            showPreview('vcConsentPreview', consentBlob);
             if (consentFileInput) consentFileInput.value = '';
             if (consentFileInfo) consentFileInfo.style.display = 'none';
             if (consentUploadZone) consentUploadZone.style.display = '';
@@ -4567,10 +4814,8 @@
           consentStarted = Date.now();
           consentRecBtn?.classList.add('recording');
           document.getElementById('vcConsentRecorder')?.classList.add('live');
-          if (consentHint) {
-            consentHint.textContent = recordingText;
-            consentHint.style.color = '';
-          }
+          showPreview('vcConsentPreview', null);
+          runConsentCountdown();
           if (consentActions) consentActions.style.display = 'none';
           consentTimerInterval = setInterval(() => {
             const elapsed = Math.round((Date.now() - consentStarted) / 1000);
@@ -4592,6 +4837,7 @@
       });
       consentRetry?.addEventListener('click', function() {
         consentBlob = null;
+        showPreview('vcConsentPreview', null);
         if (consentTimer) consentTimer.textContent = '00:00';
         if (consentHint) {
           consentHint.textContent = recordStartText;
@@ -4638,6 +4884,45 @@
             if (!document.getElementById('vcConsent')?.checked) {
               showAlert('error', consentRequiredText);
               showStep(2);
+              return;
+            }
+
+            if (reconsentVoiceId) {
+              const voiceId = reconsentVoiceId;
+              const consentOnly = new FormData();
+              consentOnly.set('_token', CSRF);
+              consentOnly.set('consent_confirmed', '1');
+              consentOnly.set('consent_duration', String(consentDuration));
+              consentOnly.set('consent_language', document.getElementById('vcConsentLanguage')?.value || 'ar-XA');
+              const consentWav = await toGeminiWav(consentBlob || consentFileInput?.files?.[0]);
+              consentOnly.set('consent_audio', consentWav, wavName('consent', consentWav));
+              const response = await fetch(CONSENT_URL_TEMPLATE.replace('__VOICE_ID__', encodeURIComponent(voiceId)), {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': CSRF, 'Accept': 'application/json' },
+                body: consentOnly,
+              });
+              const data = await response.json().catch(() => ({}));
+              if (response.ok && data?.success && data.voice) {
+                const card = voiceGrid?.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
+                if (card) {
+                  card.dataset.createdTs = String(data.voice.created_at_ts || Math.floor(Date.now() / 1000));
+                  card.dataset.failureReason = '';
+                  const progressFill = card.querySelector('[data-vc-progress-fill]');
+                  const progressPercent = card.querySelector('[data-vc-progress-percent]');
+                  if (progressFill) progressFill.style.width = '0%';
+                  if (progressPercent) progressPercent.textContent = '0%';
+                  currentVoiceCount += 1;
+                  card.dataset.status = 'pending';
+                  applyStatusToCard(card, data.voice);
+                  focusCard(voiceId);
+                }
+                setReconsentMode(null);
+                resetCreateFormUi();
+                startPolling(voiceId);
+                return;
+              }
+              const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
+              showAlert('error', errorText);
               return;
             }
 
@@ -4689,6 +4974,10 @@
         });
       }
 
+      document.getElementById('vcReconsentCancel')?.addEventListener('click', function() {
+        setReconsentMode(null);
+      });
+
       voiceGrid?.addEventListener('click', async function(event) {
         const target = event.target;
         const useLink = target instanceof Element ? target.closest('[data-vc-action="use"]') : null;
@@ -4702,6 +4991,12 @@
               language_code: card.dataset.languageCode,
             });
           }
+          return;
+        }
+        const reconsentButton = target instanceof Element ? target.closest('.vc-reconsent-btn') : null;
+        if (reconsentButton) {
+          const card = reconsentButton.closest('.vc-card');
+          setReconsentMode(reconsentButton.dataset.voiceId, card?.dataset.voiceName || '');
           return;
         }
         const retryButton = target instanceof Element ? target.closest('.vc-retry-btn') : null;

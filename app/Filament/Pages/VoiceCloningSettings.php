@@ -14,11 +14,13 @@ class VoiceCloningSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-microphone';
+    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'System';
+    protected static ?string $navigationGroup = 'Voice Cloning';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
+
+    protected static ?string $navigationLabel = 'Settings';
 
     protected static ?string $title = 'Voice Cloning Settings';
 

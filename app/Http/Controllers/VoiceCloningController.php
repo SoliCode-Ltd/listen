@@ -129,6 +129,7 @@ class VoiceCloningController extends Controller
                 },
             ],
             'consent_confirmed' => ['required', 'accepted'],
+            'consent_language' => ['nullable', 'string', 'in:ar-XA,en-US'],
             'audio_duration' => ['required', 'numeric', "min:{$minDuration}", "max:{$maxDuration}"],
             'consent_duration' => ['required', 'numeric', "min:{$minConsent}", "max:{$maxDuration}"],
         ], [
@@ -179,7 +180,8 @@ class VoiceCloningController extends Controller
             'metadata' => [
                 'model' => VoiceCloningService::MODEL,
                 'consent_duration_seconds' => (int) $validated['consent_duration'],
-                'consent_script' => VoiceCloningService::consentScriptFor($validated['language_code']),
+                'consent_language' => $validated['consent_language'] ?? $validated['language_code'],
+                'consent_script' => VoiceCloningService::consentScriptFor($validated['consent_language'] ?? $validated['language_code']),
             ],
         ]);
 
@@ -237,7 +239,119 @@ class VoiceCloningController extends Controller
                 ? VoiceCloningService::technicalFailureDetail($clonedVoice)
                 : null,
             'can_retry' => VoiceCloningService::canRetry($clonedVoice),
+            'can_replace_consent' => VoiceCloningService::canReplaceConsent($clonedVoice),
             'is_ready' => $clonedVoice->isReady(),
+        ]);
+    }
+
+    /**
+     * Keep the voice sample and send it again with a newly recorded consent sentence.
+     */
+    public function replaceConsent(Request $request, int $id)
+    {
+        if (! VoiceCloningAccess::allows($request->user())) {
+            abort(404);
+        }
+
+        $userId = (int) auth()->id();
+        $clonedVoice = ClonedVoice::forUser($userId)->findOrFail($id);
+
+        if (! VoiceCloningService::isEnabled()) {
+            return $this->jsonError(__('ui.voice_cloning.feature_disabled'), 403);
+        }
+        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        if (! VoiceCloningService::planAllows($activePlan)) {
+            return $this->jsonError(__('ui.voice_cloning.plan_disabled'), 403);
+        }
+        if (! VoiceCloningService::canReplaceConsent($clonedVoice)) {
+            return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
+        }
+
+        $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
+        $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
+        if ($activeCount >= $maxVoices) {
+            return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
+        }
+
+        $minConsent = VoiceCloningService::minConsentDuration();
+        $maxDuration = VoiceCloningService::maxSampleDuration();
+        $maxSizeKb = VoiceCloningService::maxUploadSizeMb() * 1024;
+        $allowedExtValues = VoiceCloningService::allowedExtensions();
+        $allowedMimes = VoiceCloningService::allowedMimeTypes();
+
+        $validated = $request->validate([
+            'consent_audio' => [
+                'required',
+                'file',
+                "max:{$maxSizeKb}",
+                function (string $attribute, mixed $value, \Closure $fail) use ($allowedExtValues, $allowedMimes): void {
+                    if (! $value instanceof \Illuminate\Http\UploadedFile) {
+                        return;
+                    }
+                    $extAllowed = in_array(strtolower((string) $value->getClientOriginalExtension()), $allowedExtValues, true)
+                        || in_array(strtolower((string) $value->guessExtension()), $allowedExtValues, true);
+                    if ($extAllowed || in_array(strtolower((string) $value->getMimeType()), $allowedMimes, true)) {
+                        return;
+                    }
+                    $fail(__('ui.voice_cloning.validation.audio_invalid_type'));
+                },
+            ],
+            'consent_confirmed' => ['required', 'accepted'],
+            'consent_language' => ['nullable', 'string', 'in:ar-XA,en-US'],
+            'consent_duration' => ['required', 'numeric', "min:{$minConsent}", "max:{$maxDuration}"],
+        ], [
+            'consent_audio.required' => __('ui.voice_cloning.validation.consent_audio_required'),
+            'consent_duration.required' => __('ui.voice_cloning.validation.consent_audio_required'),
+            'consent_duration.min' => __('ui.voice_cloning.validation.consent_too_short', ['min' => $minConsent]),
+            'consent_duration.max' => __('ui.voice_cloning.validation.audio_too_long', ['max' => $maxDuration]),
+            'consent_confirmed.required' => __('ui.voice_cloning.validation.consent_required'),
+            'consent_confirmed.accepted' => __('ui.voice_cloning.validation.consent_required'),
+        ]);
+
+        $consentFile = $request->file('consent_audio');
+        $consentExt = $consentFile->getClientOriginalExtension() ?: 'wav';
+        $consentFilename = "voice-cloning/{$userId}/".Str::uuid()."-consent.{$consentExt}";
+        Storage::disk('local')->put($consentFilename, file_get_contents($consentFile->getRealPath()));
+
+        $oldConsent = (string) $clonedVoice->consent_audio_path;
+        $consentLanguage = $validated['consent_language'] ?? $clonedVoice->language_code;
+
+        $clonedVoice->update([
+            'consent_audio_path' => $consentFilename,
+            'consent_confirmed' => true,
+            'status' => 'pending',
+            'failure_reason' => null,
+            'metadata' => array_merge($clonedVoice->metadata ?? [], [
+                'failure_code' => null,
+                'consent_duration_seconds' => (int) $validated['consent_duration'],
+                'consent_language' => $consentLanguage,
+                'consent_script' => VoiceCloningService::consentScriptFor($consentLanguage),
+                'consent_replaced_at' => now()->toIso8601String(),
+            ]),
+        ]);
+
+        if ($oldConsent !== '' && $oldConsent !== $consentFilename) {
+            Storage::disk('local')->delete($oldConsent);
+        }
+
+        ProcessVoiceCloningJob::dispatch($clonedVoice->id)->afterResponse();
+
+        return response()->json([
+            'success' => true,
+            'voice' => [
+                'id' => $clonedVoice->id,
+                'name' => $clonedVoice->name,
+                'language_code' => $clonedVoice->language_code,
+                'source_type' => $clonedVoice->source_type,
+                'status' => 'pending',
+                'progress_percent' => VoiceCloningService::progressPercent('pending', 0),
+                'elapsed_seconds' => 0,
+                'is_delayed' => false,
+                'created_at_ts' => now()->getTimestamp(),
+                'failure_reason' => null,
+                'can_retry' => false,
+                'can_replace_consent' => false,
+            ],
         ]);
     }
 

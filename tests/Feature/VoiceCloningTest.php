@@ -883,6 +883,150 @@ class VoiceCloningTest extends TestCase
         $page->assertSee('speaker consent verification backend', false);
     }
 
+    private function geminiConsentRejectionBody(): array
+    {
+        return ['error' => [
+            'code' => 500,
+            'message' => 'Error translating server response to JSON',
+            'status' => 'INTERNAL',
+            'details' => [[
+                '@type' => 'type.googleapis.com/google.rpc.DebugInfo',
+                'detail' => "INTERNAL: Invalid type URL, unknown type: google.rpc.context.HttpHeaderContext\nOriginal error: INVALID_ARGUMENT: Consent flow failed. Please follow instructions at https://ai.google.dev/gemini-api/docs/speech-generation for troubleshooting.\nThe recorded phrase didn't match the text on screen. Please read the prompt exactly as written. [type.googleapis.com/util.MessageSetPayload='{\\\"error\\\":{\\\"code\\\":\\\"FINISH_REASON_INPUT_VR_TAKEDOWN\\\"}}']",
+            ]],
+        ]];
+    }
+
+    public function test_consent_rejection_wrapped_in_a_500_asks_for_the_sentence_only(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response($this->geminiConsentRejectionBody(), 500),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'provider' => 'gemini',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        $voice->refresh();
+
+        \Illuminate\Support\Facades\Http::assertSentCount(1);
+        $this->assertSame('consent_phrase', data_get($voice->metadata, 'failure_code'));
+        $this->assertStringContainsString("recorded phrase didn't match", (string) $voice->failure_reason);
+        $this->assertFalse(VoiceCloningService::canRetry($voice));
+        $this->assertTrue(VoiceCloningService::canReplaceConsent($voice));
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $page->assertSee(__('ui.voice_cloning.failure_consent_phrase'), false);
+        $page->assertSee('vc-reconsent-btn', false);
+        $page->assertSee('data-consent-lang="en-US"', false);
+        $this->assertDoesNotMatchRegularExpression('/class="btn btn-primary vc-retry-btn"/', $page->getContent());
+    }
+
+    public function test_replacing_only_the_consent_sentence_sends_the_voice_again(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt old');
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response(['id' => 'voice_new_consent'], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'provider' => 'gemini',
+            'language_code' => 'ar-XA',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'metadata' => ['failure_code' => 'consent_phrase'],
+        ]);
+
+        $response = $this->actingAs($this->paidUser)->postJsonLocalizedRoute('voice-cloning.consent', [
+            'consent_audio' => UploadedFile::fake()->create('consent.wav', 300, 'audio/wav'),
+            'consent_confirmed' => '1',
+            'consent_duration' => 7,
+            'consent_language' => 'en-US',
+        ], ['id' => $voice->id]);
+
+        $response->assertOk()->assertJson(['success' => true, 'voice' => ['status' => 'pending']]);
+
+        $voice->refresh();
+        $this->assertTrue($voice->isReady());
+        $this->assertSame('voice_new_consent', $voice->provider_voice_key);
+        $this->assertSame('voice-cloning/1/sample.wav', $voice->source_audio_path);
+        $this->assertNotSame('voice-cloning/1/consent.wav', $voice->consent_audio_path);
+        $this->assertSame('en-US', data_get($voice->metadata, 'consent_language'));
+        $this->assertSame(VoiceCloningService::CONSENT_SCRIPTS['en-US'], data_get($voice->metadata, 'consent_script'));
+        Storage::disk('local')->assertMissing('voice-cloning/1/consent.wav');
+    }
+
+    public function test_consent_language_can_differ_from_the_voice_language(): void
+    {
+        Bus::fake([ProcessVoiceCloningJob::class]);
+
+        $this->actingAs($this->paidUser)->postJsonLocalizedRoute('voice-cloning.store', [
+            'name' => 'Arabic voice, English consent',
+            'language_code' => 'ar-XA',
+            'consent_language' => 'en-US',
+            'source_type' => 'recording',
+            'audio_file' => UploadedFile::fake()->create('sample.wav', 900, 'audio/wav'),
+            'consent_audio' => UploadedFile::fake()->create('consent.wav', 300, 'audio/wav'),
+            'consent_confirmed' => '1',
+            'consent_duration' => 7,
+            'audio_duration' => 15,
+        ])->assertOk();
+
+        $voice = ClonedVoice::latest('id')->first();
+        $this->assertSame('ar-XA', $voice->language_code);
+        $this->assertSame('en-US', data_get($voice->metadata, 'consent_language'));
+        $this->assertSame(VoiceCloningService::CONSENT_SCRIPTS['en-US'], data_get($voice->metadata, 'consent_script'));
+    }
+
+    public function test_admin_can_browse_cloned_voices_and_play_recordings(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+        $voice = ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Walled Mahmoud Soliman',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'failure_reason' => "Consent flow failed: The recorded phrase didn't match the text on screen.",
+            'metadata' => ['failure_code' => 'consent_phrase', 'http_status' => 500],
+        ]);
+
+        $this->actingAs($admin)
+            ->get(\App\Filament\Resources\ClonedVoiceResource::getUrl('index'))
+            ->assertOk()
+            ->assertSee('Walled Mahmoud Soliman')
+            ->assertSee('Consent sentence not recognised');
+
+        $this->actingAs($admin)
+            ->get(\App\Filament\Resources\ClonedVoiceResource::getUrl('view', ['record' => $voice]))
+            ->assertOk()
+            ->assertSee('Why it failed')
+            ->assertSee(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'consent']), false)
+            ->assertSee("recorded phrase didn&#039;t match", false);
+
+        $this->actingAs($admin)
+            ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
+            ->assertOk()
+            ->assertHeader('Content-Type', 'audio/wav');
+
+        $this->actingAs($this->paidUser)
+            ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
+            ->assertForbidden();
+    }
+
     public function test_old_webm_recordings_cannot_be_retried(): void
     {
         $voice = ClonedVoice::factory()->failed()->create([
