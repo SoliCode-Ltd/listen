@@ -111,20 +111,50 @@
       box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 22%, transparent);
     }
     .vc-notice {
-      padding: .85rem 1rem;
-      border-radius: var(--radius);
-      margin-top: .2rem;
-      font-size: .95rem;
-      line-height: 1.7;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem 1.25rem;
+      margin-top: 1rem;
+      padding: 1rem 1.05rem;
+      border-radius: 1rem;
       text-align: start;
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
+      background: color-mix(in oklab, var(--surface) 88%, var(--a));
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+      box-shadow: 0 10px 28px color-mix(in oklab, var(--a) 8%, transparent);
       color: var(--text);
     }
-    .vc-notice a {
-      display: inline-block;
-      margin-top: .45rem;
-      font-weight: 650;
+    .vc-notice-copy {
+      display: flex;
+      align-items: flex-start;
+      gap: .8rem;
+      min-width: 0;
+      flex: 1;
+    }
+    .vc-notice-icon {
+      flex: none;
+      width: 2.4rem;
+      height: 2.4rem;
+      margin-top: .05rem;
+      border-radius: .8rem;
+      display: grid;
+      place-items: center;
+      color: var(--a);
+      background: color-mix(in oklab, var(--a) 14%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
+    }
+    .vc-notice-icon svg { width: 1.15rem; height: 1.15rem; }
+    .vc-notice p {
+      margin: 0;
+      font-size: .98rem;
+      line-height: 1.75;
+      font-weight: 600;
+    }
+    .vc-notice .btn {
+      flex: none;
+      min-height: 42px;
+      padding: .55rem 1rem;
+      white-space: nowrap;
     }
     .vc-alert { padding: 1rem 1.15rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .98rem; line-height: 1.75; display: flex; align-items: flex-start; gap: .6rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
@@ -376,7 +406,7 @@
     html[dir="rtl"] .vc-empty p,
     html[dir="rtl"] .vc-guidelines li,
     html[dir="rtl"] .vc-consent-tips li,
-    html[dir="rtl"] .vc-notice,
+    html[dir="rtl"] .vc-notice p,
     html[dir="rtl"] .vc-alert,
     html[dir="rtl"] .vc-form-group label,
     html[dir="rtl"] .vc-form-group .hint,
@@ -466,9 +496,14 @@
       .vc-meta {
         flex-wrap: wrap;
       }
+      .vc-notice {
+        flex-direction: column;
+        align-items: stretch;
+      }
       .vc-actions-row .btn,
       .vc-card-actions .btn,
       .vc-upgrade .btn,
+      .vc-notice .btn,
       #vcNextStep,
       #vcEmptyState .btn {
         width: 100%;
@@ -2597,9 +2632,14 @@
               </form>
             </section>
             <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
-              <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
-              <a href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
-            </div>
+              <div class="vc-notice-copy">
+                <span class="vc-notice-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
+                </span>
+                <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
+              </div>
+              <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
+            </div><!-- /vcLimitNotice -->
           @endif
         @endif
         @endif

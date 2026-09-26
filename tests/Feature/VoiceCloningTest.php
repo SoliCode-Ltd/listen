@@ -451,6 +451,7 @@ class VoiceCloningTest extends TestCase
         $dashboard->assertSee('class="vc-notice" id="vcLimitNotice"', false);
         $notice = $this->limitNoticeHtml($dashboard->getContent());
         $this->assertStringContainsString(__('ui.voice_cloning.upgrade_cta'), $notice);
+        $this->assertStringContainsString('btn btn-primary', $notice);
         $this->assertStringContainsString(route('billing.page'), $notice);
 
         app()->setLocale('ar');
@@ -1371,7 +1372,7 @@ class VoiceCloningTest extends TestCase
 
     private function limitNoticeHtml(string $html): string
     {
-        $matched = preg_match('/id="vcLimitNotice"[\s\S]*?<\/div>/', $html, $matches);
+        $matched = preg_match('/id="vcLimitNotice"[\s\S]*?<!-- \/vcLimitNotice -->/', $html, $matches);
         $this->assertSame(1, $matched);
 
         return $matches[0];
