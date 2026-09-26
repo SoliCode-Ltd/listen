@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\GenerateAudioJob;
 use App\Jobs\ProcessVoiceCloningJob;
+use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\Plan;
 use App\Models\SiteSetting;
@@ -611,10 +613,14 @@ class VoiceCloningTest extends TestCase
 
     public function test_user_can_delete_own_voice(): void
     {
-        $voice = ClonedVoice::factory()->ready()->create([
+        $voice = ClonedVoice::factory()->failed()->create([
             'user_id' => $this->paidUser->id,
             'source_audio_path' => 'voice-cloning/test/sample.wav',
         ]);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $card = $this->voiceCardHtml($page->getContent(), $voice->id);
+        $this->assertStringContainsString('vc-delete-btn', $card);
 
         $response = $this->actingAs($this->paidUser)
             ->withoutMiddleware([
@@ -629,6 +635,36 @@ class VoiceCloningTest extends TestCase
         $response->assertJson(['success' => true]);
         // Soft deleted
         $this->assertSoftDeleted('cloned_voices', ['id' => $voice->id]);
+    }
+
+    public function test_user_cannot_delete_a_ready_voice(): void
+    {
+        $voice = ClonedVoice::factory()->ready()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Kept Voice',
+            'source_audio_path' => 'voice-cloning/test/sample.wav',
+        ]);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $card = $this->voiceCardHtml($page->getContent(), $voice->id);
+        $this->assertStringNotContainsString('vc-delete-btn', $card);
+        $this->assertStringContainsString('data-vc-action="use"', $card);
+
+        $response = $this->actingAs($this->paidUser)
+            ->withoutMiddleware([
+                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+                \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+            ])
+            ->deleteJson($this->localizedRoute('voice-cloning.destroy', ['id' => $voice->id]));
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'error' => __('ui.voice_cloning.delete_ready_blocked'),
+        ]);
+        $this->assertNotSoftDeleted('cloned_voices', ['id' => $voice->id]);
     }
 
     /* ------------------------------------------------------------ */
@@ -741,9 +777,9 @@ class VoiceCloningTest extends TestCase
         $submit->assertJson(['success' => true]);
     }
 
-    public function test_failed_card_shows_a_friendly_message_and_keeps_the_raw_error_in_details(): void
+    public function test_failed_card_shows_a_friendly_message_without_technical_details(): void
     {
-        ClonedVoice::factory()->failed()->create([
+        $voice = ClonedVoice::factory()->failed()->create([
             'user_id' => $this->paidUser->id,
             'failure_reason' => 'Call to undefined function App\\Services\\shell_exec()',
             'metadata' => ['failure_code' => 'provider'],
@@ -753,12 +789,30 @@ class VoiceCloningTest extends TestCase
 
         $page->assertOk();
         $html = $page->getContent();
+        $card = $this->voiceCardHtml($html, $voice->id);
         $this->assertMatchesRegularExpression(
             '/class="vc-alert error vc-failure-hint"[^>]*>\s*'.preg_quote(e(__('ui.voice_cloning.processing_failed_generic')), '/').'\s*</',
-            $html,
+            $card,
         );
-        $this->assertMatchesRegularExpression('/<details class="vc-tech-detail">.*shell_exec/s', $html);
+        $this->assertStringNotContainsString('vc-tech-detail', $card);
+        $this->assertStringNotContainsString('shell_exec', $card);
         $this->assertStringNotContainsString('data-failure-reason="Call to undefined', $html);
+    }
+
+    public function test_admin_sees_the_technical_failure_detail(): void
+    {
+        $this->paidUser->forceFill(['is_admin' => true])->save();
+        ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'failure_reason' => 'Call to undefined function App\\Services\\shell_exec()',
+            'metadata' => ['failure_code' => 'provider'],
+        ]);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $html = $page->getContent();
+
+        $this->assertMatchesRegularExpression('/<details class="vc-tech-detail">.*shell_exec/s', $html);
+        $this->assertStringContainsString(e(__('ui.voice_cloning.technical_details')), $html);
     }
 
     public function test_region_block_from_gemini_is_explained_and_can_be_retried(): void
@@ -790,14 +844,15 @@ class VoiceCloningTest extends TestCase
         $this->assertSame(400, data_get($voice->metadata, 'http_status'));
 
         $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
-        $page->assertSee(__('ui.voice_cloning.failure_region'), false);
-        $page->assertSee(__('ui.voice_cloning.technical_details'), false);
-        $page->assertSee('User location is not supported', false);
-        $page->assertSee('vc-retry-btn', false);
+        $card = $this->voiceCardHtml($page->getContent(), $voice->id);
+        $this->assertStringContainsString(__('ui.voice_cloning.failure_region'), $card);
+        $this->assertStringNotContainsString('vc-tech-detail', $card);
+        $this->assertStringNotContainsString('User location is not supported', $card);
+        $this->assertStringContainsString('vc-retry-btn', $card);
 
         $status = $this->actingAs($this->paidUser)
             ->getJson($this->localizedRoute('voice-cloning.status', ['id' => $voice->id]));
-        $status->assertJson(['status' => 'failed', 'can_retry' => true]);
+        $status->assertJson(['status' => 'failed', 'can_retry' => true, 'failure_detail' => null]);
 
         $retry = $this->actingAs($this->paidUser)
             ->postJsonLocalizedRoute('voice-cloning.retry', [], ['id' => $voice->id]);
@@ -891,7 +946,7 @@ class VoiceCloningTest extends TestCase
         $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
         $page->assertSee(__('ui.voice_cloning.failure_server'), false);
         $page->assertDontSee(__('ui.voice_cloning.failure_consent'), false);
-        $page->assertSee('speaker consent verification backend', false);
+        $page->assertDontSee('speaker consent verification backend', false);
     }
 
     private function geminiConsentRejectionBody(): array
@@ -1106,5 +1161,57 @@ class VoiceCloningTest extends TestCase
         $page->assertSee('cloned_'.$voice->id, false);
         $page->assertSee('Walled Voice', false);
         $page->assertSee('cloned_voice='.$voice->id, false);
+    }
+
+    public function test_generator_labels_a_cloned_voice_with_its_name(): void
+    {
+        $voice = ClonedVoice::factory()->ready()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Walled Voice',
+            'language_code' => 'ar-XA',
+            'provider_voice_key' => 'voice_walled',
+        ]);
+
+        AudioGeneration::create([
+            'user_id' => $this->paidUser->id,
+            'user_sequence_number' => 1,
+            'input_text' => 'مرحبا',
+            'source_language' => 'ar',
+            'target_language' => 'ar',
+            'voice_tier' => 'hd',
+            'voice_name' => 'cloned_'.$voice->id,
+            'tts_provider' => 'gemini',
+            'status' => 'done',
+        ]);
+
+        app()->setLocale('ar');
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $html = html_entity_decode($page->getContent());
+
+        $this->assertStringContainsString('"voice_label":"Walled Voice"', $html);
+        $this->assertStringNotContainsString('"voice_label":"'.__('ui.dashboard.default_speaker').'"', $html);
+
+        \Illuminate\Support\Facades\Bus::fake([GenerateAudioJob::class]);
+        $queued = $this->actingAs($this->paidUser)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'نص قصير',
+            'target_language' => 'ar',
+            'voice_key' => 'cloned_'.$voice->id,
+            'voice_tier' => 'standard',
+        ]);
+
+        $queued->assertJsonPath('job.voice_label', 'Walled Voice');
+    }
+
+    private function voiceCardHtml(string $html, int $voiceId): string
+    {
+        $matched = preg_match(
+            '/<article class="vc-card" data-voice-id="'.$voiceId.'"[\s\S]*?<\/article>/',
+            $html,
+            $matches,
+        );
+
+        $this->assertSame(1, $matched);
+
+        return $matches[0];
     }
 }

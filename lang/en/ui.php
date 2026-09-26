@@ -1279,6 +1279,7 @@ return [
         'technical_details' => 'Technical details',
         'delete_voice' => 'Delete',
         'delete_confirm' => 'Delete this cloned voice? You will not be able to generate with it again.',
+        'delete_ready_blocked' => 'A finished voice stays on your account and uses one of your plan slots. You can delete a voice that did not succeed.',
         'deleted_success' => 'Cloned voice deleted.',
         'use_in_generator' => 'Use in the generator',
         'created_on' => 'Created',

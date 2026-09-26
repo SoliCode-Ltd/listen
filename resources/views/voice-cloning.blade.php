@@ -193,7 +193,9 @@
                 @if($voice->isReady())
                   <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}" class="btn btn-primary" style="font-size:.82rem;padding:.4rem .8rem">{{ __('ui.voice_cloning.use_in_generator') }}</a>
                 @endif
-                <button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="{{ $voice->id }}" data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}">{{ __('ui.voice_cloning.delete_voice') }}</button>
+                @if(\App\Services\VoiceCloningService::canUserDelete($voice))
+                  <button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="{{ $voice->id }}" data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}">{{ __('ui.voice_cloning.delete_voice') }}</button>
+                @endif
               </div>
             </article>
           @endforeach

@@ -545,6 +545,15 @@ class VoiceCloningService
     }
 
     /**
+     * Finished clones keep their plan slot. Anything that has not
+     * succeeded can be removed by the owner.
+     */
+    public static function canUserDelete(ClonedVoice $voice): bool
+    {
+        return $voice->status !== 'ready';
+    }
+
+    /**
      * Whether a failed voice can be sent again without recording.
      * Only browser WAV uploads qualify; older WebM files need ffmpeg.
      */

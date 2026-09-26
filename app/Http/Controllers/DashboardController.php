@@ -43,7 +43,7 @@ class DashboardController extends Controller
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
 
         $baseQuery = $this->userHistoryQuery($userId);
-        $voiceNameMap = VoiceCatalog::mapByName();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
         $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
         $jobs = (clone $baseQuery)
@@ -361,7 +361,7 @@ class DashboardController extends Controller
         $usageRequestsPercent = $requestsUnlimited
             ? 0
             : min(100, (int) round(($counter->total_requests / max(1, $planRequests)) * 100));
-        $voiceNameMap = VoiceCatalog::mapByName();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
 
         if ($request->expectsJson()) {
             $isDone = $job->status === 'done';
@@ -545,6 +545,36 @@ class DashboardController extends Controller
             'is_demo_history' => false,
             'row_key' => 'audio:'.$job->id,
         ];
+    }
+
+    /**
+     * Catalog labels plus the owner's cloned voices, keyed the same way
+     * a generation stores them (`cloned_{id}`).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function voiceNameMapForUser(int $userId): array
+    {
+        $map = VoiceCatalog::mapByName();
+
+        ClonedVoice::withTrashed()
+            ->where('user_id', $userId)
+            ->get(['id', 'name'])
+            ->each(function (ClonedVoice $voice) use (&$map): void {
+                $name = trim((string) $voice->name);
+                if ($name === '') {
+                    return;
+                }
+
+                $key = 'cloned_'.$voice->id;
+                $map[$key] = [
+                    'key' => $key,
+                    'label' => $name,
+                    'label_ar' => $name,
+                ];
+            });
+
+        return $map;
     }
 
     private function localizedVoiceLabel(?string $voiceName, array $voiceNameMap): string

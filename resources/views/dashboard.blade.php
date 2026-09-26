@@ -2356,14 +2356,16 @@
                     <span>{{ __('ui.voice_cloning.created_on') }} {{ $vcCreatedLabel }}</span>
                     <span>{{ $vcLanguageLabel }} &middot; {{ $voice->source_type === 'recording' ? __('ui.voice_cloning.record_tab') : __('ui.voice_cloning.upload_tab') }}</span>
                   </div>
-                  @if($voice->isFailed())
+                    @if($voice->isFailed())
                     <div class="vc-alert error vc-failure-hint">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
-                    @php $vcDetail = \App\Services\VoiceCloningService::studioFailureDetail($voice); @endphp
-                    @if($vcDetail !== '')
-                      <details class="vc-tech-detail">
-                        <summary>{{ __('ui.voice_cloning.technical_details') }}</summary>
-                        <code dir="ltr">{{ $vcDetail }}</code>
-                      </details>
+                    @if(auth()->user()?->is_admin === true)
+                      @php $vcDetail = \App\Services\VoiceCloningService::studioFailureDetail($voice); @endphp
+                      @if($vcDetail !== '')
+                        <details class="vc-tech-detail">
+                          <summary>{{ __('ui.voice_cloning.technical_details') }}</summary>
+                          <code dir="ltr">{{ $vcDetail }}</code>
+                        </details>
+                      @endif
                     @endif
                   @endif
                   @if($voice->isProcessing())
@@ -2389,14 +2391,16 @@
                     @if($voice->isReady())
                       <a href="{{ route('dashboard', ['cloned_voice' => $voice->id]) }}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">{{ __('ui.voice_cloning.use_in_generator') }}</a>
                     @endif
-                    <button
-                      type="button"
-                      class="btn btn-ghost vc-delete-btn"
-                      data-voice-id="{{ $voice->id }}"
-                      data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}"
-                    >
-                      {{ __('ui.voice_cloning.delete_voice') }}
-                    </button>
+                    @if(\App\Services\VoiceCloningService::canUserDelete($voice))
+                      <button
+                        type="button"
+                        class="btn btn-ghost vc-delete-btn"
+                        data-voice-id="{{ $voice->id }}"
+                        data-confirm="{{ __('ui.voice_cloning.delete_confirm') }}"
+                      >
+                        {{ __('ui.voice_cloning.delete_voice') }}
+                      </button>
+                    @endif
                   </div>
                 </article>
             @endforeach
@@ -4167,6 +4171,24 @@
         link.setAttribute('href', href);
       }
 
+      function setDeleteButton(card, show) {
+        const actions = card.querySelector('.vc-card-actions');
+        if (!actions) return;
+        let button = actions.querySelector('.vc-delete-btn');
+        if (!show) {
+          button?.remove();
+          return;
+        }
+        if (button) return;
+        button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-ghost vc-delete-btn';
+        button.dataset.voiceId = String(card.dataset.voiceId || '');
+        button.dataset.confirm = deleteConfirmText;
+        button.textContent = deleteVoiceText;
+        actions.appendChild(button);
+      }
+
       function focusCard(voiceId) {
         if (!voiceGrid || !voiceId) return;
         const card = voiceGrid.querySelector(`.vc-card[data-voice-id="${escapeSelector(String(voiceId))}"]`);
@@ -4213,6 +4235,7 @@
         else if (payload.failure_detail !== undefined) ensureTechDetail(card, payload.failure_detail);
         updateProgressUI(card, status, elapsedSeconds, isDelayed, serverProgress);
         setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
+        setDeleteButton(card, status !== 'ready');
         if (status !== 'failed') setRetryButton(card, payload.id || card.dataset.voiceId, false);
         else if (payload.can_retry !== undefined) setRetryButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_retry));
         if (status !== 'failed') setReconsentButton(card, payload.id || card.dataset.voiceId, false);
@@ -4302,8 +4325,7 @@
               <div class="vc-progress-delay" data-vc-progress-delay></div>
             </div>
             <div class="vc-card-actions">
-              ${status === 'ready' ? `<a href="${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(voiceId)}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">${escapeHtml(useInGeneratorText)}</a>` : ''}
-              <button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="${escapeHtml(voiceId)}" data-confirm="${escapeHtml(deleteConfirmText)}">${escapeHtml(deleteVoiceText)}</button>
+              ${status === 'ready' ? `<a href="${GENERATOR_URL_BASE}?cloned_voice=${encodeURIComponent(voiceId)}#generateVoiceSection" class="btn btn-primary" data-vc-action="use">${escapeHtml(useInGeneratorText)}</a>` : `<button type="button" class="btn btn-ghost vc-delete-btn" data-voice-id="${escapeHtml(voiceId)}" data-confirm="${escapeHtml(deleteConfirmText)}">${escapeHtml(deleteVoiceText)}</button>`}
             </div>
           </article>
         `;

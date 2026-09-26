@@ -235,7 +235,7 @@ class VoiceCloningController extends Controller
             'failure_reason' => $clonedVoice->isFailed()
                 ? VoiceCloningService::publicFailureMessage($clonedVoice)
                 : null,
-            'failure_detail' => $clonedVoice->isFailed()
+            'failure_detail' => $clonedVoice->isFailed() && $request->user()?->is_admin === true
                 ? VoiceCloningService::studioFailureDetail($clonedVoice)
                 : null,
             'can_retry' => VoiceCloningService::canRetry($clonedVoice),
@@ -423,6 +423,16 @@ class VoiceCloningController extends Controller
         }
 
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
+
+        if (! VoiceCloningService::canUserDelete($clonedVoice)) {
+            $message = __('ui.voice_cloning.delete_ready_blocked');
+            if ($request->expectsJson()) {
+                return $this->jsonError($message, 422);
+            }
+
+            return redirect()->to(route('dashboard').'#voiceCloningSection')
+                ->with('error', $message);
+        }
 
         app(VoiceCloningService::class)->deleteReplicatedVoice($clonedVoice->provider_voice_key);
 

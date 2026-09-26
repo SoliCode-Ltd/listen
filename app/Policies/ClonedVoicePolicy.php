@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ClonedVoice;
 use App\Models\User;
+use App\Services\VoiceCloningService;
 
 /**
  * Authorization policy for ClonedVoice model.
@@ -39,11 +40,13 @@ class ClonedVoicePolicy
     }
 
     /**
-     * User can delete their own cloned voice.
+     * A finished clone stays on the account so it keeps its plan slot.
+     * Voices that never succeeded can still be removed.
      */
     public function delete(User $user, ClonedVoice $clonedVoice): bool
     {
-        return $user->id === $clonedVoice->user_id;
+        return $user->id === $clonedVoice->user_id
+            && VoiceCloningService::canUserDelete($clonedVoice);
     }
 
     /**
