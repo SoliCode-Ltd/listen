@@ -763,6 +763,105 @@
       }
     }
 
+    .hero:has(+ .clone-announce) {
+      padding-bottom: 1.15rem;
+    }
+    .clone-announce {
+      padding: 0 0 1.35rem;
+    }
+    .clone-announce-card {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: clamp(1rem, 2.4vw, 1.6rem);
+      padding: clamp(1rem, 2.2vw, 1.35rem) clamp(1rem, 2.4vw, 1.5rem);
+      border-radius: 1.25rem;
+      border: 1px solid color-mix(in oklab, var(--a) 34%, var(--line));
+      background:
+        radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--a) 16%, transparent), transparent 58%),
+        var(--surface);
+      box-shadow: 0 18px 40px color-mix(in oklab, var(--a) 12%, transparent);
+    }
+    html[dir="rtl"] .clone-announce-card {
+      background:
+        radial-gradient(90% 140% at 100% 0%, color-mix(in oklab, var(--a) 16%, transparent), transparent 58%),
+        var(--surface);
+    }
+    .clone-announce-mark {
+      width: 3.6rem;
+      height: 3.6rem;
+      border-radius: 1rem;
+      display: grid;
+      place-items: center;
+      color: var(--a);
+      background: color-mix(in oklab, var(--a) 14%, var(--surface2));
+      border: 1px solid color-mix(in oklab, var(--a) 28%, transparent);
+    }
+    .clone-announce-wave {
+      width: 2.15rem;
+      height: 2.15rem;
+      display: block;
+    }
+    .clone-announce-kicker {
+      margin: 0 0 .28rem;
+      color: var(--a);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+    }
+    html[dir="rtl"] .clone-announce-kicker {
+      letter-spacing: 0;
+      font-size: .92rem;
+    }
+    .clone-announce-copy h2 {
+      margin: 0 0 .28rem;
+      text-align: start;
+      font-size: clamp(1.22rem, 2.1vw, 1.7rem);
+      line-height: 1.35;
+      letter-spacing: -.02em;
+    }
+    html[dir="rtl"] .clone-announce-copy h2 {
+      letter-spacing: 0;
+      line-height: 1.55;
+      font-size: clamp(1.28rem, 2.2vw, 1.75rem);
+    }
+    .clone-announce-copy p {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(.95rem, 1.35vw, 1.05rem);
+      line-height: 1.7;
+      max-width: 48ch;
+    }
+    html[dir="rtl"] .clone-announce-copy p {
+      font-size: clamp(1rem, 1.5vw, 1.08rem);
+      line-height: 1.85;
+    }
+    .clone-announce-card .btn {
+      min-height: 48px;
+      white-space: nowrap;
+      padding-inline: 1.35rem;
+    }
+    .clone-announce-card .btn:focus-visible {
+      outline: 2px solid var(--text);
+      outline-offset: 3px;
+    }
+    @media (max-width: 760px) {
+      .hero:has(+ .clone-announce) {
+        padding-bottom: .85rem;
+      }
+      .clone-announce {
+        padding-bottom: 1rem;
+      }
+      .clone-announce-card {
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+      }
+      .clone-announce-card .btn {
+        grid-column: 1 / -1;
+        width: 100%;
+      }
+    }
+
     /* TTS Illustration CSS */
     .tts-illustration {
       position: relative;
@@ -1412,6 +1511,28 @@
             </div>
           </div>
         </aside>
+      </div>
+    </section>
+
+    <section class="clone-announce" aria-labelledby="cloneAnnounceTitle">
+      <div class="clone-announce-card">
+        <div class="clone-announce-mark" aria-hidden="true">
+          <svg class="clone-announce-wave" viewBox="0 0 128 128" fill="currentColor">
+            <rect x="8" y="59" width="10" height="10" rx="5"/>
+            <rect x="26" y="42" width="10" height="44" rx="5"/>
+            <rect x="44" y="28" width="10" height="72" rx="5"/>
+            <rect x="62" y="14" width="10" height="100" rx="5"/>
+            <rect x="80" y="28" width="10" height="72" rx="5"/>
+            <rect x="98" y="42" width="10" height="44" rx="5"/>
+            <rect x="116" y="59" width="10" height="10" rx="5"/>
+          </svg>
+        </div>
+        <div class="clone-announce-copy">
+          <p class="clone-announce-kicker">{{ __('ui.landing.clone_announce_kicker') }}</p>
+          <h2 id="cloneAnnounceTitle">{{ __('ui.landing.clone_announce_title') }}</h2>
+          <p>{{ __('ui.landing.clone_announce_body') }}</p>
+        </div>
+        <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.landing.clone_announce_cta') }}</a>
       </div>
     </section>
 

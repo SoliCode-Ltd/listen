@@ -218,4 +218,25 @@ class HomeVoiceSamplesTest extends TestCase
         $this->assertCount(1, $voiceSamples);
         $this->assertSame('Showcase Only', $voiceSamples[0]['title']);
     }
+
+    public function test_homepage_announces_voice_cloning_under_the_hero_and_links_to_pricing(): void
+    {
+        app()->setLocale('ar');
+        $arabic = $this->getLocalizedRoute('home');
+        $arabic->assertOk();
+        $arabic->assertSee('id="cloneAnnounceTitle"', false);
+        $arabic->assertSee('استنساخ الصوت متاح الآن', false);
+        $arabic->assertSee('سجّل صوتك، ثم استخدمه في كل توليد', false);
+        $arabic->assertSee('عرض الأسعار', false);
+        $arabic->assertSee('href="'.route('pricing').'"', false);
+        $arabic->assertDontSee('صار جاهزاً', false);
+
+        app()->setLocale('en');
+        $english = $this->getLocalizedRoute('home');
+        $english->assertOk();
+        $english->assertSee('Voice cloning is now available.', false);
+        $english->assertSee('Record your voice, then use it in every generation.', false);
+        $english->assertSee('View pricing', false);
+        $english->assertSee('href="'.route('pricing').'"', false);
+    }
 }
