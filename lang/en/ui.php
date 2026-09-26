@@ -1188,6 +1188,7 @@ return [
         'language_label' => 'Language of the sample',
         'language_hint' => 'Record the sample in the language you want this voice to speak.',
         'language_ar' => 'Arabic',
+        'language_en' => 'English',
         'language_en_us' => 'English (US)',
         'language_en_gb' => 'English (UK)',
         'language_en_au' => 'English (Australia)',
