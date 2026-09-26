@@ -452,6 +452,8 @@ class VoiceCloningTest extends TestCase
         $notice = $this->limitNoticeHtml($dashboard->getContent());
         $this->assertStringContainsString(__('ui.voice_cloning.upgrade_cta'), $notice);
         $this->assertStringContainsString('btn btn-primary', $notice);
+        $this->assertStringNotContainsString('vc-notice-icon', $notice);
+        $this->assertStringNotContainsString('<svg', $notice);
         $this->assertStringContainsString(route('billing.page'), $notice);
 
         app()->setLocale('ar');

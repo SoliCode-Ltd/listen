@@ -124,28 +124,10 @@
       box-shadow: 0 10px 28px color-mix(in oklab, var(--a) 8%, transparent);
       color: var(--text);
     }
-    .vc-notice-copy {
-      display: flex;
-      align-items: flex-start;
-      gap: .8rem;
-      min-width: 0;
-      flex: 1;
-    }
-    .vc-notice-icon {
-      flex: none;
-      width: 2.4rem;
-      height: 2.4rem;
-      margin-top: .05rem;
-      border-radius: .8rem;
-      display: grid;
-      place-items: center;
-      color: var(--a);
-      background: color-mix(in oklab, var(--a) 14%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
-    }
-    .vc-notice-icon svg { width: 1.15rem; height: 1.15rem; }
     .vc-notice p {
       margin: 0;
+      flex: 1;
+      min-width: 0;
       font-size: .98rem;
       line-height: 1.75;
       font-weight: 600;
@@ -2632,12 +2614,7 @@
               </form>
             </section>
             <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
-              <div class="vc-notice-copy">
-                <span class="vc-notice-icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m6 11 6-6 6 6"/></svg>
-                </span>
-                <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
-              </div>
+              <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
               <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
             </div><!-- /vcLimitNotice -->
           @endif
