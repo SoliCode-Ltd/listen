@@ -1257,6 +1257,7 @@ return [
         'failure_key' => 'The Gemini API key was rejected or is missing. Check GEMINI_TTS_API_KEY on the server, then press Try again.',
         'failure_quota' => 'The Gemini quota is used up for now. Wait a few minutes, then press Try again.',
         'failure_network' => 'The server could not reach Gemini. Press Try again in a moment.',
+        'failure_server' => 'Google’s voice service had an internal error. Your recordings are fine. Press Try again.',
         'retry_button' => 'Try again',
         'retry_not_possible' => 'These recordings can’t be sent again. Record a new sample and consent sentence.',
         'technical_details' => 'Technical details',

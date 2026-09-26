@@ -39,6 +39,14 @@ class DiagnoseVoiceCloningCommand extends Command
             ? $this->info('Voices API reachable (HTTP '.$probe['status'].').')
             : $this->error('Voices API failed (HTTP '.($probe['status'] ?? 'none').'): '.$probe['body']);
 
+        if ($probe['ok']) {
+            $stored = $service->listStoredVoices();
+            $this->line('Replicated voices stored on Google: '.count($stored));
+            foreach (array_slice($stored, 0, 20) as $voice) {
+                $this->line("  {$voice['id']}  {$voice['display_name']}");
+            }
+        }
+
         $voiceId = $this->argument('voice');
         if ($voiceId === null || $this->option('no-send')) {
             return $probe['ok'] ? self::SUCCESS : self::FAILURE;

@@ -173,7 +173,7 @@ class VoiceCloningServiceTest extends TestCase
     public function test_replication_request_uses_gemini_38_and_separate_consent_audio(): void
     {
         Storage::fake('local');
-        config(['services.gemini_tts.api_key' => 'test-key']);
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
         Storage::disk('local')->put('voice-cloning/sample.wav', 'sample-bytes');
         Storage::disk('local')->put('voice-cloning/consent.wav', 'consent-bytes');
 
@@ -209,7 +209,7 @@ class VoiceCloningServiceTest extends TestCase
     public function test_browser_wav_is_sent_to_gemini_as_wav(): void
     {
         Storage::fake('local');
-        config(['services.gemini_tts.api_key' => 'test-key']);
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
         $wav = $this->silentWav(12);
         Storage::disk('local')->put('voice-cloning/sample.wav', $wav);
         Storage::disk('local')->put('voice-cloning/consent.wav', $this->silentWav(4));
@@ -243,7 +243,7 @@ class VoiceCloningServiceTest extends TestCase
     public function test_replication_accepts_a_nested_voice_id(): void
     {
         Storage::fake('local');
-        config(['services.gemini_tts.api_key' => 'test-key']);
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
         Storage::disk('local')->put('voice-cloning/sample.wav', 'sample-bytes');
         Storage::disk('local')->put('voice-cloning/consent.wav', 'consent-bytes');
 

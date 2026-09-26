@@ -1,5 +1,6 @@
 <?php
 
+use App\Console\Commands\DiagnoseVoiceCloningCommand;
 use App\Console\Commands\EnforceBillingGraceCommand;
 use App\Console\Commands\GenerateVoiceSamples;
 use App\Console\Commands\ListenSyncExtensionCommand;
@@ -20,6 +21,7 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withCommands([
+        DiagnoseVoiceCloningCommand::class,
         EnforceBillingGraceCommand::class,
         GenerateVoiceSamples::class,
         ListenSyncExtensionCommand::class,

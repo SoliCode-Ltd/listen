@@ -752,7 +752,7 @@ class VoiceCloningTest extends TestCase
 
     public function test_region_block_from_gemini_is_explained_and_can_be_retried(): void
     {
-        config(['services.gemini_tts.api_key' => 'test-key']);
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
         Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
         Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
 
@@ -797,6 +797,92 @@ class VoiceCloningTest extends TestCase
         $this->assertSame('voice_after_retry', $voice->provider_voice_key);
     }
 
+    public function test_gemini_500_recovers_a_voice_that_was_created_anyway(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'name' => 'Walled Mahmoud Soliman',
+            'provider' => 'gemini',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        $sentName = null;
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$sentName) {
+            if ($request->method() === 'POST') {
+                $sentName = $request->data()['voice']['display_name'] ?? null;
+
+                return \Illuminate\Support\Facades\Http::response([
+                    'error' => ['code' => 500, 'message' => 'Error translating server response to JSON', 'status' => 'INTERNAL'],
+                ], 500);
+            }
+
+            return \Illuminate\Support\Facades\Http::response([
+                'voices' => [
+                    ['id' => 'voice_someone_else', 'display_name' => 'Other'],
+                    ['id' => 'voice_recovered123', 'display_name' => $sentName],
+                ],
+            ], 200);
+        });
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        $voice->refresh();
+
+        $this->assertStringContainsString('Walled Mahmoud Soliman', (string) $sentName);
+        $this->assertStringContainsString('L'.$voice->id.'-', (string) $sentName);
+        $this->assertTrue($voice->isReady());
+        $this->assertSame('voice_recovered123', $voice->provider_voice_key);
+    }
+
+    public function test_repeated_gemini_500_is_reported_as_a_google_error_not_consent(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        \Illuminate\Support\Facades\Http::fake(function ($request) {
+            if ($request->method() === 'POST') {
+                return \Illuminate\Support\Facades\Http::response([
+                    'error' => [
+                        'code' => 500,
+                        'message' => 'Error translating server response to JSON',
+                        'status' => 'INTERNAL',
+                        'details' => [['detail' => 'speaker consent verification backend']],
+                    ],
+                ], 500);
+            }
+
+            return \Illuminate\Support\Facades\Http::response(['voices' => []], 200);
+        });
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'provider' => 'gemini',
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        $voice->refresh();
+
+        $this->assertSame('failed', $voice->status);
+        $this->assertSame('server', data_get($voice->metadata, 'failure_code'));
+        \Illuminate\Support\Facades\Http::assertSentCount(3 + 3 * 2);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $page->assertSee(__('ui.voice_cloning.failure_server'), false);
+        $page->assertDontSee(__('ui.voice_cloning.failure_consent'), false);
+        $page->assertSee('speaker consent verification backend', false);
+    }
+
     public function test_old_webm_recordings_cannot_be_retried(): void
     {
         $voice = ClonedVoice::factory()->failed()->create([
@@ -827,7 +913,7 @@ class VoiceCloningTest extends TestCase
 
     public function test_diagnose_command_reports_the_gemini_reply(): void
     {
-        config(['services.gemini_tts.api_key' => 'test-key']);
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
         \Illuminate\Support\Facades\Http::fake([
             'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response(
                 ['error' => ['message' => 'User location is not supported for the API use.']],
@@ -835,10 +921,15 @@ class VoiceCloningTest extends TestCase
             ),
         ]);
 
-        $this->artisan('voice-cloning:diagnose')
-            ->expectsOutputToContain('Gemini API keys found: 1')
-            ->expectsOutputToContain('User location is not supported')
-            ->assertFailed();
+        $command = app(\App\Console\Commands\DiagnoseVoiceCloningCommand::class);
+        $command->setLaravel(app());
+        $output = new \Symfony\Component\Console\Output\BufferedOutput;
+        $exit = $command->run(new \Symfony\Component\Console\Input\ArrayInput([]), $output);
+        $text = $output->fetch();
+
+        $this->assertSame(1, $exit);
+        $this->assertStringContainsString('Gemini API keys found: 1', $text);
+        $this->assertStringContainsString('User location is not supported', $text);
     }
 
     public function test_ready_voice_offers_a_generator_button_with_that_speaker(): void

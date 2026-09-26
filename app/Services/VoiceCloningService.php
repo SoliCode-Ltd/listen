@@ -56,33 +56,62 @@ class VoiceCloningService
             $consent = $this->prepareAudio($clonedVoice->consent_audio_path);
             $languageCode = $clonedVoice->language_code ?: 'ar-XA';
 
-            $payload = [
-                'store' => true,
-                'voice' => [
-                    'model' => self::MODEL,
-                    'type' => 'replicated',
-                    'display_name' => Str::limit((string) $clonedVoice->name, 80, ''),
-                    'replicated' => [
-                        'source_audio' => [
-                            'mime_type' => $reference['mime'],
-                            'data' => base64_encode($reference['bytes']),
-                        ],
-                        'consent_audio' => [
-                            'mime_type' => $consent['mime'],
-                            'data' => base64_encode($consent['bytes']),
-                        ],
+            // A unique tag lets us find the voice again if Gemini created it
+            // but failed to send the reply (HTTP 500 "Error translating server response to JSON").
+            $displayName = Str::limit((string) $clonedVoice->name, 50, '')
+                .' · L'.$clonedVoice->id.'-'.Str::lower(Str::random(5));
+
+            $voice = [
+                'model' => self::MODEL,
+                'type' => 'replicated',
+                'display_name' => $displayName,
+                'replicated' => [
+                    'source_audio' => [
+                        'mime_type' => $reference['mime'],
+                        'data' => base64_encode($reference['bytes']),
+                    ],
+                    'consent_audio' => [
+                        'mime_type' => $consent['mime'],
+                        'data' => base64_encode($consent['bytes']),
                     ],
                 ],
             ];
 
-            $response = $this->request('POST', '/voices', $payload, 90);
-            $voiceId = $this->extractVoiceId($response);
+            $attempts = [
+                ['path' => '/voices', 'payload' => ['store' => true, 'voice' => $voice]],
+                ['path' => '/voices', 'payload' => ['store' => true, 'voice' => $voice]],
+                ['path' => '/voices?store=true', 'payload' => $voice],
+            ];
 
-            if ($response->successful() && $voiceId !== null) {
-                return [
-                    'success' => true,
-                    'voice_cloning_key' => $voiceId,
-                ];
+            $response = null;
+            foreach ($attempts as $index => $attempt) {
+                $response = $this->request('POST', $attempt['path'], $attempt['payload'], 90);
+                $voiceId = $this->extractVoiceId($response);
+
+                if ($response->successful() && $voiceId !== null) {
+                    return ['success' => true, 'voice_cloning_key' => $voiceId];
+                }
+
+                $serverSide = $response->serverError() || $response->successful();
+                if (! $serverSide) {
+                    break;
+                }
+
+                Log::warning('Gemini voice replication returned no voice id; looking it up.', [
+                    'cloned_voice_id' => $clonedVoice->id,
+                    'attempt' => $index + 1,
+                    'status' => $response->status(),
+                    'body' => mb_substr((string) $response->body(), 0, 1000),
+                ]);
+
+                $recovered = $this->findStoredVoiceByDisplayName($displayName);
+                if ($recovered !== null) {
+                    return ['success' => true, 'voice_cloning_key' => $recovered];
+                }
+
+                if ($index < count($attempts) - 1) {
+                    $this->pause(1500);
+                }
             }
 
             $errorMessage = $response->successful()
@@ -193,6 +222,75 @@ class VoiceCloningService
     public function configuredKeyCount(): int
     {
         return count($this->apiKeys());
+    }
+
+    /**
+     * @return array<int, array{id: string, display_name: string}>
+     */
+    public function listStoredVoices(int $maxPages = 5): array
+    {
+        $voices = [];
+        $pageToken = null;
+
+        for ($page = 0; $page < $maxPages; $page++) {
+            $query = ['type' => 'replicated', 'pageSize' => 100];
+            if ($pageToken) {
+                $query['pageToken'] = $pageToken;
+            }
+
+            $response = $this->request('GET', '/voices', $query, 30);
+            if (! $response->successful()) {
+                break;
+            }
+
+            foreach ((array) $response->json('voices', []) as $voice) {
+                if (! is_array($voice)) {
+                    continue;
+                }
+                $id = $this->findVoiceId(['id' => $voice['id'] ?? null, 'name' => $voice['name'] ?? null]);
+                if ($id === null) {
+                    continue;
+                }
+                $voices[] = [
+                    'id' => $id,
+                    'display_name' => (string) ($voice['display_name'] ?? $voice['displayName'] ?? ''),
+                ];
+            }
+
+            $pageToken = $response->json('nextPageToken') ?? $response->json('next_page_token');
+            if (! $pageToken) {
+                break;
+            }
+        }
+
+        return $voices;
+    }
+
+    private function pause(int $milliseconds): void
+    {
+        if ((bool) config('services.gemini_tts.voice_retry_pause', true)) {
+            usleep($milliseconds * 1000);
+        }
+    }
+
+    private function findStoredVoiceByDisplayName(string $displayName): ?string
+    {
+        try {
+            foreach ([0, 2000] as $delay) {
+                if ($delay > 0) {
+                    $this->pause($delay);
+                }
+                foreach ($this->listStoredVoices() as $voice) {
+                    if ($voice['display_name'] === $displayName) {
+                        return $voice['id'];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Gemini replicated voice lookup failed.', ['exception' => $e->getMessage()]);
+        }
+
+        return null;
     }
 
     public function deleteReplicatedVoice(?string $voiceId): void
@@ -379,6 +477,7 @@ class VoiceCloningService
             'key' => __('ui.voice_cloning.failure_key'),
             'quota' => __('ui.voice_cloning.failure_quota'),
             'network' => __('ui.voice_cloning.failure_network'),
+            'server' => __('ui.voice_cloning.failure_server'),
             default => __('ui.voice_cloning.processing_failed_generic'),
         };
     }
@@ -390,11 +489,17 @@ class VoiceCloningService
     {
         $status = data_get($voice->metadata, 'http_status');
         $error = trim((string) (data_get($voice->metadata, 'provider_error') ?: $voice->failure_reason));
-        if ($error === '') {
+        $raw = trim((string) data_get($voice->metadata, 'provider_response', ''));
+        if ($error === '' && $raw === '') {
             return '';
         }
 
-        return ($status ? "HTTP {$status}: " : '').mb_substr($error, 0, 400);
+        $detail = ($status ? "HTTP {$status}: " : '').mb_substr($error, 0, 400);
+        if ($raw !== '' && ! str_contains($detail, $raw)) {
+            $detail .= "\n\n".mb_substr($raw, 0, 1500);
+        }
+
+        return $detail;
     }
 
     /**
@@ -856,6 +961,9 @@ class VoiceCloningService
     private function classifyError(string $message, int $status): string
     {
         $haystack = strtolower($message);
+        if ($status >= 500) {
+            return 'server';
+        }
         if (str_contains($haystack, 'location') || str_contains($haystack, 'region') || str_contains($haystack, 'country') || str_contains($haystack, 'not available in your')) {
             return 'region';
         }

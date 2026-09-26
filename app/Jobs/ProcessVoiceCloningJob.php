@@ -23,7 +23,7 @@ class ProcessVoiceCloningJob implements ShouldQueue
     use Queueable;
 
     public int $tries = 2;
-    public int $timeout = 180;
+    public int $timeout = 420;
 
     public function __construct(
         public int $clonedVoiceId,
