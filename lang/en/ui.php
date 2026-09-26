@@ -692,7 +692,7 @@ return [
         'pitch' => 'Pitch',
         'style_prompt' => 'Custom Prompt',
         'style_prompt_placeholder' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")',
-        'style_prompt_hint' => 'Available for Premium voices (Gemini). Max 2000 characters.',
+        'style_prompt_hint' => 'Available for Premium voices on Listen Studio. Max 2000 characters.',
     ],
 
     // ===== DIALECTS =====
@@ -865,7 +865,7 @@ return [
         'dialogue_hint' => 'Multi-speaker conversation (Studio Max plan)',
         'style_prompt' => 'Custom Prompt',
         'style_prompt_placeholder' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")',
-        'style_prompt_hint' => 'Custom voice styling for Premium voices (Gemini). Max 2000 characters.',
+        'style_prompt_hint' => 'Custom voice styling for Premium voices on Listen Studio. Max 2000 characters.',
     ],
 
     // ===== AUTH =====
@@ -1177,7 +1177,7 @@ return [
         'upgrade_feature_3' => 'Manage up to :max custom voices',
 
         'empty_title' => 'Your voice library is empty',
-        'empty_subtitle' => 'Record a short sample and a consent line. Listen builds a voice you can use in the generator.',
+        'empty_subtitle' => 'Record a short sample and a consent line. Listen Studio builds a voice you can use in the generator.',
         'create_first' => 'Create your first voice',
 
         'create_title' => 'Create a voice',
@@ -1247,18 +1247,18 @@ return [
         'status_processing' => 'Building',
         'status_ready' => 'Ready',
         'status_failed' => 'Needs another take',
-        'processing_hint' => 'Listen is building this voice. It usually takes a minute.',
+        'processing_hint' => 'Listen Studio is building this voice. It usually takes a minute.',
         'processing_delayed' => 'This is taking longer than usual. The voice is still being built.',
         'processing_failed_generic' => 'This voice could not be created. Record a clearer sample and the consent sentence again.',
         'failure_consent' => 'The consent recording did not match the sample. Record both clips yourself, in the same room, and read the sentence exactly.',
         'failure_duration' => 'The sample must be between :min and :max seconds of clear speech.',
         'failure_audio' => 'The audio could not be used. Try a quiet WAV or MP3 recording with one speaker.',
-        'failure_region' => 'Listen cannot create voices from this server’s country yet. The recordings are fine. Update the voice connection, then press Try again.',
-        'failure_key' => 'Listen could not authorize this request. Check the voice service, then press Try again.',
-        'failure_quota' => 'Listen has reached the voice cloning limit for now. Wait a few minutes, then press Try again.',
-        'failure_network' => 'Listen could not complete the request. Press Try again in a moment.',
-        'failure_server' => 'Listen had a temporary problem creating this voice. Your recordings are fine. Press Try again.',
-        'failure_consent_phrase' => 'The consent sentence was not recognised. Your voice sample is kept. Record only the sentence again, and read every word exactly as it is written, including the Latin word. Wait a second before you stop.',
+        'failure_region' => 'Listen Studio cannot create voices from this server’s country yet. The recordings are fine. Update the voice connection, then press Try again.',
+        'failure_key' => 'Listen Studio could not authorize this request. Check the voice service, then press Try again.',
+        'failure_quota' => 'Listen Studio has reached the voice cloning limit for now. Wait a few minutes, then press Try again.',
+        'failure_network' => 'Listen Studio could not complete the request. Press Try again in a moment.',
+        'failure_server' => 'Listen Studio had a temporary problem creating this voice. Your recordings are fine. Press Try again.',
+        'failure_consent_phrase' => 'The Arabic sentence was not recognised. Your voice sample is kept. Record only that sentence again, and read every word exactly as it is written, including the English word in the middle. Wait a second before you stop.',
         'replace_consent_button' => 'Record the sentence again',
         'replace_consent_title' => 'Record the consent sentence again for “:name”',
         'replace_consent_hint' => 'Your voice sample is kept. Only the sentence below is sent again.',

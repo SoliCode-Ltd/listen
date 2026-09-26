@@ -236,7 +236,7 @@ class VoiceCloningController extends Controller
                 ? VoiceCloningService::publicFailureMessage($clonedVoice)
                 : null,
             'failure_detail' => $clonedVoice->isFailed()
-                ? VoiceCloningService::technicalFailureDetail($clonedVoice)
+                ? VoiceCloningService::studioFailureDetail($clonedVoice)
                 : null,
             'can_retry' => VoiceCloningService::canRetry($clonedVoice),
             'can_replace_consent' => VoiceCloningService::canReplaceConsent($clonedVoice),

@@ -106,6 +106,23 @@ class VoiceCloningServiceTest extends TestCase
         $this->assertNotContains('exe', $extensions);
     }
 
+    public function test_studio_details_hide_the_provider_name(): void
+    {
+        app()->setLocale('en');
+        $english = VoiceCloningService::redactProviderBrand(
+            'HTTP 500: Consent flow failed. See https://ai.google.dev/gemini-api/docs and Gemini.'
+        );
+        $this->assertStringNotContainsString('Google', $english);
+        $this->assertStringNotContainsString('Gemini', $english);
+        $this->assertStringNotContainsString('google', $english);
+        $this->assertStringContainsString('Listen Studio', $english);
+
+        app()->setLocale('ar');
+        $arabic = VoiceCloningService::redactProviderBrand('Gemini rejected the phrase.');
+        $this->assertStringContainsString('منصة إسمع', $arabic);
+        $this->assertStringNotContainsString('Gemini', $arabic);
+    }
+
     public function test_consent_scripts_available_for_both_languages(): void
     {
         $scripts = VoiceCloningService::CONSENT_SCRIPTS;

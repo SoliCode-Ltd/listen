@@ -520,6 +520,31 @@ class VoiceCloningService
     }
 
     /**
+     * Studio-facing diagnostic text. Provider names stay out of the product UI.
+     */
+    public static function studioFailureDetail(ClonedVoice $voice): string
+    {
+        return self::redactProviderBrand(self::technicalFailureDetail($voice));
+    }
+
+    public static function redactProviderBrand(string $text): string
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return '';
+        }
+
+        $brand = app()->getLocale() === 'ar' ? 'منصة إسمع' : 'Listen Studio';
+        $text = preg_replace('#https?://\S+#i', '', $text) ?? $text;
+        $text = str_ireplace(['googleapis', 'GEMINI_', 'gemini-', 'google.'], '', $text);
+        $text = preg_replace('/\b(gemini|google)\b/i', $brand, $text) ?? $text;
+        $text = preg_replace("/[ \t]{2,}/", ' ', $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+
+        return trim($text);
+    }
+
+    /**
      * Whether a failed voice can be sent again without recording.
      * Only browser WAV uploads qualify; older WebM files need ffmpeg.
      */

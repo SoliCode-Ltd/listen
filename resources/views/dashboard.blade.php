@@ -2309,7 +2309,7 @@
                   </div>
                   @if($voice->isFailed())
                     <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
-                    @php $vcDetail = \App\Services\VoiceCloningService::technicalFailureDetail($voice); @endphp
+                    @php $vcDetail = \App\Services\VoiceCloningService::studioFailureDetail($voice); @endphp
                     @if($vcDetail !== '')
                       <details class="vc-tech-detail">
                         <summary>{{ __('ui.voice_cloning.technical_details') }}</summary>
