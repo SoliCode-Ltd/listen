@@ -49,8 +49,8 @@ class ClonedVoiceResource extends Resource
         'key' => 'API key',
         'quota' => 'Quota',
         'network' => 'Network',
-        'server' => 'Google internal error',
-        'provider' => 'Other Gemini error',
+        'server' => 'Listen internal error',
+        'provider' => 'Other Listen error',
     ];
 
     public static function getNavigationBadge(): ?string
@@ -104,7 +104,7 @@ class ClonedVoiceResource extends Resource
                         ->suffix(' s')
                         ->placeholder('—'),
                     Infolists\Components\TextEntry::make('provider_voice_key')
-                        ->label('Gemini voice id')
+                        ->label('Listen voice id')
                         ->copyable()
                         ->fontFamily('mono')
                         ->placeholder('Not created yet'),
@@ -138,7 +138,7 @@ class ClonedVoiceResource extends Resource
                         ->label('What the user sees')
                         ->state(fn (ClonedVoice $record): string => VoiceCloningService::publicFailureMessage($record)),
                     Infolists\Components\TextEntry::make('technical_detail')
-                        ->label('Gemini reply')
+                        ->label('Listen reply')
                         ->state(fn (ClonedVoice $record): string => VoiceCloningService::technicalFailureDetail($record))
                         ->formatStateUsing(fn (?string $state): string => nl2br(e((string) $state)))
                         ->html()
@@ -186,7 +186,7 @@ class ClonedVoiceResource extends Resource
                     ->suffix(' s')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('provider_voice_key')
-                    ->label('Gemini voice id')
+                    ->label('Listen voice id')
                     ->fontFamily('mono')
                     ->copyable()
                     ->limit(22)
@@ -226,7 +226,7 @@ class ClonedVoiceResource extends Resource
                         ->icon('heroicon-o-trash')
                         ->color('danger')
                         ->requiresConfirmation()
-                        ->modalDescription('Deletes the Gemini voice and both recordings. This cannot be undone.')
+                        ->modalDescription('Deletes the Listen voice and both recordings. This cannot be undone.')
                         ->action(function (Collection $records): void {
                             $service = app(VoiceCloningService::class);
                             $records->each(fn (ClonedVoice $voice) => $service->purge($voice));
@@ -241,12 +241,12 @@ class ClonedVoiceResource extends Resource
     public static function resendAction(): Tables\Actions\Action
     {
         return Tables\Actions\Action::make('resend')
-            ->label('Resend to Gemini')
+            ->label('Resend to Listen')
             ->icon('heroicon-o-arrow-path')
             ->color('warning')
             ->visible(fn (ClonedVoice $record): bool => VoiceCloningService::canRetry($record))
             ->requiresConfirmation()
-            ->modalDescription('Sends the saved recordings to Gemini again.')
+            ->modalDescription('Sends the saved recordings to Listen again.')
             ->action(function (ClonedVoice $record): void {
                 self::resend($record);
             });
@@ -259,7 +259,7 @@ class ClonedVoiceResource extends Resource
             ->icon('heroicon-o-trash')
             ->color('danger')
             ->requiresConfirmation()
-            ->modalDescription('Deletes the Gemini voice and both recordings. This cannot be undone.')
+            ->modalDescription('Deletes the Listen voice and both recordings. This cannot be undone.')
             ->action(function (ClonedVoice $record): void {
                 app(VoiceCloningService::class)->purge($record);
                 Notification::make()->title('Cloned voice deleted')->success()->send();
@@ -280,7 +280,7 @@ class ClonedVoiceResource extends Resource
         $record->isReady()
             ? Notification::make()->title('Voice is ready')->body((string) $record->provider_voice_key)->success()->send()
             : Notification::make()
-                ->title('Gemini still rejected it')
+                ->title('Listen still rejected it')
                 ->body(VoiceCloningService::publicFailureMessage($record))
                 ->danger()
                 ->send();

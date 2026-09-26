@@ -2479,6 +2479,7 @@
                     <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
                     <ul class="vc-consent-tips">
                       <li>{{ __('ui.voice_cloning.consent_tip_1') }}</li>
+                      <li>{{ __('ui.voice_cloning.consent_tip_latin') }}</li>
                       <li>{{ __('ui.voice_cloning.consent_tip_2') }}</li>
                       <li>{{ __('ui.voice_cloning.consent_tip_3') }}</li>
                     </ul>

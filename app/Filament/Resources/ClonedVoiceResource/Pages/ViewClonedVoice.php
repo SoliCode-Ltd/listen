@@ -17,12 +17,12 @@ class ViewClonedVoice extends ViewRecord
     {
         return [
             Actions\Action::make('resend')
-                ->label('Resend to Gemini')
+                ->label('Resend to Listen')
                 ->icon('heroicon-o-arrow-path')
                 ->color('warning')
                 ->visible(fn (ClonedVoice $record): bool => VoiceCloningService::canRetry($record))
                 ->requiresConfirmation()
-                ->modalDescription('Sends the saved recordings to Gemini again.')
+                ->modalDescription('Sends the saved recordings to Listen again.')
                 ->action(function (ClonedVoice $record): void {
                     ClonedVoiceResource::resend($record);
                     $this->refreshFormData(['status', 'provider_voice_key', 'failure_reason', 'metadata']);
@@ -32,7 +32,7 @@ class ViewClonedVoice extends ViewRecord
                 ->icon('heroicon-o-trash')
                 ->color('danger')
                 ->requiresConfirmation()
-                ->modalDescription('Deletes the Gemini voice and both recordings. This cannot be undone.')
+                ->modalDescription('Deletes the Listen voice and both recordings. This cannot be undone.')
                 ->action(function (ClonedVoice $record): void {
                     app(VoiceCloningService::class)->purge($record);
                     Notification::make()->title('Cloned voice deleted')->success()->send();
