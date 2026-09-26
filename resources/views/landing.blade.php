@@ -764,17 +764,19 @@
     }
 
     .hero:has(+ .clone-announce) {
-      padding-bottom: 1.15rem;
+      padding-bottom: 1.75rem;
     }
     .clone-announce {
-      padding: 0 0 1.35rem;
+      padding: 0;
+    }
+    .clone-announce + .section {
+      padding-top: 1.75rem;
     }
     .clone-announce-card {
-      display: grid;
-      grid-template-columns: auto minmax(0, 1fr) auto;
+      display: flex;
       align-items: center;
-      gap: clamp(1rem, 2.4vw, 1.6rem);
-      padding: clamp(1rem, 2.2vw, 1.35rem) clamp(1rem, 2.4vw, 1.5rem);
+      gap: 1.25rem;
+      padding: 1.15rem 1.35rem;
       border-radius: 1.25rem;
       border: 1px solid color-mix(in oklab, var(--a) 34%, var(--line));
       background:
@@ -788,8 +790,9 @@
         var(--surface);
     }
     .clone-announce-mark {
-      width: 3.6rem;
-      height: 3.6rem;
+      width: 3.5rem;
+      height: 3.5rem;
+      flex: none;
       border-radius: 1rem;
       display: grid;
       place-items: center;
@@ -798,48 +801,47 @@
       border: 1px solid color-mix(in oklab, var(--a) 28%, transparent);
     }
     .clone-announce-wave {
-      width: 2.15rem;
-      height: 2.15rem;
+      width: 2.05rem;
+      height: 2.05rem;
       display: block;
     }
-    .clone-announce-kicker {
-      margin: 0 0 .28rem;
-      color: var(--a);
-      font-size: .78rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-    }
-    html[dir="rtl"] .clone-announce-kicker {
-      letter-spacing: 0;
-      font-size: .92rem;
+    .clone-announce-copy {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: .2rem;
     }
     .clone-announce-copy h2 {
-      margin: 0 0 .28rem;
+      margin: 0;
       text-align: start;
-      font-size: clamp(1.22rem, 2.1vw, 1.7rem);
+      font-size: clamp(1.2rem, 2vw, 1.55rem);
       line-height: 1.35;
       letter-spacing: -.02em;
     }
     html[dir="rtl"] .clone-announce-copy h2 {
       letter-spacing: 0;
-      line-height: 1.55;
-      font-size: clamp(1.28rem, 2.2vw, 1.75rem);
+      line-height: 1.5;
+      font-size: clamp(1.25rem, 2vw, 1.6rem);
     }
     .clone-announce-copy p {
       margin: 0;
       color: var(--muted);
-      font-size: clamp(.95rem, 1.35vw, 1.05rem);
-      line-height: 1.7;
-      max-width: 48ch;
+      font-size: 1rem;
+      line-height: 1.6;
+      max-width: 46ch;
     }
     html[dir="rtl"] .clone-announce-copy p {
-      font-size: clamp(1rem, 1.5vw, 1.08rem);
-      line-height: 1.85;
+      font-size: 1.02rem;
+      line-height: 1.75;
     }
     .clone-announce-card .btn {
+      flex: none;
       min-height: 48px;
+      margin-inline-start: auto;
       white-space: nowrap;
-      padding-inline: 1.35rem;
+      padding-inline: 1.45rem;
     }
     .clone-announce-card .btn:focus-visible {
       outline: 2px solid var(--text);
@@ -847,18 +849,23 @@
     }
     @media (max-width: 760px) {
       .hero:has(+ .clone-announce) {
-        padding-bottom: .85rem;
+        padding-bottom: 1.25rem;
       }
-      .clone-announce {
-        padding-bottom: 1rem;
+      .clone-announce + .section {
+        padding-top: 1.25rem;
       }
       .clone-announce-card {
+        display: grid;
         grid-template-columns: auto minmax(0, 1fr);
         align-items: center;
+        gap: .85rem 1rem;
+        padding: 1.05rem 1rem 1rem;
       }
       .clone-announce-card .btn {
         grid-column: 1 / -1;
         width: 100%;
+        margin-inline-start: 0;
+        margin-top: .15rem;
       }
     }
 
@@ -1528,7 +1535,6 @@
           </svg>
         </div>
         <div class="clone-announce-copy">
-          <p class="clone-announce-kicker">{{ __('ui.landing.clone_announce_kicker') }}</p>
           <h2 id="cloneAnnounceTitle">{{ __('ui.landing.clone_announce_title') }}</h2>
           <p>{{ __('ui.landing.clone_announce_body') }}</p>
         </div>

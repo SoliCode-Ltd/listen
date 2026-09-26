@@ -145,10 +145,9 @@ return [
         'cta_title' => 'هل أنت جاهز لتوسيع منتجك الصوتي؟',
         'cta_subtitle' => 'ابدأ مجاناً ثم قم بالترقية مع نمو الاستخدام. لا حاجة لبطاقة ائتمان.',
         'get_started_free' => 'ابدأ مجاناً',
-        'clone_announce_kicker' => 'منصة إسمع',
         'clone_announce_title' => 'استنساخ الصوت متاح الآن',
         'clone_announce_body' => 'سجّل صوتك، ثم استخدمه في كل توليد',
-        'clone_announce_cta' => 'عرض الأسعار',
+        'clone_announce_cta' => 'اختر باقتك',
     ],
 
     // ===== PRICING PAGE =====

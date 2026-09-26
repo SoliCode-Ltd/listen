@@ -227,16 +227,29 @@ class HomeVoiceSamplesTest extends TestCase
         $arabic->assertSee('id="cloneAnnounceTitle"', false);
         $arabic->assertSee('استنساخ الصوت متاح الآن', false);
         $arabic->assertSee('سجّل صوتك، ثم استخدمه في كل توليد', false);
-        $arabic->assertSee('عرض الأسعار', false);
+        $arabic->assertSee('اختر باقتك', false);
         $arabic->assertSee('href="'.route('pricing').'"', false);
         $arabic->assertDontSee('صار جاهزاً', false);
+        $arabicSection = $this->announcementHtml($arabic->getContent());
+        $this->assertStringNotContainsString('منصة إسمع', $arabicSection);
+        $this->assertStringNotContainsString('عرض الأسعار', $arabicSection);
 
         app()->setLocale('en');
         $english = $this->getLocalizedRoute('home');
         $english->assertOk();
         $english->assertSee('Voice cloning is now available.', false);
         $english->assertSee('Record your voice, then use it in every generation.', false);
-        $english->assertSee('View pricing', false);
+        $english->assertSee('Choose your plan', false);
         $english->assertSee('href="'.route('pricing').'"', false);
+        $englishSection = $this->announcementHtml($english->getContent());
+        $this->assertStringNotContainsString('Listen Studio', $englishSection);
+        $this->assertStringNotContainsString('View pricing', $englishSection);
+    }
+
+    private function announcementHtml(string $html): string
+    {
+        preg_match('/<section class="clone-announce"[\s\S]*?<\/section>/', $html, $matches);
+
+        return $matches[0] ?? '';
     }
 }

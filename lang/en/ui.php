@@ -145,10 +145,9 @@ return [
         'cta_title' => 'Ready to scale your voice product?',
         'cta_subtitle' => 'Start free and upgrade as your usage grows. No credit card required.',
         'get_started_free' => 'Get Started Free',
-        'clone_announce_kicker' => 'Listen Studio',
         'clone_announce_title' => 'Voice cloning is now available.',
         'clone_announce_body' => 'Record your voice, then use it in every generation.',
-        'clone_announce_cta' => 'View pricing',
+        'clone_announce_cta' => 'Choose your plan',
     ],
 
     // ===== PRICING PAGE =====
