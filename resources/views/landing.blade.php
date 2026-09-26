@@ -770,7 +770,7 @@
       padding: 0;
     }
     .clone-announce + .section {
-      padding-top: 1.75rem;
+      padding-top: 4.25rem;
     }
     .clone-announce-card {
       display: flex;
@@ -852,7 +852,7 @@
         padding-bottom: 1.25rem;
       }
       .clone-announce + .section {
-        padding-top: 1.25rem;
+        padding-top: 2.75rem;
       }
       .clone-announce-card {
         display: grid;
