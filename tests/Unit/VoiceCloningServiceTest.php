@@ -187,6 +187,47 @@ class VoiceCloningServiceTest extends TestCase
         $this->assertTrue(VoiceCloningAccess::showsUpgrade($other, $freePlan));
         $this->assertFalse(VoiceCloningAccess::showsUpgrade($other, $paidPlan));
         $this->assertFalse(VoiceCloningAccess::showsUpgrade($admin, $freePlan));
+        $this->assertSame(VoiceCloningAccess::AUDIENCE_PREVIEW, VoiceCloningAccess::audience());
+    }
+
+    public function test_everyone_audience_follows_the_plan_and_can_be_closed_again(): void
+    {
+        SiteSetting::set('voice_cloning_enabled', '1');
+        SiteSetting::set('voice_cloning_audience', VoiceCloningAccess::AUDIENCE_EVERYONE);
+
+        $admin = User::factory()->create(['email' => VoiceCloningAccess::PREVIEW_EMAIL]);
+        $customer = User::factory()->create(['email' => 'listener@example.com']);
+        $cloningPlan = Plan::factory()->paid()->create([
+            'price_cents' => 1999,
+            'voice_cloning_enabled' => true,
+        ]);
+        $plainPlan = Plan::factory()->paid()->create([
+            'price_cents' => 1999,
+            'voice_cloning_enabled' => false,
+        ]);
+        $freePlan = Plan::factory()->free()->create([
+            'voice_cloning_enabled' => false,
+        ]);
+
+        $this->assertTrue(VoiceCloningAccess::allows($customer, $cloningPlan));
+        $this->assertFalse(VoiceCloningAccess::allows($customer, $plainPlan));
+        $this->assertFalse(VoiceCloningAccess::allows($customer, $freePlan));
+        $this->assertTrue(VoiceCloningAccess::allows($admin, $freePlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($customer, $cloningPlan));
+        $this->assertTrue(VoiceCloningAccess::showsUpgrade($customer, $plainPlan));
+        $this->assertTrue(VoiceCloningAccess::showsUpgrade($customer, $freePlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($admin, $freePlan));
+
+        SiteSetting::set('voice_cloning_enabled', '0');
+        $this->assertFalse(VoiceCloningAccess::allows($customer, $cloningPlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($customer, $cloningPlan));
+
+        SiteSetting::set('voice_cloning_enabled', '1');
+        SiteSetting::set('voice_cloning_audience', VoiceCloningAccess::AUDIENCE_PREVIEW);
+
+        $this->assertFalse(VoiceCloningAccess::allows($customer, $cloningPlan));
+        $this->assertFalse(VoiceCloningAccess::showsUpgrade($customer, $cloningPlan));
+        $this->assertTrue(VoiceCloningAccess::allows($admin, $cloningPlan));
     }
 
     public function test_replication_request_uses_gemini_38_and_separate_consent_audio(): void

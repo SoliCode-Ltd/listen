@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\VoiceCloningSettings;
 use App\Jobs\GenerateAudioJob;
 use App\Jobs\ProcessVoiceCloningJob;
 use App\Models\AudioGeneration;
@@ -12,6 +13,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\VoiceCloningService;
 use App\Support\VoiceCloningAccess;
+use Livewire\Livewire;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Bus;
@@ -445,7 +447,19 @@ class VoiceCloningTest extends TestCase
         $dashboard->assertOk();
         $dashboard->assertSee(__('ui.voice_cloning.voice_count', ['count' => 2, 'max' => 2]), false);
         $dashboard->assertSee(__('ui.voice_cloning.limit_reached', ['max' => 2]), false);
+        $dashboard->assertDontSee('Delete one to create another', false);
         $dashboard->assertSee('class="vc-notice" id="vcLimitNotice"', false);
+        $notice = $this->limitNoticeHtml($dashboard->getContent());
+        $this->assertStringContainsString(__('ui.voice_cloning.upgrade_cta'), $notice);
+        $this->assertStringContainsString(route('billing.page'), $notice);
+
+        app()->setLocale('ar');
+        $arabic = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $arabic->assertSee(__('ui.voice_cloning.limit_reached', ['max' => 2]), false);
+        $arabic->assertDontSee('احذف واحداً', false);
+        $arabicNotice = $this->limitNoticeHtml($arabic->getContent());
+        $this->assertStringContainsString(__('ui.voice_cloning.upgrade_cta'), $arabicNotice);
+        app()->setLocale('en');
         $html = $dashboard->getContent();
         $this->assertMatchesRegularExpression('/id="vcLimitNotice"(?!\s+style="display:none")/', $html);
         $this->assertMatchesRegularExpression('/id="vcCreatePanel"\s+style="display:none"/', $html);
@@ -1200,6 +1214,167 @@ class VoiceCloningTest extends TestCase
         ]);
 
         $queued->assertJsonPath('job.voice_label', 'Walled Voice');
+    }
+
+    public function test_cloning_stays_on_the_admin_email_until_the_setting_opens_it(): void
+    {
+        $customer = User::factory()->create(['email' => 'listener@example.com']);
+        Subscription::create([
+            'user_id' => $customer->id,
+            'plan_id' => $this->paidPlan->id,
+            'status' => 'active',
+        ]);
+
+        $this->assertSame(VoiceCloningAccess::AUDIENCE_PREVIEW, VoiceCloningAccess::audience());
+
+        $closed = $this->actingAs($customer)->getLocalizedRoute('dashboard');
+        $closed->assertOk();
+        $closed->assertDontSee(__('ui.voice_cloning.page_title'), false);
+        $closed->assertDontSee(__('ui.voice_cloning.create_title'), false);
+
+        $this->actingAs($customer)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Closed Voice'))
+            ->assertNotFound();
+
+        SiteSetting::set('voice_cloning_enabled', '1');
+        SiteSetting::set('voice_cloning_audience', VoiceCloningAccess::AUDIENCE_EVERYONE);
+
+        app()->setLocale('en');
+        $english = $this->actingAs($customer)->getLocalizedRoute('dashboard');
+        $english->assertOk();
+        $english->assertSee(__('ui.voice_cloning.page_title'), false);
+        $english->assertSee(__('ui.voice_cloning.create_title'), false);
+        $english->assertSee(VoiceCloningService::CONSENT_SCRIPTS['en-US'], false);
+        $english->assertDontSee(__('ui.voice_cloning.preview_badge'), false);
+        $english->assertDontSee(__('ui.voice_cloning.upgrade_title'), false);
+
+        app()->setLocale('ar');
+        $arabic = $this->actingAs($customer)->getLocalizedRoute('dashboard');
+        $arabic->assertOk();
+        $arabic->assertSee(__('ui.voice_cloning.page_title'), false);
+        $arabic->assertSee(__('ui.voice_cloning.create_title'), false);
+        $arabic->assertSee(VoiceCloningService::CONSENT_SCRIPTS['ar-XA'], false);
+        $arabic->assertDontSee(__('ui.voice_cloning.preview_badge'), false);
+        app()->setLocale('en');
+
+        Bus::fake([ProcessVoiceCloningJob::class]);
+        $this->actingAs($customer)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Opened Voice'))
+            ->assertOk()
+            ->assertJson(['success' => true]);
+        Bus::assertDispatched(ProcessVoiceCloningJob::class);
+
+        $plainPlan = Plan::factory()->paid()->create([
+            'slug' => 'plain-paid',
+            'price_cents' => 999,
+            'voice_cloning_enabled' => false,
+        ]);
+        $plainUser = User::factory()->create(['email' => 'plain@example.com']);
+        Subscription::create([
+            'user_id' => $plainUser->id,
+            'plan_id' => $plainPlan->id,
+            'status' => 'active',
+        ]);
+
+        $plainPage = $this->actingAs($plainUser)->getLocalizedRoute('dashboard');
+        $plainPage->assertOk();
+        $plainPage->assertSee(__('ui.voice_cloning.upgrade_title'), false);
+        $plainPage->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $this->actingAs($plainUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Plain Voice'))
+            ->assertNotFound();
+
+        app()->setLocale('ar');
+        $plainArabic = $this->actingAs($this->freeUser)->getLocalizedRoute('dashboard');
+        $plainArabic->assertSee(__('ui.voice_cloning.upgrade_title'), false);
+        $plainArabic->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        app()->setLocale('en');
+
+        $this->actingAs($this->freeUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Free Voice'))
+            ->assertNotFound();
+
+        $adminStillOpen = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $adminStillOpen->assertSee(__('ui.voice_cloning.create_title'), false);
+
+        SiteSetting::set('voice_cloning_audience', VoiceCloningAccess::AUDIENCE_PREVIEW);
+
+        $closedAgain = $this->actingAs($customer)->getLocalizedRoute('dashboard');
+        $closedAgain->assertDontSee(__('ui.voice_cloning.page_title'), false);
+        $closedAgain->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $this->actingAs($customer)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Closed Again'))
+            ->assertNotFound();
+
+        $preview = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+        $preview->assertSee(__('ui.voice_cloning.page_title'), false);
+        $preview->assertSee(__('ui.voice_cloning.preview_badge'), false);
+    }
+
+    public function test_admin_can_switch_voice_cloning_between_preview_and_everyone(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->actingAs($admin)
+            ->get(VoiceCloningSettings::getUrl())
+            ->assertOk()
+            ->assertSee('Admin email only', false)
+            ->assertSee('All users on a plan that includes it', false)
+            ->assertSee(VoiceCloningAccess::PREVIEW_EMAIL, false);
+
+        $this->actingAs($this->paidUser)
+            ->get(VoiceCloningSettings::getUrl())
+            ->assertForbidden();
+
+        Livewire::actingAs($admin)
+            ->test(VoiceCloningSettings::class)
+            ->assertFormSet([
+                'voice_cloning_audience' => VoiceCloningAccess::AUDIENCE_PREVIEW,
+            ])
+            ->fillForm([
+                'voice_cloning_audience' => VoiceCloningAccess::AUDIENCE_EVERYONE,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(VoiceCloningAccess::AUDIENCE_EVERYONE, SiteSetting::get('voice_cloning_audience'));
+        $this->assertFalse(VoiceCloningAccess::isPreviewOnly());
+
+        Livewire::actingAs($admin)
+            ->test(VoiceCloningSettings::class)
+            ->fillForm([
+                'voice_cloning_audience' => VoiceCloningAccess::AUDIENCE_PREVIEW,
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame(VoiceCloningAccess::AUDIENCE_PREVIEW, SiteSetting::get('voice_cloning_audience'));
+        $this->assertTrue(VoiceCloningAccess::isPreviewOnly());
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function clonePayload(string $name): array
+    {
+        return [
+            'name' => $name,
+            'language_code' => 'ar-XA',
+            'source_type' => 'upload',
+            'audio_file' => UploadedFile::fake()->create('sample.wav', 1024, 'audio/wav'),
+            'consent_audio' => UploadedFile::fake()->create('consent.wav', 800, 'audio/wav'),
+            'consent_confirmed' => '1',
+            'consent_duration' => 8,
+            'audio_duration' => 15,
+        ];
+    }
+
+    private function limitNoticeHtml(string $html): string
+    {
+        $matched = preg_match('/id="vcLimitNotice"[\s\S]*?<\/div>/', $html, $matches);
+        $this->assertSame(1, $matched);
+
+        return $matches[0];
     }
 
     private function voiceCardHtml(string $html, int $voiceId): string

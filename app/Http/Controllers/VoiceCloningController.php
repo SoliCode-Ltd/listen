@@ -26,7 +26,7 @@ class VoiceCloningController extends Controller
         $user = $request->user();
         $plan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
 
-        if (VoiceCloningAccess::allows($user) || VoiceCloningAccess::showsUpgrade($user, $plan)) {
+        if (VoiceCloningAccess::allows($user, $plan) || VoiceCloningAccess::showsUpgrade($user, $plan)) {
             return redirect()->to(route('dashboard') . '#voiceCloningSection');
         }
 
@@ -38,7 +38,7 @@ class VoiceCloningController extends Controller
      */
     public function store(Request $request)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
+        if (! $this->cloningAllowed($request)) {
             abort(404);
         }
 
@@ -215,7 +215,7 @@ class VoiceCloningController extends Controller
      */
     public function status(Request $request, int $id)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
+        if (! $this->cloningAllowed($request)) {
             abort(404);
         }
 
@@ -249,7 +249,7 @@ class VoiceCloningController extends Controller
      */
     public function replaceConsent(Request $request, int $id)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
+        if (! $this->cloningAllowed($request)) {
             abort(404);
         }
 
@@ -360,7 +360,7 @@ class VoiceCloningController extends Controller
      */
     public function retry(Request $request, int $id)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
+        if (! $this->cloningAllowed($request)) {
             abort(404);
         }
 
@@ -418,7 +418,7 @@ class VoiceCloningController extends Controller
      */
     public function destroy(Request $request, int $id)
     {
-        if (! VoiceCloningAccess::allows($request->user())) {
+        if (! $this->cloningAllowed($request)) {
             abort(404);
         }
 
@@ -455,6 +455,14 @@ class VoiceCloningController extends Controller
 
         return redirect()->to(route('dashboard') . '#voiceCloningSection')
             ->with('success', __('ui.voice_cloning.deleted_success'));
+    }
+
+    private function cloningAllowed(Request $request): bool
+    {
+        $user = $request->user();
+        $plan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+
+        return VoiceCloningAccess::allows($user, $plan);
     }
 
     private function jsonError(string $message, int $status = 422): \Illuminate\Http\JsonResponse

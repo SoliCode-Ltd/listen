@@ -106,7 +106,7 @@ class DashboardController extends Controller
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         $customPromptEnabled = $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
-        $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user());
+        $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user(), $activePlan);
         $voiceCloningUpgrade = VoiceCloningAccess::showsUpgrade(auth()->user(), $activePlan);
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
@@ -232,7 +232,7 @@ class DashboardController extends Controller
         $voiceKey = $validated['voice_key'] ?? null;
         $clonedVoiceId = null;
         if ($voiceKey && str_starts_with($voiceKey, 'cloned_')) {
-            if (! VoiceCloningAccess::allows($request->user())) {
+            if (! VoiceCloningAccess::allows($request->user(), $activePlan)) {
                 throw ValidationException::withMessages([
                     'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
                 ]);

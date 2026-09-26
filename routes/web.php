@@ -220,7 +220,7 @@ Route::group([
             $user = auth()->user();
             $plan = app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
 
-            if (! \App\Support\VoiceCloningAccess::allows($user) && ! \App\Support\VoiceCloningAccess::showsUpgrade($user, $plan)) {
+            if (! \App\Support\VoiceCloningAccess::allows($user, $plan) && ! \App\Support\VoiceCloningAccess::showsUpgrade($user, $plan)) {
                 return redirect()->route('dashboard');
             }
 

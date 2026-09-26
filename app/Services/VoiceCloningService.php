@@ -372,7 +372,7 @@ class VoiceCloningService
      */
     public static function maxVoicesForViewer(?User $user, ?Plan $plan): int
     {
-        if (! VoiceCloningAccess::allows($user) || ! self::planAllows($plan)) {
+        if (! VoiceCloningAccess::allows($user, $plan) || ! self::planAllows($plan)) {
             return 0;
         }
 

@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
+use App\Support\VoiceCloningAccess;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -32,6 +33,7 @@ class VoiceCloningSettings extends Page implements HasForms
     {
         $this->form->fill([
             'voice_cloning_enabled' => (string) SiteSetting::get('voice_cloning_enabled', '1') === '1',
+            'voice_cloning_audience' => VoiceCloningAccess::audience(),
             'voice_cloning_max_per_user' => (int) SiteSetting::get('voice_cloning_max_per_user', 5),
             'voice_cloning_min_duration' => (int) SiteSetting::get('voice_cloning_min_duration', 10),
             'voice_cloning_max_upload_mb' => (int) SiteSetting::get('voice_cloning_max_upload_mb', 25),
@@ -51,6 +53,19 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->label('Enable Voice Cloning')
                             ->helperText('Globally enable or disable the voice cloning feature. Per-plan access is controlled in each Plan\'s settings.')
                             ->default(true),
+
+                        Forms\Components\Radio::make('voice_cloning_audience')
+                            ->label('Who can use voice cloning')
+                            ->options([
+                                VoiceCloningAccess::AUDIENCE_PREVIEW => 'Admin email only',
+                                VoiceCloningAccess::AUDIENCE_EVERYONE => 'All users on a plan that includes it',
+                            ])
+                            ->descriptions([
+                                VoiceCloningAccess::AUDIENCE_PREVIEW => 'Only '.VoiceCloningAccess::PREVIEW_EMAIL.' can open the studio. Other free accounts see an upgrade card. Other paid accounts do not see voice cloning.',
+                                VoiceCloningAccess::AUDIENCE_EVERYONE => 'Any signed-in user whose plan includes voice cloning can use the studio. Accounts on a plan without it see an upgrade card.',
+                            ])
+                            ->default(VoiceCloningAccess::AUDIENCE_PREVIEW)
+                            ->required(),
 
                         Forms\Components\Toggle::make('voice_cloning_recording_enabled')
                             ->label('Enable Browser Recording')
@@ -125,6 +140,11 @@ class VoiceCloningSettings extends Page implements HasForms
         $data = $this->form->getState();
 
         SiteSetting::set('voice_cloning_enabled', ($data['voice_cloning_enabled'] ?? false) ? '1' : '0', 'voice_cloning');
+        $audience = (string) ($data['voice_cloning_audience'] ?? VoiceCloningAccess::AUDIENCE_PREVIEW);
+        if (! in_array($audience, [VoiceCloningAccess::AUDIENCE_PREVIEW, VoiceCloningAccess::AUDIENCE_EVERYONE], true)) {
+            $audience = VoiceCloningAccess::AUDIENCE_PREVIEW;
+        }
+        SiteSetting::set('voice_cloning_audience', $audience, 'voice_cloning');
         SiteSetting::set('voice_cloning_recording_enabled', ($data['voice_cloning_recording_enabled'] ?? false) ? '1' : '0', 'voice_cloning');
         SiteSetting::set('voice_cloning_max_per_user', (int) ($data['voice_cloning_max_per_user'] ?? 5), 'voice_cloning');
         SiteSetting::set('voice_cloning_min_duration', (int) ($data['voice_cloning_min_duration'] ?? 10), 'voice_cloning');

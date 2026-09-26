@@ -121,7 +121,7 @@ class GenerateAudioJob implements ShouldQueue
                     ->ready()
                     ->first();
 
-                if (! $clonedVoice || ! VoiceCloningAccess::allows($clonedVoice->user)) {
+                if (! $clonedVoice || ! VoiceCloningAccess::allows($clonedVoice->user, $plan)) {
                     throw new \RuntimeException('Cloned voice not found or not ready.');
                 }
 

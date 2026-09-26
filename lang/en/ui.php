@@ -1238,7 +1238,7 @@ return [
         'submit_button' => 'Create voice',
         'submitting' => 'Creating your voice…',
         'submitted_success' => 'Your recordings are in. The voice will appear here when it is ready.',
-        'limit_reached' => 'You already have :max cloned voices. Delete one to create another.',
+        'limit_reached' => 'You have reached the limit of :max cloned voices on this plan. Upgrade your plan to create more.',
         'rate_limited' => 'Please wait a little before creating another voice.',
 
         'your_voices_title' => 'Your voices',

@@ -306,7 +306,8 @@
       </section>
       @else
         <div class="vc-alert" style="margin-top:1.5rem;background:color-mix(in oklab,var(--a) 8%,var(--surface));border:1px solid color-mix(in oklab,var(--a) 20%,var(--line));color:var(--text)">
-          {{ __('ui.voice_cloning.limit_reached', ['max' => $maxVoices]) }}
+          <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $maxVoices]) }}</p>
+          <a href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
         </div>
       @endif
     @endif

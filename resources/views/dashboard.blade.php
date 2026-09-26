@@ -114,11 +114,17 @@
       padding: .85rem 1rem;
       border-radius: var(--radius);
       margin-top: .2rem;
-      font-size: .9rem;
-      line-height: 1.5;
+      font-size: .95rem;
+      line-height: 1.7;
+      text-align: start;
       background: color-mix(in oklab, var(--a) 8%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
       color: var(--text);
+    }
+    .vc-notice a {
+      display: inline-block;
+      margin-top: .45rem;
+      font-weight: 650;
     }
     .vc-alert { padding: 1rem 1.15rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .98rem; line-height: 1.75; display: flex; align-items: flex-start; gap: .6rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
@@ -370,6 +376,7 @@
     html[dir="rtl"] .vc-empty p,
     html[dir="rtl"] .vc-guidelines li,
     html[dir="rtl"] .vc-consent-tips li,
+    html[dir="rtl"] .vc-notice,
     html[dir="rtl"] .vc-alert,
     html[dir="rtl"] .vc-form-group label,
     html[dir="rtl"] .vc-form-group .hint,
@@ -2291,7 +2298,7 @@
           <p>{{ __('ui.voice_cloning.page_subtitle') }}</p>
           @if(($voiceCloningVisible ?? false) || $vcStudioOpen)
           <div class="vc-meta">
-            @if($voiceCloningVisible ?? false)
+            @if(($voiceCloningVisible ?? false) && \App\Support\VoiceCloningAccess::isPreviewOnly())
             <span class="vc-preview-pill">{{ __('ui.voice_cloning.preview_badge') }}</span>
             @endif
             @if($vcStudioOpen)
@@ -2590,7 +2597,8 @@
               </form>
             </section>
             <div class="vc-notice" id="vcLimitNotice" @if(! $vcAtLimit) style="display:none" @endif>
-              {{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}
+              <p>{{ __('ui.voice_cloning.limit_reached', ['max' => $voiceCloningMaxVoices]) }}</p>
+              <a href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
             </div>
           @endif
         @endif
