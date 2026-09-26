@@ -1283,6 +1283,8 @@ class VoiceCloningTest extends TestCase
         $plainPage->assertOk();
         $plainPage->assertSee(__('ui.voice_cloning.upgrade_title'), false);
         $plainPage->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $upgradeCard = $this->upgradeCardHtml($plainPage->getContent());
+        $this->assertMatchesRegularExpression('/<ul class="features-list">[\s\S]*<\/ul>\s*<a class="btn btn-primary"/', $upgradeCard);
         $this->actingAs($plainUser)
             ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Plain Voice'))
             ->assertNotFound();
@@ -1291,6 +1293,10 @@ class VoiceCloningTest extends TestCase
         $plainArabic = $this->actingAs($this->freeUser)->getLocalizedRoute('dashboard');
         $plainArabic->assertSee(__('ui.voice_cloning.upgrade_title'), false);
         $plainArabic->assertDontSee(__('ui.voice_cloning.create_title'), false);
+        $this->assertMatchesRegularExpression(
+            '/<ul class="features-list">[\s\S]*<\/ul>\s*<a class="btn btn-primary"/',
+            $this->upgradeCardHtml($plainArabic->getContent()),
+        );
         app()->setLocale('en');
 
         $this->actingAs($this->freeUser)
@@ -1388,6 +1394,14 @@ class VoiceCloningTest extends TestCase
             $matches,
         );
 
+        $this->assertSame(1, $matched);
+
+        return $matches[0];
+    }
+
+    private function upgradeCardHtml(string $html): string
+    {
+        $matched = preg_match('/<section class="vc-upgrade"[\s\S]*?<\/section>/', $html, $matches);
         $this->assertSame(1, $matched);
 
         return $matches[0];

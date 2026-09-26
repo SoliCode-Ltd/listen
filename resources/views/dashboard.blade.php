@@ -141,7 +141,6 @@
     .vc-alert { padding: 1rem 1.15rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .98rem; line-height: 1.75; display: flex; align-items: flex-start; gap: .6rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
     .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
-    .vc-upgrade,
     .vc-disabled-banner {
       padding: 1.4rem;
       border-radius: 1rem;
@@ -150,10 +149,93 @@
       text-align: center;
       margin-bottom: 1rem;
     }
-    .vc-upgrade h2 { margin: 0 0 .4rem; font-size: 1.1rem; }
-    .vc-upgrade p { margin: 0 0 .9rem; color: var(--muted); }
-    .vc-upgrade .features-list { list-style: none; margin: 0 0 1rem; padding: 0; display: inline-grid; gap: .35rem; text-align: start; }
-    .vc-upgrade .features-list li { display: flex; align-items: center; gap: .45rem; font-size: .9rem; }
+    .vc-upgrade {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 100%;
+      margin: .35rem 0 0;
+      padding: 1.7rem 1.4rem 1.5rem;
+      border-radius: 1.25rem;
+      text-align: center;
+      border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
+      background:
+        radial-gradient(70% 80% at 50% 0%, color-mix(in oklab, var(--a) 14%, transparent), transparent 64%),
+        var(--surface);
+      box-shadow: 0 16px 36px color-mix(in oklab, var(--a) 8%, transparent);
+    }
+    .vc-upgrade-mark {
+      width: 3.4rem;
+      height: 3.4rem;
+      border-radius: 1rem;
+      display: grid;
+      place-items: center;
+      color: var(--a);
+      background: color-mix(in oklab, var(--a) 12%, var(--surface2));
+      border: 1px solid color-mix(in oklab, var(--a) 26%, transparent);
+    }
+    .vc-upgrade-mark svg {
+      width: 2rem;
+      height: 2rem;
+      display: block;
+    }
+    .vc-upgrade h2 {
+      margin: 1rem 0 .4rem;
+      max-width: 24rem;
+      font-size: clamp(1.2rem, 2.2vw, 1.45rem);
+      line-height: 1.35;
+    }
+    html[dir="rtl"] .vc-upgrade h2 {
+      line-height: 1.6;
+    }
+    .vc-upgrade > p {
+      margin: 0;
+      max-width: 38rem;
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.7;
+    }
+    html[dir="rtl"] .vc-upgrade > p {
+      font-size: 1.02rem;
+      line-height: 1.9;
+    }
+    .vc-upgrade .features-list {
+      list-style: none;
+      width: min(100%, 32rem);
+      margin: 1.15rem 0 0;
+      padding: .9rem 1rem;
+      display: grid;
+      gap: .7rem;
+      text-align: start;
+      border-radius: .9rem;
+      background: color-mix(in oklab, var(--surface2) 88%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+    }
+    .vc-upgrade .features-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: .65rem;
+      margin: 0;
+      font-size: .98rem;
+      line-height: 1.55;
+    }
+    html[dir="rtl"] .vc-upgrade .features-list li {
+      font-size: 1rem;
+      line-height: 1.8;
+    }
+    .vc-upgrade .features-list svg {
+      width: 1.15rem;
+      height: 1.15rem;
+      flex: none;
+      margin-top: .15rem;
+      color: var(--a);
+    }
+    .vc-upgrade .btn {
+      margin-top: 1.2rem;
+      min-height: 48px;
+      min-width: 11.5rem;
+      padding-inline: 1.45rem;
+    }
     .vc-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .85rem; margin-bottom: 1rem; }
     .vc-card {
       border-radius: 1rem;
@@ -466,10 +548,12 @@
       .vc-step { flex: 1 1 0; min-height: 44px; }
       .vc-create-panel,
       .vc-empty,
-      .vc-upgrade,
       .vc-disabled-banner,
       .vc-card {
         padding: .9rem;
+      }
+      .vc-upgrade {
+        padding: 1.25rem 1rem 1.15rem;
       }
       .vc-tabs,
       .vc-script-toolbar,
@@ -2326,12 +2410,29 @@
         </div>
 
         @if($voiceCloningUpgrade ?? false)
-          <section class="vc-upgrade">
-            <h2>{{ __('ui.voice_cloning.upgrade_title') }}</h2>
+          <section class="vc-upgrade" aria-labelledby="vcUpgradeTitle">
+            <div class="vc-upgrade-mark" aria-hidden="true">
+              <svg viewBox="0 0 128 128" fill="currentColor">
+                <rect x="8" y="59" width="10" height="10" rx="5"/>
+                <rect x="26" y="42" width="10" height="44" rx="5"/>
+                <rect x="44" y="28" width="10" height="72" rx="5"/>
+                <rect x="62" y="14" width="10" height="100" rx="5"/>
+                <rect x="80" y="28" width="10" height="72" rx="5"/>
+                <rect x="98" y="42" width="10" height="44" rx="5"/>
+                <rect x="116" y="59" width="10" height="10" rx="5"/>
+              </svg>
+            </div>
+            <h2 id="vcUpgradeTitle">{{ __('ui.voice_cloning.upgrade_title') }}</h2>
             <p>{{ __('ui.voice_cloning.upgrade_subtitle') }}</p>
             <ul class="features-list">
-              <li>{{ __('ui.voice_cloning.upgrade_feature_1') }}</li>
-              <li>{{ __('ui.voice_cloning.upgrade_feature_2') }}</li>
+              <li>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".14"/><path d="M6 10.2 8.6 12.8 14.2 7.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>{{ __('ui.voice_cloning.upgrade_feature_1') }}</span>
+              </li>
+              <li>
+                <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor" opacity=".14"/><path d="M6 10.2 8.6 12.8 14.2 7.2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <span>{{ __('ui.voice_cloning.upgrade_feature_2') }}</span>
+              </li>
             </ul>
             <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.voice_cloning.upgrade_cta') }}</a>
           </section>
