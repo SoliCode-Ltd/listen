@@ -12,14 +12,15 @@
     }
 
     /* Custom voice studio */
-    .vc-shell { margin-top: .25rem; min-width: 0; }
-    .vc-intro p { margin: .4rem 0 0; color: var(--muted); }
+    .vc-shell { margin-top: .5rem; min-width: 0; }
+    .vc-intro { margin-bottom: 1.5rem; }
+    .vc-intro p { margin: .55rem 0 0; color: var(--muted); line-height: 1.7; }
     .vc-meta {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: .55rem .8rem;
-      margin-top: .85rem;
+      gap: .85rem 1.1rem;
+      margin-top: 1.15rem;
     }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
     .vc-reconsent-banner {
@@ -58,8 +59,19 @@
     }
     .vc-segment.active { background: var(--a); color: #fff; }
     .vc-consent-tips { margin: .6rem 0 0; padding-inline-start: 1.1rem; color: var(--muted); font-size: .8rem; display: grid; gap: .2rem; }
-    .vc-preview-audio { display: block; width: 100%; max-width: 360px; margin: .7rem auto 0; }
-    .vc-preview-audio[hidden] { display: none; }
+    .vc-playback {
+      display: none;
+      justify-content: center;
+      width: 100%;
+      margin-top: 1.15rem;
+    }
+    .vc-playback.is-ready { display: flex; }
+    .vc-playback[hidden] { display: none !important; }
+    .vc-preview-audio {
+      width: min(100%, 28rem);
+      max-width: 28rem;
+      margin-inline: auto;
+    }
     .vc-recorder.countdown .vc-timer { color: var(--a); }
     .vc-tech-detail { margin: -.25rem 0 .7rem; font-size: .76rem; color: var(--muted); }
     .vc-tech-detail summary { cursor: pointer; font-weight: 700; }
@@ -89,7 +101,7 @@
       border: 1px solid color-mix(in oklab, var(--a) 24%, var(--line));
       color: var(--text);
     }
-    .vc-alert { padding: .8rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .9rem; display: flex; align-items: center; gap: .5rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
+    .vc-alert { padding: 1rem 1.15rem; border-radius: var(--radius); margin-bottom: 1rem; font-size: .98rem; line-height: 1.75; display: flex; align-items: flex-start; gap: .6rem; scroll-margin-top: 6.5rem; scroll-margin-bottom: 2rem; }
     .vc-alert.success { background: color-mix(in oklab, #22c55e 12%, var(--surface)); border: 1px solid color-mix(in oklab, #22c55e 30%, var(--line)); color: #16a34a; }
     .vc-alert.error { background: color-mix(in oklab, #ef4444 12%, var(--surface)); border: 1px solid color-mix(in oklab, #ef4444 30%, var(--line)); color: #dc2626; }
     .vc-upgrade,
@@ -168,20 +180,20 @@
       border-radius: 1rem;
       border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
       background: color-mix(in oklab, var(--surface) 72%, transparent);
-      padding: 1.5rem 1rem;
-      margin-bottom: 1rem;
+      padding: 2rem 1.6rem;
+      margin: .4rem 0 1.5rem;
     }
-    .vc-empty h3 { margin: 0 0 .35rem; }
-    .vc-empty p { margin: 0 0 .9rem; color: var(--muted); }
+    .vc-empty h3 { margin: 0 0 .55rem; }
+    .vc-empty p { margin: 0 auto 1.15rem; max-width: 38rem; color: var(--muted); line-height: 1.75; }
     .vc-create-panel {
       border-radius: 1rem;
       border: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
       background: color-mix(in oklab, var(--surface) 72%, transparent);
-      padding: 1.1rem;
-      margin-top: 1rem;
+      padding: 1.4rem 1.45rem 1.5rem;
+      margin-top: 1.5rem;
     }
     .vc-create-panel h2 { margin: 0 0 .9rem; font-size: 1.08rem; }
-    .vc-form-group { margin-bottom: 1rem; }
+    .vc-form-group { margin-bottom: 1.2rem; }
     .vc-form-group label { display: block; margin-bottom: .35rem; font-size: .88rem; font-weight: 700; }
     .vc-tabs { display: flex; gap: .45rem; margin-bottom: .8rem; }
     .vc-tab { border: 1px solid var(--line); border-radius: var(--radius); padding: .5rem .95rem; background: var(--surface); color: var(--muted); font-weight: 700; font-size: .82rem; cursor: pointer; }
@@ -224,9 +236,9 @@
     .vc-timer { margin: .7rem 0 .25rem; font-size: 1.35rem; font-weight: 800; font-variant-numeric: tabular-nums; }
     .vc-recorder .hint { margin: 0; color: var(--muted); font-size: .84rem; }
     .vc-recorder .rec-actions { margin-top: .7rem; display: flex; justify-content: center; gap: .4rem; }
-    .vc-guidelines { border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); padding: .85rem .95rem; margin-bottom: .95rem; }
-    .vc-guidelines h4 { margin: 0 0 .45rem; font-size: .86rem; color: var(--a); }
-    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .84rem; color: var(--muted); display: grid; gap: .35rem; }
+    .vc-guidelines { border-radius: .8rem; border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); padding: 1.05rem 1.15rem; margin-bottom: 1.25rem; }
+    .vc-guidelines h4 { margin: 0 0 .65rem; font-size: .92rem; color: var(--a); }
+    .vc-guidelines ul { list-style: none; margin: 0; padding: 0; font-size: .92rem; line-height: 1.7; color: var(--muted); display: grid; gap: .55rem; }
     .vc-guidelines li { display: flex; align-items: flex-start; gap: .5rem; }
     .vc-guidelines li::before {
       content: "";
@@ -255,7 +267,7 @@
       border: 1px solid color-mix(in oklab, var(--a) 32%, var(--line));
       background: color-mix(in oklab, var(--a) 10%, var(--surface));
     }
-    .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: .75rem; }
+    .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1.15rem; }
     .vc-form-group input[type="text"],
     .vc-form-group select {
       width: 100%;
@@ -273,7 +285,7 @@
       box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent);
     }
     .vc-form-group .hint { margin: .35rem 0 0; color: var(--muted); font-size: .78rem; font-weight: 500; }
-    .vc-steps { display: flex; gap: .55rem; margin: 0 0 1rem; }
+    .vc-steps { display: flex; gap: .75rem; margin: 0 0 1.25rem; }
     .vc-step {
       flex: 1;
       display: flex;
@@ -327,8 +339,23 @@
     }
     #vcConsentScript[dir="rtl"] {
       font-family: var(--font-body-ar);
-      font-size: 1.18rem;
-      line-height: 1.9;
+      font-size: 1.28rem;
+      line-height: 2.05;
+    }
+    html[dir="rtl"] .vc-shell {
+      line-height: 1.8;
+    }
+    html[dir="rtl"] .vc-intro p,
+    html[dir="rtl"] .vc-empty p,
+    html[dir="rtl"] .vc-guidelines li,
+    html[dir="rtl"] .vc-alert,
+    html[dir="rtl"] .vc-form-group label,
+    html[dir="rtl"] .vc-form-group .hint,
+    html[dir="rtl"] .vc-card-meta,
+    html[dir="rtl"] .vc-consent label,
+    html[dir="rtl"] .vc-recorder .hint {
+      font-size: 1rem;
+      line-height: 1.85;
     }
     .vc-script .hint { margin: .55rem 0 0; color: var(--muted); font-size: .8rem; }
     .vc-or {
@@ -470,7 +497,7 @@
     .dashboard-layout {
       display: grid;
       grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-      gap: 2rem;
+      gap: 2.75rem;
       align-items: start;
     }
     .dashboard-content {
@@ -2308,8 +2335,8 @@
                     <span>{{ $vcLanguageLabel }} &middot; {{ $voice->source_type === 'recording' ? __('ui.voice_cloning.record_tab') : __('ui.voice_cloning.upload_tab') }}</span>
                   </div>
                   @if($voice->isFailed())
-                    <div class="vc-alert error vc-failure-hint" style="margin-bottom:.6rem;font-size:.82rem">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
-                    @php $vcDetail = \App\Services\VoiceCloningService::technicalFailureDetail($voice); @endphp
+                    <div class="vc-alert error vc-failure-hint">{{ \App\Services\VoiceCloningService::publicFailureMessage($voice) }}</div>
+                    @php $vcDetail = \App\Services\VoiceCloningService::studioFailureDetail($voice); @endphp
                     @if($vcDetail !== '')
                       <details class="vc-tech-detail">
                         <summary>{{ __('ui.voice_cloning.technical_details') }}</summary>
@@ -2409,10 +2436,13 @@
                     <div class="vc-form-group">
                       <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
                       <select id="vcLanguage" name="language_code">
-                        <option value="ar-XA" @selected(app()->getLocale() === 'ar')>{{ __('ui.voice_cloning.language_ar') }}</option>
-                        <option value="en-US" @selected(app()->getLocale() !== 'ar')>{{ __('ui.voice_cloning.language_en_us') }}</option>
-                        <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
-                        <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
+                        @if(app()->getLocale() === 'ar')
+                          <option value="ar-XA" selected>{{ __('ui.voice_cloning.language_ar') }}</option>
+                        @else
+                          <option value="en-US" selected>{{ __('ui.voice_cloning.language_en_us') }}</option>
+                          <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
+                          <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
+                        @endif
                       </select>
                       <p class="hint">{{ __('ui.voice_cloning.language_hint') }}</p>
                     </div>
@@ -2444,8 +2474,10 @@
                       <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
                       <div class="vc-timer" id="vcTimer">00:00</div>
                       <p class="hint" id="vcRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
-                      <p class="hint" style="font-size:.8rem;margin-top:.3rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
-                      <audio class="vc-preview-audio" id="vcRecPreview" controls preload="metadata" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                      <p class="hint" style="margin-top:.45rem">{{ __('ui.voice_cloning.min_duration_note', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
+                      <div class="vc-playback" id="vcRecPlayback" hidden>
+                        <audio class="vc-preview-audio" id="vcRecPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                      </div>
                       <div class="rec-actions" id="vcRecActions" style="display:none">
                         <button type="button" class="btn btn-ghost" id="vcRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
                       </div>
@@ -2463,8 +2495,11 @@
                   <div class="vc-form-group vc-consent-language">
                     <label for="vcConsentLanguage">{{ __('ui.voice_cloning.consent_language_label') }}</label>
                     <div class="vc-segmented" role="radiogroup" aria-label="{{ __('ui.voice_cloning.consent_language_label') }}">
-                      <button type="button" class="vc-segment {{ $vcConsentLocale === 'ar-XA' ? 'active' : '' }}" data-consent-lang="ar-XA" role="radio" aria-checked="{{ $vcConsentLocale === 'ar-XA' ? 'true' : 'false' }}">العربية</button>
-                      <button type="button" class="vc-segment {{ $vcConsentLocale === 'en-US' ? 'active' : '' }}" data-consent-lang="en-US" role="radio" aria-checked="{{ $vcConsentLocale === 'en-US' ? 'true' : 'false' }}">English</button>
+                      @if($vcConsentLocale === 'ar-XA')
+                        <button type="button" class="vc-segment active" data-consent-lang="ar-XA" role="radio" aria-checked="true">العربية</button>
+                      @else
+                        <button type="button" class="vc-segment active" data-consent-lang="en-US" role="radio" aria-checked="true">English</button>
+                      @endif
                     </div>
                     <input type="hidden" name="consent_language" id="vcConsentLanguage" value="{{ $vcConsentLocale }}">
                     <p class="hint">{{ __('ui.voice_cloning.consent_language_hint') }}</p>
@@ -2479,6 +2514,7 @@
                     <p class="hint">{{ __('ui.voice_cloning.consent_script_hint') }}</p>
                     <ul class="vc-consent-tips">
                       <li>{{ __('ui.voice_cloning.consent_tip_1') }}</li>
+                      <li>{{ __('ui.voice_cloning.consent_tip_latin') }}</li>
                       <li>{{ __('ui.voice_cloning.consent_tip_2') }}</li>
                       <li>{{ __('ui.voice_cloning.consent_tip_3') }}</li>
                     </ul>
@@ -2493,7 +2529,9 @@
                       <div class="vc-bars" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
                       <div class="vc-timer" id="vcConsentTimer">00:00</div>
                       <p class="hint" id="vcConsentRecHint">{{ __('ui.voice_cloning.record_start') }}</p>
-                      <audio class="vc-preview-audio" id="vcConsentPreview" controls preload="metadata" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                      <div class="vc-playback" id="vcConsentPlayback" hidden>
+                        <audio class="vc-preview-audio" id="vcConsentPreview" controls preload="none" hidden aria-label="{{ __('ui.voice_cloning.listen_back') }}"></audio>
+                      </div>
                       <div class="rec-actions" id="vcConsentRecActions" style="display:none">
                         <button type="button" class="btn btn-ghost" id="vcConsentRecRetry">{{ __('ui.voice_cloning.record_retry') }}</button>
                       </div>
@@ -3763,17 +3801,24 @@
       function showPreview(audioId, blob) {
         const audio = document.getElementById(audioId);
         if (!audio) return;
+        const playback = audio.closest('.vc-playback');
         if (audio.dataset.url) URL.revokeObjectURL(audio.dataset.url);
         if (!blob) {
           audio.removeAttribute('src');
           audio.dataset.url = '';
           audio.hidden = true;
+          playback?.classList.remove('is-ready');
+          if (playback) playback.hidden = true;
           return;
         }
         const url = URL.createObjectURL(blob);
         audio.dataset.url = url;
         audio.src = url;
         audio.hidden = false;
+        if (playback) {
+          playback.hidden = false;
+          playback.classList.add('is-ready');
+        }
       }
       const retryText = @json(__('ui.voice_cloning.retry_button'));
       const techDetailsText = @json(__('ui.voice_cloning.technical_details'));
@@ -4551,7 +4596,7 @@
         return new Blob([view], { type: 'audio/wav' });
       }
 
-      // Gemini wants 24 kHz mono 16-bit WAV. Converting here means the server
+      // The voice service wants 24 kHz mono 16-bit WAV. Converting here means the server
       // never needs ffmpeg or exec(), which many hosts disable.
       async function toGeminiWav(blob) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;

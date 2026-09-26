@@ -45,7 +45,7 @@ class VoiceCloningSettings extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Voice Cloning Feature')
-                    ->description('Control voice cloning availability and limits. Uses Google Cloud TTS Chirp 3 Instant Custom Voice API.')
+                    ->description('Control voice cloning availability and limits for Listen Studio.')
                     ->schema([
                         Forms\Components\Toggle::make('voice_cloning_enabled')
                             ->label('Enable Voice Cloning')
@@ -86,8 +86,8 @@ class VoiceCloningSettings extends Page implements HasForms
                             ->helperText('Maximum file upload size in megabytes.'),
                     ]),
 
-                Forms\Components\Section::make('Google Cloud TTS Configuration')
-                    ->description('Voice cloning uses the Chirp 3: Instant Custom Voice API (v1beta1). Your GCP project must be on Google\'s allow-list.')
+                Forms\Components\Section::make('Listen voice service')
+                    ->description('Region used when Listen creates a cloned voice.')
                     ->schema([
                         Forms\Components\Select::make('voice_cloning_region')
                             ->label('API Region')
@@ -100,7 +100,7 @@ class VoiceCloningSettings extends Page implements HasForms
                                 'europe-west2' => 'Europe West (europe-west2)',
                             ])
                             ->default('global')
-                            ->helperText('Google Cloud TTS region for voice cloning API calls.'),
+                            ->helperText('Region Listen uses for voice cloning.'),
                     ]),
 
                 Forms\Components\Section::make('Statistics')
