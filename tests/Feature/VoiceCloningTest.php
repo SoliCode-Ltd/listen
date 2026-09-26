@@ -125,8 +125,10 @@ class VoiceCloningTest extends TestCase
         $english->assertSee(__('ui.voice_cloning.step_consent'), false);
         $english->assertSee(__('ui.voice_cloning.consent_upload_label'), false);
         $english->assertSee(VoiceCloningService::CONSENT_SCRIPTS['en-US'], false);
-        $english->assertSee('<option value="en-US"', false);
-        $english->assertDontSee('<option value="ar-XA"', false);
+        $english->assertSee(__('ui.voice_cloning.language_en'), false);
+        $english->assertDontSee('<select id="vcLanguage"', false);
+        $english->assertDontSee(__('ui.voice_cloning.language_hint'), false);
+        $english->assertSee('id="vcLanguage" value="en-US"', false);
         $english->assertSee('id="vcRecPlayback" hidden', false);
 
         app()->setLocale('ar');
@@ -136,9 +138,9 @@ class VoiceCloningTest extends TestCase
         $arabic->assertSee(__('ui.voice_cloning.step_sample'), false);
         $arabic->assertSee(__('ui.voice_cloning.consent_upload_label'), false);
         $arabic->assertSee(VoiceCloningService::CONSENT_SCRIPTS['ar-XA'], false);
-        $arabic->assertSee('<option value="ar-XA"', false);
-        $arabic->assertDontSee('<option value="en-US"', false);
-        $arabic->assertDontSee('<option value="en-GB"', false);
+        $arabic->assertSee('id="vcLanguage" value="ar-XA"', false);
+        $arabic->assertDontSee('<select id="vcLanguage"', false);
+        $arabic->assertDontSee(__('ui.voice_cloning.language_hint'), false);
         $arabic->assertDontSee('Gemini 3.8', false);
         app()->setLocale('en');
     }

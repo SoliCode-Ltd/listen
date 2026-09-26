@@ -58,7 +58,26 @@
       cursor: pointer;
     }
     .vc-segment.active { background: var(--a); color: #fff; }
-    .vc-consent-tips { margin: .6rem 0 0; padding-inline-start: 1.1rem; color: var(--muted); font-size: .8rem; display: grid; gap: .2rem; }
+    .vc-consent-tips {
+      list-style: none;
+      margin: .85rem 0 0;
+      padding: 0;
+      font-size: .92rem;
+      line-height: 1.7;
+      color: var(--muted);
+      display: grid;
+      gap: .55rem;
+    }
+    .vc-consent-tips li { display: flex; align-items: flex-start; gap: .5rem; }
+    .vc-consent-tips li::before {
+      content: "";
+      width: .42rem;
+      height: .42rem;
+      margin-top: .38rem;
+      border-radius: 99px;
+      flex-shrink: 0;
+      background: var(--a);
+    }
     .vc-playback {
       display: none;
       justify-content: center;
@@ -269,7 +288,8 @@
     }
     .vc-field-grid { display: grid; grid-template-columns: 1.2fr .8fr; gap: 1.15rem; }
     .vc-form-group input[type="text"],
-    .vc-form-group select {
+    .vc-form-group select,
+    .vc-language-value {
       width: 100%;
       border-radius: .8rem;
       border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
@@ -277,6 +297,7 @@
       color: var(--text);
       padding: .72rem .85rem;
       font: inherit;
+      line-height: 1.45;
     }
     .vc-form-group input[type="text"]:focus,
     .vc-form-group select:focus {
@@ -348,6 +369,7 @@
     html[dir="rtl"] .vc-intro p,
     html[dir="rtl"] .vc-empty p,
     html[dir="rtl"] .vc-guidelines li,
+    html[dir="rtl"] .vc-consent-tips li,
     html[dir="rtl"] .vc-alert,
     html[dir="rtl"] .vc-form-group label,
     html[dir="rtl"] .vc-form-group .hint,
@@ -2434,17 +2456,9 @@
                       <input type="text" id="vcName" name="name" minlength="2" maxlength="50" placeholder="{{ __('ui.voice_cloning.voice_name_placeholder') }}">
                     </div>
                     <div class="vc-form-group">
-                      <label for="vcLanguage">{{ __('ui.voice_cloning.language_label') }}</label>
-                      <select id="vcLanguage" name="language_code">
-                        @if(app()->getLocale() === 'ar')
-                          <option value="ar-XA" selected>{{ __('ui.voice_cloning.language_ar') }}</option>
-                        @else
-                          <option value="en-US" selected>{{ __('ui.voice_cloning.language_en_us') }}</option>
-                          <option value="en-GB">{{ __('ui.voice_cloning.language_en_gb') }}</option>
-                          <option value="en-AU">{{ __('ui.voice_cloning.language_en_au') }}</option>
-                        @endif
-                      </select>
-                      <p class="hint">{{ __('ui.voice_cloning.language_hint') }}</p>
+                      <label id="vcLanguageLabel">{{ __('ui.voice_cloning.language_label') }}</label>
+                      <div class="vc-language-value" role="text" aria-labelledby="vcLanguageLabel">{{ app()->getLocale() === 'ar' ? __('ui.voice_cloning.language_ar') : __('ui.voice_cloning.language_en') }}</div>
+                      <input type="hidden" name="language_code" id="vcLanguage" value="{{ app()->getLocale() === 'ar' ? 'ar-XA' : 'en-US' }}">
                     </div>
                   </div>
 
