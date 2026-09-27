@@ -773,10 +773,15 @@
       padding-top: 4.25rem;
     }
     .clone-announce-card {
-      display: flex;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      grid-template-areas:
+        "mark copy cta"
+        "dialects dialects dialects";
       align-items: center;
-      gap: 1.25rem;
-      padding: 1.15rem 1.35rem;
+      column-gap: 1.25rem;
+      row-gap: .9rem;
+      padding: 1.2rem 1.35rem 1.15rem;
       border-radius: 1.25rem;
       border: 1px solid color-mix(in oklab, var(--a) 34%, var(--line));
       background:
@@ -790,6 +795,7 @@
         var(--surface);
     }
     .clone-announce-mark {
+      grid-area: mark;
       width: 3.5rem;
       height: 3.5rem;
       flex: none;
@@ -806,7 +812,7 @@
       display: block;
     }
     .clone-announce-copy {
-      flex: 1;
+      grid-area: copy;
       min-width: 0;
       display: flex;
       flex-direction: column;
@@ -836,10 +842,32 @@
       font-size: 1.02rem;
       line-height: 1.75;
     }
+    .clone-announce-dialects {
+      grid-area: dialects;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .45rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .clone-announce-dialects li {
+      margin: 0;
+      padding: .38rem .72rem;
+      border-radius: var(--radius-full);
+      border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
+      background: color-mix(in oklab, var(--a) 12%, var(--surface));
+      color: var(--text);
+      font-size: .84rem;
+      font-weight: 500;
+      line-height: 1.35;
+      letter-spacing: 0;
+    }
     .clone-announce-card .btn {
-      flex: none;
+      grid-area: cta;
+      justify-self: end;
+      align-self: center;
       min-height: 48px;
-      margin-inline-start: auto;
       white-space: nowrap;
       padding-inline: 1.45rem;
     }
@@ -855,17 +883,26 @@
         padding-top: 2.75rem;
       }
       .clone-announce-card {
-        display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        gap: .85rem 1rem;
+        grid-template-areas:
+          "mark copy"
+          "dialects dialects"
+          "cta cta";
+        column-gap: 1rem;
+        row-gap: .75rem;
         padding: 1.05rem 1rem 1rem;
       }
+      .clone-announce-dialects {
+        gap: .4rem;
+      }
+      .clone-announce-dialects li {
+        font-size: .8rem;
+        padding: .34rem .62rem;
+      }
       .clone-announce-card .btn {
-        grid-column: 1 / -1;
+        justify-self: stretch;
         width: 100%;
-        margin-inline-start: 0;
-        margin-top: .15rem;
+        margin-top: .1rem;
       }
     }
 
@@ -1539,6 +1576,11 @@
           <p>{{ __('ui.landing.clone_announce_body') }}</p>
         </div>
         <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.landing.clone_announce_cta') }}</a>
+        <ul class="clone-announce-dialects" aria-label="{{ __('ui.landing.clone_announce_dialects_label') }}">
+          @foreach (__('ui.landing.clone_announce_dialects') as $dialectKey)
+            <li>{{ __('ui.dialects.'.$dialectKey) }}</li>
+          @endforeach
+        </ul>
       </div>
     </section>
 
