@@ -1097,17 +1097,52 @@ class VoiceCloningTest extends TestCase
             ->get(\App\Filament\Resources\ClonedVoiceResource::getUrl('view', ['record' => $voice]))
             ->assertOk()
             ->assertSee('Why it failed')
-            ->assertSee(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'consent']), false)
+            ->assertSee('/admin-audio/cloned-voices/'.$voice->id.'/consent', false)
+            ->assertSee('/admin-audio/cloned-voices/'.$voice->id.'/sample', false)
             ->assertSee("recorded phrase didn&#039;t match", false);
 
         $this->actingAs($admin)
             ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
             ->assertOk()
-            ->assertHeader('Content-Type', 'audio/wav');
+            ->assertHeader('Content-Type', 'audio/wav')
+            ->assertHeader('Accept-Ranges', 'bytes');
+
+        $this->actingAs($admin)
+            ->withHeaders(['Range' => 'bytes=0-3'])
+            ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
+            ->assertStatus(206)
+            ->assertHeader('Content-Range', 'bytes 0-3/22');
 
         $this->actingAs($this->paidUser)
             ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
             ->assertForbidden();
+    }
+
+    public function test_admin_can_play_a_recording_stored_before_the_private_disk(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $relative = 'voice-cloning/9/legacy-sample.wav';
+        $absolute = storage_path('app/'.$relative);
+        if (! is_dir(dirname($absolute))) {
+            mkdir(dirname($absolute), 0775, true);
+        }
+        file_put_contents($absolute, 'RIFF....WAVEfmt legacy');
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => $relative,
+            'consent_audio_path' => null,
+        ]);
+
+        try {
+            $this->actingAs($admin)
+                ->get(route('admin.cloned-voices.audio', ['voice' => $voice->id, 'kind' => 'sample']))
+                ->assertOk()
+                ->assertHeader('Content-Type', 'audio/wav')
+                ->assertHeader('Accept-Ranges', 'bytes');
+        } finally {
+            @unlink($absolute);
+        }
     }
 
     public function test_old_webm_recordings_cannot_be_retried(): void
