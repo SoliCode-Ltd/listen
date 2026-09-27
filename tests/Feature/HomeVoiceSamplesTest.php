@@ -227,31 +227,27 @@ class HomeVoiceSamplesTest extends TestCase
         $arabic->assertSee('id="cloneAnnounceTitle"', false);
         $arabic->assertSee('استنساخ الصوت متاح الآن', false);
         $arabic->assertSee('سجّل صوتك، ثم استخدمه في كل توليد بأي لهجة تختارها.', false);
-        $arabic->assertSee('اللهجات المتاحة مع صوتك المستنسخ', false);
         $arabic->assertSee('اختر باقتك', false);
         $arabic->assertSee('href="'.route('pricing').'"', false);
         $arabic->assertDontSee('صار جاهزاً', false);
         $arabicSection = $this->announcementHtml($arabic->getContent());
         $this->assertStringNotContainsString('منصة إسمع', $arabicSection);
         $this->assertStringNotContainsString('عرض الأسعار', $arabicSection);
-        foreach (['سعودي', 'مصري', 'إماراتي', 'لبناني', 'عراقي', 'مغربي', 'فصحى'] as $dialect) {
-            $this->assertStringContainsString($dialect, $arabicSection);
-        }
+        $this->assertStringNotContainsString('clone-announce-dialects', $arabicSection);
+        $this->assertStringNotContainsString('سعودي', $arabicSection);
 
         app()->setLocale('en');
         $english = $this->getLocalizedRoute('home');
         $english->assertOk();
         $english->assertSee('Voice cloning is now available.', false);
         $english->assertSee('Record your voice, then use it in every generation, in any dialect you choose.', false);
-        $english->assertSee('Dialects available with your cloned voice', false);
         $english->assertSee('Choose your plan', false);
         $english->assertSee('href="'.route('pricing').'"', false);
         $englishSection = $this->announcementHtml($english->getContent());
         $this->assertStringNotContainsString('Listen Studio', $englishSection);
         $this->assertStringNotContainsString('View pricing', $englishSection);
-        foreach (['Saudi', 'Egyptian', 'Emirati', 'Lebanese', 'Iraqi', 'Moroccan', 'Modern Standard Arabic'] as $dialect) {
-            $this->assertStringContainsString($dialect, $englishSection);
-        }
+        $this->assertStringNotContainsString('clone-announce-dialects', $englishSection);
+        $this->assertStringNotContainsString('Saudi', $englishSection);
     }
 
     public function test_audio_download_converts_wav_into_a_whatsapp_file(): void

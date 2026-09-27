@@ -147,8 +147,6 @@ return [
         'get_started_free' => 'Get Started Free',
         'clone_announce_title' => 'Voice cloning is now available.',
         'clone_announce_body' => 'Record your voice, then use it in every generation, in any dialect you choose.',
-        'clone_announce_dialects_label' => 'Dialects available with your cloned voice',
-        'clone_announce_dialects' => ['saudi', 'egyptian', 'emirati', 'kuwaiti', 'omani', 'lebanese', 'syrian', 'jordanian', 'iraqi', 'moroccan', 'tunisian', 'msa'],
         'clone_announce_cta' => 'Choose your plan',
     ],
 

@@ -147,8 +147,6 @@ return [
         'get_started_free' => 'ابدأ مجاناً',
         'clone_announce_title' => 'استنساخ الصوت متاح الآن',
         'clone_announce_body' => 'سجّل صوتك، ثم استخدمه في كل توليد بأي لهجة تختارها.',
-        'clone_announce_dialects_label' => 'اللهجات المتاحة مع صوتك المستنسخ',
-        'clone_announce_dialects' => ['saudi', 'egyptian', 'emirati', 'kuwaiti', 'omani', 'lebanese', 'syrian', 'jordanian', 'iraqi', 'moroccan', 'tunisian', 'msa'],
         'clone_announce_cta' => 'اختر باقتك',
     ],
 
