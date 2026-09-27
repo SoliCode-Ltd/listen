@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\NewsletterMailbox;
 use App\Filament\Resources\NewsletterResource;
 use App\Filament\Resources\NewsletterResource\Pages\EditNewsletter;
 use App\Mail\NewsletterMail;
@@ -14,6 +15,7 @@ use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Newsletter\NewsletterRenderer;
 use App\Services\Newsletter\NewsletterSender;
 use App\Services\PlanAccessService;
+use App\Support\TitanMailbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
@@ -224,6 +226,52 @@ class NewsletterTest extends TestCase
 
         $this->get(route('newsletter.unsubscribe', ['email' => $user->email]))
             ->assertForbidden();
+    }
+
+    public function test_titan_mailbox_replaces_a_broken_resend_mailer(): void
+    {
+        $this->assertFalse(class_exists(\Resend::class));
+
+        config(['mail.default' => 'resend']);
+        TitanMailbox::preferOverBrokenResend();
+
+        $this->assertSame('titan', config('mail.default'));
+        $this->assertSame('smtp.titan.email', config('mail.mailers.titan.host'));
+        $this->assertSame(465, config('mail.mailers.titan.port'));
+        $this->assertSame('help@listenai.studio', config('mail.mailers.titan.username'));
+    }
+
+    public function test_missing_titan_password_tells_the_admin_where_to_add_it(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('help@listenai.studio');
+        TitanMailbox::requirePassword();
+    }
+
+    public function test_saved_mailbox_password_is_used_for_titan(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        Livewire::actingAs($admin)
+            ->test(NewsletterMailbox::class)
+            ->fillForm([
+                'host' => 'smtp.titan.email',
+                'port' => 465,
+                'username' => 'help@listenai.studio',
+                'from_name' => 'Listen',
+                'password' => 'titan-secret',
+            ])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        $this->assertSame('titan-secret', TitanMailbox::password());
+        $this->assertSame('help@listenai.studio', TitanMailbox::username());
+
+        $this->actingAs($admin)
+            ->get(NewsletterMailbox::getUrl())
+            ->assertOk()
+            ->assertSee('help@listenai.studio')
+            ->assertDontSee('titan-secret');
     }
 
     public function test_renderer_can_show_one_language_and_escapes_html(): void

@@ -49,6 +49,18 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        // Titan Email for listenai.studio. Password is applied at send time.
+        'titan' => [
+            'transport' => 'smtp',
+            'scheme' => 'smtps',
+            'host' => 'smtp.titan.email',
+            'port' => 465,
+            'username' => 'help@listenai.studio',
+            'password' => env('MAIL_PASSWORD'),
+            'timeout' => 20,
+            'local_domain' => 'listenai.studio',
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],
@@ -111,8 +123,8 @@ return [
     */
 
     'from' => [
-        'address' => env('MAIL_FROM_ADDRESS', 'hello@example.com'),
-        'name' => env('MAIL_FROM_NAME', 'Example'),
+        'address' => env('MAIL_FROM_ADDRESS', 'help@listenai.studio'),
+        'name' => env('MAIL_FROM_NAME', 'Listen'),
     ],
 
 ];

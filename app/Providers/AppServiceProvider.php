@@ -2,9 +2,6 @@
 
 namespace App\Providers;
 
-use App\Contracts\TtsProviderInterface;
-use App\Models\ClonedVoice;
-use App\Policies\ClonedVoicePolicy;
 use App\Console\Commands\EnforceBillingGraceCommand;
 use App\Console\Commands\GenerateVoiceSamples;
 use App\Console\Commands\ListenSyncExtensionCommand;
@@ -13,17 +10,21 @@ use App\Console\Commands\SyncArabicTranslationsCommand;
 use App\Console\Commands\SyncBillingSubscriptionsCommand;
 use App\Console\Commands\SyncStripePlansCommand;
 use App\Console\Commands\ValidateVoiceCatalogCommand;
+use App\Contracts\TtsProviderInterface;
 use App\Models\BillingSubscription;
 use App\Models\BillingSubscriptionItem;
+use App\Models\ClonedVoice;
 use App\Models\SiteSetting;
+use App\Policies\ClonedVoicePolicy;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
+use App\Support\TitanMailbox;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
-use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
 use Mcamara\LaravelLocalization\Traits\LoadsTranslatedCachedRoutes;
@@ -80,6 +81,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (! $this->app->environment('testing')) {
+            TitanMailbox::preferOverBrokenResend();
+        }
+
         RouteServiceProvider::loadCachedRoutesUsing(fn () => $this->loadCachedRoutes());
 
         if (! $this->app->runningInConsole()) {
