@@ -6,6 +6,7 @@ use App\Mail\NewsletterMail;
 use App\Models\Newsletter;
 use App\Models\NewsletterDelivery;
 use App\Models\User;
+use App\Support\TitanMailbox;
 use Illuminate\Support\Facades\Mail;
 use InvalidArgumentException;
 use RuntimeException;
@@ -129,27 +130,37 @@ class NewsletterSender
                 throw new RuntimeException('Add a subject before sending.');
             }
 
-            $fromAddress = filter_var((string) $newsletter->from_address, FILTER_VALIDATE_EMAIL)
-                ? (string) $newsletter->from_address
-                : (string) config('mail.from.address');
             $fromName = filled($newsletter->from_name)
                 ? (string) $newsletter->from_name
-                : (string) config('mail.from.name');
+                : TitanMailbox::fromName();
             $replyTo = filter_var((string) $newsletter->reply_to, FILTER_VALIDATE_EMAIL)
                 ? (string) $newsletter->reply_to
                 : null;
             $unsubscribeUrl = $this->renderer->unsubscribeUrl($recipient['email'], $locale);
+            $fromAddress = filter_var((string) $newsletter->from_address, FILTER_VALIDATE_EMAIL)
+                ? (string) $newsletter->from_address
+                : TitanMailbox::ADDRESS;
 
-            Mail::to($recipient['email'], $recipient['name'] !== '' ? $recipient['name'] : null)
-                ->send(new NewsletterMail(
-                    htmlBody: $html,
-                    textBody: $text,
-                    subjectLine: $subject,
-                    fromAddress: $fromAddress,
-                    fromName: $fromName,
-                    replyToAddress: $replyTo,
-                    unsubscribeUrl: $unsubscribeUrl !== '' ? $unsubscribeUrl : null,
-                ));
+            if (! app()->environment('testing')) {
+                TitanMailbox::apply();
+                TitanMailbox::requirePassword();
+                // Titan rejects mail whose From address is not the signed-in mailbox.
+                $fromAddress = TitanMailbox::username();
+            }
+
+            $pending = new NewsletterMail(
+                htmlBody: $html,
+                textBody: $text,
+                subjectLine: $subject,
+                fromAddress: $fromAddress,
+                fromName: $fromName,
+                replyToAddress: $replyTo,
+                unsubscribeUrl: $unsubscribeUrl !== '' ? $unsubscribeUrl : null,
+            );
+
+            $mailer = app()->environment('testing') ? Mail::mailer() : Mail::mailer('titan');
+            $mailer->to($recipient['email'], $recipient['name'] !== '' ? $recipient['name'] : null)
+                ->send($pending);
 
             $this->log($newsletter, $recipient, $locale, $isTest, NewsletterDelivery::STATUS_SENT, null);
 

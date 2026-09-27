@@ -153,7 +153,7 @@ class Newsletter extends Model
             'footer_en' => 'You received this because you have a Listen account.',
             'footer_ar' => 'وصلتك هذه الرسالة لأن لديك حساباً على Listen.',
             'from_name' => 'Listen',
-            'from_address' => null,
+            'from_address' => 'help@listenai.studio',
             'reply_to' => null,
             'internal_notes' => null,
         ];

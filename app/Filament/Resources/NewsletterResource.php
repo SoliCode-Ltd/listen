@@ -77,7 +77,8 @@ class NewsletterResource extends Resource
                         ->label('From address')
                         ->email()
                         ->maxLength(255)
-                        ->helperText('Leave empty to use the address in your mail settings. The domain must already be allowed to send.'),
+                        ->default('help@listenai.studio')
+                        ->helperText('Titan only delivers from the signed-in mailbox, help@listenai.studio. The password is saved under Newsletter → Mailbox.'),
                     Forms\Components\TextInput::make('reply_to')
                         ->label('Reply-to')
                         ->email()
