@@ -248,6 +248,20 @@ class NewsletterTest extends TestCase
         TitanMailbox::requirePassword();
     }
 
+    public function test_titan_auth_failure_explains_the_third_party_lock(): void
+    {
+        $raw = 'Failed to authenticate on SMTP server with username "help@listenai.studio" using the following authenticators: "LOGIN", "PLAIN". Authenticator "LOGIN" returned "Expected response code "235" but got code "535", with message "535 5.7.8 Error: authentication failed: UGFzc3dvcmQ6".".';
+
+        $explained = TitanMailbox::explainFailure($raw);
+
+        $this->assertStringContainsString('Enable Titan on other apps', $explained);
+        $this->assertStringContainsString('https://app.titan.email/mail/', $explained);
+        $this->assertStringContainsString('two-factor', strtolower($explained));
+        $this->assertStringContainsString('UGFzc3dvcmQ6', $explained);
+        $this->assertStringNotContainsString('Expected response code', $explained);
+        $this->assertSame('Some other mail error.', TitanMailbox::explainFailure('Some other mail error.'));
+    }
+
     public function test_saved_mailbox_password_is_used_for_titan(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
@@ -271,6 +285,7 @@ class NewsletterTest extends TestCase
             ->get(NewsletterMailbox::getUrl())
             ->assertOk()
             ->assertSee('help@listenai.studio')
+            ->assertSee('Enable Titan on other apps')
             ->assertDontSee('titan-secret');
     }
 

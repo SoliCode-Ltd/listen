@@ -115,6 +115,29 @@ class TitanMailbox
         SiteSetting::set('titan_mail_password', Crypt::encryptString($password), 'mail');
     }
 
+    /**
+     * Titan's 535 reply includes the AUTH LOGIN challenge "UGFzc3dvcmQ6"
+     * (base64 for "Password:"). That token is the server prompt, not the password we sent.
+     */
+    public static function explainFailure(string $message): string
+    {
+        $authFailed = str_contains($message, '535')
+            || str_contains(strtolower($message), 'authentication failed')
+            || str_contains($message, 'UGFzc3dvcmQ6');
+
+        if (! $authFailed) {
+            return $message;
+        }
+
+        $mailbox = self::username();
+
+        return 'Titan refused SMTP login for '.$mailbox.'. The password did reach the server. '
+            .'"UGFzc3dvcmQ6" is Titan\'s own password prompt, not a blank password. '
+            .'Sign in at https://app.titan.email/mail/ as '.$mailbox.', open Settings, and turn on Enable Titan on other apps. '
+            .'If two-factor authentication is on for that mailbox, Titan blocks every outside mail app until it is turned off. '
+            .'Use the password for this mailbox. The Name.com account password is a different password.';
+    }
+
     private static function setting(string $key, string $default): string
     {
         try {

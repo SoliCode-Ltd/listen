@@ -172,7 +172,7 @@ class NewsletterSender
                 $locale,
                 $isTest,
                 NewsletterDelivery::STATUS_FAILED,
-                $exception->getMessage()
+                TitanMailbox::explainFailure($exception->getMessage())
             );
 
             return false;
