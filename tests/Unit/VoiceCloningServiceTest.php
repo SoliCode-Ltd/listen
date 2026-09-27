@@ -338,6 +338,69 @@ class VoiceCloningServiceTest extends TestCase
         );
     }
 
+    public function test_every_studio_dialect_gets_its_own_cloned_direction(): void
+    {
+        $service = app(VoiceCloningService::class);
+        $seen = [];
+
+        foreach (\App\Support\TtsStudioConfig::dialectValues() as $code) {
+            $style = $service->deliveryStyle($code);
+
+            $this->assertNotSame('', $style, $code);
+            $this->assertArrayNotHasKey($style, $seen, $code);
+            $seen[$style] = $code;
+        }
+    }
+
+    public function test_lebanese_direction_is_not_the_saudi_one(): void
+    {
+        $service = app(VoiceCloningService::class);
+
+        $this->assertStringContainsString('Lebanese', $service->deliveryStyle('ar-LB'));
+        $this->assertStringNotContainsString('Najdi', $service->deliveryStyle('ar-LB'));
+        $this->assertNotSame($service->deliveryStyle('ar-SA'), $service->deliveryStyle('ar-IQ'));
+    }
+
+    public function test_saudi_script_is_rewritten_into_that_dialect(): void
+    {
+        config([
+            'services.gemini_tts.api_key' => 'test-key',
+            'services.gemini_tts.voice_retry_pause' => false,
+        ]);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent' => Http::response([
+                'candidates' => [[
+                    'content' => ['parts' => [['text' => "```\nوش لونك\n```"]]],
+                ]],
+            ]),
+        ]);
+
+        $this->assertSame('وش لونك', app(VoiceCloningService::class)->speakableText('إزيك', 'ar-SA'));
+        Http::assertSent(function ($request): bool {
+            $prompt = (string) ($request->data()['contents'][0]['parts'][0]['text'] ?? '');
+
+            return str_contains($request->url(), '/models/gemini-3.5-flash:generateContent')
+                && str_contains($prompt, 'Najdi Saudi')
+                && str_contains($prompt, 'إزيك');
+        });
+        $this->assertSame('إزيك', app(VoiceCloningService::class)->speakableText('إزيك', null));
+    }
+
+    public function test_a_failed_dialect_rewrite_keeps_the_original_script(): void
+    {
+        config([
+            'services.gemini_tts.api_key' => 'test-key',
+            'services.gemini_tts.voice_retry_pause' => false,
+        ]);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response(['error' => ['message' => 'unavailable']], 500),
+        ]);
+
+        $this->assertSame('مرحبا', app(VoiceCloningService::class)->speakableText('مرحبا', 'ar-KW'));
+    }
+
     public function test_cloned_synthesis_requests_wav_and_the_selected_accent(): void
     {
         Storage::fake('public');

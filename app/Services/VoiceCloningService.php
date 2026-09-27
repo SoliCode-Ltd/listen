@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -25,6 +26,18 @@ use Illuminate\Support\Str;
 class VoiceCloningService
 {
     public const MODEL = 'gemini-3.8-flash-tts';
+
+    /**
+     * Text models that can rewrite a script into another dialect.
+     * The speech model reads the script word for word, so the accent
+     * has to be in the words as well as in the style direction.
+     *
+     * @var array<int, string>
+     */
+    private const TRANSCRIPT_MODELS = [
+        'gemini-3.5-flash',
+        'gemini-3.6-flash',
+    ];
 
     /**
      * Consent lines the speaker records.
@@ -199,6 +212,35 @@ class VoiceCloningService
     }
 
     /**
+     * The speech model reads the script word for word and copies the recording accent.
+     * A chosen dialect is written into the script first, then spoken in that accent.
+     * No dialect leaves the script unchanged.
+     */
+    public function speakableText(string $text, ?string $dialect): string
+    {
+        $text = trim($text);
+        $instruction = $this->clonedAccentInstruction($dialect);
+        if ($text === '' || $instruction === '') {
+            return $text;
+        }
+
+        $cacheKey = 'listen:clone-dialect:v1:'.sha1($instruction.'|'.$text);
+        $cached = Cache::get($cacheKey);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $rewritten = $this->rewriteTranscript($text, $instruction);
+        if ($rewritten === null || $rewritten === '') {
+            return $text;
+        }
+
+        Cache::put($cacheKey, $rewritten, now()->addDays(7));
+
+        return $rewritten;
+    }
+
+    /**
      * Direction for one generation. The stored voice already carries the person.
      * A selected accent has to be a short style line, or the recording accent is copied.
      */
@@ -278,6 +320,93 @@ class VoiceCloningService
             'EN-ZA' => 'South African English accent.',
             default => 'Speak in this accent: '.$code.'.',
         };
+    }
+
+    private function rewriteTranscript(string $text, string $instruction): ?string
+    {
+        $prompt = "Rewrite this transcript so it is spoken in this variety:\n"
+            .$instruction."\n\n"
+            ."Rules:\n"
+            ."- Keep the same meaning, names, numbers, and sentence order.\n"
+            ."- Use the everyday words and grammar of that variety.\n"
+            ."- Do not add a title, notes, labels, or quotation marks.\n"
+            ."- If it is already in that variety, return it unchanged.\n"
+            ."- Return only the spoken transcript.\n\n"
+            ."Transcript:\n".$text;
+
+        foreach (self::TRANSCRIPT_MODELS as $model) {
+            try {
+                $response = $this->request('POST', '/models/'.$model.':generateContent', [
+                    'contents' => [[
+                        'role' => 'user',
+                        'parts' => [['text' => $prompt]],
+                    ]],
+                    'generationConfig' => [
+                        'temperature' => 0.2,
+                    ],
+                ], 15);
+            } catch (\Throwable $e) {
+                Log::warning('Cloned-voice dialect rewrite failed.', [
+                    'model' => $model,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return null;
+            }
+
+            if ($response->successful()) {
+                $raw = data_get($response->json(), 'candidates.0.content.parts.0.text');
+
+                return is_string($raw) ? $this->cleanSpokenTranscript($raw, $text) : $text;
+            }
+
+            if (! $this->transcriptModelMissing($response)) {
+                Log::warning('Cloned-voice dialect rewrite was rejected.', [
+                    'model' => $model,
+                    'status' => $response->status(),
+                ]);
+
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    private function transcriptModelMissing(Response $response): bool
+    {
+        if ($response->status() === 404) {
+            return true;
+        }
+
+        if ($response->status() !== 400) {
+            return false;
+        }
+
+        $message = strtolower($this->responseError($response));
+
+        return str_contains($message, 'not found')
+            || str_contains($message, 'no longer available')
+            || str_contains($message, 'not supported');
+    }
+
+    private function cleanSpokenTranscript(string $raw, string $original): string
+    {
+        $text = trim($raw);
+        $text = preg_replace('/^```[a-z]*\s*/i', '', $text) ?? $text;
+        $text = preg_replace('/\s*```$/', '', $text) ?? $text;
+        $text = preg_replace('/^(spoken transcript|transcript)\s*:\s*/i', '', trim($text)) ?? $text;
+        $text = trim($text, "\"' \n\r\t");
+
+        if ($text === '' || str_contains($text, 'Rewrite this transcript')) {
+            return $original;
+        }
+
+        if (mb_strlen($text) > max(mb_strlen($original) * 2, mb_strlen($original) + 400)) {
+            return $original;
+        }
+
+        return $text;
     }
 
     /**

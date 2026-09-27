@@ -67,7 +67,7 @@ class GenerateAudioJob implements ShouldQueue
     ];
 
     public int $tries = 3;
-    public int $timeout = 120;
+    public int $timeout = 150;
 
     public function __construct(public int $audioGenerationId)
     {
@@ -126,6 +126,10 @@ class GenerateAudioJob implements ShouldQueue
                 }
 
                 $voiceCloningService = app(VoiceCloningService::class);
+                $textForSpeech = $voiceCloningService->speakableText(
+                    $textForSpeech,
+                    $studioOptions['dialect'] ?? null,
+                );
                 $audio = $voiceCloningService->synthesizeWithClonedVoice(
                     $textForSpeech,
                     $clonedVoice->language_code,
