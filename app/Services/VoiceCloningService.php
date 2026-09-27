@@ -199,6 +199,88 @@ class VoiceCloningService
     }
 
     /**
+     * Direction for one generation. The stored voice already carries the person.
+     * A selected accent has to be a short style line, or the recording accent is copied.
+     */
+    public function deliveryStyle(
+        ?string $dialect,
+        string $performanceStyle = 'neutral',
+        string $emotion = 'neutral',
+        ?string $customPrompt = null,
+        float $speed = 1.0,
+        float $pitch = 0.0,
+    ): string {
+        $parts = [];
+        $accent = $this->clonedAccentInstruction($dialect);
+        if ($accent !== '') {
+            $parts[] = $accent;
+        }
+
+        $custom = trim((string) $customPrompt);
+        if ($custom !== '') {
+            $parts[] = $custom;
+        }
+
+        $performance = strtolower(trim($performanceStyle));
+        if ($performance !== '' && $performance !== 'neutral') {
+            $parts[] = 'Performance style: '.str_replace(['_', '-'], ' ', $performance).'.';
+        }
+
+        $emotion = strtolower(trim($emotion));
+        if ($emotion !== '' && $emotion !== 'neutral') {
+            $parts[] = 'Emotional tone: '.str_replace(['_', '-'], ' ', $emotion).'.';
+        }
+
+        if ($speed > 0 && abs($speed - 1) >= 0.15) {
+            $parts[] = $speed < 1 ? 'Speak a little more slowly.' : 'Speak a little more quickly.';
+        }
+
+        if ($pitch <= -3) {
+            $parts[] = 'Use a deeper, lower-pitched voice.';
+        } elseif ($pitch >= 3) {
+            $parts[] = 'Use a higher-pitched, brighter voice.';
+        }
+
+        return trim(implode(' ', $parts));
+    }
+
+    private function clonedAccentInstruction(?string $dialect): string
+    {
+        $code = strtoupper(str_replace('_', '-', trim((string) $dialect)));
+        if ($code === '') {
+            return '';
+        }
+
+        return match ($code) {
+            'AR-SA' => 'Najdi Saudi colloquial Arabic, the way someone from Riyadh talks to a friend. Pronounce ج as the English j, never as the Egyptian hard g. Saudi Gulf rhythm and Saudi wording.',
+            'AR-AE' => 'Emirati Gulf Arabic, the way someone from Dubai talks. Do not use an Egyptian accent.',
+            'AR-KW' => 'Kuwaiti Gulf Arabic. Do not use an Egyptian accent.',
+            'AR-QA' => 'Qatari Gulf Arabic. Do not use an Egyptian accent.',
+            'AR-BH' => 'Bahraini Gulf Arabic. Do not use an Egyptian accent.',
+            'AR-OM' => 'Omani Arabic. Do not use an Egyptian accent.',
+            'AR-YE' => 'Yemeni Arabic. Do not use an Egyptian accent.',
+            'AR-EG' => 'Cairene Egyptian colloquial Arabic. Pronounce ج like the English g, with Cairo rhythm.',
+            'AR-LB' => 'Lebanese Levantine Arabic. Do not use an Egyptian accent.',
+            'AR-SY' => 'Syrian Levantine Arabic. Do not use an Egyptian accent.',
+            'AR-JO' => 'Jordanian Levantine Arabic, the way someone from Amman talks. Do not use an Egyptian accent.',
+            'AR-PS' => 'Palestinian Levantine Arabic. Do not use an Egyptian accent.',
+            'AR-IQ' => 'Iraqi Arabic. Do not use an Egyptian accent.',
+            'AR-MA' => 'Moroccan Arabic. Do not use an Egyptian accent or Modern Standard Arabic.',
+            'AR-DZ' => 'Algerian Arabic. Do not use an Egyptian accent.',
+            'AR-TN' => 'Tunisian Arabic. Do not use an Egyptian accent.',
+            'AR-LY' => 'Libyan Arabic. Do not use an Egyptian accent.',
+            'AR-SD' => 'Sudanese Arabic. Do not use an Egyptian accent.',
+            'AR-XA', 'AR' => 'Modern Standard Arabic (Fusha) with clear formal pronunciation, not the colloquial accent of the recording.',
+            'EN-US' => 'General American English accent.',
+            'EN-GB' => 'British English accent.',
+            'EN-AU' => 'Australian English accent.',
+            'EN-IN' => 'Indian English accent.',
+            'EN-ZA' => 'South African English accent.',
+            default => 'Speak in this accent: '.$code.'.',
+        };
+    }
+
+    /**
      * Cheap read-only call that proves the key, network, and region can reach
      * the Voices API before any audio is sent.
      *
@@ -624,7 +706,11 @@ class VoiceCloningService
                 'type' => 'user_input',
                 'content' => [$content],
             ]],
-            'response_format' => ['type' => 'audio'],
+            'response_format' => [
+                'type' => 'audio',
+                'mime_type' => 'audio/wav',
+                'sample_rate' => 24000,
+            ],
             'generation_config' => [
                 'speech_config' => [
                     ['voice' => $voiceId],

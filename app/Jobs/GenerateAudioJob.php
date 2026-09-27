@@ -130,7 +130,14 @@ class GenerateAudioJob implements ShouldQueue
                     $textForSpeech,
                     $clonedVoice->language_code,
                     $clonedVoice->provider_voice_key,
-                    $this->clonedVoiceStyle($studioOptions),
+                    $voiceCloningService->deliveryStyle(
+                        $studioOptions['dialect'] ?? null,
+                        (string) ($studioOptions['performance_style'] ?? 'neutral'),
+                        (string) ($studioOptions['emotion'] ?? 'neutral'),
+                        $studioOptions['style_prompt'] ?? null,
+                        (float) ($studioOptions['speed'] ?? 1),
+                        (float) ($studioOptions['pitch'] ?? 0),
+                    ),
                 );
             } else {
                 $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
@@ -343,35 +350,6 @@ class GenerateAudioJob implements ShouldQueue
                 'total_minutes' => $nextMinutes,
             ]);
         });
-    }
-
-    /**
-     * @param  array{dialect?:mixed,performance_style?:mixed,style_prompt?:mixed,emotion?:mixed,speed?:mixed,pitch?:mixed}  $options
-     */
-    private function clonedVoiceStyle(array $options): string
-    {
-        $parts = [];
-        $style = trim((string) ($options['style_prompt'] ?? ''));
-        if ($style !== '') {
-            $parts[] = $style;
-        }
-
-        $performance = strtolower(trim((string) ($options['performance_style'] ?? '')));
-        if ($performance !== '' && $performance !== 'neutral') {
-            $parts[] = 'Performance style: '.str_replace(['_', '-'], ' ', $performance).'.';
-        }
-
-        $emotion = strtolower(trim((string) ($options['emotion'] ?? '')));
-        if ($emotion !== '' && $emotion !== 'neutral') {
-            $parts[] = 'Emotional tone: '.str_replace(['_', '-'], ' ', $emotion).'.';
-        }
-
-        $speed = (float) ($options['speed'] ?? 1);
-        if ($speed > 0 && abs($speed - 1) >= 0.15) {
-            $parts[] = $speed < 1 ? 'Speak a little more slowly.' : 'Speak a little more quickly.';
-        }
-
-        return trim(implode(' ', $parts));
     }
 
     /**

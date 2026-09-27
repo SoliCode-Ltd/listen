@@ -323,4 +323,59 @@ class VoiceCloningServiceTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame('voice_nested123', $result['voice_cloning_key']);
     }
+
+    public function test_saudi_accent_overrides_the_recording_without_egyptian_pronunciation(): void
+    {
+        $style = app(VoiceCloningService::class)->deliveryStyle('ar-SA');
+
+        $this->assertStringContainsString('Najdi Saudi', $style);
+        $this->assertStringContainsString('English j', $style);
+        $this->assertStringNotContainsString('Pronounce ج like the English g', $style);
+        $this->assertSame('', app(VoiceCloningService::class)->deliveryStyle(null));
+        $this->assertStringContainsString(
+            'Pronounce ج like the English g',
+            app(VoiceCloningService::class)->deliveryStyle('ar-EG'),
+        );
+    }
+
+    public function test_cloned_synthesis_requests_wav_and_the_selected_accent(): void
+    {
+        Storage::fake('public');
+        config([
+            'services.gemini_tts.api_key' => 'test-key',
+            'services.gemini_tts.voice_retry_pause' => false,
+        ]);
+
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'output_audio' => ['data' => base64_encode('RIFF....WAVE')],
+            ], 200),
+        ]);
+
+        $style = app(VoiceCloningService::class)->deliveryStyle('ar-SA', 'narrative', 'warm');
+        $result = app(VoiceCloningService::class)->synthesizeWithClonedVoice(
+            'مرحبا',
+            'ar-XA',
+            'voice_saudi',
+            $style,
+        );
+
+        $this->assertSame(VoiceCloningService::MODEL, $result['model']);
+        $this->assertStringStartsWith('audio/cloned/', $result['audio_path']);
+
+        Http::assertSent(function ($request) use ($style): bool {
+            $data = $request->data();
+            $annotation = $data['input'][0]['content'][0]['annotations'][0] ?? [];
+
+            return str_ends_with($request->url(), '/interactions')
+                && ($data['model'] ?? null) === 'gemini-3.8-flash-tts'
+                && ($data['response_format']['type'] ?? null) === 'audio'
+                && ($data['response_format']['mime_type'] ?? null) === 'audio/wav'
+                && ($data['response_format']['sample_rate'] ?? null) === 24000
+                && ($data['generation_config']['speech_config'][0]['voice'] ?? null) === 'voice_saudi'
+                && ($annotation['type'] ?? null) === 'speech_metadata'
+                && ($annotation['style'] ?? null) === $style
+                && str_contains((string) ($annotation['style'] ?? ''), 'Najdi Saudi');
+        });
+    }
 }
