@@ -1,14 +1,15 @@
 <?php
 
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminClonedVoiceAudioController;
 use App\Http\Controllers\AdminManualPaymentProofController;
+use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManualPaymentController;
 use App\Http\Controllers\MediaController;
+use App\Http\Controllers\NewsletterUnsubscribeController;
 use App\Http\Controllers\VoiceCloningController;
 use App\Models\SiteSetting;
 use App\Support\SeoHelper;
@@ -109,6 +110,10 @@ Route::get('/favicon.ico', function () {
 
     return redirect()->away($target, 301);
 })->name('favicon');
+
+Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
+    ->middleware('signed')
+    ->name('newsletter.unsubscribe');
 
 Route::group([
     'prefix' => LaravelLocalization::setLocale(),
