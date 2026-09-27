@@ -246,6 +246,15 @@ class HomeVoiceSamplesTest extends TestCase
         $this->assertStringNotContainsString('View pricing', $englishSection);
     }
 
+    public function test_audio_download_converts_wav_into_a_whatsapp_file(): void
+    {
+        $page = $this->getLocalizedRoute('home');
+        $page->assertOk();
+        $page->assertSee('function toWhatsAppAudio', false);
+        $page->assertSee('lame.min.js', false);
+        $page->assertSee('audio/mpeg', false);
+    }
+
     private function announcementHtml(string $html): string
     {
         preg_match('/<section class="clone-announce"[\s\S]*?<\/section>/', $html, $matches);

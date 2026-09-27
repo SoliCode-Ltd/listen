@@ -195,7 +195,9 @@ class VoiceCloningService
         }
 
         $audioContent = $this->ensurePlayableAudio($audioContent);
-        $extension = str_starts_with($audioContent, 'RIFF') ? 'wav' : 'mp3';
+        $packaged = \App\Support\ShareableAudio::package($audioContent);
+        $audioContent = $packaged['bytes'];
+        $extension = $packaged['extension'];
         $filename = 'audio/cloned/'.now()->format('Ymd').'/'.Str::uuid().'.'.$extension;
         Storage::disk('public')->put($filename, $audioContent);
 

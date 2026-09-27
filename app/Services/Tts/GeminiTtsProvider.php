@@ -4,6 +4,7 @@ namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
 use App\Support\GeminiTtsModel;
+use App\Support\ShareableAudio;
 use App\Support\TtsStudioConfig;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -757,7 +758,9 @@ class GeminiTtsProvider implements TtsProviderInterface
             $audioData = $this->wrapPcmL16AsWav($audioData, 24000, 1, 16);
             $mimeType = 'audio/wav';
         }
-        $extension = ($mimeType === 'audio/mpeg') ? 'mp3' : 'wav';
+        $packaged = ShareableAudio::package($audioData);
+        $audioData = $packaged['bytes'];
+        $extension = $packaged['extension'];
 
         $filename = 'audio/' . now()->format('Ymd_His') . '_listen.studio_' . Str::random(12) . '.' . $extension;
         $disk = Storage::disk('public');

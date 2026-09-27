@@ -187,6 +187,88 @@
     });
   }
 
+  var lameScriptUrl = @json(asset('js/lame.min.js'));
+  var lameLoader = null;
+
+  function ensureMp3Encoder() {
+    if (window.lamejs && window.lamejs.Mp3Encoder) return Promise.resolve();
+    if (lameLoader) return lameLoader;
+    lameLoader = new Promise(function(resolve, reject) {
+      var script = document.createElement('script');
+      script.src = lameScriptUrl;
+      script.async = true;
+      script.onload = function() {
+        if (window.lamejs && window.lamejs.Mp3Encoder) resolve();
+        else reject(new Error('encoder'));
+      };
+      script.onerror = function() { reject(new Error('encoder')); };
+      document.head.appendChild(script);
+    });
+    return lameLoader;
+  }
+
+  function audioContainer(bytes) {
+    if (bytes.length >= 12 && bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 && bytes[8] === 0x57 && bytes[9] === 0x41 && bytes[10] === 0x56 && bytes[11] === 0x45) return 'wav';
+    if (bytes.length >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) return 'mp3';
+    if (bytes.length >= 2 && bytes[0] === 0xFF && (bytes[1] & 0xE0) === 0xE0) return 'mp3';
+    if (bytes.length >= 8 && bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) return 'm4a';
+    if (bytes.length >= 4 && bytes[0] === 0x4F && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) return 'ogg';
+    return 'wav';
+  }
+
+  function floatToPcm16(samples) {
+    var pcm = new Int16Array(samples.length);
+    for (var i = 0; i < samples.length; i++) {
+      var value = Math.max(-1, Math.min(1, samples[i]));
+      pcm[i] = value < 0 ? value * 0x8000 : value * 0x7FFF;
+    }
+    return pcm;
+  }
+
+  function encodePcmToMp3(samples, sampleRate) {
+    var encoder = new window.lamejs.Mp3Encoder(1, sampleRate, 192);
+    var block = 1152;
+    var chunks = [];
+    for (var offset = 0; offset < samples.length; offset += block) {
+      var slice = samples.subarray(offset, offset + block);
+      var encoded = encoder.encodeBuffer(slice, slice);
+      if (encoded && encoded.length) chunks.push(encoded);
+    }
+    var end = encoder.flush();
+    if (end && end.length) chunks.push(end);
+    return new Blob(chunks, { type: 'audio/mpeg' });
+  }
+
+  window.toWhatsAppAudio = toWhatsAppAudio;
+  function toWhatsAppAudio(buffer) {
+    var bytes = new Uint8Array(buffer);
+    var kind = audioContainer(bytes);
+    if (kind === 'mp3' || kind === 'm4a' || kind === 'ogg') {
+      var type = kind === 'mp3' ? 'audio/mpeg' : (kind === 'm4a' ? 'audio/mp4' : 'audio/ogg');
+      return Promise.resolve({ blob: new Blob([buffer], { type: type }), extension: kind });
+    }
+
+    return ensureMp3Encoder().then(function() {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) throw new Error('audio');
+      var context = new Ctx();
+      return context.decodeAudioData(buffer.slice(0)).then(function(decoded) {
+        var mixed = new Float32Array(decoded.length);
+        var channels = decoded.numberOfChannels || 1;
+        for (var channel = 0; channel < channels; channel++) {
+          var data = decoded.getChannelData(channel);
+          for (var i = 0; i < decoded.length; i++) mixed[i] += data[i] / channels;
+        }
+        var blob = encodePcmToMp3(floatToPcm16(mixed), decoded.sampleRate || 24000);
+        if (context.close) context.close();
+        return { blob: blob, extension: 'mp3' };
+      }).catch(function(error) {
+        if (context.close) context.close();
+        throw error;
+      });
+    });
+  }
+
   window.initCustomAudioPlayers = function() {
     var audios = document.querySelectorAll('audio:not(.initialized)');
     Array.prototype.forEach.call(audios, function(audio) {
@@ -282,14 +364,14 @@
         if (fallbackMatch && fallbackMatch[1]) return String(fallbackMatch[1]).toLowerCase();
         return fallback;
       };
-      var buildDownloadFilename = function() {
+      var buildDownloadFilename = function(extension) {
         var src = audio.getAttribute('src') || '';
         var language = sanitizeFileSegment(audio.dataset.downloadLanguage, 'audio');
         var textPart = sanitizeFileSegment(audio.dataset.downloadText, 'sample');
         var speaker = sanitizeFileSegment(audio.dataset.downloadSpeaker, 'speaker');
         var quality = sanitizeFileSegment(audio.dataset.downloadQuality, 'standard');
-        var extension = getDownloadExtension(src);
-        return [language, textPart, speaker, quality].join('_') + '.' + extension;
+        var chosen = String(extension || '').toLowerCase() || getDownloadExtension(src);
+        return [language, textPart, speaker, quality].join('_') + '.' + chosen;
       };
 
       var isDragging = false;
@@ -516,15 +598,38 @@
              window.location.href = redirectUrl;
              return;
            }
-           var a = document.createElement('a');
            var src = audio.getAttribute('src');
-           if (!src) return;
-           a.href = src;
-           a.download = buildDownloadFilename();
-           a.target = '_blank';
-           document.body.appendChild(a);
-           a.click();
-           document.body.removeChild(a);
+           if (!src || menuBtn.dataset.busy === '1') return;
+           menuBtn.dataset.busy = '1';
+           menuBtn.disabled = true;
+           fetch(src, { credentials: 'same-origin' })
+             .then(function(response) {
+               if (!response.ok) throw new Error('audio');
+               return response.arrayBuffer();
+             })
+             .then(function(buffer) { return toWhatsAppAudio(buffer); })
+             .then(function(file) {
+               var url = URL.createObjectURL(file.blob);
+               var a = document.createElement('a');
+               a.href = url;
+               a.download = buildDownloadFilename(file.extension);
+               document.body.appendChild(a);
+               a.click();
+               document.body.removeChild(a);
+               window.setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+             })
+             .catch(function() {
+               var a = document.createElement('a');
+               a.href = src;
+               a.download = buildDownloadFilename();
+               document.body.appendChild(a);
+               a.click();
+               document.body.removeChild(a);
+             })
+             .finally(function() {
+               menuBtn.dataset.busy = '0';
+               menuBtn.disabled = false;
+             });
         });
       }
       

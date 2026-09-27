@@ -49,10 +49,12 @@ class GeminiTtsModelSelectionTest extends TestCase
         $spoken = $captured->body['contents'][0]['parts'][0]['text'];
         $this->assertStringContainsString('مرحبا', $spoken);
         $this->assertStringContainsString('Emotional tone', $spoken);
-        $this->assertStringStartsWith('RIFF', Storage::disk('public')->get($result['audio_path']));
+        $saved = Storage::disk('public')->get($result['audio_path']);
+        $this->assertStringEndsWith('.mp3', $result['audio_path']);
+        $this->assertTrue(\App\Support\ShareableAudio::isMp3($saved));
     }
 
-    public function test_newest_model_speaks_only_the_transcript_and_saves_wav(): void
+    public function test_newest_model_speaks_only_the_transcript_and_saves_mp3(): void
     {
         SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $wav = $this->wavBytes();
@@ -73,7 +75,10 @@ class GeminiTtsModelSelectionTest extends TestCase
         $this->assertSame('Kore', $captured->body['generationConfig']['speechConfig']['voiceConfig']['voice']);
         $this->assertStringContainsString('slow', strtolower($part['speech_metadata']['style']));
         $this->assertStringNotContainsString('speech_metadata', $part['text']);
-        $this->assertSame($wav, Storage::disk('public')->get($result['audio_path']));
+        $saved = Storage::disk('public')->get($result['audio_path']);
+        $this->assertStringEndsWith('.mp3', $result['audio_path']);
+        $this->assertTrue(\App\Support\ShareableAudio::isMp3($saved));
+        $this->assertNotSame($wav, $saved);
     }
 
     public function test_lite_model_and_unknown_value_are_handled_safely(): void
@@ -119,7 +124,7 @@ class GeminiTtsModelSelectionTest extends TestCase
         $this->assertSame('Charon', $voices[1]['voiceConfig']['prebuiltVoiceConfig']['voiceName']);
     }
 
-    public function test_pcm_beginning_with_mpeg_sync_bits_is_saved_as_wav(): void
+    public function test_pcm_beginning_with_mpeg_sync_bits_is_saved_as_mp3(): void
     {
         $pcm = "\xff\xff\x00\x00".$this->pcmBytes();
         $this->fakeAudio('audio/l16', $pcm);
@@ -129,9 +134,9 @@ class GeminiTtsModelSelectionTest extends TestCase
         ]);
 
         $saved = Storage::disk('public')->get($result['audio_path']);
-        $this->assertStringEndsWith('.wav', $result['audio_path']);
-        $this->assertStringStartsWith('RIFF', $saved);
-        $this->assertSame(1, substr_count($saved, 'RIFF'));
+        $this->assertStringEndsWith('.mp3', $result['audio_path']);
+        $this->assertTrue(\App\Support\ShareableAudio::isMp3($saved));
+        $this->assertStringStartsNotWith('RIFF', $saved);
     }
 
     private function fakeAudio(string $mime, string $bytes): \stdClass
