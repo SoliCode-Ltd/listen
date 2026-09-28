@@ -7,6 +7,7 @@ use App\Filament\Resources\NewsletterResource\Pages\Concerns\PreviewsNewsletter;
 use App\Models\Newsletter;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Newsletter\NewsletterSender;
+use App\Support\TitanMailbox;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -85,8 +86,9 @@ class EditNewsletter extends EditRecord
                     } catch (\Throwable $exception) {
                         Notification::make()
                             ->title('Example was not sent')
-                            ->body($exception->getMessage())
+                            ->body(TitanMailbox::explainFailure($exception->getMessage()))
                             ->danger()
+                            ->persistent()
                             ->send();
 
                         return;
@@ -145,8 +147,9 @@ class EditNewsletter extends EditRecord
                     } catch (\Throwable $exception) {
                         Notification::make()
                             ->title('Newsletter was not sent')
-                            ->body($exception->getMessage())
+                            ->body(TitanMailbox::explainFailure($exception->getMessage()))
                             ->danger()
+                            ->persistent()
                             ->send();
 
                         return;

@@ -48,7 +48,7 @@ class NewsletterMailbox extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Titan Email')
-                    ->description('Newsletters send through the Titan mailbox for listenai.studio. Use the password you use to open help@listenai.studio, not a Resend API key.')
+                    ->description('Newsletters send through the Titan mailbox for listenai.studio. Use the password for help@listenai.studio. Before the first send, sign in at https://app.titan.email/mail/ as that mailbox, open Settings, and turn on Enable Titan on other apps. Two-factor authentication on the mailbox blocks SMTP even when the password is correct.')
                     ->schema([
                         Forms\Components\TextInput::make('host')
                             ->label('SMTP host')
@@ -119,8 +119,9 @@ class NewsletterMailbox extends Page implements HasForms
                     } catch (\Throwable $exception) {
                         Notification::make()
                             ->title('Mailbox test was not sent')
-                            ->body($exception->getMessage())
+                            ->body(TitanMailbox::explainFailure($exception->getMessage()))
                             ->danger()
+                            ->persistent()
                             ->send();
 
                         return;
