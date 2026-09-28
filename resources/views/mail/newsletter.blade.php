@@ -68,35 +68,28 @@
                                     <p style="margin:0 0 14px 0;font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
                                 @endforeach
                                 @if ($section['highlights'] !== [])
-                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 6px 0;">
-                                        @foreach ($section['highlights'] as $highlight)
-                                            <tr>
-                                                <td dir="{{ $section['dir'] }}" style="padding:0;border-bottom:1px solid #F0EEF6;">
-                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0 4px 0;">
+                                        <tr>
+                                            <td align="center" style="text-align:center;">
+                                                <table role="presentation" dir="{{ $section['dir'] }}" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                                                    @foreach ($section['highlights'] as $highlight)
                                                         <tr>
-                                                            @if ($section['dir'] === 'ltr')
-                                                                <td width="18" valign="middle" style="width:18px;padding:14px 0;">
-                                                                    <div style="width:8px;height:8px;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
-                                                                </td>
-                                                                <td valign="middle" style="padding:14px 0 14px 8px;font-family:{{ $section['font'] }};font-size:15px;line-height:1.45;color:#16161D;text-align:left;">{{ $highlight }}</td>
-                                                            @else
-                                                                <td valign="middle" style="padding:14px 8px 14px 0;font-family:{{ $section['font'] }};font-size:15px;line-height:1.45;color:#16161D;text-align:right;">{{ $highlight }}</td>
-                                                                <td width="18" valign="middle" style="width:18px;padding:14px 0;text-align:left;">
-                                                                    <div style="width:8px;height:8px;margin-left:auto;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
-                                                                </td>
-                                                            @endif
+                                                            <td width="16" valign="middle" style="width:16px;padding:6px 8px;">
+                                                                <div style="width:8px;height:8px;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
+                                                            </td>
+                                                            <td valign="middle" dir="{{ $section['dir'] }}" style="padding:6px 0;font-family:{{ $section['font'] }};font-size:15px;line-height:1.45;color:#16161D;text-align:{{ $section['align'] }};">{{ $highlight }}</td>
                                                         </tr>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        @endforeach
+                                                    @endforeach
+                                                </table>
+                                            </td>
+                                        </tr>
                                     </table>
                                 @endif
                                 @if ($section['cta_label'] !== '' && $section['cta_url'] !== '')
-                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:22px 0 0 0;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:16px 0 0 0;">
                                         <tr>
-                                            <td align="{{ $section['align'] }}" style="padding:0 0 8px 0;text-align:{{ $section['align'] }};">
-                                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                            <td align="center" style="text-align:center;">
+                                                <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                                                     <tr>
                                                         <td align="center" bgcolor="#7659FA" style="border-radius:999px;background:#7659FA;">
                                                             <a href="{{ $section['cta_url'] }}" style="display:inline-block;padding:14px 26px;font-family:{{ $section['font'] }};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:999px;">{{ $section['cta_label'] }}</a>
@@ -108,7 +101,7 @@
                                     </table>
                                 @endif
                                 @if ($section['footer'] !== '')
-                                    <p style="display:block;clear:both;margin:14px 0 8px 0;font-size:13px;line-height:1.6;color:#71717A;text-align:{{ $section['align'] }};">{{ $section['footer'] }}</p>
+                                    <p style="display:block;margin:8px 0 4px 0;font-size:13px;line-height:1.5;color:#71717A;text-align:center;">{{ $section['footer'] }}</p>
                                 @endif
                             </td>
                         </tr>
