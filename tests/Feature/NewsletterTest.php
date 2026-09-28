@@ -314,6 +314,7 @@ class NewsletterTest extends TestCase
         $this->assertStringContainsString('Hello Sam,', $html);
         $this->assertStringContainsString('email-logo-en.png', $html);
         $this->assertStringContainsString('text-align:center', $html);
+        $this->assertDoesNotMatchRegularExpression('/<table[^>]*\salign="/', $html);
         $this->assertStringContainsString('lang=en', $html);
         $this->assertStringContainsString('lang=ar', $html);
         $this->assertStringNotContainsString('>L</td>', $html);

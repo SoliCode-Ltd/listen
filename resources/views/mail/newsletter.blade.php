@@ -19,16 +19,16 @@
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ECEAF3;margin:0;padding:0;">
         <tr>
             <td align="center" style="padding:32px 12px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;max-width:600px;background:#ffffff;border-radius:20px;">
                     <tr>
-                        <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:36px 32px 22px 32px;text-align:center;">
-                            <img src="{{ $logoUrl }}" alt="{{ $logoAlt }}" width="176" height="56" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:176px;max-width:176px;height:auto;">
+                        <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:36px 28px 22px 28px;text-align:center;">
+                            <img src="{{ $logoUrl }}" alt="{{ $logoAlt }}" width="168" height="54" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:168px;max-width:100%;height:auto;">
                             <p style="margin:10px 0 0 0;font-family:{{ $font }};font-size:12px;line-height:1.4;letter-spacing:0.18em;color:#A1A1AA;text-align:center;">{{ $siteName }}</p>
                         </td>
                     </tr>
                     <tr>
                         <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:0 0 22px 0;font-size:0;line-height:0;">
-                            <table role="presentation" cellpadding="0" cellspacing="0" align="center">
+                            <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 auto;">
                                 <tr>
                                     @foreach ($wave as $height)
                                         <td valign="bottom" style="padding:0 3px;font-size:0;line-height:0;">
@@ -46,16 +46,22 @@
                                     <div style="height:1px;background:#ECEAF3;margin:8px 0 32px 0;"></div>
                                 @endif
                                 @if ($section['eyebrow'] !== '')
-                                    <table role="presentation" cellpadding="0" cellspacing="0" align="{{ $section['align'] }}" style="margin:0 0 16px 0;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 14px 0;">
                                         <tr>
-                                            <td bgcolor="#F3F0FF" style="background:#F3F0FF;border-radius:999px;padding:6px 12px;">
-                                                <span style="font-family:{{ $section['font'] }};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#5B3DF5;">{{ $section['eyebrow'] }}</span>
+                                            <td align="{{ $section['align'] }}" style="text-align:{{ $section['align'] }};">
+                                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                                    <tr>
+                                                        <td bgcolor="#F3F0FF" style="background:#F3F0FF;border-radius:999px;padding:6px 12px;">
+                                                            <span style="font-family:{{ $section['font'] }};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#5B3DF5;">{{ $section['eyebrow'] }}</span>
+                                                        </td>
+                                                    </tr>
+                                                </table>
                                             </td>
                                         </tr>
                                     </table>
                                 @endif
                                 @if ($section['headline'] !== '')
-                                    <h1 style="margin:0 0 16px 0;font-size:34px;line-height:1.15;font-weight:600;letter-spacing:-0.035em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
+                                    <h1 style="display:block;margin:0 0 16px 0;font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-0.03em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
                                 @endif
                                 <p style="margin:0 0 14px 0;font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
                                 @foreach ($section['paragraphs'] as $paragraph)
@@ -87,16 +93,22 @@
                                     </table>
                                 @endif
                                 @if ($section['cta_label'] !== '' && $section['cta_url'] !== '')
-                                    <table role="presentation" cellpadding="0" cellspacing="0" align="{{ $section['align'] }}" style="margin:22px 0 8px 0;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:22px 0 0 0;">
                                         <tr>
-                                            <td align="center" bgcolor="#7659FA" style="border-radius:999px;background:#7659FA;">
-                                                <a href="{{ $section['cta_url'] }}" style="display:inline-block;padding:14px 26px;font-family:{{ $section['font'] }};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:999px;">{{ $section['cta_label'] }}</a>
+                                            <td align="{{ $section['align'] }}" style="padding:0 0 8px 0;text-align:{{ $section['align'] }};">
+                                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                                    <tr>
+                                                        <td align="center" bgcolor="#7659FA" style="border-radius:999px;background:#7659FA;">
+                                                            <a href="{{ $section['cta_url'] }}" style="display:inline-block;padding:14px 26px;font-family:{{ $section['font'] }};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:999px;">{{ $section['cta_label'] }}</a>
+                                                        </td>
+                                                    </tr>
+                                                </table>
                                             </td>
                                         </tr>
                                     </table>
                                 @endif
                                 @if ($section['footer'] !== '')
-                                    <p style="margin:16px 0 8px 0;font-size:13px;line-height:1.6;color:#71717A;text-align:{{ $section['align'] }};">{{ $section['footer'] }}</p>
+                                    <p style="display:block;clear:both;margin:14px 0 8px 0;font-size:13px;line-height:1.6;color:#71717A;text-align:{{ $section['align'] }};">{{ $section['footer'] }}</p>
                                 @endif
                             </td>
                         </tr>
