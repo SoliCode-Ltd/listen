@@ -1,3 +1,7 @@
+@php
+    $font = "'IBM Plex Sans', 'Segoe UI', Arial, sans-serif";
+    $wave = [4, 8, 14, 8, 5, 12, 20, 12, 6, 16, 26, 16, 7, 18, 11, 5, 13, 8, 4];
+@endphp
 <!DOCTYPE html>
 <html lang="{{ ($sections[0]['lang'] ?? 'en') === 'ar' && count($sections) === 1 ? 'ar' : 'en' }}" xmlns="http://www.w3.org/1999/xhtml">
 <head>
@@ -7,76 +11,107 @@
     <meta name="supported-color-schemes" content="light">
     <title>{{ $subject }}</title>
 </head>
-<body style="margin:0;padding:0;background:#F3F1FA;color:#16161D;">
-    <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;color:#F3F1FA;">
+<body style="margin:0;padding:0;background:#ECEAF3;color:#16161D;">
+    <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;color:#ECEAF3;">
         {{ $preheader }}
         &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
     </div>
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F3F1FA;margin:0;padding:0;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#ECEAF3;margin:0;padding:0;">
         <tr>
-            <td align="center" style="padding:40px 16px;">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #E4E0F2;border-radius:24px;overflow:hidden;">
+            <td align="center" style="padding:32px 12px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;background:#ffffff;border-radius:20px;overflow:hidden;">
                     <tr>
-                        <td style="height:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</td>
+                        <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:36px 32px 22px 32px;text-align:center;">
+                            <img src="{{ $logoUrl }}" alt="{{ $logoAlt }}" width="176" height="56" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:176px;max-width:176px;height:auto;">
+                            <p style="margin:10px 0 0 0;font-family:{{ $font }};font-size:12px;line-height:1.4;letter-spacing:0.18em;color:#A1A1AA;text-align:center;">{{ $siteName }}</p>
+                        </td>
                     </tr>
                     <tr>
-                        <td align="center" style="padding:36px 40px 8px 40px;background:#ffffff;text-align:center;">
-                            <img src="{{ $logoUrl }}" alt="{{ $logoAlt }}" width="188" height="60" style="display:block;margin:0 auto;border:0;outline:none;text-decoration:none;width:188px;max-width:188px;height:auto;">
-                            <p style="margin:14px 0 0 0;font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;font-size:13px;line-height:1.4;letter-spacing:0.14em;color:#6E6A80;text-align:center;">{{ $siteName }}</p>
+                        <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:0 0 22px 0;font-size:0;line-height:0;">
+                            <table role="presentation" cellpadding="0" cellspacing="0" align="center">
+                                <tr>
+                                    @foreach ($wave as $height)
+                                        <td valign="bottom" style="padding:0 3px;font-size:0;line-height:0;">
+                                            <div style="width:4px;height:{{ $height }}px;background:#7659FA;border-radius:2px;font-size:0;line-height:{{ $height }}px;">&nbsp;</div>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            </table>
                         </td>
                     </tr>
                     @foreach ($sections as $index => $section)
                         <tr>
-                            <td dir="{{ $section['dir'] }}" align="center" style="padding:{{ $index === 0 ? '28px' : '8px' }} 40px 8px 40px;font-family:{{ $section['font'] }};">
+                            <td dir="{{ $section['dir'] }}" align="{{ $section['align'] }}" style="padding:{{ $index === 0 ? '36px' : '8px' }} 36px 8px 36px;text-align:{{ $section['align'] }};font-family:{{ $section['font'] }};background:#ffffff;">
                                 @if ($index > 0)
-                                    <div style="height:1px;background:#E8E5F3;margin:12px auto 28px auto;"></div>
+                                    <div style="height:1px;background:#ECEAF3;margin:8px 0 32px 0;"></div>
                                 @endif
                                 @if ($section['eyebrow'] !== '')
-                                    <div style="font-size:11px;font-weight:600;letter-spacing:0.18em;text-transform:uppercase;color:#7659FA;margin:0 0 14px 0;text-align:center;">{{ $section['eyebrow'] }}</div>
+                                    <table role="presentation" cellpadding="0" cellspacing="0" align="{{ $section['align'] }}" style="margin:0 0 16px 0;">
+                                        <tr>
+                                            <td bgcolor="#F3F0FF" style="background:#F3F0FF;border-radius:999px;padding:6px 12px;">
+                                                <span style="font-family:{{ $section['font'] }};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#5B3DF5;">{{ $section['eyebrow'] }}</span>
+                                            </td>
+                                        </tr>
+                                    </table>
                                 @endif
                                 @if ($section['headline'] !== '')
-                                    <h1 style="margin:0 auto 18px auto;max-width:440px;font-size:30px;line-height:1.25;font-weight:600;letter-spacing:-0.03em;color:#12121A;text-align:center;">{{ $section['headline'] }}</h1>
+                                    <h1 style="margin:0 0 16px 0;font-size:34px;line-height:1.15;font-weight:600;letter-spacing:-0.035em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
                                 @endif
-                                <p dir="{{ $section['dir'] }}" style="margin:0 auto 14px auto;max-width:440px;font-size:16px;line-height:1.6;color:#24242C;text-align:center;">{{ $section['greeting'] }}</p>
+                                <p style="margin:0 0 14px 0;font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
                                 @foreach ($section['paragraphs'] as $paragraph)
-                                    <p dir="{{ $section['dir'] }}" style="margin:0 auto 14px auto;max-width:440px;font-size:16px;line-height:1.75;color:#4A4A55;text-align:center;">{!! $paragraph !!}</p>
+                                    <p style="margin:0 0 14px 0;font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
                                 @endforeach
                                 @if ($section['highlights'] !== [])
-                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:20px auto 8px auto;max-width:440px;background:#F7F5FF;border:1px solid #E8E4F8;border-radius:16px;">
+                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 6px 0;">
                                         @foreach ($section['highlights'] as $highlight)
                                             <tr>
-                                                <td dir="{{ $section['dir'] }}" align="center" style="padding:{{ $loop->first ? '16px' : '0' }} 20px {{ $loop->last ? '16px' : '8px' }} 20px;font-family:{{ $section['font'] }};font-size:15px;line-height:1.55;color:#1C1C24;text-align:center;">{{ $highlight }}</td>
+                                                <td dir="{{ $section['dir'] }}" style="padding:0;border-bottom:1px solid #F0EEF6;">
+                                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                                        <tr>
+                                                            @if ($section['dir'] === 'ltr')
+                                                                <td width="18" valign="middle" style="width:18px;padding:14px 0;">
+                                                                    <div style="width:8px;height:8px;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
+                                                                </td>
+                                                                <td valign="middle" style="padding:14px 0 14px 8px;font-family:{{ $section['font'] }};font-size:15px;line-height:1.45;color:#16161D;text-align:left;">{{ $highlight }}</td>
+                                                            @else
+                                                                <td valign="middle" style="padding:14px 8px 14px 0;font-family:{{ $section['font'] }};font-size:15px;line-height:1.45;color:#16161D;text-align:right;">{{ $highlight }}</td>
+                                                                <td width="18" valign="middle" style="width:18px;padding:14px 0;text-align:left;">
+                                                                    <div style="width:8px;height:8px;margin-left:auto;border-radius:4px;background:#7659FA;font-size:0;line-height:0;">&nbsp;</div>
+                                                                </td>
+                                                            @endif
+                                                        </tr>
+                                                    </table>
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </table>
                                 @endif
                                 @if ($section['cta_label'] !== '' && $section['cta_url'] !== '')
-                                    <table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:24px auto 8px auto;">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" align="{{ $section['align'] }}" style="margin:22px 0 8px 0;">
                                         <tr>
-                                            <td align="center" bgcolor="#7659FA" style="border-radius:12px;background:#7659FA;">
-                                                <a href="{{ $section['cta_url'] }}" style="display:inline-block;padding:15px 28px;font-family:{{ $section['font'] }};font-size:15px;font-weight:600;line-height:1.2;letter-spacing:-0.01em;color:#ffffff;text-decoration:none;border-radius:12px;">{{ $section['cta_label'] }}</a>
+                                            <td align="center" bgcolor="#7659FA" style="border-radius:999px;background:#7659FA;">
+                                                <a href="{{ $section['cta_url'] }}" style="display:inline-block;padding:14px 26px;font-family:{{ $section['font'] }};font-size:15px;font-weight:600;line-height:1.2;color:#ffffff;text-decoration:none;border-radius:999px;">{{ $section['cta_label'] }}</a>
                                             </td>
                                         </tr>
                                     </table>
                                 @endif
                                 @if ($section['footer'] !== '')
-                                    <p dir="{{ $section['dir'] }}" style="margin:18px auto 8px auto;max-width:440px;font-size:13px;line-height:1.6;color:#71717A;text-align:center;">{{ $section['footer'] }}</p>
+                                    <p style="margin:16px 0 8px 0;font-size:13px;line-height:1.6;color:#71717A;text-align:{{ $section['align'] }};">{{ $section['footer'] }}</p>
                                 @endif
                             </td>
                         </tr>
                     @endforeach
                     <tr>
-                        <td align="center" style="padding:20px 40px 32px 40px;background:#FAF9FD;text-align:center;">
-                            <div style="height:1px;background:#E8E5F3;margin:0 auto 16px auto;"></div>
-                            <p style="margin:0 0 8px 0;font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;font-size:12px;line-height:1.5;letter-spacing:0.12em;color:#8A8A96;text-align:center;">{{ $siteName }}</p>
+                        <td align="center" bgcolor="#0B0B0F" style="background:#0B0B0F;padding:22px 32px 26px 32px;text-align:center;">
+                            <p style="margin:0 0 8px 0;font-family:{{ $font }};font-size:12px;line-height:1.5;letter-spacing:0.14em;color:#A1A1AA;text-align:center;">{{ $siteName }}</p>
                             @if ($unsubscribeUrlEn && $unsubscribeUrlAr)
-                                <p style="margin:0;font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;font-size:12px;line-height:1.6;color:#71717A;text-align:center;">
-                                    <a href="{{ $unsubscribeUrlEn }}" style="color:#5B45C6;text-decoration:underline;">Unsubscribe</a>
-                                    <span style="color:#C4C4CE;"> · </span>
-                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#5B45C6;text-decoration:underline;font-family:'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;">إلغاء الاشتراك</a>
+                                <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">
+                                    <a href="{{ $unsubscribeUrlEn }}" style="color:#C4B8FF;text-decoration:underline;">Unsubscribe</a>
+                                    <span style="color:#5C5C6A;"> · </span>
+                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#C4B8FF;text-decoration:underline;font-family:'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;">إلغاء الاشتراك</a>
                                 </p>
                             @elseif ($preview)
-                                <p style="margin:0;font-family:'IBM Plex Sans', 'Segoe UI', Arial, sans-serif;font-size:12px;line-height:1.6;color:#71717A;text-align:center;">Unsubscribe · إلغاء الاشتراك</p>
+                                <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">Unsubscribe · إلغاء الاشتراك</p>
                             @endif
                         </td>
                     </tr>
