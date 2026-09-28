@@ -17,7 +17,12 @@ class SendQueuedNewslettersCommand extends Command
         $limit = $this->option('limit');
         $limit = ($limit === null || $limit === '') ? $pace->perMinute() : (int) $limit;
 
-        $sent = $sender->drain(max(0, $limit));
+        return $this->drainOnce($sender, $pace, max(0, $limit));
+    }
+
+    private function drainOnce(NewsletterSender $sender, NewsletterPace $pace, int $limit): int
+    {
+        $sent = $sender->drain($limit);
         $this->info('Sent '.$sent.' newsletter '.($sent === 1 ? 'email' : 'emails').'.');
 
         $reason = $pace->holdReason();

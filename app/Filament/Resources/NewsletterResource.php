@@ -7,6 +7,7 @@ use App\Filament\Resources\NewsletterResource\RelationManagers\DeliveriesRelatio
 use App\Models\Newsletter;
 use App\Models\Plan;
 use App\Services\Newsletter\NewsletterPace;
+use App\Services\Newsletter\NewsletterSender;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -66,12 +67,25 @@ class NewsletterResource extends Resource
                             $queued = $record->queuedDeliveries()->count();
                             $pace = app(NewsletterPace::class);
                             $hold = $pace->holdReason();
+                            $sending = '';
+                            if ($queued > 0 && $hold === null) {
+                                $sender = app(NewsletterSender::class);
+                                $sender->ensureRunning();
+                                if ($sender->runnerIsAlive()) {
+                                    $sending = ' Sending is running. Refresh in a minute and Sent will go up.';
+                                } elseif ($error = $sender->spawnError()) {
+                                    $sending = ' '.$error;
+                                } else {
+                                    $sending = ' Sending starts in the background. Refresh in a minute.';
+                                }
+                            }
 
                             return 'Status: '.$record->status
                                 .'. Sent: '.$record->sent_count
                                 .'. Failed: '.$record->failed_count
                                 .'. Queued: '.$queued
                                 .'. Mailbox today: '.$pace->sentToday().' of '.$pace->dailyLimit().'.'
+                                .$sending
                                 .($hold !== null ? ' Paused: '.$hold : '')
                                 .$example;
                         }),
