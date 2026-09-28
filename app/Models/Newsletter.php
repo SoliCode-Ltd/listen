@@ -133,7 +133,7 @@ class Newsletter extends Model
             'headline_en' => 'Clone your voice. Use it on every script.',
             'headline_ar' => 'استنسخ صوتك واستخدمه في كل نص.',
             'intro_en' => 'Listen can now build a voice from a short recording of you. Once it is ready, that voice is available whenever you generate speech.',
-            'intro_ar' => 'يستطيع Listen الآن بناء صوت من تسجيل قصير لك. عندما يجهز، يصبح هذا الصوت متاحاً كلما ولّدت كلاماً.',
+            'intro_ar' => 'تستطيع منصة إسمع الآن بناء صوت من تسجيل قصير لك. عندما يجهز، يصبح هذا الصوت متاحاً كلما ولّدت كلاماً.',
             'body_en' => 'Cloning is included on a paid plan. Free accounts stay on the standard voices. Upgrade, then open Voice Cloning in your dashboard and record a sample in a quiet room.',
             'body_ar' => 'الاستنساخ متاح في الباقات المدفوعة. الحساب المجاني يبقى على الأصوات القياسية. رقِّ اشتراكك، ثم افتح استنساخ الأصوات في لوحة التحكم وسجّل العينة في غرفة هادئة.',
             'highlights_en' => [
@@ -151,7 +151,7 @@ class Newsletter extends Model
             'cta_url_en' => self::billingUrl('en'),
             'cta_url_ar' => self::billingUrl('ar'),
             'footer_en' => 'You received this because you have a Listen account.',
-            'footer_ar' => 'وصلتك هذه الرسالة لأن لديك حساباً على Listen.',
+            'footer_ar' => 'وصلتك هذه الرسالة لأن لديك حساباً على منصة إسمع.',
             'from_name' => 'Listen',
             'from_address' => 'help@listenai.studio',
             'reply_to' => null,

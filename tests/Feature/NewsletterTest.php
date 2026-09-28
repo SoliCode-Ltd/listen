@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Filament\Pages\NewsletterMailbox;
 use App\Filament\Resources\NewsletterResource;
 use App\Filament\Resources\NewsletterResource\Pages\EditNewsletter;
+use App\Filament\Resources\NewsletterResource\RelationManagers\DeliveriesRelationManager;
 use App\Mail\NewsletterMail;
 use App\Models\Newsletter;
 use App\Models\NewsletterDelivery;
@@ -212,12 +213,23 @@ class NewsletterTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'reader@example.com']);
         $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
-        $url = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_EN);
+        $english = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_EN);
+        $arabic = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_AR);
 
-        $this->get($url)
+        $this->get($english)
             ->assertOk()
             ->assertSee('You are unsubscribed')
-            ->assertSee('تم إلغاء الاشتراك');
+            ->assertSee('logo-light.svg')
+            ->assertDontSee('تم إلغاء الاشتراك')
+            ->assertDontSee('logo-ar-light.svg');
+
+        $this->get($arabic)
+            ->assertOk()
+            ->assertSee('تم إلغاء الاشتراك')
+            ->assertSee('منصة إسمع')
+            ->assertSee('logo-ar-light.svg')
+            ->assertDontSee('You are unsubscribed')
+            ->assertDontSee('logo-light.svg');
 
         $this->assertDatabaseHas('newsletter_suppressions', [
             'email' => 'reader@example.com',
@@ -300,9 +312,21 @@ class NewsletterTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Hello Sam,', $html);
+        $this->assertStringContainsString('email-logo-en.png', $html);
+        $this->assertStringContainsString('text-align:center', $html);
+        $this->assertStringContainsString('lang=en', $html);
+        $this->assertStringContainsString('lang=ar', $html);
+        $this->assertStringNotContainsString('>L</td>', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
         $this->assertStringNotContainsString('استنسخ صوتك', $html);
+
+        $arabicHtml = app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_AR, [
+            'name' => 'سام',
+            'email' => 'sam@example.com',
+        ]);
+        $this->assertStringContainsString('email-logo-ar.png', $arabicHtml);
+        $this->assertStringNotContainsString('email-logo-en.png', $arabicHtml);
     }
 
     public function test_admin_can_open_newsletter_and_send_an_example_without_emailing_the_audience(): void
@@ -366,6 +390,51 @@ class NewsletterTest extends TestCase
         Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($paid->email));
         Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($admin->email));
         $this->assertSame(Newsletter::STATUS_SENT, $newsletter->fresh()->status);
+    }
+
+    public function test_admin_can_remove_send_log_rows(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        $keep = NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'email' => 'keep@example.com',
+            'locale' => 'en',
+            'is_test' => true,
+            'status' => NewsletterDelivery::STATUS_FAILED,
+            'error' => 'mailbox',
+            'sent_at' => now(),
+        ]);
+        $remove = NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'email' => 'remove@example.com',
+            'locale' => 'en',
+            'is_test' => true,
+            'status' => NewsletterDelivery::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+
+        Livewire::actingAs($admin)
+            ->test(DeliveriesRelationManager::class, [
+                'ownerRecord' => $newsletter,
+                'pageClass' => EditNewsletter::class,
+            ])
+            ->assertSee('Clear log')
+            ->assertSee('remove@example.com')
+            ->callTableAction('delete', $remove);
+
+        $this->assertDatabaseMissing('newsletter_deliveries', ['id' => $remove->id]);
+        $this->assertDatabaseHas('newsletter_deliveries', ['id' => $keep->id]);
+
+        Livewire::actingAs($admin)
+            ->test(DeliveriesRelationManager::class, [
+                'ownerRecord' => $newsletter->fresh(),
+                'pageClass' => EditNewsletter::class,
+            ])
+            ->callTableAction('clearLog');
+
+        $this->assertDatabaseMissing('newsletter_deliveries', ['id' => $keep->id]);
+        $this->assertSame(0, $newsletter->deliveries()->count());
     }
 
     /**

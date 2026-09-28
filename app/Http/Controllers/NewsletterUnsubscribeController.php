@@ -20,8 +20,11 @@ class NewsletterUnsubscribeController extends Controller
             ['unsubscribed_at' => now()],
         );
 
+        $locale = $request->query('lang') === 'ar' ? 'ar' : 'en';
+
         return response()->view('newsletter.unsubscribed', [
             'email' => $email,
+            'locale' => $locale,
         ]);
     }
 }
