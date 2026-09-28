@@ -7,6 +7,11 @@ use Illuminate\Support\Facades\URL;
 
 class NewsletterRenderer
 {
+    /** Same stacks as resources/views/components/styles.blade.php. */
+    public const FONT_EN = "'IBM Plex Sans', sans-serif";
+
+    public const FONT_AR = "'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif";
+
     /**
      * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool}  $recipient
      */
@@ -146,9 +151,7 @@ class NewsletterRenderer
             'lang' => $lang,
             'dir' => $arabic ? 'rtl' : 'ltr',
             'align' => $arabic ? 'right' : 'left',
-            'font' => $arabic
-                ? "'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif"
-                : "'IBM Plex Sans', 'Segoe UI', Arial, sans-serif",
+            'font' => $arabic ? self::FONT_AR : self::FONT_EN,
             'preheader' => $this->personalize((string) ($arabic ? $newsletter->preheader_ar : $newsletter->preheader_en), $name),
             'eyebrow' => $this->personalize((string) ($arabic ? $newsletter->eyebrow_ar : $newsletter->eyebrow_en), $name),
             'headline' => $this->personalize((string) ($arabic ? $newsletter->headline_ar : $newsletter->headline_en), $name),

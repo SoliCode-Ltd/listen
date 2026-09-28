@@ -1,5 +1,6 @@
 @php
-    $font = "'IBM Plex Sans', 'Segoe UI', Arial, sans-serif";
+    $font = \App\Services\Newsletter\NewsletterRenderer::FONT_EN;
+    $fontAr = \App\Services\Newsletter\NewsletterRenderer::FONT_AR;
     $wave = [4, 8, 14, 8, 5, 12, 20, 12, 6, 16, 26, 16, 7, 18, 11, 5, 13, 8, 4];
 @endphp
 <!DOCTYPE html>
@@ -10,8 +11,9 @@
     <meta name="color-scheme" content="light">
     <meta name="supported-color-schemes" content="light">
     <title>{{ $subject }}</title>
+    @include('components.site-fonts')
 </head>
-<body style="margin:0;padding:0;background:#ECEAF3;color:#16161D;">
+<body style="margin:0;padding:0;background:#ECEAF3;color:#16161D;font-family:{{ $font }};">
     <div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;color:#ECEAF3;">
         {{ $preheader }}
         &#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;
@@ -46,11 +48,11 @@
                                     <div style="height:1px;background:#ECEAF3;margin:8px 0 32px 0;"></div>
                                 @endif
                                 @if ($section['headline'] !== '')
-                                    <h1 style="display:block;margin:0 0 16px 0;font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-0.03em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
+                                    <h1 style="display:block;margin:0 0 16px 0;font-family:{{ $section['font'] }};font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-0.03em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
                                 @endif
-                                <p style="margin:0 0 14px 0;font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
+                                <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
                                 @foreach ($section['paragraphs'] as $paragraph)
-                                    <p style="margin:0 0 14px 0;font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
+                                    <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
                                 @endforeach
                                 @if ($section['highlights'] !== [])
                                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0 4px 0;">
@@ -86,7 +88,7 @@
                                     </table>
                                 @endif
                                 @if ($section['footer'] !== '')
-                                    <p style="display:block;margin:8px 0 4px 0;font-size:13px;line-height:1.5;color:#71717A;text-align:center;">{{ $section['footer'] }}</p>
+                                    <p style="display:block;margin:8px 0 4px 0;font-family:{{ $section['font'] }};font-size:13px;line-height:1.5;color:#71717A;text-align:center;">{{ $section['footer'] }}</p>
                                 @endif
                             </td>
                         </tr>
@@ -98,7 +100,7 @@
                                 <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">
                                     <a href="{{ $unsubscribeUrlEn }}" style="color:#C4B8FF;text-decoration:underline;">Unsubscribe</a>
                                     <span style="color:#5C5C6A;"> · </span>
-                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#C4B8FF;text-decoration:underline;font-family:'IBM Plex Sans Arabic', Tahoma, Arial, sans-serif;">إلغاء الاشتراك</a>
+                                    <a href="{{ $unsubscribeUrlAr }}" dir="rtl" style="color:#C4B8FF;text-decoration:underline;font-family:{{ $fontAr }};">إلغاء الاشتراك</a>
                                 </p>
                             @elseif ($preview)
                                 <p style="margin:0;font-family:{{ $font }};font-size:12px;line-height:1.6;color:#C4B8FF;text-align:center;">Unsubscribe · إلغاء الاشتراك</p>
