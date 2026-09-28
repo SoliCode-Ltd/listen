@@ -5,6 +5,8 @@ use App\Console\Commands\EnforceBillingGraceCommand;
 use App\Console\Commands\GenerateVoiceSamples;
 use App\Console\Commands\ListenSyncExtensionCommand;
 use App\Console\Commands\SendBillingRemindersCommand;
+use App\Console\Commands\SendNewsletterBatchCommand;
+use App\Console\Commands\SendQueuedNewslettersCommand;
 use App\Console\Commands\SyncArabicTranslationsCommand;
 use App\Console\Commands\SyncBillingSubscriptionsCommand;
 use App\Console\Commands\SyncStripePlansCommand;
@@ -26,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         GenerateVoiceSamples::class,
         ListenSyncExtensionCommand::class,
         SendBillingRemindersCommand::class,
+        SendNewsletterBatchCommand::class,
+        SendQueuedNewslettersCommand::class,
         SyncArabicTranslationsCommand::class,
         SyncBillingSubscriptionsCommand::class,
         SyncStripePlansCommand::class,

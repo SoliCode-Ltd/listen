@@ -75,23 +75,12 @@ class NewsletterSender
      */
     public function sendToAudience(Newsletter $newsletter, bool $confirmed = false): array
     {
-        $queued = $this->queueNextBatch($newsletter, $this->pace->dailyLimit(), $confirmed);
-
-        if (! app()->environment('testing')) {
-            return [
-                'sent' => 0,
-                'failed' => 0,
-                'queued' => $queued['queued'],
-            ];
-        }
-
-        $sent = $this->drain($this->pace->dailyLimit(), false);
-        $newsletter->refresh();
+        $result = $this->sendNow($newsletter, $this->pace->perClick(), $confirmed);
 
         return [
-            'sent' => $sent,
-            'failed' => (int) $newsletter->failed_count,
-            'queued' => $queued['queued'],
+            'sent' => $result['sent'],
+            'failed' => $result['failed'],
+            'queued' => $result['queued'],
         ];
     }
 
@@ -101,7 +90,7 @@ class NewsletterSender
      *
      * @return array{queued: int, sent: int, failed: int, waiting: int}
      */
-    public function queueNextBatch(Newsletter $newsletter, int $batchSize, bool $confirmed = false): array
+    public function queueNextBatch(Newsletter $newsletter, int $batchSize, bool $confirmed = false, bool $startRunner = true): array
     {
         if (! $confirmed) {
             throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
@@ -158,11 +147,46 @@ class NewsletterSender
             });
         });
 
-        if (($result['queued'] ?? 0) > 0) {
+        if ($startRunner && ($result['queued'] ?? 0) > 0) {
             $this->ensureRunning();
         }
 
         return $result;
+    }
+
+    /**
+     * Send the next messages before the admin request ends.
+     * Uses the same mail call as an example send. Does not touch the scheduler.
+     *
+     * @return array{sent: int, failed: int, queued: int, waiting: int, hold: ?string}
+     */
+    public function sendNow(Newsletter $newsletter, int $count, bool $confirmed = false): array
+    {
+        if (! $confirmed) {
+            throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
+        }
+
+        $count = max(1, min($count, $this->pace->perClick()));
+
+        if (! app()->environment('testing')) {
+            set_time_limit(180);
+        }
+
+        if ($newsletter->queuedDeliveries()->count() < 1) {
+            $this->queueNextBatch($newsletter, $count, true, false);
+        }
+
+        $sent = $this->drain($count, true);
+        $fresh = $newsletter->fresh() ?? $newsletter;
+        $progress = $this->progress($fresh);
+
+        return [
+            'sent' => $sent,
+            'failed' => $progress['failed'],
+            'queued' => $progress['queued'],
+            'waiting' => $this->audience->waitingCount($fresh),
+            'hold' => $this->pace->holdReason(),
+        ];
     }
 
     /**
