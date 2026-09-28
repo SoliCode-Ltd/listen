@@ -193,7 +193,6 @@ Run the scheduler in production (`php artisan schedule:work`, or a system cron e
 | `listen:billing-enforce-grace` | Hourly |
 | `listen:billing-reminders` | Daily at 09:00 |
 | `plans:expire-discounts` | Every 5 minutes |
-| `newsletter:work --kick` | Every minute. Starts the newsletter sender if a batch is queued and the background sender is not already running |
 
 Other commands:
 

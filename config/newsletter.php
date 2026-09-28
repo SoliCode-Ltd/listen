@@ -13,4 +13,7 @@ return [
     // The scheduler sends this many each minute (180 per hour).
     'per_minute' => (int) env('NEWSLETTER_PER_MINUTE', 3),
 
+    // Sent inside the admin click, same path as an example email.
+    'per_click' => (int) env('NEWSLETTER_PER_CLICK', 10),
+
 ];

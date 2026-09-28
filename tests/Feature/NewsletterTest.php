@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\SendNewsletterBatchCommand;
 use App\Filament\Pages\NewsletterMailbox;
 use App\Filament\Resources\NewsletterResource;
 use App\Filament\Resources\NewsletterResource\Pages\EditNewsletter;
@@ -25,6 +26,8 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use RuntimeException;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Tests\TestCase;
 
 class NewsletterTest extends TestCase
@@ -402,7 +405,7 @@ class NewsletterTest extends TestCase
             ->assertNotified()
             ->callAction('sendToAudience', data: [
                 'confirm' => true,
-                'batch_size' => 500,
+                'batch_size' => 10,
             ])
             ->assertNotified();
 
@@ -588,6 +591,28 @@ class NewsletterTest extends TestCase
         $this->assertSame(2, NewsletterDelivery::query()->where('status', NewsletterDelivery::STATUS_QUEUED)->count());
     }
 
+    public function test_send_now_delivers_queued_messages_without_the_scheduler(): void
+    {
+        Mail::fake();
+        Config::set('newsletter.per_click', 2);
+
+        $users = User::factory()->count(4)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 4, true, false);
+        Mail::assertNothingSent();
+
+        $result = app(NewsletterSender::class)->sendNow($newsletter->fresh(), 10, true);
+
+        $this->assertSame(2, $result['sent']);
+        $this->assertSame(2, $result['queued']);
+        Mail::assertSentCount(2);
+        $sentEmails = $users->sortBy('id')->take(2)->pluck('email')->map(fn ($email) => strtolower((string) $email))->all();
+        foreach ($sentEmails as $email) {
+            Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($email));
+        }
+        $this->assertSame(2, $newsletter->fresh()->sent_count);
+    }
+
     public function test_worker_sends_a_queued_batch_without_waiting_for_another_click(): void
     {
         Mail::fake();
@@ -598,7 +623,10 @@ class NewsletterTest extends TestCase
         Mail::assertNothingSent();
         $this->assertFalse(app(NewsletterSender::class)->ensureRunning());
 
-        $this->artisan('newsletter:work', ['--once' => true])->assertSuccessful();
+        $command = app(SendNewsletterBatchCommand::class);
+        $command->setLaravel($this->app);
+        $exit = $command->run(new ArrayInput(['--once' => true]), new BufferedOutput);
+        $this->assertSame(0, $exit);
 
         Mail::assertSentCount(2);
         $this->assertSame(0, $newsletter->queuedDeliveries()->count());

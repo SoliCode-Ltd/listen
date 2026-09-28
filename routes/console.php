@@ -12,4 +12,3 @@ Schedule::command('listen:billing-sync')->everyFifteenMinutes();
 Schedule::command('listen:billing-reminders')->dailyAt('09:00');
 Schedule::command('listen:billing-enforce-grace')->hourly();
 Schedule::command('plans:expire-discounts')->everyFiveMinutes();
-Schedule::command('newsletter:work --kick')->everyMinute()->withoutOverlapping(2);

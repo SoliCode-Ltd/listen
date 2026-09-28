@@ -24,6 +24,11 @@ class NewsletterPace
         return max(1, (int) config('newsletter.per_minute', 3));
     }
 
+    public function perClick(): int
+    {
+        return max(1, (int) config('newsletter.per_click', 10));
+    }
+
     public function sentToday(): int
     {
         return $this->sentSince(now()->startOfDay());
