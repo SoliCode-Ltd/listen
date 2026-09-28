@@ -305,12 +305,14 @@ class NewsletterTest extends TestCase
     {
         $newsletter = new Newsletter(array_merge(Newsletter::defaultAttributes(), [
             'body_en' => '<script>alert(1)</script>',
+            'eyebrow_en' => 'Voice cloning',
         ]));
         $html = app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_EN, [
             'name' => 'Sam',
             'email' => 'sam@example.com',
         ]);
 
+        $this->assertStringNotContainsString('Voice cloning', $html);
         $this->assertStringContainsString('Hello Sam,', $html);
         $this->assertStringContainsString('email-logo-en.png', $html);
         $this->assertStringContainsString('text-align:center', $html);

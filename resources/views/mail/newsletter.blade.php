@@ -45,21 +45,6 @@
                                 @if ($index > 0)
                                     <div style="height:1px;background:#ECEAF3;margin:8px 0 32px 0;"></div>
                                 @endif
-                                @if ($section['eyebrow'] !== '')
-                                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 14px 0;">
-                                        <tr>
-                                            <td align="{{ $section['align'] }}" style="text-align:{{ $section['align'] }};">
-                                                <table role="presentation" cellpadding="0" cellspacing="0">
-                                                    <tr>
-                                                        <td bgcolor="#F3F0FF" style="background:#F3F0FF;border-radius:999px;padding:6px 12px;">
-                                                            <span style="font-family:{{ $section['font'] }};font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#5B3DF5;">{{ $section['eyebrow'] }}</span>
-                                                        </td>
-                                                    </tr>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    </table>
-                                @endif
                                 @if ($section['headline'] !== '')
                                     <h1 style="display:block;margin:0 0 16px 0;font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-0.03em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
                                 @endif
@@ -70,8 +55,8 @@
                                 @if ($section['highlights'] !== [])
                                     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0 4px 0;">
                                         <tr>
-                                            <td align="center" style="text-align:center;">
-                                                <table role="presentation" dir="{{ $section['dir'] }}" cellpadding="0" cellspacing="0" style="margin:0 auto;">
+                                            <td align="{{ $section['align'] }}" style="text-align:{{ $section['align'] }};">
+                                                <table role="presentation" dir="{{ $section['dir'] }}" cellpadding="0" cellspacing="0">
                                                     @foreach ($section['highlights'] as $highlight)
                                                         <tr>
                                                             <td width="16" valign="middle" style="width:16px;padding:6px 8px;">
