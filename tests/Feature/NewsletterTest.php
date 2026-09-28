@@ -213,16 +213,23 @@ class NewsletterTest extends TestCase
     {
         $user = User::factory()->create(['email' => 'reader@example.com']);
         $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
-        $url = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_EN);
+        $english = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_EN);
+        $arabic = app(NewsletterRenderer::class)->unsubscribeUrl($user->email, Newsletter::LANGUAGE_AR);
 
-        $this->get($url)
+        $this->get($english)
             ->assertOk()
             ->assertSee('You are unsubscribed')
+            ->assertSee('logo-light.svg')
+            ->assertDontSee('تم إلغاء الاشتراك')
+            ->assertDontSee('logo-ar-light.svg');
+
+        $this->get($arabic)
+            ->assertOk()
             ->assertSee('تم إلغاء الاشتراك')
             ->assertSee('منصة إسمع')
-            ->assertSee('logo-light.svg')
             ->assertSee('logo-ar-light.svg')
-            ->assertDontSee('رسائل Listen');
+            ->assertDontSee('You are unsubscribed')
+            ->assertDontSee('logo-light.svg');
 
         $this->assertDatabaseHas('newsletter_suppressions', [
             'email' => 'reader@example.com',
@@ -290,11 +297,21 @@ class NewsletterTest extends TestCase
         ]);
 
         $this->assertStringContainsString('Hello Sam,', $html);
-        $this->assertStringContainsString('aria-label="Listen"', $html);
+        $this->assertStringContainsString('email-logo-en.png', $html);
+        $this->assertStringContainsString('text-align:center', $html);
+        $this->assertStringContainsString('lang=en', $html);
+        $this->assertStringContainsString('lang=ar', $html);
         $this->assertStringNotContainsString('>L</td>', $html);
         $this->assertStringContainsString('&lt;script&gt;alert(1)&lt;/script&gt;', $html);
         $this->assertStringNotContainsString('<script>alert(1)</script>', $html);
         $this->assertStringNotContainsString('استنسخ صوتك', $html);
+
+        $arabicHtml = app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_AR, [
+            'name' => 'سام',
+            'email' => 'sam@example.com',
+        ]);
+        $this->assertStringContainsString('email-logo-ar.png', $arabicHtml);
+        $this->assertStringNotContainsString('email-logo-en.png', $arabicHtml);
     }
 
     public function test_admin_can_open_newsletter_and_send_an_example_without_emailing_the_audience(): void

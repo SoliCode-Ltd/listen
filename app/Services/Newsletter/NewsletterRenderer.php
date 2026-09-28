@@ -14,15 +14,19 @@ class NewsletterRenderer
     {
         $locale = $this->normalizeLocale($locale);
         $sections = $this->sections($newsletter, $locale, $recipient);
-        $unsubscribeUrl = $preview ? null : $this->unsubscribeUrl((string) ($recipient['email'] ?? ''), $locale);
+        $email = (string) ($recipient['email'] ?? '');
+        $primaryLang = ($sections[0]['lang'] ?? 'en') === 'ar' ? 'ar' : 'en';
 
         return view('mail.newsletter', [
             'subject' => $this->subject($newsletter, $locale),
             'preheader' => $this->preheader($sections),
             'sections' => $sections,
-            'unsubscribeUrl' => $unsubscribeUrl,
+            'unsubscribeUrlEn' => $preview ? null : $this->unsubscribeUrl($email, Newsletter::LANGUAGE_EN),
+            'unsubscribeUrlAr' => $preview ? null : $this->unsubscribeUrl($email, Newsletter::LANGUAGE_AR),
             'preview' => $preview,
-            'appName' => 'Listen',
+            'logoUrl' => asset($primaryLang === 'ar' ? 'images/email-logo-ar.png' : 'images/email-logo-en.png'),
+            'logoAlt' => $primaryLang === 'ar' ? 'منصة إسمع' : 'Listen',
+            'siteName' => 'listenai.studio',
         ])->render();
     }
 
