@@ -220,6 +220,10 @@ class NewsletterTest extends TestCase
             ->assertOk()
             ->assertSee('You are unsubscribed')
             ->assertSee('logo-light.svg')
+            ->assertSee('IBM+Plex+Sans:wght@400;500;600;700;800', false)
+            ->assertSee('IBM+Plex+Sans+Arabic:wght@400;500;600;700;800', false)
+            ->assertSee("font-family: 'IBM Plex Sans', sans-serif", false)
+            ->assertDontSee('Segoe UI')
             ->assertDontSee('تم إلغاء الاشتراك')
             ->assertDontSee('logo-ar-light.svg');
 
@@ -228,6 +232,8 @@ class NewsletterTest extends TestCase
             ->assertSee('تم إلغاء الاشتراك')
             ->assertSee('منصة إسمع')
             ->assertSee('logo-ar-light.svg')
+            ->assertSee("font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif", false)
+            ->assertDontSee('Tahoma')
             ->assertDontSee('You are unsubscribed')
             ->assertDontSee('logo-light.svg');
 
@@ -313,6 +319,11 @@ class NewsletterTest extends TestCase
         ]);
 
         $this->assertStringNotContainsString('Voice cloning', $html);
+        $this->assertStringContainsString('IBM+Plex+Sans:wght@400;500;600;700;800', $html);
+        $this->assertStringContainsString('IBM+Plex+Sans+Arabic:wght@400;500;600;700;800', $html);
+        $this->assertStringContainsString(e(NewsletterRenderer::FONT_EN), $html);
+        $this->assertStringNotContainsString('Segoe UI', $html);
+        $this->assertStringNotContainsString('Tahoma', $html);
         $this->assertStringContainsString('Hello Sam,', $html);
         $this->assertStringContainsString('email-logo-en.png', $html);
         $this->assertStringContainsString('text-align:center', $html);
@@ -330,6 +341,7 @@ class NewsletterTest extends TestCase
         ]);
         $this->assertStringContainsString('email-logo-ar.png', $arabicHtml);
         $this->assertStringNotContainsString('email-logo-en.png', $arabicHtml);
+        $this->assertStringContainsString(e(NewsletterRenderer::FONT_AR), $arabicHtml);
     }
 
     public function test_admin_can_open_newsletter_and_send_an_example_without_emailing_the_audience(): void

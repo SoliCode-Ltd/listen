@@ -8,7 +8,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex">
     <title>{{ $arabic ? 'تم إلغاء الاشتراك' : 'Unsubscribed' }}</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+    @include('components.site-fonts')
     <style>
         * { box-sizing: border-box; }
         body {
@@ -16,7 +16,10 @@
             min-height: 100vh;
             background: #F3F1FA;
             color: #16161D;
-            font-family: {{ $arabic ? '"IBM Plex Sans Arabic", Tahoma, Arial, sans-serif' : '"IBM Plex Sans", "Segoe UI", Arial, sans-serif' }};
+            font-family: 'IBM Plex Sans', sans-serif;
+        }
+        html[dir="rtl"] body {
+            font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
         }
         .wrap {
             min-height: 100vh;
@@ -40,7 +43,7 @@
         .logo { height: 48px; width: auto; display: block; margin: 0 auto; }
         .site {
             margin: 16px 0 0;
-            font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+            font-family: 'IBM Plex Sans', sans-serif;
             font-size: 13px;
             line-height: 1.4;
             letter-spacing: 0.14em;
@@ -53,7 +56,7 @@
             padding: 8px 14px;
             background: #F6F4FF;
             border-radius: 999px;
-            font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+            font-family: 'IBM Plex Sans', sans-serif;
             font-size: 14px;
             line-height: 1.4;
             color: #3F3F4A;
@@ -75,7 +78,7 @@
             font-size: 14px;
             letter-spacing: 0.04em;
             text-decoration: none;
-            font-family: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+            font-family: 'IBM Plex Sans', sans-serif;
         }
     </style>
 </head>
