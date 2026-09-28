@@ -110,30 +110,40 @@ class EditNewsletter extends EditRecord
                     $waiting = app(NewsletterAudience::class)->waitingCount($draft);
                     $pace = app(NewsletterPace::class);
                     $hold = $pace->holdReason();
-                    $click = $pace->perClick();
+                    $room = $progress['queued'] > 0
+                        ? min($progress['queued'], $pace->hourlyRemaining())
+                        : $pace->availableNow();
 
                     $summary = 'Already sent: '.$progress['sent'].'.'
                         .' Failed, still waiting: '.$progress['failed'].'.'
                         .' Queued: '.$progress['queued'].'.'
                         .' Still waiting: '.$waiting.'.'
+                        .' Mailbox this hour: '.$pace->sentThisHour().' of '.$pace->hourlyLimit().'.'
                         .' Mailbox today: '.$pace->sentToday().' of '.$pace->dailyLimit().'.';
 
                     if ($hold !== null) {
                         $summary .= ' Paused: '.$hold;
                     }
 
+                    $limitNote = 'Titan allows '.$pace->hourlyLimit().' an hour and '.$pace->dailyLimit().' a day from this mailbox.';
+                    $intro = $room > 0
+                        ? 'This click sends the number you enter before the page finishes, the same way an example email is sent. '.$limitNote.' You can send up to '.$room.' right now. Keep this page open until it finishes. People who already received this newsletter are skipped. Nothing is sent until you confirm.'
+                        : 'This mailbox has used Titan\'s limit for this hour or for today. '.$limitNote.' Nothing is sent until that room opens up again.';
+
                     return [
                         Forms\Components\Placeholder::make('audience_count')
                             ->label('This newsletter')
-                            ->content(new HtmlString(e($summary).'<br><br>This click sends up to '.$click.' people before the page finishes, the same way an example email is sent. People who already received this newsletter are skipped. If more are queued or still waiting, press send again for the next '.$click.'. Nothing is sent until you confirm.')),
+                            ->content(new HtmlString(e($summary).'<br><br>'.e($intro))),
                         Forms\Components\TextInput::make('batch_size')
                             ->label('How many to send this time')
                             ->numeric()
                             ->required()
-                            ->default($click)
+                            ->default($room > 0 ? $room : 1)
                             ->minValue(1)
-                            ->maxValue($click)
-                            ->helperText('Maximum '.$click.' per click so the page can finish. Titan still allows about '.$pace->dailyLimit().' a day from this mailbox. The billing scheduler is not used.'),
+                            ->maxValue($room > 0 ? $room : 1)
+                            ->helperText($room > 0
+                                ? 'Maximum '.$room.' right now. That is what Titan still allows ('.$pace->hourlyLimit().' per hour, '.$pace->dailyLimit().' per day).'
+                                : 'Titan\'s hourly or daily limit is already used. Wait, then send again.'),
                         Forms\Components\Checkbox::make('confirm')
                             ->label('I checked the preview and I want to send these now')
                             ->accepted(),
@@ -144,7 +154,7 @@ class EditNewsletter extends EditRecord
                         $newsletter = $this->persistDraft();
                         $result = app(NewsletterSender::class)->sendNow(
                             $newsletter,
-                            (int) ($data['batch_size'] ?? app(NewsletterPace::class)->perClick()),
+                            (int) ($data['batch_size'] ?? app(NewsletterPace::class)->availableNow()),
                             true,
                         );
                     } catch (\Throwable $exception) {
@@ -172,8 +182,11 @@ class EditNewsletter extends EditRecord
                     }
 
                     $body = 'Sent '.$result['sent'].'. Failed '.$result['failed'].'. Still queued: '.$result['queued'].'. Still waiting: '.$result['waiting'].'.';
+                    $left = app(NewsletterPace::class)->availableNow();
                     if ($result['queued'] > 0) {
-                        $body .= ' Press send again for the next '.app(NewsletterPace::class)->perClick().'.';
+                        $body .= ' Press send again to finish the queued mail.';
+                    } elseif ($result['waiting'] > 0 && $left > 0) {
+                        $body .= ' Press send again. Titan still allows '.$left.' more right now.';
                     }
                     if ($result['hold'] !== null) {
                         $body .= ' Paused: '.$result['hold'];
@@ -204,7 +217,7 @@ class EditNewsletter extends EditRecord
                     app(NewsletterPace::class)->clearHold();
                     Notification::make()
                         ->title('Sending resumed')
-                        ->body('Press Send next batch. The next '.app(NewsletterPace::class)->perClick().' go out before the page finishes.')
+                        ->body('Press Send next batch. You can send up to '.app(NewsletterPace::class)->availableNow().' right now.')
                         ->success()
                         ->send();
                 }),

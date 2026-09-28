@@ -16,7 +16,7 @@ class NewsletterPace
 
     public function hourlyLimit(): int
     {
-        return max(1, (int) config('newsletter.hourly_limit', 180));
+        return max(1, (int) config('newsletter.hourly_limit', 200));
     }
 
     public function perMinute(): int
@@ -24,9 +24,12 @@ class NewsletterPace
         return max(1, (int) config('newsletter.per_minute', 3));
     }
 
-    public function perClick(): int
+    /**
+     * How many this click can finish: the smaller of today's remainder and this hour's remainder.
+     */
+    public function availableNow(): int
     {
-        return max(1, (int) config('newsletter.per_click', 10));
+        return min($this->dailyRemaining(), $this->hourlyRemaining());
     }
 
     public function sentToday(): int
