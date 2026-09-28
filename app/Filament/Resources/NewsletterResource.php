@@ -67,7 +67,7 @@ class NewsletterResource extends Resource
                             $pace = app(NewsletterPace::class);
                             $hold = $pace->holdReason();
                             $sending = $queued > 0
-                                ? ' Press Send next batch. The next '.$pace->perClick().' go out before this page finishes.'
+                                ? ' Press Send next batch. Queued mail goes out before this page finishes, up to '.$pace->hourlyRemaining().' this hour.'
                                 : '';
 
                             return 'Status: '.$record->status

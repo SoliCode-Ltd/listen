@@ -405,7 +405,7 @@ class NewsletterTest extends TestCase
             ->assertNotified()
             ->callAction('sendToAudience', data: [
                 'confirm' => true,
-                'batch_size' => 10,
+                'batch_size' => 90,
             ])
             ->assertNotified();
 
@@ -594,14 +594,14 @@ class NewsletterTest extends TestCase
     public function test_send_now_delivers_queued_messages_without_the_scheduler(): void
     {
         Mail::fake();
-        Config::set('newsletter.per_click', 2);
+        Config::set('newsletter.hourly_limit', 2);
 
         $users = User::factory()->count(4)->create();
         $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
         app(NewsletterSender::class)->queueNextBatch($newsletter, 4, true, false);
         Mail::assertNothingSent();
 
-        $result = app(NewsletterSender::class)->sendNow($newsletter->fresh(), 10, true);
+        $result = app(NewsletterSender::class)->sendNow($newsletter->fresh(), 90, true);
 
         $this->assertSame(2, $result['sent']);
         $this->assertSame(2, $result['queued']);
@@ -611,6 +611,26 @@ class NewsletterTest extends TestCase
             Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($email));
         }
         $this->assertSame(2, $newsletter->fresh()->sent_count);
+    }
+
+    public function test_one_click_sends_past_the_old_ten_cap_up_to_titan_room(): void
+    {
+        Mail::fake();
+        Config::set('newsletter.hourly_limit', 200);
+        Config::set('newsletter.daily_limit', 500);
+
+        User::factory()->count(12)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+
+        $this->assertSame(200, app(NewsletterPace::class)->availableNow());
+
+        $result = app(NewsletterSender::class)->sendNow($newsletter->fresh(), 90, true);
+
+        $this->assertSame(12, $result['sent']);
+        $this->assertSame(0, $result['queued']);
+        Mail::assertSentCount(12);
+        $this->assertSame(188, app(NewsletterPace::class)->availableNow());
+        $this->assertSame(188, app(NewsletterPace::class)->hourlyRemaining());
     }
 
     public function test_worker_sends_a_queued_batch_without_waiting_for_another_click(): void

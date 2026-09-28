@@ -23,6 +23,8 @@ class NewsletterSender
 
     private const SPAWN_ERROR = 'newsletter_sender_spawn_error';
 
+    private const SEND_LOCK = 'newsletter_send_now';
+
     public function __construct(
         private readonly NewsletterAudience $audience,
         private readonly NewsletterRenderer $renderer,
@@ -75,7 +77,7 @@ class NewsletterSender
      */
     public function sendToAudience(Newsletter $newsletter, bool $confirmed = false): array
     {
-        $result = $this->sendNow($newsletter, $this->pace->perClick(), $confirmed);
+        $result = $this->sendNow($newsletter, max(1, $this->pace->availableNow()), $confirmed);
 
         return [
             'sent' => $result['sent'],
@@ -166,27 +168,51 @@ class NewsletterSender
             throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
         }
 
-        $count = max(1, min($count, $this->pace->perClick()));
-
-        if (! app()->environment('testing')) {
-            set_time_limit(180);
+        if (! Cache::add(self::SEND_LOCK, '1', 120)) {
+            throw new RuntimeException('A batch is already going out. Wait until that page finishes, then press send again.');
         }
 
-        if ($newsletter->queuedDeliveries()->count() < 1) {
-            $this->queueNextBatch($newsletter, $count, true, false);
+        try {
+            if (! app()->environment('testing')) {
+                ignore_user_abort(true);
+                set_time_limit(0);
+            }
+
+            if ($this->pace->hourlyRemaining() < 1) {
+                throw new RuntimeException(
+                    'Titan allows '.$this->pace->hourlyLimit().' an hour from this mailbox. '
+                    .$this->pace->sentThisHour().' already went out in the last hour. Try again when that hour has passed.'
+                );
+            }
+
+            $queued = $newsletter->queuedDeliveries()->count();
+            if ($queued < 1) {
+                if ($this->pace->dailyRemaining() < 1) {
+                    throw new RuntimeException('The mailbox has already used its '.$this->pace->dailyLimit().' sends for today. The next batch can start tomorrow.');
+                }
+
+                $count = max(1, min($count, $this->pace->availableNow()));
+                $this->queueNextBatch($newsletter, $count, true, false);
+            } else {
+                $count = max(1, min($count, $this->pace->hourlyRemaining()));
+            }
+
+            $sent = $this->drain($count, true, function (): void {
+                Cache::put(self::SEND_LOCK, '1', 120);
+            });
+            $fresh = $newsletter->fresh() ?? $newsletter;
+            $progress = $this->progress($fresh);
+
+            return [
+                'sent' => $sent,
+                'failed' => $progress['failed'],
+                'queued' => $progress['queued'],
+                'waiting' => $this->audience->waitingCount($fresh),
+                'hold' => $this->pace->holdReason(),
+            ];
+        } finally {
+            Cache::forget(self::SEND_LOCK);
         }
-
-        $sent = $this->drain($count, true);
-        $fresh = $newsletter->fresh() ?? $newsletter;
-        $progress = $this->progress($fresh);
-
-        return [
-            'sent' => $sent,
-            'failed' => $progress['failed'],
-            'queued' => $progress['queued'],
-            'waiting' => $this->audience->waitingCount($fresh),
-            'hold' => $this->pace->holdReason(),
-        ];
     }
 
     /**
@@ -305,7 +331,7 @@ class NewsletterSender
     /**
      * Send up to $limit queued messages. Mailbox-wide Titan errors pause the rest.
      */
-    public function drain(int $limit, bool $respectPace = true): int
+    public function drain(int $limit, bool $respectPace = true, ?callable $tick = null): int
     {
         if ($limit < 1 || ($respectPace && $this->pace->holdReason() !== null)) {
             return 0;
@@ -330,6 +356,9 @@ class NewsletterSender
         $sent = 0;
 
         foreach ($rows as $row) {
+            if ($tick !== null) {
+                $tick();
+            }
             $newsletter = $row->newsletter;
             if (! $newsletter) {
                 $row->delete();
