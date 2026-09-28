@@ -14,7 +14,7 @@ class DeliveriesRelationManager extends RelationManager
 
     public function isReadOnly(): bool
     {
-        return true;
+        return false;
     }
 
     public function table(Table $table): Table
@@ -47,8 +47,33 @@ class DeliveriesRelationManager extends RelationManager
                     ->toggleable(),
             ])
             ->defaultSort('id', 'desc')
-            ->headerActions([])
-            ->actions([])
-            ->bulkActions([]);
+            ->headerActions([
+                Tables\Actions\Action::make('clearLog')
+                    ->label('Clear log')
+                    ->icon('heroicon-o-trash')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalHeading('Clear the send log')
+                    ->modalDescription('Removes every row for this newsletter. If a sent row is removed, that address can be included again the next time this newsletter skips people who already received it.')
+                    ->modalSubmitActionLabel('Clear log')
+                    ->action(function (): void {
+                        $this->getOwnerRecord()->deliveries()->delete();
+                    }),
+            ])
+            ->actions([
+                Tables\Actions\DeleteAction::make()
+                    ->label('Remove')
+                    ->modalHeading('Remove this log row')
+                    ->modalDescription('If this row was a successful send, that address can be included again the next time this newsletter skips people who already received it.')
+                    ->modalSubmitActionLabel('Remove'),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkActionGroup::make([
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->label('Remove selected'),
+                ]),
+            ])
+            ->emptyStateHeading('No sends yet')
+            ->emptyStateDescription('Example sends and audience sends are listed here. You can remove rows when the log gets long.');
     }
 }
