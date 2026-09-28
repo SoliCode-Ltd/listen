@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class NewsletterDelivery extends Model
 {
+    public const STATUS_QUEUED = 'queued';
+
     public const STATUS_SENT = 'sent';
 
     public const STATUS_FAILED = 'failed';

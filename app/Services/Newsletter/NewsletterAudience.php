@@ -13,13 +13,15 @@ use Illuminate\Support\Facades\DB;
 class NewsletterAudience
 {
     /**
-     * @param  callable(array{email: string, name: string, user_id: int|null}): void  $callback
+     * @param  callable(array{email: string, name: string, user_id: int|null}): (void|bool)  $callback
      */
     public function each(Newsletter $newsletter, callable $callback): void
     {
         if ($newsletter->audience === Newsletter::AUDIENCE_CUSTOM) {
             foreach ($this->customRecipients($newsletter) as $recipient) {
-                $callback($recipient);
+                if ($callback($recipient) === false) {
+                    return;
+                }
             }
 
             return;
@@ -28,20 +30,83 @@ class NewsletterAudience
         $this->userQuery($newsletter)
             ->select(['id', 'name', 'email'])
             ->orderBy('id')
-            ->chunkById(200, function ($users) use ($callback, $newsletter): void {
+            ->chunkById(200, function ($users) use ($callback, $newsletter) {
                 foreach ($users as $user) {
                     $email = strtolower(trim((string) $user->email));
                     if (! $this->isDeliverableEmail($email, $newsletter)) {
                         continue;
                     }
 
-                    $callback([
+                    if ($callback([
                         'email' => $email,
                         'name' => (string) $user->name,
                         'user_id' => (int) $user->id,
-                    ]);
+                    ]) === false) {
+                        return false;
+                    }
                 }
             });
+    }
+
+    /**
+     * People who have not been successfully sent this newsletter and are not already queued.
+     * Lowest account id first, so the next batch continues where the last one stopped.
+     *
+     * @return list<array{email: string, name: string, user_id: int|null}>
+     */
+    public function pending(Newsletter $newsletter, int $limit): array
+    {
+        if ($limit < 1) {
+            return [];
+        }
+
+        $queued = $this->queuedAddresses($newsletter);
+        $found = [];
+
+        $this->each($newsletter, function (array $recipient) use (&$found, $limit, $queued): bool {
+            if (isset($queued[$recipient['email']])) {
+                return true;
+            }
+
+            $found[] = $recipient;
+
+            return count($found) < $limit;
+        });
+
+        return $found;
+    }
+
+    public function waitingCount(Newsletter $newsletter): int
+    {
+        $queued = $this->queuedAddresses($newsletter);
+        $count = 0;
+
+        $this->each($newsletter, function (array $recipient) use (&$count, $queued): void {
+            if (! isset($queued[$recipient['email']])) {
+                $count++;
+            }
+        });
+
+        return $count;
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private function queuedAddresses(Newsletter $newsletter): array
+    {
+        if (! $newsletter->getKey()) {
+            return [];
+        }
+
+        return NewsletterDelivery::query()
+            ->where('newsletter_id', $newsletter->getKey())
+            ->where('is_test', false)
+            ->where('status', NewsletterDelivery::STATUS_QUEUED)
+            ->pluck('email')
+            ->map(fn ($email): string => strtolower((string) $email))
+            ->flip()
+            ->all();
     }
 
     public function count(Newsletter $newsletter): int

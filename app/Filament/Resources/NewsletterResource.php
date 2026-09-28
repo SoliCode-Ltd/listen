@@ -6,6 +6,7 @@ use App\Filament\Resources\NewsletterResource\Pages;
 use App\Filament\Resources\NewsletterResource\RelationManagers\DeliveriesRelationManager;
 use App\Models\Newsletter;
 use App\Models\Plan;
+use App\Services\Newsletter\NewsletterPace;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -44,7 +45,7 @@ class NewsletterResource extends Resource
     {
         return [
             Forms\Components\Section::make('Campaign')
-                ->description('Saving stores a draft. Nothing is emailed until you use Send example or Send to audience.')
+                ->description('Saving stores a draft. Nothing is emailed until you use Send example or Send next batch.')
                 ->schema([
                     Forms\Components\TextInput::make('name')
                         ->label('Internal name')
@@ -62,7 +63,17 @@ class NewsletterResource extends Resource
                                 ? ' Last example: '.$record->last_test_email.' at '.$record->last_test_sent_at?->timezone(config('app.timezone'))->format('Y-m-d H:i').'.'
                                 : ' No example sent yet.';
 
-                            return 'Status: '.$record->status.'. Sent: '.$record->sent_count.'. Failed: '.$record->failed_count.'.'.$example;
+                            $queued = $record->queuedDeliveries()->count();
+                            $pace = app(NewsletterPace::class);
+                            $hold = $pace->holdReason();
+
+                            return 'Status: '.$record->status
+                                .'. Sent: '.$record->sent_count
+                                .'. Failed: '.$record->failed_count
+                                .'. Queued: '.$queued
+                                .'. Mailbox today: '.$pace->sentToday().' of '.$pace->dailyLimit().'.'
+                                .($hold !== null ? ' Paused: '.$hold : '')
+                                .$example;
                         }),
                     Forms\Components\Textarea::make('internal_notes')
                         ->label('Internal notes')
@@ -329,6 +340,9 @@ class NewsletterResource extends Resource
                 Tables\Columns\TextColumn::make('sent_count')
                     ->label('Sent')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('queued_deliveries_count')
+                    ->label('Queued')
+                    ->counts('queuedDeliveries'),
                 Tables\Columns\TextColumn::make('failed_count')
                     ->label('Failed')
                     ->sortable(),

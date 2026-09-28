@@ -99,6 +99,13 @@ class Newsletter extends Model
         return $this->hasMany(NewsletterDelivery::class);
     }
 
+    public function queuedDeliveries(): HasMany
+    {
+        return $this->deliveries()
+            ->where('is_test', false)
+            ->where('status', NewsletterDelivery::STATUS_QUEUED);
+    }
+
     public static function billingUrl(string $locale): string
     {
         $base = rtrim((string) config('app.url'), '/');
