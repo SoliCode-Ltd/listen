@@ -8,6 +8,7 @@ use App\Models\NewsletterDelivery;
 use App\Models\NewsletterSuppression;
 use App\Models\User;
 use App\Support\TitanMailbox;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -16,6 +17,12 @@ use RuntimeException;
 
 class NewsletterSender
 {
+    private const RUNNER_LOCK = 'newsletter_sender_lock';
+
+    private const RUNNER_HEARTBEAT = 'newsletter_sender_heartbeat';
+
+    private const SPAWN_ERROR = 'newsletter_sender_spawn_error';
+
     public function __construct(
         private readonly NewsletterAudience $audience,
         private readonly NewsletterRenderer $renderer,
@@ -90,7 +97,7 @@ class NewsletterSender
 
     /**
      * Line up the next people who have not received this newsletter.
-     * Mail goes out later through newsletter:send-queued.
+     * Mail goes out in the background through newsletter:work.
      *
      * @return array{queued: int, sent: int, failed: int, waiting: int}
      */
@@ -106,7 +113,7 @@ class NewsletterSender
 
         $batchSize = max(1, min($batchSize, $this->pace->dailyLimit()));
 
-        return Cache::lock('newsletter-batch', 20)->block(10, function () use ($newsletter, $batchSize): array {
+        $result = Cache::lock('newsletter-batch', 20)->block(10, function () use ($newsletter, $batchSize): array {
             return DB::transaction(function () use ($newsletter, $batchSize): array {
                 $locked = Newsletter::query()->whereKey($newsletter->getKey())->lockForUpdate()->firstOrFail();
                 $alreadyQueued = $locked->queuedDeliveries()->count();
@@ -150,6 +157,125 @@ class NewsletterSender
                 ];
             });
         });
+
+        if (($result['queued'] ?? 0) > 0) {
+            $this->ensureRunning();
+        }
+
+        return $result;
+    }
+
+    /**
+     * The batch is only a queue until a process sends it. Start that process
+     * when the scheduler is not already doing it.
+     */
+    public function ensureRunning(): bool
+    {
+        if (app()->environment('testing')) {
+            return false;
+        }
+
+        if ($this->pace->queued() < 1 || $this->pace->holdReason() !== null) {
+            return false;
+        }
+
+        if ($this->runnerIsAlive()) {
+            return true;
+        }
+
+        return $this->spawn();
+    }
+
+    public function runnerIsAlive(): bool
+    {
+        if (! Cache::has(self::RUNNER_LOCK)) {
+            return false;
+        }
+
+        $beat = Cache::get(self::RUNNER_HEARTBEAT);
+        if (! is_string($beat) || $beat === '') {
+            return true;
+        }
+
+        try {
+            return Carbon::parse($beat)->greaterThan(now()->subSeconds(90));
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public function spawnError(): ?string
+    {
+        $error = Cache::get(self::SPAWN_ERROR);
+
+        return is_string($error) && $error !== '' ? $error : null;
+    }
+
+    public function claimRunner(): bool
+    {
+        return Cache::add(self::RUNNER_LOCK, (string) getmypid(), 90);
+    }
+
+    public function refreshRunner(): void
+    {
+        Cache::put(self::RUNNER_LOCK, (string) getmypid(), 90);
+        Cache::put(self::RUNNER_HEARTBEAT, now()->toIso8601String(), 120);
+    }
+
+    public function releaseRunner(): void
+    {
+        Cache::forget(self::RUNNER_LOCK);
+        Cache::forget(self::RUNNER_HEARTBEAT);
+    }
+
+    private function spawn(): bool
+    {
+        if (! function_exists('exec') || $this->functionDisabled('exec')) {
+            Cache::put(self::SPAWN_ERROR, 'The server cannot start the newsletter sender in the background. Queued mail stays waiting until the scheduler runs.', now()->addHour());
+
+            return false;
+        }
+
+        $php = $this->phpBinary();
+        $log = storage_path('logs/newsletter-sender.log');
+        $command = 'nohup '.escapeshellarg($php).' '.escapeshellarg(base_path('artisan')).' newsletter:work >> '.escapeshellarg($log).' 2>&1 &';
+        exec($command, $output, $code);
+
+        if ($code !== 0) {
+            Cache::put(self::SPAWN_ERROR, 'The newsletter sender did not start (exit '.$code.').', now()->addHour());
+
+            return false;
+        }
+
+        Cache::forget(self::SPAWN_ERROR);
+
+        return true;
+    }
+
+    private function phpBinary(): string
+    {
+        $candidates = [];
+        if (PHP_SAPI === 'cli') {
+            $candidates[] = PHP_BINARY;
+        }
+        $candidates[] = PHP_BINDIR.DIRECTORY_SEPARATOR.'php';
+        $candidates[] = '/usr/bin/php';
+        $candidates[] = '/usr/local/bin/php';
+
+        foreach ($candidates as $path) {
+            if ($path !== '' && is_executable($path)) {
+                return $path;
+            }
+        }
+
+        return 'php';
+    }
+
+    private function functionDisabled(string $name): bool
+    {
+        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+        return in_array($name, $disabled, true);
     }
 
     /**

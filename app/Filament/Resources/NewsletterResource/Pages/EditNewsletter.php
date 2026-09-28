@@ -183,7 +183,7 @@ class EditNewsletter extends EditRecord
                     $hold = app(NewsletterPace::class)->holdReason();
                     Notification::make()
                         ->title($result['queued'].' lined up')
-                        ->body('Already sent: '.$result['sent'].'. Still waiting after this batch: '.$result['waiting'].'. They go out at about '.app(NewsletterPace::class)->hourlyLimit().' per hour. You can leave this page. The next click continues with whoever is still waiting.'.($hold !== null ? ' Paused: '.$hold : ''))
+                        ->body('Already sent: '.$result['sent'].'. Still waiting after this batch: '.$result['waiting'].'. Sending continues in the background at about '.app(NewsletterPace::class)->hourlyLimit().' per hour. You can leave this page. Refresh to see Sent go up. The next click continues with whoever is still waiting.'.($hold !== null ? ' Paused: '.$hold : ''))
                         ->success()
                         ->persistent()
                         ->send();
@@ -200,9 +200,10 @@ class EditNewsletter extends EditRecord
                 ->modalSubmitActionLabel('Resume sending')
                 ->action(function (): void {
                     app(NewsletterPace::class)->clearHold();
+                    app(NewsletterSender::class)->ensureRunning();
                     Notification::make()
                         ->title('Sending resumed')
-                        ->body('Queued messages continue on the next minute.')
+                        ->body('Queued messages are going out in the background. Refresh in a minute to see the sent count.')
                         ->success()
                         ->send();
                 }),

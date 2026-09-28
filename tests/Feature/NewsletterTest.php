@@ -588,6 +588,24 @@ class NewsletterTest extends TestCase
         $this->assertSame(2, NewsletterDelivery::query()->where('status', NewsletterDelivery::STATUS_QUEUED)->count());
     }
 
+    public function test_worker_sends_a_queued_batch_without_waiting_for_another_click(): void
+    {
+        Mail::fake();
+
+        User::factory()->count(2)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 2, true);
+        Mail::assertNothingSent();
+        $this->assertFalse(app(NewsletterSender::class)->ensureRunning());
+
+        $this->artisan('newsletter:work', ['--once' => true])->assertSuccessful();
+
+        Mail::assertSentCount(2);
+        $this->assertSame(0, $newsletter->queuedDeliveries()->count());
+        $this->assertSame(2, $newsletter->fresh()->sent_count);
+        $this->assertFalse(app(NewsletterSender::class)->runnerIsAlive());
+    }
+
     public function test_stopping_a_batch_returns_queued_people_to_the_audience(): void
     {
         Mail::fake();
