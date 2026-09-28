@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\NewsletterResource\RelationManagers;
 
+use App\Models\Newsletter;
+use App\Services\Newsletter\NewsletterSender;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -40,7 +42,17 @@ class DeliveriesRelationManager extends RelationManager
                     ->boolean(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->color(fn (string $state): string => $state === 'sent' ? 'success' : 'danger'),
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                        'sent' => 'Sent',
+                        'queued' => 'Queued',
+                        'failed' => 'Failed',
+                        default => $state,
+                    })
+                    ->color(fn (string $state): string => match ($state) {
+                        'sent' => 'success',
+                        'queued' => 'warning',
+                        default => 'danger',
+                    }),
                 Tables\Columns\TextColumn::make('error')
                     ->limit(80)
                     ->tooltip(fn ($record): ?string => $record->error)
@@ -57,7 +69,11 @@ class DeliveriesRelationManager extends RelationManager
                     ->modalDescription('Removes every row for this newsletter. If a sent row is removed, that address can be included again the next time this newsletter skips people who already received it.')
                     ->modalSubmitActionLabel('Clear log')
                     ->action(function (): void {
-                        $this->getOwnerRecord()->deliveries()->delete();
+                        $newsletter = $this->getOwnerRecord();
+                        $newsletter->deliveries()->delete();
+                        if ($newsletter instanceof Newsletter) {
+                            app(NewsletterSender::class)->cancelQueued($newsletter);
+                        }
                     }),
             ])
             ->actions([

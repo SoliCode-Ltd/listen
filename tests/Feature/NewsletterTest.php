@@ -13,11 +13,15 @@ use App\Models\NewsletterSuppression;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Newsletter\NewsletterAudience;
+use App\Services\Newsletter\NewsletterPace;
 use App\Services\Newsletter\NewsletterRenderer;
 use App\Services\Newsletter\NewsletterSender;
 use App\Services\PlanAccessService;
 use App\Support\TitanMailbox;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Mail\Events\MessageSending;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Mail;
 use Livewire\Livewire;
 use RuntimeException;
@@ -366,7 +370,7 @@ class NewsletterTest extends TestCase
             ->get(NewsletterResource::getUrl('edit', ['record' => $newsletter]))
             ->assertOk()
             ->assertSee('Send example to my email')
-            ->assertSee('Send to audience')
+            ->assertSee('Send next batch')
             ->assertSee('Clone your voice. Use it on every script.');
 
         Livewire::actingAs($admin)
@@ -398,6 +402,7 @@ class NewsletterTest extends TestCase
             ->assertNotified()
             ->callAction('sendToAudience', data: [
                 'confirm' => true,
+                'batch_size' => 500,
             ])
             ->assertNotified();
 
@@ -450,6 +455,153 @@ class NewsletterTest extends TestCase
 
         $this->assertDatabaseMissing('newsletter_deliveries', ['id' => $keep->id]);
         $this->assertSame(0, $newsletter->deliveries()->count());
+    }
+
+    public function test_next_batch_queues_a_slice_and_the_following_batch_continues(): void
+    {
+        Mail::fake();
+        Config::set('newsletter.daily_limit', 10);
+
+        $users = User::factory()->count(4)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        $sender = app(NewsletterSender::class);
+
+        $first = $sender->queueNextBatch($newsletter, 2, true);
+
+        $this->assertSame(2, $first['queued']);
+        $this->assertSame(2, $first['waiting']);
+        Mail::assertNothingSent();
+        $this->assertSame(Newsletter::STATUS_SENDING, $newsletter->fresh()->status);
+
+        $firstEmails = $users->sortBy('id')->take(2)->pluck('email')->map(fn ($email) => strtolower((string) $email))->all();
+        $this->assertEquals($firstEmails, NewsletterDelivery::query()
+            ->where('status', NewsletterDelivery::STATUS_QUEUED)
+            ->orderBy('id')
+            ->pluck('email')
+            ->all());
+
+        try {
+            $sender->queueNextBatch($newsletter->fresh(), 2, true);
+            $this->fail('A second batch should wait until the first one finishes.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('already going out', $exception->getMessage());
+        }
+
+        $this->assertSame(2, $sender->drain(10, false));
+        Mail::assertSentCount(2);
+        $this->assertSame(Newsletter::STATUS_SENT, $newsletter->fresh()->status);
+        $this->assertSame(2, $newsletter->fresh()->sent_count);
+
+        Mail::fake();
+        $second = $sender->queueNextBatch($newsletter->fresh(), 2, true);
+        $this->assertSame(2, $second['queued']);
+        $this->assertSame(0, $second['waiting']);
+        $secondEmails = $users->sortBy('id')->slice(2)->pluck('email')->map(fn ($email) => strtolower((string) $email))->values()->all();
+        $this->assertEquals($secondEmails, NewsletterDelivery::query()
+            ->where('status', NewsletterDelivery::STATUS_QUEUED)
+            ->orderBy('id')
+            ->pluck('email')
+            ->all());
+    }
+
+    public function test_daily_mailbox_cap_is_shared_by_every_newsletter(): void
+    {
+        Mail::fake();
+        Config::set('newsletter.daily_limit', 2);
+
+        $earlier = Newsletter::query()->create(Newsletter::defaultAttributes());
+        foreach (['one@example.com', 'two@example.com'] as $email) {
+            NewsletterDelivery::query()->create([
+                'newsletter_id' => $earlier->id,
+                'email' => $email,
+                'locale' => 'en',
+                'is_test' => false,
+                'status' => NewsletterDelivery::STATUS_SENT,
+                'sent_at' => now(),
+            ]);
+        }
+
+        User::factory()->create(['email' => 'still-waiting@example.com']);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+
+        try {
+            app(NewsletterSender::class)->queueNextBatch($newsletter, 500, true);
+            $this->fail('The shared daily cap should refuse another batch.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('tomorrow', $exception->getMessage());
+        }
+
+        Mail::assertNothingSent();
+        $this->assertSame(0, $newsletter->deliveries()->count());
+    }
+
+    public function test_hourly_cap_leaves_queued_mail_for_the_next_run(): void
+    {
+        Mail::fake();
+        Config::set('newsletter.hourly_limit', 1);
+
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'email' => 'already-this-hour@example.com',
+            'locale' => 'en',
+            'is_test' => false,
+            'status' => NewsletterDelivery::STATUS_SENT,
+            'sent_at' => now(),
+        ]);
+        $queued = NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'email' => 'next@example.com',
+            'locale' => 'en',
+            'is_test' => false,
+            'status' => NewsletterDelivery::STATUS_QUEUED,
+        ]);
+
+        $this->assertSame(0, app(NewsletterSender::class)->drain(3, true));
+        Mail::assertNothingSent();
+        $this->assertSame(NewsletterDelivery::STATUS_QUEUED, $queued->fresh()->status);
+    }
+
+    public function test_titan_rate_limit_pauses_the_batch_and_keeps_the_rest_queued(): void
+    {
+        Config::set('newsletter.hourly_limit', 10);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        foreach (['first@example.com', 'second@example.com'] as $email) {
+            NewsletterDelivery::query()->create([
+                'newsletter_id' => $newsletter->id,
+                'email' => $email,
+                'locale' => 'en',
+                'is_test' => false,
+                'status' => NewsletterDelivery::STATUS_QUEUED,
+            ]);
+        }
+
+        Event::listen(MessageSending::class, function (): void {
+            throw new RuntimeException('421 4.7.1 rate limit exceeded');
+        });
+
+        $this->assertSame(0, app(NewsletterSender::class)->drain(3, true));
+        $this->assertSame(2, NewsletterDelivery::query()->where('status', NewsletterDelivery::STATUS_QUEUED)->count());
+        $this->assertStringContainsString('rate limit', (string) app(NewsletterPace::class)->holdReason());
+
+        $this->assertSame(0, app(NewsletterSender::class)->drain(3, true));
+        $this->assertSame(2, NewsletterDelivery::query()->where('status', NewsletterDelivery::STATUS_QUEUED)->count());
+    }
+
+    public function test_stopping_a_batch_returns_queued_people_to_the_audience(): void
+    {
+        Mail::fake();
+
+        $users = User::factory()->count(2)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 2, true);
+
+        $this->assertSame(2, app(NewsletterSender::class)->cancelQueued($newsletter->fresh()));
+        $this->assertSame(0, $newsletter->queuedDeliveries()->count());
+        $this->assertSame(Newsletter::STATUS_DRAFT, $newsletter->fresh()->status);
+        $this->assertSame(2, app(NewsletterAudience::class)->waitingCount($newsletter->fresh()));
+        $this->assertNotNull($users->first());
+        Mail::assertNothingSent();
     }
 
     /**
