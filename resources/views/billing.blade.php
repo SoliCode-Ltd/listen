@@ -524,8 +524,81 @@
     .btn[hidden],
     .message[hidden],
     #trialBtn[hidden],
-    #trialNote[hidden] {
+    #trialNote[hidden],
+    #checkoutChoice[hidden] {
       display: none !important;
+    }
+    .checkout-choice .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+    }
+    .checkout-choice {
+      display: grid;
+      gap: .6rem;
+      margin: 1rem 0 0;
+      padding: 0;
+      border: 0;
+    }
+    .choice-card {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      padding: .85rem 1rem;
+      border: 2px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+      cursor: pointer;
+      transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+    }
+    .choice-card:hover {
+      border-color: color-mix(in oklab, var(--a) 45%, var(--line));
+    }
+    .choice-card:has(input:checked) {
+      border-color: var(--a);
+      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 12%, transparent);
+    }
+    .choice-card input {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      margin: .15rem 0 0;
+      accent-color: var(--a);
+    }
+    .choice-body {
+      display: grid;
+      gap: .2rem;
+      min-width: 0;
+    }
+    .choice-title {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .45rem;
+      font-weight: 700;
+    }
+    .choice-badge {
+      padding: .12rem .5rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--ok, #10B981) 16%, transparent);
+      color: var(--ok, #10B981);
+      font-size: .72rem;
+      font-weight: 700;
+    }
+    .choice-sub {
+      color: var(--muted);
+      font-size: .86rem;
+      line-height: 1.45;
+    }
+    .choice-note {
+      color: var(--muted);
+      font-size: .78rem;
+      line-height: 1.45;
+      opacity: .85;
     }
 
     /* ── Messages ── */
@@ -977,7 +1050,6 @@
                   @endif
                 </div>
               @endif
-              <div id="trialNote" class="message info" hidden></div>
               <div class="consent-box">
                 @if($stripeReady)
                   <span>{{ __('ui.billing.card_processed_by_stripe') }}</span> · {{ __('ui.billing.auto_renew_notice') }}
@@ -988,12 +1060,36 @@
             </div>
           </div>
 
+          @if(!empty($trialOffer['enabled']) && !empty($trialOffer['available']))
+            <fieldset class="checkout-choice" id="checkoutChoice" hidden>
+              <legend class="sr-only">{{ __('ui.billing.checkout_choice_label') }}</legend>
+              <label class="choice-card">
+                <input type="radio" name="checkout_mode" value="trial" checked>
+                <span class="choice-body">
+                  <span class="choice-title">
+                    {{ __('ui.billing.trial_choice_title', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
+                    <span class="choice-badge">{{ __('ui.billing.recommended') }}</span>
+                  </span>
+                  <span class="choice-sub" id="trialChoiceSub"></span>
+                  <span class="choice-note" id="trialNote" hidden></span>
+                </span>
+              </label>
+              <label class="choice-card">
+                <input type="radio" name="checkout_mode" value="pay">
+                <span class="choice-body">
+                  <span class="choice-title">{{ __('ui.billing.pay_choice_title') }}</span>
+                  <span class="choice-sub" id="payChoiceSub"></span>
+                </span>
+              </label>
+            </fieldset>
+          @endif
+
           <div class="actions">
             <button class="btn btn-primary" id="subscribeBtn" type="submit" {{ $stripeReady ? '' : 'disabled' }}>
               {{ __('ui.billing.confirm_and_pay') }}
             </button>
             @if(!empty($trialOffer['enabled']) && !empty($trialOffer['available']))
-              <button class="btn" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
+              <button class="btn btn-primary" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
                 {{ __('ui.billing.start_creator_trial', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
               </button>
             @endif
@@ -1076,6 +1172,10 @@
       'trial_starting' => __('ui.billing.trial_starting'),
       'trial_started_redirecting' => __('ui.billing.trial_started_redirecting'),
       'trial_note' => __('ui.billing.trial_note'),
+      'trial_choice_sub' => __('ui.billing.trial_choice_sub'),
+      'pay_choice_sub' => __('ui.billing.pay_choice_sub'),
+      'due_today' => __('ui.billing.due_today'),
+      'trial_quote_hint' => __('ui.billing.trial_quote_hint'),
     ];
   @endphp
   <script>
@@ -1091,6 +1191,11 @@
     const gadsTrialConversionSendTo = @json(\App\Support\SeoHelper::googleAdsTrialConversionSendTo());
     const trialOffer = @json($trialOffer ?? ['available' => false, 'quota' => []]);
     const trialBtn = document.getElementById('trialBtn');
+    const trialBtnDefaultText = trialBtn ? trialBtn.textContent.trim() : '';
+    const checkoutChoice = document.getElementById('checkoutChoice');
+    const checkoutModeInputs = Array.from(document.querySelectorAll('input[name="checkout_mode"]'));
+    const trialChoiceSub = document.getElementById('trialChoiceSub');
+    const payChoiceSub = document.getElementById('payChoiceSub');
     const trialNote = document.getElementById('trialNote');
 
     const messageBox = document.getElementById('message');
@@ -1310,37 +1415,79 @@
         subscribeBtn.disabled = !hasPlan || (usingStripe ? !stripe : false);
       }
 
-      const plan = currentPlan();
-      const cycle = String(cycleSelect?.value || 'monthly');
-      const planCycles = (trialOffer.plan_cycles || {})[String(plan?.slug || '')] || [];
-      const trialReady = Boolean(trialOffer.enabled && trialOffer.available)
-        && usingStripe
-        && planCycles.indexOf(cycle) !== -1;
+      const trial = trialState();
+      const trialMode = trial.ready && selectedCheckoutMode() === 'trial';
+      if (checkoutChoice) {
+        checkoutChoice.hidden = !trial.ready;
+      }
+      if (subscribeBtn) {
+        subscribeBtn.hidden = trialMode;
+      }
       if (trialBtn) {
-        trialBtn.hidden = !trialReady;
-        trialBtn.style.display = trialReady ? '' : 'none';
+        trialBtn.hidden = !trialMode;
+        trialBtn.style.display = trialMode ? '' : 'none';
+      }
+      if (trial.ready) {
+        if (trialChoiceSub) {
+          trialChoiceSub.textContent = String(i18n.trial_choice_sub || '')
+            .replace(':zero', trial.zero)
+            .replace(':amount', trial.amount)
+            .replace(':date', trial.date);
+        }
+        if (payChoiceSub) {
+          payChoiceSub.textContent = String(i18n.pay_choice_sub || '').replace(':amount', trial.amount);
+        }
       }
       if (trialNote) {
-        if (!trialReady) {
+        if (!trial.ready) {
           trialNote.hidden = true;
           trialNote.textContent = '';
         } else {
-          const quota = (trialOffer.plan_quotas || {})[String(plan?.slug || '')] || trialOffer.quota || {};
-          const amount = (cycle === 'yearly' ? plan?.yearly?.amount_formatted : plan?.monthly?.amount_formatted) || '';
-          const end = new Date();
-          end.setDate(end.getDate() + Number(trialOffer.days || 7));
+          const quota = (trialOffer.plan_quotas || {})[String(trial.plan?.slug || '')] || trialOffer.quota || {};
           trialNote.hidden = false;
           trialNote.textContent = String(i18n.trial_note || '')
-            .replace(':plan', String(plan?.localized_name || plan?.name || ''))
             .replace(':quota', String(quota.name || trialOffer.quota_plan_name || ''))
-            .replace(':days', String(trialOffer.days || 7))
-            .replace(':amount', amount)
-            .replace(':date', end.toLocaleDateString())
             .replace(':chars', Number(quota.chars || 0).toLocaleString())
             .replace(':per_request', Number(quota.per_request || 0).toLocaleString())
             .replace(':minutes', Number(quota.minutes || 0).toLocaleString());
         }
       }
+    }
+
+    function selectedCheckoutMode() {
+      const checked = checkoutModeInputs.find(function(input) { return input.checked; });
+      return checked ? String(checked.value) : 'pay';
+    }
+
+    function trialState() {
+      const plan = currentPlan();
+      const cycle = String(cycleSelect?.value || 'monthly');
+      const planCycles = (trialOffer.plan_cycles || {})[String(plan?.slug || '')] || [];
+      const ready = Boolean(trialBtn && trialOffer.enabled && trialOffer.available)
+        && selectedMethod() === 'stripe'
+        && planCycles.indexOf(cycle) !== -1;
+      const amount = String((cycle === 'yearly' ? plan?.yearly?.amount_formatted : plan?.monthly?.amount_formatted) || '');
+      const end = new Date();
+      end.setDate(end.getDate() + Number(trialOffer.days || 7));
+
+      return {
+        ready: ready,
+        plan: plan,
+        amount: `\u2066${amount}\u2069`,
+        zero: `\u2066${zeroAmount(amount)}\u2069`,
+        zeroPlain: zeroAmount(amount),
+        date: end.toLocaleDateString(document.documentElement.lang || undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+      };
+    }
+
+    function zeroAmount(formatted) {
+      const text = String(formatted || '');
+      const zeroed = text.replace(/[0-9\u0660-\u0669]+(?:[.,\u066B\u066C\s][0-9\u0660-\u0669]+)*/, '0');
+      return zeroed === text ? '0' : zeroed;
+    }
+
+    function isTrialCheckout() {
+      return trialState().ready && selectedCheckoutMode() === 'trial';
     }
 
     function renderManualPanel(selected) {
@@ -1416,6 +1563,14 @@
       quoteHint.textContent = selected.method === 'stripe'
         ? `${i18n.you_will_be_charged} ${amountBidi} (${cycleLabel(selected.meta)}).`
         : `${i18n.you_will_pay_manually} ${amountBidi}.`;
+      if (isTrialCheckout()) {
+        const trial = trialState();
+        quoteAmount.textContent = trial.zeroPlain;
+        quoteAmountLabel.textContent = i18n.due_today;
+        quoteHint.textContent = String(i18n.trial_quote_hint || '')
+          .replace(':amount', trial.amount)
+          .replace(':date', trial.date);
+      }
       renderManualPanel(selected);
       syncManualFields();
     }
@@ -1566,8 +1721,11 @@
         if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
         if (!cardComplete) throw new Error(i18n.enter_card_details);
 
-        setSubscribeButtonBusy(true, i18n.trial_starting);
-        if (trialBtn) trialBtn.disabled = true;
+        if (trialBtn) {
+          trialBtn.disabled = true;
+          trialBtn.classList.add('is-loading');
+          trialBtn.textContent = i18n.trial_starting;
+        }
 
         const setupResponse = await post('{{ route('billing.trial.setup') }}', {
           plan: String(currentPlan()?.slug || ''),
@@ -1608,13 +1766,20 @@
       } catch (error) {
         setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
       } finally {
-        setSubscribeButtonBusy(false);
-        if (trialBtn) trialBtn.disabled = false;
+        if (trialBtn) {
+          trialBtn.disabled = false;
+          trialBtn.classList.remove('is-loading');
+          trialBtn.textContent = trialBtnDefaultText;
+        }
       }
     });
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (isTrialCheckout()) {
+        trialBtn?.click();
+        return;
+      }
       setMessage('', '');
 
       try {
@@ -1702,6 +1867,13 @@
       syncPaymentMethods();
       renderMode();
       renderChargePreview();
+    });
+    checkoutModeInputs.forEach(function(input) {
+      input.addEventListener('change', function() {
+        setMessage('', '');
+        renderMode();
+        renderChargePreview();
+      });
     });
     cycleSelect?.addEventListener('change', function() {
       syncManualFields();
