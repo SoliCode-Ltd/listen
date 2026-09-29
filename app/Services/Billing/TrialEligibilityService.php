@@ -96,7 +96,7 @@ class TrialEligibilityService
     /**
      * Public callout for the homepage and pricing page.
      *
-     * @return array{show:bool,days:int,quota_plan_name:string,chars:int,minutes:int,plans:list<string>,plan_cycles:array<string, list<string>>}
+     * @return array{show:bool,days:int,quota_plan_name:string,chars:int,minutes:int,plans:list<string>,plan_cycles:array<string, list<string>>,all_plans:bool}
      */
     public function promoFor(?User $user): array
     {
@@ -113,6 +113,7 @@ class TrialEligibilityService
             'minutes' => (int) ($quota->monthly_minutes ?? 0),
             'plans' => $plans->pluck('slug')->values()->all(),
             'plan_cycles' => $this->planCycles($plans),
+            'all_plans' => $plans->count() === Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->count(),
         ];
     }
 
@@ -250,10 +251,53 @@ class TrialEligibilityService
         return $this->trialPlan($slug, 'monthly');
     }
 
+    /**
+     * Plans the admin picked for the trial. Null means every paid plan (never configured).
+     *
+     * @return list<string>|null
+     */
+    public function allowedPlanSlugs(): ?array
+    {
+        $stored = SiteSetting::get('billing_trial_plan_slugs', null);
+        if ($stored === null || $stored === '') {
+            return null;
+        }
+
+        $slugs = json_decode((string) $stored, true);
+
+        return is_array($slugs)
+            ? array_values(array_unique(array_map(fn ($slug): string => strtolower(trim((string) $slug)), $slugs)))
+            : null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function allowedCycles(): array
+    {
+        $stored = SiteSetting::get('billing_trial_cycles', null);
+        if ($stored === null || $stored === '') {
+            return self::CYCLES;
+        }
+
+        $cycles = json_decode((string) $stored, true);
+
+        return is_array($cycles)
+            ? array_values(array_intersect(self::CYCLES, $cycles))
+            : self::CYCLES;
+    }
+
+    public function planAllowed(Plan $plan): bool
+    {
+        $allowed = $this->allowedPlanSlugs();
+
+        return $allowed === null || in_array(strtolower((string) $plan->slug), $allowed, true);
+    }
+
     public function trialPlan(string $slug, string $cycle): ?Plan
     {
         $slug = strtolower(trim($slug));
-        if ($slug === '' || ! in_array($cycle, self::CYCLES, true)) {
+        if ($slug === '' || ! in_array($cycle, $this->allowedCycles(), true)) {
             return null;
         }
 
@@ -263,7 +307,7 @@ class TrialEligibilityService
             ->where('price_cents', '>', 0)
             ->first();
 
-        if (! $plan instanceof Plan || $this->priceIdFor($plan, $cycle) === '') {
+        if (! $plan instanceof Plan || ! $this->planAllowed($plan) || $this->priceIdFor($plan, $cycle) === '') {
             return null;
         }
 
@@ -291,7 +335,11 @@ class TrialEligibilityService
      */
     public function cyclesFor(Plan $plan): array
     {
-        return array_values(array_filter(self::CYCLES, fn (string $cycle): bool => $this->priceIdFor($plan, $cycle) !== ''));
+        if (! $this->planAllowed($plan)) {
+            return [];
+        }
+
+        return array_values(array_filter($this->allowedCycles(), fn (string $cycle): bool => $this->priceIdFor($plan, $cycle) !== ''));
     }
 
     /**

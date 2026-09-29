@@ -829,7 +829,7 @@
           </span>
           <span class="trial-pill-text">
             <strong>{{ __('ui.pricing.trial_pill_highlight', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</strong>
-            {{ __('ui.pricing.trial_pill_text') }}
+            {{ __(!empty($trialPromo['all_plans']) ? 'ui.pricing.trial_pill_text' : 'ui.pricing.trial_pill_text_selected') }}
           </span>
         </div>
       @endif

@@ -179,6 +179,7 @@ return [
         'get_started' => 'Get started',
         'trial_pill_highlight' => ':days days free',
         'trial_pill_text' => 'on any paid plan, cancel anytime.',
+        'trial_pill_text_selected' => 'on selected plans, cancel anytime.',
         'trial_chip' => ':days-day free trial',
         'start_trial_cta' => 'Start :days-day free trial',
         'free_forever' => 'Free forever',

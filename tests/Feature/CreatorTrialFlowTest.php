@@ -424,6 +424,85 @@ class CreatorTrialFlowTest extends TestCase
             ->assertSee('"creator":["monthly","yearly"]', false);
     }
 
+    public function test_admin_can_limit_the_trial_to_chosen_plans_and_cycles(): void
+    {
+        Plan::query()->where('slug', 'starter')->update(['stripe_price_monthly' => 'price_starter_month']);
+        Plan::query()->where('slug', 'creator')->update(['stripe_price_yearly' => 'price_creator_year']);
+        SiteSetting::set('billing_trial_plan_slugs', json_encode(['starter']), 'billing');
+
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->actingAs($user);
+        $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'monthly'])->assertStatus(422);
+        $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'yearly'])->assertStatus(422);
+        $this->assertSame([], $this->stripe->setupIntents);
+
+        $this->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertSee('"plans":["starter"]', false)
+            ->assertSee('"plan_cycles":{"starter":["monthly"]}', false);
+
+        auth()->logout();
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('on selected plans, cancel anytime.', false)
+            ->assertSee(e(route('trial.start', ['plan' => 'starter'])), false)
+            ->assertDontSee(e(route('trial.start', ['plan' => 'creator'])), false);
+
+        SiteSetting::set('billing_trial_plan_slugs', json_encode(['starter', 'creator']), 'billing');
+        SiteSetting::set('billing_trial_cycles', json_encode(['monthly']), 'billing');
+        Cache::flush();
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('on any paid plan, cancel anytime.', false)
+            ->assertSee(e(route('trial.start', ['plan' => 'creator'])), false)
+            ->assertDontSee(e(route('trial.start', ['plan' => 'creator', 'billing_cycle' => 'yearly'])), false);
+
+        $this->actingAs($user);
+        $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'yearly'])->assertStatus(422);
+        $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'monthly'])->assertOk();
+
+        SiteSetting::set('billing_trial_plan_slugs', json_encode([]), 'billing');
+        Cache::flush();
+        $this->assertFalse(app(\App\Services\Billing\TrialEligibilityService::class)->promoFor(null)['show']);
+        auth()->logout();
+        $this->getLocalizedRoute('pricing')->assertOk()->assertDontSee('class="trial-pill"', false);
+        $this->getLocalizedRoute('home')->assertOk()->assertDontSee('class="btn btn-trial"', false);
+    }
+
+    public function test_a_plan_turned_off_after_setup_cannot_finish_the_trial(): void
+    {
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->actingAs($user);
+        $setup = $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'monthly'])->assertOk();
+        $intentId = (string) $setup->json('setup_intent_id');
+        $this->stripe->putCard(['id' => 'pm_late_off', 'customer' => $user->fresh()->stripe_id, 'fingerprint' => 'fp_late_off']);
+        $this->stripe->markSucceeded($intentId, 'pm_late_off');
+
+        SiteSetting::set('billing_trial_plan_slugs', json_encode(['starter']), 'billing');
+        Cache::flush();
+
+        $this->postJsonLocalizedRoute('billing.trial.confirm', ['setup_intent_id' => $intentId])->assertStatus(422);
+        $this->assertSame([], $this->stripe->created);
+    }
+
+    public function test_billing_settings_page_saves_the_trial_plans_and_cycles(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin);
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        \Livewire\Livewire::test(\App\Filament\Pages\BillingSettings::class)
+            ->assertFormSet(['trial_plan_slugs' => ['starter', 'creator'], 'trial_cycles' => ['monthly', 'yearly']])
+            ->fillForm(['trial_plan_slugs' => ['creator'], 'trial_cycles' => ['monthly']])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        Cache::flush();
+        $eligibility = app(\App\Services\Billing\TrialEligibilityService::class);
+        $this->assertSame(['creator'], $eligibility->allowedPlanSlugs());
+        $this->assertSame(['monthly'], $eligibility->allowedCycles());
+    }
+
     public function test_the_trial_cap_never_exceeds_the_plan_the_customer_picked(): void
     {
         Plan::query()->where('slug', 'starter')->update([

@@ -179,6 +179,7 @@ return [
         'get_started' => 'ابدأ الآن',
         'trial_pill_highlight' => ':days أيام مجاناً',
         'trial_pill_text' => 'على أي خطة مدفوعة، وألغِ في أي وقت.',
+        'trial_pill_text_selected' => 'على خطط مختارة، وألغِ في أي وقت.',
         'trial_chip' => 'تجربة مجانية :days أيام',
         'start_trial_cta' => 'ابدأ تجربة مجانية لمدة :days أيام',
         'free_forever' => 'مجاني للأبد',
