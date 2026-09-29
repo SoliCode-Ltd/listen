@@ -332,7 +332,6 @@ return [
         'trial_choice_sub' => ':zero today. Then :amount on :date. Cancel anytime before that and you pay nothing.',
         'pay_choice_title' => 'Pay now, no trial',
         'pay_choice_sub' => ':amount today. Your plan starts with full limits right away.',
-        'recommended' => 'Recommended',
         'due_today' => 'Due today',
         'trial_quote_hint' => 'Then :amount on :date unless you cancel before.',
         'trial_active_notice' => 'Your :plan trial is active. Usage is capped at the :quota allowance: :chars characters, :per_request per request, and :minutes minutes. Cancel before the trial ends to avoid the charge.',

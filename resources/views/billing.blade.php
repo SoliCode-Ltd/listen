@@ -571,34 +571,28 @@
     }
     .choice-body {
       display: grid;
-      gap: .2rem;
+      flex: 1;
+      gap: .25rem;
       min-width: 0;
     }
     .choice-title {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: .45rem;
+      font-size: 1rem;
       font-weight: 700;
-    }
-    .choice-badge {
-      padding: .12rem .5rem;
-      border-radius: 999px;
-      background: color-mix(in oklab, var(--ok, #10B981) 16%, transparent);
-      color: var(--ok, #10B981);
-      font-size: .72rem;
-      font-weight: 700;
+      line-height: 1.4;
+      color: var(--text);
     }
     .choice-sub {
-      color: var(--muted);
-      font-size: .86rem;
-      line-height: 1.45;
+      color: color-mix(in oklab, var(--text) 78%, var(--muted));
+      font-size: .92rem;
+      line-height: 1.65;
     }
     .choice-note {
+      margin-top: .35rem;
+      padding-top: .5rem;
+      border-top: 1px solid var(--line);
       color: var(--muted);
-      font-size: .78rem;
-      line-height: 1.45;
-      opacity: .85;
+      font-size: .85rem;
+      line-height: 1.65;
     }
 
     /* ── Messages ── */
@@ -1066,10 +1060,7 @@
               <label class="choice-card">
                 <input type="radio" name="checkout_mode" value="trial" checked>
                 <span class="choice-body">
-                  <span class="choice-title">
-                    {{ __('ui.billing.trial_choice_title', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
-                    <span class="choice-badge">{{ __('ui.billing.recommended') }}</span>
-                  </span>
+                  <span class="choice-title">{{ __('ui.billing.trial_choice_title', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}</span>
                   <span class="choice-sub" id="trialChoiceSub"></span>
                   <span class="choice-note" id="trialNote" hidden></span>
                 </span>

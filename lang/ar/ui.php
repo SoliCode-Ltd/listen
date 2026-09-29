@@ -332,7 +332,6 @@ return [
         'trial_choice_sub' => ':zero اليوم، ثم :amount في :date. ألغِ قبل ذلك في أي وقت ولن تدفع شيئاً.',
         'pay_choice_title' => 'ادفع الآن بدون تجربة',
         'pay_choice_sub' => ':amount اليوم، وتبدأ خطتك بكامل حدودها فوراً.',
-        'recommended' => 'موصى به',
         'due_today' => 'المستحق اليوم',
         'trial_quote_hint' => 'ثم :amount في :date ما لم تلغِ قبل ذلك.',
         'trial_active_notice' => 'تجربة :plan نشطة. الاستخدام محدود بحدود خطة :quota: :chars حرفاً، و:per_request في الطلب الواحد، و:minutes دقيقة. ألغِ قبل انتهاء التجربة لتجنب الخصم.',
