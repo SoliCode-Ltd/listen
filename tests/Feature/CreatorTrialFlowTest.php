@@ -318,6 +318,9 @@ class CreatorTrialFlowTest extends TestCase
         $this->actingAs($user)->getLocalizedRoute('billing.page')
             ->assertOk()
             ->assertSee('id="trialBtn"', false)
+            ->assertSee('id="checkoutChoice"', false)
+            ->assertSee('Start with a 7-day free trial', false)
+            ->assertSee('Pay now, no trial', false)
             ->assertSee('.btn[hidden]', false)
             ->assertSee('value="stripe" checked', false)
             ->assertSee('"enabled":true', false)
@@ -339,6 +342,7 @@ class CreatorTrialFlowTest extends TestCase
         $this->actingAs($user)->getLocalizedRoute('billing.page')
             ->assertOk()
             ->assertDontSee('id="trialBtn"', false)
+            ->assertDontSee('id="checkoutChoice"', false)
             ->assertSee('value="stripe" checked', false)
             ->assertSee('"enabled":false', false)
             ->assertSee(__('ui.billing.confirm_and_pay'), false);
