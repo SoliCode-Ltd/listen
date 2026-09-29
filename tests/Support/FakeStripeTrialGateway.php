@@ -8,7 +8,7 @@ use RuntimeException;
 
 class FakeStripeTrialGateway implements StripeTrialGateway
 {
-    /** @var array<string, array{id:string,status:string,customer:string,payment_method:string,client_secret:string}> */
+    /** @var array<string, array{id:string,status:string,customer:string,payment_method:string,client_secret:string,metadata:array<string, string>}> */
     public array $setupIntents = [];
 
     /** @var array<string, array<string, mixed>> */
@@ -39,7 +39,7 @@ class FakeStripeTrialGateway implements StripeTrialGateway
         return (string) $user->stripe_id;
     }
 
-    public function createSetupIntent(string $customerId): array
+    public function createSetupIntent(string $customerId, array $metadata = []): array
     {
         $id = 'seti_'.(count($this->setupIntents) + 1);
         $this->setupIntents[$id] = [
@@ -48,6 +48,7 @@ class FakeStripeTrialGateway implements StripeTrialGateway
             'customer' => $customerId,
             'payment_method' => '',
             'client_secret' => $id.'_secret',
+            'metadata' => $metadata,
         ];
 
         return [
@@ -96,6 +97,7 @@ class FakeStripeTrialGateway implements StripeTrialGateway
             'status' => $intent['status'],
             'customer' => $intent['customer'],
             'payment_method' => $intent['payment_method'],
+            'metadata' => $intent['metadata'] ?? [],
         ];
     }
 

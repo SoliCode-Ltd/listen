@@ -27,18 +27,20 @@ class TrialSubscriptionService
      */
     public function beginSetup(User $user, array $input): array
     {
-        $this->assertCreatorMonthly($input);
-        $this->assertPlansReady();
+        $plan = $this->resolveCheckoutPlan($input);
 
         $reason = $this->eligibility->denialReason($user, null);
         if ($reason !== null) {
-            $this->recordBlocked($user, $reason, null, null);
+            $this->recordBlocked($user, $reason, null, null, $plan);
             throw new TrialStartException($this->reasonKey($reason), 422, true, $reason);
         }
 
         try {
             $customerId = $this->gateway->ensureCustomer($user);
-            $intent = $this->gateway->createSetupIntent($customerId);
+            $intent = $this->gateway->createSetupIntent($customerId, [
+                'listen_purpose' => 'card_trial',
+                'listen_plan_slug' => (string) $plan->slug,
+            ]);
         } catch (TrialStartException $exception) {
             throw $exception;
         } catch (\Throwable $exception) {
@@ -79,14 +81,6 @@ class TrialSubscriptionService
             throw new TrialStartException('ui.backend.trial_disabled');
         }
 
-        $this->assertPlansReady();
-        $creator = $this->eligibility->creatorPlan();
-        $starter = $this->eligibility->starterPlan();
-        if (! $creator instanceof Plan || ! $starter instanceof Plan) {
-            throw new TrialStartException('ui.backend.trial_plan_not_ready');
-        }
-        $priceId = $this->eligibility->creatorMonthlyPriceId();
-
         try {
             $intent = $this->gateway->retrieveSetupIntent($setupIntentId);
         } catch (\Throwable $exception) {
@@ -100,6 +94,12 @@ class TrialSubscriptionService
         }
 
         $this->assertIntentVerified($user, $intent);
+        $creator = $this->resolveStoredPlan($intent);
+        $starter = $this->eligibility->starterPlan();
+        if (! $starter instanceof Plan) {
+            throw new TrialStartException('ui.backend.trial_plan_not_ready');
+        }
+        $priceId = $this->eligibility->monthlyPriceId($creator);
 
         try {
             $card = $this->gateway->retrievePaymentMethod($intent['payment_method']);
@@ -117,7 +117,7 @@ class TrialSubscriptionService
 
         $reason = $this->eligibility->denialReason($user, (string) ($card['fingerprint'] ?? ''));
         if ($reason !== null) {
-            $this->recordBlocked($user, $reason, $card, $setupIntentId);
+            $this->recordBlocked($user, $reason, $card, $setupIntentId, $creator);
             $this->cards->rememberCard($user, $card, 'trial', false, null, $setupIntentId, true);
             throw new TrialStartException($this->reasonKey($reason), 422, true, $reason);
         }
@@ -126,7 +126,7 @@ class TrialSubscriptionService
             return $this->confirmInsideLock($user, $creator, $starter, $priceId, $card, $setupIntentId);
         } catch (TrialStartException $exception) {
             if ($exception->blocked && $exception->reason !== null && ! $this->blockedMomentAgo($user, $exception->reason)) {
-                $this->recordBlocked($user, $exception->reason, $card, $setupIntentId);
+                $this->recordBlocked($user, $exception->reason, $card, $setupIntentId, $creator);
             }
 
             throw $exception;
@@ -207,32 +207,47 @@ class TrialSubscriptionService
     }
 
     /**
-     * @param  array{plan:string,billing_cycle:string}  $input
+     * @param  array{plan?:string,billing_cycle?:string}  $input
      */
-    private function assertCreatorMonthly(array $input): void
+    private function resolveCheckoutPlan(array $input): Plan
     {
-        $plan = strtolower(trim((string) ($input['plan'] ?? '')));
-        $cycle = strtolower(trim((string) ($input['billing_cycle'] ?? '')));
         if (! $this->eligibility->enabled()) {
             throw new TrialStartException('ui.backend.trial_disabled');
         }
 
-        $expected = $this->eligibility->trialPlanSlug();
-
-        if ($plan !== $expected || $cycle !== 'monthly') {
-            throw new TrialStartException('ui.backend.trial_creator_monthly_only');
-        }
-    }
-
-    private function assertPlansReady(): void
-    {
-        if ($this->eligibility->creatorPlan() === null || $this->eligibility->starterPlan() === null) {
+        if ($this->eligibility->starterPlan() === null) {
             throw new TrialStartException('ui.backend.trial_plan_not_ready');
         }
 
-        if ($this->eligibility->creatorMonthlyPriceId() === '') {
-            throw new TrialStartException('ui.backend.billing_price_not_configured');
+        $cycle = strtolower(trim((string) ($input['billing_cycle'] ?? '')));
+        if ($cycle !== 'monthly') {
+            throw new TrialStartException('ui.backend.trial_creator_monthly_only');
         }
+
+        $plan = $this->eligibility->paidMonthlyPlan((string) ($input['plan'] ?? ''));
+        if (! $plan instanceof Plan) {
+            throw new TrialStartException('ui.backend.trial_creator_monthly_only');
+        }
+
+        return $plan;
+    }
+
+    /**
+     * @param  array{metadata?:array<string, mixed>}  $intent
+     */
+    private function resolveStoredPlan(array $intent): Plan
+    {
+        $slug = strtolower(trim((string) ($intent['metadata']['listen_plan_slug'] ?? '')));
+        if ($slug === '') {
+            throw new TrialStartException('ui.backend.trial_plan_not_ready');
+        }
+
+        $plan = $this->eligibility->paidMonthlyPlan($slug);
+        if (! $plan instanceof Plan) {
+            throw new TrialStartException('ui.backend.trial_creator_monthly_only');
+        }
+
+        return $plan;
     }
 
     /**
@@ -375,11 +390,10 @@ class TrialSubscriptionService
     /**
      * @param  array{id?:string,brand?:string,last4?:string,exp_month?:int,exp_year?:int,fingerprint?:string,funding?:string,country?:string,cvc_check?:string}|null  $card
      */
-    private function recordBlocked(User $user, string $reason, ?array $card, ?string $setupIntentId): void
+    private function recordBlocked(User $user, string $reason, ?array $card, ?string $setupIntentId, ?Plan $creator = null): void
     {
-        $creator = $this->eligibility->creatorPlan();
         $starter = $this->eligibility->starterPlan();
-        if (! $creator) {
+        if (! $creator instanceof Plan) {
             return;
         }
 
@@ -500,7 +514,7 @@ class TrialSubscriptionService
     {
         return [
             'trial_ends_at' => optional($trial->trial_ends_at)->toIso8601String() ?? '',
-            'plan' => $this->eligibility->trialPlanSlug(),
+            'plan' => (string) ($trial->plan?->slug ?: ''),
             'amount_cents' => (int) $trial->amount_cents,
         ];
     }
