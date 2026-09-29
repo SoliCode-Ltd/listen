@@ -95,7 +95,7 @@ class TrialSubscriptionService
 
         $this->assertIntentVerified($user, $intent);
         $creator = $this->resolveStoredPlan($intent);
-        $starter = $this->eligibility->starterPlan();
+        $starter = $this->eligibility->quotaPlanFor($creator);
         if (! $starter instanceof Plan) {
             throw new TrialStartException('ui.backend.trial_plan_not_ready');
         }

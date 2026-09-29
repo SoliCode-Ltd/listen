@@ -488,20 +488,36 @@ class StripeWebhookEmailService
             $planLabel = $this->localPlanLabelFromUser($user) ?? $planLabel;
         }
 
+        $price = $subscription->items->data[0]->price ?? null;
+        $amount = $this->formatAmount(
+            isset($price->unit_amount) ? (int) $price->unit_amount : null,
+            (string) ($price->currency ?? 'usd')
+        );
+        $willCancel = (bool) ($subscription->cancel_at_period_end ?? false);
+
         $details = [
             'Plan' => $planLabel,
             'Trial Ends' => $trialEnd,
+            'Amount' => $willCancel ? 'No charge (canceled)' : $amount,
             'Stripe Subscription ID' => $subscriptionId,
             'Stripe Customer ID' => $customerId,
         ];
 
+        $summary = $willCancel
+            ? ["Your {$planLabel} trial ends on {$trialEnd}.", 'You canceled, so your card will not be charged.']
+            : [
+                "Your {$planLabel} trial ends on {$trialEnd}.",
+                "Your saved card will be charged {$amount} then, and the plan renews monthly.",
+                'To avoid the charge, cancel before the trial ends at '.$this->manageBillingUrl(),
+            ];
+
         $html = $this->renderEmail(
             $user,
             'Trial ending soon',
-            ["Your {$planLabel} trial ends soon.", 'To avoid interruption, update billing details at '.$this->manageBillingUrl()],
+            $summary,
             $details,
             $this->manageBillingUrl(),
-            'Update Billing'
+            'Manage Subscription'
         );
 
         $this->sendMail($user, 'Trial ending soon', $html);

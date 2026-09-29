@@ -285,8 +285,27 @@ class CreatorTrialFlowTest extends TestCase
 
         $this->getLocalizedRoute('pricing')
             ->assertOk()
-            ->assertDontSee('class="btn btn-trial"', false)
-            ->assertDontSee(route('trial.start'), false);
+            ->assertSee('class="trial-pill"', false)
+            ->assertSee('Try any paid plan free for 7 days', false)
+            ->assertSee('href="'.e(route('trial.start', ['plan' => 'creator'])).'"', false)
+            ->assertSee('data-yearly-href="'.e(route('register')).'"', false)
+            ->assertSee('No charge today', false);
+
+        $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($this->localizedRoute('trial.start').'?plan=creator')->assertRedirect(route('register'));
+        $this->assertSame(
+            route('billing.page', ['plan' => 'creator', 'billing_cycle' => 'monthly', 'payment_method' => 'stripe']),
+            session('url.intended')
+        );
+
+        $this->actingAs($user)->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('data-monthly-href="'.e(route('trial.start', ['plan' => 'creator'])).'"', false)
+            ->assertSee('data-yearly-href="'.e(route('billing.page', ['plan' => 'creator', 'billing_cycle' => 'yearly'])).'"', false)
+            ->assertSee('data-yearly-label="'.__('ui.pricing.upgrade_now').'"', false);
 
         $this->actingAs($user)->getLocalizedRoute('home')
             ->assertOk()
@@ -333,6 +352,111 @@ class CreatorTrialFlowTest extends TestCase
             ->assertOk()
             ->assertDontSee('class="btn btn-trial"', false)
             ->assertSee(__('ui.landing.create_free_account'), false);
+
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertDontSee('class="trial-pill"', false)
+            ->assertDontSee(route('trial.start'), false)
+            ->assertDontSee('No charge today', false);
+    }
+
+    public function test_the_trial_cap_never_exceeds_the_plan_the_customer_picked(): void
+    {
+        Plan::query()->where('slug', 'starter')->update([
+            'stripe_price_monthly' => 'price_starter_month',
+        ]);
+        SiteSetting::set('billing_trial_quota_plan_slug', 'creator', 'billing');
+
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->startTrial($user, 'pm_small_plan', '4242', 'fp_small_plan', 'starter')->assertOk();
+
+        $trial = BillingTrial::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('starter', $trial->quotaPlan?->slug);
+        $this->assertSame(500000, $trial->chars_limit);
+        $this->assertSame(500000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($user->id)?->monthly_chars);
+    }
+
+    public function test_the_cap_stays_until_the_first_charge_even_after_the_trial_date_passes(): void
+    {
+        $user = User::factory()->create(['stripe_id' => 'cus_gap']);
+        $creator = Plan::query()->where('slug', 'creator')->firstOrFail();
+        $starter = Plan::query()->where('slug', 'starter')->firstOrFail();
+        app(PlanAccessService::class)->assignPlan($user, $creator, 'active', now()->addMonth());
+        $trial = BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $creator->id,
+            'quota_plan_id' => $starter->id,
+            'status' => BillingTrial::STATUS_TRIALING,
+            'stripe_customer_id' => 'cus_gap',
+            'stripe_subscription_id' => 'sub_gap',
+            'amount_cents' => 2200,
+            'started_at' => now()->subDays(7),
+            'trial_ends_at' => now()->subHour(),
+        ]);
+
+        $access = app(PlanAccessService::class);
+        $this->assertSame(500000, (int) $access->resolveQuotaPlanForUserId($user->id)?->monthly_chars);
+
+        $this->mock(BillingSyncService::class, function ($mock) {
+            $mock->shouldReceive('syncIfStale')->andReturnNull();
+            $mock->shouldReceive('syncUser')->andReturnNull();
+        });
+        $referrals = Mockery::mock(ReferralQualificationService::class);
+        $referrals->shouldReceive('evaluate')->andReturnNull();
+        $referrals->shouldReceive('isFirstPaidPlanTransition')->andReturnFalse();
+        $this->app->instance(ReferralQualificationService::class, $referrals);
+
+        $this->postJson('/api/stripe/webhook', [
+            'id' => 'evt_gap_paid',
+            'type' => 'invoice.paid',
+            'data' => ['object' => [
+                'id' => 'in_gap',
+                'customer' => 'cus_gap',
+                'subscription' => 'sub_gap',
+                'amount_paid' => 2200,
+                'currency' => 'usd',
+            ]],
+        ])->assertOk();
+
+        $this->assertSame(BillingTrial::STATUS_PAID, $trial->fresh()->status);
+        $this->assertSame(1500000, (int) $access->resolveQuotaPlanForUserId($user->id)?->monthly_chars);
+
+        $trial->forceFill(['status' => BillingTrial::STATUS_TRIALING, 'paid_at' => null, 'trial_ends_at' => now()->subDays(4)])->save();
+        $this->assertFalse($access->userHasUnpaidTrialWindow($user->id));
+    }
+
+    public function test_resuming_a_canceled_trial_puts_it_back_in_trial(): void
+    {
+        $user = User::factory()->create(['stripe_id' => 'cus_resume']);
+        $creator = Plan::query()->where('slug', 'creator')->firstOrFail();
+        $trial = BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $creator->id,
+            'status' => BillingTrial::STATUS_CANCELED,
+            'canceled_at' => now(),
+            'stripe_subscription_id' => 'sub_resume',
+            'amount_cents' => 2200,
+            'trial_ends_at' => now()->addDays(3),
+        ]);
+
+        $this->mock(BillingSyncService::class, function ($mock) {
+            $mock->shouldReceive('syncIfStale')->andReturnNull();
+            $mock->shouldReceive('syncUser')->andReturnNull();
+        });
+
+        $this->postJson('/api/stripe/webhook', [
+            'id' => 'evt_resume',
+            'type' => 'customer.subscription.updated',
+            'data' => ['object' => [
+                'id' => 'sub_resume',
+                'customer' => 'cus_resume',
+                'status' => 'trialing',
+                'cancel_at_period_end' => false,
+            ]],
+        ])->assertOk();
+
+        $this->assertSame(BillingTrial::STATUS_TRIALING, $trial->fresh()->status);
+        $this->assertNull($trial->fresh()->canceled_at);
     }
 
     public function test_same_person_cannot_take_a_second_trial_with_another_card(): void

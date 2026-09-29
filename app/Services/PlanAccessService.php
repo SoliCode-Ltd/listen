@@ -43,11 +43,7 @@ class PlanAccessService
             return $activePlan;
         }
 
-        $openTrial = BillingTrial::query()
-            ->where('user_id', $userId)
-            ->whereNull('paid_at')
-            ->where('trial_ends_at', '>', now())
-            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+        $openTrial = $this->unpaidTrialWindowQuery($userId)
             ->latest('id')
             ->first();
         $starter = $openTrial?->quotaPlan
@@ -65,12 +61,30 @@ class PlanAccessService
 
     public function userHasUnpaidTrialWindow(int $userId): bool
     {
+        return $this->unpaidTrialWindowQuery($userId)->exists();
+    }
+
+    /**
+     * Stripe can mark the subscription active up to about an hour before the first
+     * renewal invoice is actually charged, so a trial that has not been paid keeps
+     * its cap for a short while after trial_ends_at.
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<BillingTrial>
+     */
+    private function unpaidTrialWindowQuery(int $userId): \Illuminate\Database\Eloquent\Builder
+    {
         return BillingTrial::query()
             ->where('user_id', $userId)
             ->whereNull('paid_at')
-            ->where('trial_ends_at', '>', now())
-            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
-            ->exists();
+            ->where(function ($query) {
+                $query->where(function ($trialing) {
+                    $trialing->where('status', BillingTrial::STATUS_TRIALING)
+                        ->where('trial_ends_at', '>', now()->subDays(3));
+                })->orWhere(function ($canceled) {
+                    $canceled->where('status', BillingTrial::STATUS_CANCELED)
+                        ->where('trial_ends_at', '>', now());
+                });
+            });
     }
 
     public function ensureFreePlanForUser(User $user): void
