@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
+use App\Services\Billing\TrialUsageRecorder;
 use App\Services\PlanAccessService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioUrl;
@@ -41,6 +42,7 @@ class DashboardController extends Controller
         );
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
 
         $baseQuery = $this->userHistoryQuery($userId);
         $voiceNameMap = $this->voiceNameMapForUser($userId);
@@ -94,9 +96,9 @@ class DashboardController extends Controller
         $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
         $catalogByTier = VoiceCatalog::publicCatalogByTier();
         $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
-        $planChars = PlanUsageGuard::planChars($activePlan);
-        $planRequests = PlanUsageGuard::planRequests($activePlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
+        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planRequests = PlanUsageGuard::planRequests($quotaPlan);
+        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
         $usageCharsPercent = min(100, (int) round(($usage->total_chars / $planChars) * 100));
         $usageRequestsPercent = $requestsUnlimited
             ? 0
@@ -185,8 +187,9 @@ class DashboardController extends Controller
     {
         $userId = (int) auth()->id();
         $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
-        $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
+        $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $planTier));
 
@@ -282,7 +285,7 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
+        PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
 
         $recorded = $this->audioGenerationRecorder->createForUser(
             $userId,
@@ -328,6 +331,7 @@ class DashboardController extends Controller
         $counter->increment('total_requests');
         $counter->increment('total_chars', $estimate['chars']);
         $counter->increment('total_minutes', $estimate['minutes']);
+        app(TrialUsageRecorder::class)->add($userId, $estimate);
 
         try {
             // Dashboard flow is intentionally synchronous for immediate UX.
@@ -354,9 +358,9 @@ class DashboardController extends Controller
             'total' => (clone $baseQuery)->count(),
         ];
 
-        $planChars = PlanUsageGuard::planChars($activePlan);
-        $planRequests = PlanUsageGuard::planRequests($activePlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
+        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planRequests = PlanUsageGuard::planRequests($quotaPlan);
+        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
         $usageCharsPercent = min(100, (int) round(($counter->total_chars / $planChars) * 100));
         $usageRequestsPercent = $requestsUnlimited
             ? 0
@@ -516,6 +520,7 @@ class DashboardController extends Controller
             'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
             'total_minutes' => max(0, (int) $counter->total_minutes - (int) $estimate['minutes']),
         ]);
+        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
     private function buildJobPayload(AudioGeneration $job, array $voiceNameMap): array

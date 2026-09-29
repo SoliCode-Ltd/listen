@@ -957,6 +957,21 @@
                 <input type="checkbox" id="saveCard" checked>
                 <span>{{ __('ui.billing.save_card_for_future') }}</span>
               </label>
+              @if(!empty($trialOffer['show_admin_test_cards']))
+                <div class="consent-box" id="adminTrialCards">
+                  <strong>{{ __('ui.billing.trial_admin_test_title') }}</strong>
+                  <p>{{ __('ui.billing.trial_admin_test_body') }}</p>
+                  <ul>
+                    @foreach(($trialOffer['test_cards'] ?? []) as $testCard)
+                      <li><code>{{ $testCard['number'] }}</code> — {{ $testCard['label'] }}</li>
+                    @endforeach
+                  </ul>
+                  @if(empty($trialOffer['stripe_test_mode']))
+                    <p>{{ __('ui.billing.trial_admin_live_mode_warning') }}</p>
+                  @endif
+                </div>
+              @endif
+              <div id="trialNote" class="message info" hidden></div>
               <div class="consent-box">
                 @if($stripeReady)
                   <span>{{ __('ui.billing.card_processed_by_stripe') }}</span> · {{ __('ui.billing.auto_renew_notice') }}
@@ -970,6 +985,9 @@
           <div class="actions">
             <button class="btn btn-primary" id="subscribeBtn" type="submit" {{ $stripeReady ? '' : 'disabled' }}>
               {{ __('ui.billing.confirm_and_pay') }}
+            </button>
+            <button class="btn" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
+              {{ __('ui.billing.start_creator_trial', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
             </button>
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
@@ -1046,6 +1064,10 @@
       'monthly_label' => __('ui.billing.monthly'),
       'yearly_label' => __('ui.billing.yearly'),
       'cycle_with_discount' => __('ui.billing.cycle_with_discount'),
+      'start_creator_trial' => __('ui.billing.start_creator_trial'),
+      'trial_starting' => __('ui.billing.trial_starting'),
+      'trial_started_redirecting' => __('ui.billing.trial_started_redirecting'),
+      'trial_note' => __('ui.billing.trial_note'),
     ];
   @endphp
   <script>
@@ -1058,6 +1080,9 @@
     const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
     const initialPaymentMethod = @json($selectedPaymentMethod);
     const gadsConversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
+    const trialOffer = @json($trialOffer ?? ['available' => false, 'quota' => []]);
+    const trialBtn = document.getElementById('trialBtn');
+    const trialNote = document.getElementById('trialNote');
 
     const messageBox = document.getElementById('message');
     const subscribeBtn = document.getElementById('subscribeBtn');
@@ -1275,6 +1300,36 @@
         const hasPlan = Boolean(currentPlan());
         subscribeBtn.disabled = !hasPlan || (usingStripe ? !stripe : false);
       }
+
+      const plan = currentPlan();
+      const trialReady = Boolean(trialOffer.available)
+        && usingStripe
+        && String(plan?.slug || '') === String(trialOffer.plan || '')
+        && String(cycleSelect?.value || '') === 'monthly';
+      if (trialBtn) {
+        trialBtn.hidden = !trialReady;
+      }
+      if (trialNote) {
+        if (!trialReady) {
+          trialNote.hidden = true;
+          trialNote.textContent = '';
+        } else {
+          const quota = trialOffer.quota || {};
+          const amount = plan?.monthly?.amount_formatted || '';
+          const end = new Date();
+          end.setDate(end.getDate() + Number(trialOffer.days || 7));
+          trialNote.hidden = false;
+          trialNote.textContent = String(i18n.trial_note || '')
+            .replace(':plan', String(trialOffer.plan_name || ''))
+            .replace(':quota', String(trialOffer.quota_plan_name || ''))
+            .replace(':days', String(trialOffer.days || 7))
+            .replace(':amount', amount)
+            .replace(':date', end.toLocaleDateString())
+            .replace(':chars', Number(quota.chars || 0).toLocaleString())
+            .replace(':per_request', Number(quota.per_request || 0).toLocaleString())
+            .replace(':minutes', Number(quota.minutes || 0).toLocaleString());
+        }
+      }
     }
 
     function renderManualPanel(selected) {
@@ -1474,6 +1529,53 @@
       }
     }
 
+    trialBtn?.addEventListener('click', async () => {
+      setMessage('', '');
+      try {
+        if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
+        if (!cardComplete) throw new Error(i18n.enter_card_details);
+
+        setSubscribeButtonBusy(true, i18n.trial_starting);
+        if (trialBtn) trialBtn.disabled = true;
+
+        const setupResponse = await post('{{ route('billing.trial.setup') }}', {
+          plan: String(trialOffer.plan || ''),
+          billing_cycle: 'monthly',
+        });
+        if (!setupResponse.ok || setupResponse.data?.ok === false) {
+          throw new Error(responseMessage(setupResponse, i18n.upgrade_failed));
+        }
+
+        const confirmed = await stripe.confirmCardSetup(String(setupResponse.data.client_secret || ''), {
+          payment_method: {
+            card,
+            billing_details: {
+              name: userName || undefined,
+              email: userEmail || undefined,
+            },
+          },
+        });
+        if (confirmed.error) {
+          throw new Error(normalizeStripeMessage(confirmed.error.message, i18n.payment_auth_failed));
+        }
+
+        const confirmResponse = await post('{{ route('billing.trial.confirm') }}', {
+          setup_intent_id: String(confirmed.setupIntent?.id || ''),
+        });
+        if (!confirmResponse.ok || confirmResponse.data?.ok === false) {
+          throw new Error(responseMessage(confirmResponse, i18n.upgrade_failed));
+        }
+
+        setMessage('ok', confirmResponse.data?.message || i18n.trial_started_redirecting);
+        window.location.href = '{{ route('manage-subscription.page') }}';
+      } catch (error) {
+        setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
+      } finally {
+        setSubscribeButtonBusy(false);
+        if (trialBtn) trialBtn.disabled = false;
+      }
+    });
+
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
       setMessage('', '');
@@ -1566,6 +1668,7 @@
     });
     cycleSelect?.addEventListener('change', function() {
       syncManualFields();
+      renderMode();
       renderChargePreview();
     });
 

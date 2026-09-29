@@ -47,6 +47,16 @@ class PlanUsageGuard
             }
         }
 
+        if ((bool) ($plan?->getAttribute('enforce_trial_minute_cap') ?? false)) {
+            $planMinutes = (int) ($plan->monthly_minutes ?? 0);
+            $incomingMinutes = (int) ($estimate['minutes'] ?? 0);
+            if ($planMinutes > 0 && (((int) $counter->total_minutes + $incomingMinutes) > $planMinutes)) {
+                throw ValidationException::withMessages([
+                    'content' => __('ui.backend.trial_minute_limit'),
+                ]);
+            }
+        }
+
         if (! self::hasUnlimitedRequests($plan)) {
             $planRequests = self::planRequests($plan);
             if (((int) $counter->total_requests + 1) > $planRequests) {

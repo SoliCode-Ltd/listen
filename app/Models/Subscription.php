@@ -67,6 +67,10 @@ class Subscription extends Model
                     return;
                 }
 
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
+                    return;
+                }
+
                 app(\App\Services\Referral\ReferralQualificationService::class)
                     ->evaluate($user, 'paid_plan');
             } catch (\Throwable $e) {

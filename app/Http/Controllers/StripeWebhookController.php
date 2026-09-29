@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Billing\TrialOutcomeService;
 use App\Services\BillingLifecycleService;
 use App\Services\StripeWebhookEmailService;
 use Illuminate\Http\Request;
@@ -15,7 +16,8 @@ class StripeWebhookController extends Controller
     public function __invoke(
         Request $request,
         BillingLifecycleService $billingLifecycleService,
-        StripeWebhookEmailService $stripeWebhookEmailService
+        StripeWebhookEmailService $stripeWebhookEmailService,
+        TrialOutcomeService $trialOutcomeService,
     )
     {
         $payload = $request->getContent();
@@ -77,6 +79,7 @@ class StripeWebhookController extends Controller
                 default => null,
             };
 
+            $trialOutcomeService->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);
         } catch (\Throwable $exception) {
             if ($eventCacheKey !== null) {

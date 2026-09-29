@@ -197,6 +197,8 @@ Route::group([
         Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+        Route::post('/billing/trial/setup', [\App\Http\Controllers\TrialBillingController::class, 'setup'])->name('billing.trial.setup');
+        Route::post('/billing/trial/confirm', [\App\Http\Controllers\TrialBillingController::class, 'confirm'])->name('billing.trial.confirm');
         Route::post('/billing/payment-method', [BillingController::class, 'updatePaymentMethod'])->name('billing.payment-method');
         Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
         Route::post('/billing/resume', [BillingController::class, 'resume'])->name('billing.resume');

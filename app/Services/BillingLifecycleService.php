@@ -51,6 +51,10 @@ class BillingLifecycleService
                         continue;
                     }
 
+                    if ($this->planAccessService->userHasUnpaidTrialWindow((int) $user->id)) {
+                        continue;
+                    }
+
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
                     $planName = (string) ($subscription->plan?->name ?? 'your plan');
                     $displayName = $this->displayName($user);

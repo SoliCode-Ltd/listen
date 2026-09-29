@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\TrialEligibilityService;
 use App\Support\VoiceTier;
 
 class PlanAccessService
@@ -27,6 +29,48 @@ class PlanAccessService
         }
 
         return $this->freePlan();
+    }
+
+    /**
+     * Feature access stays on the active plan. During an unpaid Creator trial,
+     * character and minute limits come from the Starter plan and overage is off.
+     * The returned model is not persisted.
+     */
+    public function resolveQuotaPlanForUserId(int $userId, ?Plan $activePlan = null): ?Plan
+    {
+        $activePlan ??= $this->resolveActivePlanForUserId($userId);
+        if (! $this->userHasUnpaidTrialWindow($userId)) {
+            return $activePlan;
+        }
+
+        $openTrial = BillingTrial::query()
+            ->where('user_id', $userId)
+            ->whereNull('paid_at')
+            ->where('trial_ends_at', '>', now())
+            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+            ->latest('id')
+            ->first();
+        $starter = $openTrial?->quotaPlan
+            ?: Plan::query()->where('slug', app(TrialEligibilityService::class)->quotaPlanSlug())->first();
+        if (! $starter) {
+            return $activePlan;
+        }
+
+        $quota = $starter->replicate();
+        $quota->allow_overage = false;
+        $quota->setAttribute('enforce_trial_minute_cap', true);
+
+        return $quota;
+    }
+
+    public function userHasUnpaidTrialWindow(int $userId): bool
+    {
+        return BillingTrial::query()
+            ->where('user_id', $userId)
+            ->whereNull('paid_at')
+            ->where('trial_ends_at', '>', now())
+            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+            ->exists();
     }
 
     public function ensureFreePlanForUser(User $user): void
@@ -60,7 +104,7 @@ class PlanAccessService
         // Capture the transition signal BEFORE the subscription row is mutated
         // so we can detect a free->paid upgrade reliably.
         $isFirstPaid = false;
-        if ((int) $plan->price_cents > 0) {
+        if ((int) $plan->price_cents > 0 && ! $this->userHasUnpaidTrialWindow((int) $user->id)) {
             try {
                 $isFirstPaid = app(\App\Services\Referral\ReferralQualificationService::class)
                     ->isFirstPaidPlanTransition($user, $plan);

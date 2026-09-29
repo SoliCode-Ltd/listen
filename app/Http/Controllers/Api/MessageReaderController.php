@@ -10,6 +10,7 @@ use App\Models\UsageCounter;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
+use App\Services\Billing\TrialUsageRecorder;
 use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
@@ -38,6 +39,7 @@ class MessageReaderController extends Controller
         $this->billingSyncService->syncIfStale($user);
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
 
         $period = now()->format('Y-m');
@@ -46,9 +48,9 @@ class MessageReaderController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $planChars = PlanUsageGuard::planChars($activePlan);
-        $planRequests = PlanUsageGuard::planRequests($activePlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($activePlan);
+        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planRequests = PlanUsageGuard::planRequests($quotaPlan);
+        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
 
         // Determine the preferred provider for HD voices based on plan policy
         $preferredProvider = $this->preferredProviderForPlan($activePlan, $planTier);
@@ -73,8 +75,8 @@ class MessageReaderController extends Controller
                     'slug' => (string) ($activePlan?->slug ?? 'free'),
                     'voice_tier' => $planTier,
                     'voice_tier_label' => VoiceTier::label($planTier),
-                    'max_chars_per_request' => PlanUsageGuard::maxCharsPerRequest($activePlan),
-                    'allow_overage' => PlanUsageGuard::allowsOverage($activePlan),
+                    'max_chars_per_request' => PlanUsageGuard::maxCharsPerRequest($quotaPlan),
+                    'allow_overage' => PlanUsageGuard::allowsOverage($quotaPlan),
                     'overage_price_per_million_cents' => $activePlan?->overage_price_per_million_cents !== null
                         ? (int) $activePlan->overage_price_per_million_cents
                         : null,
@@ -131,8 +133,9 @@ class MessageReaderController extends Controller
         $this->billingSyncService->syncIfStale($user);
 
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
-        $maxChars = PlanUsageGuard::maxCharsPerRequest($activePlan);
+        $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
         $processingMode = strtolower((string) config('listen.audio.processing', 'sync'));
         $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
         $emotionValues = TtsStudioConfig::emotionValues();
@@ -210,7 +213,7 @@ class MessageReaderController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        PlanUsageGuard::assertWithinLimits($activePlan, $counter, $estimate);
+        PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
 
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         $recorded = $this->audioGenerationRecorder->createForUser(
@@ -258,6 +261,7 @@ class MessageReaderController extends Controller
         $counter->increment('total_requests');
         $counter->increment('total_chars', $estimate['chars']);
         $counter->increment('total_minutes', $estimate['minutes']);
+        app(TrialUsageRecorder::class)->add((int) $user->id, $estimate);
 
         if (! $runAsync) {
             try {
@@ -414,6 +418,7 @@ class MessageReaderController extends Controller
             'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
             'total_minutes' => max(0, (int) $counter->total_minutes - (int) $estimate['minutes']),
         ]);
+        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, ?string $voiceName, string $tier): string
