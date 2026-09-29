@@ -149,13 +149,5 @@
       @endif
     @else
       <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
-    @endauth
-    @if(!empty($trialPromo['show']) && in_array($plan['slug'], $trialPromo['plans'] ?? [], true) && !$isFree && !$isCurrent && !$isLower)
-      <a
-        class="plan-trial-link"
-        data-trial-monthly="1"
-        href="{{ route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly', 'payment_method' => 'stripe']) }}"
-      >{{ __('ui.pricing.start_trial', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</a>
-    @endif
-  </div>
+    @endauth  </div>
 </div>
