@@ -107,8 +107,9 @@ class HomeController extends Controller
 
     public function startFreeTrial(Request $request)
     {
-        $query = ['billing_cycle' => 'monthly', 'payment_method' => 'stripe'];
-        $plan = app(TrialEligibilityService::class)->paidMonthlyPlan((string) $request->query('plan', ''));
+        $cycle = $request->query('billing_cycle') === 'yearly' ? 'yearly' : 'monthly';
+        $query = ['billing_cycle' => $cycle, 'payment_method' => 'stripe'];
+        $plan = app(TrialEligibilityService::class)->trialPlan((string) $request->query('plan', ''), $cycle);
         if ($plan) {
             $query = ['plan' => $plan->slug] + $query;
         }

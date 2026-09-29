@@ -494,6 +494,7 @@ class StripeWebhookEmailService
             (string) ($price->currency ?? 'usd')
         );
         $willCancel = (bool) ($subscription->cancel_at_period_end ?? false);
+        $renews = (string) ($price->recurring->interval ?? 'month') === 'year' ? 'yearly' : 'monthly';
 
         $details = [
             'Plan' => $planLabel,
@@ -507,7 +508,7 @@ class StripeWebhookEmailService
             ? ["Your {$planLabel} trial ends on {$trialEnd}.", 'You canceled, so your card will not be charged.']
             : [
                 "Your {$planLabel} trial ends on {$trialEnd}.",
-                "Your saved card will be charged {$amount} then, and the plan renews monthly.",
+                "Your saved card will be charged {$amount} then, and the plan renews {$renews}.",
                 'To avoid the charge, cancel before the trial ends at '.$this->manageBillingUrl(),
             ];
 

@@ -1310,13 +1310,11 @@
       }
 
       const plan = currentPlan();
-      const eligiblePlans = Array.isArray(trialOffer.plans) ? trialOffer.plans.map(function(slug) {
-        return String(slug || '');
-      }) : [];
+      const cycle = String(cycleSelect?.value || 'monthly');
+      const planCycles = (trialOffer.plan_cycles || {})[String(plan?.slug || '')] || [];
       const trialReady = Boolean(trialOffer.enabled && trialOffer.available)
         && usingStripe
-        && eligiblePlans.indexOf(String(plan?.slug || '')) !== -1
-        && String(cycleSelect?.value || '') === 'monthly';
+        && planCycles.indexOf(cycle) !== -1;
       if (trialBtn) {
         trialBtn.hidden = !trialReady;
         trialBtn.style.display = trialReady ? '' : 'none';
@@ -1327,7 +1325,7 @@
           trialNote.textContent = '';
         } else {
           const quota = (trialOffer.plan_quotas || {})[String(plan?.slug || '')] || trialOffer.quota || {};
-          const amount = plan?.monthly?.amount_formatted || '';
+          const amount = (cycle === 'yearly' ? plan?.yearly?.amount_formatted : plan?.monthly?.amount_formatted) || '';
           const end = new Date();
           end.setDate(end.getDate() + Number(trialOffer.days || 7));
           trialNote.hidden = false;
@@ -1552,7 +1550,7 @@
 
         const setupResponse = await post('{{ route('billing.trial.setup') }}', {
           plan: String(currentPlan()?.slug || ''),
-          billing_cycle: 'monthly',
+          billing_cycle: String(cycleSelect?.value || 'monthly'),
         });
         if (!setupResponse.ok || setupResponse.data?.ok === false) {
           throw new Error(responseMessage(setupResponse, i18n.upgrade_failed));

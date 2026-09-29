@@ -24,6 +24,8 @@ class TrialEligibilityService
 
     public const REASON_ALREADY_SUBSCRIBED = 'already_subscribed';
 
+    public const CYCLES = ['monthly', 'yearly'];
+
     /**
      * @return list<array{number:string,label:string}>
      */
@@ -74,9 +76,9 @@ class TrialEligibilityService
             'available' => $available,
             'reason' => $reason,
             'plans' => $plans->pluck('slug')->values()->all(),
+            'plan_cycles' => $this->planCycles($plans),
             'plan_quotas' => $planQuotas,
             'quota_plan_name' => (string) ($starter->name ?? ''),
-            'cycle' => 'monthly',
             'days' => $this->trialDays(),
             'is_admin' => (bool) $user->is_admin,
             'stripe_test_mode' => $this->stripeIsTestMode(),
@@ -94,7 +96,7 @@ class TrialEligibilityService
     /**
      * Public callout for the homepage and pricing page.
      *
-     * @return array{show:bool,days:int,quota_plan_name:string,chars:int,minutes:int,plans:list<string>}
+     * @return array{show:bool,days:int,quota_plan_name:string,chars:int,minutes:int,plans:list<string>,plan_cycles:array<string, list<string>>}
      */
     public function promoFor(?User $user): array
     {
@@ -110,6 +112,7 @@ class TrialEligibilityService
             'chars' => (int) ($quota->monthly_chars ?? 0),
             'minutes' => (int) ($quota->monthly_minutes ?? 0),
             'plans' => $plans->pluck('slug')->values()->all(),
+            'plan_cycles' => $this->planCycles($plans),
         ];
     }
 
@@ -244,8 +247,13 @@ class TrialEligibilityService
 
     public function paidMonthlyPlan(string $slug): ?Plan
     {
+        return $this->trialPlan($slug, 'monthly');
+    }
+
+    public function trialPlan(string $slug, string $cycle): ?Plan
+    {
         $slug = strtolower(trim($slug));
-        if ($slug === '') {
+        if ($slug === '' || ! in_array($cycle, self::CYCLES, true)) {
             return null;
         }
 
@@ -255,7 +263,7 @@ class TrialEligibilityService
             ->where('price_cents', '>', 0)
             ->first();
 
-        if (! $plan instanceof Plan || $this->monthlyPriceId($plan) === '') {
+        if (! $plan instanceof Plan || $this->priceIdFor($plan, $cycle) === '') {
             return null;
         }
 
@@ -264,12 +272,26 @@ class TrialEligibilityService
 
     public function monthlyPriceId(Plan $plan): string
     {
-        $priceId = trim((string) $plan->getStripePriceId('monthly'));
+        return $this->priceIdFor($plan, 'monthly');
+    }
+
+    public function priceIdFor(Plan $plan, string $cycle): string
+    {
+        $cycle = $cycle === 'yearly' ? 'yearly' : 'monthly';
+        $priceId = trim((string) $plan->getStripePriceId($cycle));
         if ($priceId !== '') {
             return $priceId;
         }
 
-        return trim((string) config('services.stripe.prices.'.$plan->slug.'.monthly', ''));
+        return trim((string) config('services.stripe.prices.'.$plan->slug.'.'.$cycle, ''));
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function cyclesFor(Plan $plan): array
+    {
+        return array_values(array_filter(self::CYCLES, fn (string $cycle): bool => $this->priceIdFor($plan, $cycle) !== ''));
     }
 
     /**
@@ -282,8 +304,17 @@ class TrialEligibilityService
             ->where('price_cents', '>', 0)
             ->orderBy('price_cents')
             ->get()
-            ->filter(fn (Plan $plan): bool => $this->monthlyPriceId($plan) !== '')
+            ->filter(fn (Plan $plan): bool => $this->cyclesFor($plan) !== [])
             ->values();
+    }
+
+    /**
+     * @param  Collection<int, Plan>  $plans
+     * @return array<string, list<string>>
+     */
+    private function planCycles(Collection $plans): array
+    {
+        return $plans->mapWithKeys(fn (Plan $plan): array => [(string) $plan->slug => $this->cyclesFor($plan)])->all();
     }
 
     public function normalizeEmail(?string $email): string
