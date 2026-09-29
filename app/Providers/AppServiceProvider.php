@@ -16,6 +16,8 @@ use App\Models\BillingSubscriptionItem;
 use App\Models\ClonedVoice;
 use App\Models\SiteSetting;
 use App\Policies\ClonedVoicePolicy;
+use App\Services\Billing\CashierStripeTrialGateway;
+use App\Services\Billing\StripeTrialGateway;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
@@ -39,6 +41,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         Cashier::ignoreRoutes();
+        $this->app->bind(StripeTrialGateway::class, CashierStripeTrialGateway::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

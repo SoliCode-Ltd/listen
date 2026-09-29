@@ -365,6 +365,11 @@
       <h1>{{ __('ui.manage_subscription.title') }}</h1>
       <p>{{ __('ui.manage_subscription.subtitle') }}</p>
     </div>
+    @if(!empty($trialNotice ?? null))
+      <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
+        {{ $trialNotice }}
+      </div>
+    @endif
     @if($billingProfileRemoved)
       <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
         {{ __('ui.manage_subscription.billing_profile_removed') }}

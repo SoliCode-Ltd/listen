@@ -7,6 +7,8 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\SavedPaymentMethodRecorder;
+use App\Services\Billing\TrialEligibilityService;
 use App\Services\BillingSyncService;
 use App\Services\DemoHistoryImporter;
 use App\Services\LocalizedPricingService;
@@ -30,6 +32,8 @@ class BillingController extends Controller
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly PlanAccessService $planAccessService,
         private readonly StripeWebhookEmailService $stripeWebhookEmailService,
+        private readonly TrialEligibilityService $trialEligibility,
+        private readonly SavedPaymentMethodRecorder $savedCards,
     ) {}
 
     public function index(Request $request)
@@ -65,6 +69,7 @@ class BillingController extends Controller
             'defaultPaymentMethod' => $defaultPaymentMethod,
             'countryContext' => $countryContext,
             'paymentBrandAssets' => $this->localizedPricingService->paymentBrandAssets(),
+            'trialOffer' => $this->trialEligibility->offerFor($user),
         ]);
     }
 
@@ -124,6 +129,7 @@ class BillingController extends Controller
             'subscriptionEndsAt' => $this->formatDateLabel(($subscription?->onGracePeriod() ?? false) ? $subscription?->ends_at?->toDateString() : null),
             'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
             'upcomingCharge' => $this->resolveUpcomingCharge($subscription, $countryContext, $locale),
+            'trialNotice' => $this->trialNotice($user),
         ]);
     }
 
@@ -253,6 +259,9 @@ class BillingController extends Controller
         }
 
         $this->clearApprovedManualOverride($user);
+        if ($saveCard && $paymentMethod !== '') {
+            $this->savedCards->rememberQuietly($user, $paymentMethod, 'subscription');
+        }
         $this->billingSyncService->syncIfStale($user, true);
         $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
 
@@ -298,6 +307,7 @@ class BillingController extends Controller
             $this->ensureStripeCustomer($user);
             $this->assertCardPaymentMethod((string) $validated['payment_method']);
             $user->updateDefaultPaymentMethod((string) $validated['payment_method']);
+            $this->savedCards->rememberQuietly($user, (string) $validated['payment_method'], 'update');
             $this->billingSyncService->syncIfStale($user, true);
         } catch (\Throwable $exception) {
             Log::warning('Unable to update Stripe payment method.', [
@@ -1207,6 +1217,21 @@ class BillingController extends Controller
 
         // 3. Fall back to .env / config - LEGACY FALLBACK
         return trim((string) config("services.stripe.prices.{$planSlug}.{$cycle}", ''));
+    }
+
+    private function trialNotice(User $user): ?string
+    {
+        if (! $this->planAccessService->userHasUnpaidTrialWindow((int) $user->id)) {
+            return null;
+        }
+
+        $starter = $this->trialEligibility->starterPlan();
+
+        return __('ui.billing.trial_active_notice', [
+            'chars' => number_format((int) ($starter->monthly_chars ?? 0)),
+            'per_request' => number_format((int) ($starter->max_chars_per_request ?? 0)),
+            'minutes' => number_format((int) ($starter->monthly_minutes ?? 0)),
+        ]);
     }
 
     private function clearApprovedManualOverride(User $user): void

@@ -38,6 +38,11 @@ return [
             7,
             1,
         ],
+        'creator_trial' => [
+            'days' => 7,
+            'plan_slug' => 'creator',
+            'quota_plan_slug' => 'starter',
+        ],
     ],
 
     'demo' => [
