@@ -56,11 +56,25 @@ class TrialEligibilityService
             && $starter !== null
             && $plans->isNotEmpty();
 
+        $planQuotas = [];
+        foreach ($plans as $plan) {
+            $cap = $this->quotaPlanFor($plan);
+            if ($cap instanceof Plan) {
+                $planQuotas[(string) $plan->slug] = [
+                    'name' => (string) $cap->name,
+                    'chars' => (int) $cap->monthly_chars,
+                    'per_request' => (int) $cap->max_chars_per_request,
+                    'minutes' => (int) $cap->monthly_minutes,
+                ];
+            }
+        }
+
         return [
             'enabled' => $enabled,
             'available' => $available,
             'reason' => $reason,
             'plans' => $plans->pluck('slug')->values()->all(),
+            'plan_quotas' => $planQuotas,
             'quota_plan_name' => (string) ($starter->name ?? ''),
             'cycle' => 'monthly',
             'days' => $this->trialDays(),
@@ -213,6 +227,19 @@ class TrialEligibilityService
         $plan = $this->creatorPlan();
 
         return $plan ? $this->monthlyPriceId($plan) : '';
+    }
+
+    /**
+     * The trial never allows more than the plan the customer picked.
+     */
+    public function quotaPlanFor(Plan $chosen): ?Plan
+    {
+        $cap = $this->starterPlan();
+        if (! $cap instanceof Plan) {
+            return null;
+        }
+
+        return (int) $cap->monthly_chars > (int) $chosen->monthly_chars ? $chosen : $cap;
     }
 
     public function paidMonthlyPlan(string $slug): ?Plan

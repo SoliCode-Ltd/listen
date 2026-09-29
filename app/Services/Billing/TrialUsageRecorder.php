@@ -45,8 +45,15 @@ class TrialUsageRecorder
         return BillingTrial::query()
             ->where('user_id', $userId)
             ->whereNull('paid_at')
-            ->where('trial_ends_at', '>', now())
-            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+            ->where(function ($query) {
+                $query->where(function ($trialing) {
+                    $trialing->where('status', BillingTrial::STATUS_TRIALING)
+                        ->where('trial_ends_at', '>', now()->subDays(3));
+                })->orWhere(function ($canceled) {
+                    $canceled->where('status', BillingTrial::STATUS_CANCELED)
+                        ->where('trial_ends_at', '>', now());
+                });
+            })
             ->latest('id')
             ->first();
     }

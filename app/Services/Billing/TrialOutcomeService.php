@@ -101,6 +101,15 @@ class TrialOutcomeService
             return;
         }
 
+        if ($status === 'trialing' && $trial->status === BillingTrial::STATUS_CANCELED) {
+            $trial->forceFill([
+                'status' => BillingTrial::STATUS_TRIALING,
+                'canceled_at' => null,
+            ])->save();
+
+            return;
+        }
+
         if (in_array($status, ['canceled', 'incomplete_expired'], true)) {
             $this->markClosed($trial, $trial->charge_failed_at ? BillingTrial::STATUS_CHARGE_FAILED : BillingTrial::STATUS_CANCELED);
         }

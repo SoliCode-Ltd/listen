@@ -1326,14 +1326,14 @@
           trialNote.hidden = true;
           trialNote.textContent = '';
         } else {
-          const quota = trialOffer.quota || {};
+          const quota = (trialOffer.plan_quotas || {})[String(plan?.slug || '')] || trialOffer.quota || {};
           const amount = plan?.monthly?.amount_formatted || '';
           const end = new Date();
           end.setDate(end.getDate() + Number(trialOffer.days || 7));
           trialNote.hidden = false;
           trialNote.textContent = String(i18n.trial_note || '')
             .replace(':plan', String(plan?.localized_name || plan?.name || ''))
-            .replace(':quota', String(trialOffer.quota_plan_name || ''))
+            .replace(':quota', String(quota.name || trialOffer.quota_plan_name || ''))
             .replace(':days', String(trialOffer.days || 7))
             .replace(':amount', amount)
             .replace(':date', end.toLocaleDateString())

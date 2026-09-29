@@ -101,12 +101,18 @@ class HomeController extends Controller
             'activePlanSlug' => $activePlanSlug,
             'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
+            'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),
         ]);
     }
 
     public function startFreeTrial(Request $request)
     {
-        $billingUrl = route('billing.page', ['billing_cycle' => 'monthly', 'payment_method' => 'stripe']);
+        $query = ['billing_cycle' => 'monthly', 'payment_method' => 'stripe'];
+        $plan = app(TrialEligibilityService::class)->paidMonthlyPlan((string) $request->query('plan', ''));
+        if ($plan) {
+            $query = ['plan' => $plan->slug] + $query;
+        }
+        $billingUrl = route('billing.page', $query);
 
         if ($request->user()) {
             return redirect()->to($billingUrl);

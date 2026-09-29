@@ -320,6 +320,59 @@
       color: var(--muted);
       cursor: not-allowed;
     }
+    .trial-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: .55rem;
+      margin: 0 auto 1rem;
+      padding: .3rem .85rem .3rem .3rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, var(--a) 45%, transparent);
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      font-size: .88rem;
+      font-weight: 600;
+      box-shadow: 0 6px 22px color-mix(in oklab, var(--a) 22%, transparent);
+    }
+    .trial-pill-tag {
+      padding: .2rem .6rem;
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--a), var(--b));
+      color: #fff;
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+    .plan-trial-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      margin-top: .6rem;
+      padding: .25rem .65rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--ok, #10B981) 14%, transparent);
+      color: var(--ok, #10B981);
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .plan-trial-chip svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .plan-trial-note {
+      margin: .55rem 0 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: .78rem;
+      line-height: 1.4;
+    }
+    .plans-grid.is-yearly [data-trial-only] {
+      display: none !important;
+    }
 
     .features-section {
       padding: 2.5rem 0;
@@ -741,6 +794,12 @@
     @endphp
     <section class="page-hero reveal">
       <!-- <span class="eyebrow">Flexible pricing</span> -->
+      @if(!empty($trialPromo['show']))
+        <div class="trial-pill">
+          <span class="trial-pill-tag">{{ __('ui.pricing.trial_pill_tag') }}</span>
+          <span class="trial-pill-text">{{ __('ui.pricing.trial_pill_text', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</span>
+        </div>
+      @endif
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
       <div class="billing-wrapper">
@@ -911,6 +970,13 @@
           if (nextHref !== '') {
             link.setAttribute('href', nextHref);
           }
+
+          var nextLabel = isYearly
+            ? link.getAttribute('data-yearly-label')
+            : link.getAttribute('data-monthly-label');
+          if (nextLabel) {
+            link.textContent = nextLabel;
+          }
         });
       }
 
@@ -931,6 +997,9 @@
         monthlyBtn.classList.toggle('active', !yearly);
         yearlyBtn.classList.toggle('active', yearly);
         billingToggle.classList.toggle('yearly', yearly);
+        document.querySelectorAll('.plans-grid').forEach(function(el) {
+          el.classList.toggle('is-yearly', yearly);
+        });
         updatePrices();
         updateUpgradeLinks();
         updateDiscountBadges();
