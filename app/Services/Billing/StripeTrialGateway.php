@@ -9,12 +9,13 @@ interface StripeTrialGateway
     public function ensureCustomer(User $user): string;
 
     /**
+     * @param  array<string, string>  $metadata
      * @return array{id:string,client_secret:string}
      */
-    public function createSetupIntent(string $customerId): array;
+    public function createSetupIntent(string $customerId, array $metadata = []): array;
 
     /**
-     * @return array{id:string,status:string,customer:string,payment_method:string}
+     * @return array{id:string,status:string,customer:string,payment_method:string,metadata:array<string, string>}
      */
     public function retrieveSetupIntent(string $setupIntentId): array;
 

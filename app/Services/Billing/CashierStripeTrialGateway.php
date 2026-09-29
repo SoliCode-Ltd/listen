@@ -17,15 +17,15 @@ class CashierStripeTrialGateway implements StripeTrialGateway
         return (string) $user->stripe_id;
     }
 
-    public function createSetupIntent(string $customerId): array
+    public function createSetupIntent(string $customerId, array $metadata = []): array
     {
         $intent = Cashier::stripe()->setupIntents->create([
             'customer' => $customerId,
             'usage' => 'off_session',
             'payment_method_types' => ['card'],
-            'metadata' => [
-                'listen_purpose' => 'creator_trial',
-            ],
+            'metadata' => array_merge([
+                'listen_purpose' => 'card_trial',
+            ], $metadata),
         ]);
 
         return [
@@ -47,6 +47,9 @@ class CashierStripeTrialGateway implements StripeTrialGateway
             'status' => (string) ($intent->status ?? ''),
             'customer' => $this->idFromMixed($intent->customer ?? null),
             'payment_method' => (string) $paymentMethod,
+            'metadata' => [
+                'listen_plan_slug' => $this->metadataValue($intent->metadata ?? null, 'listen_plan_slug'),
+            ],
         ];
     }
 
@@ -121,6 +124,19 @@ class CashierStripeTrialGateway implements StripeTrialGateway
         }
 
         Cashier::stripe()->subscriptions->cancel($subscriptionId, []);
+    }
+
+    private function metadataValue(mixed $metadata, string $key): string
+    {
+        if (is_array($metadata)) {
+            return trim((string) ($metadata[$key] ?? ''));
+        }
+
+        if (is_object($metadata)) {
+            return trim((string) ($metadata->{$key} ?? ''));
+        }
+
+        return '';
     }
 
     private function idFromMixed(mixed $value): string

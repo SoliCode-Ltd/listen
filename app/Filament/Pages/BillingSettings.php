@@ -38,7 +38,6 @@ class BillingSettings extends Page implements HasForms
             'grace_days' => (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)),
             'webhook_emails_enabled' => (string) SiteSetting::get('billing_webhook_emails', config('listen.billing.webhook_email_enabled', '1')) === '1',
             'trial_enabled' => (string) SiteSetting::get('billing_trial_enabled', '1') === '1',
-            'trial_plan_slug' => (string) SiteSetting::get('billing_trial_plan_slug', (string) config('listen.billing.creator_trial.plan_slug', 'creator')),
             'trial_quota_plan_slug' => (string) SiteSetting::get('billing_trial_quota_plan_slug', (string) config('listen.billing.creator_trial.quota_plan_slug', 'starter')),
             'trial_days' => (int) SiteSetting::get('billing_trial_days', (int) config('listen.billing.creator_trial.days', 7)),
             'pricing_forced_country_code' => (string) SiteSetting::get('pricing_forced_country_code', ''),
@@ -140,24 +139,14 @@ class BillingSettings extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('Card trial')
-                    ->description('Turn the free card trial on or off, and choose which plan it sells. Confirm and Pay is unchanged.')
+                    ->description('Customers can start the free trial on any paid monthly plan they choose. Stripe charges that plan when the trial ends. Usage during the trial follows the cap below. Confirm and Pay is unchanged.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('trial_enabled')
                             ->label('Enable free card trial')
-                            ->helperText('Off hides the trial button. People already in a trial keep it until it ends or they cancel. Confirm and Pay stays available.')
+                            ->helperText('Off removes the trial button, the pricing callout, and the homepage callout. People already in a trial keep it until it ends or they cancel. Confirm and Pay stays available.')
+                            ->dehydrated()
                             ->columnSpanFull(),
-                        Forms\Components\Select::make('trial_plan_slug')
-                            ->label('Trial plan')
-                            ->options(fn (): array => Plan::query()
-                                ->where('is_active', true)
-                                ->where('price_cents', '>', 0)
-                                ->orderBy('price_cents')
-                                ->pluck('name', 'slug')
-                                ->all())
-                            ->required()
-                            ->native(false)
-                            ->helperText('The monthly price of this plan is what Stripe charges when the trial ends. Yearly checkout stays pay-now.'),
                         Forms\Components\Select::make('trial_quota_plan_slug')
                             ->label('Usage cap during the trial')
                             ->options(fn (): array => Plan::query()
@@ -167,7 +156,7 @@ class BillingSettings extends Page implements HasForms
                                 ->all())
                             ->required()
                             ->native(false)
-                            ->helperText('Features follow the trial plan. Character and minute limits follow this plan, with overage off.'),
+                            ->helperText('The customer keeps the features of the plan they picked. Character and minute limits follow this plan, with overage off. Starter is the default cap.'),
                         Forms\Components\TextInput::make('trial_days')
                             ->label('Trial length (days)')
                             ->numeric()
@@ -330,9 +319,11 @@ class BillingSettings extends Page implements HasForms
         if (array_key_exists('webhook_emails_enabled', $data)) {
             SiteSetting::set('billing_webhook_emails', $data['webhook_emails_enabled'] ? '1' : '0', $group);
         }
-        if (array_key_exists('trial_enabled', $data)) {
-            SiteSetting::set('billing_trial_enabled', $data['trial_enabled'] ? '1' : '0', $group);
-        }
+        SiteSetting::set(
+            'billing_trial_enabled',
+            filter_var($data['trial_enabled'] ?? false, FILTER_VALIDATE_BOOLEAN) ? '1' : '0',
+            $group
+        );
         if (array_key_exists('trial_plan_slug', $data)) {
             SiteSetting::set('billing_trial_plan_slug', strtolower(trim((string) $data['trial_plan_slug'])), $group);
         }
