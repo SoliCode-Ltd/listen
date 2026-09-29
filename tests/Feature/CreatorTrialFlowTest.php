@@ -265,12 +265,35 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertSame(10000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($starterUser->id)?->monthly_chars);
     }
 
-    public function test_turning_the_trial_off_hides_it_on_billing_pricing_and_the_homepage(): void
+    public function test_homepage_trial_button_follows_the_setting_and_the_visitor(): void
     {
         Plan::query()->where('slug', 'starter')->update([
             'stripe_price_monthly' => 'price_starter_month',
         ]);
+        $billingUrl = route('billing.page', ['billing_cycle' => 'monthly', 'payment_method' => 'stripe']);
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('class="btn btn-trial"', false)
+            ->assertSee('Start 7-day free trial', false)
+            ->assertSee(route('trial.start'), false)
+            ->assertDontSee(__('ui.landing.create_free_account'), false);
+
+        $this->getLocalizedRoute('trial.start')->assertRedirect(route('register'));
+        $this->assertSame($billingUrl, session('url.intended'));
+
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertDontSee('class="btn btn-trial"', false)
+            ->assertDontSee(route('trial.start'), false);
+
+        $this->actingAs($user)->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('class="btn btn-trial"', false)
+            ->assertSee(__('ui.landing.go_to_dashboard'), false);
+
+        $this->actingAs($user)->getLocalizedRoute('trial.start')->assertRedirect($billingUrl);
 
         $this->actingAs($user)->getLocalizedRoute('billing.page')
             ->assertOk()
@@ -280,16 +303,16 @@ class CreatorTrialFlowTest extends TestCase
             ->assertSee('"enabled":true', false)
             ->assertSee('"plans":["starter","creator"]', false);
 
-        $this->getLocalizedRoute('home')
+        $this->startTrial($user, 'pm_visa_home', '4242', 'fp_home')->assertOk();
+        $this->actingAs($user->fresh())->getLocalizedRoute('home')
             ->assertOk()
-            ->assertSee('Start a 7-day free trial', false)
-            ->assertSee('payment_method=stripe', false);
+            ->assertDontSee('class="btn btn-trial"', false)
+            ->assertSee(__('ui.landing.browser_extension'), false);
+    }
 
-        $this->getLocalizedRoute('pricing')
-            ->assertOk()
-            ->assertSee('New here? Start any paid plan with a 7-day free trial', false)
-            ->assertSee('data-trial-monthly="1"', false);
-
+    public function test_turning_the_trial_off_hides_it_on_billing_and_the_homepage(): void
+    {
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
         SiteSetting::set('billing_trial_enabled', '0', 'billing');
 
         $this->actingAs($user)->getLocalizedRoute('billing.page')
@@ -299,14 +322,17 @@ class CreatorTrialFlowTest extends TestCase
             ->assertSee('"enabled":false', false)
             ->assertSee(__('ui.billing.confirm_and_pay'), false);
 
+        $this->actingAs($user)->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertDontSee('class="btn btn-trial"', false)
+            ->assertSee(__('ui.landing.browser_extension'), false);
+
+        auth()->logout();
+
         $this->getLocalizedRoute('home')
             ->assertOk()
-            ->assertDontSee('Start a 7-day free trial', false);
-
-        $this->getLocalizedRoute('pricing')
-            ->assertOk()
-            ->assertDontSee('Start a 7-day free trial', false)
-            ->assertDontSee('data-trial-monthly="1"', false);
+            ->assertDontSee('class="btn btn-trial"', false)
+            ->assertSee(__('ui.landing.create_free_account'), false);
     }
 
     public function test_same_person_cannot_take_a_second_trial_with_another_card(): void

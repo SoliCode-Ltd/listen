@@ -101,8 +101,20 @@ class HomeController extends Controller
             'activePlanSlug' => $activePlanSlug,
             'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
-            'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),
         ]);
+    }
+
+    public function startFreeTrial(Request $request)
+    {
+        $billingUrl = route('billing.page', ['billing_cycle' => 'monthly', 'payment_method' => 'stripe']);
+
+        if ($request->user()) {
+            return redirect()->to($billingUrl);
+        }
+
+        $request->session()->put('url.intended', $billingUrl);
+
+        return redirect()->route('register');
     }
 
     public function seoLandingPage(Request $request, string $page)
