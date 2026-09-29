@@ -176,7 +176,7 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertSame($this->stripe->created[0]['id'], $this->stripe->canceled[0]);
     }
 
-    public function test_yearly_and_non_creator_plans_never_open_a_setup_intent(): void
+    public function test_yearly_free_and_unpriced_plans_never_open_a_setup_intent(): void
     {
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
         $this->actingAs($user);
@@ -187,12 +187,28 @@ class CreatorTrialFlowTest extends TestCase
         ])->assertStatus(422);
 
         $this->postJsonLocalizedRoute('billing.trial.setup', [
+            'plan' => 'free',
+            'billing_cycle' => 'monthly',
+        ])->assertStatus(422);
+
+        $this->postJsonLocalizedRoute('billing.trial.setup', [
             'plan' => 'starter',
             'billing_cycle' => 'monthly',
         ])->assertStatus(422);
 
         $this->assertSame([], $this->stripe->setupIntents);
         $this->assertSame(0, BillingTrial::query()->count());
+
+        Plan::query()->where('slug', 'starter')->update([
+            'stripe_price_monthly' => 'price_starter_month',
+        ]);
+
+        $this->postJsonLocalizedRoute('billing.trial.setup', [
+            'plan' => 'starter',
+            'billing_cycle' => 'monthly',
+        ])->assertOk();
+
+        $this->assertSame('starter', $this->stripe->setupIntents['seti_1']['metadata']['listen_plan_slug']);
     }
 
     public function test_turning_the_trial_off_leaves_only_the_normal_checkout(): void
@@ -210,34 +226,87 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertFalse(app(\App\Services\Billing\TrialEligibilityService::class)->offerFor($user)['available']);
     }
 
-    public function test_the_trial_can_be_moved_to_another_monthly_plan(): void
+    public function test_any_paid_monthly_plan_keeps_its_features_and_uses_the_filament_usage_cap(): void
     {
         Plan::query()->where('slug', 'starter')->update([
             'stripe_price_monthly' => 'price_starter_month',
         ]);
-        SiteSetting::set('billing_trial_plan_slug', 'starter', 'billing');
         SiteSetting::set('billing_trial_quota_plan_slug', 'free', 'billing');
         SiteSetting::set('billing_trial_days', '3', 'billing');
 
+        $creatorUser = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $creatorResponse = $this->startTrial($creatorUser, 'pm_visa_creator', '4242', 'fp_creator_choice');
+        $creatorResponse->assertOk()
+            ->assertJsonPath('plan', 'creator')
+            ->assertJsonPath('amount_cents', 2200);
+
+        $creatorTrial = BillingTrial::query()->where('user_id', $creatorUser->id)->firstOrFail();
+        $this->assertSame('creator', $creatorTrial->plan?->slug);
+        $this->assertSame('free', $creatorTrial->quotaPlan?->slug);
+        $this->assertSame(10000, $creatorTrial->chars_limit);
+        $this->assertSame('price_creator_month', $this->stripe->created[0]['price_id']);
+        $this->assertTrue($creatorTrial->trial_ends_at->greaterThan(now()->addDays(2)));
+        $this->assertTrue($creatorTrial->trial_ends_at->lessThan(now()->addDays(4)));
+        $this->assertSame('creator', app(PlanAccessService::class)->resolveActivePlanForUserId($creatorUser->id)?->slug);
+        $this->assertSame(10000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($creatorUser->id)?->monthly_chars);
+
+        $starterUser = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $starterResponse = $this->startTrial($starterUser, 'pm_visa_starter', '5556', 'fp_starter_choice', 'starter');
+        $starterResponse->assertOk()
+            ->assertJsonPath('plan', 'starter')
+            ->assertJsonPath('amount_cents', 900);
+
+        $starterTrial = BillingTrial::query()->where('user_id', $starterUser->id)->firstOrFail();
+        $this->assertSame('starter', $starterTrial->plan?->slug);
+        $this->assertSame('free', $starterTrial->quotaPlan?->slug);
+        $this->assertSame(900, $starterTrial->amount_cents);
+        $this->assertSame('price_starter_month', $this->stripe->created[1]['price_id']);
+        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId($starterUser->id)?->slug);
+        $this->assertSame(10000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($starterUser->id)?->monthly_chars);
+    }
+
+    public function test_turning_the_trial_off_hides_it_on_billing_pricing_and_the_homepage(): void
+    {
+        Plan::query()->where('slug', 'starter')->update([
+            'stripe_price_monthly' => 'price_starter_month',
+        ]);
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
-        $this->actingAs($user);
 
-        $this->postJsonLocalizedRoute('billing.trial.setup', [
-            'plan' => 'creator',
-            'billing_cycle' => 'monthly',
-        ])->assertStatus(422);
+        $this->actingAs($user)->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertSee('id="trialBtn"', false)
+            ->assertSee('.btn[hidden]', false)
+            ->assertSee('value="stripe" checked', false)
+            ->assertSee('"enabled":true', false)
+            ->assertSee('"plans":["starter","creator"]', false);
 
-        $response = $this->startTrial($user, 'pm_visa_starter', '4242', 'fp_starter_trial', 'starter');
-        $response->assertOk()->assertJsonPath('plan', 'starter');
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertSee('Start a 7-day free trial', false)
+            ->assertSee('payment_method=stripe', false);
 
-        $trial = BillingTrial::query()->where('user_id', $user->id)->firstOrFail();
-        $this->assertSame('starter', $trial->plan?->slug);
-        $this->assertSame('free', $trial->quotaPlan?->slug);
-        $this->assertSame(10000, $trial->chars_limit);
-        $this->assertTrue($trial->trial_ends_at->greaterThan(now()->addDays(2)));
-        $this->assertTrue($trial->trial_ends_at->lessThan(now()->addDays(4)));
-        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
-        $this->assertSame(10000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($user->id)?->monthly_chars);
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('New here? Start any paid plan with a 7-day free trial', false)
+            ->assertSee('data-trial-monthly="1"', false);
+
+        SiteSetting::set('billing_trial_enabled', '0', 'billing');
+
+        $this->actingAs($user)->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertDontSee('id="trialBtn"', false)
+            ->assertSee('value="stripe" checked', false)
+            ->assertSee('"enabled":false', false)
+            ->assertSee(__('ui.billing.confirm_and_pay'), false);
+
+        $this->getLocalizedRoute('home')
+            ->assertOk()
+            ->assertDontSee('Start a 7-day free trial', false);
+
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertDontSee('Start a 7-day free trial', false)
+            ->assertDontSee('data-trial-monthly="1"', false);
     }
 
     public function test_same_person_cannot_take_a_second_trial_with_another_card(): void

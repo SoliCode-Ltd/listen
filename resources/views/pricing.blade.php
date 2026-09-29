@@ -320,6 +320,43 @@
       color: var(--muted);
       cursor: not-allowed;
     }
+    .plan-trial-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin-top: .55rem;
+      padding: .7rem 1rem;
+      border-radius: var(--radius);
+      border: 1px solid color-mix(in oklab, var(--a) 55%, transparent);
+      background: color-mix(in oklab, var(--a) 12%, var(--surface));
+      color: var(--text);
+      font-weight: 700;
+      font-size: .9rem;
+      text-decoration: none;
+    }
+    .plan-trial-link[hidden] {
+      display: none !important;
+    }
+    .trial-banner {
+      max-width: 46rem;
+      margin: 1.25rem auto 0;
+      padding: 1rem 1.15rem;
+      border-radius: 16px;
+      border: 1px solid color-mix(in oklab, var(--a) 55%, transparent);
+      background: color-mix(in oklab, var(--a) 14%, var(--surface));
+      text-align: start;
+    }
+    .trial-banner strong {
+      display: block;
+      margin-bottom: .35rem;
+      font-size: 1.05rem;
+    }
+    .trial-banner p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.55;
+    }
 
     .features-section {
       padding: 2.5rem 0;
@@ -743,6 +780,16 @@
       <!-- <span class="eyebrow">Flexible pricing</span> -->
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
+      @if(!empty($trialPromo['show']))
+        <div class="trial-banner">
+          <strong>{{ __('ui.pricing.trial_banner_title', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</strong>
+          <p>{{ __('ui.pricing.trial_banner_body', [
+            'quota' => $trialPromo['quota_plan_name'] ?? '',
+            'chars' => number_format((int) ($trialPromo['chars'] ?? 0)),
+            'minutes' => number_format((int) ($trialPromo['minutes'] ?? 0)),
+          ]) }}</p>
+        </div>
+      @endif
       <div class="billing-wrapper">
         <div class="billing-toggle" id="billingToggle">
           <span class="billing-indicator" aria-hidden="true"></span>
@@ -926,6 +973,12 @@
         });
       }
 
+      function updateTrialLinks() {
+        document.querySelectorAll('[data-trial-monthly]').forEach(function(link) {
+          link.hidden = isYearly;
+        });
+      }
+
       function setBillingMode(yearly) {
         isYearly = yearly;
         monthlyBtn.classList.toggle('active', !yearly);
@@ -934,6 +987,7 @@
         updatePrices();
         updateUpgradeLinks();
         updateDiscountBadges();
+        updateTrialLinks();
       }
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });
@@ -941,6 +995,7 @@
 
       updatePrices();
       updateUpgradeLinks();
+      updateTrialLinks();
 
       var revealElements = document.querySelectorAll('.reveal');
       var revealObserver = new IntersectionObserver(function(entries) {

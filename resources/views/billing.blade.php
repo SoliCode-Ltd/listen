@@ -521,6 +521,12 @@
       opacity: .75;
       pointer-events: none;
     }
+    .btn[hidden],
+    .message[hidden],
+    #trialBtn[hidden],
+    #trialNote[hidden] {
+      display: none !important;
+    }
 
     /* ── Messages ── */
     .message {
@@ -816,7 +822,7 @@
               <label>{{ __('ui.billing.payment_method_label') }}</label>
               <div class="payment-method-grid" id="paymentMethodGrid">
                 <label class="payment-method-card" data-method-card="stripe">
-                  <input type="radio" name="payment_method_choice" value="stripe">
+                  <input type="radio" name="payment_method_choice" value="stripe" @checked($selectedPaymentMethod === '' || $selectedPaymentMethod === 'stripe')>
                   <div class="method-title">
                     <div class="method-brand">
                       <span class="method-logo" aria-hidden="true">
@@ -957,7 +963,7 @@
                 <input type="checkbox" id="saveCard" checked>
                 <span>{{ __('ui.billing.save_card_for_future') }}</span>
               </label>
-              @if(!empty($trialOffer['show_admin_test_cards']))
+              @if(!empty($trialOffer['enabled']) && !empty($trialOffer['show_admin_test_cards']))
                 <div class="consent-box" id="adminTrialCards">
                   <strong>{{ __('ui.billing.trial_admin_test_title') }}</strong>
                   <p>{{ __('ui.billing.trial_admin_test_body') }}</p>
@@ -986,9 +992,11 @@
             <button class="btn btn-primary" id="subscribeBtn" type="submit" {{ $stripeReady ? '' : 'disabled' }}>
               {{ __('ui.billing.confirm_and_pay') }}
             </button>
-            <button class="btn" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
-              {{ __('ui.billing.start_creator_trial', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
-            </button>
+            @if(!empty($trialOffer['enabled']) && !empty($trialOffer['available']))
+              <button class="btn" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
+                {{ __('ui.billing.start_creator_trial', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
+              </button>
+            @endif
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
           <div id="message" class="message {{ $initialMessageType }}">{{ $initialMessageText }}</div>
@@ -1302,12 +1310,16 @@
       }
 
       const plan = currentPlan();
-      const trialReady = Boolean(trialOffer.available)
+      const eligiblePlans = Array.isArray(trialOffer.plans) ? trialOffer.plans.map(function(slug) {
+        return String(slug || '');
+      }) : [];
+      const trialReady = Boolean(trialOffer.enabled && trialOffer.available)
         && usingStripe
-        && String(plan?.slug || '') === String(trialOffer.plan || '')
+        && eligiblePlans.indexOf(String(plan?.slug || '')) !== -1
         && String(cycleSelect?.value || '') === 'monthly';
       if (trialBtn) {
         trialBtn.hidden = !trialReady;
+        trialBtn.style.display = trialReady ? '' : 'none';
       }
       if (trialNote) {
         if (!trialReady) {
@@ -1320,7 +1332,7 @@
           end.setDate(end.getDate() + Number(trialOffer.days || 7));
           trialNote.hidden = false;
           trialNote.textContent = String(i18n.trial_note || '')
-            .replace(':plan', String(trialOffer.plan_name || ''))
+            .replace(':plan', String(plan?.localized_name || plan?.name || ''))
             .replace(':quota', String(trialOffer.quota_plan_name || ''))
             .replace(':days', String(trialOffer.days || 7))
             .replace(':amount', amount)
@@ -1539,7 +1551,7 @@
         if (trialBtn) trialBtn.disabled = true;
 
         const setupResponse = await post('{{ route('billing.trial.setup') }}', {
-          plan: String(trialOffer.plan || ''),
+          plan: String(currentPlan()?.slug || ''),
           billing_cycle: 'monthly',
         });
         if (!setupResponse.ok || setupResponse.data?.ok === false) {

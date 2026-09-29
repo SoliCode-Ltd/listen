@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 class TrialEligibilityService
 {
@@ -46,26 +47,26 @@ class TrialEligibilityService
      */
     public function offerFor(User $user): array
     {
-        $creator = $this->creatorPlan();
         $starter = $this->starterPlan();
+        $plans = $this->trialablePlans();
         $reason = $this->denialReason($user, null);
-        $available = $this->enabled()
+        $enabled = $this->enabled();
+        $available = $enabled
             && $reason === null
-            && $creator !== null
             && $starter !== null
-            && $this->creatorMonthlyPriceId() !== '';
+            && $plans->isNotEmpty();
 
         return [
+            'enabled' => $enabled,
             'available' => $available,
             'reason' => $reason,
-            'plan' => $this->trialPlanSlug(),
-            'plan_name' => (string) ($creator->name ?? ''),
+            'plans' => $plans->pluck('slug')->values()->all(),
             'quota_plan_name' => (string) ($starter->name ?? ''),
             'cycle' => 'monthly',
             'days' => $this->trialDays(),
             'is_admin' => (bool) $user->is_admin,
             'stripe_test_mode' => $this->stripeIsTestMode(),
-            'show_admin_test_cards' => (bool) $user->is_admin,
+            'show_admin_test_cards' => $enabled && (bool) $user->is_admin,
             'test_cards' => $user->is_admin ? $this->adminTestCards() : [],
             'quota' => [
                 'chars' => (int) ($starter->monthly_chars ?? 0),
@@ -73,7 +74,28 @@ class TrialEligibilityService
                 'minutes' => (int) ($starter->monthly_minutes ?? 0),
                 'premium_minutes' => (int) ($starter->premium_voice_minutes ?? 0),
             ],
-            'amount_cents' => (int) ($creator->price_cents ?? 0),
+        ];
+    }
+
+    /**
+     * Public callout for the homepage and pricing page.
+     *
+     * @return array{show:bool,days:int,quota_plan_name:string,chars:int,minutes:int,plans:list<string>}
+     */
+    public function promoFor(?User $user): array
+    {
+        $quota = $this->starterPlan();
+        $plans = $this->trialablePlans();
+        $enabled = $this->enabled() && $quota !== null && $plans->isNotEmpty();
+        $eligible = $user === null || $this->denialReason($user, null) === null;
+
+        return [
+            'show' => $enabled && $eligible,
+            'days' => $this->trialDays(),
+            'quota_plan_name' => (string) ($quota->name ?? ''),
+            'chars' => (int) ($quota->monthly_chars ?? 0),
+            'minutes' => (int) ($quota->monthly_minutes ?? 0),
+            'plans' => $plans->pluck('slug')->values()->all(),
         ];
     }
 
@@ -189,16 +211,52 @@ class TrialEligibilityService
     public function creatorMonthlyPriceId(): string
     {
         $plan = $this->creatorPlan();
-        if (! $plan) {
-            return '';
+
+        return $plan ? $this->monthlyPriceId($plan) : '';
+    }
+
+    public function paidMonthlyPlan(string $slug): ?Plan
+    {
+        $slug = strtolower(trim($slug));
+        if ($slug === '') {
+            return null;
         }
 
+        $plan = Plan::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->first();
+
+        if (! $plan instanceof Plan || $this->monthlyPriceId($plan) === '') {
+            return null;
+        }
+
+        return $plan;
+    }
+
+    public function monthlyPriceId(Plan $plan): string
+    {
         $priceId = trim((string) $plan->getStripePriceId('monthly'));
         if ($priceId !== '') {
             return $priceId;
         }
 
         return trim((string) config('services.stripe.prices.'.$plan->slug.'.monthly', ''));
+    }
+
+    /**
+     * @return Collection<int, Plan>
+     */
+    public function trialablePlans(): Collection
+    {
+        return Plan::query()
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->orderBy('price_cents')
+            ->get()
+            ->filter(fn (Plan $plan): bool => $this->monthlyPriceId($plan) !== '')
+            ->values();
     }
 
     public function normalizeEmail(?string $email): string

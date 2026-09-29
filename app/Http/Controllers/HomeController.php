@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Billing\TrialEligibilityService;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\Referral\DemoRewardLedgerService;
@@ -83,6 +84,7 @@ class HomeController extends Controller
             'heroVoiceSample' => $heroVoiceSample,
             'voiceSamples' => $voiceSamples,
             'countryContext' => $countryContext,
+            'trialPromo' => app(TrialEligibilityService::class)->promoFor(request()->user()),
         ]);
     }
 
@@ -99,6 +101,7 @@ class HomeController extends Controller
             'activePlanSlug' => $activePlanSlug,
             'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
+            'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),
         ]);
     }
 
