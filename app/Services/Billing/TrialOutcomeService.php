@@ -144,12 +144,41 @@ class TrialOutcomeService
 
     private function subscriptionId(object $invoice): string
     {
-        $subscription = $invoice->subscription ?? '';
-        if (is_object($subscription)) {
-            return trim((string) ($subscription->id ?? ''));
+        $subscription = $this->invoiceValue($invoice, 'subscription');
+        $fromTopLevel = $this->idFromMixed($subscription);
+        if ($fromTopLevel !== '') {
+            return $fromTopLevel;
         }
 
-        return trim((string) $subscription);
+        $parent = $this->invoiceValue($invoice, 'parent');
+        if (! is_object($parent)) {
+            return '';
+        }
+
+        $details = $this->invoiceValue($parent, 'subscription_details');
+        if (! is_object($details)) {
+            return '';
+        }
+
+        return $this->idFromMixed($this->invoiceValue($details, 'subscription'));
+    }
+
+    private function invoiceValue(object $object, string $key): mixed
+    {
+        if ($object instanceof \ArrayAccess && $object->offsetExists($key)) {
+            return $object->offsetGet($key);
+        }
+
+        return $object->{$key} ?? null;
+    }
+
+    private function idFromMixed(mixed $value): string
+    {
+        if (is_object($value)) {
+            return trim((string) ($value->id ?? ''));
+        }
+
+        return trim((string) $value);
     }
 
     private function qualifyReferral(BillingTrial $trial): void

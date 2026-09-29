@@ -407,6 +407,54 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertSame(100.0, BillingTrial::outcomeCounts()['conversion_rate']);
     }
 
+    public function test_paid_invoice_without_a_top_level_subscription_id_still_converts_the_trial(): void
+    {
+        $user = User::factory()->create(['stripe_id' => 'cus_basil']);
+        $creator = Plan::query()->where('slug', 'creator')->firstOrFail();
+        $trial = BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $creator->id,
+            'status' => BillingTrial::STATUS_TRIALING,
+            'stripe_customer_id' => 'cus_basil',
+            'stripe_subscription_id' => 'sub_basil',
+            'amount_cents' => 2200,
+            'started_at' => now()->subDays(7),
+            'trial_ends_at' => now(),
+        ]);
+
+        $this->mock(BillingSyncService::class, function ($mock) {
+            $mock->shouldReceive('syncIfStale')->andReturnNull();
+            $mock->shouldReceive('syncUser')->andReturnNull();
+        });
+
+        $referrals = Mockery::mock(ReferralQualificationService::class);
+        $referrals->shouldReceive('evaluate')->once()->andReturnNull();
+        $this->app->instance(ReferralQualificationService::class, $referrals);
+
+        $this->postJson('/api/stripe/webhook', [
+            'id' => 'evt_basil_paid',
+            'type' => 'invoice.paid',
+            'data' => [
+                'object' => [
+                    'id' => 'in_basil',
+                    'customer' => 'cus_basil',
+                    'amount_paid' => 2200,
+                    'currency' => 'usd',
+                    'parent' => [
+                        'type' => 'subscription_details',
+                        'subscription_details' => [
+                            'subscription' => 'sub_basil',
+                        ],
+                    ],
+                ],
+            ],
+        ])->assertOk();
+
+        $paid = $trial->fresh();
+        $this->assertSame(BillingTrial::STATUS_PAID, $paid->status);
+        $this->assertSame(2200, $paid->amount_paid_cents);
+    }
+
     public function test_cancel_and_failed_charge_are_separate_outcomes(): void
     {
         $user = User::factory()->create(['stripe_id' => 'cus_end']);
