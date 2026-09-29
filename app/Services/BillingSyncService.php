@@ -74,7 +74,9 @@ class BillingSyncService
 
                         if ($mappedPlan && in_array($selectedStatus, ['active', 'trialing'], true)) {
                             $targetPlan = $mappedPlan;
-                            $periodEndTs = (int) ($stripeSubscription->current_period_end ?? 0);
+                            $periodEndTs = (int) ($stripeSubscription->current_period_end
+                                ?? $stripeSubscription->items->data[0]->current_period_end
+                                ?? 0);
                             $periodEnd = $periodEndTs > 0
                                 ? Carbon::createFromTimestamp($periodEndTs)
                                 : now()->addMonth();

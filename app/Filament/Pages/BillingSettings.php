@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Services\Billing\TrialEligibilityService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -29,6 +30,7 @@ class BillingSettings extends Page implements HasForms
 
     public function mount(): void
     {
+        $trialEligibility = app(TrialEligibilityService::class);
         $state = [
             'stripe_key_set' => ! empty(config('cashier.key', config('services.stripe.key'))),
             'stripe_secret_set' => ! empty(config('cashier.secret', config('services.stripe.secret'))),
@@ -38,6 +40,9 @@ class BillingSettings extends Page implements HasForms
             'grace_days' => (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)),
             'webhook_emails_enabled' => (string) SiteSetting::get('billing_webhook_emails', config('listen.billing.webhook_email_enabled', '1')) === '1',
             'trial_enabled' => (string) SiteSetting::get('billing_trial_enabled', '1') === '1',
+            'trial_plan_slugs' => $trialEligibility->allowedPlanSlugs()
+                ?? Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->pluck('slug')->all(),
+            'trial_cycles' => $trialEligibility->allowedCycles(),
             'trial_quota_plan_slug' => (string) SiteSetting::get('billing_trial_quota_plan_slug', (string) config('listen.billing.creator_trial.quota_plan_slug', 'starter')),
             'trial_days' => (int) SiteSetting::get('billing_trial_days', (int) config('listen.billing.creator_trial.days', 7)),
             'pricing_forced_country_code' => (string) SiteSetting::get('pricing_forced_country_code', ''),
@@ -139,7 +144,7 @@ class BillingSettings extends Page implements HasForms
                     ]),
 
                 Forms\Components\Section::make('Card trial')
-                    ->description('Customers can start the free trial on any paid monthly plan they choose. Stripe charges that plan when the trial ends. Usage during the trial follows the cap below. Confirm and Pay is unchanged.')
+                    ->description('Customers can start the free trial on the plans and billing cycles checked below. Stripe charges that plan when the trial ends. Usage during the trial follows the cap below. Confirm and Pay is unchanged.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('trial_enabled')
@@ -147,6 +152,30 @@ class BillingSettings extends Page implements HasForms
                             ->helperText('Off removes the trial button, the pricing callout, and the homepage callout. People already in a trial keep it until it ends or they cancel. Confirm and Pay stays available.')
                             ->dehydrated()
                             ->columnSpanFull(),
+                        Forms\Components\CheckboxList::make('trial_plan_slugs')
+                            ->label('Plans that offer the trial')
+                            ->options(fn (): array => Plan::query()
+                                ->where('is_active', true)
+                                ->where('price_cents', '>', 0)
+                                ->orderBy('price_cents')
+                                ->get()
+                                ->mapWithKeys(fn (Plan $plan): array => [
+                                    (string) $plan->slug => $plan->hasStripeConfig()
+                                        ? (string) $plan->name
+                                        : $plan->name.' (no Stripe price yet)',
+                                ])
+                                ->all())
+                            ->columns(2)
+                            ->bulkToggleable()
+                            ->helperText('Unchecked plans keep normal checkout only. The trial button, the pricing chip, and the pricing line follow this list. Nothing checked hides the trial everywhere. People already in a trial keep it.'),
+                        Forms\Components\CheckboxList::make('trial_cycles')
+                            ->label('Billing cycles that offer the trial')
+                            ->options([
+                                'monthly' => 'Monthly',
+                                'yearly' => 'Yearly',
+                            ])
+                            ->columns(2)
+                            ->helperText('A yearly trial charges the full yearly price when it ends. A plan also needs a Stripe price for that cycle.'),
                         Forms\Components\Select::make('trial_quota_plan_slug')
                             ->label('Usage cap during the trial')
                             ->options(fn (): array => Plan::query()
@@ -326,6 +355,17 @@ class BillingSettings extends Page implements HasForms
         );
         if (array_key_exists('trial_plan_slug', $data)) {
             SiteSetting::set('billing_trial_plan_slug', strtolower(trim((string) $data['trial_plan_slug'])), $group);
+        }
+        if (array_key_exists('trial_plan_slugs', $data)) {
+            $slugs = array_values(array_unique(array_map(
+                fn ($slug): string => strtolower(trim((string) $slug)),
+                (array) ($data['trial_plan_slugs'] ?? [])
+            )));
+            SiteSetting::set('billing_trial_plan_slugs', json_encode($slugs), $group);
+        }
+        if (array_key_exists('trial_cycles', $data)) {
+            $cycles = array_values(array_intersect(TrialEligibilityService::CYCLES, (array) ($data['trial_cycles'] ?? [])));
+            SiteSetting::set('billing_trial_cycles', json_encode($cycles), $group);
         }
         if (array_key_exists('trial_quota_plan_slug', $data)) {
             SiteSetting::set('billing_trial_quota_plan_slug', strtolower(trim((string) $data['trial_quota_plan_slug'])), $group);

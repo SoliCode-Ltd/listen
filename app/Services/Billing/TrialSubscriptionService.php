@@ -27,11 +27,11 @@ class TrialSubscriptionService
      */
     public function beginSetup(User $user, array $input): array
     {
-        $plan = $this->resolveCheckoutPlan($input);
+        [$plan, $cycle] = $this->resolveCheckoutPlan($input);
 
         $reason = $this->eligibility->denialReason($user, null);
         if ($reason !== null) {
-            $this->recordBlocked($user, $reason, null, null, $plan);
+            $this->recordBlocked($user, $reason, null, null, $plan, $cycle);
             throw new TrialStartException($this->reasonKey($reason), 422, true, $reason);
         }
 
@@ -40,6 +40,7 @@ class TrialSubscriptionService
             $intent = $this->gateway->createSetupIntent($customerId, [
                 'listen_purpose' => 'card_trial',
                 'listen_plan_slug' => (string) $plan->slug,
+                'listen_billing_cycle' => $cycle,
             ]);
         } catch (TrialStartException $exception) {
             throw $exception;
@@ -94,12 +95,12 @@ class TrialSubscriptionService
         }
 
         $this->assertIntentVerified($user, $intent);
-        $creator = $this->resolveStoredPlan($intent);
+        [$creator, $cycle] = $this->resolveStoredPlan($intent);
         $starter = $this->eligibility->quotaPlanFor($creator);
         if (! $starter instanceof Plan) {
             throw new TrialStartException('ui.backend.trial_plan_not_ready');
         }
-        $priceId = $this->eligibility->monthlyPriceId($creator);
+        $priceId = $this->eligibility->priceIdFor($creator, $cycle);
 
         try {
             $card = $this->gateway->retrievePaymentMethod($intent['payment_method']);
@@ -117,16 +118,16 @@ class TrialSubscriptionService
 
         $reason = $this->eligibility->denialReason($user, (string) ($card['fingerprint'] ?? ''));
         if ($reason !== null) {
-            $this->recordBlocked($user, $reason, $card, $setupIntentId, $creator);
+            $this->recordBlocked($user, $reason, $card, $setupIntentId, $creator, $cycle);
             $this->cards->rememberCard($user, $card, 'trial', false, null, $setupIntentId, true);
             throw new TrialStartException($this->reasonKey($reason), 422, true, $reason);
         }
 
         try {
-            return $this->confirmInsideLock($user, $creator, $starter, $priceId, $card, $setupIntentId);
+            return $this->confirmInsideLock($user, $creator, $cycle, $starter, $priceId, $card, $setupIntentId);
         } catch (TrialStartException $exception) {
             if ($exception->blocked && $exception->reason !== null && ! $this->blockedMomentAgo($user, $exception->reason)) {
-                $this->recordBlocked($user, $exception->reason, $card, $setupIntentId, $creator);
+                $this->recordBlocked($user, $exception->reason, $card, $setupIntentId, $creator, $cycle);
             }
 
             throw $exception;
@@ -137,9 +138,9 @@ class TrialSubscriptionService
      * @param  array{id:string,brand?:string,last4?:string,exp_month?:int,exp_year?:int,fingerprint?:string,funding?:string,country?:string,cvc_check?:string}  $card
      * @return array{trial_ends_at:string,plan:string,amount_cents:int}
      */
-    private function confirmInsideLock(User $user, Plan $creator, Plan $starter, string $priceId, array $card, string $setupIntentId): array
+    private function confirmInsideLock(User $user, Plan $creator, string $cycle, Plan $starter, string $priceId, array $card, string $setupIntentId): array
     {
-        return DB::transaction(function () use ($user, $creator, $starter, $priceId, $card, $setupIntentId) {
+        return DB::transaction(function () use ($user, $creator, $cycle, $starter, $priceId, $card, $setupIntentId) {
             /** @var User $locked */
             $locked = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
 
@@ -167,6 +168,7 @@ class TrialSubscriptionService
                     [
                         'listen_trial' => '1',
                         'listen_plan_slug' => (string) $creator->slug,
+                        'listen_billing_cycle' => $cycle,
                         'listen_user_id' => (string) $locked->id,
                         'listen_admin_test' => $locked->is_admin ? '1' : '0',
                     ]
@@ -190,7 +192,7 @@ class TrialSubscriptionService
             }
 
             try {
-                $trial = $this->persistTrial($locked, $creator, $starter, $priceId, $card, $setupIntentId, $stripeSubscription);
+                $trial = $this->persistTrial($locked, $creator, $cycle, $starter, $priceId, $card, $setupIntentId, $stripeSubscription);
             } catch (\Throwable $exception) {
                 $this->cancelQuietly((string) ($stripeSubscription['id'] ?? ''));
                 Log::warning('Creator trial local record failed after Stripe created the subscription. The Stripe subscription was canceled.', [
@@ -208,8 +210,9 @@ class TrialSubscriptionService
 
     /**
      * @param  array{plan?:string,billing_cycle?:string}  $input
+     * @return array{0:Plan,1:string}
      */
-    private function resolveCheckoutPlan(array $input): Plan
+    private function resolveCheckoutPlan(array $input): array
     {
         if (! $this->eligibility->enabled()) {
             throw new TrialStartException('ui.backend.trial_disabled');
@@ -220,34 +223,32 @@ class TrialSubscriptionService
         }
 
         $cycle = strtolower(trim((string) ($input['billing_cycle'] ?? '')));
-        if ($cycle !== 'monthly') {
-            throw new TrialStartException('ui.backend.trial_creator_monthly_only');
-        }
-
-        $plan = $this->eligibility->paidMonthlyPlan((string) ($input['plan'] ?? ''));
+        $plan = $this->eligibility->trialPlan((string) ($input['plan'] ?? ''), $cycle);
         if (! $plan instanceof Plan) {
             throw new TrialStartException('ui.backend.trial_creator_monthly_only');
         }
 
-        return $plan;
+        return [$plan, $cycle];
     }
 
     /**
      * @param  array{metadata?:array<string, mixed>}  $intent
+     * @return array{0:Plan,1:string}
      */
-    private function resolveStoredPlan(array $intent): Plan
+    private function resolveStoredPlan(array $intent): array
     {
         $slug = strtolower(trim((string) ($intent['metadata']['listen_plan_slug'] ?? '')));
         if ($slug === '') {
             throw new TrialStartException('ui.backend.trial_plan_not_ready');
         }
 
-        $plan = $this->eligibility->paidMonthlyPlan($slug);
+        $cycle = strtolower(trim((string) ($intent['metadata']['listen_billing_cycle'] ?? 'monthly')));
+        $plan = $this->eligibility->trialPlan($slug, $cycle);
         if (! $plan instanceof Plan) {
             throw new TrialStartException('ui.backend.trial_creator_monthly_only');
         }
 
-        return $plan;
+        return [$plan, $cycle];
     }
 
     /**
@@ -327,7 +328,7 @@ class TrialSubscriptionService
      * @param  array{id:string,brand?:string,last4?:string,exp_month?:int,exp_year?:int,fingerprint?:string,funding?:string,country?:string,cvc_check?:string}  $card
      * @param  array{id:string,trial_end:int,item_id?:string,product_id?:string}  $stripeSubscription
      */
-    private function persistTrial(User $user, Plan $creator, Plan $starter, string $priceId, array $card, string $setupIntentId, array $stripeSubscription): BillingTrial
+    private function persistTrial(User $user, Plan $creator, string $cycle, Plan $starter, string $priceId, array $card, string $setupIntentId, array $stripeSubscription): BillingTrial
     {
         $endsAt = Carbon::createFromTimestamp((int) $stripeSubscription['trial_end']);
 
@@ -335,6 +336,7 @@ class TrialSubscriptionService
             'user_id' => $user->id,
             'plan_id' => $creator->id,
             'quota_plan_id' => $starter->id,
+            'billing_cycle' => $cycle,
             'status' => BillingTrial::STATUS_TRIALING,
             'is_admin_test' => (bool) $user->is_admin,
             'stripe_customer_id' => $user->stripe_id,
@@ -350,7 +352,7 @@ class TrialSubscriptionService
             'card_country' => $card['country'] ?? null,
             'cvc_check' => $card['cvc_check'] ?? null,
             'off_session_ready' => true,
-            'amount_cents' => (int) $creator->price_cents,
+            'amount_cents' => $this->cycleAmountCents($creator, $cycle),
             'currency' => 'usd',
             'chars_limit' => (int) $starter->monthly_chars,
             'minutes_limit' => (int) $starter->monthly_minutes,
@@ -390,7 +392,7 @@ class TrialSubscriptionService
     /**
      * @param  array{id?:string,brand?:string,last4?:string,exp_month?:int,exp_year?:int,fingerprint?:string,funding?:string,country?:string,cvc_check?:string}|null  $card
      */
-    private function recordBlocked(User $user, string $reason, ?array $card, ?string $setupIntentId, ?Plan $creator = null): void
+    private function recordBlocked(User $user, string $reason, ?array $card, ?string $setupIntentId, ?Plan $creator = null, string $cycle = 'monthly'): void
     {
         $starter = $this->eligibility->starterPlan();
         if (! $creator instanceof Plan) {
@@ -401,6 +403,7 @@ class TrialSubscriptionService
             'user_id' => $user->id,
             'plan_id' => $creator->id,
             'quota_plan_id' => $starter?->id,
+            'billing_cycle' => $cycle,
             'status' => BillingTrial::STATUS_BLOCKED,
             'is_admin_test' => false,
             'stripe_customer_id' => $user->stripe_id,
@@ -415,7 +418,7 @@ class TrialSubscriptionService
             'card_country' => $card['country'] ?? null,
             'cvc_check' => $card['cvc_check'] ?? null,
             'off_session_ready' => $card !== null,
-            'amount_cents' => (int) $creator->price_cents,
+            'amount_cents' => $this->cycleAmountCents($creator, $cycle),
             'currency' => 'usd',
             'chars_limit' => (int) ($starter->monthly_chars ?? 0),
             'minutes_limit' => (int) ($starter->monthly_minutes ?? 0),
@@ -527,6 +530,13 @@ class TrialSubscriptionService
             ->where('blocked_reason', $reason)
             ->where('created_at', '>=', now()->subMinute())
             ->exists();
+    }
+
+    private function cycleAmountCents(Plan $plan, string $cycle): int
+    {
+        return $cycle === 'yearly'
+            ? $plan->getEffectiveYearlyPriceCents()
+            : (int) $plan->price_cents;
     }
 
     private function blankToNull(mixed $value): ?string

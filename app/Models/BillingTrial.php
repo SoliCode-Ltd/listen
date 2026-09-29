@@ -22,6 +22,7 @@ class BillingTrial extends Model
         'user_id',
         'plan_id',
         'quota_plan_id',
+        'billing_cycle',
         'status',
         'is_admin_test',
         'stripe_customer_id',
