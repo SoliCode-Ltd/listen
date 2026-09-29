@@ -329,7 +329,6 @@ return [
         'trial_note' => 'أثناء التجربة يكون الاستخدام بحدود خطة :quota: :chars حرفاً، و:per_request في الطلب الواحد، و:minutes دقيقة. بدون استهلاك إضافي.',
         'checkout_choice_label' => 'كيف تريد أن تبدأ؟',
         'trial_choice_title' => 'ابدأ بتجربة مجانية لمدة :days أيام',
-        'trial_choice_sub' => ':zero اليوم، ثم :amount في :date. ألغِ قبل ذلك في أي وقت ولن تدفع شيئاً.',
         'pay_choice_title' => 'ادفع الآن بدون تجربة',
         'pay_choice_sub' => ':amount اليوم، وتبدأ خطتك بكامل حدودها فوراً.',
         'due_today' => 'المستحق اليوم',

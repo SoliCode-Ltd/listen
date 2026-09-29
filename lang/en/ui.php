@@ -329,7 +329,6 @@ return [
         'trial_note' => 'During the trial, usage is capped at the :quota allowance: :chars characters, :per_request per request, and :minutes minutes. No overage.',
         'checkout_choice_label' => 'How do you want to start?',
         'trial_choice_title' => 'Start with a :days-day free trial',
-        'trial_choice_sub' => ':zero today. Then :amount on :date. Cancel anytime before that and you pay nothing.',
         'pay_choice_title' => 'Pay now, no trial',
         'pay_choice_sub' => ':amount today. Your plan starts with full limits right away.',
         'due_today' => 'Due today',

@@ -586,11 +586,12 @@
       font-size: .92rem;
       line-height: 1.65;
     }
-    .choice-note {
-      margin-top: .35rem;
-      padding-top: .5rem;
-      border-top: 1px solid var(--line);
-      color: var(--muted);
+    .trial-cap-note {
+      margin: .85rem 0 0;
+      padding: .7rem .85rem;
+      border-radius: var(--radius);
+      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+      color: color-mix(in oklab, var(--text) 72%, var(--muted));
       font-size: .85rem;
       line-height: 1.65;
     }
@@ -1061,8 +1062,6 @@
                 <input type="radio" name="checkout_mode" value="trial" checked>
                 <span class="choice-body">
                   <span class="choice-title">{{ __('ui.billing.trial_choice_title', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}</span>
-                  <span class="choice-sub" id="trialChoiceSub"></span>
-                  <span class="choice-note" id="trialNote" hidden></span>
                 </span>
               </label>
               <label class="choice-card">
@@ -1116,6 +1115,7 @@
             <dd id="quoteCycle">-</dd>
           </div>
         </div>
+        <p class="trial-cap-note" id="trialNote" hidden></p>
       </div>
     </div>
   </main>
@@ -1163,7 +1163,6 @@
       'trial_starting' => __('ui.billing.trial_starting'),
       'trial_started_redirecting' => __('ui.billing.trial_started_redirecting'),
       'trial_note' => __('ui.billing.trial_note'),
-      'trial_choice_sub' => __('ui.billing.trial_choice_sub'),
       'pay_choice_sub' => __('ui.billing.pay_choice_sub'),
       'due_today' => __('ui.billing.due_today'),
       'trial_quote_hint' => __('ui.billing.trial_quote_hint'),
@@ -1185,7 +1184,6 @@
     const trialBtnDefaultText = trialBtn ? trialBtn.textContent.trim() : '';
     const checkoutChoice = document.getElementById('checkoutChoice');
     const checkoutModeInputs = Array.from(document.querySelectorAll('input[name="checkout_mode"]'));
-    const trialChoiceSub = document.getElementById('trialChoiceSub');
     const payChoiceSub = document.getElementById('payChoiceSub');
     const trialNote = document.getElementById('trialNote');
 
@@ -1419,18 +1417,12 @@
         trialBtn.style.display = trialMode ? '' : 'none';
       }
       if (trial.ready) {
-        if (trialChoiceSub) {
-          trialChoiceSub.textContent = String(i18n.trial_choice_sub || '')
-            .replace(':zero', trial.zero)
-            .replace(':amount', trial.amount)
-            .replace(':date', trial.date);
-        }
         if (payChoiceSub) {
           payChoiceSub.textContent = String(i18n.pay_choice_sub || '').replace(':amount', trial.amount);
         }
       }
       if (trialNote) {
-        if (!trial.ready) {
+        if (!trialMode) {
           trialNote.hidden = true;
           trialNote.textContent = '';
         } else {
@@ -1465,7 +1457,6 @@
         ready: ready,
         plan: plan,
         amount: `\u2066${amount}\u2069`,
-        zero: `\u2066${zeroAmount(amount)}\u2069`,
         zeroPlain: zeroAmount(amount),
         date: end.toLocaleDateString(document.documentElement.lang || undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
       };
