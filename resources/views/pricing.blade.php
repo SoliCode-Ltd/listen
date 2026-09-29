@@ -321,26 +321,61 @@
       cursor: not-allowed;
     }
     .trial-pill {
+      position: relative;
       display: inline-flex;
       align-items: center;
-      gap: .55rem;
-      margin: 0 auto 1rem;
-      padding: .3rem .85rem .3rem .3rem;
+      gap: .6rem;
+      margin: 0 auto 1.1rem;
+      padding: .35rem 1.05rem .35rem .35rem;
       border-radius: 999px;
-      border: 1px solid color-mix(in oklab, var(--a) 45%, transparent);
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      font-size: .88rem;
-      font-weight: 600;
-      box-shadow: 0 6px 22px color-mix(in oklab, var(--a) 22%, transparent);
+      border: 1px solid transparent;
+      background:
+        linear-gradient(color-mix(in oklab, var(--a) 8%, var(--surface)), color-mix(in oklab, var(--a) 8%, var(--surface))) padding-box,
+        linear-gradient(120deg, var(--a), var(--b), var(--a)) border-box;
+      background-size: 100% 100%, 200% 100%;
+      box-shadow: 0 8px 28px color-mix(in oklab, var(--a) 24%, transparent);
+      font-size: .92rem;
+      line-height: 1.3;
+      animation: trial-pill-flow 6s linear infinite;
     }
-    .trial-pill-tag {
-      padding: .2rem .6rem;
-      border-radius: 999px;
+    [dir="rtl"] .trial-pill {
+      padding: .35rem .35rem .35rem 1.05rem;
+    }
+    .trial-pill-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
       background: linear-gradient(135deg, var(--a), var(--b));
       color: #fff;
-      font-size: .74rem;
-      font-weight: 700;
-      letter-spacing: .02em;
+    }
+    .trial-pill-icon svg {
+      width: 16px;
+      height: 16px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .trial-pill-text {
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .trial-pill-text strong {
+      background: linear-gradient(135deg, var(--a), var(--b));
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      font-weight: 800;
+    }
+    @keyframes trial-pill-flow {
+      to { background-position: 0 0, 200% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .trial-pill { animation: none; }
     }
     .plan-trial-chip {
       display: inline-flex;
@@ -354,6 +389,10 @@
       font-size: .78rem;
       font-weight: 700;
     }
+    .plans-grid.is-yearly [data-trial-monthly-only],
+    .plans-grid:not(.is-yearly) [data-trial-yearly-only] {
+      display: none !important;
+    }
     .plan-trial-chip svg {
       width: 14px;
       height: 14px;
@@ -363,17 +402,6 @@
       stroke-linecap: round;
       stroke-linejoin: round;
     }
-    .plan-trial-note {
-      margin: .55rem 0 0;
-      text-align: center;
-      color: var(--muted);
-      font-size: .78rem;
-      line-height: 1.4;
-    }
-    .plans-grid.is-yearly [data-trial-only] {
-      display: none !important;
-    }
-
     .features-section {
       padding: 2.5rem 0;
     }
@@ -796,8 +824,13 @@
       <!-- <span class="eyebrow">Flexible pricing</span> -->
       @if(!empty($trialPromo['show']))
         <div class="trial-pill">
-          <span class="trial-pill-tag">{{ __('ui.pricing.trial_pill_tag') }}</span>
-          <span class="trial-pill-text">{{ __('ui.pricing.trial_pill_text', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</span>
+          <span class="trial-pill-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/></svg>
+          </span>
+          <span class="trial-pill-text">
+            <strong>{{ __('ui.pricing.trial_pill_highlight', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</strong>
+            {{ __('ui.pricing.trial_pill_text') }}
+          </span>
         </div>
       @endif
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
