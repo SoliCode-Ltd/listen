@@ -121,6 +121,7 @@ Route::group([
 ], function (): void {
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
+    Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
     Route::get('/ai-voice-generator', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_voice_generator')->name('seo.ai-voice-generator');
     Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');

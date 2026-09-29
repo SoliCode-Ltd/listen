@@ -66,30 +66,10 @@
       gap: .75rem;
       flex-wrap: wrap;
     }
-    .trial-promo {
-      display: flex;
-      flex-direction: column;
-      gap: .35rem;
-      margin: 0 0 1.15rem;
-      padding: 1rem 1.15rem;
-      border-radius: 16px;
-      border: 1px solid color-mix(in oklab, var(--brand-accent) 60%, transparent);
-      background: color-mix(in oklab, var(--brand-accent) 16%, var(--surface));
-      color: inherit;
-      text-decoration: none;
-      box-shadow: 0 10px 30px color-mix(in oklab, var(--brand-accent) 18%, transparent);
-    }
-    .trial-promo strong {
-      font-size: 1.08rem;
-    }
-    .trial-promo span {
-      color: var(--muted);
-      line-height: 1.5;
-    }
-    .trial-promo em {
-      font-style: normal;
-      font-weight: 700;
+    .btn-trial {
+      border-color: var(--brand-accent);
       color: var(--brand-accent);
+      font-weight: 700;
     }
 
     .hero-art {
@@ -1491,24 +1471,21 @@
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
           <h1>{{ __('ui.landing.hero_title_before') }} <span class="brand-text">{{ __('ui.landing.hero_title_highlight') }}</span> {{ __('ui.landing.hero_title_after') }}</h1>
           <p class="lead">{{ __('ui.landing.hero_subtitle') }}</p>
-          @if(!empty($trialPromo['show']))
-            <a class="trial-promo" href="{{ route('billing.page', ['billing_cycle' => 'monthly', 'payment_method' => 'stripe']) }}">
-              <strong>{{ __('ui.landing.trial_promo_title', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</strong>
-              <span>{{ __('ui.landing.trial_promo_body', [
-                'quota' => $trialPromo['quota_plan_name'] ?? '',
-                'chars' => number_format((int) ($trialPromo['chars'] ?? 0)),
-                'minutes' => number_format((int) ($trialPromo['minutes'] ?? 0)),
-              ]) }}</span>
-              <em>{{ __('ui.landing.trial_promo_action') }}</em>
-            </a>
-          @endif
           <div class="hero-cta">
             @guest
               <a class="btn btn-primary" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
-              <a class="btn" href="{{ route('register') }}">{{ __('ui.landing.create_free_account') }}</a>
+              @if(!empty($trialPromo['show']))
+                <a class="btn btn-trial" href="{{ route('trial.start') }}">{{ __('ui.landing.trial_button', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</a>
+              @else
+                <a class="btn" href="{{ route('register') }}">{{ __('ui.landing.create_free_account') }}</a>
+              @endif
             @else
               <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
-              <a class="btn" href="{{ route('browsers-extension.page') }}">{{ __('ui.landing.browser_extension') }}</a>
+              @if(!empty($trialPromo['show']))
+                <a class="btn btn-trial" href="{{ route('trial.start') }}">{{ __('ui.landing.trial_button', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}</a>
+              @else
+                <a class="btn" href="{{ route('browsers-extension.page') }}">{{ __('ui.landing.browser_extension') }}</a>
+              @endif
             @endguest
           </div>
         </div>
