@@ -53,6 +53,7 @@ class BillingTrial extends Model
         'phone_normalized',
         'device_id',
         'registration_ip',
+        'gclid',
         'blocked_reason',
         'started_at',
         'trial_ends_at',

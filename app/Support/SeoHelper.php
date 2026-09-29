@@ -1074,6 +1074,11 @@ class SeoHelper
         return trim((string) SiteSetting::get('google_ads_conversion_send_to', ''));
     }
 
+    public static function googleAdsTrialConversionSendTo(): string
+    {
+        return trim((string) SiteSetting::get('google_ads_trial_conversion_send_to', ''));
+    }
+
     public static function googleTagHeadCode(): string
     {
         return trim((string) SiteSetting::get('google_tag_head_code', ''));

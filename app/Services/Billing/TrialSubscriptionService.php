@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Exceptions\TrialStartException;
+use App\Http\Middleware\CaptureAdClickId;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
@@ -362,6 +363,7 @@ class TrialSubscriptionService
             'phone_normalized' => $this->eligibility->normalizePhone($user->phone_number) ?: null,
             'device_id' => $this->eligibility->primaryDeviceId($user),
             'registration_ip' => $user->registration_ip,
+            'gclid' => CaptureAdClickId::fromRequest(request()),
             'started_at' => now(),
             'trial_ends_at' => $endsAt,
         ]);

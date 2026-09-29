@@ -1088,6 +1088,7 @@
     const planCatalog = @json(collect($upgradePlansForUi)->keyBy('slug')->all());
     const initialPaymentMethod = @json($selectedPaymentMethod);
     const gadsConversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
+    const gadsTrialConversionSendTo = @json(\App\Support\SeoHelper::googleAdsTrialConversionSendTo());
     const trialOffer = @json($trialOffer ?? ['available' => false, 'quota' => []]);
     const trialBtn = document.getElementById('trialBtn');
     const trialNote = document.getElementById('trialNote');
@@ -1533,10 +1534,30 @@
       });
     });
 
-    function trackPurchaseConversion() {
-      if (typeof gtag === 'function' && gadsConversionSendTo) {
-        gtag('event', 'conversion', { send_to: gadsConversionSendTo });
-      }
+    function sendAdsConversion(sendTo, meta, transactionId) {
+      return new Promise(function(resolve) {
+        if (typeof gtag !== 'function' || !sendTo) {
+          resolve();
+          return;
+        }
+        const payload = { send_to: sendTo, event_callback: resolve };
+        const chargeCurrency = String(meta?.charge_currency || meta?.currency || '').toUpperCase();
+        const minor = chargeCurrency === 'USD' && meta?.base_usd_cents ? meta.base_usd_cents : meta?.amount_cents;
+        if (chargeCurrency && Number(minor) > 0) {
+          payload.value = Math.round(Number(minor)) / 100;
+          payload.currency = chargeCurrency;
+        }
+        if (transactionId) {
+          payload.transaction_id = String(transactionId);
+        }
+        gtag('event', 'conversion', payload);
+        // Navigating away before the hit is sent drops the conversion.
+        setTimeout(resolve, 1500);
+      });
+    }
+
+    function trackPurchaseConversion(meta) {
+      return sendAdsConversion(gadsConversionSendTo, meta, '');
     }
 
     trialBtn?.addEventListener('click', async () => {
@@ -1577,6 +1598,12 @@
         }
 
         setMessage('ok', confirmResponse.data?.message || i18n.trial_started_redirecting);
+        const trialPlan = currentPlan();
+        await sendAdsConversion(
+          gadsTrialConversionSendTo,
+          trialPlan ? trialPlan[String(cycleSelect?.value || 'monthly')] : null,
+          String(confirmed.setupIntent?.id || '')
+        );
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
         setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
@@ -1613,7 +1640,7 @@
             throw new Error(responseMessage(response, i18n.upgrade_failed));
           }
 
-          trackPurchaseConversion();
+          await trackPurchaseConversion(selected.meta);
           setMessage('ok', response.data?.message || i18n.manual_request_received);
           proofInput.value = '';
           proofUploadArea?.classList.remove('has-file');
@@ -1651,7 +1678,7 @@
             throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
           }
 
-          trackPurchaseConversion();
+          await trackPurchaseConversion(selected.meta);
           setMessage('ok', i18n.payment_confirmed_redirecting);
           window.location.href = '{{ route('manage-subscription.page') }}';
           return;
@@ -1661,7 +1688,7 @@
           throw new Error(response.data?.message || i18n.upgrade_failed);
         }
 
-        trackPurchaseConversion();
+        await trackPurchaseConversion(selected.meta);
         setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
