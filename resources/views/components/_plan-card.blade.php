@@ -63,6 +63,12 @@
       <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
     </div>
     <div class="price-note price-note-text"></div>
+    @if(!empty($trialPromo['show']) && in_array($plan['slug'], $trialPromo['plans'] ?? [], true) && !$isFree && !$isCurrent && !$isLower)
+      <span class="plan-trial-chip" data-trial-only>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+        {{ __('ui.pricing.trial_chip', ['days' => (int) ($trialPromo['days'] ?? 7)]) }}
+      </span>
+    @endif
   </div>
 
   {{-- Countdown timer for discounted plans --}}
@@ -128,6 +134,14 @@
     @endforeach
   </ul>
 
+  @php
+    $hasTrial = !empty($trialPromo['show'])
+      && in_array($plan['slug'], $trialPromo['plans'] ?? [], true)
+      && !$isFree && !$isCurrent && !$isLower;
+    $trialDays = (int) ($trialPromo['days'] ?? 7);
+    $trialUrl = $hasTrial ? route('trial.start', ['plan' => $plan['slug']]) : null;
+    $trialLabel = __('ui.pricing.start_trial_cta', ['days' => $trialDays]);
+  @endphp
   <div class="plan-action">
     @auth
       @if($isCurrent)
@@ -136,7 +150,7 @@
         <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
       @else
         @php
-          $monthlyBillingUrl = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly']);
+          $monthlyBillingUrl = $trialUrl ?? route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'monthly']);
           $yearlyBillingUrl = route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']);
         @endphp
         <a
@@ -145,9 +159,29 @@
           data-upgrade-link="1"
           data-monthly-href="{{ $monthlyBillingUrl }}"
           data-yearly-href="{{ $yearlyBillingUrl }}"
-        >{{ __('ui.pricing.upgrade_now') }}</a>
+          @if($hasTrial)
+          data-monthly-label="{{ $trialLabel }}"
+          data-yearly-label="{{ __('ui.pricing.upgrade_now') }}"
+          @endif
+        >{{ $hasTrial ? $trialLabel : __('ui.pricing.upgrade_now') }}</a>
       @endif
     @else
-      <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
-    @endauth  </div>
+      @if($hasTrial)
+        <a
+          class="plan-btn btn-primary"
+          href="{{ $trialUrl }}"
+          data-upgrade-link="1"
+          data-monthly-href="{{ $trialUrl }}"
+          data-yearly-href="{{ route('register') }}"
+          data-monthly-label="{{ $trialLabel }}"
+          data-yearly-label="{{ __('ui.pricing.get_started') }}"
+        >{{ $trialLabel }}</a>
+      @else
+        <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ $plan['slug'] === 'free' ? __('ui.pricing.start_free') : __('ui.pricing.get_started') }}</a>
+      @endif
+    @endauth
+    @if($hasTrial)
+      <p class="plan-trial-note" data-trial-only>{{ __('ui.pricing.trial_note', ['days' => $trialDays]) }}</p>
+    @endif
+  </div>
 </div>
