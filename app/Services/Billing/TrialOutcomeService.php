@@ -78,13 +78,8 @@ class TrialOutcomeService
         $cancelAtPeriodEnd = (bool) ($subscription->cancel_at_period_end ?? false);
 
         if ($status === 'active') {
-            $trial->forceFill([
-                'status' => BillingTrial::STATUS_PAID,
-                'paid_at' => $trial->paid_at ?? now(),
-                'canceled_at' => null,
-            ])->save();
-            $this->qualifyReferral($trial);
-
+            // A trial can flip to active while the renewal invoice is still an unpaid draft.
+            // Paid is recorded only from invoice.paid with a positive amount.
             return;
         }
 

@@ -519,6 +519,84 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertSame(0.0, $counts['conversion_rate']);
     }
 
+    public function test_an_active_subscription_update_without_a_charge_does_not_count_as_paid(): void
+    {
+        $user = User::factory()->create(['stripe_id' => 'cus_active_unpaid']);
+        $creator = Plan::query()->where('slug', 'creator')->firstOrFail();
+        $trial = BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $creator->id,
+            'status' => BillingTrial::STATUS_TRIALING,
+            'stripe_subscription_id' => 'sub_active_unpaid',
+            'amount_cents' => 2200,
+            'trial_ends_at' => now(),
+        ]);
+
+        $this->mock(BillingSyncService::class, function ($mock) {
+            $mock->shouldReceive('syncIfStale')->andReturnNull();
+            $mock->shouldReceive('syncUser')->andReturnNull();
+        });
+
+        $this->postJson('/api/stripe/webhook', [
+            'id' => 'evt_active_unpaid',
+            'type' => 'customer.subscription.updated',
+            'data' => [
+                'object' => [
+                    'id' => 'sub_active_unpaid',
+                    'customer' => 'cus_active_unpaid',
+                    'status' => 'active',
+                    'cancel_at_period_end' => false,
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(BillingTrial::STATUS_TRIALING, $trial->fresh()->status);
+        $this->assertNull($trial->fresh()->paid_at);
+
+        $this->postJson('/api/stripe/webhook', [
+            'id' => 'evt_active_then_failed',
+            'type' => 'invoice.payment_failed',
+            'data' => [
+                'object' => [
+                    'id' => 'in_active_then_failed',
+                    'customer' => 'cus_active_unpaid',
+                    'subscription' => 'sub_active_unpaid',
+                    'amount_due' => 2200,
+                    'currency' => 'usd',
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame(BillingTrial::STATUS_CHARGE_FAILED, $trial->fresh()->status);
+    }
+
+    public function test_a_canceled_billing_subscription_can_be_replaced_by_a_trial(): void
+    {
+        $user = User::factory()->create([
+            'subscription_status_checked_at' => now(),
+        ]);
+        BillingSubscription::query()->create([
+            'user_id' => $user->id,
+            'type' => 'default',
+            'stripe_id' => 'sub_old_canceled',
+            'stripe_status' => 'canceled',
+            'stripe_price' => 'price_old',
+            'quantity' => 1,
+            'ends_at' => now()->subDay(),
+        ]);
+
+        $response = $this->startTrial($user, 'pm_visa_4242', '4242', 'fp_after_cancel');
+
+        $response->assertOk()->assertJsonPath('ok', true);
+        $this->assertSame([], $this->stripe->canceled);
+        $this->assertSame(1, BillingSubscription::query()->where('user_id', $user->id)->count());
+        $this->assertDatabaseHas('billing_subscriptions', [
+            'user_id' => $user->id,
+            'stripe_status' => 'trialing',
+        ]);
+        $this->assertNotSame('sub_old_canceled', BillingSubscription::query()->where('user_id', $user->id)->value('stripe_id'));
+    }
+
     public function test_existing_pay_controller_is_not_wired_to_the_trial(): void
     {
         $source = file_get_contents(app_path('Http/Controllers/BillingController.php'));

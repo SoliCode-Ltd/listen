@@ -341,16 +341,7 @@ class TrialSubscriptionService
             'trial_ends_at' => $endsAt,
         ]);
 
-        $billingSubscription = BillingSubscription::query()->create([
-            'user_id' => $user->id,
-            'type' => 'default',
-            'stripe_id' => $stripeSubscription['id'],
-            'stripe_status' => 'trialing',
-            'stripe_price' => $priceId,
-            'quantity' => 1,
-            'trial_ends_at' => $endsAt,
-            'ends_at' => null,
-        ]);
+        $billingSubscription = $this->storeTrialSubscription($user, $priceId, $endsAt, $stripeSubscription);
 
         if (trim((string) ($stripeSubscription['item_id'] ?? '')) !== '') {
             $billingSubscription->items()->create([
@@ -441,6 +432,41 @@ class TrialSubscriptionService
                 'blocked_reason' => 'replaced_by_admin_retest',
             ])->save();
         }
+    }
+
+    /**
+     * @param  array{id:string,item_id?:string,product_id?:string}  $stripeSubscription
+     */
+    private function storeTrialSubscription(User $user, string $priceId, Carbon $endsAt, array $stripeSubscription): BillingSubscription
+    {
+        $payload = [
+            'user_id' => $user->id,
+            'type' => 'default',
+            'stripe_id' => $stripeSubscription['id'],
+            'stripe_status' => 'trialing',
+            'stripe_price' => $priceId,
+            'quantity' => 1,
+            'trial_ends_at' => $endsAt,
+            'ends_at' => null,
+        ];
+
+        $existing = BillingSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('type', 'default')
+            ->first();
+
+        if ($existing && ! in_array((string) $existing->stripe_status, ['canceled', 'incomplete', 'incomplete_expired'], true)) {
+            throw new \RuntimeException('A live billing subscription already exists for this user.');
+        }
+
+        if ($existing) {
+            $existing->items()->delete();
+            $existing->forceFill($payload)->save();
+
+            return $existing;
+        }
+
+        return BillingSubscription::query()->create($payload);
     }
 
     private function cancelQuietly(string $subscriptionId): void

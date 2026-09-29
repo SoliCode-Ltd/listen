@@ -151,6 +151,9 @@ class StripeWebhookEmailService
     private function handleInvoicePaid(object $invoice): void
     {
         $invoiceId = trim((string) ($invoice->id ?? ''));
+        if ((int) ($invoice->amount_paid ?? 0) <= 0) {
+            return;
+        }
         if ($this->shouldSkipEmail("invoice-paid:{$invoiceId}", 24 * 30)) {
             return;
         }
