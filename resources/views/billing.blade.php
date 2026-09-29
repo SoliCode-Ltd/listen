@@ -594,6 +594,12 @@
       font-size: .86rem;
       line-height: 1.45;
     }
+    .choice-note {
+      color: var(--muted);
+      font-size: .78rem;
+      line-height: 1.45;
+      opacity: .85;
+    }
 
     /* ── Messages ── */
     .message {
@@ -1044,7 +1050,6 @@
                   @endif
                 </div>
               @endif
-              <div id="trialNote" class="message info" hidden></div>
               <div class="consent-box">
                 @if($stripeReady)
                   <span>{{ __('ui.billing.card_processed_by_stripe') }}</span> · {{ __('ui.billing.auto_renew_notice') }}
@@ -1066,6 +1071,7 @@
                     <span class="choice-badge">{{ __('ui.billing.recommended') }}</span>
                   </span>
                   <span class="choice-sub" id="trialChoiceSub"></span>
+                  <span class="choice-note" id="trialNote" hidden></span>
                 </span>
               </label>
               <label class="choice-card">
@@ -1433,7 +1439,7 @@
         }
       }
       if (trialNote) {
-        if (!trialMode) {
+        if (!trial.ready) {
           trialNote.hidden = true;
           trialNote.textContent = '';
         } else {

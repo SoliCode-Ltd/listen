@@ -63,7 +63,7 @@ class TrialEligibilityService
             $cap = $this->quotaPlanFor($plan);
             if ($cap instanceof Plan) {
                 $planQuotas[(string) $plan->slug] = [
-                    'name' => (string) $cap->name,
+                    'name' => $cap->getLocalizedName(),
                     'chars' => (int) $cap->monthly_chars,
                     'per_request' => (int) $cap->max_chars_per_request,
                     'minutes' => (int) $cap->monthly_minutes,
@@ -78,7 +78,7 @@ class TrialEligibilityService
             'plans' => $plans->pluck('slug')->values()->all(),
             'plan_cycles' => $this->planCycles($plans),
             'plan_quotas' => $planQuotas,
-            'quota_plan_name' => (string) ($starter->name ?? ''),
+            'quota_plan_name' => (string) ($starter?->getLocalizedName() ?? ''),
             'days' => $this->trialDays(),
             'is_admin' => (bool) $user->is_admin,
             'stripe_test_mode' => $this->stripeIsTestMode(),
@@ -108,7 +108,7 @@ class TrialEligibilityService
         return [
             'show' => $enabled && $eligible,
             'days' => $this->trialDays(),
-            'quota_plan_name' => (string) ($quota->name ?? ''),
+            'quota_plan_name' => (string) ($quota?->getLocalizedName() ?? ''),
             'chars' => (int) ($quota->monthly_chars ?? 0),
             'minutes' => (int) ($quota->monthly_minutes ?? 0),
             'plans' => $plans->pluck('slug')->values()->all(),
