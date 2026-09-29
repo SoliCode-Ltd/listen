@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BillingSubscription;
+use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
@@ -1225,12 +1226,22 @@ class BillingController extends Controller
             return null;
         }
 
-        $starter = $this->trialEligibility->starterPlan();
+        $trial = BillingTrial::query()
+            ->where('user_id', $user->id)
+            ->whereNull('paid_at')
+            ->where('trial_ends_at', '>', now())
+            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+            ->latest('id')
+            ->first();
+        $quota = $trial?->quotaPlan ?: $this->trialEligibility->starterPlan();
+        $planName = (string) ($trial?->plan?->name ?: $this->trialEligibility->creatorPlan()?->name ?: '');
 
         return __('ui.billing.trial_active_notice', [
-            'chars' => number_format((int) ($starter->monthly_chars ?? 0)),
-            'per_request' => number_format((int) ($starter->max_chars_per_request ?? 0)),
-            'minutes' => number_format((int) ($starter->monthly_minutes ?? 0)),
+            'plan' => $planName,
+            'quota' => (string) ($quota->name ?? ''),
+            'chars' => number_format((int) ($quota->monthly_chars ?? 0)),
+            'per_request' => number_format((int) ($quota->max_chars_per_request ?? 0)),
+            'minutes' => number_format((int) ($quota->monthly_minutes ?? 0)),
         ]);
     }
 

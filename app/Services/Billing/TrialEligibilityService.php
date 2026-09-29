@@ -5,6 +5,7 @@ namespace App\Services\Billing;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -48,12 +49,18 @@ class TrialEligibilityService
         $creator = $this->creatorPlan();
         $starter = $this->starterPlan();
         $reason = $this->denialReason($user, null);
-        $available = $reason === null && $creator !== null && $starter !== null && $this->creatorMonthlyPriceId() !== '';
+        $available = $this->enabled()
+            && $reason === null
+            && $creator !== null
+            && $starter !== null
+            && $this->creatorMonthlyPriceId() !== '';
 
         return [
             'available' => $available,
             'reason' => $reason,
-            'plan' => (string) config('listen.billing.creator_trial.plan_slug', 'creator'),
+            'plan' => $this->trialPlanSlug(),
+            'plan_name' => (string) ($creator->name ?? ''),
+            'quota_plan_name' => (string) ($starter->name ?? ''),
             'cycle' => 'monthly',
             'days' => $this->trialDays(),
             'is_admin' => (bool) $user->is_admin,
@@ -127,15 +134,45 @@ class TrialEligibilityService
         return null;
     }
 
+    public function enabled(): bool
+    {
+        return (string) SiteSetting::get('billing_trial_enabled', config('listen.billing.creator_trial.enabled', true) ? '1' : '0') === '1';
+    }
+
+    public function trialPlanSlug(): string
+    {
+        $stored = strtolower(trim((string) SiteSetting::get('billing_trial_plan_slug', '')));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return strtolower((string) config('listen.billing.creator_trial.plan_slug', 'creator'));
+    }
+
+    public function quotaPlanSlug(): string
+    {
+        $stored = strtolower(trim((string) SiteSetting::get('billing_trial_quota_plan_slug', '')));
+        if ($stored !== '') {
+            return $stored;
+        }
+
+        return strtolower((string) config('listen.billing.creator_trial.quota_plan_slug', 'starter'));
+    }
+
     public function trialDays(): int
     {
-        return max(1, (int) config('listen.billing.creator_trial.days', 7));
+        $stored = SiteSetting::get('billing_trial_days', null);
+        $days = $stored === null || $stored === ''
+            ? (int) config('listen.billing.creator_trial.days', 7)
+            : (int) $stored;
+
+        return max(1, min(90, $days));
     }
 
     public function creatorPlan(): ?Plan
     {
         return Plan::query()
-            ->where('slug', (string) config('listen.billing.creator_trial.plan_slug', 'creator'))
+            ->where('slug', $this->trialPlanSlug())
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->first();
@@ -144,7 +181,7 @@ class TrialEligibilityService
     public function starterPlan(): ?Plan
     {
         return Plan::query()
-            ->where('slug', (string) config('listen.billing.creator_trial.quota_plan_slug', 'starter'))
+            ->where('slug', $this->quotaPlanSlug())
             ->where('is_active', true)
             ->first();
     }
@@ -161,7 +198,7 @@ class TrialEligibilityService
             return $priceId;
         }
 
-        return trim((string) config('services.stripe.prices.creator.monthly', ''));
+        return trim((string) config('services.stripe.prices.'.$plan->slug.'.monthly', ''));
     }
 
     public function normalizeEmail(?string $email): string

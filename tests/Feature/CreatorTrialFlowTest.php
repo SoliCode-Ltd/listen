@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SavedPaymentMethod;
+use App\Models\SiteSetting;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\StripeTrialGateway;
@@ -14,6 +15,7 @@ use App\Services\PlanAccessService;
 use App\Services\Referral\ReferralQualificationService;
 use App\Support\PlanUsageGuard;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Mockery;
 use Tests\Support\FakeStripeTrialGateway;
 use Tests\TestCase;
@@ -27,6 +29,8 @@ class CreatorTrialFlowTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        Cache::flush();
 
         $this->stripe = new FakeStripeTrialGateway();
         $this->app->instance(StripeTrialGateway::class, $this->stripe);
@@ -189,6 +193,51 @@ class CreatorTrialFlowTest extends TestCase
 
         $this->assertSame([], $this->stripe->setupIntents);
         $this->assertSame(0, BillingTrial::query()->count());
+    }
+
+    public function test_turning_the_trial_off_leaves_only_the_normal_checkout(): void
+    {
+        SiteSetting::set('billing_trial_enabled', '0', 'billing');
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->actingAs($user);
+
+        $this->postJsonLocalizedRoute('billing.trial.setup', [
+            'plan' => 'creator',
+            'billing_cycle' => 'monthly',
+        ])->assertStatus(422);
+
+        $this->assertSame([], $this->stripe->setupIntents);
+        $this->assertFalse(app(\App\Services\Billing\TrialEligibilityService::class)->offerFor($user)['available']);
+    }
+
+    public function test_the_trial_can_be_moved_to_another_monthly_plan(): void
+    {
+        Plan::query()->where('slug', 'starter')->update([
+            'stripe_price_monthly' => 'price_starter_month',
+        ]);
+        SiteSetting::set('billing_trial_plan_slug', 'starter', 'billing');
+        SiteSetting::set('billing_trial_quota_plan_slug', 'free', 'billing');
+        SiteSetting::set('billing_trial_days', '3', 'billing');
+
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->actingAs($user);
+
+        $this->postJsonLocalizedRoute('billing.trial.setup', [
+            'plan' => 'creator',
+            'billing_cycle' => 'monthly',
+        ])->assertStatus(422);
+
+        $response = $this->startTrial($user, 'pm_visa_starter', '4242', 'fp_starter_trial', 'starter');
+        $response->assertOk()->assertJsonPath('plan', 'starter');
+
+        $trial = BillingTrial::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('starter', $trial->plan?->slug);
+        $this->assertSame('free', $trial->quotaPlan?->slug);
+        $this->assertSame(10000, $trial->chars_limit);
+        $this->assertTrue($trial->trial_ends_at->greaterThan(now()->addDays(2)));
+        $this->assertTrue($trial->trial_ends_at->lessThan(now()->addDays(4)));
+        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
+        $this->assertSame(10000, (int) app(PlanAccessService::class)->resolveQuotaPlanForUserId($user->id)?->monthly_chars);
     }
 
     public function test_same_person_cannot_take_a_second_trial_with_another_card(): void
@@ -644,13 +693,13 @@ class CreatorTrialFlowTest extends TestCase
         ]);
     }
 
-    private function startTrial(User $user, string $paymentMethodId, string $last4, string $fingerprint): \Illuminate\Testing\TestResponse
+    private function startTrial(User $user, string $paymentMethodId, string $last4, string $fingerprint, string $plan = 'creator'): \Illuminate\Testing\TestResponse
     {
         $user->forceFill(['subscription_status_checked_at' => now()])->save();
         $this->actingAs($user);
 
         $setup = $this->postJsonLocalizedRoute('billing.trial.setup', [
-            'plan' => 'creator',
+            'plan' => $plan,
             'billing_cycle' => 'monthly',
         ]);
         $setup->assertOk();

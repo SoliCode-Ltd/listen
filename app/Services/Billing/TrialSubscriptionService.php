@@ -75,6 +75,10 @@ class TrialSubscriptionService
             return $this->successPayload($existing);
         }
 
+        if (! $this->eligibility->enabled()) {
+            throw new TrialStartException('ui.backend.trial_disabled');
+        }
+
         $this->assertPlansReady();
         $creator = $this->eligibility->creatorPlan();
         $starter = $this->eligibility->starterPlan();
@@ -209,7 +213,11 @@ class TrialSubscriptionService
     {
         $plan = strtolower(trim((string) ($input['plan'] ?? '')));
         $cycle = strtolower(trim((string) ($input['billing_cycle'] ?? '')));
-        $expected = strtolower((string) config('listen.billing.creator_trial.plan_slug', 'creator'));
+        if (! $this->eligibility->enabled()) {
+            throw new TrialStartException('ui.backend.trial_disabled');
+        }
+
+        $expected = $this->eligibility->trialPlanSlug();
 
         if ($plan !== $expected || $cycle !== 'monthly') {
             throw new TrialStartException('ui.backend.trial_creator_monthly_only');
@@ -492,7 +500,7 @@ class TrialSubscriptionService
     {
         return [
             'trial_ends_at' => optional($trial->trial_ends_at)->toIso8601String() ?? '',
-            'plan' => (string) config('listen.billing.creator_trial.plan_slug', 'creator'),
+            'plan' => $this->eligibility->trialPlanSlug(),
             'amount_cents' => (int) $trial->amount_cents,
         ];
     }

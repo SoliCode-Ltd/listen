@@ -6,6 +6,7 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\TrialEligibilityService;
 use App\Support\VoiceTier;
 
 class PlanAccessService
@@ -42,9 +43,15 @@ class PlanAccessService
             return $activePlan;
         }
 
-        $starter = Plan::query()
-            ->where('slug', (string) config('listen.billing.creator_trial.quota_plan_slug', 'starter'))
+        $openTrial = BillingTrial::query()
+            ->where('user_id', $userId)
+            ->whereNull('paid_at')
+            ->where('trial_ends_at', '>', now())
+            ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
+            ->latest('id')
             ->first();
+        $starter = $openTrial?->quotaPlan
+            ?: Plan::query()->where('slug', app(TrialEligibilityService::class)->quotaPlanSlug())->first();
         if (! $starter) {
             return $activePlan;
         }

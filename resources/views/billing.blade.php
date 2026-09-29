@@ -987,7 +987,7 @@
               {{ __('ui.billing.confirm_and_pay') }}
             </button>
             <button class="btn" id="trialBtn" type="button" hidden {{ $stripeReady ? '' : 'disabled' }}>
-              {{ __('ui.billing.start_creator_trial') }}
+              {{ __('ui.billing.start_creator_trial', ['days' => (int) ($trialOffer['days'] ?? 7)]) }}
             </button>
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
@@ -1304,7 +1304,7 @@
       const plan = currentPlan();
       const trialReady = Boolean(trialOffer.available)
         && usingStripe
-        && String(plan?.slug || '') === 'creator'
+        && String(plan?.slug || '') === String(trialOffer.plan || '')
         && String(cycleSelect?.value || '') === 'monthly';
       if (trialBtn) {
         trialBtn.hidden = !trialReady;
@@ -1320,6 +1320,9 @@
           end.setDate(end.getDate() + Number(trialOffer.days || 7));
           trialNote.hidden = false;
           trialNote.textContent = String(i18n.trial_note || '')
+            .replace(':plan', String(trialOffer.plan_name || ''))
+            .replace(':quota', String(trialOffer.quota_plan_name || ''))
+            .replace(':days', String(trialOffer.days || 7))
             .replace(':amount', amount)
             .replace(':date', end.toLocaleDateString())
             .replace(':chars', Number(quota.chars || 0).toLocaleString())
@@ -1536,7 +1539,7 @@
         if (trialBtn) trialBtn.disabled = true;
 
         const setupResponse = await post('{{ route('billing.trial.setup') }}', {
-          plan: 'creator',
+          plan: String(trialOffer.plan || ''),
           billing_cycle: 'monthly',
         });
         if (!setupResponse.ok || setupResponse.data?.ok === false) {
