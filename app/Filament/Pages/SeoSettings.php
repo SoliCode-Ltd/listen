@@ -63,6 +63,8 @@ class SeoSettings extends Page implements HasForms
             'google_analytics_id' => SiteSetting::get('google_analytics_id', ''),
             'google_tag_id' => SiteSetting::get('google_tag_id', ''),
             'google_ads_conversion_send_to' => SiteSetting::get('google_ads_conversion_send_to', ''),
+            'google_ads_trial_conversion_send_to' => SiteSetting::get('google_ads_trial_conversion_send_to', ''),
+            'google_ads_trial_paid_conversion_name' => SiteSetting::get('google_ads_trial_paid_conversion_name', 'Trial converted'),
             'google_tag_head_code' => SiteSetting::get('google_tag_head_code', ''),
             'facebook_pixel_code' => SiteSetting::get('facebook_pixel_code', ''),
             'enable_structured_data' => (string) SiteSetting::get('enable_structured_data', '1') === '1',
@@ -305,8 +307,18 @@ class SeoSettings extends Page implements HasForms
                         Forms\Components\TextInput::make('google_ads_conversion_send_to')
                             ->label('Google Ads Conversion Send-To')
                             ->placeholder('AW-XXXXXXXXXX/XXXXXXXXXXX')
-                            ->helperText('Conversion ID/Label for purchase events (e.g. AW-123456789/AbCdEfGhIjK). Found in Google Ads → Goals → Conversions → Tag setup.')
+                            ->helperText('Conversion ID/Label for purchase events (e.g. AW-123456789/AbCdEfGhIjK). Found in Google Ads → Goals → Conversions → Tag setup. Sent with the paid amount and currency.')
                             ->maxLength(60),
+                        Forms\Components\TextInput::make('google_ads_trial_conversion_send_to')
+                            ->label('Google Ads Trial Started Send-To')
+                            ->placeholder('AW-XXXXXXXXXX/XXXXXXXXXXX')
+                            ->helperText('Conversion ID/Label of a separate "Start trial" conversion action. Fires once when a card trial starts, with the plan price as value and the setup ID as transaction ID. Leave empty to send nothing.')
+                            ->maxLength(60),
+                        Forms\Components\TextInput::make('google_ads_trial_paid_conversion_name')
+                            ->label('Google Ads Trial Paid Conversion Name')
+                            ->placeholder('Trial converted')
+                            ->helperText('Must match the name of the "Import → Conversions from clicks" action in Google Ads. Used by Billing → Trials → Export paid trials for Google Ads.')
+                            ->maxLength(100),
                         Forms\Components\Textarea::make('google_tag_head_code')
                             ->label('Google Tag Head Code')
                             ->helperText('Optional: paste the full Google tag snippet including script tags. If set, it overrides generated ID-based tags.')

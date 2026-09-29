@@ -503,6 +503,68 @@ class CreatorTrialFlowTest extends TestCase
         $this->assertSame(['monthly'], $eligibility->allowedCycles());
     }
 
+    public function test_google_ads_click_is_kept_on_the_trial_and_exported_once_it_is_paid(): void
+    {
+        $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($this->localizedRoute('pricing').'?gclid=Cj0KCQ-test_click')
+            ->assertOk()
+            ->assertCookie(\App\Http\Middleware\CaptureAdClickId::COOKIE, 'Cj0KCQ-test_click');
+
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->withCredentials()->withCookie(\App\Http\Middleware\CaptureAdClickId::COOKIE, 'Cj0KCQ-test_click');
+        $this->startTrial($user, 'pm_ads', '4242', 'fp_ads')->assertOk();
+
+        $trial = BillingTrial::query()->where('user_id', $user->id)->firstOrFail();
+        $this->assertSame('Cj0KCQ-test_click', $trial->gclid);
+
+        $export = app(\App\Services\Billing\TrialAdsConversionExport::class);
+        $this->assertSame([], $export->rows());
+
+        $trial->forceFill([
+            'status' => BillingTrial::STATUS_PAID,
+            'paid_at' => \Illuminate\Support\Carbon::parse('2026-09-20 10:00:00', 'UTC'),
+            'amount_paid_cents' => 2200,
+        ])->save();
+        BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $trial->plan_id,
+            'status' => BillingTrial::STATUS_PAID,
+            'is_admin_test' => true,
+            'gclid' => 'admin_click',
+            'amount_cents' => 2200,
+            'paid_at' => now(),
+        ]);
+
+        $this->assertSame([
+            ['Cj0KCQ-test_click', 'Trial converted', '2026-09-20 10:00:00+00:00', '22.00', 'USD'],
+        ], $export->rows());
+        $this->assertStringStartsWith("\"Google Click ID\",\"Conversion Name\",\"Conversion Time\",\"Conversion Value\",\"Conversion Currency\"\n", $export->csv());
+
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        \Livewire\Livewire::test(\App\Filament\Resources\BillingTrialResource\Pages\ListBillingTrials::class)
+            ->callAction('exportGoogleAds')
+            ->assertFileDownloaded('google-ads-trial-conversions-'.now()->format('Y-m-d').'.csv');
+    }
+
+    public function test_billing_page_sends_the_trial_conversion_only_when_it_is_configured(): void
+    {
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $this->actingAs($user)->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertSee('const gadsTrialConversionSendTo = ""', false);
+
+        SiteSetting::set('google_ads_trial_conversion_send_to', 'AW-123/TrialLabel', 'seo');
+        Cache::flush();
+        $this->actingAs($user)->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertSee('const gadsTrialConversionSendTo = "AW-123\/TrialLabel"', false)
+            ->assertSee('event_callback: resolve', false);
+    }
+
     public function test_the_trial_cap_never_exceeds_the_plan_the_customer_picked(): void
     {
         Plan::query()->where('slug', 'starter')->update([
