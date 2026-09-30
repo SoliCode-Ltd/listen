@@ -924,6 +924,7 @@ return [
         'phone_number' => 'Phone Number',
         'password' => 'Password',
         'remember_me' => 'Remember me',
+        'session_expired' => 'Your session timed out for security. Please try again.',
         'sign_in' => 'Sign In',
         'no_account' => "Don't have an account?",
         'create_one' => 'Create one',
