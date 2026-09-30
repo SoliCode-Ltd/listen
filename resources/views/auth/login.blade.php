@@ -486,6 +486,11 @@
   </script>
 </head>
 <body>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) window.location.reload();
+    });
+  </script>
   @include('components.header')
 
   <main class="container auth-page">
@@ -594,7 +599,7 @@
             <input type="password" id="password" name="password" required autocomplete="current-password">
           </div>
           <label class="remember-row">
-            <input type="checkbox" name="remember" value="1">
+            <input type="checkbox" name="remember" value="1" checked>
             {{ __('ui.auth.remember_me') }}
           </label>
           <button class="submit-btn" type="submit">{{ __('ui.auth.sign_in') }}</button>

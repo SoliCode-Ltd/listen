@@ -63,6 +63,7 @@ class AuthController extends Controller
         $response = response()->view('auth.login', [
             'authSettings' => $this->authSettings->authUiPayload(),
         ]);
+        $response->headers->set('Cache-Control', 'no-store, private');
 
         return $this->attachDeviceCookie($request, $response);
     }
@@ -128,6 +129,7 @@ class AuthController extends Controller
         $response = response()->view('auth.register', [
             'authSettings' => $this->authSettings->authUiPayload(),
         ]);
+        $response->headers->set('Cache-Control', 'no-store, private');
 
         return $this->attachDeviceCookie($request, $response);
     }
@@ -161,7 +163,7 @@ class AuthController extends Controller
         $this->attachFreePlanIfMissing($user);
         $this->bindReferralFromRequest($request, $user);
 
-        Auth::login($user);
+        Auth::login($user, true);
         $this->stampLoginIp($user, $request);
         $request->session()->regenerate();
 

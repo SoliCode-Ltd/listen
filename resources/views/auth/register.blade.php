@@ -483,6 +483,11 @@
   </script>
 </head>
 <body>
+  <script>
+    window.addEventListener('pageshow', function (event) {
+      if (event.persisted) window.location.reload();
+    });
+  </script>
   @include('components.header')
 
   <main class="container auth-page">

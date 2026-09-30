@@ -14,6 +14,9 @@ use App\Console\Commands\ValidateVoiceCatalogCommand;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
+use Illuminate\Session\TokenMismatchException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -62,5 +65,26 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Stale CSRF tokens (mobile tab restored, back button, idle page) get a
+        // retry instead of the bare "419 Page Expired" screen.
+        $exceptions->render(function (HttpException $e, Request $request) {
+            if (! $e->getPrevious() instanceof TokenMismatchException) {
+                return null;
+            }
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'ok' => false,
+                    'message' => __('ui.auth.session_expired'),
+                ], 419);
+            }
+
+            if ($request->user() && $request->routeIs('login.submit', 'register.submit')) {
+                return redirect()->route('dashboard');
+            }
+
+            return back()
+                ->withInput($request->except(['password', 'password_confirmation', '_token']))
+                ->withErrors(['auth' => __('ui.auth.session_expired')]);
+        });
     })->create();
