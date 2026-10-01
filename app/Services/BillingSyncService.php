@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
-use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -69,7 +68,7 @@ class BillingSyncService
 
                     if ($stripeSubscription) {
                         $selectedStatus = (string) ($stripeSubscription->status ?? '');
-                        $mappedSlug = $this->planSlugForSubscription($stripeSubscription);
+                        $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
                         $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
                         $targetPlan = $freePlan;
 
@@ -198,7 +197,7 @@ class BillingSyncService
         ];
 
         $sorted = collect($subscriptions->data ?? [])
-            ->filter(fn ($sub) => $this->planSlugForSubscription($sub) !== null)
+            ->filter(fn ($sub) => $this->mappedPlanSlugForSubscription($sub) !== null)
             ->sort(function ($left, $right) use ($statusPriority) {
                 $leftPriority = $statusPriority[(string) ($left->status ?? '')] ?? 99;
                 $rightPriority = $statusPriority[(string) ($right->status ?? '')] ?? 99;
@@ -256,31 +255,6 @@ class BillingSyncService
         if (! empty($seenItemIds)) {
             $subscription->items()->whereNotIn('stripe_id', $seenItemIds)->delete();
         }
-    }
-
-    /**
-     * A trial subscription belongs to the plan the customer chose at checkout,
-     * whatever plan its Stripe price happens to be mapped to.
-     */
-    private function planSlugForSubscription(object $stripeSubscription): ?string
-    {
-        $subscriptionId = trim((string) ($stripeSubscription->id ?? ''));
-        if ($subscriptionId !== '') {
-            $trialPlanSlug = BillingTrial::query()
-                ->where('stripe_subscription_id', $subscriptionId)
-                ->whereNotNull('plan_id')
-                ->latest('id')
-                ->with('plan')
-                ->first()
-                ?->plan
-                ?->slug;
-
-            if (is_string($trialPlanSlug) && $trialPlanSlug !== '') {
-                return $trialPlanSlug;
-            }
-        }
-
-        return $this->mappedPlanSlugForSubscription($stripeSubscription);
     }
 
     private function mappedPlanSlugForSubscription(object $stripeSubscription): ?string

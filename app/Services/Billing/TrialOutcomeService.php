@@ -3,6 +3,7 @@
 namespace App\Services\Billing;
 
 use App\Models\BillingTrial;
+use App\Models\Plan;
 use App\Models\User;
 use App\Services\Referral\ReferralQualificationService;
 use Illuminate\Support\Facades\Log;
@@ -11,7 +12,46 @@ class TrialOutcomeService
 {
     public function __construct(
         private readonly ReferralQualificationService $referrals,
+        private readonly TrialEligibilityService $eligibility,
     ) {}
+
+    /**
+     * Keeps the trial record on the plan Stripe will actually charge after a plan change.
+     */
+    public function followPrice(string $subscriptionId, string $priceId): void
+    {
+        $priceId = trim($priceId);
+        $trial = $this->trialForSubscription($subscriptionId);
+        if (! $trial || $priceId === '' || $trial->status === BillingTrial::STATUS_PAID) {
+            return;
+        }
+
+        $plan = Plan::query()
+            ->where('stripe_price_monthly', $priceId)
+            ->orWhere('stripe_price_yearly', $priceId)
+            ->orderBy('id')
+            ->first();
+        if (! $plan instanceof Plan) {
+            return;
+        }
+
+        $cycle = trim((string) $plan->stripe_price_yearly) === $priceId ? 'yearly' : 'monthly';
+        if ((int) $trial->plan_id === (int) $plan->id && (string) $trial->billing_cycle === $cycle) {
+            return;
+        }
+
+        $cap = $this->eligibility->quotaPlanFor($plan);
+        $trial->forceFill(array_filter([
+            'plan_id' => $plan->id,
+            'billing_cycle' => $cycle,
+            'amount_cents' => $cycle === 'yearly' ? $plan->getEffectiveYearlyPriceCents() : (int) $plan->price_cents,
+            'quota_plan_id' => $cap?->id,
+            'chars_limit' => $cap ? (int) $cap->monthly_chars : null,
+            'minutes_limit' => $cap ? (int) $cap->monthly_minutes : null,
+            'max_chars_per_request' => $cap ? (int) $cap->max_chars_per_request : null,
+            'premium_minutes_limit' => $cap ? (int) $cap->premium_voice_minutes : null,
+        ], fn ($value) => $value !== null))->save();
+    }
 
     public function handleStripeEvent(object $event): void
     {
@@ -69,6 +109,11 @@ class TrialOutcomeService
 
     private function handleSubscriptionUpdated(object $subscription): void
     {
+        $this->followPrice(
+            (string) ($subscription->id ?? ''),
+            (string) ($subscription->items->data[0]->price->id ?? '')
+        );
+
         $trial = $this->trialForSubscription((string) ($subscription->id ?? ''));
         if (! $trial || $trial->status === BillingTrial::STATUS_PAID) {
             return;
