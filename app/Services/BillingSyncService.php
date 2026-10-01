@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -68,7 +69,7 @@ class BillingSyncService
 
                     if ($stripeSubscription) {
                         $selectedStatus = (string) ($stripeSubscription->status ?? '');
-                        $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
+                        $mappedSlug = $this->planSlugForSubscription($stripeSubscription);
                         $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
                         $targetPlan = $freePlan;
 
@@ -197,7 +198,7 @@ class BillingSyncService
         ];
 
         $sorted = collect($subscriptions->data ?? [])
-            ->filter(fn ($sub) => $this->mappedPlanSlugForSubscription($sub) !== null)
+            ->filter(fn ($sub) => $this->planSlugForSubscription($sub) !== null)
             ->sort(function ($left, $right) use ($statusPriority) {
                 $leftPriority = $statusPriority[(string) ($left->status ?? '')] ?? 99;
                 $rightPriority = $statusPriority[(string) ($right->status ?? '')] ?? 99;
@@ -257,6 +258,31 @@ class BillingSyncService
         }
     }
 
+    /**
+     * A trial subscription belongs to the plan the customer chose at checkout,
+     * whatever plan its Stripe price happens to be mapped to.
+     */
+    private function planSlugForSubscription(object $stripeSubscription): ?string
+    {
+        $subscriptionId = trim((string) ($stripeSubscription->id ?? ''));
+        if ($subscriptionId !== '') {
+            $trialPlanSlug = BillingTrial::query()
+                ->where('stripe_subscription_id', $subscriptionId)
+                ->whereNotNull('plan_id')
+                ->latest('id')
+                ->with('plan')
+                ->first()
+                ?->plan
+                ?->slug;
+
+            if (is_string($trialPlanSlug) && $trialPlanSlug !== '') {
+                return $trialPlanSlug;
+            }
+        }
+
+        return $this->mappedPlanSlugForSubscription($stripeSubscription);
+    }
+
     private function mappedPlanSlugForSubscription(object $stripeSubscription): ?string
     {
         $knownPriceToSlug = $this->knownPriceToSlugMap();
@@ -280,16 +306,24 @@ class BillingSyncService
         $map = [];
         
         // 1. PRIMARY: Read from Plan model (auto-synced Stripe prices)
-        $plans = Plan::query()->select(['slug', 'stripe_price_monthly', 'stripe_price_yearly'])->get();
+        $plans = Plan::query()->select(['slug', 'stripe_price_monthly', 'stripe_price_yearly'])->orderBy('id')->get();
         foreach ($plans as $plan) {
-            $monthlyPrice = trim((string) $plan->stripe_price_monthly);
-            $yearlyPrice = trim((string) $plan->stripe_price_yearly);
-            
-            if ($monthlyPrice !== '') {
-                $map[$monthlyPrice] = (string) $plan->slug;
-            }
-            if ($yearlyPrice !== '') {
-                $map[$yearlyPrice] = (string) $plan->slug;
+            foreach ([trim((string) $plan->stripe_price_monthly), trim((string) $plan->stripe_price_yearly)] as $priceId) {
+                if ($priceId === '') {
+                    continue;
+                }
+
+                if (isset($map[$priceId]) && $map[$priceId] !== (string) $plan->slug) {
+                    Log::error('The same Stripe price is set on two plans. The first plan keeps it.', [
+                        'price_id' => $priceId,
+                        'kept_plan' => $map[$priceId],
+                        'ignored_plan' => (string) $plan->slug,
+                    ]);
+
+                    continue;
+                }
+
+                $map[$priceId] = (string) $plan->slug;
             }
         }
         
