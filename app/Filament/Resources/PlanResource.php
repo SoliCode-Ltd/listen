@@ -539,6 +539,18 @@ class PlanResource extends Resource
                     ->tooltip(fn (Plan $record): string => $record->hasStripeConfig()
                         ? 'Product ID: ' . ($record->stripe_product_id ?? '-')
                         : 'Not synced to Stripe'),
+                Tables\Columns\TextColumn::make('stripe_price_monthly')
+                    ->label('Stripe monthly price')
+                    ->placeholder('-')
+                    ->copyable()
+                    ->color(fn (Plan $record): ?string => self::priceIsShared($record->stripe_price_monthly) ? 'danger' : null)
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('stripe_price_yearly')
+                    ->label('Stripe yearly price')
+                    ->placeholder('-')
+                    ->copyable()
+                    ->color(fn (Plan $record): ?string => self::priceIsShared($record->stripe_price_yearly) ? 'danger' : null)
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
@@ -751,5 +763,16 @@ class PlanResource extends Resource
 
         return array_values(array_filter($items, fn ($item) => is_array($item)));
     }
-}
 
+    private static function priceIsShared(?string $priceId): bool
+    {
+        $priceId = trim((string) $priceId);
+        if ($priceId === '') {
+            return false;
+        }
+
+        return Plan::query()
+            ->where(fn ($query) => $query->where('stripe_price_monthly', $priceId)->orWhere('stripe_price_yearly', $priceId))
+            ->count() > 1;
+    }
+}

@@ -124,4 +124,52 @@ class BillingSyncPriceMapTest extends TestCase
         $this->assertArrayHasKey('price_old_monthly', $map);
         $this->assertArrayHasKey('price_old_yearly', $map);
     }
+
+    public function test_shared_price_keeps_the_first_plan_instead_of_upgrading(): void
+    {
+        Plan::factory()->create(['slug' => 'starter', 'stripe_price_monthly' => 'price_shared']);
+        Plan::factory()->create(['slug' => 'creator', 'stripe_price_monthly' => 'price_shared']);
+
+        $method = new ReflectionMethod(BillingSyncService::class, 'knownPriceToSlugMap');
+        $method->setAccessible(true);
+        $map = $method->invoke(app(BillingSyncService::class));
+
+        $this->assertSame('starter', $map['price_shared']);
+    }
+
+    public function test_trial_subscription_resolves_to_the_plan_chosen_at_checkout(): void
+    {
+        $starter = Plan::factory()->create(['slug' => 'starter', 'stripe_price_monthly' => 'price_starter_m']);
+        Plan::factory()->create(['slug' => 'creator', 'stripe_price_monthly' => 'price_starter_m', 'stripe_price_yearly' => 'price_creator_y']);
+        $user = \App\Models\User::factory()->create(['stripe_id' => 'cus_trial']);
+        \App\Models\BillingTrial::query()->create([
+            'user_id' => $user->id,
+            'plan_id' => $starter->id,
+            'quota_plan_id' => $starter->id,
+            'status' => \App\Models\BillingTrial::STATUS_TRIALING,
+            'stripe_customer_id' => 'cus_trial',
+            'stripe_subscription_id' => 'sub_trial',
+            'amount_cents' => 900,
+            'started_at' => now(),
+            'trial_ends_at' => now()->addDays(7),
+        ]);
+
+        $subscription = json_decode(json_encode([
+            'id' => 'sub_trial',
+            'status' => 'trialing',
+            'items' => ['data' => [['price' => ['id' => 'price_starter_m']]]],
+        ]));
+        $other = json_decode(json_encode([
+            'id' => 'sub_other',
+            'status' => 'active',
+            'items' => ['data' => [['price' => ['id' => 'price_creator_y']]]],
+        ]));
+
+        $method = new ReflectionMethod(BillingSyncService::class, 'planSlugForSubscription');
+        $method->setAccessible(true);
+        $service = app(BillingSyncService::class);
+
+        $this->assertSame('starter', $method->invoke($service, $subscription));
+        $this->assertSame('creator', $method->invoke($service, $other));
+    }
 }
