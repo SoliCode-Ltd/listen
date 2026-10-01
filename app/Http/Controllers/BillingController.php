@@ -10,6 +10,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\TrialEligibilityService;
+use App\Services\Billing\TrialOutcomeService;
 use App\Services\BillingSyncService;
 use App\Services\DemoHistoryImporter;
 use App\Services\LocalizedPricingService;
@@ -35,6 +36,7 @@ class BillingController extends Controller
         private readonly StripeWebhookEmailService $stripeWebhookEmailService,
         private readonly TrialEligibilityService $trialEligibility,
         private readonly SavedPaymentMethodRecorder $savedCards,
+        private readonly TrialOutcomeService $trialOutcomes,
     ) {}
 
     public function index(Request $request)
@@ -193,7 +195,18 @@ class BillingController extends Controller
 
             $subscription = $this->currentDefaultSubscription($user);
 
-            if ($subscription && $subscription->valid()) {
+            if ($subscription && $subscription->valid() && $subscription->onTrial()) {
+                // A plain swap keeps the trial running, so "pay now" would charge nothing today.
+                if ($paymentMethod !== '') {
+                    $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+                }
+                // Before the swap: the invoice.paid webhook can land first and lock the trial record.
+                $this->trialOutcomes->followPrice((string) $subscription->stripe_id, $priceId);
+                $subscription->skipTrial()->swapAndInvoice(
+                    $priceId,
+                    $couponId ? ['discounts' => [['coupon' => $couponId]]] : []
+                );
+            } elseif ($subscription && $subscription->valid()) {
                 if (! $subscription->hasPrice($priceId)) {
                     try {
                         $subscription->swap($priceId);

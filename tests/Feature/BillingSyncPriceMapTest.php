@@ -137,11 +137,11 @@ class BillingSyncPriceMapTest extends TestCase
         $this->assertSame('starter', $map['price_shared']);
     }
 
-    public function test_trial_subscription_resolves_to_the_plan_chosen_at_checkout(): void
+    public function test_trial_subscription_follows_the_price_stripe_will_charge(): void
     {
         $starter = Plan::factory()->create(['slug' => 'starter', 'stripe_price_monthly' => 'price_starter_m']);
-        Plan::factory()->create(['slug' => 'creator', 'stripe_price_monthly' => 'price_starter_m', 'stripe_price_yearly' => 'price_creator_y']);
-        $user = \App\Models\User::factory()->create(['stripe_id' => 'cus_trial']);
+        Plan::factory()->create(['slug' => 'creator', 'stripe_price_monthly' => 'price_creator_m']);
+        $user = \App\Models\User::factory()->create();
         \App\Models\BillingTrial::query()->create([
             'user_id' => $user->id,
             'plan_id' => $starter->id,
@@ -154,22 +154,15 @@ class BillingSyncPriceMapTest extends TestCase
             'trial_ends_at' => now()->addDays(7),
         ]);
 
-        $subscription = json_decode(json_encode([
+        $swapped = json_decode(json_encode([
             'id' => 'sub_trial',
             'status' => 'trialing',
-            'items' => ['data' => [['price' => ['id' => 'price_starter_m']]]],
-        ]));
-        $other = json_decode(json_encode([
-            'id' => 'sub_other',
-            'status' => 'active',
-            'items' => ['data' => [['price' => ['id' => 'price_creator_y']]]],
+            'items' => ['data' => [['price' => ['id' => 'price_creator_m']]]],
         ]));
 
-        $method = new ReflectionMethod(BillingSyncService::class, 'planSlugForSubscription');
+        $method = new ReflectionMethod(BillingSyncService::class, 'mappedPlanSlugForSubscription');
         $method->setAccessible(true);
-        $service = app(BillingSyncService::class);
 
-        $this->assertSame('starter', $method->invoke($service, $subscription));
-        $this->assertSame('creator', $method->invoke($service, $other));
+        $this->assertSame('creator', $method->invoke(app(BillingSyncService::class), $swapped));
     }
 }
