@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SubscriptionResource\Pages;
+use App\Models\BillingTrial;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use Filament\Forms;
@@ -10,7 +11,9 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 
 class SubscriptionResource extends Resource
 {
@@ -146,6 +149,8 @@ class SubscriptionResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
+                    ->state(fn (Subscription $record): string => self::displayStatus($record))
+                    ->formatStateUsing(fn (string $state): string => Str::headline($state))
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'active' => 'success',
@@ -183,7 +188,21 @@ class SubscriptionResource extends Resource
                         'past_due' => 'Past Due',
                         'trialing' => 'Trialing',
                         'expired' => 'Expired',
-                    ]),
+                    ])
+                    ->query(function (Builder $query, array $data): Builder {
+                        $value = (string) ($data['value'] ?? '');
+
+                        return match ($value) {
+                            '' => $query,
+                            'trialing' => $query->where(fn (Builder $q) => $q
+                                ->where('status', 'trialing')
+                                ->orWhere(fn (Builder $active) => $active
+                                    ->where('status', 'active')
+                                    ->whereIn('user_id', self::openTrialUserIds()))),
+                            'active' => $query->where('status', 'active')->whereNotIn('user_id', self::openTrialUserIds()),
+                            default => $query->where('status', $value),
+                        };
+                    }),
                 Tables\Filters\SelectFilter::make('plan_id')
                     ->relationship('plan', 'name')
                     ->label('Plan'),
@@ -208,5 +227,28 @@ class SubscriptionResource extends Resource
             'view' => Pages\ViewSubscription::route('/{record}'),
             'edit' => Pages\EditSubscription::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * Trial users keep status "active" so plan access works; the open trial is what marks them as trialing.
+     */
+    private static function openTrialUserIds(): Builder
+    {
+        return BillingTrial::query()
+            ->select('user_id')
+            ->where('status', BillingTrial::STATUS_TRIALING)
+            ->whereNull('paid_at');
+    }
+
+    private static function displayStatus(Subscription $record): string
+    {
+        $status = (string) $record->status;
+        if ($status !== 'active') {
+            return $status;
+        }
+
+        $trialUsers = once(fn () => self::openTrialUserIds()->pluck('user_id')->map(fn ($id) => (int) $id)->flip()->all());
+
+        return isset($trialUsers[(int) $record->user_id]) ? 'trialing' : $status;
     }
 }
