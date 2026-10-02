@@ -157,6 +157,35 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame(['short text'], GoogleCloudTtsProvider::splitForByteLimit('short text'));
     }
 
+    public function test_unpunctuated_text_reaches_google_without_overlong_sentences(): void
+    {
+        $calls = $this->fakeGemini([
+            Http::response(['candidates' => [['finishReason' => 'OTHER', 'content' => ['parts' => [['text' => '']]]]]]),
+        ]);
+        config(['services.gemini_tts.retry_budget_seconds' => 0]);
+        $text = 'سالفة '.trim(str_repeat('كان يا ما كان في قديم الزمان رجل طيب، ', 60));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertTrue($result['fallback_used']);
+        $sent = implode(' ', $calls->googleTexts);
+        foreach (preg_split('/(?<=[.!?؟…])\s+/u', $sent) as $sentence) {
+            $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_SENTENCE_CHARS, mb_strlen($sentence));
+        }
+        $wordsOnly = fn (string $s) => preg_split('/\s+/u', trim(preg_replace('/[.،,]/u', '', $s)));
+        $this->assertSame($wordsOnly($text), $wordsOnly($sent));
+    }
+
+    public function test_long_sentences_break_at_a_comma_and_short_ones_are_untouched(): void
+    {
+        $this->assertSame('Short one. Another.', GoogleCloudTtsProvider::breakLongSentences('Short one. Another.'));
+
+        $broken = GoogleCloudTtsProvider::breakLongSentences('aaa bbb, ccc ddd eee fff', 16);
+
+        $this->assertSame('aaa bbb. ccc ddd eee fff', $broken);
+        $this->assertSame("line one\nline two", GoogleCloudTtsProvider::breakLongSentences("line one\nline two"));
+    }
+
     public function test_key_limits_come_from_config_so_config_cache_keeps_them(): void
     {
         $this->app->forgetInstance(GeminiKeyManager::class);

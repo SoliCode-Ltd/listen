@@ -22,6 +22,9 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
     /** Google rejects input.text over 5,000 bytes; Arabic is ~2 bytes per letter. */
     public const MAX_INPUT_BYTES = 4800;
 
+    /** Google rejects a request when one sentence is too long ("sentences that are too long"). */
+    public const MAX_SENTENCE_CHARS = 250;
+
     public function name(): string
     {
         return 'google_cloud';
@@ -96,6 +99,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         // MP3 frames can be joined end to end; other encodings carry a header
         // per file, so they keep the single-request behaviour.
+        $text = self::breakLongSentences($text);
         $chunks = $audioConfig['audioEncoding'] === 'MP3'
             ? self::splitForByteLimit($text, self::MAX_INPUT_BYTES)
             : [mb_substr($text, 0, 5000)];
@@ -127,6 +131,52 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             'char_count' => $charCount,
             'cost_estimate_usd' => $this->estimateCost($charCount, $voiceName),
         ];
+    }
+
+    /**
+     * End any sentence longer than the limit, preferring the last comma
+     * before the limit, otherwise the last space.
+     */
+    public static function breakLongSentences(string $text, int $maxChars = self::MAX_SENTENCE_CHARS): string
+    {
+        $lines = preg_split('/\R/u', $text) ?: [$text];
+
+        foreach ($lines as $i => $line) {
+            $words = preg_split('/\s+/u', trim($line), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $out = [];
+            $sentenceStart = 0;
+            $sentenceChars = 0;
+
+            foreach ($words as $word) {
+                $wordChars = mb_strlen($word) + 1;
+                if ($sentenceChars + $wordChars > $maxChars && count($out) > $sentenceStart) {
+                    $breakAt = count($out) - 1;
+                    for ($j = count($out) - 1; $j > $sentenceStart; $j--) {
+                        if (preg_match('/[،,؛;:]$/u', $out[$j])) {
+                            $breakAt = $j;
+                            break;
+                        }
+                    }
+                    $out[$breakAt] = preg_replace('/[،,؛;:]$/u', '', $out[$breakAt]).'.';
+                    $sentenceStart = $breakAt + 1;
+                    $sentenceChars = 0;
+                    for ($j = $sentenceStart; $j < count($out); $j++) {
+                        $sentenceChars += mb_strlen($out[$j]) + 1;
+                    }
+                }
+
+                $out[] = $word;
+                $sentenceChars += $wordChars;
+                if (preg_match('/[.!?؟…]["»”)\]]*$/u', $word)) {
+                    $sentenceStart = count($out);
+                    $sentenceChars = 0;
+                }
+            }
+
+            $lines[$i] = implode(' ', $out);
+        }
+
+        return trim(implode("\n", $lines));
     }
 
     /**
