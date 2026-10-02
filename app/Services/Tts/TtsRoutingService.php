@@ -78,7 +78,13 @@ class TtsRoutingService
                         'fallback_error' => $fallbackError->getMessage(),
                         'user_id' => $userId,
                     ]);
-                    throw $primaryError; // Throw the original error
+                    throw new \RuntimeException(
+                        mb_substr($primaryError->getMessage(), 0, 240)
+                            .' | Google fallback failed: '
+                            .mb_substr($fallbackError->getMessage(), 0, 240),
+                        0,
+                        $primaryError,
+                    );
                 }
             } else {
                 throw $primaryError;
