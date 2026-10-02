@@ -29,6 +29,10 @@ jobs:
           extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
           coverage: none
 
+      # The app converts Gemini WAV output to MP3 with ffmpeg, as on the servers.
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
       - name: Cache Composer packages
         uses: actions/cache@v4
         with:

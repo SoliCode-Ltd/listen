@@ -32,6 +32,8 @@ class LocalizedPricingServiceTest extends TestCase
         \App\Models\SiteSetting::set('pricing_fallback_country_code', 'US', 'billing');
         \App\Models\SiteSetting::set('pricing_fallback_currency_code', 'USD', 'billing');
         \App\Models\SiteSetting::set('pricing_ip_lookup_enabled', '0', 'billing');
+        // Also the server-public-IP lookup, which otherwise geolocates the machine running the tests.
+        \App\Models\SiteSetting::set('pricing_public_ip_lookup_enabled', '0', 'billing');
         \App\Models\SiteSetting::set('pricing_accept_language_enabled', '0', 'billing');
 
         $service = app(LocalizedPricingService::class);
