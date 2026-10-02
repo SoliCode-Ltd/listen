@@ -5,7 +5,10 @@ namespace App\Services\Tts;
 use App\Contracts\TtsProviderInterface;
 use App\Support\GeminiTtsModel;
 use App\Support\ShareableAudio;
+use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -403,15 +406,157 @@ class GeminiTtsProvider implements TtsProviderInterface
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
         $endpoint = $this->buildEndpoint($model);
-        $payload = $this->buildSingleSpeakerPayload($model, $text, $stylePrompt, $voiceName, $languageCode);
 
-        $audio = $this->requestAudio($endpoint, $payload);
+        // Long outputs end with finishReason OTHER and no audio, so long
+        // texts are read in pieces and the audio is joined.
+        $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        $chunks = mb_strlen($text) > $maxChars ? TextChunker::split($text, $maxChars, 'mb_strlen') : [$text];
+        $payloads = array_map(
+            fn(string $chunk) => $this->buildSingleSpeakerPayload($model, $chunk, $stylePrompt, $voiceName, $languageCode),
+            $chunks,
+        );
+
+        $audio = count($payloads) === 1
+            ? $this->requestAudio($endpoint, $payloads[0])
+            : $this->joinAudioParts($this->requestAudioParts($endpoint, $payloads));
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
 
         return [
             'audio_path' => $filename,
             'duration_seconds' => $this->estimateDurationSeconds($text),
         ];
+    }
+
+    /**
+     * Send the pieces in parallel batches. A piece that fails is sent again
+     * on its own, with the usual retries and key rotation.
+     *
+     * @param  array<int, array<string, mixed>>  $payloads
+     * @return array<int, array{bytes:string,mime_type:?string}>
+     */
+    private function requestAudioParts(string $endpoint, array $payloads): array
+    {
+        $timeout = (int) config('services.gemini_tts.timeout_seconds', 60);
+        $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
+        $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
+        $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
+        $keyInfo = $this->currentKeyInfo ?? $this->getAvailableKey();
+        $startedAt = microtime(true);
+        $parts = [];
+
+        foreach (array_chunk($payloads, $parallel, true) as $batch) {
+            $responses = Http::pool(function (Pool $pool) use ($batch, $endpoint, $timeout, $verifySsl, $keyInfo) {
+                foreach ($batch as $index => $payload) {
+                    $pool->as('part' . $index)
+                        ->timeout($timeout)
+                        ->withOptions(['verify' => $verifySsl])
+                        ->withHeaders([
+                            'Content-Type' => 'application/json',
+                            'x-goog-api-key' => $keyInfo['key'],
+                        ])
+                        ->post($endpoint, $payload);
+                }
+            });
+
+            foreach ($batch as $index => $payload) {
+                $response = $responses['part' . $index] ?? null;
+                $error = $response instanceof \Throwable ? $response->getMessage() : null;
+
+                if ($response instanceof Response && $response->ok() && is_array($response->json())) {
+                    try {
+                        $parts[$index] = $this->extractAudioFromResponse($response->json());
+                        continue;
+                    } catch (TransientGeminiException $e) {
+                        $error = $e->getMessage();
+                    }
+                } elseif ($response instanceof Response) {
+                    $error = 'HTTP ' . $response->status() . ': ' . mb_substr($response->body(), 0, 200);
+                }
+
+                $elapsed = microtime(true) - $startedAt;
+                Log::warning('Gemini TTS piece failed.', [
+                    'piece' => $index + 1,
+                    'pieces' => count($payloads),
+                    'elapsed_seconds' => round($elapsed, 1),
+                    'error' => mb_substr((string) $error, 0, 300),
+                ]);
+                if ($elapsed >= $retryBudgetSeconds && !($response instanceof Response && $response->status() === 429)) {
+                    throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
+                }
+
+                $parts[$index] = $this->requestAudio($endpoint, $payload);
+            }
+        }
+
+        for ($i = 1; $i < count($payloads); $i++) {
+            $this->getKeyManager()->recordUsage($keyInfo['name'], 0);
+        }
+
+        ksort($parts);
+
+        return $parts;
+    }
+
+    /**
+     * Join the pieces into one WAV with a short pause between them.
+     *
+     * @param  array<int, array{bytes:string,mime_type:?string}>  $parts
+     * @return array{bytes:string,mime_type:string}
+     */
+    private function joinAudioParts(array $parts): array
+    {
+        $types = array_map(fn(array $part) => $this->detectAudioMimeType($part['bytes'], $part['mime_type']), $parts);
+        if (count(array_unique($types)) === 1 && reset($types) === 'audio/mpeg') {
+            return ['bytes' => implode('', array_column($parts, 'bytes')), 'mime_type' => 'audio/mpeg'];
+        }
+
+        $pcm = '';
+        $sampleRate = null;
+        $channels = 1;
+        foreach (array_values($parts) as $i => $part) {
+            $decoded = $this->decodePcm($part['bytes'], $part['mime_type']);
+            $sampleRate ??= $decoded['sample_rate'];
+            $channels = $decoded['channels'];
+            if ($i > 0) {
+                $pcm .= str_repeat("\0", (int) round($sampleRate * 0.3) * 2 * $channels);
+            }
+            $samples = $decoded['pcm'];
+            $pcm .= strlen($samples) % 2 === 0 ? $samples : substr($samples, 0, -1);
+        }
+
+        return [
+            'bytes' => $this->wrapPcmL16AsWav($pcm, $sampleRate ?? 24000, $channels, 16),
+            'mime_type' => 'audio/wav',
+        ];
+    }
+
+    /**
+     * @return array{pcm:string,sample_rate:int,channels:int}
+     */
+    private function decodePcm(string $data, ?string $mimeTypeHint): array
+    {
+        $sampleRate = preg_match('/rate=(\d+)/i', (string) $mimeTypeHint, $m) ? (int) $m[1] : 24000;
+        $channels = 1;
+
+        if ($this->detectAudioMimeType($data, $mimeTypeHint) !== 'audio/wav') {
+            return ['pcm' => $data, 'sample_rate' => $sampleRate, 'channels' => $channels];
+        }
+
+        $pcm = '';
+        $offset = 12;
+        while ($offset + 8 <= strlen($data)) {
+            $id = substr($data, $offset, 4);
+            $size = unpack('V', substr($data, $offset + 4, 4))[1];
+            if ($id === 'fmt ' && $size >= 16) {
+                $channels = unpack('v', substr($data, $offset + 10, 2))[1] ?: 1;
+                $sampleRate = unpack('V', substr($data, $offset + 12, 4))[1] ?: $sampleRate;
+            } elseif ($id === 'data') {
+                $pcm .= substr($data, $offset + 8, $size);
+            }
+            $offset += 8 + $size + ($size % 2);
+        }
+
+        return ['pcm' => $pcm, 'sample_rate' => $sampleRate, 'channels' => $channels];
     }
 
     /**
