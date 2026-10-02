@@ -8,7 +8,6 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
-use App\Support\RequestIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Cache;
@@ -62,8 +61,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => null,
             'registration_device_id' => null,
             'last_seen_device_id' => null,
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -91,7 +88,7 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         $this->assertFalse($user->isBlocked());
     }
 
-    public function test_users_from_different_ips_different_devices_different_signatures_are_independent(): void
+    public function test_users_from_different_ips_and_devices_are_independent(): void
     {
         // Create users with completely distinct signals
         User::factory()->create([
@@ -99,16 +96,12 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => '10.0.0.1',
             'registration_device_id' => 'device-aaa-111',
             'last_seen_device_id' => 'device-aaa-111',
-            'registration_request_signature' => hash('sha256', 'sig-1'),
-            'last_seen_request_signature' => hash('sha256', 'sig-1'),
         ]);
         User::factory()->create([
             'registration_ip' => '10.0.0.2',
             'last_login_ip' => '10.0.0.2',
             'registration_device_id' => 'device-bbb-222',
             'last_seen_device_id' => 'device-bbb-222',
-            'registration_request_signature' => hash('sha256', 'sig-2'),
-            'last_seen_request_signature' => hash('sha256', 'sig-2'),
         ]);
 
         // Third user with unique signals
@@ -117,8 +110,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => '10.0.0.3',
             'registration_device_id' => 'device-ccc-333',
             'last_seen_device_id' => 'device-ccc-333',
-            'registration_request_signature' => hash('sha256', 'sig-3'),
-            'last_seen_request_signature' => hash('sha256', 'sig-3'),
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -183,31 +174,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         $this->assertSame(1, $service->linkedAccountCount($user));
     }
 
-    public function test_null_request_signatures_do_not_link_users(): void
-    {
-        User::factory()->create([
-            'registration_ip' => '10.2.1.1',
-            'last_login_ip' => '10.2.1.1',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-        User::factory()->create([
-            'registration_ip' => '10.2.1.2',
-            'last_login_ip' => '10.2.1.2',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-        $user = User::factory()->create([
-            'registration_ip' => '10.2.1.3',
-            'last_login_ip' => '10.2.1.3',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-
-        $service = app(MultiAccountEnforcementService::class);
-        $this->assertSame(1, $service->linkedAccountCount($user));
-    }
-
     public function test_empty_string_signals_do_not_link_users(): void
     {
         User::factory()->create([
@@ -215,24 +181,18 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => '10.3.1.1',
             'registration_device_id' => '',
             'last_seen_device_id' => '',
-            'registration_request_signature' => '',
-            'last_seen_request_signature' => '',
         ]);
         User::factory()->create([
             'registration_ip' => '10.3.1.2',
             'last_login_ip' => '10.3.1.2',
             'registration_device_id' => '',
             'last_seen_device_id' => '',
-            'registration_request_signature' => '',
-            'last_seen_request_signature' => '',
         ]);
         $user = User::factory()->create([
             'registration_ip' => '10.3.1.3',
             'last_login_ip' => '10.3.1.3',
             'registration_device_id' => '',
             'last_seen_device_id' => '',
-            'registration_request_signature' => '',
-            'last_seen_request_signature' => '',
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -250,17 +210,17 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         Cache::forget('site_setting.max_accounts_per_ip');
 
         $ip = '192.168.50.1';
-        User::factory()->count(2)->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->count(2)->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
 
         // Third user = exactly at limit (3) — NOT blocked
-        $userAtLimit = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $userAtLimit = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($userAtLimit);
         $userAtLimit->refresh();
         $this->assertFalse($userAtLimit->isBlocked(), 'User at exactly the limit should NOT be blocked');
 
         // Fourth user = over limit — blocked
-        $userOverLimit = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $userOverLimit = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
         $service->enforceAfterAuth($userOverLimit);
         $userOverLimit->refresh();
         $this->assertTrue($userOverLimit->isBlocked(), 'User over the limit should be blocked');
@@ -272,9 +232,9 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         Cache::forget('site_setting.max_accounts_per_ip');
 
         $ip = '192.168.60.1';
-        User::factory()->count(5)->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->count(5)->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
 
-        $sixthUser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $sixthUser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($sixthUser);
 
@@ -286,7 +246,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
     {
         $ip = '10.5.5.5';
         $deviceId = 'shared-device-xyz-123456789012';
-        $signature = hash('sha256', 'shared-sig');
 
         // User with all signals pointing to same group
         $user = User::factory()->create([
@@ -294,8 +253,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => $ip,
             'registration_device_id' => $deviceId,
             'last_seen_device_id' => $deviceId,
-            'registration_request_signature' => $signature,
-            'last_seen_request_signature' => $signature,
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -453,101 +410,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    //  SECTION 6: Request Signature entropy guard (Bug 1 fix)
-    // ══════════════════════════════════════════════════════════════════════
-
-    public function test_request_signature_returns_null_without_client_hints(): void
-    {
-        // Simulate Firefox/Safari — no Sec-CH-UA* headers
-        $request = HttpRequest::create('/test', 'GET', [], [], [], [
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.5',
-        ]);
-
-        $signature = RequestIdentity::signature($request);
-        $this->assertNull($signature, 'Signature must be null without Client Hints to prevent false linking');
-    }
-
-    public function test_request_signature_returns_hash_with_client_hints(): void
-    {
-        $request = HttpRequest::create('/test', 'GET', [], [], [], [
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/125.0',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.9',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="125", "Google Chrome";v="125"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-            'HTTP_SEC_CH_UA_MOBILE' => '?0',
-        ]);
-
-        $signature = RequestIdentity::signature($request);
-        $this->assertNotNull($signature, 'Signature should exist when Client Hints are present');
-        $this->assertSame(64, strlen($signature), 'Signature should be a SHA-256 hex string');
-    }
-
-    public function test_request_signature_returns_null_for_empty_user_agent(): void
-    {
-        $request = HttpRequest::create('/test', 'GET', [], [], [], [
-            'HTTP_USER_AGENT' => '',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="125"',
-        ]);
-
-        $signature = RequestIdentity::signature($request);
-        $this->assertNull($signature, 'Empty UA should return null signature');
-    }
-
-    public function test_different_client_hints_produce_different_signatures(): void
-    {
-        $base = [
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/125.0',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="125"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-            'HTTP_SEC_CH_UA_MOBILE' => '?0',
-        ];
-
-        $request1 = HttpRequest::create('/test', 'GET', [], [], [], $base);
-        $request2 = HttpRequest::create('/test', 'GET', [], [], [], array_merge($base, [
-            'HTTP_SEC_CH_UA_PLATFORM' => '"macOS"',
-        ]));
-
-        $sig1 = RequestIdentity::signature($request1);
-        $sig2 = RequestIdentity::signature($request2);
-
-        $this->assertNotNull($sig1);
-        $this->assertNotNull($sig2);
-        $this->assertNotSame($sig1, $sig2, 'Different platforms should produce different signatures');
-    }
-
-    public function test_users_with_no_client_hints_are_not_linked_by_signature(): void
-    {
-        // Simulate: both users registered from browsers without Client Hints
-        // With the fix, their request_signature should be null → no false linking
-        $user1 = User::factory()->create([
-            'registration_ip' => '10.50.1.1',
-            'last_login_ip' => '10.50.1.1',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-        $user2 = User::factory()->create([
-            'registration_ip' => '10.50.1.2',
-            'last_login_ip' => '10.50.1.2',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-        $user3 = User::factory()->create([
-            'registration_ip' => '10.50.1.3',
-            'last_login_ip' => '10.50.1.3',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-
-        $service = app(MultiAccountEnforcementService::class);
-        $service->enforceAfterAuth($user3);
-
-        $user3->refresh();
-        $this->assertFalse($user3->isBlocked(), 'Users with null signatures on different IPs should never be linked');
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
     //  SECTION 7: Cross-column matching edge cases
     // ══════════════════════════════════════════════════════════════════════
 
@@ -633,8 +495,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => $sharedIp,
             'registration_device_id' => null,
             'last_seen_device_id' => null,
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
         ]);
 
         $user = User::factory()->create([
@@ -642,8 +502,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
             'last_login_ip' => $sharedIp,
             'registration_device_id' => 'unique-device-only-this-user-has',
             'last_seen_device_id' => 'unique-device-only-this-user-has',
-            'registration_request_signature' => hash('sha256', 'unique-sig'),
-            'last_seen_request_signature' => hash('sha256', 'unique-sig'),
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -692,37 +550,6 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         $this->assertTrue($user->isBlocked(), 'Same device across 3 accounts triggers block (by design)');
     }
 
-    public function test_same_signature_only_links_accounts_regardless_of_ip(): void
-    {
-        $sig = hash('sha256', 'shared-signature-isolation-test');
-
-        User::factory()->create([
-            'registration_ip' => '10.101.1.1',
-            'last_login_ip' => '10.101.1.1',
-            'registration_request_signature' => $sig,
-            'last_seen_request_signature' => $sig,
-        ]);
-        User::factory()->create([
-            'registration_ip' => '10.101.1.2',
-            'last_login_ip' => '10.101.1.2',
-            'registration_request_signature' => $sig,
-            'last_seen_request_signature' => $sig,
-        ]);
-
-        $user = User::factory()->create([
-            'registration_ip' => '10.101.1.3',
-            'last_login_ip' => '10.101.1.3',
-            'registration_request_signature' => $sig,
-            'last_seen_request_signature' => $sig,
-        ]);
-
-        $service = app(MultiAccountEnforcementService::class);
-        $count = $service->linkedAccountCount($user);
-
-        // Same signature → linked (by design)
-        $this->assertSame(3, $count);
-    }
-
     // ══════════════════════════════════════════════════════════════════════
     //  SECTION 10: Configurable limit edge cases
     // ══════════════════════════════════════════════════════════════════════
@@ -733,9 +560,9 @@ class LinkedAccountCorrectnessAuditTest extends TestCase
         Cache::forget('site_setting.max_accounts_per_ip');
 
         $ip = '10.110.0.1';
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
 
-        $user = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $user = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_limit_shared_browser_0123456']);
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($user);
 

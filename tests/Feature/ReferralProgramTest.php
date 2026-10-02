@@ -124,7 +124,8 @@ class ReferralProgramTest extends TestCase
 
         /** @var ReferralService $svc */
         $svc = app(ReferralService::class);
-        $referrer = User::factory()->create();
+        // An established referrer: signups minutes apart are flagged as tandem abuse.
+        $referrer = User::factory()->create(['created_at' => now()->subDays(2)]);
         $referrerProfile = $svc->ensureProfile($referrer);
 
         $referred = User::factory()->create();
@@ -149,6 +150,43 @@ class ReferralProgramTest extends TestCase
         /** @var DemoRewardLedgerService $ledger */
         $ledger = app(DemoRewardLedgerService::class);
         $this->assertSame((int) $campaign->reward_chars, $ledger->balanceFor($referrer));
+    }
+
+    public function test_rapid_tandem_signup_is_flagged_and_not_rewarded(): void
+    {
+        $campaign = $this->seedCampaign();
+        $this->seedFreePlan();
+        $paidPlan = $this->seedPaidPlan();
+
+        /** @var ReferralService $svc */
+        $svc = app(ReferralService::class);
+        // Referrer and referred account created within minutes of each other.
+        $referrer = User::factory()->create(['created_at' => now()->subMinutes(2)]);
+        $referrerProfile = $svc->ensureProfile($referrer);
+
+        $referred = User::factory()->create();
+        $svc->attachReferrerOnRegister($referred, $referrerProfile->referral_code, Request::create('/demo', 'GET'));
+
+        $this->assertDatabaseHas('referral_conversions', [
+            'referred_user_id' => $referred->id,
+            'status' => ReferralConversion::STATUS_PENDING,
+        ]);
+
+        // Simulate paid plan activation via PlanAccessService.
+        /** @var PlanAccessService $planSvc */
+        $planSvc = app(PlanAccessService::class);
+        $planSvc->assignPlan($referred, $paidPlan);
+
+        $conv = ReferralConversion::query()
+            ->where('referred_user_id', $referred->id)
+            ->first();
+        $this->assertNotNull($conv);
+        $this->assertSame(ReferralConversion::STATUS_FLAGGED, $conv->status);
+        $this->assertContains('rapid_tandem_signup', (array) $conv->fraud_indicators);
+
+        /** @var DemoRewardLedgerService $ledger */
+        $ledger = app(DemoRewardLedgerService::class);
+        $this->assertSame(0, $ledger->balanceFor($referrer));
     }
 
     public function test_free_plan_assignment_does_not_grant_reward(): void
@@ -182,8 +220,8 @@ class ReferralProgramTest extends TestCase
     {
         ReferralCampaign::forgetCache();
 
-        return ReferralCampaign::query()->create([
-            'slug' => 'default',
+        // The migration seeds the 'default' campaign; configure it for the test.
+        return ReferralCampaign::query()->updateOrCreate(['slug' => 'default'], [
             'name' => 'Default',
             'is_active' => true,
             'qualification_step' => ReferralCampaign::QUALIFICATION_PAID_PLAN,

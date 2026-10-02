@@ -126,7 +126,7 @@ class LocalizedPricingServiceTest extends TestCase
         ], 'instapay', 'en');
 
         $this->assertNotNull($quote);
-        $this->assertSame(47115, $quote['amount_minor']);
+        $this->assertSame(47200, $quote['amount_minor']); // EGP is rounded up to whole pounds (471.15 -> 472)
         $this->assertSame('EGP', $quote['currency']);
     }
 

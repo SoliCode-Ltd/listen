@@ -30,8 +30,12 @@ class DemoQuotaSyncAndAuthFlowTest extends TestCase
         $page = $this->actingAs($newUser)->getLocalizedRoute('demo.page');
 
         $page->assertOk();
-        $page->assertSee('"requires_client_sync":false', false);
-        $page->assertSee('"verification_source":"user_only"', false);
+        // Checked on the view data: the page embeds it with @json, which escapes quotes.
+        // The page load cannot see the browser fingerprint, so it asks the browser to
+        // sync through the quota endpoint below, which then answers without a sync flag.
+        $page->assertViewHas('demoQuota', fn (array $quota): bool => $quota['requires_client_sync'] === true
+            && $quota['verification_source'] === 'user_only'
+            && $quota['used_chars'] === 0);
 
         $quota = $this->actingAs($newUser)->postJsonLocalizedRoute('demo.quota', [
             'fp_canvas' => $sharedCanvas,

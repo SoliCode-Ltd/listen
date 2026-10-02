@@ -19,7 +19,7 @@ use Tests\TestCase;
 
 /**
  * Tests for the multi-account enforcement system:
- * - Auto-blocking users who exceed max accounts per IP
+ * - Auto-blocking users who exceed max accounts per device (browser cookie)
  * - Admin protection (admins never auto-blocked)
  * - Configurable limit via site settings
  * - VPN bypass detection (current request IP cross-check)
@@ -28,6 +28,12 @@ use Tests\TestCase;
 class MultiAccountEnforcementTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * Auto-blocking is decided by the device cookie only (a shared IP alone is not
+     * proof). Scenarios that model "the same person" share this device.
+     */
+    private const SHARED_DEVICE = 'dev_shared_browser_0123456789abcdef';
 
     protected function setUp(): void
     {
@@ -39,16 +45,17 @@ class MultiAccountEnforcementTest extends TestCase
     //  1.  Auto-blocking on email registration
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_third_account_from_same_ip_is_auto_blocked_on_email_registration(): void
+    public function test_third_account_from_same_device_is_auto_blocked_on_email_registration(): void
     {
         $ip = '10.0.0.1';
 
         // Create 2 existing accounts (the default limit)
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // Register a 3rd account from the same IP
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Abuser Three',
                 'email' => 'abuser3@example.com',
@@ -63,13 +70,14 @@ class MultiAccountEnforcementTest extends TestCase
         $this->assertStringContainsString('multiple accounts', $user->blocked_reason_en);
     }
 
-    public function test_second_account_from_same_ip_is_not_blocked(): void
+    public function test_second_account_from_same_device_is_not_blocked(): void
     {
         $ip = '10.0.0.2';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Second User',
                 'email' => 'second@example.com',
@@ -82,36 +90,36 @@ class MultiAccountEnforcementTest extends TestCase
         $this->assertFalse($user->isBlocked(), 'Second account should NOT be blocked');
     }
 
-    public function test_third_account_from_same_request_signature_is_auto_blocked_even_with_different_ips(): void
+    public function test_third_account_from_same_device_is_auto_blocked_even_with_different_ips(): void
     {
-        $sharedSignature = hash('sha256', 'same-browser-signature');
+        $sharedDevice = self::SHARED_DEVICE;
 
         User::factory()->create([
             'registration_ip' => '10.1.0.1',
             'last_login_ip' => '10.1.0.1',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
 
         User::factory()->create([
             'registration_ip' => '10.1.0.2',
             'last_login_ip' => '10.1.0.2',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
 
         $abuser = User::factory()->create([
             'registration_ip' => '10.1.0.3',
             'last_login_ip' => '10.1.0.3',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($abuser);
 
         $abuser->refresh();
-        $this->assertTrue($abuser->isBlocked(), 'Third same-signature account should be auto-blocked');
+        $this->assertTrue($abuser->isBlocked(), 'Third account on the same device should be auto-blocked');
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -123,12 +131,13 @@ class MultiAccountEnforcementTest extends TestCase
         $ip = '10.0.0.3';
 
         // Create 2 accounts to meet the limit
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // Create a 3rd account that's an admin
         $admin = User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'is_admin' => true,
         ]);
@@ -146,10 +155,11 @@ class MultiAccountEnforcementTest extends TestCase
 
         // 1 admin + 1 regular = only 1 non-admin counts
         User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'is_admin' => true]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // Register a 3rd account — only 2 non-admin accounts, so should NOT be blocked
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Not Blocked',
                 'email' => 'notblocked@example.com',
@@ -173,9 +183,10 @@ class MultiAccountEnforcementTest extends TestCase
         Cache::forget('site_setting.max_accounts_per_ip');
 
         // Create 3 accounts — under the new limit of 4
-        User::factory()->count(3)->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->count(3)->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Fourth User',
                 'email' => 'fourth@example.com',
@@ -194,9 +205,10 @@ class MultiAccountEnforcementTest extends TestCase
         SiteSetting::set('max_accounts_per_ip', '4', 'general');
         Cache::forget('site_setting.max_accounts_per_ip');
 
-        User::factory()->count(4)->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->count(4)->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Fifth User',
                 'email' => 'fifth@example.com',
@@ -217,8 +229,8 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.7';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // Create 3rd user with different IP initially
         $user = User::factory()->create([
@@ -229,6 +241,7 @@ class MultiAccountEnforcementTest extends TestCase
 
         // Login from the shared IP — stampLoginIp updates last_login_ip, then enforce runs
         $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('login.submit', [
                 'email' => $user->email,
                 'password' => 'Password123!',
@@ -243,14 +256,15 @@ class MultiAccountEnforcementTest extends TestCase
         $this->enablePhoneSettings();
         $ip = '10.0.0.8';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $user = User::factory()->create([
             'firebase_uid' => 'phone-enforce-uid',
             'phone_number' => '+201000000099',
             'phone_verified_at' => now(),
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
         ]);
 
@@ -261,6 +275,7 @@ class MultiAccountEnforcementTest extends TestCase
         $this->app->instance(PhoneAuthBridgeService::class, $mock);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('auth.phone.verify', [
                 'id_token' => 'mock_token',
                 'intent' => 'login',
@@ -276,12 +291,13 @@ class MultiAccountEnforcementTest extends TestCase
         $this->enableFirebaseGoogleSettings();
         $ip = '10.0.0.9';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $user = User::factory()->create([
             'firebase_uid' => 'fb-google-enforce-uid',
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
         ]);
 
@@ -292,6 +308,7 @@ class MultiAccountEnforcementTest extends TestCase
         $this->app->instance(PhoneAuthBridgeService::class, $mock);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('auth.firebase-google.verify', [
                 'id_token' => 'mock_google_token',
             ]);
@@ -375,17 +392,19 @@ class MultiAccountEnforcementTest extends TestCase
     //  6.  Cross-auth-method enforcement
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_email_plus_phone_from_same_ip_third_gets_blocked(): void
+    public function test_email_plus_phone_from_same_device_third_gets_blocked(): void
     {
         $ip = '10.0.0.10';
 
         User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'auth_provider' => null, // email user
         ]);
         User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'auth_provider' => 'phone',
             'firebase_uid' => 'phone-uid-cross',
@@ -394,6 +413,7 @@ class MultiAccountEnforcementTest extends TestCase
 
         // Third account via email
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Third Cross',
                 'email' => 'thirdcross@example.com',
@@ -406,23 +426,26 @@ class MultiAccountEnforcementTest extends TestCase
         $this->assertTrue($user->isBlocked());
     }
 
-    public function test_google_plus_firebase_google_from_same_ip_third_gets_blocked(): void
+    public function test_google_plus_firebase_google_from_same_device_third_gets_blocked(): void
     {
         $ip = '10.0.0.11';
 
         User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'google_id' => 'google-id-1',
         ]);
         User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'auth_provider' => 'firebase_google',
             'firebase_uid' => 'fb-google-uid-1',
         ]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Third Google',
                 'email' => 'thirdgoogle@example.com',
@@ -443,10 +466,11 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.12';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Blocked Redirect',
                 'email' => 'blockedredirect@example.com',
@@ -463,8 +487,8 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.13';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // 3rd user has a different registration_ip, but will login from the shared IP
         $user = User::factory()->create([
@@ -473,6 +497,7 @@ class MultiAccountEnforcementTest extends TestCase
         ]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('login.submit', [
                 'email' => $user->email,
                 'password' => 'Password123!',
@@ -490,10 +515,10 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.14';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
-        $user = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $user = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($user);
@@ -512,25 +537,25 @@ class MultiAccountEnforcementTest extends TestCase
         SiteSetting::set('max_accounts_per_ip', '2', 'general');
         Cache::forget('site_setting.max_accounts_per_ip');
 
-        $sharedSignature = hash('sha256', 'backfill-shared-signature');
+        $sharedDevice = self::SHARED_DEVICE;
 
         $u1 = User::factory()->create([
             'registration_ip' => '172.16.10.1',
             'last_login_ip' => '172.16.10.1',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
         $u2 = User::factory()->create([
             'registration_ip' => '172.16.10.2',
             'last_login_ip' => '172.16.10.2',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
         $u3 = User::factory()->create([
             'registration_ip' => '172.16.10.3',
             'last_login_ip' => '172.16.10.3',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
         ]);
 
         $this->artisan('listen:multi-account-backfill --dry-run')
@@ -577,12 +602,13 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.20';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         // 3rd user gets auto-blocked
         $user = User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'password' => Hash::make('Password123!'),
         ]);
@@ -608,17 +634,19 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.21';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $user = User::factory()->create([
             'registration_ip' => $ip,
+            'registration_device_id' => self::SHARED_DEVICE,
             'last_login_ip' => $ip,
             'password' => Hash::make('Password123!'),
             'multi_account_whitelisted' => true,
         ]);
 
         $response = $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('login.submit', [
                 'email' => $user->email,
                 'password' => 'Password123!',
@@ -659,10 +687,11 @@ class MultiAccountEnforcementTest extends TestCase
     {
         $ip = '10.0.0.15';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => self::SHARED_DEVICE]);
 
         $this->withServerVariables(['REMOTE_ADDR' => $ip])
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postLocalizedRoute('register.submit', [
                 'name' => 'Reason Check',
                 'email' => 'reasoncheck@example.com',

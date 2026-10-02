@@ -10,7 +10,6 @@ use App\Services\Auth\AuthSettingsService;
 use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
-use App\Support\RequestIdentity;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\App;
@@ -23,11 +22,9 @@ use Tests\TestCase;
  * Comprehensive test suite covering the full suspicious-users pipeline:
  *
  * - Device ID stamping on every auth path
- * - Request signature stamping on every auth path
  * - BlockedUserService (block / unblock / localized reasons / fallback chain)
- * - RequestIdentity signature generation
- * - Multi-account enforcement across device IDs, signatures, and IPs
- * - Cross-signal enforcement (device + IP + signature combos)
+ * - Multi-account enforcement (auto-blocks on shared device cookie only; IPs are
+ *   shown to admins but never block on their own)
  * - EnsureUserIsNotBlocked middleware (JSON + web)
  * - Edge cases and combined scenarios
  */
@@ -146,73 +143,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     // ══════════════════════════════════════════════════════════════════════
     //  SECTION 2: Request signature stamping during auth flows
     // ══════════════════════════════════════════════════════════════════════
-
-    public function test_email_registration_stamps_request_signature(): void
-    {
-        $headers = $this->chromeHeaders();
-
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
-            ->withHeaders($headers)
-            ->postLocalizedRoute('register.submit', [
-                'name' => 'Sig User',
-                'email' => 'sig-reg@example.com',
-                'password' => 'Password123!',
-                'password_confirmation' => 'Password123!',
-            ]);
-
-        $user = User::where('email', 'sig-reg@example.com')->first();
-        $this->assertNotNull($user);
-        $this->assertNotNull($user->registration_request_signature);
-        $this->assertNotNull($user->last_seen_request_signature);
-        $this->assertSame($user->registration_request_signature, $user->last_seen_request_signature);
-        $this->assertSame(64, strlen($user->registration_request_signature), 'Signature must be SHA-256 hex');
-    }
-
-    public function test_email_login_updates_last_seen_request_signature(): void
-    {
-        $originalSig = hash('sha256', 'original-browser-sig');
-
-        $user = User::factory()->create([
-            'password' => Hash::make('Password123!'),
-            'registration_request_signature' => $originalSig,
-            'last_seen_request_signature' => $originalSig,
-        ]);
-
-        $newHeaders = [
-            'User-Agent' => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/132.0.0.0 Safari/537.36',
-            'Accept-Language' => 'fr-FR,fr;q=0.9',
-            'Sec-CH-UA' => '"Chromium";v="132", "Google Chrome";v="132"',
-            'Sec-CH-UA-Platform' => '"macOS"',
-            'Sec-CH-UA-Mobile' => '?0',
-        ];
-
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
-            ->withHeaders($newHeaders)
-            ->postLocalizedRoute('login.submit', [
-                'email' => $user->email,
-                'password' => 'Password123!',
-            ]);
-
-        $user->refresh();
-        $this->assertSame($originalSig, $user->registration_request_signature, 'registration signature must not change');
-        $this->assertNotSame($originalSig, $user->last_seen_request_signature, 'last_seen_request_signature must update');
-    }
-
-    public function test_registration_without_user_agent_stores_null_signature(): void
-    {
-        // RequestIdentity::signature returns null when User-Agent is empty
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1', 'HTTP_USER_AGENT' => ''])
-            ->postLocalizedRoute('register.submit', [
-                'name' => 'No UA User',
-                'email' => 'no-ua@example.com',
-                'password' => 'Password123!',
-                'password_confirmation' => 'Password123!',
-            ]);
-
-        $user = User::where('email', 'no-ua@example.com')->first();
-        $this->assertNotNull($user);
-        $this->assertNull($user->registration_request_signature);
-    }
 
     // ══════════════════════════════════════════════════════════════════════
     //  SECTION 3: BlockedUserService — block / unblock / reasons
@@ -405,117 +335,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════════════════════════
-    //  SECTION 4: RequestIdentity — signature generation
-    // ══════════════════════════════════════════════════════════════════════
-
-    public function test_signature_returns_sha256_hash_for_valid_request(): void
-    {
-        $request = $this->fakeRequest([
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-            'HTTP_SEC_CH_UA_MOBILE' => '?0',
-        ]);
-
-        $sig = RequestIdentity::signature($request);
-        $this->assertNotNull($sig);
-        $this->assertSame(64, strlen($sig));
-        $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $sig);
-    }
-
-    public function test_signature_returns_null_when_no_user_agent(): void
-    {
-        $request = $this->fakeRequest(['HTTP_USER_AGENT' => '']);
-        $this->assertNull(RequestIdentity::signature($request));
-    }
-
-    public function test_same_headers_produce_same_signature(): void
-    {
-        $serverVars = [
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US',
-            'HTTP_SEC_CH_UA' => '"Chrome";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-            'HTTP_SEC_CH_UA_MOBILE' => '?0',
-        ];
-
-        $sig1 = RequestIdentity::signature($this->fakeRequest($serverVars));
-        $sig2 = RequestIdentity::signature($this->fakeRequest($serverVars));
-
-        $this->assertSame($sig1, $sig2);
-    }
-
-    public function test_different_user_agents_produce_different_signatures(): void
-    {
-        $sig1 = RequestIdentity::signature($this->fakeRequest([
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-        ]));
-
-        $sig2 = RequestIdentity::signature($this->fakeRequest([
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Firefox/120',
-            'HTTP_SEC_CH_UA' => '"Firefox";v="120"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-        ]));
-
-        $this->assertNotNull($sig1);
-        $this->assertNotNull($sig2);
-        $this->assertNotSame($sig1, $sig2);
-    }
-
-    public function test_different_accept_language_produces_different_signature(): void
-    {
-        $base = [
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-        ];
-
-        $sig1 = RequestIdentity::signature($this->fakeRequest(array_merge($base, [
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.9',
-        ])));
-
-        $sig2 = RequestIdentity::signature($this->fakeRequest(array_merge($base, [
-            'HTTP_ACCEPT_LANGUAGE' => 'ar-EG,ar;q=0.9',
-        ])));
-
-        $this->assertNotNull($sig1);
-        $this->assertNotNull($sig2);
-        $this->assertNotSame($sig1, $sig2);
-    }
-
-    public function test_signature_is_case_insensitive(): void
-    {
-        $sig1 = RequestIdentity::signature($this->fakeRequest([
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 Chrome/131',
-            'HTTP_SEC_CH_UA' => '"Chromium";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"Windows"',
-        ]));
-
-        $sig2 = RequestIdentity::signature($this->fakeRequest([
-            'HTTP_USER_AGENT' => 'mozilla/5.0 chrome/131',
-            'HTTP_SEC_CH_UA' => '"chromium";v="131"',
-            'HTTP_SEC_CH_UA_PLATFORM' => '"windows"',
-        ]));
-
-        $this->assertNotNull($sig1);
-        $this->assertNotNull($sig2);
-        $this->assertSame($sig1, $sig2);
-    }
-
-    public function test_signature_returns_null_without_client_hints(): void
-    {
-        $request = $this->fakeRequest([
-            'HTTP_USER_AGENT' => 'Mozilla/5.0 (Windows NT 10.0; rv:125.0) Gecko/20100101 Firefox/125.0',
-            'HTTP_ACCEPT_LANGUAGE' => 'en-US,en;q=0.5',
-        ]);
-
-        $this->assertNull(RequestIdentity::signature($request), 'Without Client Hints, signature must be null to prevent false linking');
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
     //  SECTION 5: Device ID-based multi-account enforcement
     // ══════════════════════════════════════════════════════════════════════
 
@@ -575,8 +394,10 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertFalse($second->isBlocked(), 'Two accounts with same device should not be blocked');
     }
 
-    public function test_different_devices_same_ip_third_account_blocked(): void
+    public function test_different_devices_same_ip_third_account_not_auto_blocked(): void
     {
+        // Auto-blocking uses only the device cookie: a shared IP (mobile carriers,
+        // offices, universities) is shown to admins but is not proof on its own.
         $ip = '10.3.0.1';
 
         User::factory()->create([
@@ -592,18 +413,16 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_seen_device_id' => 'dev_device_b_0123456789abcdef',
         ]);
 
-        $abuser = User::factory()->create([
+        $third = User::factory()->create([
             'registration_ip' => $ip,
             'last_login_ip' => $ip,
             'registration_device_id' => 'dev_device_c_0123456789abcdef',
             'last_seen_device_id' => 'dev_device_c_0123456789abcdef',
         ]);
 
-        $service = app(MultiAccountEnforcementService::class);
-        $service->enforceAfterAuth($abuser);
+        app(MultiAccountEnforcementService::class)->enforceAfterAuth($third);
 
-        $abuser->refresh();
-        $this->assertTrue($abuser->isBlocked(), 'Third account on same IP should still be blocked regardless of different devices');
+        $this->assertFalse($third->fresh()->isBlocked(), 'A shared IP alone must not auto-block');
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -644,50 +463,19 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertTrue($abuser->isBlocked(), 'Cross-column device_id match should trigger blocking');
     }
 
-    public function test_cross_column_signature_matching_triggers_enforcement(): void
-    {
-        $sharedSig = hash('sha256', 'cross-col-signature');
-
-        User::factory()->create([
-            'registration_ip' => '10.5.0.1',
-            'last_login_ip' => '10.5.0.1',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => null,
-        ]);
-        User::factory()->create([
-            'registration_ip' => '10.5.0.2',
-            'last_login_ip' => '10.5.0.2',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => $sharedSig,
-        ]);
-
-        $abuser = User::factory()->create([
-            'registration_ip' => '10.5.0.3',
-            'last_login_ip' => '10.5.0.3',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
-        ]);
-
-        $service = app(MultiAccountEnforcementService::class);
-        $service->enforceAfterAuth($abuser);
-
-        $abuser->refresh();
-        $this->assertTrue($abuser->isBlocked());
-    }
-
-    public function test_mixed_signals_ip_plus_device_triggers_enforcement(): void
+    public function test_shared_ip_does_not_count_towards_the_device_limit(): void
     {
         $sharedIp = '10.6.0.1';
         $sharedDevice = 'dev_mixed_signal_device_01234567';
 
-        // User A shares IP
+        // User A shares only the IP.
         User::factory()->create([
             'registration_ip' => $sharedIp,
             'last_login_ip' => $sharedIp,
             'registration_device_id' => 'dev_unrelated_device_a_01234567',
         ]);
 
-        // User B shares device_id (different IP)
+        // User B shares only the device.
         User::factory()->create([
             'registration_ip' => '10.6.0.2',
             'last_login_ip' => '10.6.0.2',
@@ -695,19 +483,26 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_seen_device_id' => $sharedDevice,
         ]);
 
-        // User C has both the shared IP and device_id — total linked = 3
-        $abuser = User::factory()->create([
+        // User C: two accounts on the device (within the limit of 2) plus one on the IP.
+        $userC = User::factory()->create([
             'registration_ip' => $sharedIp,
             'last_login_ip' => $sharedIp,
             'registration_device_id' => $sharedDevice,
             'last_seen_device_id' => $sharedDevice,
         ]);
 
-        $service = app(MultiAccountEnforcementService::class);
-        $service->enforceAfterAuth($abuser);
+        app(MultiAccountEnforcementService::class)->enforceAfterAuth($userC);
+        $this->assertFalse($userC->fresh()->isBlocked(), 'IP matches must not push the device count over the limit');
 
-        $abuser->refresh();
-        $this->assertTrue($abuser->isBlocked(), 'Mixed IP+device signals triggering 3+ linked accounts should block');
+        // A third account on the same device is over the limit.
+        $userD = User::factory()->create([
+            'registration_ip' => '10.6.0.9',
+            'last_login_ip' => '10.6.0.9',
+            'registration_device_id' => $sharedDevice,
+            'last_seen_device_id' => $sharedDevice,
+        ]);
+        app(MultiAccountEnforcementService::class)->enforceAfterAuth($userD);
+        $this->assertTrue($userD->fresh()->isBlocked());
     }
 
     public function test_no_signals_at_all_does_not_block(): void
@@ -717,8 +512,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_login_ip' => null,
             'registration_device_id' => null,
             'last_seen_device_id' => null,
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -735,8 +528,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_login_ip' => '10.7.0.2',
             'registration_device_id' => 'dev_signals_test_device_01234567',
             'last_seen_device_id' => 'dev_signals_test_new_device_0123',
-            'registration_request_signature' => hash('sha256', 'sig1'),
-            'last_seen_request_signature' => hash('sha256', 'sig2'),
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -744,14 +535,13 @@ class SuspiciousUsersComprehensiveTest extends TestCase
 
         $this->assertArrayHasKey('ips', $signals);
         $this->assertArrayHasKey('device_ids', $signals);
-        $this->assertArrayHasKey('request_signatures', $signals);
+        $this->assertArrayNotHasKey('request_signatures', $signals);
 
         $this->assertCount(2, $signals['ips']);
         $this->assertContains('10.7.0.1', $signals['ips']);
         $this->assertContains('10.7.0.2', $signals['ips']);
 
         $this->assertCount(2, $signals['device_ids']);
-        $this->assertCount(2, $signals['request_signatures']);
     }
 
     public function test_linked_signals_deduplicates_same_values(): void
@@ -765,8 +555,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_login_ip' => $sameIp,
             'registration_device_id' => $sameDevice,
             'last_seen_device_id' => $sameDevice,
-            'registration_request_signature' => $sameSig,
-            'last_seen_request_signature' => $sameSig,
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
@@ -774,14 +562,12 @@ class SuspiciousUsersComprehensiveTest extends TestCase
 
         $this->assertCount(1, $signals['ips']);
         $this->assertCount(1, $signals['device_ids']);
-        $this->assertCount(1, $signals['request_signatures']);
     }
 
-    public function test_linked_account_count_includes_all_signal_types(): void
+    public function test_linked_account_count_includes_ip_and_device_links(): void
     {
         $sharedIp = '10.9.0.1';
         $sharedDevice = 'dev_count_test_device_0123456789';
-        $sharedSig = hash('sha256', 'count-test-sig');
 
         // User A: shares IP only
         User::factory()->create([
@@ -797,29 +583,21 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_seen_device_id' => $sharedDevice,
         ]);
 
-        // User C: shares signature only (different IP, different device)
+        // Unrelated user
         User::factory()->create([
             'registration_ip' => '10.9.0.3',
             'last_login_ip' => '10.9.0.3',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
         ]);
 
-        // The target user has all three signals
         $target = User::factory()->create([
             'registration_ip' => $sharedIp,
             'last_login_ip' => $sharedIp,
             'registration_device_id' => $sharedDevice,
             'last_seen_device_id' => $sharedDevice,
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
         ]);
 
-        $service = app(MultiAccountEnforcementService::class);
-        $count = $service->linkedAccountCount($target);
-
-        // Should count all 4 (User A via IP, User B via device, User C via sig, plus target itself)
-        $this->assertSame(4, $count);
+        // Admin display counts IP and device links: A, B and the target itself.
+        $this->assertSame(3, app(MultiAccountEnforcementService::class)->linkedAccountCount($target));
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -964,13 +742,14 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     {
         $ip = '10.12.0.1';
 
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_lifecycle_shared_device_0123']);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_lifecycle_shared_device_0123']);
 
         // 3rd user gets auto-blocked
         $user = User::factory()->create([
             'registration_ip' => $ip,
             'last_login_ip' => $ip,
+            'registration_device_id' => 'dev_lifecycle_shared_device_0123',
             'password' => Hash::make('Password123!'),
         ]);
 
@@ -1011,10 +790,10 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         Cache::forget('site_setting.' . MultiAccountEnforcementService::BLOCK_REASON_AR_SETTING_KEY);
 
         $ip = '10.13.0.1';
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_custom_reason_device_0123456']);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_custom_reason_device_0123456']);
 
-        $abuser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $abuser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_custom_reason_device_0123456']);
 
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($abuser);
@@ -1201,7 +980,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     //  SECTION 13: Registration flow device + signature combined
     // ══════════════════════════════════════════════════════════════════════
 
-    public function test_registration_captures_both_device_and_signature(): void
+    public function test_registration_captures_device_and_ip(): void
     {
         $deviceId = 'dev_combined_reg_test_0123456789';
         $headers = $this->chromeHeaders();
@@ -1220,8 +999,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertNotNull($user);
         $this->assertSame($deviceId, $user->registration_device_id);
         $this->assertSame($deviceId, $user->last_seen_device_id);
-        $this->assertNotNull($user->registration_request_signature);
-        $this->assertNotNull($user->last_seen_request_signature);
         $this->assertSame('10.18.0.1', $user->registration_ip);
     }
 
@@ -1265,10 +1042,10 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         Cache::put('admin:suspicious_users_count', 5, 600);
 
         $ip = '10.20.0.1';
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
-        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_cache_invalidation_device_01']);
+        User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_cache_invalidation_device_01']);
 
-        $abuser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip]);
+        $abuser = User::factory()->create(['registration_ip' => $ip, 'last_login_ip' => $ip, 'registration_device_id' => 'dev_cache_invalidation_device_01']);
 
         $service = app(MultiAccountEnforcementService::class);
         $service->enforceAfterAuth($abuser);
@@ -1364,56 +1141,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertContains($u2->id, $ids);
     }
 
-    public function test_suspicious_users_query_finds_shared_request_signatures(): void
-    {
-        $sharedSig = hash('sha256', 'suspicious-shared-sig');
-
-        $u1 = User::factory()->create([
-            'registration_ip' => '10.52.0.1',
-            'last_login_ip' => '10.52.0.1',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
-        ]);
-        $u2 = User::factory()->create([
-            'registration_ip' => '10.52.0.2',
-            'last_login_ip' => '10.52.0.2',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
-        ]);
-
-        $page = new \App\Filament\Pages\SuspiciousUsers();
-        $query = $this->invokeProtected($page, 'getSuspiciousUsersQuery');
-        $ids = $query->pluck('id')->toArray();
-
-        $this->assertContains($u1->id, $ids);
-        $this->assertContains($u2->id, $ids);
-    }
-
-    public function test_suspicious_users_query_finds_cross_column_signature_matches(): void
-    {
-        $sharedSig = hash('sha256', 'cross-col-suspicious-sig');
-
-        $u1 = User::factory()->create([
-            'registration_ip' => '10.53.0.1',
-            'last_login_ip' => '10.53.0.1',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => null,
-        ]);
-        $u2 = User::factory()->create([
-            'registration_ip' => '10.53.0.2',
-            'last_login_ip' => '10.53.0.2',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => $sharedSig,
-        ]);
-
-        $page = new \App\Filament\Pages\SuspiciousUsers();
-        $query = $this->invokeProtected($page, 'getSuspiciousUsersQuery');
-        $ids = $query->pluck('id')->toArray();
-
-        $this->assertContains($u1->id, $ids);
-        $this->assertContains($u2->id, $ids);
-    }
-
     public function test_suspicious_users_query_returns_empty_when_no_shared_signals(): void
     {
         User::factory()->create(['registration_ip' => '10.60.0.1', 'last_login_ip' => '10.60.0.1']);
@@ -1462,10 +1189,9 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertNotContains($loner->id, $linkedIds);
     }
 
-    public function test_get_linked_users_includes_device_and_signature_linked(): void
+    public function test_get_linked_users_includes_device_linked(): void
     {
         $sharedDevice = 'dev_linked_users_test_0123456789';
-        $sharedSig = hash('sha256', 'linked-users-sig-test');
 
         $u1 = User::factory()->create([
             'registration_ip' => '10.80.0.1',
@@ -1473,30 +1199,24 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'registration_device_id' => $sharedDevice,
             'last_seen_device_id' => $sharedDevice,
         ]);
-        $u2 = User::factory()->create([
+        $unrelated = User::factory()->create([
             'registration_ip' => '10.80.0.2',
             'last_login_ip' => '10.80.0.2',
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
         ]);
 
-        // Target user has both signals
         $target = User::factory()->create([
             'registration_ip' => '10.80.0.3',
             'last_login_ip' => '10.80.0.3',
             'registration_device_id' => $sharedDevice,
             'last_seen_device_id' => $sharedDevice,
-            'registration_request_signature' => $sharedSig,
-            'last_seen_request_signature' => $sharedSig,
         ]);
 
         $page = new \App\Filament\Pages\SuspiciousUsers();
-        $linked = $this->invokeProtected($page, 'getLinkedUsers', $target);
-        $linkedIds = $linked->pluck('id')->toArray();
+        $linkedIds = $this->invokeProtected($page, 'getLinkedUsers', $target)->pluck('id')->toArray();
 
         $this->assertContains($u1->id, $linkedIds);
-        $this->assertContains($u2->id, $linkedIds);
         $this->assertContains($target->id, $linkedIds);
+        $this->assertNotContains($unrelated->id, $linkedIds);
     }
 
     public function test_get_linked_users_returns_empty_when_no_signals(): void
@@ -1506,8 +1226,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'last_login_ip' => null,
             'registration_device_id' => null,
             'last_seen_device_id' => null,
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
         ]);
 
         $page = new \App\Filament\Pages\SuspiciousUsers();
@@ -1565,28 +1283,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'registration_ip' => '10.71.0.2',
             'last_login_ip' => '10.71.0.2',
             'registration_device_id' => $sharedDevice,
-        ]);
-
-        $badge = \App\Filament\Pages\SuspiciousUsers::getNavigationBadge();
-
-        $this->assertNotNull($badge);
-        $this->assertSame('2', $badge);
-    }
-
-    public function test_navigation_badge_includes_signature_shared_users(): void
-    {
-        Cache::forget('admin:suspicious_users_count');
-
-        $sharedSig = hash('sha256', 'badge-sig-test');
-        User::factory()->create([
-            'registration_ip' => '10.72.0.1',
-            'last_login_ip' => '10.72.0.1',
-            'registration_request_signature' => $sharedSig,
-        ]);
-        User::factory()->create([
-            'registration_ip' => '10.72.0.2',
-            'last_login_ip' => '10.72.0.2',
-            'registration_request_signature' => $sharedSig,
         ]);
 
         $badge = \App\Filament\Pages\SuspiciousUsers::getNavigationBadge();
@@ -1723,7 +1419,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->assertSame('10.0.0.99', $user->last_login_ip, 'Phone auth must update last_login_ip via stampLoginIp');
     }
 
-    public function test_stamp_login_ip_backfills_device_and_signature_when_null(): void
+    public function test_stamp_login_ip_backfills_device_when_null(): void
     {
         // Test the stampLoginIp method behavior directly:
         // When a user has null device_id/signature and logs in with them,
@@ -1733,8 +1429,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'password' => Hash::make('Password123!'),
             'registration_device_id' => null,
             'last_seen_device_id' => null,
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
         ]);
 
         $headers = $this->chromeHeaders();
@@ -1751,37 +1445,6 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         // Both registration and last_seen should be backfilled
         $this->assertSame($deviceId, $user->registration_device_id, 'stampLoginIp should backfill registration_device_id');
         $this->assertSame($deviceId, $user->last_seen_device_id, 'stampLoginIp should set last_seen_device_id');
-        $this->assertNotNull($user->registration_request_signature, 'stampLoginIp should backfill registration_request_signature');
-        $this->assertNotNull($user->last_seen_request_signature, 'stampLoginIp should set last_seen_request_signature');
-    }
-
-    public function test_firebase_google_auth_stamps_signature_via_stamp_login_ip(): void
-    {
-        $this->enableFirebaseGoogleSettings();
-        $headers = $this->chromeHeaders();
-
-        $user = User::factory()->create([
-            'firebase_uid' => 'fb-google-sig-stamp-uid',
-            'registration_ip' => '10.0.0.1',
-            'registration_request_signature' => null,
-            'last_seen_request_signature' => null,
-        ]);
-
-        $mock = Mockery::mock(PhoneAuthBridgeService::class);
-        $mock->shouldReceive('resolveUserFromGoogleIdToken')
-            ->once()
-            ->andReturn($user);
-        $this->app->instance(PhoneAuthBridgeService::class, $mock);
-
-        $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.1'])
-            ->withHeaders($headers)
-            ->postJsonLocalizedRoute('auth.firebase-google.verify', [
-                'id_token' => 'mock_google_token',
-            ]);
-
-        $user->refresh();
-        $this->assertNotNull($user->registration_request_signature, 'Firebase Google auth should backfill registration_request_signature');
-        $this->assertNotNull($user->last_seen_request_signature, 'Firebase Google auth should update last_seen_request_signature');
     }
 
     // ══════════════════════════════════════════════════════════════════════

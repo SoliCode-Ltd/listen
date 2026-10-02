@@ -2,7 +2,9 @@
 
 namespace Tests\Unit;
 
-use PHPUnit\Framework\TestCase;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 use ReflectionClass;
 use ReflectionMethod;
 
@@ -20,6 +22,8 @@ use ReflectionMethod;
  */
 class GeminiStylePromptTest extends TestCase
 {
+    use RefreshDatabase;
+
     private object $provider;
     private ReflectionMethod $buildStylePrompt;
     private ReflectionMethod $getEmotionDescription;
@@ -52,9 +56,7 @@ class GeminiStylePromptTest extends TestCase
     // ARABIC DIALECT TESTS
     // ==========================================
 
-    /**
-     * @dataProvider arabicDialectsProvider
-     */
+    #[DataProvider('arabicDialectsProvider')]
     public function test_arabic_dialect_included_in_prompt(string $dialectCode, string $expectedDialectName): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -166,9 +168,7 @@ class GeminiStylePromptTest extends TestCase
     // EMOTION TESTS
     // ==========================================
 
-    /**
-     * @dataProvider emotionsProvider
-     */
+    #[DataProvider('emotionsProvider')]
     public function test_emotion_included_in_prompt(string $emotion, string $expectedDescription): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -238,9 +238,7 @@ class GeminiStylePromptTest extends TestCase
     // PERFORMANCE STYLE TESTS
     // ==========================================
 
-    /**
-     * @dataProvider performanceStylesProvider
-     */
+    #[DataProvider('performanceStylesProvider')]
     public function test_performance_style_included_in_prompt(string $style): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -286,9 +284,7 @@ class GeminiStylePromptTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider arabicPerformanceStylesProvider
-     */
+    #[DataProvider('arabicPerformanceStylesProvider')]
     public function test_arabic_performance_styles_use_arabic_hints(string $style): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -338,9 +334,7 @@ class GeminiStylePromptTest extends TestCase
     // SPEED TESTS
     // ==========================================
 
-    /**
-     * @dataProvider speedVariationsProvider
-     */
+    #[DataProvider('speedVariationsProvider')]
     public function test_speed_variations_affect_prompt(float $speed, ?string $expectedInstruction): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -385,9 +379,7 @@ class GeminiStylePromptTest extends TestCase
     // PITCH TESTS
     // ==========================================
 
-    /**
-     * @dataProvider pitchVariationsProvider
-     */
+    #[DataProvider('pitchVariationsProvider')]
     public function test_pitch_variations_affect_prompt(float $pitch, ?string $expectedInstruction): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -434,9 +426,7 @@ class GeminiStylePromptTest extends TestCase
     // LANGUAGE DETECTION TESTS
     // ==========================================
 
-    /**
-     * @dataProvider arabicLanguageCodesProvider
-     */
+    #[DataProvider('arabicLanguageCodesProvider')]
     public function test_arabic_language_detection(string $languageCode): void
     {
         $isArabic = $this->isArabicLanguage->invoke($this->provider, $languageCode);
@@ -459,9 +449,7 @@ class GeminiStylePromptTest extends TestCase
         ];
     }
 
-    /**
-     * @dataProvider nonArabicLanguageCodesProvider
-     */
+    #[DataProvider('nonArabicLanguageCodesProvider')]
     public function test_non_arabic_language_detection(string $languageCode): void
     {
         $isArabic = $this->isArabicLanguage->invoke($this->provider, $languageCode);
@@ -607,8 +595,10 @@ class GeminiStylePromptTest extends TestCase
         $this->assertEquals($prompt1, $prompt2);
     }
 
-    public function test_fallback_prompt_for_unknown_style(): void
+    public function test_unknown_style_is_passed_through_by_name(): void
     {
+        // Styles come from an admin-editable catalog, so an unrecognised style is
+        // sent to Gemini by name rather than silently dropped.
         $prompt = $this->buildStylePrompt->invoke(
             $this->provider,
             'unknown_style',
@@ -619,26 +609,19 @@ class GeminiStylePromptTest extends TestCase
             0.0
         );
 
-        // Should have fallback
-        $this->assertStringContainsString('naturally', $prompt);
-        $this->assertStringContainsString('professional', $prompt);
+        $this->assertStringContainsString('Performance style: unknown style.', $prompt);
+        $this->assertStringContainsString('consistent', $prompt);
     }
 
-    public function test_fallback_prompt_for_arabic_unknown_style(): void
+    public function test_fallback_prompt_when_no_style_or_emotion_is_given(): void
     {
-        $prompt = $this->buildStylePrompt->invoke(
-            $this->provider,
-            'unknown_style',
-            'neutral',
-            'ar',
-            1.0,
-            null,
-            0.0
-        );
+        $english = $this->buildStylePrompt->invoke($this->provider, '', 'neutral', 'en-US', 1.0, null, 0.0);
+        $arabic = $this->buildStylePrompt->invoke($this->provider, '', 'neutral', 'ar', 1.0, null, 0.0);
 
-        // Should have Arabic fallback
-        $this->assertStringContainsString('Arabic', $prompt);
-        $this->assertStringContainsString('naturally', $prompt);
+        $this->assertStringContainsString('naturally', $english);
+        $this->assertStringContainsString('professional', $english);
+        $this->assertStringContainsString('Arabic', $arabic);
+        $this->assertStringContainsString('naturally', $arabic);
     }
 
     public function test_extreme_speed_values(): void
@@ -669,9 +652,8 @@ class GeminiStylePromptTest extends TestCase
 
     /**
      * Test all dialect + emotion combinations work without errors.
-     *
-     * @dataProvider dialectEmotionMatrixProvider
      */
+    #[DataProvider('dialectEmotionMatrixProvider')]
     public function test_dialect_emotion_matrix(string $dialect, string $emotion): void
     {
         $prompt = $this->buildStylePrompt->invoke(
@@ -705,9 +687,8 @@ class GeminiStylePromptTest extends TestCase
 
     /**
      * Test all style + emotion combinations work without errors.
-     *
-     * @dataProvider styleEmotionMatrixProvider
      */
+    #[DataProvider('styleEmotionMatrixProvider')]
     public function test_style_emotion_matrix(string $style, string $emotion): void
     {
         $prompt = $this->buildStylePrompt->invoke(
