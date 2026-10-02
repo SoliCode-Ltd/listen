@@ -8,6 +8,15 @@ use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
 abstract class TestCase extends BaseTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Tests must never reach real services (Google, Gemini, Stripe, geo-IP):
+        // any HTTP call that is not faked fails the test instead of leaving the machine.
+        \Illuminate\Support\Facades\Http::preventStrayRequests();
+    }
+
     /**
      * Generate a localized URL for the given route name.
      *

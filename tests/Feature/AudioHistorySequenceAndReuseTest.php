@@ -144,7 +144,7 @@ class AudioHistorySequenceAndReuseTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('?reuse='.$premiumJob->user_sequence_number.'#generateVoiceSection', false);
-        $response->assertSee('Reuse Settings');
+        $response->assertSee(__('ui.dashboard.reuse_settings'));
         $response->assertDontSee('?reuse='.$standardJob->user_sequence_number.'#generateVoiceSection', false);
     }
 

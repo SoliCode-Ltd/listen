@@ -132,11 +132,20 @@ class AppServiceProvider extends ServiceProvider
                     && ! str_contains($currentContent, "apiBase: '{$apiBase}'")
                     && ! str_contains($currentContent, "\"apiBase\":\\\"{$apiBase}\\\"")
                 ) {
-                    try {
-                        \Illuminate\Support\Facades\Artisan::call('listen:sync-extension');
-                    } catch (\Throwable $e) {
-                        // Suppress error during early boot.
-                    }
+                    // Run once the app has booted: calling Artisan during provider boot builds
+                    // the console before bootstrap/app.php registers its commands, which then
+                    // silently disappear (plans:expire-discounts, newsletter:work, ...).
+                    $this->app->booted(function (): void {
+                        if ($this->app->environment('testing')) {
+                            return;
+                        }
+
+                        try {
+                            \Illuminate\Support\Facades\Artisan::call('listen:sync-extension');
+                        } catch (\Throwable $e) {
+                            // Never block the command that is actually running.
+                        }
+                    });
                 }
             }
         }

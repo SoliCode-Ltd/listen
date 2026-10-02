@@ -45,7 +45,7 @@ class ManualPaymentFlowTest extends TestCase
             'billing_cycle' => 'monthly',
             'payment_method' => 'instapay',
             'status' => ManualPaymentRequest::STATUS_PENDING,
-            'expected_amount_minor' => 99465,
+            'expected_amount_minor' => 99500, // EGP is rounded up to whole pounds (994.65 -> 995)
             'currency' => 'EGP',
         ]);
 

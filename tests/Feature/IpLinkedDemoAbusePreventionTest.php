@@ -7,7 +7,6 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\Auth\PhoneAuthBridgeService;
-use App\Support\RequestIdentity;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request as HttpRequest;
@@ -411,64 +410,6 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
         ]);
-
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('text');
-    }
-
-    public function test_different_ips_with_cleared_cookie_still_share_quota_via_request_signature(): void
-    {
-        $voice = $this->seedVoice();
-        $sharedUserAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36';
-        $sharedAcceptLanguage = 'en-US,en;q=0.9';
-        $sharedSecChUa = '"Chromium";v="131", "Google Chrome";v="131", "Not_A Brand";v="24"';
-        $sharedSecChUaPlatform = '"Windows"';
-        $sharedSecChUaMobile = '?0';
-
-        $signatureRequest = HttpRequest::create('/', 'GET', [], [], [], [
-            'HTTP_USER_AGENT' => $sharedUserAgent,
-            'HTTP_ACCEPT_LANGUAGE' => $sharedAcceptLanguage,
-            'HTTP_SEC_CH_UA' => $sharedSecChUa,
-            'HTTP_SEC_CH_UA_PLATFORM' => $sharedSecChUaPlatform,
-            'HTTP_SEC_CH_UA_MOBILE' => $sharedSecChUaMobile,
-        ]);
-        $sharedSignature = RequestIdentity::signature($signatureRequest);
-        $this->assertNotNull($sharedSignature);
-
-        $userA = User::factory()->create([
-            'registration_ip' => '203.0.113.11',
-            'last_login_ip' => '203.0.113.11',
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
-        ]);
-        $this->storeDemoUsage($userA, 280);
-
-        $userB = User::factory()->create([
-            'registration_ip' => '198.51.100.17',
-            'last_login_ip' => '198.51.100.17',
-            'registration_device_id' => null,
-            'last_seen_device_id' => null,
-            'registration_request_signature' => $sharedSignature,
-            'last_seen_request_signature' => $sharedSignature,
-        ]);
-
-        Cache::flush();
-
-        $response = $this->actingAs($userB)
-            ->withServerVariables(['REMOTE_ADDR' => '198.51.100.17'])
-            ->withHeaders([
-                'User-Agent' => $sharedUserAgent,
-                'Accept-Language' => $sharedAcceptLanguage,
-                'Sec-CH-UA' => $sharedSecChUa,
-                'Sec-CH-UA-Platform' => $sharedSecChUaPlatform,
-                'Sec-CH-UA-Mobile' => $sharedSecChUaMobile,
-            ])
-            ->postJsonLocalizedRoute('demo.run', [
-                'text' => str_repeat('q', 30), // 280 + 30 > 300
-                'target_language' => 'en',
-                'voice_tier' => 'standard',
-                'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
-            ]);
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors('text');

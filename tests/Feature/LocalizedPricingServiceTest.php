@@ -32,6 +32,8 @@ class LocalizedPricingServiceTest extends TestCase
         \App\Models\SiteSetting::set('pricing_fallback_country_code', 'US', 'billing');
         \App\Models\SiteSetting::set('pricing_fallback_currency_code', 'USD', 'billing');
         \App\Models\SiteSetting::set('pricing_ip_lookup_enabled', '0', 'billing');
+        // Also the server-public-IP lookup, which otherwise geolocates the machine running the tests.
+        \App\Models\SiteSetting::set('pricing_public_ip_lookup_enabled', '0', 'billing');
         \App\Models\SiteSetting::set('pricing_accept_language_enabled', '0', 'billing');
 
         $service = app(LocalizedPricingService::class);
@@ -126,7 +128,7 @@ class LocalizedPricingServiceTest extends TestCase
         ], 'instapay', 'en');
 
         $this->assertNotNull($quote);
-        $this->assertSame(47115, $quote['amount_minor']);
+        $this->assertSame(47200, $quote['amount_minor']); // EGP is rounded up to whole pounds (471.15 -> 472)
         $this->assertSame('EGP', $quote['currency']);
     }
 

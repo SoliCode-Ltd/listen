@@ -20,7 +20,7 @@ class ArabicVoiceMapperTest extends TestCase
 
     // ─── Static Accessors ─────────────────────────────────────
 
-    public function test_get_dialects_returns_all_19_dialects(): void
+    public function test_get_dialects_follows_the_studio_catalog(): void
     {
         $dialects = ArabicVoiceMapper::getDialects();
 
@@ -28,10 +28,14 @@ class ArabicVoiceMapperTest extends TestCase
         $this->assertArrayHasKey('ar-SA', $dialects);
         $this->assertArrayHasKey('ar-EG', $dialects);
         $this->assertArrayHasKey('ar-XA', $dialects);
-        $this->assertCount(19, $dialects);
+        // The admin-editable studio catalog decides which dialects are offered.
+        $this->assertSame(
+            array_column(\App\Support\TtsStudioConfig::dialectCatalogForLanguage('ar'), 'value'),
+            array_keys($dialects)
+        );
     }
 
-    public function test_get_emotions_returns_all_10_emotions(): void
+    public function test_get_emotions_follows_the_studio_catalog(): void
     {
         $emotions = ArabicVoiceMapper::getEmotions();
 
@@ -39,7 +43,10 @@ class ArabicVoiceMapperTest extends TestCase
         $this->assertArrayHasKey('neutral', $emotions);
         $this->assertArrayHasKey('warm', $emotions);
         $this->assertArrayHasKey('angry', $emotions);
-        $this->assertCount(10, $emotions);
+        $this->assertSame(
+            array_column(\App\Support\TtsStudioConfig::emotionCatalog(), 'value'),
+            array_keys($emotions)
+        );
     }
 
     public function test_emotions_have_required_keys(): void

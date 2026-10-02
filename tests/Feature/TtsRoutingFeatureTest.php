@@ -30,10 +30,10 @@ class TtsRoutingFeatureTest extends TestCase
 
     // ─── Global Mode from SiteSetting ─────────────────────────
 
-    public function test_global_mode_defaults_to_legacy(): void
+    public function test_global_mode_defaults_to_google(): void
     {
         $router = $this->makeRouter();
-        $this->assertSame('legacy', $router->getGlobalMode());
+        $this->assertSame('google', $router->getGlobalMode());
     }
 
     public function test_global_mode_reads_from_site_settings(): void
@@ -45,12 +45,12 @@ class TtsRoutingFeatureTest extends TestCase
         $this->assertSame('hybrid', $router->getGlobalMode());
     }
 
-    public function test_invalid_global_mode_falls_back_to_legacy(): void
+    public function test_invalid_global_mode_falls_back_to_google(): void
     {
         SiteSetting::set('tts_mode', 'invalid_mode');
 
         $router = $this->makeRouter();
-        $this->assertSame('legacy', $router->getGlobalMode());
+        $this->assertSame('google', $router->getGlobalMode());
     }
 
     // ─── shouldFallback ───────────────────────────────────────

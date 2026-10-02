@@ -1203,6 +1203,11 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function getPerformanceStyleDescription(string $style, bool $isArabic): string
     {
+        // No style behaves like 'neutral' instead of producing "Performance style: ."
+        if (trim($style) === '') {
+            return '';
+        }
+
         $customInstruction = trim((string) TtsStudioConfig::performanceStyleInstruction($style, $isArabic ? 'ar' : 'en'));
         if ($customInstruction !== '') {
             return $customInstruction;

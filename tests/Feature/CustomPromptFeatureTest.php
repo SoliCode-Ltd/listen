@@ -23,7 +23,10 @@ class CustomPromptFeatureTest extends TestCase
      */
     public function test_style_prompt_validation_accepts_valid_string(): void
     {
-        $response = $this->postJson(route('demo.preview'), [
+        // The demo requires a signed-in member.
+        $this->actingAs(User::factory()->create());
+
+        $response = $this->postJsonLocalizedRoute('demo.preview', [
             'text' => 'Hello, this is a test.',
             'target_language' => 'en',
             'translate' => false,
@@ -31,10 +34,7 @@ class CustomPromptFeatureTest extends TestCase
             'style_prompt' => 'Speak with enthusiasm and energy.',
         ]);
 
-        // Should not return validation error for style_prompt
-        if ($response->status() === 422) {
-            $this->assertArrayNotHasKey('style_prompt', $response->json('errors', []));
-        }
+        $response->assertJsonMissingValidationErrors(['style_prompt']);
     }
 
     /**
@@ -42,11 +42,16 @@ class CustomPromptFeatureTest extends TestCase
      */
     public function test_style_prompt_validation_rejects_too_long(): void
     {
-        $response = $this->postJson(route('demo.preview'), [
+        $this->actingAs(User::factory()->create());
+
+        $response = $this->postJsonLocalizedRoute('demo.preview', [
             'text' => 'Hello, this is a test.',
             'target_language' => 'en',
             'translate' => false,
             'voice_tier' => 'hd',
+            // HD previews require a style and an emotion before the rest is validated.
+            'performance_style' => 'neutral',
+            'emotion' => 'neutral',
             'style_prompt' => str_repeat('a', 2001), // Over 2000 chars
         ]);
 
@@ -64,13 +69,17 @@ class CustomPromptFeatureTest extends TestCase
             'voice_tier' => VoiceTier::STANDARD,
         ]);
 
-        $user = User::factory()->create([
+        // Plans are attached through subscriptions (users no longer carry plan_id).
+        $user = User::factory()->create();
+        \App\Models\Subscription::query()->create([
+            'user_id' => $user->id,
             'plan_id' => $plan->id,
+            'status' => 'active',
         ]);
 
         $this->actingAs($user);
 
-        $response = $this->postJson(route('dashboard.generate'), [
+        $response = $this->postJsonLocalizedRoute('dashboard.generate', [
             'text' => 'Hello, this is a test.',
             'target_language' => 'en',
             'translate' => false,
@@ -78,12 +87,8 @@ class CustomPromptFeatureTest extends TestCase
             'style_prompt' => 'This should be stripped for standard tier.',
         ]);
 
-        // The request should succeed (or fail for other reasons)
-        // but style_prompt should be stripped by sanitizeStudioOptionsForTier
-        // We're testing that the validation passes at least
-        if ($response->status() === 422) {
-            $this->assertArrayNotHasKey('style_prompt', $response->json('errors', []));
-        }
+        // style_prompt is stripped by sanitizeStudioOptionsForTier, never a validation error.
+        $response->assertJsonMissingValidationErrors(['style_prompt']);
     }
 
     /**
@@ -99,18 +104,20 @@ class CustomPromptFeatureTest extends TestCase
     }
 
     /**
-     * Test that pricing features include Custom Prompt for HD tier plans.
+     * Custom Prompt is switched on per plan (custom_prompt_enabled), and the
+     * pricing page lists it for those plans.
      */
-    public function test_pricing_page_includes_custom_prompt_for_hd_plans(): void
+    public function test_pricing_page_includes_custom_prompt_for_plans_that_enable_it(): void
     {
-        // Create an HD tier plan
         Plan::factory()->create([
             'voice_tier' => VoiceTier::HD,
             'slug' => 'test-hd-plan',
             'price_cents' => 999,
+            'is_active' => true,
+            'custom_prompt_enabled' => true,
         ]);
 
-        $response = $this->get(route('pricing'));
+        $response = $this->getLocalizedRoute('pricing');
         $response->assertStatus(200);
 
         // The response should include the Custom Prompt feature label

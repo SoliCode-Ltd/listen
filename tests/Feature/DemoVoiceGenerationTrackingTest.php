@@ -75,6 +75,13 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->app->instance(TranslationService::class, $translation);
         $this->app->instance(TtsService::class, $tts);
 
+        // HD demos only offer Gemini voices when a Gemini key is configured.
+        $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $keys = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        $keys->shouldReceive('getAllKeys')->andReturn([$key]);
+        $keys->shouldReceive('getAvailableKey')->andReturn($key);
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $keys);
+
         $response = $this->postJsonLocalizedRoute('demo.preview', [
             'text' => 'Hello world',
             'target_language' => 'en',
@@ -117,13 +124,14 @@ class DemoVoiceGenerationTrackingTest extends TestCase
         $this->assertSame(1.5, $generation->pitch);
         $this->assertSame('gemini-2.5-flash-preview-tts', $generation->tts_model);
         $this->assertSame(842, $generation->tts_latency_ms);
-        $this->assertStringStartsWith('u:', $generation->primary_identity_hash);
+        // Demo usage is keyed to the browser (fingerprint > device cookie > IP+UA),
+        // not the account; this request has neither fingerprint nor cookie.
+        $this->assertStringStartsWith('rq:', $generation->primary_identity_hash);
         $this->assertSame(300, $generation->quota_limit_chars);
         $this->assertSame(300 - $billableChars, $generation->quota_remaining_chars);
         $this->assertIsArray($generation->metadata);
         $this->assertSame(300 - $billableChars, data_get($generation->metadata, 'quota.remaining_chars'));
         $this->assertSame('hybrid', $generation->metadata['routing_mode']);
-        $this->assertStringStartsWith('u:', $generation->primary_identity_hash);
         $this->assertArrayNotHasKey('identities', $generation->metadata);
 
         $response->assertJsonPath('quota.limit_chars', 300);
