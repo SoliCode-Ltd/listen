@@ -19,8 +19,11 @@ use Illuminate\Support\Str;
  */
 class GoogleCloudTtsProvider implements TtsProviderInterface
 {
-    /** Google rejects input.text over 5,000 bytes; Arabic is ~2 bytes per letter. */
-    public const MAX_INPUT_BYTES = 4800;
+    /**
+     * Google rejects input.text over 5,000 bytes, and Chirp 3 HD voices at slow
+     * speeds take over 30 seconds on a full request, so requests stay small.
+     */
+    public const MAX_INPUT_BYTES = 1500;
 
     /** Google rejects a request when one sentence is too long ("sentences that are too long"). */
     public const MAX_SENTENCE_CHARS = 250;
@@ -134,8 +137,8 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * End any sentence longer than the limit, preferring the last comma
-     * before the limit, otherwise the last space.
+     * End every line with a full stop, and end any sentence longer than the
+     * limit, preferring the last comma before the limit, otherwise the last space.
      */
     public static function breakLongSentences(string $text, int $maxChars = self::MAX_SENTENCE_CHARS): string
     {
@@ -171,6 +174,11 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                     $sentenceStart = count($out);
                     $sentenceChars = 0;
                 }
+            }
+
+            // Google does not treat a line break as the end of a sentence.
+            if ($out !== [] && ! preg_match('/[.!?؟…]["»”)\]]*$/u', $out[count($out) - 1])) {
+                $out[count($out) - 1] = preg_replace('/[،,؛;:]$/u', '', $out[count($out) - 1]).'.';
             }
 
             $lines[$i] = implode(' ', $out);
@@ -234,11 +242,12 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
     {
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
         if ($apiKey !== '') {
-            $separator = str_contains($endpoint, '?') ? '&' : '?';
+            // Header, not ?key=, so the key never shows up in cURL errors and logs.
             $response = $this->sendWithSslFallback(
                 fn(bool $verify) => Http::timeout($timeout)
                     ->withOptions(['verify' => $verify])
-                    ->post($endpoint . $separator . 'key=' . $apiKey, $payload),
+                    ->withHeaders(['X-Goog-Api-Key' => $apiKey])
+                    ->post($endpoint, $payload),
                 $verifySsl,
                 'Speech API request',
             );
