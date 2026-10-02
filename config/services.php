@@ -83,6 +83,8 @@ return [
         // Extra attempts after a 5xx or a reply without audio, before falling back.
         'transient_retries' => (int) env('GEMINI_TTS_TRANSIENT_RETRIES', 2),
         'retry_pause_ms' => (int) env('GEMINI_TTS_RETRY_PAUSE_MS', 600),
+        // No retry once this many seconds have gone, so slow failures fall back at once.
+        'retry_budget_seconds' => (int) env('GEMINI_TTS_RETRY_BUDGET_SECONDS', 20),
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),

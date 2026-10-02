@@ -72,6 +72,20 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame(2, $calls->gemini);
     }
 
+    public function test_slow_reply_without_audio_falls_back_without_retrying(): void
+    {
+        config(['services.gemini_tts.retry_budget_seconds' => 0]);
+        $calls = $this->fakeGemini([
+            Http::response(['candidates' => [['finishReason' => 'OTHER', 'content' => ['parts' => [['text' => '']]]]]]),
+        ]);
+
+        $result = app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertTrue($result['fallback_used']);
+        $this->assertSame(1, $calls->gemini);
+        $this->assertSame(1, $calls->google);
+    }
+
     public function test_bad_request_is_not_retried(): void
     {
         $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'bad']], 400)]);

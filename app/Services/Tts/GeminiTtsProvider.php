@@ -644,17 +644,23 @@ class GeminiTtsProvider implements TtsProviderInterface
     private function requestAudio(string $endpoint, array $payload): array
     {
         $retries = max(0, (int) config('services.gemini_tts.transient_retries', 2));
+        // A slow failure would push the dashboard request past the web
+        // server timeout if repeated; let the Google fallback take over instead.
+        $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
+        $startedAt = microtime(true);
 
         for ($attempt = 0; ; $attempt++) {
             try {
                 return $this->extractAudioFromResponse($this->callGeminiApi($endpoint, $payload));
             } catch (TransientGeminiException $e) {
-                if ($attempt >= $retries) {
+                $elapsed = microtime(true) - $startedAt;
+                if ($attempt >= $retries || $elapsed >= $retryBudgetSeconds) {
                     throw $e;
                 }
 
                 Log::warning('Gemini TTS transient failure, retrying.', [
                     'attempt' => $attempt + 1,
+                    'elapsed_seconds' => round($elapsed, 1),
                     'error' => mb_substr($e->getMessage(), 0, 300),
                 ]);
 
