@@ -1,0 +1,94 @@
+name: SaaS stats
+
+# Read-only statistics snapshot from the staging or live database.
+# Pipes scripts/stats/saas_stats.php over SSH into the app's own PHP, so nothing
+# is deployed or written on the server. The output is aggregate numbers only.
+#
+# Repository secrets (Settings -> Secrets and variables -> Actions), per target:
+#   STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY, optional STAGING_APP_PATH
+#   LIVE_SSH_HOST,    LIVE_SSH_USER,    LIVE_SSH_KEY,    optional LIVE_APP_PATH
+# APP_PATH defaults to ~/public_html (Cloudways application layout).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which server to read from
+        type: choice
+        options: [staging, live]
+        default: staging
+      months:
+        description: How many months of history to include (1-36)
+        default: '12'
+  # Also runs (both targets) when the stats script or this workflow changes on the
+  # working branch, so it can be exercised before it reaches the default branch.
+  push:
+    branches: [claude/clever-darwin-qt43hw]
+    paths:
+      - .github/workflows/saas-stats.yml
+      - scripts/stats/**
+
+permissions:
+  contents: read
+
+jobs:
+  stats:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(github.event_name == 'workflow_dispatch' && format('["{0}"]', inputs.target) || '["staging","live"]') }}
+    concurrency:
+      group: saas-stats-${{ matrix.target }}
+      cancel-in-progress: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Collect stats over SSH
+        env:
+          SSH_HOST: ${{ matrix.target == 'live' && secrets.LIVE_SSH_HOST || secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ matrix.target == 'live' && secrets.LIVE_SSH_USER || secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ matrix.target == 'live' && secrets.LIVE_SSH_KEY || secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ matrix.target == 'live' && secrets.LIVE_APP_PATH || secrets.STAGING_APP_PATH }}
+          MONTHS: ${{ inputs.months || '12' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::notice::SSH secrets for target '${{ matrix.target }}' are not set; skipping."
+            exit 0
+          fi
+          # Pasted secrets often carry a trailing space or newline, which breaks the login.
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          echo "Connecting as a ${#SSH_USER}-character user name to a ${#SSH_HOST}-character host."
+          case "$MONTHS" in ''|*[!0-9]*) echo "::error::months must be a number"; exit 1 ;; esac
+
+          install -m 700 -d ~/.ssh
+          # Keys pasted from Windows can carry CRLF line endings, which OpenSSH rejects.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_stats
+          chmod 600 ~/.ssh/id_stats
+          # The fingerprint is public; compare it with `ssh-keygen -lf <key>` on the machine that made the key.
+          echo "Using key: $(ssh-keygen -lf ~/.ssh/id_stats || echo 'unreadable key')"
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # Find the app root on the server, then let its PHP run the script from stdin.
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; STATS_MONTHS=$MONTHS php"
+          ssh -i ~/.ssh/id_stats -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/stats/saas_stats.php > stats.json
+
+          python3 -m json.tool stats.json > /dev/null
+          echo "===== SAAS_STATS_JSON_BEGIN ====="
+          cat stats.json
+          echo "===== SAAS_STATS_JSON_END ====="
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_stats
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: saas-stats-${{ matrix.target }}-${{ github.run_number }}
+          path: stats.json
+          if-no-files-found: ignore
+          retention-days: 30
