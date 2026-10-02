@@ -61,8 +61,11 @@ jobs:
           case "$MONTHS" in ''|*[!0-9]*) echo "::error::months must be a number"; exit 1 ;; esac
 
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/id_stats
+          # Keys pasted from Windows can carry CRLF line endings, which OpenSSH rejects.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_stats
           chmod 600 ~/.ssh/id_stats
+          # The fingerprint is public; compare it with `ssh-keygen -lf <key>` on the machine that made the key.
+          echo "Using key: $(ssh-keygen -lf ~/.ssh/id_stats || echo 'unreadable key')"
           ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
           # Find the app root on the server, then let its PHP run the script from stdin.
