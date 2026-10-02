@@ -98,6 +98,7 @@ class PaidGenerationResilienceTest extends TestCase
 
     public function test_long_arabic_fallback_is_split_under_googles_byte_limit(): void
     {
+        config(['services.gemini_tts.max_chars_per_request' => 5000]);
         $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
         $text = trim(str_repeat('هذا نص عربي طويل لاختبار حد البايتات في جوجل. ', 100));
         $this->assertGreaterThan(5000, strlen($text));
@@ -182,8 +183,38 @@ class PaidGenerationResilienceTest extends TestCase
 
         $broken = GoogleCloudTtsProvider::breakLongSentences('aaa bbb, ccc ddd eee fff', 16);
 
-        $this->assertSame('aaa bbb. ccc ddd eee fff', $broken);
-        $this->assertSame("line one\nline two", GoogleCloudTtsProvider::breakLongSentences("line one\nline two"));
+        $this->assertSame('aaa bbb. ccc ddd eee fff.', $broken);
+        $this->assertSame("line one.\nline two.", GoogleCloudTtsProvider::breakLongSentences("line one\nline two"));
+        $this->assertSame("asked? yes.\ndone.", GoogleCloudTtsProvider::breakLongSentences("asked? yes،\ndone."));
+    }
+
+    public function test_story_split_only_by_line_breaks_reaches_google_as_short_sentences(): void
+    {
+        $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
+        $line = trim(str_repeat('كلام عراقي من القلب ', 4));
+        $text = 'سالفة '.implode("\n", array_fill(0, 28, $line));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertTrue($result['fallback_used']);
+        $this->assertGreaterThan(1, count($calls->googleTexts));
+        foreach ($calls->googleTexts as $chunk) {
+            $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_INPUT_BYTES, strlen($chunk));
+            foreach (preg_split('/(?<=[.!?؟…])\s+/u', $chunk) as $sentence) {
+                $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_SENTENCE_CHARS, mb_strlen($sentence));
+            }
+        }
+    }
+
+    public function test_google_api_key_is_sent_in_a_header_not_the_url(): void
+    {
+        $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
+
+        app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'texttospeech')
+            && ! str_contains($request->url(), 'test-google-key')
+            && $request->header('X-Goog-Api-Key') === ['test-google-key']);
     }
 
     public function test_key_limits_come_from_config_so_config_cache_keeps_them(): void
@@ -237,12 +268,70 @@ class PaidGenerationResilienceTest extends TestCase
     /**
      * @param  array<int, mixed>  $geminiResponses  Played in order; the last one repeats.
      */
+    public function test_long_text_is_read_in_pieces_and_joined_into_one_wav(): void
+    {
+        config(['services.gemini_tts.model' => 'gemini-3.8-flash-tts', 'services.gemini_tts.max_chars_per_request' => 300]);
+        $calls = $this->fakeGemini([$this->geminiAudio()]);
+        $sentence = 'كان يا ما كان في قديم الزمان رجل طيب يسكن في بغداد';
+        $text = implode("\n", array_fill(0, 20, $sentence));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertSame('gemini', $result['provider']);
+        $this->assertFalse($result['fallback_used']);
+        $this->assertGreaterThan(1, $calls->gemini);
+        $this->assertSame(0, $calls->google);
+        foreach ($calls->geminiTexts as $piece) {
+            $this->assertLessThanOrEqual(300, mb_strlen($piece));
+        }
+        $this->assertSame(preg_split('/\s+/u', $text), preg_split('/\s+/u', implode(' ', $calls->geminiTexts)));
+
+        Storage::disk('public')->assertExists($result['audio_path']);
+    }
+
+    public function test_pieces_are_joined_into_one_wav_with_a_pause(): void
+    {
+        $provider = app(\App\Services\Tts\GeminiTtsProvider::class);
+        $wrap = new \ReflectionMethod($provider, 'wrapPcmL16AsWav');
+        $join = new \ReflectionMethod($provider, 'joinAudioParts');
+        $first = pack('v*', 1, 2, 3);
+        $second = pack('v*', 4, 5);
+
+        $joined = $join->invoke($provider, [
+            ['bytes' => $first, 'mime_type' => 'audio/L16;codec=pcm;rate=24000'],
+            ['bytes' => $wrap->invoke($provider, $second, 24000, 1, 16), 'mime_type' => 'audio/wav'],
+        ]);
+
+        $pause = str_repeat("\0", 7200 * 2);
+        $this->assertSame('audio/wav', $joined['mime_type']);
+        $this->assertSame($wrap->invoke($provider, $first . $pause . $second, 24000, 1, 16), $joined['bytes']);
+    }
+
+    public function test_failed_piece_is_retried_on_its_own(): void
+    {
+        config(['services.gemini_tts.model' => 'gemini-3.8-flash-tts', 'services.gemini_tts.max_chars_per_request' => 300]);
+        $calls = $this->fakeGemini([
+            $this->geminiAudio(),
+            Http::response(['candidates' => [['finishReason' => 'OTHER', 'content' => ['parts' => [['text' => '']]]]]]),
+            $this->geminiAudio(),
+        ]);
+        $text = implode("\n", array_fill(0, 10, 'كان يا ما كان في قديم الزمان رجل طيب يسكن في بغداد'));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertSame('gemini', $result['provider']);
+        $this->assertSame(0, $calls->google);
+        $this->assertSame(3, $calls->gemini);
+        $this->assertSame($calls->geminiTexts[1], $calls->geminiTexts[2]);
+    }
+
     private function fakeGemini(array $geminiResponses): \stdClass
     {
         $calls = new \stdClass;
         $calls->gemini = 0;
         $calls->google = 0;
         $calls->googleTexts = [];
+        $calls->geminiTexts = [];
 
         Http::fake(function ($request) use ($calls, $geminiResponses) {
             if (str_contains($request->url(), 'texttospeech')) {
@@ -254,6 +343,7 @@ class PaidGenerationResilienceTest extends TestCase
 
             $response = $geminiResponses[min($calls->gemini, count($geminiResponses) - 1)];
             $calls->gemini++;
+            $calls->geminiTexts[] = $request->data()['contents'][0]['parts'][0]['text'] ?? '';
 
             return $response;
         });
