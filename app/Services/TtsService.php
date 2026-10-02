@@ -306,11 +306,11 @@ class TtsService
 
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
         if ($apiKey !== '') {
-            $separator = str_contains($endpoint, '?') ? '&' : '?';
             $response = $this->sendWithSslFallback(
                 fn (bool $verify) => Http::timeout($timeout)
                     ->withOptions(['verify' => $verify])
-                    ->post($endpoint.$separator.'key='.$apiKey, $payload),
+                    ->withHeaders(['X-Goog-Api-Key' => $apiKey])
+                    ->post($endpoint, $payload),
                 $verifySsl,
                 'Speech API request',
             );
