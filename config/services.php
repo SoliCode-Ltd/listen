@@ -75,6 +75,14 @@ return [
         'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
         'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),
         'cost_per_million_chars' => env('GEMINI_TTS_COST_PER_MILLION_CHARS', 0),
+        // Per-key budgets tracked locally by GeminiKeyManager. Set them to the
+        // limits of your Gemini tier; the defaults match the free tier.
+        'rpm_limit' => (int) env('GEMINI_TTS_RPM_LIMIT', 10),
+        'tpm_limit' => (int) env('GEMINI_TTS_TPM_LIMIT', 10000),
+        'rpd_limit' => (int) env('GEMINI_TTS_RPD_LIMIT', 100),
+        // Extra attempts after a 5xx or a reply without audio, before falling back.
+        'transient_retries' => (int) env('GEMINI_TTS_TRANSIENT_RETRIES', 2),
+        'retry_pause_ms' => (int) env('GEMINI_TTS_RETRY_PAUSE_MS', 600),
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),
