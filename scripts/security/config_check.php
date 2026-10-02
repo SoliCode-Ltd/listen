@@ -76,6 +76,24 @@ $checks = [
         )),
         'public_dotfiles' => array_values(array_map('basename', glob(public_path('.*')) ?: [])),
     ],
+    'installed_packages' => (function () use ($root) {
+        $installed = json_decode((string) @file_get_contents($root.'/vendor/composer/installed.json'), true);
+        $packages = $installed['packages'] ?? $installed ?? [];
+        $wanted = ['laravel/framework', 'laravel/cashier', 'stripe/stripe-php', 'filament/filament', 'livewire/livewire',
+            'guzzlehttp/guzzle', 'dompdf/dompdf', 'league/commonmark', 'symfony/mime'];
+
+        return collect($packages)->filter(fn ($p) => in_array($p['name'] ?? '', $wanted, true))
+            ->mapWithKeys(fn ($p) => [$p['name'] => $p['version'] ?? '?'])->sortKeys()->all();
+    })(),
+    'stripe_api_version' => class_exists(\Laravel\Cashier\Cashier::class) ? \Laravel\Cashier\Cashier::STRIPE_VERSION : null,
+    'composer_lock_matches_installed' => (function () use ($root) {
+        $lock = json_decode((string) @file_get_contents($root.'/composer.lock'), true);
+        $installed = json_decode((string) @file_get_contents($root.'/vendor/composer/installed.json'), true);
+        $locked = collect($lock['packages'] ?? [])->pluck('version', 'name');
+        $have = collect($installed['packages'] ?? [])->pluck('version', 'name');
+
+        return $locked->filter(fn ($v, $name) => ($have[$name] ?? null) !== $v)->count() === 0;
+    })(),
     'users' => [
         'admins' => Schema::hasColumn('users', 'is_admin') ? DB::table('users')->where('is_admin', true)->count() : null,
     ],
