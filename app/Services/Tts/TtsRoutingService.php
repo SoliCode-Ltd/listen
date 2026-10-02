@@ -78,10 +78,13 @@ class TtsRoutingService
                         'fallback_error' => $fallbackError->getMessage(),
                         'user_id' => $userId,
                     ]);
+                    $compact = fn (\Throwable $e, int $max) => mb_substr(
+                        (string) preg_replace('/\s+/u', ' ', $e->getMessage()),
+                        0,
+                        $max,
+                    );
                     throw new \RuntimeException(
-                        mb_substr($primaryError->getMessage(), 0, 240)
-                            .' | Google fallback failed: '
-                            .mb_substr($fallbackError->getMessage(), 0, 240),
+                        $compact($primaryError, 200).' | Google fallback failed: '.$compact($fallbackError, 290),
                         0,
                         $primaryError,
                     );

@@ -133,7 +133,7 @@ class DiagnoseUserGenerationsCommand extends Command
                     $g->voice_tier,
                     $log?->provider ?? $g->tts_provider ?? '-',
                     ($log?->fallback_used ?? $g->tts_fallback_used) ? 'yes' : 'no',
-                    mb_substr((string) ($log?->failure_reason ?? $g->error_message ?? ''), 0, 160),
+                    wordwrap(mb_substr((string) preg_replace('/\s+/u', ' ', (string) ($log?->failure_reason ?? $g->error_message ?? '')), 0, 500), 90, "\n", true),
                 ];
             })->all(),
         );
