@@ -51,6 +51,19 @@ class BusinessStatsDashboardTest extends TestCase
         $generation($paying, 'done', now()->subDays(1));
         $generation($admin, 'done', now()->subDays(1));
 
+        // Gemini logs no cost: 60 s of audio and 400 characters are priced from config/analytics.php.
+        DB::table('audio_generations')->insert([
+            'user_id' => $paying->id, 'input_text' => 'hello', 'target_language' => 'ar', 'status' => 'done',
+            'tts_provider' => 'gemini', 'tts_model' => 'gemini-2.5-flash-preview-tts', 'tts_latency_ms' => 20000,
+            'billable_chars' => 400, 'duration_seconds' => 60, 'tts_cost_estimate_usd' => 0,
+            'created_at' => now()->subDays(2), 'updated_at' => now()->subDays(2),
+        ]);
+        DB::table('demo_voice_generations')->insert([
+            'primary_identity_hash' => 'demo-1', 'input_text' => 'hi', 'target_language' => 'ar',
+            'voice_provider' => 'google_cloud', 'voice_name' => 'ar-XA-Wavenet-A', 'billable_chars' => 1000,
+            'duration_seconds' => 30, 'created_at' => now()->subDays(3), 'updated_at' => now()->subDays(3),
+        ]);
+
         return compact('admin');
     }
 
@@ -66,7 +79,7 @@ class BusinessStatsDashboardTest extends TestCase
         $this->assertSame(2, $s['members']['new_30d']);
         $this->assertSame(2, $s['engagement']['activated']);
         $this->assertSame(2, $s['engagement']['active_30d']);
-        $this->assertSame(3, $s['generations']['last_30d']);
+        $this->assertSame(4, $s['generations']['last_30d']);
         $this->assertSame(1, $s['generations']['failed_30d']);
         $this->assertSame(1, $s['revenue']['paying_stripe']);
         $this->assertSame(900, $s['revenue']['mrr_cents']);
@@ -75,6 +88,32 @@ class BusinessStatsDashboardTest extends TestCase
         $this->assertSame(3, array_sum(array_column($s['monthly'], 'signups')));
         $this->assertSame('google_cloud', $s['providers'][0]['provider']);
         $this->assertSame(3, $s['providers'][0]['generations']);
+    }
+
+    public function test_api_usage_includes_demo_and_admins_and_estimates_missing_costs(): void
+    {
+        $this->seedBusinessData();
+
+        $api = app(BusinessStatsService::class)->build(12)['api_usage'];
+        $t = $api['totals_30d'];
+
+        // 4 Google member/admin generations logged at $0.01, Gemini estimated, demo WaveNet estimated.
+        $gemini = (60 * 32 * 10.0 + 400 / 4 * 0.5) / 1_000_000;
+        $demo = 1000 / 1_000_000 * 16;
+        $this->assertSame(6, $t['requests']);
+        $this->assertSame(400 + 1000 + 4 * 100, $t['chars']);
+        $this->assertEqualsWithDelta(0.04 + $gemini + $demo, $t['cost'], 0.006);
+        $this->assertEqualsWithDelta(0.01, $t['admin_cost'], 0.0001);
+        $this->assertEqualsWithDelta($demo, $t['demo_cost'], 0.006);
+
+        $models = collect($api['by_model_30d'])->keyBy('model');
+        $this->assertTrue($models->has('Gemini · gemini-2.5-flash-preview-tts'));
+        $this->assertSame('estimated', $models['Gemini · gemini-2.5-flash-preview-tts']['cost_basis']);
+        $this->assertTrue($models->has('Google Cloud TTS · Wavenet'));
+
+        config(['analytics.gemini_tts.free_tier' => true]);
+        $free = app(BusinessStatsService::class)->build(12)['api_usage']['by_model_30d'];
+        $this->assertSame(0.0, (float) collect($free)->firstWhere('model', 'Gemini · gemini-2.5-flash-preview-tts')['cost_usd']);
     }
 
     public function test_period_is_limited_to_known_values(): void
@@ -107,7 +146,7 @@ class BusinessStatsDashboardTest extends TestCase
         $reader->close();
         unlink($path);
 
-        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'Providers (30d)', 'Breakdowns'], $names);
+        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Breakdowns'], $names);
         $this->assertEquals(3, $summary['Total members (excl. admins)']);
         $this->assertEquals(9, $summary['Est. MRR (USD, list price)']);
     }
@@ -117,6 +156,11 @@ class BusinessStatsDashboardTest extends TestCase
         ['admin' => $admin] = $this->seedBusinessData();
 
         $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Download report (Excel)');
+        $this->assertSame(
+            ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart'],
+            collect(\Filament\Facades\Filament::getPanel('admin')->getWidgets())->map(fn ($w) => class_basename($w))->sort()->values()->all(),
+            'Only the business widgets should be on the dashboard.'
+        );
 
         Livewire::actingAs($admin)
             ->test(Dashboard::class)
@@ -137,7 +181,9 @@ class BusinessStatsDashboardTest extends TestCase
             \App\Filament\Widgets\BusinessGrowthChart::class => 'Growth',
             \App\Filament\Widgets\BusinessUsageChart::class => 'Usage',
             \App\Filament\Widgets\BusinessRevenueChart::class => 'Monetisation',
-            \App\Filament\Widgets\BusinessCostChart::class => 'TTS cost',
+            \App\Filament\Widgets\ApiUsageKpis::class => 'Gross margin',
+            \App\Filament\Widgets\ApiCostChart::class => 'API cost',
+            \App\Filament\Widgets\ApiUsageBreakdown::class => 'Gemini · gemini-2.5-flash-preview-tts',
         ] as $widget => $text) {
             Livewire::test($widget, ['filters' => ['months' => 6]])->assertSee($text);
         }

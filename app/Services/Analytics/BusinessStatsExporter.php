@@ -80,7 +80,7 @@ class BusinessStatsExporter
             ['Generations', 'Failure rate (30d)', $this->pct($generations['failure_rate_30d'] ?? 0)],
             ['Generations', 'Audio minutes (30d)', $generations['audio_minutes_30d'] ?? 0],
             ['Generations', 'Billable characters (30d)', $generations['billable_chars_30d'] ?? 0],
-            ['Generations', 'Est. TTS cost USD (30d)', $generations['est_cost_usd_30d'] ?? 0],
+            ['Generations', 'Cost logged for member generations USD (30d)', $generations['est_cost_usd_30d'] ?? 0],
             ['Generations', 'Translated share (30d)', $this->pct($generations['translate_share_30d'] ?? 0)],
             ['Generations', 'Cloned voices', $generations['cloned_voices'] ?? 0],
             ['Generations', 'Blocked generations (30d)', $generations['blocked_generations_30d'] ?? 0],
@@ -104,11 +104,58 @@ class BusinessStatsExporter
                 'retention_month_2' => $r['retention_month_2'] === null ? null : $this->pct($r['retention_month_2']),
             ]), $s['cohorts'] ?? [])),
             'Plans' => $this->table($s['plans'] ?? []),
-            'Providers (30d)' => $this->table(array_map(fn ($r) => array_merge($r, [
-                'failure_rate' => $this->pct($r['failure_rate']),
-                'fallback_rate' => $this->pct($r['fallback_rate']),
-            ]), $s['providers'] ?? [])),
         ];
+
+        $api = $s['api_usage'] ?? [];
+        $unit = $s['unit_economics'] ?? [];
+        $apiRows = [['Metric', 'Last 30 days', 'Selected period', 'All time']];
+        $apiMetrics = [
+            'requests' => 'Generations (all sources)',
+            'api_requests' => 'Provider API calls',
+            'cache_hits' => 'Served from cache',
+            'failed' => 'Failed generations',
+            'translated' => 'Translated requests',
+            'chars' => 'Characters processed',
+            'api_chars' => 'Characters sent to providers',
+            'member_chars' => 'Characters — members',
+            'demo_chars' => 'Characters — demo',
+            'admin_chars' => 'Characters — admins',
+            'audio_minutes' => 'Audio minutes',
+            'cost' => 'API cost (USD)',
+            'recorded_cost' => 'Cost logged by the app (USD)',
+            'member_cost' => 'Cost — members (USD)',
+            'demo_cost' => 'Cost — demo (USD)',
+            'admin_cost' => 'Cost — admins (USD)',
+            'cost_per_1k_chars' => 'Cost per 1,000 characters (USD)',
+            'cost_per_audio_minute' => 'Cost per audio minute (USD)',
+        ];
+        foreach ($apiMetrics as $key => $label) {
+            $apiRows[] = [
+                $label,
+                $api['totals_30d'][$key] ?? 0,
+                $api['totals_period'][$key] ?? 0,
+                $api['totals_all_time'][$key] ?? 0,
+            ];
+        }
+        $apiRows[] = [];
+        $apiRows[] = ['Unit economics (last 30 days)', 'Value'];
+        $apiRows[] = ['MRR (USD, list price)', $unit['mrr_usd'] ?? 0];
+        $apiRows[] = ['API cost (USD)', $unit['api_cost_30d'] ?? 0];
+        $apiRows[] = ['Gross margin (USD)', $unit['gross_margin_usd'] ?? 0];
+        $apiRows[] = ['Gross margin', isset($unit['gross_margin_rate']) ? $this->pct($unit['gross_margin_rate']) : '—'];
+        $apiRows[] = ['API cost per active member (USD)', $unit['api_cost_per_active_member'] ?? 0];
+        $apiRows[] = ['Revenue per paying member (USD / month)', $unit['revenue_per_paying_member'] ?? 0];
+        $apiRows[] = ['Demo share of API cost', $this->pct($unit['demo_cost_share'] ?? 0)];
+
+        $modelRows = fn (array $rows) => $this->table(array_map(fn ($r) => array_merge($r, [
+            'failure_rate' => $this->pct($r['failure_rate']),
+        ]), $rows));
+
+        $sheets['API usage'] = $apiRows;
+        $sheets['API by model (30d)'] = $modelRows($api['by_model_30d'] ?? []);
+        $sheets['API by model (period)'] = $modelRows($api['by_model_period'] ?? []);
+        $sheets['API monthly'] = $this->table($api['monthly'] ?? []);
+        $sheets['Plan quota usage'] = $this->table($api['quota_chars_by_month'] ?? []);
 
         $breakdowns = [
             ['Members', 'Signup method', $members['signup_method'] ?? []],
@@ -125,6 +172,7 @@ class BusinessStatsExporter
             ['Manual payments', 'Status', $manual['by_status'] ?? []],
             ['Manual payments', 'Method', $manual['by_method'] ?? []],
             ['Growth', 'Referral conversions', $channels['referral_conversions'] ?? []],
+            ['API', 'Characters by plan (30d)', $api['chars_by_plan_30d'] ?? []],
         ];
         $rows = [['Section', 'Breakdown', 'Item', 'Count']];
         foreach ($breakdowns as [$section, $label, $pairs]) {

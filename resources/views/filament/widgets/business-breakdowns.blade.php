@@ -51,7 +51,7 @@
             </div>
         </x-filament::section>
 
-        <div style="display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 46rem), 1fr));">
+        <div style="display: grid; gap: 1.5rem;">
             <x-filament::section>
                 <x-slot name="heading">Plans</x-slot>
                 <x-slot name="description">Members currently on each plan, paying Stripe subscriptions and estimated MRR at list price.</x-slot>
@@ -89,44 +89,6 @@
                 </div>
             </x-filament::section>
 
-            <x-filament::section>
-                <x-slot name="heading">Voice providers (last 30 days)</x-slot>
-                <x-slot name="description">Speed, reliability and recorded cost of each text-to-speech provider.</x-slot>
-
-                <div class="overflow-x-auto">
-                    <table class="w-full text-sm">
-                        <thead>
-                            <tr class="border-b border-gray-200 text-gray-500 dark:border-white/10 dark:text-gray-400">
-                                <th class="px-3 py-2 text-start font-medium">Provider</th>
-                                <th class="px-3 py-2 text-end font-medium">Generations</th>
-                                <th class="px-3 py-2 text-end font-medium">Avg time</th>
-                                <th class="px-3 py-2 text-end font-medium">Failures</th>
-                                <th class="px-3 py-2 text-end font-medium">Fallbacks</th>
-                                <th class="px-3 py-2 text-end font-medium">Minutes</th>
-                                <th class="px-3 py-2 text-end font-medium">Est. cost</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @forelse ($providers as $p)
-                                <tr class="border-b border-gray-100 dark:border-white/5">
-                                    <td class="px-3 py-2">{{ $p['provider'] }}</td>
-                                    <td class="px-3 py-2 text-end tabular-nums">{{ number_format($p['generations']) }}</td>
-                                    <td class="px-3 py-2 text-end tabular-nums">{{ $p['avg_latency_s'] === null ? '—' : $p['avg_latency_s'].' s' }}</td>
-                                    <td @class([
-                                        'px-3 py-2 text-end tabular-nums',
-                                        'font-semibold text-danger-600 dark:text-danger-400' => $p['failure_rate'] > 0.05,
-                                    ])>{{ $percent($p['failure_rate']) }}</td>
-                                    <td class="px-3 py-2 text-end tabular-nums">{{ $percent($p['fallback_rate']) }}</td>
-                                    <td class="px-3 py-2 text-end tabular-nums">{{ number_format($p['audio_minutes'], 1) }}</td>
-                                    <td class="px-3 py-2 text-end tabular-nums">${{ number_format($p['est_cost_usd'], 2) }}</td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="7" class="px-3 py-4 text-center text-gray-500">No generations in the last 30 days.</td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </x-filament::section>
         </div>
 
         <div style="display: grid; gap: 1.5rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));">

@@ -30,7 +30,6 @@ class BusinessBreakdowns extends Widget
             'statErrors' => $s['errors'] ?? [],
             'cohorts' => $s['cohorts'] ?? [],
             'plans' => $s['plans'] ?? [],
-            'providers' => $s['providers'] ?? [],
             'breakdowns' => array_filter([
                 'Members by plan' => $revenue['members_by_plan'] ?? [],
                 'Paying Stripe subscriptions' => $revenue['paying_by_plan'] ?? [],

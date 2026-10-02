@@ -29,6 +29,7 @@ class BusinessRevenueKpis extends BaseWidget
         $manual = $s['manual_payments'] ?? [];
         $monthly = collect($s['monthly'] ?? []);
         $mrr = (int) ($revenue['mrr_cents'] ?? 0);
+        $stripe = $revenue['stripe_by_status'] ?? [];
 
         $manualTotals = collect($manual['approved_by_currency'] ?? [])
             ->map(fn ($amount, $currency) => $currency.' '.number_format($amount, 2))
@@ -60,9 +61,12 @@ class BusinessRevenueKpis extends BaseWidget
                 ->description(number_format($manual['pending'] ?? 0).' waiting for review')
                 ->descriptionIcon('heroicon-m-building-library')
                 ->color(($manual['pending'] ?? 0) > 0 ? 'warning' : 'gray'),
-            Stat::make('Stripe statuses', collect($revenue['stripe_by_status'] ?? [])->map(fn ($n, $k) => "{$k}: {$n}")->implode(' · ') ?: '—')
-                ->description('All Stripe subscriptions by status')
-                ->descriptionIcon('heroicon-m-list-bullet'),
+            Stat::make('Stripe subscriptions in trial', number_format($stripe['trialing'] ?? 0))
+                ->description(collect($stripe)->except('trialing')
+                    ->map(fn ($n, $status) => number_format($n).' '.static::stripeStatusLabel($status))
+                    ->implode(' · ') ?: 'No other Stripe subscriptions')
+                ->descriptionIcon('heroicon-m-clock')
+                ->color('info'),
         ];
     }
 }
