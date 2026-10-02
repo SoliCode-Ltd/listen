@@ -43,9 +43,10 @@ class BusinessProductKpis extends BaseWidget
                 ->description(number_format($g['billable_chars_30d'] ?? 0).' billable characters')
                 ->descriptionIcon('heroicon-m-speaker-wave')
                 ->chart($monthly->pluck('audio_minutes')->all()),
-            Stat::make('Est. TTS cost', '$'.number_format($g['est_cost_usd_30d'] ?? 0, 2))
-                ->description('Recorded provider cost estimates')
-                ->descriptionIcon('heroicon-m-currency-dollar'),
+            Stat::make('Blocked generations', number_format($g['blocked_generations_30d'] ?? 0))
+                ->description('Requests stopped by the content filter')
+                ->descriptionIcon('heroicon-m-shield-exclamation')
+                ->color(($g['blocked_generations_30d'] ?? 0) > 0 ? 'warning' : 'gray'),
             Stat::make('Demo generations', number_format($channels['demo_generations_30d'] ?? 0))
                 ->description(number_format($channels['demo_visitors'] ?? 0).' demo visitors all time')
                 ->descriptionIcon('heroicon-m-play')

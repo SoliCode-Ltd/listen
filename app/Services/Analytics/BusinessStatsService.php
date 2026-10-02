@@ -45,7 +45,7 @@ class BusinessStatsService
     public function snapshot(int $months = self::DEFAULT_MONTHS, bool $fresh = false): array
     {
         $months = self::normalizeMonths($months);
-        $key = "business_stats:v1:{$months}";
+        $key = "business_stats:v2:{$months}";
 
         if ($fresh) {
             Cache::forget($key);
@@ -57,7 +57,7 @@ class BusinessStatsService
     public function forget(): void
     {
         foreach (self::PERIODS as $months) {
-            Cache::forget("business_stats:v1:{$months}");
+            Cache::forget("business_stats:v2:{$months}");
         }
     }
 
@@ -89,6 +89,7 @@ class BusinessStatsService
             'cohorts' => fn () => $this->cohorts(),
             'providers' => fn () => $this->providers(),
             'plans' => fn () => $this->plans(),
+            'api_usage' => fn () => (new ApiUsageStats($this->driver, $this->now, $this->since))->build(),
         ];
 
         foreach ($sections as $name => $build) {
@@ -101,7 +102,30 @@ class BusinessStatsService
             }
         }
 
+        $snapshot['unit_economics'] = $this->unitEconomics($snapshot);
+
         return $snapshot;
+    }
+
+    /**
+     * API cost against revenue and usage, from the sections already built.
+     */
+    private function unitEconomics(array $s): array
+    {
+        $cost30 = (float) ($s['api_usage']['totals_30d']['cost'] ?? 0);
+        $mrr = ($s['revenue']['mrr_cents'] ?? 0) / 100;
+        $active30 = (int) ($s['engagement']['active_30d'] ?? 0);
+        $paying = (int) ($s['revenue']['members_on_paid_plans'] ?? 0);
+
+        return [
+            'api_cost_30d' => round($cost30, 2),
+            'mrr_usd' => round($mrr, 2),
+            'gross_margin_usd' => round($mrr - $cost30, 2),
+            'gross_margin_rate' => $mrr > 0 ? round(($mrr - $cost30) / $mrr, 4) : null,
+            'api_cost_per_active_member' => $active30 > 0 ? round(($s['api_usage']['totals_30d']['member_cost'] ?? 0) / $active30, 4) : 0,
+            'revenue_per_paying_member' => $paying > 0 ? round($mrr / $paying, 2) : 0,
+            'demo_cost_share' => $cost30 > 0 ? round(($s['api_usage']['totals_30d']['demo_cost'] ?? 0) / $cost30, 4) : 0,
+        ];
     }
 
     // ---------------------------------------------------------------------
