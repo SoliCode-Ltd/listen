@@ -19,6 +19,12 @@ use Illuminate\Support\Str;
  */
 class GoogleCloudTtsProvider implements TtsProviderInterface
 {
+    /** Google rejects input.text over 5,000 bytes; Arabic is ~2 bytes per letter. */
+    public const MAX_INPUT_BYTES = 4800;
+
+    /** Google rejects a request when one sentence is too long ("sentences that are too long"). */
+    public const MAX_SENTENCE_CHARS = 250;
+
     public function name(): string
     {
         return 'google_cloud';
@@ -81,7 +87,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         $payload = [
             'input' => [
-                'text' => mb_substr($text, 0, 5000),
+                'text' => '',
             ],
             'voice' => [
                 'languageCode' => $languageCode,
@@ -91,6 +97,141 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             'audioConfig' => $audioConfig,
         ];
 
+        // MP3 frames can be joined end to end; other encodings carry a header
+        // per file, so they keep the single-request behaviour.
+        $text = self::breakLongSentences($text);
+        $chunks = $audioConfig['audioEncoding'] === 'MP3'
+            ? self::splitForByteLimit($text, self::MAX_INPUT_BYTES)
+            : [mb_substr($text, 0, 5000)];
+
+        $binary = '';
+        foreach ($chunks as $chunk) {
+            $payload['input']['text'] = $chunk;
+            $binary .= $this->requestAudio($payload, $endpoint, $timeout, $verifySsl);
+        }
+
+        $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists('audio')) {
+            $disk->makeDirectory('audio');
+        }
+
+        $disk->put($filename, $binary);
+
+        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
+        $charCount = mb_strlen($text);
+
+        return [
+            'audio_path' => $filename,
+            'duration_seconds' => $this->estimateDurationSeconds($text),
+            'provider' => $this->name(),
+            'model' => 'google-cloud-tts',
+            'latency_ms' => $latencyMs,
+            'char_count' => $charCount,
+            'cost_estimate_usd' => $this->estimateCost($charCount, $voiceName),
+        ];
+    }
+
+    /**
+     * End any sentence longer than the limit, preferring the last comma
+     * before the limit, otherwise the last space.
+     */
+    public static function breakLongSentences(string $text, int $maxChars = self::MAX_SENTENCE_CHARS): string
+    {
+        $lines = preg_split('/\R/u', $text) ?: [$text];
+
+        foreach ($lines as $i => $line) {
+            $words = preg_split('/\s+/u', trim($line), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $out = [];
+            $sentenceStart = 0;
+            $sentenceChars = 0;
+
+            foreach ($words as $word) {
+                $wordChars = mb_strlen($word) + 1;
+                if ($sentenceChars + $wordChars > $maxChars && count($out) > $sentenceStart) {
+                    $breakAt = count($out) - 1;
+                    for ($j = count($out) - 1; $j > $sentenceStart; $j--) {
+                        if (preg_match('/[،,؛;:]$/u', $out[$j])) {
+                            $breakAt = $j;
+                            break;
+                        }
+                    }
+                    $out[$breakAt] = preg_replace('/[،,؛;:]$/u', '', $out[$breakAt]).'.';
+                    $sentenceStart = $breakAt + 1;
+                    $sentenceChars = 0;
+                    for ($j = $sentenceStart; $j < count($out); $j++) {
+                        $sentenceChars += mb_strlen($out[$j]) + 1;
+                    }
+                }
+
+                $out[] = $word;
+                $sentenceChars += $wordChars;
+                if (preg_match('/[.!?؟…]["»”)\]]*$/u', $word)) {
+                    $sentenceStart = count($out);
+                    $sentenceChars = 0;
+                }
+            }
+
+            $lines[$i] = implode(' ', $out);
+        }
+
+        return trim(implode("\n", $lines));
+    }
+
+    /**
+     * Split text into pieces under the API's per-request byte limit,
+     * breaking at sentence ends, then at spaces, then mid-word as a last resort.
+     *
+     * @return array<int, string>
+     */
+    public static function splitForByteLimit(string $text, int $maxBytes = self::MAX_INPUT_BYTES): array
+    {
+        $text = trim($text);
+        if (strlen($text) <= $maxBytes) {
+            return [$text];
+        }
+
+        $pieces = [];
+        foreach (preg_split('/(?<=[.!?؟؛…\n])\s+/u', $text) ?: [$text] as $sentence) {
+            if (strlen($sentence) <= $maxBytes) {
+                $pieces[] = $sentence;
+                continue;
+            }
+            foreach (preg_split('/\s+/u', $sentence) ?: [$sentence] as $word) {
+                while (strlen($word) > $maxBytes) {
+                    $head = mb_strcut($word, 0, $maxBytes, 'UTF-8');
+                    $pieces[] = $head;
+                    $word = substr($word, strlen($head));
+                }
+                if ($word !== '') {
+                    $pieces[] = $word;
+                }
+            }
+        }
+
+        $chunks = [];
+        $current = '';
+        foreach ($pieces as $piece) {
+            $candidate = $current === '' ? $piece : $current.' '.$piece;
+            if (strlen($candidate) <= $maxBytes) {
+                $current = $candidate;
+                continue;
+            }
+            if ($current !== '') {
+                $chunks[] = $current;
+            }
+            $current = $piece;
+        }
+        if ($current !== '') {
+            $chunks[] = $current;
+        }
+
+        return $chunks;
+    }
+
+    private function requestAudio(array $payload, string $endpoint, int $timeout, bool $verifySsl): string
+    {
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
         if ($apiKey !== '') {
             $separator = str_contains($endpoint, '?') ? '&' : '?';
@@ -127,27 +268,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('Failed to decode speech audio payload.');
         }
 
-        $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
-        $disk = Storage::disk('public');
-
-        if (!$disk->exists('audio')) {
-            $disk->makeDirectory('audio');
-        }
-
-        $disk->put($filename, $binary);
-
-        $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
-        $charCount = mb_strlen($text);
-
-        return [
-            'audio_path' => $filename,
-            'duration_seconds' => $this->estimateDurationSeconds($text),
-            'provider' => $this->name(),
-            'model' => 'google-cloud-tts',
-            'latency_ms' => $latencyMs,
-            'char_count' => $charCount,
-            'cost_estimate_usd' => $this->estimateCost($charCount, $voiceName),
-        ];
+        return $binary;
     }
 
     // ──────────────────────────────────────────────────────────

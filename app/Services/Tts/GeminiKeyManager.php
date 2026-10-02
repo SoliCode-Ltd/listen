@@ -107,9 +107,9 @@ class GeminiKeyManager
      */
     public function getKeyStats(string $keyName): array
     {
-        $rpmLimit = (int) env('GEMINI_TTS_RPM_LIMIT', self::DEFAULT_RPM_LIMIT);
-        $tpmLimit = (int) env('GEMINI_TTS_TPM_LIMIT', self::DEFAULT_TPM_LIMIT);
-        $rpdLimit = (int) env('GEMINI_TTS_RPD_LIMIT', self::DEFAULT_RPD_LIMIT);
+        $rpmLimit = $this->rpmLimit();
+        $tpmLimit = (int) config('services.gemini_tts.tpm_limit', self::DEFAULT_TPM_LIMIT);
+        $rpdLimit = (int) config('services.gemini_tts.rpd_limit', self::DEFAULT_RPD_LIMIT);
 
         $rpmUsed = $this->getRpmUsage($keyName);
         $tpmUsed = $this->getTpmUsage($keyName);
@@ -168,8 +168,7 @@ class GeminiKeyManager
     {
         // Set RPM to limit to prevent use until minute expires
         $cacheKey = $this->cacheKey('rpm', $keyName);
-        $rpmLimit = (int) env('GEMINI_TTS_RPM_LIMIT', self::DEFAULT_RPM_LIMIT);
-        Cache::put($cacheKey, $rpmLimit, self::CACHE_TTL_MINUTE);
+        Cache::put($cacheKey, $this->rpmLimit(), self::CACHE_TTL_MINUTE);
 
         Log::warning('Gemini key marked as exhausted', ['key' => $keyName]);
     }
@@ -284,6 +283,11 @@ class GeminiKeyManager
     }
 
     // ---------- Private helpers ----------
+
+    private function rpmLimit(): int
+    {
+        return (int) config('services.gemini_tts.rpm_limit', self::DEFAULT_RPM_LIMIT);
+    }
 
     private function getRpmUsage(string $keyName): int
     {

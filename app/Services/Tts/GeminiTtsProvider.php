@@ -405,8 +405,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $endpoint = $this->buildEndpoint($model);
         $payload = $this->buildSingleSpeakerPayload($model, $text, $stylePrompt, $voiceName, $languageCode);
 
-        $response = $this->callGeminiApi($endpoint, $payload);
-        $audio = $this->extractAudioFromResponse($response);
+        $audio = $this->requestAudio($endpoint, $payload);
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
 
         return [
@@ -442,8 +441,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             );
         $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
 
-        $response = $this->callGeminiApi($endpoint, $payload);
-        $audio = $this->extractAudioFromResponse($response);
+        $audio = $this->requestAudio($endpoint, $payload);
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
 
         return [
@@ -639,6 +637,42 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
+     * Send the request and return its audio, retrying transient failures.
+     *
+     * @return array{bytes:string,mime_type:?string}
+     */
+    private function requestAudio(string $endpoint, array $payload): array
+    {
+        $retries = max(0, (int) config('services.gemini_tts.transient_retries', 2));
+        // A slow failure would push the dashboard request past the web
+        // server timeout if repeated; let the Google fallback take over instead.
+        $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
+        $startedAt = microtime(true);
+
+        for ($attempt = 0; ; $attempt++) {
+            try {
+                return $this->extractAudioFromResponse($this->callGeminiApi($endpoint, $payload));
+            } catch (TransientGeminiException $e) {
+                $elapsed = microtime(true) - $startedAt;
+                if ($attempt >= $retries || $elapsed >= $retryBudgetSeconds) {
+                    throw $e;
+                }
+
+                Log::warning('Gemini TTS transient failure, retrying.', [
+                    'attempt' => $attempt + 1,
+                    'elapsed_seconds' => round($elapsed, 1),
+                    'error' => mb_substr($e->getMessage(), 0, 300),
+                ]);
+
+                $pauseMs = max(0, (int) config('services.gemini_tts.retry_pause_ms', 600));
+                if ($pauseMs > 0) {
+                    usleep($pauseMs * 1000 * ($attempt + 1));
+                }
+            }
+        }
+    }
+
+    /**
      * Call the Gemini API with automatic API-key rotation on 429 errors.
      */
     private function callGeminiApi(string $endpoint, array $payload): array
@@ -692,6 +726,15 @@ class GeminiTtsProvider implements TtsProviderInterface
                 continue;
             }
 
+            if ($response->serverError()) {
+                Log::warning('Gemini TTS API returned a server error', [
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 500),
+                    'key' => $keyInfo['name'],
+                ]);
+                throw new TransientGeminiException('Gemini TTS request failed (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
+            }
+
             if (!$response->ok()) {
                 Log::error('Gemini TTS API returned error', [
                     'status' => $response->status(),
@@ -718,14 +761,24 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function extractAudioFromResponse(array $response): array
     {
+        $blockReason = $response['promptFeedback']['blockReason'] ?? null;
+        if (is_string($blockReason) && $blockReason !== '') {
+            throw new \RuntimeException('Gemini TTS blocked the prompt: ' . $blockReason);
+        }
+
         $candidates = $response['candidates'] ?? [];
         if (!is_array($candidates) || empty($candidates)) {
-            throw new \RuntimeException('Gemini TTS response contains no candidates.');
+            throw new TransientGeminiException('Gemini TTS response contains no candidates.');
+        }
+
+        $finishReason = (string) ($candidates[0]['finishReason'] ?? '');
+        if (in_array($finishReason, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'], true)) {
+            throw new \RuntimeException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
         }
 
         $parts = $candidates[0]['content']['parts'] ?? [];
         if (!is_array($parts)) {
-            throw new \RuntimeException('Gemini TTS response contains no parts.');
+            throw new TransientGeminiException('Gemini TTS response contains no parts (finishReason ' . ($finishReason ?: 'none') . ').');
         }
 
         foreach ($parts as $part) {
@@ -744,7 +797,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
         }
 
-        throw new \RuntimeException('Gemini TTS response contains no audio data.');
+        throw new TransientGeminiException('Gemini TTS response contains no audio data (finishReason ' . ($finishReason ?: 'none') . ').');
     }
 
     /**
