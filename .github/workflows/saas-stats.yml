@@ -58,6 +58,10 @@ jobs:
             echo "::notice::SSH secrets for target '${{ matrix.target }}' are not set; skipping."
             exit 0
           fi
+          # Pasted secrets often carry a trailing space or newline, which breaks the login.
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          echo "Connecting as a ${#SSH_USER}-character user name to a ${#SSH_HOST}-character host."
           case "$MONTHS" in ''|*[!0-9]*) echo "::error::months must be a number"; exit 1 ;; esac
 
           install -m 700 -d ~/.ssh
