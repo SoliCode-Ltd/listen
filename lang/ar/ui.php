@@ -1118,6 +1118,7 @@ return [
     // ===== BACKEND MESSAGES =====
     'backend' => [
         'auth_invalid_credentials' => 'بريد إلكتروني أو كلمة مرور غير صحيحة.',
+        'auth_too_many_attempts' => 'محاولات كثيرة جداً. يرجى الانتظار :seconds ثانية ثم المحاولة مرة أخرى.',
         'auth_social_not_configured' => 'تسجيل الدخول عبر جوجل غير مهيأ حالياً.',
         'auth_social_session_expired' => 'انتهت جلسة تسجيل الدخول. يرجى المحاولة مرة أخرى.',
         'auth_social_failed' => 'فشل تسجيل الدخول عبر جوجل. يرجى المحاولة مرة أخرى.',

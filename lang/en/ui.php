@@ -1113,6 +1113,7 @@ return [
     // ===== BACKEND MESSAGES =====
     'backend' => [
         'auth_invalid_credentials' => 'Invalid email or password.',
+        'auth_too_many_attempts' => 'Too many attempts. Please wait :seconds seconds and try again.',
         'auth_social_not_configured' => 'Google sign-in is not configured right now.',
         'auth_social_session_expired' => 'Your sign-in session expired. Please try again.',
         'auth_social_failed' => 'Google sign-in failed. Please try again.',

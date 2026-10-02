@@ -26,7 +26,8 @@ class FirebaseTokenVerifier
      *   email_verified: bool,
      *   display_name: string|null,
      *   photo_url: string|null,
-     *   provider_ids: array<int, string>
+     *   provider_ids: array<int, string>,
+     *   provider_emails: array<string, string>
      * }
      */
     public function verify(string $idToken, ?string $expectedProvider = null): array
@@ -87,6 +88,16 @@ class FirebaseTokenVerifier
             ->values()
             ->all();
 
+        // The email each sign-in provider vouches for. For Google this is the Google
+        // account's own address, unlike the top-level email which another provider
+        // (e.g. email/password) may have set without verification.
+        $providerEmails = collect($providerInfo)
+            ->filter(static fn ($item): bool => is_array($item) && trim((string) ($item['email'] ?? '')) !== '')
+            ->mapWithKeys(static fn (array $item): array => [
+                strtolower(trim((string) ($item['providerId'] ?? ''))) => trim((string) $item['email']),
+            ])
+            ->all();
+
         if ($expectedProvider !== null && ! in_array($expectedProvider, $providerIds, true)) {
             throw new RuntimeException("firebase_token_not_{$expectedProvider}_provider");
         }
@@ -108,6 +119,7 @@ class FirebaseTokenVerifier
             'display_name' => $displayName !== '' ? $displayName : null,
             'photo_url' => $photoUrl !== '' ? $photoUrl : null,
             'provider_ids' => $providerIds,
+            'provider_emails' => $providerEmails,
         ];
     }
 

@@ -71,7 +71,7 @@ class AuthenticationSettingsFlowTest extends TestCase
         $mock = Mockery::mock(PhoneAuthBridgeService::class);
         $mock->shouldReceive('resolveUserFromIdToken')
             ->once()
-            ->with('mocked_id_token')
+            ->with('mocked_id_token', Mockery::any())
             ->andReturn($user);
 
         $this->app->instance(PhoneAuthBridgeService::class, $mock);

@@ -46,6 +46,7 @@ class AdminPanelProvider extends PanelProvider
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
                 \App\Http\Middleware\ForceAdminLocale::class,
+                \App\Http\Middleware\SecurityHeaders::class,
             ])
             ->authMiddleware([
                 Authenticate::class,

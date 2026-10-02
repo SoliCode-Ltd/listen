@@ -76,7 +76,10 @@ class PhoneAuthBridgeService
     {
         $identity = $this->firebaseTokenVerifier->verify($idToken, 'google.com');
         $firebaseUid = $identity['uid'];
-        $email = $identity['email'];
+        // Prefer the address of the Google identity itself: the top-level Firebase
+        // email can come from another provider and need not be verified.
+        $googleEmail = $identity['provider_emails']['google.com'] ?? null;
+        $email = $googleEmail ?: $identity['email'];
         $displayName = $identity['display_name'];
         $photoUrl = $identity['photo_url'];
 
@@ -84,6 +87,11 @@ class PhoneAuthBridgeService
 
         if (! $user && $email) {
             $user = User::query()->where('email', $email)->first();
+
+            // Never take over an existing account on the strength of an unverified address.
+            if ($user && ! $googleEmail && ! $identity['email_verified']) {
+                throw new RuntimeException('google_email_not_verified');
+            }
 
             if ($user && filled($user->firebase_uid) && $user->firebase_uid !== $firebaseUid) {
                 throw new RuntimeException('google_account_link_conflict');

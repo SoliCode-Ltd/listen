@@ -131,19 +131,19 @@ Route::group([
     Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
 
     Route::get('/contact-us', [\App\Http\Controllers\ContactController::class, 'show'])->name('contact');
-    Route::post('/contact-us', [\App\Http\Controllers\ContactController::class, 'submit'])->name('contact.submit');
+    Route::post('/contact-us', [\App\Http\Controllers\ContactController::class, 'submit'])->middleware('throttle:contact')->name('contact.submit');
     Route::get('/contact', fn () => redirect()->route('contact', status: 301));
-    Route::post('/contact', [\App\Http\Controllers\ContactController::class, 'submit']);
+    Route::post('/contact', [\App\Http\Controllers\ContactController::class, 'submit'])->middleware('throttle:contact');
 
     Route::middleware('guest')->group(function () {
         Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
         Route::post('/login', [AuthController::class, 'login'])
-            ->middleware('auth.method:email')
+            ->middleware(['auth.method:email', 'throttle:login'])
             ->name('login.submit');
 
         Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
         Route::post('/register', [AuthController::class, 'register'])
-            ->middleware('auth.method:email')
+            ->middleware(['auth.method:email', 'throttle:register'])
             ->name('register.submit');
 
         Route::get('/auth/social/redirect', [AuthController::class, 'redirectToGoogle'])
@@ -159,11 +159,11 @@ Route::group([
             ->middleware('auth.method:google');
 
         Route::post('/auth/phone/verify', [AuthController::class, 'phoneAuthenticate'])
-            ->middleware('auth.method:phone')
+            ->middleware(['auth.method:phone', 'throttle:auth-bridge'])
             ->name('auth.phone.verify');
 
         Route::post('/auth/firebase-google/verify', [AuthController::class, 'firebaseGoogleAuthenticate'])
-            ->middleware('auth.method:firebase_google')
+            ->middleware(['auth.method:firebase_google', 'throttle:auth-bridge'])
             ->name('auth.firebase-google.verify');
     });
 

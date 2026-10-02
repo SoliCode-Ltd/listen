@@ -53,6 +53,8 @@ class AdminManualPaymentProofController extends Controller
 
         return response()->file($absolutePath, [
             'Content-Disposition' => 'inline; filename="'.basename($absolutePath).'"',
+            'X-Content-Type-Options' => 'nosniff',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 }

@@ -11,7 +11,13 @@ class MediaController extends Controller
     public function show(Request $request, string $path)
     {
         $normalized = ltrim(str_replace('\\', '/', trim($path)), '/');
-        if ($normalized === '' || str_contains($normalized, '..')) {
+        if ($normalized === '' || str_contains($normalized, '..') || str_contains($normalized, "\0")) {
+            abort(404);
+        }
+
+        // Never serve hidden files (.htaccess, .env, …) or server-side source code.
+        $extension = strtolower(pathinfo($normalized, PATHINFO_EXTENSION));
+        if (preg_match('#(^|/)\.#', $normalized) === 1 || in_array($extension, ['php', 'phtml', 'phar', 'env', 'log', 'sql', 'ini'], true)) {
             abort(404);
         }
 
