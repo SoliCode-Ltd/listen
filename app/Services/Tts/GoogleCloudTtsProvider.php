@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\TextChunker;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Support\Facades\Cache;
@@ -195,47 +196,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
      */
     public static function splitForByteLimit(string $text, int $maxBytes = self::MAX_INPUT_BYTES): array
     {
-        $text = trim($text);
-        if (strlen($text) <= $maxBytes) {
-            return [$text];
-        }
-
-        $pieces = [];
-        foreach (preg_split('/(?<=[.!?؟؛…\n])\s+/u', $text) ?: [$text] as $sentence) {
-            if (strlen($sentence) <= $maxBytes) {
-                $pieces[] = $sentence;
-                continue;
-            }
-            foreach (preg_split('/\s+/u', $sentence) ?: [$sentence] as $word) {
-                while (strlen($word) > $maxBytes) {
-                    $head = mb_strcut($word, 0, $maxBytes, 'UTF-8');
-                    $pieces[] = $head;
-                    $word = substr($word, strlen($head));
-                }
-                if ($word !== '') {
-                    $pieces[] = $word;
-                }
-            }
-        }
-
-        $chunks = [];
-        $current = '';
-        foreach ($pieces as $piece) {
-            $candidate = $current === '' ? $piece : $current.' '.$piece;
-            if (strlen($candidate) <= $maxBytes) {
-                $current = $candidate;
-                continue;
-            }
-            if ($current !== '') {
-                $chunks[] = $current;
-            }
-            $current = $piece;
-        }
-        if ($current !== '') {
-            $chunks[] = $current;
-        }
-
-        return $chunks;
+        return TextChunker::split($text, $maxBytes, 'strlen');
     }
 
     private function requestAudio(array $payload, string $endpoint, int $timeout, bool $verifySsl): string
