@@ -85,6 +85,9 @@ return [
         'retry_pause_ms' => (int) env('GEMINI_TTS_RETRY_PAUSE_MS', 600),
         // No retry once this many seconds have gone, so slow failures fall back at once.
         'retry_budget_seconds' => (int) env('GEMINI_TTS_RETRY_BUDGET_SECONDS', 20),
+        // Longer single-voice texts are read in pieces sent at the same time.
+        'max_chars_per_request' => (int) env('GEMINI_TTS_MAX_CHARS_PER_REQUEST', 900),
+        'max_parallel_requests' => (int) env('GEMINI_TTS_MAX_PARALLEL_REQUESTS', 4),
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),
