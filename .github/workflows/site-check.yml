@@ -1,0 +1,68 @@
+name: Site security check
+
+# Read-only checks of the live and staging sites:
+#  1. From the outside: sensitive paths must not be reachable, security headers.
+#  2. Over SSH: security-relevant configuration flags (never secret values).
+# Uses the same SSH secrets as the "SaaS stats" workflow.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/clever-darwin-qt43hw]
+    paths:
+      - .github/workflows/site-check.yml
+      - scripts/security/**
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [staging, live]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Probe public URLs
+        env:
+          BASE: ${{ matrix.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
+        run: |
+          for path in / /.env /.env.example /.git/config /.git/HEAD /composer.json /composer.lock /artisan \
+                      /storage/logs/laravel.log /media/index.php /media/.htaccess /media/../.env \
+                      /_ignition/health-check /telescope /horizon /phpinfo.php /info.php /up \
+                      /api/reader/profile /api/extension/config /admin/login; do
+            code=$(curl -s --path-as-is -o /dev/null -w '%{http_code}' --max-time 20 "$BASE$path" || echo 000)
+            echo "$code  $path"
+          done
+          echo
+          echo "== Response headers for / =="
+          curl -sI --max-time 20 "$BASE/" | grep -iE '^(strict-transport-security|x-frame-options|x-content-type-options|content-security-policy|referrer-policy|permissions-policy|server|x-powered-by|set-cookie)' | sed -E 's/(=)[^;]*/\1…/'
+
+      - name: Configuration flags over SSH
+        env:
+          SSH_HOST: ${{ matrix.target == 'live' && secrets.LIVE_SSH_HOST || secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ matrix.target == 'live' && secrets.LIVE_SSH_USER || secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ matrix.target == 'live' && secrets.LIVE_SSH_KEY || secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ matrix.target == 'live' && secrets.LIVE_APP_PATH || secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::notice::SSH secrets for '${{ matrix.target }}' are not set; skipping."
+            exit 0
+          fi
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/security/config_check.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_check
