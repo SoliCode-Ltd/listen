@@ -234,7 +234,9 @@ class AuthController extends Controller
         }
 
         $email = trim((string) $googleUser->getEmail());
-        if ($email === '') {
+        // Google reports whether it verified the address; never match an account by an unverified one.
+        $emailVerified = $googleUser->user['email_verified'] ?? $googleUser->user['verified_email'] ?? true;
+        if ($email === '' || $emailVerified === false || $emailVerified === 'false') {
             return redirect()->route('login')->withErrors([
                 'email' => __('ui.backend.auth_social_no_email'),
             ]);
