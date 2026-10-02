@@ -182,8 +182,38 @@ class PaidGenerationResilienceTest extends TestCase
 
         $broken = GoogleCloudTtsProvider::breakLongSentences('aaa bbb, ccc ddd eee fff', 16);
 
-        $this->assertSame('aaa bbb. ccc ddd eee fff', $broken);
-        $this->assertSame("line one\nline two", GoogleCloudTtsProvider::breakLongSentences("line one\nline two"));
+        $this->assertSame('aaa bbb. ccc ddd eee fff.', $broken);
+        $this->assertSame("line one.\nline two.", GoogleCloudTtsProvider::breakLongSentences("line one\nline two"));
+        $this->assertSame("asked? yes.\ndone.", GoogleCloudTtsProvider::breakLongSentences("asked? yes،\ndone."));
+    }
+
+    public function test_story_split_only_by_line_breaks_reaches_google_as_short_sentences(): void
+    {
+        $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
+        $line = trim(str_repeat('كلام عراقي من القلب ', 4));
+        $text = 'سالفة '.implode("\n", array_fill(0, 28, $line));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertTrue($result['fallback_used']);
+        $this->assertGreaterThan(1, count($calls->googleTexts));
+        foreach ($calls->googleTexts as $chunk) {
+            $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_INPUT_BYTES, strlen($chunk));
+            foreach (preg_split('/(?<=[.!?؟…])\s+/u', $chunk) as $sentence) {
+                $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_SENTENCE_CHARS, mb_strlen($sentence));
+            }
+        }
+    }
+
+    public function test_google_api_key_is_sent_in_a_header_not_the_url(): void
+    {
+        $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
+
+        app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'texttospeech')
+            && ! str_contains($request->url(), 'test-google-key')
+            && $request->header('X-Goog-Api-Key') === ['test-google-key']);
     }
 
     public function test_key_limits_come_from_config_so_config_cache_keeps_them(): void
