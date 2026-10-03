@@ -322,4 +322,41 @@ class StandardVoiceEngineTest extends TestCase
         $this->assertSame(1, $calls['gemini']);
         $this->assertSame(['en-US-Chirp3-HD-Leda'], $calls['google']);
     }
+
+    public function test_demo_ships_plain_samples_for_standard_quality(): void
+    {
+        Plan::query()->create([
+            'slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'monthly_minutes' => 10,
+            'monthly_chars' => 10000, 'monthly_requests' => 60, 'max_chars_per_request' => 1200,
+            'voice_tier' => 'standard', 'tts_provider_policy' => 'google_cloud', 'is_active' => true,
+        ]);
+        $this->actingAs(User::factory()->create());
+
+        $samples = $this->demoSampleScripts($this->getLocalizedRoute('demo.page')->assertOk()->getContent());
+
+        $this->assertIsArray($samples);
+        $this->assertStringContainsString('[', $samples['hd']['ar'], 'HD keeps the directed script');
+        foreach (['ar', 'en'] as $lang) {
+            $plain = $samples['standard'][$lang];
+            $this->assertNotSame('', $plain);
+            $this->assertDoesNotMatchRegularExpression('/[\[\]()]|\d/u', $plain, "Standard {$lang} sample must be plain sentences");
+        }
+
+        SiteSetting::set('demo_sample_standard_ar', 'نص عادي من الإدارة.', 'general');
+        Cache::flush();
+        $samples = $this->demoSampleScripts($this->getLocalizedRoute('demo.page')->getContent());
+        $this->assertSame('نص عادي من الإدارة.', $samples['standard']['ar']);
+    }
+
+    /**
+     * The page embeds the samples as JSON.parse('...') via Js::from.
+     */
+    private function demoSampleScripts(string $html): ?array
+    {
+        if (! preg_match("/const sampleScripts = JSON\\.parse\\('(.*?)'\\);/s", $html, $m)) {
+            return null;
+        }
+
+        return json_decode((string) json_decode('"'.$m[1].'"'), true);
+    }
 }

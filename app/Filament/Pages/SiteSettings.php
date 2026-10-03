@@ -36,6 +36,8 @@ class SiteSettings extends Page implements HasForms
             'whatsapp_number' => SiteSetting::get('whatsapp_number', '201553212603'),
             'demo_sample_ar' => SiteSetting::get('demo_sample_ar', ''),
             'demo_sample_en' => SiteSetting::get('demo_sample_en', ''),
+            'demo_sample_standard_ar' => SiteSetting::get('demo_sample_standard_ar', ''),
+            'demo_sample_standard_en' => SiteSetting::get('demo_sample_standard_en', ''),
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
             'custom_css' => SiteSetting::get('custom_css', ''),
@@ -93,7 +95,7 @@ class SiteSettings extends Page implements HasForms
                             ->columnSpanFull(),
                     ]),
                 Forms\Components\Section::make('Demo Page Sample Texts')
-                    ->description('The sample texts loaded when users click the English/Arabic sample chips on the demo page. Leave empty to use the built-in default.')
+                    ->description('The sample texts loaded when users click the English/Arabic sample chips on the demo page. HD samples can carry timings and [tags]; Standard samples must be plain text. Leave empty to use the built-in default.')
                     ->columns(1)
                     ->collapsible()
                     ->schema([
@@ -105,6 +107,14 @@ class SiteSettings extends Page implements HasForms
                             ->label('Arabic Sample Text')
                             ->rows(10)
                             ->helperText('Shown when the user clicks the "Arabic sample" chip on the demo page.'),
+                        Forms\Components\Textarea::make('demo_sample_standard_en')
+                            ->label('English Sample Text (Standard quality)')
+                            ->rows(4)
+                            ->helperText('Used instead when the demo is set to Standard quality. Standard voices read every character, so use plain sentences only: no timings, [tags] or (stage directions).'),
+                        Forms\Components\Textarea::make('demo_sample_standard_ar')
+                            ->label('Arabic Sample Text (Standard quality)')
+                            ->rows(4)
+                            ->helperText('Used instead when the demo is set to Standard quality. Plain sentences only.'),
                     ]),
                 Forms\Components\Section::make('Anti-Abuse')
                     ->columns(2)
