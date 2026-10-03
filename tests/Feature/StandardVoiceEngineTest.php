@@ -359,4 +359,37 @@ class StandardVoiceEngineTest extends TestCase
 
         return json_decode((string) json_decode('"'.$m[1].'"'), true);
     }
+
+    public function test_gemini_directions_are_not_read_aloud_by_google_voices(): void
+    {
+        $this->useEngine(StandardVoiceEngine::CHIRP3_HD);
+
+        $script = "(00-03ث) [هادئ + فضولي]: \"تخيّل… (نفَس خفيف) كلماتك تبقى صوت طبيعي.\"\n\n"
+            ."(سكتة 0.5 ثانية)\n\n"
+            .'(03-06ث) [خفيف + ضحكة بسيطة]: "(يضحك بخفة) مع إسمع الموضوع أسهل."';
+
+        app(GoogleCloudTtsProvider::class)->synthesize($script, 'ar', [
+            'voice_name' => 'ar-XA-Wavenet-A',
+            'tier' => 'standard',
+            'gender' => 'female',
+        ]);
+
+        $sent = implode(' ', array_map(fn ($d) => $d['input']['text'], $this->sentVoices()));
+        $this->assertStringContainsString('تخيّل… كلماتك تبقى صوت طبيعي.', $sent);
+        $this->assertStringContainsString('مع إسمع الموضوع أسهل.', $sent);
+        foreach (['[', ']', '00-03', 'نفَس', 'يضحك', 'سكتة'] as $markup) {
+            $this->assertStringNotContainsString($markup, $sent);
+        }
+    }
+
+    public function test_ordinary_brackets_and_quotes_are_kept(): void
+    {
+        $text = 'منظمة الصحة العالمية (WHO) أعلنت اليوم. Call (555) 123-4567 at 3-5 pm. '
+            .'He said "hello" (in 2020) and it was a breathtaking view (the best).';
+
+        $this->assertSame($text, GoogleCloudTtsProvider::stripPerformanceMarkup($text));
+        $this->assertSame('"but tomorrow"', GoogleCloudTtsProvider::stripPerformanceMarkup('"(soft sigh) but tomorrow"'));
+        $this->assertSame('Next line.', GoogleCloudTtsProvider::stripPerformanceMarkup("(pause 0.5s)\nNext line."));
+        $this->assertSame('[ ]', GoogleCloudTtsProvider::stripPerformanceMarkup('[ ]'), 'never returns empty text');
+    }
 }

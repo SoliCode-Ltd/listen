@@ -110,7 +110,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         // MP3 frames can be joined end to end; other encodings carry a header
         // per file, so they keep the single-request behaviour.
-        $text = self::breakLongSentences($text);
+        $text = self::breakLongSentences(self::stripPerformanceMarkup($text));
         $chunks = $audioConfig['audioEncoding'] === 'MP3'
             ? self::splitForByteLimit($text, self::MAX_INPUT_BYTES)
             : [mb_substr($text, 0, 5000)];
@@ -140,6 +140,47 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             'char_count' => $charCount,
             'cost_estimate_usd' => $this->estimateCost($charCount, $voiceName),
         ];
+    }
+
+    /**
+     * Google voices read every character, so the directions written for
+     * Gemini come out as noise: [tone tags], (00-03s) timings and cues such
+     * as (soft sigh) or (يضحك بخفة). Remove them and keep the words.
+     * Ordinary text in brackets, like (WHO), is left alone.
+     */
+    public static function stripPerformanceMarkup(string $text): string
+    {
+        $cueWords = 'pause|silence|beat|laugh|laughs|laughing|chuckle|chuckles|giggle|sigh|sighs|breath|breathes|inhale|exhale|whisper|whispers|whispering|softly|cough|clears throat|smile|smiles'
+            .'|سكتة|سكوت|صمت|وقفة|توقف|يضحك|تضحك|ضحكة|ضحك|يبتسم|تبتسم|ابتسامة|تنهد|تنهيدة|يتنهد|تتنهد|همس|يهمس|تهمس|نفس|شهيق|زفير|بهدوء';
+
+        $clean = preg_replace([
+            // [calm + questioning], [هادئ + تساؤل]
+            '/\[[^\[\]\n]{1,60}\]/u',
+            // (00-03s), (03–07ث), (0:00-0:03), (pause 0.5s), (سكتة 0.5 ثانية)
+            '/\(\s*[\d٠-٩][\d٠-٩:.,\s]*[-–—][\s\d٠-٩:.,]*(?:s|sec|secs|seconds|ث|ثانية|ثوان|ثواني)?\s*\)/iu',
+        ], ' ', $text) ?? $text;
+
+        // (light chuckle), (soft sigh), (يضحك بخفة), (نفَس خفيف): matched with
+        // Arabic diacritics ignored, so a vowelled cue word still counts.
+        $clean = preg_replace_callback('/\(([^()\n]{1,40})\)/u', function (array $m) use ($cueWords): string {
+            $plain = preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $m[1]) ?? $m[1];
+
+            return preg_match('/(?:^|[^\p{L}])(?:'.$cueWords.')(?:$|[^\p{L}])/iu', $plain) ? ' ' : $m[0];
+        }, $clean) ?? $clean;
+
+        $lines = [];
+        foreach (preg_split('/\R/u', $clean) ?: [$clean] as $line) {
+            // A line that was only a label ("(00-03s) [calm]:") leaves a stray colon.
+            $line = trim((string) preg_replace('/^[\s:：،,.\-–—]+/u', '', $line));
+            $line = trim((string) preg_replace('/\s{2,}/u', ' ', $line));
+            // Close the gap a removed cue leaves inside quotes ("(laughs) Hi" → "Hi").
+            $line = (string) preg_replace(['/^"\s+/u', '/\s+"$/u', '/([«“])\s+/u', '/\s+([»”])/u'], ['"', '"', '$1', '$1'], $line);
+            $lines[] = $line;
+        }
+
+        $clean = trim((string) preg_replace("/\n{3,}/", "\n\n", implode("\n", $lines)));
+
+        return preg_match('/[\p{L}\p{N}]/u', $clean) ? $clean : $text;
     }
 
     /**
