@@ -183,4 +183,43 @@ class MemberCountryTest extends TestCase
         $this->assertNull($a->fresh()->country_code, 'skipped, retried on the next run');
         $this->assertSame('SA', $b->fresh()->country_code);
     }
+
+    public function test_admin_lists_show_and_filter_by_country(): void
+    {
+        $plan = \App\Models\Plan::create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_chars' => 500000,
+            'monthly_minutes' => 120, 'monthly_requests' => 1000, 'max_chars_per_request' => 5000,
+            'allow_overage' => false, 'is_active' => true,
+        ]);
+        $egypt = User::factory()->create(['country_code' => 'EG']);
+        $saudi = User::factory()->create(['country_code' => 'SA']);
+        $unknown = User::factory()->create(['country_code' => null]);
+        $subEgypt = \App\Models\Subscription::create(['user_id' => $egypt->id, 'plan_id' => $plan->id, 'status' => 'active']);
+        $subSaudi = \App\Models\Subscription::create(['user_id' => $saudi->id, 'plan_id' => $plan->id, 'status' => 'active']);
+
+        $this->actingAs(User::factory()->create(['is_admin' => true, 'country_code' => 'GB']));
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        \Livewire\Livewire::test(\App\Filament\Resources\UserResource\Pages\ListUsers::class)
+            ->assertSee('🇪🇬 Egypt')
+            ->assertSee('🇸🇦 Saudi Arabia')
+            ->filterTable('country_code', 'EG')
+            ->assertCanSeeTableRecords([$egypt])
+            ->assertCanNotSeeTableRecords([$saudi, $unknown]);
+
+        \Livewire\Livewire::test(\App\Filament\Resources\UserResource\Pages\ListUsers::class)
+            ->filterTable('country_code', '__unknown')
+            ->assertCanSeeTableRecords([$unknown])
+            ->assertCanNotSeeTableRecords([$egypt, $saudi]);
+
+        \Livewire\Livewire::test(\App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions::class)
+            ->assertSee('🇸🇦 Saudi Arabia')
+            ->filterTable('country', 'SA')
+            ->assertCanSeeTableRecords([$subSaudi])
+            ->assertCanNotSeeTableRecords([$subEgypt]);
+
+        $this->get(\App\Filament\Resources\UserResource::getUrl('edit', ['record' => $egypt]))
+            ->assertOk()
+            ->assertSee('🇪🇬 Egypt');
+    }
 }

@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use Illuminate\Support\Facades\DB;
+
 /**
  * Country names and the regions the business reports group members into.
  */
@@ -54,6 +56,36 @@ class Countries
         }
 
         return $code;
+    }
+
+    /** "🇪🇬 Egypt", or "—" when the country is not known yet. */
+    public static function label(?string $code): string
+    {
+        $code = strtoupper(trim((string) $code));
+        if (strlen($code) !== 2) {
+            return '—';
+        }
+
+        $flag = mb_chr(0x1F1E6 + ord($code[0]) - 65).mb_chr(0x1F1E6 + ord($code[1]) - 65);
+
+        return $flag.' '.self::name($code);
+    }
+
+    /**
+     * Countries that members are in, for admin filters: ['EG' => '🇪🇬 Egypt', ...].
+     *
+     * @return array<string, string>
+     */
+    public static function optionsInUse(): array
+    {
+        return DB::table('users')
+            ->whereNotNull('country_code')
+            ->distinct()
+            ->orderBy('country_code')
+            ->pluck('country_code')
+            ->mapWithKeys(fn ($code) => [strtoupper((string) $code) => self::label($code)])
+            ->sort()
+            ->all();
     }
 
     public static function region(?string $code): string
