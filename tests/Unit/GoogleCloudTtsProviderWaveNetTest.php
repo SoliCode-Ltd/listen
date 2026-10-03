@@ -44,6 +44,21 @@ class GoogleCloudTtsProviderWaveNetTest extends TestCase
         $this->assertSame('en-US-Neural2-F', $resolved);
     }
 
+    public function test_recorded_cost_uses_the_rate_for_each_voice_family(): void
+    {
+        $provider = new GoogleCloudTtsProvider();
+        $method = (new ReflectionClass(GoogleCloudTtsProvider::class))->getMethod('estimateCost');
+        $method->setAccessible(true);
+
+        $this->assertSame(30.0, $method->invoke($provider, 1_000_000, 'ar-XA-Chirp3-HD-Achernar'));
+        $this->assertSame(16.0, $method->invoke($provider, 1_000_000, 'ar-XA-Wavenet-A'));
+        $this->assertSame(16.0, $method->invoke($provider, 1_000_000, 'en-US-Neural2-F'));
+        $this->assertSame(4.0, $method->invoke($provider, 1_000_000, 'en-US-Standard-C'));
+
+        config(['analytics.google_cloud_tts.per_million_chars.chirp3-hd' => 32]);
+        $this->assertSame(32.0, $method->invoke($provider, 1_000_000, 'ar-XA-Chirp3-HD-Achernar'));
+    }
+
     private function invokeResolveGoogleVoiceName(string $voiceName, string $language, string $tier, string $gender): string
     {
         $provider = new GoogleCloudTtsProvider();
