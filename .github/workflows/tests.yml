@@ -7,7 +7,7 @@ name: Tests
 on:
   pull_request:
   push:
-    branches: [main, claude/clever-darwin-qt43hw]
+    branches: [main, claude/clever-darwin-qt43hw, claude/elegant-ptolemy-nsecia]
 
 permissions:
   contents: read

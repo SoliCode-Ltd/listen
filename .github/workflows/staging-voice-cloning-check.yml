@@ -1,0 +1,98 @@
+name: Staging voice cloning check
+
+# Read-only health check of voice cloning on STAGING.
+# Pipes scripts/tts/voice_cloning_check.php over SSH into the staging app's PHP:
+# server setup, the Gemini Voices API, cloned-voice rows (stuck, missing files,
+# orphans on Gemini), and, unless turned off, two short lines spoken with the
+# newest ready cloned voice. The database session is READ ONLY; the audio files
+# the synthesis writes are deleted again and come back here as an artifact.
+# Same secrets as the SaaS stats workflow (STAGING_SSH_*).
+
+on:
+  workflow_dispatch:
+    inputs:
+      synthesize:
+        description: Speak two short test lines with the newest ready cloned voice
+        type: boolean
+        default: true
+  push:
+    branches: [claude/elegant-ptolemy-nsecia]
+    paths:
+      - .github/workflows/staging-voice-cloning-check.yml
+      - scripts/tts/voice_cloning_check.php
+
+permissions:
+  contents: read
+
+concurrency:
+  group: staging-voice-cloning-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run on staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          CLONE_SYNTH: ${{ (github.event_name != 'workflow_dispatch' || inputs.synthesize) && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::error::Staging SSH secrets are not set."
+            exit 1
+          fi
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; CLONE_SYNTH=$CLONE_SYNTH php"
+          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/tts/voice_cloning_check.php > result.json
+          rm -f ~/.ssh/id_check
+
+      - name: Install ffprobe
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg > /dev/null
+
+      - name: Summarise and save the audio
+        run: |
+          set -euo pipefail
+          mkdir -p audio
+          python3 - <<'EOF'
+          import base64, json, subprocess
+          data = json.load(open('result.json'))
+          for case in data.get('synthesis', []):
+              audio = case.pop('audio_base64', None)
+              if audio:
+                  path = f"audio/{case['name']}.{case.get('format', 'bin')}"
+                  open(path, 'wb').write(base64.b64decode(audio))
+                  probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True)
+                  case['audio_seconds'] = round(float(probe.stdout.strip() or 0), 1) if probe.returncode == 0 else None
+          print(json.dumps(data, ensure_ascii=False, indent=2))
+          json.dump(data, open('summary.json', 'w'), ensure_ascii=False, indent=2)
+          problems = []
+          if not data['voices_api']['ok']:
+              problems.append('Voices API unreachable')
+          if data['db']['stuck_over_20_min']:
+              problems.append(f"{len(data['db']['stuck_over_20_min'])} stuck rows")
+          problems += [f"synthesis {c['name']} failed" for c in data.get('synthesis', []) if not c.get('ok')]
+          print('\nRESULT:', 'PASS' if not problems else 'ATTENTION: ' + '; '.join(problems))
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: staging-voice-cloning-check-${{ github.run_number }}
+          path: |
+            audio/
+            summary.json
+          if-no-files-found: ignore
+          retention-days: 14
