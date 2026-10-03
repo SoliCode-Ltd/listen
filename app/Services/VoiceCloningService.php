@@ -7,7 +7,9 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
+use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
+use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -171,30 +173,22 @@ class VoiceCloningService
         string $voiceCloningKey,
         string $style = '',
     ): array {
-        $text = trim(mb_substr($text, 0, 5000));
+        $text = trim($text);
         if ($text === '') {
             throw new \RuntimeException('TTS text is empty.');
         }
 
         $startTime = microtime(true);
         $style = trim($style);
-        $response = $this->request('POST', '/interactions', $this->interactionPayload($text, $voiceCloningKey, $style), 90);
 
-        if (! $response->successful() && $this->shouldFallbackToGenerateContent($response)) {
-            $response = $this->request('POST', '/models/'.self::MODEL.':generateContent', $this->generateContentPayload($text, $voiceCloningKey, $style), 90);
-        }
+        // Long outputs end with no audio, so long scripts are read in pieces
+        // and joined, the same way the stock Gemini voices are.
+        $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        $chunks = TextChunker::split($text, $maxChars, 'mb_strlen');
+        $audioContent = count($chunks) === 1
+            ? $this->speakPiece($chunks[0], $voiceCloningKey, $style)
+            : $this->joinWavPieces($this->speakPieces($chunks, $voiceCloningKey, $style));
 
-        if (! $response->successful()) {
-            $errorMsg = $this->responseError($response);
-            throw new \RuntimeException('Cloned voice synthesis failed: '.$errorMsg);
-        }
-
-        $audioContent = $this->extractAudioBytes($response->json() ?? []);
-        if ($audioContent === '') {
-            throw new \RuntimeException('Cloned voice synthesis returned no audio.');
-        }
-
-        $audioContent = $this->ensurePlayableAudio($audioContent);
         $packaged = \App\Support\ShareableAudio::package($audioContent);
         $audioContent = $packaged['bytes'];
         $extension = $packaged['extension'];
@@ -211,6 +205,147 @@ class VoiceCloningService
             'char_count' => mb_strlen($text),
             'duration_seconds' => null,
         ];
+    }
+
+    /**
+     * One request, with the generateContent fallback. Returns playable WAV bytes.
+     */
+    private function speakPiece(string $text, string $voiceId, string $style): string
+    {
+        $response = $this->request('POST', '/interactions', $this->interactionPayload($text, $voiceId, $style), 90);
+
+        if (! $response->successful() && $this->shouldFallbackToGenerateContent($response)) {
+            $response = $this->request('POST', '/models/'.self::MODEL.':generateContent', $this->generateContentPayload($text, $voiceId, $style), 90);
+        }
+
+        return $this->audioFromResponse($response);
+    }
+
+    private function audioFromResponse(Response $response): string
+    {
+        if (! $response->successful()) {
+            throw new \RuntimeException('Cloned voice synthesis failed: '.$this->responseError($response));
+        }
+
+        $audio = $this->extractAudioBytes($response->json() ?? []);
+        if ($audio === '') {
+            throw new \RuntimeException('Cloned voice synthesis returned no audio.');
+        }
+
+        return $this->ensurePlayableAudio($audio);
+    }
+
+    /**
+     * Send the pieces in parallel batches so long scripts fit in the job timeout.
+     * A piece that fails is sent again on its own, with key rotation and the fallback.
+     *
+     * @param  array<int, string>  $chunks
+     * @return array<int, string>
+     */
+    private function speakPieces(array $chunks, string $voiceId, string $style): array
+    {
+        $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        $keys = $this->apiKeys();
+        if ($keys === []) {
+            throw new \RuntimeException('Gemini API key is not configured.');
+        }
+        $key = $keys[0]['key'];
+        $verify = (bool) config('services.gemini_tts.verify_ssl', true);
+        $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
+        $parts = [];
+
+        foreach (array_chunk($chunks, $parallel, true) as $batch) {
+            $responses = Http::pool(function (Pool $pool) use ($batch, $baseUrl, $key, $verify, $voiceId, $style) {
+                foreach ($batch as $index => $chunk) {
+                    $pool->as('part'.$index)
+                        ->timeout(90)
+                        ->connectTimeout(20)
+                        ->withOptions(['verify' => $verify])
+                        ->withHeaders([
+                            'Content-Type' => 'application/json',
+                            'x-goog-api-key' => $key,
+                        ])
+                        ->post($baseUrl.'/interactions', $this->interactionPayload($chunk, $voiceId, $style));
+                }
+            });
+
+            foreach ($batch as $index => $chunk) {
+                $response = $responses['part'.$index] ?? null;
+                if ($response instanceof Response && $response->successful()) {
+                    try {
+                        $parts[$index] = $this->audioFromResponse($response);
+
+                        continue;
+                    } catch (\RuntimeException) {
+                        // Sent again on its own below.
+                    }
+                }
+
+                Log::warning('Cloned voice piece failed; sending it again.', [
+                    'piece' => $index + 1,
+                    'pieces' => count($chunks),
+                    'status' => $response instanceof Response ? $response->status() : null,
+                ]);
+                $parts[$index] = $this->speakPiece($chunk, $voiceId, $style);
+            }
+        }
+
+        ksort($parts);
+
+        return $parts;
+    }
+
+    /**
+     * Join WAV pieces into one WAV with a short pause between them.
+     *
+     * @param  array<int, string>  $pieces
+     */
+    private function joinWavPieces(array $pieces): string
+    {
+        $pcm = '';
+        $sampleRate = 24000;
+        $channels = 1;
+        foreach (array_values($pieces) as $i => $piece) {
+            $decoded = $this->wavToPcm($piece);
+            if ($i === 0) {
+                $sampleRate = $decoded['sample_rate'];
+                $channels = $decoded['channels'];
+            } else {
+                $pcm .= str_repeat("\0", (int) round($sampleRate * 0.3) * 2 * $channels);
+            }
+            $samples = $decoded['pcm'];
+            $pcm .= strlen($samples) % 2 === 0 ? $samples : substr($samples, 0, -1);
+        }
+
+        return $this->pcmToWav($pcm, $sampleRate, $channels);
+    }
+
+    /**
+     * @return array{pcm: string, sample_rate: int, channels: int}
+     */
+    private function wavToPcm(string $wav): array
+    {
+        $sampleRate = 24000;
+        $channels = 1;
+        if (! str_starts_with($wav, 'RIFF') || substr($wav, 8, 4) !== 'WAVE') {
+            return ['pcm' => $wav, 'sample_rate' => $sampleRate, 'channels' => $channels];
+        }
+
+        $pcm = '';
+        $offset = 12;
+        while ($offset + 8 <= strlen($wav)) {
+            $id = substr($wav, $offset, 4);
+            $size = unpack('V', substr($wav, $offset + 4, 4))[1];
+            if ($id === 'fmt ' && $size >= 16) {
+                $channels = unpack('v', substr($wav, $offset + 10, 2))[1] ?: 1;
+                $sampleRate = unpack('V', substr($wav, $offset + 12, 4))[1] ?: $sampleRate;
+            } elseif ($id === 'data') {
+                $pcm .= substr($wav, $offset + 8, $size);
+            }
+            $offset += 8 + $size + ($size % 2);
+        }
+
+        return ['pcm' => $pcm, 'sample_rate' => $sampleRate, 'channels' => $channels];
     }
 
     /**
@@ -1064,9 +1199,12 @@ class VoiceCloningService
             $audio = substr($audio, 0, -1);
         }
 
+        return $this->pcmToWav($audio, 24000, 1);
+    }
+
+    private function pcmToWav(string $audio, int $sampleRate, int $channels): string
+    {
         $dataLength = strlen($audio);
-        $sampleRate = 24000;
-        $channels = 1;
         $bitsPerSample = 16;
         $byteRate = $sampleRate * $channels * ($bitsPerSample / 8);
         $blockAlign = $channels * ($bitsPerSample / 8);

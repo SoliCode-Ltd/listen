@@ -441,4 +441,45 @@ class VoiceCloningServiceTest extends TestCase
                 && str_contains((string) ($annotation['style'] ?? ''), 'Najdi Saudi');
         });
     }
+
+    public function test_long_cloned_script_is_read_in_pieces_without_dropping_text(): void
+    {
+        Storage::fake('public');
+        config([
+            'services.gemini_tts.api_key' => 'test-key',
+            'services.gemini_tts.voice_retry_pause' => false,
+            'services.gemini_tts.max_chars_per_request' => 900,
+        ]);
+
+        $pcm = str_repeat("\x01\x00", 2400);
+        $wav = 'RIFF'.pack('V', 36 + strlen($pcm)).'WAVEfmt '.pack('VvvVVvv', 16, 1, 1, 24000, 48000, 2, 16)
+            .'data'.pack('V', strlen($pcm)).$pcm;
+        Http::fake([
+            'https://generativelanguage.googleapis.com/*' => Http::response([
+                'output_audio' => ['data' => base64_encode($wav)],
+            ], 200),
+        ]);
+
+        $sentences = [];
+        for ($i = 1; $i <= 120; $i++) {
+            $sentences[] = "This is sentence number {$i} of a long script.";
+        }
+        $text = implode(' ', $sentences);
+        $this->assertGreaterThan(5000, mb_strlen($text));
+
+        $result = app(VoiceCloningService::class)->synthesizeWithClonedVoice($text, 'en-US', 'voice_long');
+
+        $spoken = [];
+        Http::assertSent(function ($request) use (&$spoken): bool {
+            $piece = (string) ($request->data()['input'][0]['content'][0]['text'] ?? '');
+            $spoken[] = $piece;
+
+            return str_ends_with($request->url(), '/interactions') && mb_strlen($piece) <= 900;
+        });
+
+        $this->assertGreaterThan(5, count($spoken));
+        $this->assertStringContainsString('sentence number 120 of a long script.', implode(' ', $spoken));
+        $this->assertSame(mb_strlen($text), $result['char_count']);
+        Storage::disk('public')->assertExists($result['audio_path']);
+    }
 }

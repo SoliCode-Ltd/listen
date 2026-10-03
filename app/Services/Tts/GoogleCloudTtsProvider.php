@@ -420,10 +420,16 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
     private function estimateCost(int $charCount, string $voiceName): float
     {
-        // Google Cloud TTS pricing: Standard=$4/1M chars, WaveNet=$16/1M chars, Neural2=$16/1M
-        $isWaveNet = str_contains(strtolower($voiceName), '-wavenet-');
-        $isNeural = str_contains(strtolower($voiceName), '-neural2-');
-        $ratePerMillion = ($isWaveNet || $isNeural) ? 16.0 : 4.0;
+        // Rates per 1M chars by voice family (Chirp3-HD $30, WaveNet/Neural2 $16,
+        // Standard $4), set in config/analytics.php so the dashboard uses the same ones.
+        $voice = strtolower($voiceName);
+        $ratePerMillion = (float) config('analytics.google_cloud_tts.default_per_million_chars', 4);
+        foreach ((array) config('analytics.google_cloud_tts.per_million_chars', []) as $pattern => $rate) {
+            if ($pattern !== '' && str_contains($voice, (string) $pattern)) {
+                $ratePerMillion = (float) $rate;
+                break;
+            }
+        }
 
         return round(($charCount / 1_000_000) * $ratePerMillion, 6);
     }
