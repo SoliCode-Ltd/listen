@@ -54,8 +54,19 @@ class BackfillUserCountriesCommand extends Command
         $unresolved = 0;
         $bar = $this->output->createProgressBar($ips->count());
 
+        $failed = 0;
         foreach ($ips as $row) {
-            $country = $pricing->countryForIp((string) $row->ip);
+            try {
+                $country = $pricing->countryForIp((string) $row->ip);
+            } catch (\Throwable $e) {
+                // One bad lookup is skipped; the members keep no country and a later run retries them.
+                $failed++;
+                $country = null;
+                if ($failed === 1) {
+                    $this->newLine();
+                    $this->warn('A lookup failed and was skipped ('.mb_substr($e->getMessage(), 0, 160).'). Continuing.');
+                }
+            }
             if ($country === null) {
                 $unresolved++;
             } else {
@@ -81,7 +92,8 @@ class BackfillUserCountriesCommand extends Command
         $this->table(['Country', 'Members'], collect($found)->take(15)
             ->map(fn ($n, $code) => [Countries::name($code)." ({$code})", $n])->values()->all());
         $this->info(($dryRun ? 'Would update' : 'Updated').' '.($dryRun ? array_sum($found) : $updated).' members; '
-            ."{$unresolved} IP addresses had no country (private address or lookup unavailable).");
+            ."{$unresolved} IP addresses had no country (private address or lookup unavailable)"
+            .($failed > 0 ? ", {$failed} lookups failed with an error" : '').'. Run again to retry the rest.');
 
         return self::SUCCESS;
     }

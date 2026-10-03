@@ -786,9 +786,27 @@ class LocalizedPricingService
             return null;
         }
 
-        return Cache::remember('billing:ip_country:'.sha1($ip), now()->addDays(30), function () use ($ip): ?string {
-            return $this->lookupCountryFromProviders($ip);
-        });
+        $key = 'billing:ip_country:'.sha1($ip);
+        try {
+            $cached = Cache::get($key);
+            if (is_string($cached) && $cached !== '') {
+                return $cached;
+            }
+        } catch (\Throwable) {
+            // An unreadable cache only means one more lookup.
+        }
+
+        $country = $this->lookupCountryFromProviders($ip);
+        if ($country !== null) {
+            try {
+                Cache::put($key, $country, now()->addDays(30));
+            } catch (\Throwable) {
+                // A cache the current user cannot write (for example storage folders
+                // owned by the web server) must not stop the caller.
+            }
+        }
+
+        return $country;
     }
 
     private function countryFromPublicIpLookup(): ?string
