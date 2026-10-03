@@ -146,7 +146,7 @@ class BusinessStatsDashboardTest extends TestCase
         $reader->close();
         unlink($path);
 
-        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Breakdowns'], $names);
+        $this->assertSame(['Summary', 'Monthly', 'Cohorts', 'Plans', 'API usage', 'API by model (30d)', 'API by model (period)', 'API monthly', 'Plan quota usage', 'Countries', 'Regions', 'Breakdowns'], $names);
         $this->assertEquals(3, $summary['Total members (excl. admins)']);
         $this->assertEquals(9, $summary['Est. MRR (USD, list price)']);
     }

@@ -84,6 +84,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
+
         if (! $this->app->environment('testing')) {
             TitanMailbox::preferOverBrokenResend();
         }

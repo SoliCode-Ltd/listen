@@ -89,6 +89,7 @@ class BusinessStatsService
             'cohorts' => fn () => $this->cohorts(),
             'providers' => fn () => $this->providers(),
             'plans' => fn () => $this->plans(),
+            'audience' => fn () => $this->audience(),
             'api_usage' => fn () => (new ApiUsageStats($this->driver, $this->now, $this->since))->build(),
         ];
 
@@ -541,6 +542,91 @@ class BusinessStatsService
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * Who the members are: countries and regions, how they sign up, personal
+     * or work email, and which Arabic dialects they ask for. Aggregates only.
+     */
+    private function audience(): array
+    {
+        $data = ['countries' => [], 'regions' => [], 'with_country' => 0, 'members' => $this->memberQuery()->count()];
+
+        if ($this->hasColumn('users', 'country_code')) {
+            $members = $this->memberQuery()
+                ->selectRaw("coalesce(users.country_code, '') as c, count(*) as n")
+                ->groupBy('c')->pluck('n', 'c');
+            $active = $this->memberGenerations()
+                ->where('audio_generations.created_at', '>=', $this->now->copy()->subDays(30))
+                ->selectRaw("coalesce(users.country_code, '') as c, count(distinct audio_generations.user_id) as n")
+                ->groupBy('c')->pluck('n', 'c');
+            $paying = DB::table('subscriptions')
+                ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
+                ->join('users', 'users.id', '=', 'subscriptions.user_id')
+                ->where('subscriptions.status', 'active')
+                ->where('plans.price_cents', '>', 0)
+                ->when($this->hasColumn('users', 'is_admin'), fn ($q) => $q->where('users.is_admin', false))
+                ->selectRaw("coalesce(users.country_code, '') as c, count(distinct users.id) as n")
+                ->groupBy('c')->pluck('n', 'c');
+
+            $rows = [];
+            foreach ($members as $code => $n) {
+                $rows[] = [
+                    'code' => $code === '' ? null : strtoupper($code),
+                    'country' => \App\Support\Countries::name($code),
+                    'region' => \App\Support\Countries::region($code),
+                    'members' => (int) $n,
+                    'active_30d' => (int) ($active[$code] ?? 0),
+                    'paying' => (int) ($paying[$code] ?? 0),
+                ];
+            }
+            usort($rows, fn ($a, $b) => [$a['code'] === null, -$a['members']] <=> [$b['code'] === null, -$b['members']]);
+            $data['countries'] = $rows;
+            $data['with_country'] = collect($rows)->whereNotNull('code')->sum('members');
+            $data['country_count'] = collect($rows)->whereNotNull('code')->count();
+            $data['arab_world_members'] = collect($rows)->filter(fn ($r) => \App\Support\Countries::isArabWorld($r['code']))->sum('members');
+
+            $regions = [];
+            foreach ($rows as $row) {
+                $r = &$regions[$row['region']];
+                $r ??= ['region' => $row['region'], 'members' => 0, 'active_30d' => 0, 'paying' => 0];
+                $r['members'] += $row['members'];
+                $r['active_30d'] += $row['active_30d'];
+                $r['paying'] += $row['paying'];
+                unset($r);
+            }
+            $data['regions'] = collect($regions)->sortBy(fn ($r) => [$r['region'] === \App\Support\Countries::UNKNOWN, -$r['members']])->values()->all();
+        }
+
+        // Personal webmail or a work / school domain, from the domain only.
+        $personal = ['gmail.com', 'googlemail.com', 'hotmail.com', 'outlook.com', 'live.com', 'msn.com', 'yahoo.com',
+            'icloud.com', 'me.com', 'mac.com', 'aol.com', 'proton.me', 'protonmail.com', 'yandex.com', 'mail.ru', 'gmx.com', 'zoho.com'];
+        $emailTypes = ['Personal email' => 0, 'Work email' => 0];
+        foreach ($this->memberQuery()->pluck('email') as $email) {
+            $domain = strtolower((string) substr(strrchr((string) $email, '@') ?: '', 1));
+            if ($domain === '') {
+                continue;
+            }
+            $isPersonal = in_array($domain, $personal, true)
+                || preg_match('/^(hotmail|outlook|live|yahoo|windowslive)\.[a-z.]+$/', $domain);
+            $emailTypes[$isPersonal ? 'Personal email' : 'Work email']++;
+        }
+        $data['email_types'] = $emailTypes;
+
+        if ($this->hasColumn('audio_generations', 'dialect')) {
+            $labels = collect(\App\Support\TtsStudioConfig::dialectCatalogForLanguage('ar'))
+                ->mapWithKeys(fn (array $row) => [strtolower((string) $row['value']) => (string) $row['label']]);
+            $data['dialects'] = collect($this->pairs(
+                $this->memberGenerations()
+                    ->where('audio_generations.created_at', '>=', $this->since)
+                    ->whereNotNull('audio_generations.dialect')
+                    ->where('audio_generations.dialect', 'like', 'ar%'),
+                'audio_generations.dialect',
+                8
+            ))->mapWithKeys(fn ($n, $code) => [$labels[strtolower((string) $code)] ?? strtoupper((string) $code) => $n])->all();
+        }
+
+        return $data;
     }
 
     private function plans(): array

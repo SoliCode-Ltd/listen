@@ -774,6 +774,23 @@ class LocalizedPricingService
         });
     }
 
+    /**
+     * Country of a stored IP address, for analytics and the member country
+     * backfill. Private and local addresses have no country.
+     */
+    public function countryForIp(string $ip): ?string
+    {
+        $ip = trim($ip);
+        if ($ip === '' || filter_var($ip, FILTER_VALIDATE_IP) === false || $this->isLocalIp($ip)
+            || filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+            return null;
+        }
+
+        return Cache::remember('billing:ip_country:'.sha1($ip), now()->addDays(30), function () use ($ip): ?string {
+            return $this->lookupCountryFromProviders($ip);
+        });
+    }
+
     private function countryFromPublicIpLookup(): ?string
     {
         if (! $this->siteSettingFlag('pricing_public_ip_lookup_enabled', true)) {
@@ -1019,6 +1036,10 @@ class LocalizedPricingService
             ],
             [
                 'url' => $encodedIp !== null ? 'https://ipinfo.io/'.$encodedIp.'/json' : 'https://ipinfo.io/json',
+                'key' => 'country',
+            ],
+            [
+                'url' => $encodedIp !== null ? 'https://api.country.is/'.$encodedIp : 'https://api.country.is/',
                 'key' => 'country',
             ],
         ];

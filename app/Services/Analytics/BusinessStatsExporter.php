@@ -157,6 +157,17 @@ class BusinessStatsExporter
         $sheets['API monthly'] = $this->table($api['monthly'] ?? []);
         $sheets['Plan quota usage'] = $this->table($api['quota_chars_by_month'] ?? []);
 
+        $audience = $s['audience'] ?? [];
+        $sheets['Countries'] = $this->table(array_map(fn (array $r) => [
+            'country' => $r['country'],
+            'code' => $r['code'],
+            'region' => $r['region'],
+            'members' => $r['members'],
+            'active_30d' => $r['active_30d'],
+            'paying' => $r['paying'],
+        ], $audience['countries'] ?? []));
+        $sheets['Regions'] = $this->table($audience['regions'] ?? []);
+
         $breakdowns = [
             ['Members', 'Signup method', $members['signup_method'] ?? []],
             ['Engagement', 'Generations per member', $engagement['generations_per_member'] ?? []],
@@ -173,6 +184,8 @@ class BusinessStatsExporter
             ['Manual payments', 'Method', $manual['by_method'] ?? []],
             ['Growth', 'Referral conversions', $channels['referral_conversions'] ?? []],
             ['API', 'Characters by plan (30d)', $api['chars_by_plan_30d'] ?? []],
+            ['Audience', 'Email type', $audience['email_types'] ?? []],
+            ['Audience', 'Arabic dialect requested (period)', $audience['dialects'] ?? []],
         ];
         $rows = [['Section', 'Breakdown', 'Item', 'Count']];
         foreach ($breakdowns as [$section, $label, $pairs]) {
