@@ -68,6 +68,9 @@ jobs:
             < check.php > result.json
           rm -f ~/.ssh/id_check
 
+      - name: Install ffprobe
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+
       - name: Summarise and save the audio
         run: |
           set -euo pipefail
@@ -87,8 +90,12 @@ jobs:
               if audio:
                   name = re.sub(r'[^A-Za-z0-9.+-]+', '_', case['name']).strip('_') + '.mp3'
                   open('audio/' + name, 'wb').write(base64.b64decode(audio))
-                  probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'audio/' + name], capture_output=True, text=True)
-                  seconds = f" audio={float(probe.stdout.strip() or 0):.1f}s" if probe.returncode == 0 else ' audio=unreadable'
+                  try:
+                      probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'audio/' + name], capture_output=True, text=True)
+                      seconds = f" audio={float(probe.stdout.strip() or 0):.1f}s" if probe.returncode == 0 else ' audio=unreadable'
+                      case['audio_seconds'] = float(probe.stdout.strip() or 0) if probe.returncode == 0 else None
+                  except FileNotFoundError:
+                      seconds = ''
               status = 'OK  ' if case['ok'] else 'FAIL'
               failures += 0 if case['ok'] else 1
               print(f"  {status} {case['name']:<45} {case['voice']:<32} {case['latency_ms']:>6} ms {case.get('bytes', 0):>8} B{seconds} {case.get('error', '')}")
