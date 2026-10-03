@@ -1,0 +1,50 @@
+name: Staging demo audio inspect
+
+# Read-only: shows which engine made the newest Standard-quality demo clips on
+# STAGING (saved engine setting, recorded cost per 1M characters, MP3 format).
+# Pipes scripts/tts/demo_audio_inspect.php over SSH; nothing is written.
+# Same secrets as the SaaS stats workflow (STAGING_SSH_*).
+
+on:
+  workflow_dispatch:
+    inputs:
+      audio:
+        description: Part of a demo audio file name to single out (optional)
+        default: ''
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/staging-demo-inspect.yml
+      - scripts/tts/demo_audio_inspect.php
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+          DEMO_AUDIO: ${{ inputs.audio || '20261003_171553_eFTV7M26Ldus' }}
+        run: |
+          set -euo pipefail
+          case "$DEMO_AUDIO" in *[!A-Za-z0-9_.-]*) echo "::error::audio may only contain letters, digits, _ . -"; exit 1 ;; esac
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; DEMO_AUDIO=$DEMO_AUDIO php"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/tts/demo_audio_inspect.php | tee inspect.json
+          rm -f ~/.ssh/id_inspect
+          python3 -m json.tool inspect.json > /dev/null

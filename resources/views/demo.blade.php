@@ -117,11 +117,20 @@ TXT;
 (15–19s) [warm + encouraging]:
 "Just start… and the rest will follow."
 TXT;
-              $customDemoSampleAr = trim((string) \App\Models\SiteSetting::get('demo_sample_ar', ''));
-              $customDemoSampleEn = trim((string) \App\Models\SiteSetting::get('demo_sample_en', ''));
+              // Standard voices (Google WaveNet / Chirp 3 HD) read every character,
+              // so their samples are plain sentences: no timings, [tags] or (cues).
+              $defaultStandardSampleAr = 'منذ متى وأنت تقول لنفسك إنك ستبدأ؟ في كل مرة تقول: غداً. لكن الغد لا يأتي أبداً. لست بحاجة إلى أن تكون مستعداً تماماً. ابدأ فقط، وسيأتي الباقي.';
+              $defaultStandardSampleEn = "How long have you been telling yourself you'll start? Every time, you say: tomorrow. But tomorrow never comes. You don't need to be completely ready. Just start, and the rest will follow.";
+              $sampleSetting = fn (string $key, string $default): string => ($value = trim((string) \App\Models\SiteSetting::get($key, ''))) !== '' ? $value : $default;
               $demoSampleScripts = [
-                'ar' => $customDemoSampleAr !== '' ? $customDemoSampleAr : $defaultDemoSampleAr,
-                'en' => $customDemoSampleEn !== '' ? $customDemoSampleEn : $defaultDemoSampleEn,
+                'hd' => [
+                  'ar' => $sampleSetting('demo_sample_ar', $defaultDemoSampleAr),
+                  'en' => $sampleSetting('demo_sample_en', $defaultDemoSampleEn),
+                ],
+                'standard' => [
+                  'ar' => $sampleSetting('demo_sample_standard_ar', $defaultStandardSampleAr),
+                  'en' => $sampleSetting('demo_sample_standard_en', $defaultStandardSampleEn),
+                ],
               ];
             @endphp
             <div class="s-card s-card-editor reveal">
@@ -368,7 +377,9 @@ TXT;
     const textInput = document.getElementById('text');
     const charCounter = document.getElementById('charCounter');
     const outputPlaceholder = document.getElementById('outputPlaceholder');
-    const sampleScripts = {!! \Illuminate\Support\Js::from($demoSampleScripts ?? ['ar' => '', 'en' => '']) !!};
+    const sampleScripts = {!! \Illuminate\Support\Js::from($demoSampleScripts ?? ['hd' => ['ar' => '', 'en' => ''], 'standard' => ['ar' => '', 'en' => '']]) !!};
+    const sampleTierKey = () => (String(voiceTier?.value || '').toLowerCase() === 'standard' ? 'standard' : 'hd');
+    const sampleFor = (tier, lang) => String(sampleScripts?.[tier]?.[lang] || '').trim();
 
     const autoDialectLabel = '{{ __("ui.dashboard.dialect_auto", ["default" => "Auto-detect"]) }}';
     const dialectsByLanguage = {
@@ -1294,7 +1305,7 @@ TXT;
     document.querySelectorAll('[data-sample], [data-sample-key]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const sampleKey = String(btn.getAttribute('data-sample-key') || '').trim().toLowerCase();
-        const mappedScript = sampleKey ? String(sampleScripts?.[sampleKey] || '').trim() : '';
+        const mappedScript = sampleKey ? sampleFor(sampleTierKey(), sampleKey) : '';
         const fallbackScript = String(btn.getAttribute('data-sample') || '').trim();
         textInput.value = mappedScript || fallbackScript;
         updateCharCount();
@@ -1302,7 +1313,19 @@ TXT;
     });
     form?.addEventListener('submit', (event) => { event.preventDefault(); previewBtn?.click(); });
 
-    voiceTier?.addEventListener('change', () => { renderVoiceOptions(); renderDialectOptions(); applyStudioTierState(); });
+    voiceTier?.addEventListener('change', () => {
+      // A loaded sample follows the quality: plain sentences for Standard,
+      // the directed script for HD. Text the visitor typed is left alone.
+      const current = String(textInput?.value || '').trim();
+      const otherTier = sampleTierKey() === 'standard' ? 'hd' : 'standard';
+      ['ar', 'en'].forEach((lang) => {
+        if (current !== '' && current === sampleFor(otherTier, lang)) {
+          textInput.value = sampleFor(sampleTierKey(), lang);
+          updateCharCount();
+        }
+      });
+      renderVoiceOptions(); renderDialectOptions(); applyStudioTierState();
+    });
     targetLanguage?.addEventListener('change', () => {
       if (isTranslateEnabled()) preferredTranslateLanguage = normalizeLanguage(targetLanguage.value);
       renderVoiceOptions(); renderDialectOptions(); applyStudioTierState();
