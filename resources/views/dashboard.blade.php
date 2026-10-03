@@ -1014,6 +1014,7 @@
       font-size: .78rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
     .slider-wrap {
       position: relative;
@@ -1087,6 +1088,7 @@
       font-weight: 700;
       letter-spacing: 0.05em;
       margin-inline-start: 0.35rem;
+      white-space: nowrap;
     }
     .s-card {
       border-radius: var(--radius-lg);
@@ -1868,8 +1870,56 @@
       .page-card h1 {
         font-size: 1.3rem;
       }
+      .dashboard-layout {
+        gap: 1rem;
+      }
+      .dashboard-menu {
+        min-width: 0;
+      }
+      .reveal.dashboard-menu {
+        margin-top: 0;
+      }
       .dashboard-menu-list {
-        grid-template-columns: 1fr;
+        display: flex;
+        gap: .45rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        padding-bottom: .2rem;
+      }
+      .dashboard-menu-list::-webkit-scrollbar {
+        display: none;
+      }
+      .dashboard-menu-link {
+        flex: 0 0 auto;
+        padding: .55rem .95rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-full, 999px);
+        font-size: .88rem;
+        white-space: nowrap;
+        scroll-snap-align: start;
+      }
+      .dashboard-menu-link::before,
+      .dashboard-menu-link span:last-child {
+        display: none;
+      }
+      .dashboard-menu-link span:first-child {
+        overflow-wrap: normal;
+      }
+      .dashboard-menu-link.active {
+        border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+        background: color-mix(in oklab, var(--a) 18%, transparent);
+      }
+      .perf-panel {
+        padding: 1rem .75rem;
+      }
+      .perf-section {
+        padding: .6rem .35rem;
+      }
+      .perf-row-2 {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
       }
       .control-pair > div,
       .editor-panel {
@@ -3147,6 +3197,13 @@
       dashboardSections.forEach(function(section) {
         section.classList.toggle('active', section.id === sectionId);
       });
+      const activeLink = dashboardNavLinks.find(function(link) { return link.classList.contains('active'); });
+      const navList = activeLink?.parentElement;
+      if (navList && navList.scrollWidth > navList.clientWidth + 1) {
+        const listBox = navList.getBoundingClientRect();
+        const linkBox = activeLink.getBoundingClientRect();
+        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: 'smooth' });
+      }
     }
 
     function syncSectionFromHash(scroll = false) {
