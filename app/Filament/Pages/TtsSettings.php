@@ -112,7 +112,7 @@ class TtsSettings extends Page implements HasForms
                             ->options(StandardVoiceEngine::options())
                             ->default(StandardVoiceEngine::WAVENET)
                             ->required()
-                            ->helperText('Reads Standard-quality generations only (the free plan, and paid plans when Standard is chosen). HD voices and the demo, which opens on HD Gemini, are not affected. With Chirp 3 HD, each standard voice in the picker is read by a matching Chirp 3 HD voice of the same language and gender. Pitch is ignored by Chirp 3 HD. Switch back at any time.'),
+                            ->helperText('Reads Standard-quality generations only: the free plan, and the demo if a visitor switches it to Standard. Paid plans and the demo default use HD (Gemini) and are not affected. With Chirp 3 HD, each standard voice in the picker is read by a matching Chirp 3 HD voice of the same language and gender. Pitch is ignored by Chirp 3 HD. Switch back at any time.'),
                         Forms\Components\Toggle::make('tts_fallback_enabled')
                             ->label('Enable Fallback')
                             ->helperText('If Gemini fails, automatically fall back to Google Cloud TTS.')
