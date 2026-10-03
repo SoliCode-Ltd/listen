@@ -3,16 +3,18 @@ name: Staging voice cloning check
 # Read-only health check of voice cloning on STAGING.
 # Pipes scripts/tts/voice_cloning_check.php over SSH into the staging app's PHP:
 # server setup, the Gemini Voices API, cloned-voice rows (stuck, missing files,
-# orphans on Gemini), and, unless turned off, two short lines spoken with the
-# newest ready cloned voice. The database session is READ ONLY; the audio files
-# the synthesis writes are deleted again and come back here as an artifact.
+# orphans on Gemini), and, unless turned off, each ready cloned voice speaking
+# Arabic (Fusha, Saudi, Egyptian) and English (US, UK); Gemini transcribes every
+# clip and the run fails if the words or the language do not match. The
+# database session is READ ONLY; the audio files the synthesis writes are
+# deleted again and come back here as an artifact.
 # Same secrets as the SaaS stats workflow (STAGING_SSH_*).
 
 on:
   workflow_dispatch:
     inputs:
       synthesize:
-        description: Speak two short test lines with the newest ready cloned voice
+        description: Speak Arabic and English test lines with each ready cloned voice
         type: boolean
         default: true
   push:
@@ -31,7 +33,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -67,24 +69,49 @@ jobs:
           set -euo pipefail
           mkdir -p audio
           python3 - <<'EOF'
-          import base64, json, subprocess
+          import base64, difflib, json, re, subprocess, sys
           data = json.load(open('result.json'))
+
+          def norm(text):
+              text = (text or '').lower()
+              text = re.sub('[\u064B-\u065F\u0670\u0640]', '', text)
+              text = re.sub('[\u0623\u0625\u0622]', '\u0627', text).replace('\u0649', '\u064A').replace('\u0629', '\u0647')
+              text = re.sub(r'[^\w\s]', ' ', text)
+              return ' '.join(text.split())
+
+          problems = []
+          rows = []
           for case in data.get('synthesis', []):
               audio = case.pop('audio_base64', None)
               if audio:
-                  path = f"audio/{case['name']}.{case.get('format', 'bin')}"
+                  path = f"audio/voice{case['voice_row']}_{case['name']}.{case.get('format', 'bin')}"
                   open(path, 'wb').write(base64.b64decode(audio))
                   probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', path], capture_output=True, text=True)
                   case['audio_seconds'] = round(float(probe.stdout.strip() or 0), 1) if probe.returncode == 0 else None
+              heard = case.get('heard') or {}
+              score = difflib.SequenceMatcher(None, norm(case.get('spoken_text')), norm(heard.get('transcript'))).ratio() if heard.get('transcript') else 0.0
+              want = 'arabic' if case['name'].startswith('ar_') else 'english'
+              lang_ok = want in str(heard.get('language', '')).lower()
+              case['match'] = round(score, 3)
+              case['language_ok'] = lang_ok
+              good = case.get('ok') and score >= 0.85 and lang_ok
+              if not good:
+                  problems.append(f"voice {case['voice_row']} {case['name']}: ok={case.get('ok')} match={score:.2f} heard_language={heard.get('language')} {case.get('error', '')} {heard.get('error', '')}".strip())
+              rows.append(f"{'PASS' if good else 'FAIL'}  voice {case['voice_row']} ({case['voice_language']})  {case['name']:<14} {str(case.get('audio_seconds')):>5}s  match {score:.2f}  heard: {heard.get('language')} / {heard.get('accent_or_dialect')}")
+
           print(json.dumps(data, ensure_ascii=False, indent=2))
           json.dump(data, open('summary.json', 'w'), ensure_ascii=False, indent=2)
-          problems = []
+          print('\n'.join(['', 'Cloned voice synthesis, transcribed back:'] + rows))
           if not data['voices_api']['ok']:
               problems.append('Voices API unreachable')
           if data['db']['stuck_over_20_min']:
               problems.append(f"{len(data['db']['stuck_over_20_min'])} stuck rows")
-          problems += [f"synthesis {c['name']} failed" for c in data.get('synthesis', []) if not c.get('ok')]
-          print('\nRESULT:', 'PASS' if not problems else 'ATTENTION: ' + '; '.join(problems))
+          if data.get('synthesis_skipped'):
+              print('Synthesis skipped:', data['synthesis_skipped'])
+          print('\nRESULT:', 'PASS' if not problems else 'FAIL')
+          for p in problems:
+              print('  -', p)
+          sys.exit(1 if problems else 0)
           EOF
 
       - uses: actions/upload-artifact@v4

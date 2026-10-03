@@ -7,9 +7,11 @@
  *
  * The database session is READ ONLY and the cache is in memory, so nothing is
  * written to the app. Output is JSON with ids, counts and statuses only: no
- * names, emails, keys or recordings. With CLONE_SYNTH=1 it also speaks two
- * short lines with the newest ready cloned voice and returns the audio
- * (base64) so it can be listened to; the files it writes are deleted again.
+ * names, emails, keys or recordings. With CLONE_SYNTH=1 each ready cloned voice
+ * also speaks short Arabic (Fusha, Saudi, Egyptian) and English (US, UK) lines
+ * plus long two-piece scripts; Gemini transcribes every clip so the words can
+ * be checked, and the audio comes back (base64) to listen to. The files the
+ * synthesis writes are deleted again.
  */
 
 use App\Models\ClonedVoice;
@@ -121,56 +123,91 @@ if ($probe['ok']) {
     ];
 }
 
-// Optional live synthesis with the newest ready voice.
+// Optional live synthesis: every ready voice speaks Arabic and English in
+// several dialects, the way a generation does (dialect rewrite, then delivery
+// style), and Gemini transcribes each clip back so the words can be compared.
 $out['synthesis'] = [];
-$ready = $rows->reject->trashed()->filter(fn ($v) => $v->isReady())->sortByDesc('id')->first();
-if (getenv('CLONE_SYNTH') === '1' && $ready && $probe['ok']) {
-    $arabic = str_starts_with(strtolower((string) $ready->language_code), 'ar');
-    $short = $arabic ? 'مرحباً، هذا اختبار قصير لصوتك المستنسخ.' : 'Hello, this is a short test of your cloned voice.';
-    $long = $arabic
-        ? str_repeat('هذه جملة لاختبار تقسيم النص الطويل إلى أجزاء ثم دمجها في ملف واحد بصوت متصل. ', 4)
-        : str_repeat('This sentence checks that a long script is split into pieces and joined into one smooth file. ', 4);
-    $cases = [
-        'short' => [$short, null],
-        'two_pieces' => [$long, 200],
-    ];
-    foreach ($cases as $name => [$text, $maxChars]) {
-        $case = ['name' => $name, 'voice_row' => $ready->id, 'language' => $ready->language_code, 'chars' => mb_strlen($text)];
-        $previous = config('services.gemini_tts.max_chars_per_request');
-        if ($maxChars !== null) {
-            config(['services.gemini_tts.max_chars_per_request' => $maxChars]);
-        }
+$readyVoices = $rows->reject->trashed()->filter(fn ($v) => $v->isReady())->sortByDesc('id')->take(3);
+$out['ready_voice_languages'] = $readyVoices->pluck('language_code')->values()->all();
+
+$requestMethod = new ReflectionMethod($service, 'request');
+$requestMethod->setAccessible(true);
+$transcribe = function (string $audio, string $mime) use ($service, $requestMethod): array {
+    $prompt = 'Transcribe the speech in this audio exactly, in the script it is spoken in. '
+        .'Reply with JSON only: {"transcript": "...", "language": "...", "accent_or_dialect": "..."}';
+    foreach (['gemini-3.5-flash', 'gemini-3.6-flash'] as $model) {
         try {
-            $style = $service->deliveryStyle(null, 'neutral', 'neutral');
-            $result = $service->synthesizeWithClonedVoice($text, (string) $ready->language_code, (string) $ready->provider_voice_key, $style);
-            $bytes = $result['audio_content'];
-            $case += [
-                'ok' => strlen($bytes) > 1000,
-                'latency_ms' => $result['latency_ms'],
-                'bytes' => strlen($bytes),
-                'format' => str_starts_with($bytes, 'RIFF') ? 'wav' : (str_starts_with($bytes, 'ID3') || str_starts_with($bytes, "\xFF") ? 'mp3' : 'other'),
-                'audio_base64' => base64_encode($bytes),
-            ];
-            Storage::disk('public')->delete($result['audio_path']);
+            $response = $requestMethod->invoke($service, 'POST', '/models/'.$model.':generateContent', [
+                'contents' => [['role' => 'user', 'parts' => [
+                    ['inline_data' => ['mime_type' => $mime, 'data' => base64_encode($audio)]],
+                    ['text' => $prompt],
+                ]]],
+                'generationConfig' => ['temperature' => 0, 'responseMimeType' => 'application/json'],
+            ], 60);
         } catch (\Throwable $e) {
-            $case += ['ok' => false, 'error' => mb_substr(get_class($e).': '.$e->getMessage(), 0, 500)];
-        } finally {
-            config(['services.gemini_tts.max_chars_per_request' => $previous]);
+            return ['error' => mb_substr($e->getMessage(), 0, 200)];
         }
-        $out['synthesis'][] = $case;
+        if ($response->successful()) {
+            $raw = (string) data_get($response->json(), 'candidates.0.content.parts.0.text', '');
+            $json = json_decode(trim(preg_replace('/^```(json)?|```$/m', '', $raw)), true);
+
+            return is_array($json) ? $json + ['model' => $model] : ['raw' => mb_substr($raw, 0, 400), 'model' => $model];
+        }
+        if ($response->status() !== 404) {
+            return ['error' => 'HTTP '.$response->status().': '.mb_substr((string) $response->body(), 0, 200)];
+        }
     }
 
-    if ($arabic) {
-        try {
-            $plain = 'نحن سعداء جداً بانضمامك إلينا اليوم.';
-            $rewritten = $service->speakableText($plain, 'ar-EG');
-            $out['dialect_rewrite'] = ['ok' => $rewritten !== '', 'changed' => $rewritten !== $plain, 'chars' => mb_strlen($rewritten)];
-        } catch (\Throwable $e) {
-            $out['dialect_rewrite'] = ['ok' => false, 'error' => mb_substr($e->getMessage(), 0, 300)];
+    return ['error' => 'no transcription model available'];
+};
+
+if (getenv('CLONE_SYNTH') === '1' && $readyVoices->isNotEmpty() && $probe['ok']) {
+    $arText = 'مرحباً بكم في إسمع. اليوم نجرّب الصوت المستنسخ باللغة العربية.';
+    $enText = 'Welcome to Listen. Today we are testing the cloned voice in English.';
+    $cases = [
+        ['name' => 'ar_fusha', 'text' => $arText, 'dialect' => 'ar-XA'],
+        ['name' => 'ar_saudi', 'text' => $arText, 'dialect' => 'ar-SA'],
+        ['name' => 'ar_egyptian', 'text' => $arText, 'dialect' => 'ar-EG'],
+        ['name' => 'en_us', 'text' => $enText, 'dialect' => 'en-US'],
+        ['name' => 'en_gb', 'text' => $enText, 'dialect' => 'en-GB'],
+        ['name' => 'ar_two_pieces', 'text' => str_repeat('هذه جملة لاختبار تقسيم النص الطويل إلى أجزاء ثم دمجها في ملف واحد. ', 4), 'dialect' => null, 'max_chars' => 200],
+        ['name' => 'en_two_pieces', 'text' => str_repeat('This sentence checks that a long script is split into pieces and joined into one file. ', 4), 'dialect' => null, 'max_chars' => 200],
+    ];
+    foreach ($readyVoices as $voice) {
+        foreach ($cases as $c) {
+            $case = ['name' => $c['name'], 'voice_row' => $voice->id, 'voice_language' => $voice->language_code, 'dialect' => $c['dialect']];
+            $previous = config('services.gemini_tts.max_chars_per_request');
+            if (isset($c['max_chars'])) {
+                config(['services.gemini_tts.max_chars_per_request' => $c['max_chars']]);
+            }
+            try {
+                $spoken = $service->speakableText($c['text'], $c['dialect']);
+                $style = $service->deliveryStyle($c['dialect'], 'neutral', 'neutral');
+                $result = $service->synthesizeWithClonedVoice($spoken, (string) $voice->language_code, (string) $voice->provider_voice_key, $style);
+                $bytes = $result['audio_content'];
+                $format = str_starts_with($bytes, 'RIFF') ? 'wav' : (str_starts_with($bytes, 'ID3') || str_starts_with($bytes, "\xFF") ? 'mp3' : 'other');
+                $case += [
+                    'ok' => strlen($bytes) > 1000,
+                    'input_text' => $c['text'],
+                    'spoken_text' => $spoken,
+                    'rewritten' => $spoken !== trim($c['text']),
+                    'latency_ms' => $result['latency_ms'],
+                    'bytes' => strlen($bytes),
+                    'format' => $format,
+                    'heard' => $transcribe($bytes, $format === 'wav' ? 'audio/wav' : 'audio/mpeg'),
+                    'audio_base64' => base64_encode($bytes),
+                ];
+                Storage::disk('public')->delete($result['audio_path']);
+            } catch (\Throwable $e) {
+                $case += ['ok' => false, 'error' => mb_substr(get_class($e).': '.$e->getMessage(), 0, 500)];
+            } finally {
+                config(['services.gemini_tts.max_chars_per_request' => $previous]);
+            }
+            $out['synthesis'][] = $case;
         }
     }
 } else {
-    $out['synthesis_skipped'] = $ready ? 'CLONE_SYNTH is not 1' : 'no ready cloned voice on this server';
+    $out['synthesis_skipped'] = $readyVoices->isNotEmpty() ? 'CLONE_SYNTH is not 1' : 'no ready cloned voice on this server';
 }
 
 echo json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT), "\n";
