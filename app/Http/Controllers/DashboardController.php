@@ -110,6 +110,9 @@ class DashboardController extends Controller
         $extensionApiState = $this->extensionApiState(auth()->user());
         $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user(), $activePlan);
         $voiceCloningUpgrade = VoiceCloningAccess::showsUpgrade(auth()->user(), $activePlan);
+        if ($voiceCloningVisible) {
+            VoiceCloningService::failStalledForUser($userId);
+        }
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
             : collect();

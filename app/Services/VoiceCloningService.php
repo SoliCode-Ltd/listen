@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -99,8 +100,31 @@ class VoiceCloningService
             ];
 
             $response = null;
+            $connectionError = null;
             foreach ($attempts as $index => $attempt) {
-                $response = $this->request('POST', $attempt['path'], $attempt['payload'], 90);
+                try {
+                    $response = $this->request('POST', $attempt['path'], $attempt['payload'], 90);
+                } catch (ConnectionException $e) {
+                    // A timeout can still leave a voice behind on Gemini's side.
+                    $connectionError = $e;
+                    Log::warning('Gemini voice replication timed out; looking it up.', [
+                        'cloned_voice_id' => $clonedVoice->id,
+                        'attempt' => $index + 1,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    $recovered = $this->findStoredVoiceByDisplayName($displayName);
+                    if ($recovered !== null) {
+                        return ['success' => true, 'voice_cloning_key' => $recovered];
+                    }
+
+                    if ($index < count($attempts) - 1) {
+                        $this->pause(1500);
+                    }
+
+                    continue;
+                }
+                $connectionError = null;
                 $voiceId = $this->extractVoiceId($response);
 
                 if ($response->successful() && $voiceId !== null) {
@@ -127,6 +151,10 @@ class VoiceCloningService
                 if ($index < count($attempts) - 1) {
                     $this->pause(1500);
                 }
+            }
+
+            if ($connectionError !== null || ! $response instanceof Response) {
+                throw $connectionError ?? new \RuntimeException('Gemini voice request failed.');
             }
 
             $errorMessage = $response->successful()
@@ -741,6 +769,55 @@ class VoiceCloningService
             'ready', 'failed' => 100,
             default => 0,
         };
+    }
+
+    /**
+     * A job runs for at most a few minutes. An attempt older than this whose row
+     * has not moved was cut off (worker restart, PHP time limit), so it would
+     * otherwise stay "processing" and keep its plan slot forever.
+     */
+    public const STALLED_AFTER_SECONDS = 1200;
+
+    public static function failIfStalled(ClonedVoice $voice): bool
+    {
+        if (! $voice->isProcessing()) {
+            return false;
+        }
+
+        $cutoff = now()->subSeconds(self::STALLED_AFTER_SECONDS);
+        $started = $voice->attemptStartedAt();
+        if (! $started || $started->greaterThan($cutoff) || ($voice->updated_at && $voice->updated_at->greaterThan($cutoff))) {
+            return false;
+        }
+
+        $reason = 'Processing stopped before it finished.';
+        $voice->update([
+            'status' => 'failed',
+            'failure_reason' => $reason,
+            'metadata' => array_merge($voice->metadata ?? [], [
+                'failure_code' => 'server',
+                'provider_error' => $reason,
+                'http_status' => null,
+                'provider_response' => '',
+                'failed_at' => now()->toIso8601String(),
+            ]),
+        ]);
+
+        Log::warning('Voice cloning attempt stalled; marked failed.', [
+            'cloned_voice_id' => $voice->id,
+            'user_id' => $voice->user_id,
+        ]);
+
+        return true;
+    }
+
+    public static function failStalledForUser(int $userId): void
+    {
+        ClonedVoice::forUser($userId)
+            ->whereIn('status', ['pending', 'validating', 'processing'])
+            ->where('updated_at', '<', now()->subSeconds(self::STALLED_AFTER_SECONDS))
+            ->get()
+            ->each(fn (ClonedVoice $voice) => self::failIfStalled($voice));
     }
 
     public static function elapsedSeconds(mixed $from): int

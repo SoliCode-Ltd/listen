@@ -1396,6 +1396,254 @@ class VoiceCloningTest extends TestCase
         $this->assertTrue(VoiceCloningAccess::isPreviewOnly());
     }
 
+    public function test_a_stalled_attempt_is_failed_and_frees_its_slot(): void
+    {
+        $this->paidPlan->update(['voice_cloning_max_voices' => 1]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        $voice = ClonedVoice::factory()->processing()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+        ]);
+        $old = now()->subSeconds(VoiceCloningService::STALLED_AFTER_SECONDS + 60);
+        ClonedVoice::whereKey($voice->id)->update(['created_at' => $old, 'updated_at' => $old]);
+
+        $status = $this->statusJson($voice);
+
+        $status->assertOk()->assertJson(['status' => 'failed', 'can_retry' => true]);
+        $this->assertSame('server', data_get($voice->fresh()->metadata, 'failure_code'));
+
+        Bus::fake([ProcessVoiceCloningJob::class]);
+        $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', $this->clonePayload('Second voice'))
+            ->assertOk();
+    }
+
+    public function test_a_recent_attempt_is_not_treated_as_stalled(): void
+    {
+        $voice = ClonedVoice::factory()->processing()->create(['user_id' => $this->paidUser->id]);
+        $old = now()->subSeconds(VoiceCloningService::STALLED_AFTER_SECONDS + 60);
+        // Created long ago, but the row moved a minute ago: still running.
+        ClonedVoice::whereKey($voice->id)->update(['created_at' => $old, 'updated_at' => now()->subMinute()]);
+
+        $this->statusJson($voice)
+            ->assertOk()
+            ->assertJson(['status' => 'processing']);
+    }
+
+    public function test_dashboard_fails_a_stalled_attempt_before_listing(): void
+    {
+        $voice = ClonedVoice::factory()->processing()->create(['user_id' => $this->paidUser->id]);
+        $old = now()->subSeconds(VoiceCloningService::STALLED_AFTER_SECONDS + 60);
+        ClonedVoice::whereKey($voice->id)->update(['created_at' => $old, 'updated_at' => $old]);
+
+        $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
+
+        $page->assertOk();
+        $this->assertSame('failed', $voice->fresh()->status);
+        $this->assertStringContainsString(__('ui.voice_cloning.failure_server'), $this->voiceCardHtml($page->getContent(), $voice->id));
+    }
+
+    public function test_retry_progress_is_measured_from_the_retry_not_from_creation(): void
+    {
+        $voice = ClonedVoice::factory()->failed()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'metadata' => ['failure_code' => 'server'],
+        ]);
+        ClonedVoice::whereKey($voice->id)->update(['created_at' => now()->subDays(3)]);
+
+        Bus::fake([ProcessVoiceCloningJob::class]);
+        $retry = $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.retry', [], ['id' => $voice->id]);
+        $retry->assertOk();
+        $this->assertEqualsWithDelta(now()->getTimestamp(), $retry->json('voice.started_at_ts'), 5);
+
+        $status = $this->statusJson($voice);
+
+        $status->assertOk()->assertJson(['status' => 'pending', 'is_delayed' => false]);
+        $this->assertLessThan(10, $status->json('elapsed_seconds'));
+        $this->assertLessThan(40, $status->json('progress_percent'));
+        $this->assertEqualsWithDelta(now()->subDays(3)->getTimestamp(), $status->json('created_at_ts'), 5);
+    }
+
+    public function test_the_job_builds_a_voice_only_once(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+        \Illuminate\Support\Facades\Http::fake([
+            'https://generativelanguage.googleapis.com/*' => \Illuminate\Support\Facades\Http::response(['id' => 'voice_once'], 200),
+        ]);
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+
+        $this->assertSame('voice_once', $voice->fresh()->provider_voice_key);
+        \Illuminate\Support\Facades\Http::assertSentCount(1);
+    }
+
+    public function test_a_second_run_does_not_restart_an_attempt_in_progress(): void
+    {
+        \Illuminate\Support\Facades\Http::fake();
+        $voice = ClonedVoice::factory()->processing()->create(['user_id' => $this->paidUser->id]);
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+
+        $this->assertSame('processing', $voice->fresh()->status);
+        \Illuminate\Support\Facades\Http::assertNothingSent();
+    }
+
+    public function test_a_voice_deleted_while_building_is_removed_from_gemini(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        $deleted = [];
+        \Illuminate\Support\Facades\Http::fake(function ($request) use ($voice, &$deleted) {
+            if ($request->method() === 'POST') {
+                // The owner deletes the voice while Gemini is still building it.
+                ClonedVoice::whereKey($voice->id)->first()?->delete();
+
+                return \Illuminate\Support\Facades\Http::response(['id' => 'voice_built_late'], 200);
+            }
+            if ($request->method() === 'DELETE') {
+                $deleted[] = $request->url();
+            }
+
+            return \Illuminate\Support\Facades\Http::response([], 200);
+        });
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+
+        $this->assertCount(1, $deleted);
+        $this->assertStringEndsWith('/voices/voice_built_late', $deleted[0]);
+        $trashed = ClonedVoice::withTrashed()->find($voice->id);
+        $this->assertTrue($trashed->trashed());
+        $this->assertNull($trashed->provider_voice_key);
+        $this->assertNotSame('ready', $trashed->status);
+    }
+
+    public function test_a_timed_out_create_call_recovers_the_voice_gemini_made(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        $sentName = null;
+        $posts = 0;
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$sentName, &$posts) {
+            if ($request->method() === 'POST') {
+                $posts++;
+                $sentName = $request->data()['voice']['display_name'] ?? null;
+
+                throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Operation timed out');
+            }
+
+            return \Illuminate\Support\Facades\Http::response([
+                'voices' => [['id' => 'voice_made_anyway', 'display_name' => $sentName]],
+            ], 200);
+        });
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+
+        $this->assertSame(1, $posts);
+        $this->assertTrue($voice->fresh()->isReady());
+        $this->assertSame('voice_made_anyway', $voice->fresh()->provider_voice_key);
+    }
+
+    public function test_repeated_timeouts_are_reported_as_a_network_failure(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Storage::disk('local')->put('voice-cloning/1/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/1/consent.wav', 'RIFF....WAVEfmt consent');
+
+        $voice = ClonedVoice::factory()->create([
+            'user_id' => $this->paidUser->id,
+            'source_audio_path' => 'voice-cloning/1/sample.wav',
+            'consent_audio_path' => 'voice-cloning/1/consent.wav',
+            'source_audio_duration_seconds' => 15,
+            'consent_confirmed' => true,
+        ]);
+
+        \Illuminate\Support\Facades\Http::fake(function ($request) {
+            if ($request->method() === 'POST') {
+                throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Operation timed out');
+            }
+
+            return \Illuminate\Support\Facades\Http::response(['voices' => []], 200);
+        });
+
+        (new ProcessVoiceCloningJob($voice->id))->handle(app(VoiceCloningService::class));
+        $voice->refresh();
+
+        $this->assertSame('failed', $voice->status);
+        $this->assertSame('network', data_get($voice->metadata, 'failure_code'));
+        $this->assertTrue(VoiceCloningService::canRetry($voice));
+    }
+
+    public function test_a_crafted_file_name_does_not_set_the_stored_extension(): void
+    {
+        Bus::fake([ProcessVoiceCloningJob::class]);
+
+        $payload = $this->clonePayload('Safe name');
+        $payload['audio_file'] = UploadedFile::fake()->create('sample.php', 1024, 'audio/wav');
+        $payload['consent_audio'] = UploadedFile::fake()->create('consent.PHTML', 800, 'audio/wav');
+
+        $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', $payload)
+            ->assertOk();
+
+        $voice = ClonedVoice::firstOrFail();
+        $this->assertStringEndsWith('.wav', $voice->source_audio_path);
+        $this->assertStringEndsWith('-consent.wav', $voice->consent_audio_path);
+    }
+
+    public function test_an_upper_case_wav_extension_can_still_be_retried(): void
+    {
+        Bus::fake([ProcessVoiceCloningJob::class]);
+
+        $payload = $this->clonePayload('Upper case');
+        $payload['audio_file'] = UploadedFile::fake()->create('SAMPLE.WAV', 1024, 'audio/wav');
+        $payload['consent_audio'] = UploadedFile::fake()->create('CONSENT.WAV', 800, 'audio/wav');
+
+        $this->actingAs($this->paidUser)
+            ->postJsonLocalizedRoute('voice-cloning.store', $payload)
+            ->assertOk();
+
+        $voice = ClonedVoice::firstOrFail();
+        $voice->update(['status' => 'failed', 'metadata' => ['failure_code' => 'server']]);
+        $this->assertTrue(VoiceCloningService::canRetry($voice->fresh()));
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1411,6 +1659,17 @@ class VoiceCloningTest extends TestCase
             'consent_duration' => 8,
             'audio_duration' => 15,
         ];
+    }
+
+    private function statusJson(ClonedVoice $voice): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($this->paidUser)
+            ->withoutMiddleware([
+                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            ])
+            ->getJson($this->localizedRoute('voice-cloning.status', ['id' => $voice->id]));
     }
 
     private function limitNoticeHtml(string $html): string

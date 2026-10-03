@@ -67,6 +67,31 @@ class ClonedVoice extends Model
         return in_array($this->status, ['pending', 'validating', 'processing'], true);
     }
 
+    /**
+     * When the current attempt began. A retry or a new consent sentence
+     * starts a new attempt, so progress is not measured from creation.
+     */
+    public function attemptStartedAt(): ?\Carbon\CarbonInterface
+    {
+        $started = $this->created_at;
+        foreach (['retried_at', 'consent_replaced_at'] as $key) {
+            $value = data_get($this->metadata, $key);
+            if (! is_string($value) || $value === '') {
+                continue;
+            }
+            try {
+                $at = \Carbon\Carbon::parse($value);
+            } catch (\Throwable) {
+                continue;
+            }
+            if ($started === null || $at->greaterThan($started)) {
+                $started = $at;
+            }
+        }
+
+        return $started;
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

@@ -61,6 +61,7 @@ class VoiceCloningController extends Controller
 
         // Check the plan cap. A stored max of 0 uses the site-wide default.
         // Failed attempts do not keep a slot, so the user can record again.
+        VoiceCloningService::failStalledForUser($userId);
         $currentCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($currentCount >= $maxVoices) {
@@ -157,12 +158,12 @@ class VoiceCloningController extends Controller
 
         // Store the audio file securely (private disk, not public)
         $file = $request->file('audio_file');
-        $ext = $file->getClientOriginalExtension() ?: 'wav';
+        $ext = $this->storedExtension($file);
         $filename = "voice-cloning/{$userId}/" . Str::uuid() . ".{$ext}";
         Storage::disk('local')->put($filename, file_get_contents($file->getRealPath()));
 
         $consentFile = $request->file('consent_audio');
-        $consentExt = $consentFile->getClientOriginalExtension() ?: 'wav';
+        $consentExt = $this->storedExtension($consentFile);
         $consentFilename = "voice-cloning/{$userId}/" . Str::uuid() . "-consent.{$consentExt}";
         Storage::disk('local')->put($consentFilename, file_get_contents($consentFile->getRealPath()));
 
@@ -220,7 +221,9 @@ class VoiceCloningController extends Controller
         }
 
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
-        $elapsedSeconds = VoiceCloningService::elapsedSeconds($clonedVoice->created_at);
+        VoiceCloningService::failIfStalled($clonedVoice);
+        $startedAt = $clonedVoice->attemptStartedAt();
+        $elapsedSeconds = VoiceCloningService::elapsedSeconds($startedAt);
 
         return response()->json([
             'id' => $clonedVoice->id,
@@ -230,6 +233,7 @@ class VoiceCloningController extends Controller
             'elapsed_seconds' => $elapsedSeconds,
             'is_delayed' => $clonedVoice->isProcessing() && $elapsedSeconds >= 90,
             'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
+            'started_at_ts' => $startedAt?->getTimestamp(),
             'updated_at_ts' => $clonedVoice->updated_at?->getTimestamp(),
             'language_code' => $clonedVoice->language_code,
             'failure_reason' => $clonedVoice->isFailed()
@@ -267,6 +271,7 @@ class VoiceCloningController extends Controller
             return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
         }
 
+        VoiceCloningService::failStalledForUser($userId);
         $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($activeCount >= $maxVoices) {
@@ -309,7 +314,7 @@ class VoiceCloningController extends Controller
         ]);
 
         $consentFile = $request->file('consent_audio');
-        $consentExt = $consentFile->getClientOriginalExtension() ?: 'wav';
+        $consentExt = $this->storedExtension($consentFile);
         $consentFilename = "voice-cloning/{$userId}/".Str::uuid()."-consent.{$consentExt}";
         Storage::disk('local')->put($consentFilename, file_get_contents($consentFile->getRealPath()));
 
@@ -347,7 +352,8 @@ class VoiceCloningController extends Controller
                 'progress_percent' => VoiceCloningService::progressPercent('pending', 0),
                 'elapsed_seconds' => 0,
                 'is_delayed' => false,
-                'created_at_ts' => now()->getTimestamp(),
+                'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
+                'started_at_ts' => now()->getTimestamp(),
                 'failure_reason' => null,
                 'can_retry' => false,
                 'can_replace_consent' => false,
@@ -378,6 +384,7 @@ class VoiceCloningController extends Controller
             return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
         }
 
+        VoiceCloningService::failStalledForUser($userId);
         $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($activeCount >= $maxVoices) {
@@ -407,7 +414,8 @@ class VoiceCloningController extends Controller
                 'progress_percent' => VoiceCloningService::progressPercent('pending', 0),
                 'elapsed_seconds' => 0,
                 'is_delayed' => false,
-                'created_at_ts' => now()->getTimestamp(),
+                'created_at_ts' => $clonedVoice->created_at?->getTimestamp(),
+                'started_at_ts' => now()->getTimestamp(),
                 'failure_reason' => null,
             ],
         ]);
@@ -455,6 +463,23 @@ class VoiceCloningController extends Controller
 
         return redirect()->to(route('dashboard') . '#voiceCloningSection')
             ->with('success', __('ui.voice_cloning.deleted_success'));
+    }
+
+    /**
+     * The browser sends WAV. Anything else keeps a known audio extension so a
+     * crafted file name never decides what lands on disk.
+     */
+    private function storedExtension(\Illuminate\Http\UploadedFile $file): string
+    {
+        $allowed = VoiceCloningService::allowedExtensions();
+        foreach ([$file->getClientOriginalExtension(), $file->guessExtension()] as $candidate) {
+            $candidate = strtolower(trim((string) $candidate));
+            if (in_array($candidate, $allowed, true)) {
+                return $candidate;
+            }
+        }
+
+        return 'bin';
     }
 
     private function cloningAllowed(Request $request): bool

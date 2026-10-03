@@ -425,9 +425,28 @@
         grid-template-columns: repeat(2, minmax(200px, 1fr));
       }
     }
-    @media (max-width: 500px) {
+    /* Phones: one swipeable row instead of a column of a dozen full-width cards. */
+    @media (max-width: 560px) {
       .sample-showcase-track {
-        grid-template-columns: 1fr;
+        grid-template-columns: none;
+        grid-auto-flow: column;
+        grid-auto-columns: 82%;
+        column-gap: .85rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x mandatory;
+        scroll-padding-inline: .25rem;
+        padding: .5rem .25rem 1rem;
+        scrollbar-width: thin;
+      }
+      .sample-showcase-track .sample-card {
+        scroll-snap-align: start;
+      }
+      .sample-showcase-track .sample-card:hover {
+        transform: none;
+      }
+      .sample-card-hero {
+        min-height: 6.5rem;
       }
     }
     /* Individual voice card */

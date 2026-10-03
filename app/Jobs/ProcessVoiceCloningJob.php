@@ -34,17 +34,23 @@ class ProcessVoiceCloningJob implements ShouldQueue
         ignore_user_abort(true);
         set_time_limit($this->timeout);
 
-        $clonedVoice = ClonedVoice::find($this->clonedVoiceId);
-
-        if (! $clonedVoice || $clonedVoice->status === 'ready' || $clonedVoice->status === 'failed') {
+        // Claim the attempt. Two runs for one request (a double click, a retry
+        // racing the first run) would otherwise create two Gemini voices.
+        $claimed = ClonedVoice::whereKey($this->clonedVoiceId)
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'validating',
+                'failure_reason' => null,
+                'updated_at' => now(),
+            ]);
+        if ($claimed !== 1) {
             return;
         }
 
-        // Transition: validating
-        $clonedVoice->update([
-            'status' => 'validating',
-            'failure_reason' => null,
-        ]);
+        $clonedVoice = ClonedVoice::find($this->clonedVoiceId);
+        if (! $clonedVoice) {
+            return;
+        }
 
         // Basic validation checks
         if (! $this->validateAudioFile($clonedVoice)) {
@@ -55,6 +61,20 @@ class ProcessVoiceCloningJob implements ShouldQueue
         $clonedVoice->update(['status' => 'processing']);
 
         $result = $service->generateVoiceCloningKey($clonedVoice);
+
+        // The owner may delete the voice while Gemini is still building it.
+        // Do not leave their voice stored on Google after they removed it.
+        if (! ClonedVoice::whereKey($clonedVoice->id)->exists()) {
+            if ($result['success'] && filled($result['voice_cloning_key'] ?? null)) {
+                $service->deleteReplicatedVoice($result['voice_cloning_key']);
+            }
+            Log::info('Voice cloning finished after the voice was deleted.', [
+                'cloned_voice_id' => $clonedVoice->id,
+                'user_id' => $clonedVoice->user_id,
+            ]);
+
+            return;
+        }
 
         if ($result['success'] && filled($result['voice_cloning_key'] ?? null)) {
             $clonedVoice->update([
@@ -88,7 +108,7 @@ class ProcessVoiceCloningJob implements ShouldQueue
     {
         $clonedVoice = ClonedVoice::find($this->clonedVoiceId);
 
-        if ($clonedVoice && $clonedVoice->status !== 'ready') {
+        if ($clonedVoice && $clonedVoice->isProcessing()) {
             $this->markFailed(
                 $clonedVoice,
                 $e ? $e->getMessage() : 'Job failed after max retries.',

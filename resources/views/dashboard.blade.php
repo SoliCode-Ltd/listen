@@ -1014,6 +1014,7 @@
       font-size: .78rem;
       font-weight: 700;
       font-variant-numeric: tabular-nums;
+      white-space: nowrap;
     }
     .slider-wrap {
       position: relative;
@@ -1087,6 +1088,7 @@
       font-weight: 700;
       letter-spacing: 0.05em;
       margin-inline-start: 0.35rem;
+      white-space: nowrap;
     }
     .s-card {
       border-radius: var(--radius-lg);
@@ -1868,8 +1870,56 @@
       .page-card h1 {
         font-size: 1.3rem;
       }
+      .dashboard-layout {
+        gap: 1rem;
+      }
+      .dashboard-menu {
+        min-width: 0;
+      }
+      .reveal.dashboard-menu {
+        margin-top: 0;
+      }
       .dashboard-menu-list {
-        grid-template-columns: 1fr;
+        display: flex;
+        gap: .45rem;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scroll-snap-type: x proximity;
+        scrollbar-width: none;
+        padding-bottom: .2rem;
+      }
+      .dashboard-menu-list::-webkit-scrollbar {
+        display: none;
+      }
+      .dashboard-menu-link {
+        flex: 0 0 auto;
+        padding: .55rem .95rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-full, 999px);
+        font-size: .88rem;
+        white-space: nowrap;
+        scroll-snap-align: start;
+      }
+      .dashboard-menu-link::before,
+      .dashboard-menu-link span:last-child {
+        display: none;
+      }
+      .dashboard-menu-link span:first-child {
+        overflow-wrap: normal;
+      }
+      .dashboard-menu-link.active {
+        border-color: color-mix(in oklab, var(--a) 55%, var(--line));
+        background: color-mix(in oklab, var(--a) 18%, transparent);
+      }
+      .perf-panel {
+        padding: 1rem .75rem;
+      }
+      .perf-section {
+        padding: .6rem .35rem;
+      }
+      .perf-row-2 {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
       }
       .control-pair > div,
       .editor-panel {
@@ -2456,7 +2506,7 @@
               @php
                 $vcInitialProgress = \App\Services\VoiceCloningService::progressPercent(
                     (string) $voice->status,
-                    \App\Services\VoiceCloningService::elapsedSeconds($voice->created_at),
+                    \App\Services\VoiceCloningService::elapsedSeconds($voice->attemptStartedAt()),
                 );
                 $vcLanguageLabel = match ((string) $voice->language_code) {
                     'ar-XA' => __('ui.voice_cloning.language_ar'),
@@ -2469,7 +2519,7 @@
                     ? $voice->created_at->locale(app()->getLocale() === 'ar' ? 'ar' : 'en')->isoFormat('D MMM YYYY')
                     : '';
               @endphp
-                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
+                <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-started-ts="{{ $voice->attemptStartedAt()?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}">
@@ -3147,6 +3197,13 @@
       dashboardSections.forEach(function(section) {
         section.classList.toggle('active', section.id === sectionId);
       });
+      const activeLink = dashboardNavLinks.find(function(link) { return link.classList.contains('active'); });
+      const navList = activeLink?.parentElement;
+      if (navList && navList.scrollWidth > navList.clientWidth + 1) {
+        const listBox = navList.getBoundingClientRect();
+        const linkBox = activeLink.getBoundingClientRect();
+        navList.scrollBy({ left: (linkBox.left + linkBox.width / 2) - (listBox.left + listBox.width / 2), behavior: 'smooth' });
+      }
     }
 
     function syncSectionFromHash(scroll = false) {
@@ -3902,6 +3959,7 @@
       const consentTooShortText = @json(__('ui.voice_cloning.validation.consent_too_short', ['min' => $voiceCloningMinConsent ?? 3]));
       const consentRequiredText = @json(__('ui.voice_cloning.validation.consent_required'));
       const nameRequiredText = @json(__('ui.voice_cloning.validation.name_required'));
+      const unreadableFileText = @json(__('ui.voice_cloning.validation.audio_invalid_type'));
       const copyLabel = @json(__('ui.voice_cloning.consent_copy'));
       const copiedLabel = @json(__('ui.voice_cloning.consent_copied'));
       const sampleReadyText = @json(__('ui.voice_cloning.sample_ready'));
@@ -4338,9 +4396,12 @@
 
         const createdTs = Number(payload.created_at_ts || card.dataset.createdTs || Math.floor(Date.now() / 1000));
         card.dataset.createdTs = String(createdTs);
+        // A retry starts a new attempt; progress is measured from that, not from creation.
+        const startedTs = Number(payload.started_at_ts || card.dataset.startedTs || createdTs);
+        card.dataset.startedTs = String(startedTs);
 
         const rawElapsed = Number(payload.elapsed_seconds);
-        const fallbackElapsed = Math.max(0, Math.floor(Date.now() / 1000) - createdTs);
+        const fallbackElapsed = Math.max(0, Math.floor(Date.now() / 1000) - startedTs);
         const elapsedSeconds = Number.isFinite(rawElapsed) ? Math.max(0, rawElapsed) : fallbackElapsed;
         const serverProgress = Number(payload.progress_percent ?? NaN);
         const failureReason = String(payload.failure_reason || card.dataset.failureReason || '').trim();
@@ -4382,7 +4443,10 @@
             const response = await fetch(`${STATUS_URL_BASE}${id}`, {
               headers: { 'Accept': 'application/json', 'X-CSRF-TOKEN': CSRF },
             });
-            if (!response.ok) return;
+            if (!response.ok) {
+              if ([401, 403, 404, 419].includes(response.status)) stopPolling(id);
+              return;
+            }
             const data = await response.json().catch(() => ({}));
             applyStatusToCard(card, data);
             if (String(data?.status || '').toLowerCase() === 'ready' || String(data?.status || '').toLowerCase() === 'failed') {
@@ -4429,7 +4493,7 @@
         const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
 
         return `
-          <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-failure-reason="${failureReason}">
+          <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-started-ts="${Number(voice?.started_at_ts || createdTs)}" data-failure-reason="${failureReason}">
             <div class="vc-card-header">
               <h3 class="vc-card-name">${name}</h3>
               <span class="vc-status ${escapeHtml(status)}">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
@@ -4475,6 +4539,10 @@
         showPreview('vcConsentPreview', null);
         setConsentLanguage(document.getElementById('vcLanguage')?.value || 'ar-XA');
         document.getElementById('vcSourceType').value = 'upload';
+        uploadDuration = 0;
+        recordDuration = 0;
+        uploadMeasureToken += 1;
+        consentMeasureToken += 1;
         setAudioDuration(0);
         setConsentDuration(0);
         recordedBlob = null;
@@ -4532,6 +4600,7 @@
           const uploadPanel = document.getElementById('vcUploadPanel');
           const recordPanel = document.getElementById('vcRecordPanel');
           if (sourceType) sourceType.value = mode;
+          setAudioDuration(mode === 'recording' ? recordDuration : uploadDuration);
           if (uploadPanel) uploadPanel.style.display = mode === 'upload' ? '' : 'none';
           if (recordPanel) recordPanel.style.display = mode === 'recording' ? '' : 'none';
         });
@@ -4548,27 +4617,82 @@
         if (durationEl) durationEl.value = String(seconds || 0);
       }
 
-      function handleFileSelect(file) {
+      let uploadDuration = 0;
+      let recordDuration = 0;
+      let uploadMeasureToken = 0;
+      let consentMeasureToken = 0;
+
+      // Seconds of audio in a file, or null when the browser cannot read it.
+      // Recorder WebM files report Infinity until fully decoded, so decode as a fallback.
+      async function measureDuration(file) {
+        const fromMedia = await new Promise((resolve) => {
+          const audio = new Audio();
+          const url = URL.createObjectURL(file);
+          let settled = false;
+          const done = (value) => {
+            if (settled) return;
+            settled = true;
+            URL.revokeObjectURL(url);
+            resolve(value);
+          };
+          audio.preload = 'metadata';
+          audio.addEventListener('loadedmetadata', () => done(audio.duration));
+          audio.addEventListener('error', () => done(NaN));
+          setTimeout(() => done(NaN), 8000);
+          audio.src = url;
+        });
+        if (Number.isFinite(fromMedia) && fromMedia > 0) return fromMedia;
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return null;
+        let context = null;
+        try {
+          context = new AudioCtx();
+          const raw = await file.arrayBuffer();
+          const decoded = await new Promise((resolve, reject) => {
+            const pending = context.decodeAudioData(raw, resolve, reject);
+            if (pending && typeof pending.then === 'function') pending.then(resolve, reject);
+          });
+          return Number.isFinite(decoded?.duration) ? decoded.duration : null;
+        } catch (_error) {
+          return null;
+        } finally {
+          try { await context?.close?.(); } catch (_error) {}
+        }
+      }
+
+      async function handleFileSelect(file) {
         if (!file || !fileName || !fileInfo || !uploadZone) return;
         fileName.textContent = `{{ __('ui.voice_cloning.upload_selected') }} ${file.name} (${(file.size / 1024 / 1024).toFixed(1)} MB)`;
         fileInfo.style.display = '';
         uploadZone.style.display = 'none';
-        const audio = new Audio();
-        audio.addEventListener('loadedmetadata', function() {
-          const duration = Math.round(audio.duration || 0);
-          setAudioDuration(duration);
-          const range = document.getElementById('vcSampleRange');
+        const showingUpload = () => String(document.getElementById('vcSourceType')?.value || 'upload') === 'upload';
+        uploadDuration = 0;
+        if (showingUpload()) setAudioDuration(0);
+        const token = ++uploadMeasureToken;
+        const measured = await measureDuration(file);
+        if (token !== uploadMeasureToken) return;
+        const range = document.getElementById('vcSampleRange');
+        if (measured === null) {
           if (range) {
-            range.textContent = `${duration}s`;
-            range.className = duration >= MIN_DURATION && duration <= MAX_DURATION ? 'vc-range ok' : 'vc-range bad';
+            range.textContent = '';
+            range.className = 'vc-range bad';
           }
-          if (duration < MIN_DURATION) {
-            showAlert('error', sampleTooShortText);
-          } else if (duration > MAX_DURATION) {
-            showAlert('error', sampleTooLongText);
-          }
-        });
-        audio.src = URL.createObjectURL(file);
+          showAlert('error', unreadableFileText);
+          return;
+        }
+        const duration = Math.round(measured);
+        uploadDuration = duration;
+        if (showingUpload()) setAudioDuration(duration);
+        if (range) {
+          range.textContent = `${duration}s`;
+          range.className = duration >= MIN_DURATION && duration <= MAX_DURATION ? 'vc-range ok' : 'vc-range bad';
+        }
+        if (duration < MIN_DURATION) {
+          showAlert('error', sampleTooShortText);
+        } else if (duration > MAX_DURATION) {
+          showAlert('error', sampleTooLongText);
+        }
       }
 
       if (uploadZone && fileInput && fileInfo) {
@@ -4600,6 +4724,8 @@
           fileInput.value = '';
           fileInfo.style.display = 'none';
           uploadZone.style.display = '';
+          uploadMeasureToken += 1;
+          uploadDuration = 0;
           setAudioDuration(0);
         });
       }
@@ -4659,6 +4785,7 @@
             recordedBlob = new Blob(audioChunks, { type: recorderMimeType });
             showPreview('vcRecPreview', recordedBlob);
             const duration = Math.round((Date.now() - recordingStart) / 1000);
+            recordDuration = duration;
             setAudioDuration(duration);
             document.getElementById('vcRecorder')?.classList.remove('live');
             if (recHint) {
@@ -4721,6 +4848,7 @@
           }
           if (recActions) recActions.style.display = 'none';
           if (recBtn) recBtn.classList.remove('recording');
+          recordDuration = 0;
           setAudioDuration(0);
         });
       }
@@ -4928,22 +5056,28 @@
       consentFileInput?.addEventListener('change', function() {
         const file = this.files?.[0];
         if (!file) return;
-        const audio = new Audio();
-        audio.addEventListener('loadedmetadata', function() {
-          const duration = Math.round(audio.duration || 0);
+        markConsentFile(file);
+        setConsentDuration(0);
+        showPreview('vcConsentPreview', file);
+        const token = ++consentMeasureToken;
+        measureDuration(file).then((measured) => {
+          if (token !== consentMeasureToken) return;
+          if (measured === null) {
+            showAlert('error', unreadableFileText);
+            return;
+          }
+          const duration = Math.round(measured);
           setConsentDuration(duration);
           if (duration < MIN_CONSENT) showAlert('error', consentTooShortText);
           else if (duration > MAX_DURATION) showAlert('error', sampleTooLongText);
         });
-        audio.src = URL.createObjectURL(file);
-        markConsentFile(file);
-        showPreview('vcConsentPreview', file);
       });
       consentFileRemove?.addEventListener('click', function() {
         if (consentFileInput) consentFileInput.value = '';
         showPreview('vcConsentPreview', null);
         if (consentFileInfo) consentFileInfo.style.display = 'none';
         if (consentUploadZone) consentUploadZone.style.display = '';
+        consentMeasureToken += 1;
         setConsentDuration(0);
       });
 
@@ -5002,6 +5136,7 @@
             if (consentFileInfo) consentFileInfo.style.display = 'none';
             if (consentUploadZone) consentUploadZone.style.display = '';
             const duration = Math.round((Date.now() - consentStarted) / 1000);
+            consentMeasureToken += 1;
             setConsentDuration(duration);
             if (consentHint) {
               if (duration < MIN_CONSENT) {
@@ -5112,7 +5247,7 @@
               if (response.ok && data?.success && data.voice) {
                 const card = voiceGrid?.querySelector(`.vc-card[data-voice-id="${escapeSelector(voiceId)}"]`);
                 if (card) {
-                  card.dataset.createdTs = String(data.voice.created_at_ts || Math.floor(Date.now() / 1000));
+                  card.dataset.startedTs = String(data.voice.started_at_ts || Math.floor(Date.now() / 1000));
                   card.dataset.failureReason = '';
                   const progressFill = card.querySelector('[data-vc-progress-fill]');
                   const progressPercent = card.querySelector('[data-vc-progress-percent]');
@@ -5220,7 +5355,7 @@
             if (response.ok && data?.success && data.voice) {
               const card = retryButton.closest('.vc-card');
               if (card) {
-                card.dataset.createdTs = String(data.voice.created_at_ts || Math.floor(Date.now() / 1000));
+                card.dataset.startedTs = String(data.voice.started_at_ts || Math.floor(Date.now() / 1000));
                 card.dataset.failureReason = '';
                 const progressFill = card.querySelector('[data-vc-progress-fill]');
                 const progressPercent = card.querySelector('[data-vc-progress-percent]');
@@ -5281,8 +5416,8 @@
       setInterval(() => {
         voiceGrid?.querySelectorAll('.vc-card[data-status="pending"], .vc-card[data-status="validating"], .vc-card[data-status="processing"]').forEach((card) => {
           const status = String(card.getAttribute('data-status') || '').toLowerCase();
-          const createdTs = Number(card.getAttribute('data-created-ts') || Math.floor(Date.now() / 1000));
-          const elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - createdTs);
+          const startedTs = Number(card.getAttribute('data-started-ts') || card.getAttribute('data-created-ts') || Math.floor(Date.now() / 1000));
+          const elapsedSeconds = Math.max(0, Math.floor(Date.now() / 1000) - startedTs);
           const delayed = elapsedSeconds >= 90;
           updateProgressUI(card, status, elapsedSeconds, delayed);
         });
@@ -5296,6 +5431,7 @@
           id: card.getAttribute('data-voice-id'),
           status: card.getAttribute('data-status'),
           created_at_ts: Number(card.getAttribute('data-created-ts') || 0),
+          started_at_ts: Number(card.getAttribute('data-started-ts') || 0),
         });
       });
     })();
