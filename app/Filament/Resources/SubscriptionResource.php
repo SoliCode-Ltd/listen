@@ -6,6 +6,7 @@ use App\Filament\Resources\SubscriptionResource\Pages;
 use App\Models\BillingTrial;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Support\Countries;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -144,6 +145,11 @@ class SubscriptionResource extends Resource
                     ->label('User')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('user.country_code')
+                    ->label('Country')
+                    ->formatStateUsing(fn (?string $state) => Countries::label($state))
+                    ->placeholder('—')
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('plan.name')
                     ->label('Plan')
                     ->searchable()
@@ -181,6 +187,15 @@ class SubscriptionResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('country')
+                    ->label('Country')
+                    ->options(fn () => ['__unknown' => 'Not known yet'] + Countries::optionsInUse())
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        '__unknown' => $query->whereHas('user', fn (Builder $q) => $q->whereNull('country_code')),
+                        default => $query->whereHas('user', fn (Builder $q) => $q->where('country_code', $data['value'])),
+                    }),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'active' => 'Active',

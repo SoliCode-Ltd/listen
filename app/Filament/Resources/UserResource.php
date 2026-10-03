@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
+use App\Support\Countries;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -91,6 +92,9 @@ class UserResource extends Resource
                 Forms\Components\Section::make(__('ui.admin.users.ip_demo_section'))
                     ->columns(2)
                     ->schema([
+                        Forms\Components\Placeholder::make('country')
+                            ->label('Country')
+                            ->content(fn (?User $record) => Countries::label($record?->country_code)),
                         Forms\Components\TextInput::make('registration_ip')
                             ->label(__('ui.admin.users.registration_ip'))
                             ->disabled()
@@ -262,6 +266,13 @@ HTML;
                 Tables\Columns\TextColumn::make('email')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('country_code')
+                    ->label('Country')
+                    ->formatStateUsing(fn (?string $state) => Countries::label($state))
+                    ->placeholder('—')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('phone_number')
                     ->label(__('ui.admin.users.phone_number'))
                     ->toggleable(isToggledHiddenByDefault: true)
@@ -340,6 +351,15 @@ HTML;
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                Tables\Filters\SelectFilter::make('country_code')
+                    ->label('Country')
+                    ->options(fn () => ['__unknown' => 'Not known yet'] + Countries::optionsInUse())
+                    ->searchable()
+                    ->query(fn (Builder $query, array $data) => match ($data['value'] ?? null) {
+                        null, '' => $query,
+                        '__unknown' => $query->whereNull('country_code'),
+                        default => $query->where('country_code', $data['value']),
+                    }),
                 Tables\Filters\TernaryFilter::make('is_admin')
                     ->label(__('ui.admin.users.admin_filter')),
                 Tables\Filters\TernaryFilter::make('is_blocked')
