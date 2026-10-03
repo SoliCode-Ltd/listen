@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Services\Analytics\BusinessReportPdf;
 use App\Services\Analytics\BusinessStatsExporter;
 use App\Services\Analytics\BusinessStatsService;
 use Filament\Actions\Action;
@@ -12,6 +13,7 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Pages\Dashboard\Concerns\HasFiltersForm;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class Dashboard extends BaseDashboard
 {
@@ -37,9 +39,14 @@ class Dashboard extends BaseDashboard
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('downloadInvestorReport')
+                ->label('Investor report (PDF)')
+                ->icon('heroicon-o-document-chart-bar')
+                ->action(fn () => $this->downloadInvestorReport()),
             Action::make('downloadReport')
-                ->label('Download report (Excel)')
+                ->label('Raw data (Excel)')
                 ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
                 ->action(fn () => $this->downloadReport()),
             Action::make('refreshStats')
                 ->label('Refresh numbers')
@@ -52,6 +59,17 @@ class Dashboard extends BaseDashboard
                     return redirect(static::getUrl());
                 }),
         ];
+    }
+
+    public function downloadInvestorReport(): StreamedResponse
+    {
+        $months = BusinessStatsService::normalizeMonths($this->filters['months'] ?? null);
+        $snapshot = app(BusinessStatsService::class)->snapshot($months, fresh: true);
+        $pdf = app(BusinessReportPdf::class)->render($snapshot);
+
+        $filename = sprintf('listen-studio-business-report-%s.pdf', now()->format('Y-m-d'));
+
+        return response()->streamDownload(fn () => print ($pdf), $filename, ['Content-Type' => 'application/pdf']);
     }
 
     public function downloadReport(): BinaryFileResponse

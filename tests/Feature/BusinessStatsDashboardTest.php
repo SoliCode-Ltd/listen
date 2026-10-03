@@ -155,7 +155,7 @@ class BusinessStatsDashboardTest extends TestCase
     {
         ['admin' => $admin] = $this->seedBusinessData();
 
-        $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Download report (Excel)');
+        $this->actingAs($admin)->get('/admin')->assertOk()->assertSee('Investor report (PDF)')->assertSee('Raw data (Excel)');
         $this->assertSame(
             ['ApiCostChart', 'ApiUsageBreakdown', 'ApiUsageKpis', 'BusinessBreakdowns', 'BusinessGrowthChart', 'BusinessGrowthKpis', 'BusinessProductKpis', 'BusinessRevenueChart', 'BusinessRevenueKpis', 'BusinessUsageChart'],
             collect(\Filament\Facades\Filament::getPanel('admin')->getWidgets())->map(fn ($w) => class_basename($w))->sort()->values()->all(),
@@ -166,6 +166,37 @@ class BusinessStatsDashboardTest extends TestCase
             ->test(Dashboard::class)
             ->callAction('downloadReport')
             ->assertFileDownloaded();
+
+        Livewire::actingAs($admin)
+            ->test(Dashboard::class)
+            ->callAction('downloadInvestorReport')
+            ->assertFileDownloaded('listen-studio-business-report-'.now()->format('Y-m-d').'.pdf');
+    }
+
+    public function test_investor_pdf_is_a_real_pdf_with_the_headline_numbers(): void
+    {
+        $this->seedBusinessData();
+        $snapshot = app(BusinessStatsService::class)->build(6);
+        $report = app(\App\Services\Analytics\BusinessReportPdf::class);
+
+        $pdf = $report->render($snapshot);
+        $this->assertStringStartsWith('%PDF-', $pdf);
+        $this->assertGreaterThan(10_000, strlen($pdf));
+
+        $data = $report->viewData($snapshot);
+        $this->assertSame('3', $data['kpis'][0]['value'], 'members exclude admins');
+        $this->assertSame('$9', $data['kpis'][5]['value'], 'MRR from the Starter card subscription');
+        $this->assertNotEmpty($data['highlights']);
+        $html = view('reports.business-analytics', $data)->render();
+        $this->assertStringNotContainsString('Blocked', $html, 'internal moderation figures stay out of the investor report');
+        $this->assertStringNotContainsString('@example', $html, 'no personal data');
+    }
+
+    public function test_investor_pdf_renders_for_a_brand_new_site(): void
+    {
+        $pdf = app(\App\Services\Analytics\BusinessReportPdf::class)->render(app(BusinessStatsService::class)->build(3));
+
+        $this->assertStringStartsWith('%PDF-', $pdf);
     }
 
     public function test_dashboard_widgets_render(): void
