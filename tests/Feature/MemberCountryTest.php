@@ -150,4 +150,37 @@ class MemberCountryTest extends TestCase
         $this->assertStringNotContainsString('@gmail', $html, 'no personal data');
         $this->assertStringStartsWith('%PDF-', $report->render($snapshot));
     }
+
+    public function test_lookup_survives_a_cache_it_cannot_write(): void
+    {
+        // On live, storage/framework/cache folders made by the web server were not writable over SSH.
+        Http::fake(['https://ipapi.co/*' => Http::response(['country_code' => 'EG'])]);
+        Cache::shouldReceive('get')->andReturn(null);
+        Cache::shouldReceive('put')->andThrow(new \ErrorException('file_put_contents(storage/framework/cache/data/8c/d0/x): Failed to open stream: Permission denied'));
+
+        $this->assertSame('EG', app(LocalizedPricingService::class)->countryForIp('41.33.0.1'));
+    }
+
+    public function test_backfill_keeps_going_when_one_lookup_fails(): void
+    {
+        $a = User::factory()->create(['country_code' => null, 'registration_ip' => '41.0.0.1']);
+        $b = User::factory()->create(['country_code' => null, 'registration_ip' => '5.0.0.9']);
+
+        $this->mock(LocalizedPricingService::class, function ($mock) {
+            $mock->shouldReceive('countryForIp')->andReturnUsing(function (string $ip) {
+                if ($ip === '41.0.0.1') {
+                    throw new \ErrorException('Permission denied');
+                }
+
+                return 'SA';
+            });
+        });
+
+        $this->artisan('users:backfill-country', ['--sleep' => 0])
+            ->expectsOutputToContain('1 lookups failed with an error')
+            ->assertSuccessful();
+
+        $this->assertNull($a->fresh()->country_code, 'skipped, retried on the next run');
+        $this->assertSame('SA', $b->fresh()->country_code);
+    }
 }
