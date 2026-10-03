@@ -30,11 +30,17 @@ class BackfillUserCountriesCommand extends Command
         $missing = DB::table('users')->whereNull('country_code')->count();
         $this->info("Members without a country: {$missing}");
 
-        $ips = DB::table('users')
+        // The IP is worked out in a subquery so the grouping is plain enough
+        // for MySQL's ONLY_FULL_GROUP_BY mode.
+        $memberIps = DB::table('users')
             ->whereNull('country_code')
-            ->selectRaw('coalesce(nullif(registration_ip, \'\'), last_login_ip) as ip, count(*) as members')
-            ->groupByRaw('coalesce(nullif(registration_ip, \'\'), last_login_ip)')
-            ->havingRaw('coalesce(nullif(registration_ip, \'\'), last_login_ip) is not null')
+            ->selectRaw("coalesce(nullif(registration_ip, ''), last_login_ip) as ip");
+        $ips = DB::query()
+            ->fromSub($memberIps, 'member_ips')
+            ->whereNotNull('ip')
+            ->where('ip', '!=', '')
+            ->selectRaw('ip, count(*) as members')
+            ->groupBy('ip')
             ->orderByDesc('members')
             ->get();
 
