@@ -11,6 +11,7 @@ use App\Services\TtsService;
 use App\Support\StandardVoiceEngine;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -183,5 +184,67 @@ class StandardVoiceEngineTest extends TestCase
 
         Cache::flush();
         $this->assertFalse(StandardVoiceEngine::usesChirp());
+    }
+
+    public function test_blank_gender_is_never_sent_to_google(): void
+    {
+        $this->useEngine(StandardVoiceEngine::CHIRP3_HD);
+
+        app(GoogleCloudTtsProvider::class)->synthesize('Hello there.', 'en', [
+            'voice_name' => 'en-US-Wavenet-C',
+            'tier' => 'standard',
+            'gender' => '',
+        ]);
+
+        $voice = $this->sentVoices()[0]['voice'];
+        $this->assertSame('en-US-Chirp3-HD-Leda', $voice['name']);
+        $this->assertContains($voice['ssmlGender'], ['MALE', 'FEMALE', 'NEUTRAL']);
+    }
+
+    public function test_long_text_pieces_go_out_in_parallel_and_stay_in_order(): void
+    {
+        $this->useEngine(StandardVoiceEngine::CHIRP3_HD);
+        config(['services.google_tts.max_parallel_requests' => 3]);
+
+        $attempts = [];
+        Http::swap(new Factory);
+        Http::fake(function ($request) use (&$attempts) {
+            $text = (string) ($request->data()['input']['text'] ?? '');
+            preg_match('/جملة رقم (\d+)/u', $text, $m);
+            $first = (int) ($m[1] ?? 0);
+            $attempts[$first] = ($attempts[$first] ?? 0) + 1;
+
+            // The second piece fails once and must be sent again on its own.
+            if ($first > 1 && $attempts[$first] === 1 && count($attempts) === 2) {
+                return Http::response(['error' => ['message' => 'busy']], 503);
+            }
+
+            return Http::response(['audioContent' => base64_encode("[{$first}]")], 200);
+        });
+
+        $sentences = [];
+        for ($i = 1; $i <= 200; $i++) {
+            $sentences[] = "هذه جملة رقم {$i} في نص طويل للتجربة.";
+        }
+
+        $result = app(GoogleCloudTtsProvider::class)->synthesize(implode(' ', $sentences), 'ar', [
+            'voice_name' => 'ar-XA-Wavenet-A',
+            'tier' => 'standard',
+            'gender' => 'female',
+        ]);
+
+        $audio = Storage::disk('public')->get($result['audio_path']);
+        preg_match_all('/\[(\d+)\]/', $audio, $m);
+        $order = array_map('intval', $m[1]);
+
+        $this->assertGreaterThan(3, count($order), 'text should need several pieces');
+        $sorted = $order;
+        sort($sorted);
+        $this->assertSame($sorted, $order, 'pieces must be joined in reading order');
+        $this->assertSame(1, $order[0]);
+        $this->assertContains(2, array_values($attempts), 'the failed piece was sent again');
+        foreach ($this->sentVoices() as $data) {
+            $this->assertSame('ar-XA-Chirp3-HD-Aoede', $data['voice']['name']);
+        }
     }
 }

@@ -1,7 +1,7 @@
 name: Standard voice check
 
 # Live check of the Chirp 3 HD standard voice engine on STAGING only.
-# Pipes scripts/tts/standard_voice_check.php (plus this branch's voice mapping)
+# Pipes scripts/tts/standard_voice_check.php (plus this branch's engine and provider)
 # over SSH into the staging app's PHP, which calls Google with its own
 # credentials. Nothing is deployed and nothing is written to the database.
 # The audio comes back as a downloadable artifact so it can be listened to.
@@ -17,6 +17,7 @@ on:
       - .github/workflows/standard-voice-check.yml
       - scripts/tts/**
       - app/Support/StandardVoiceEngine.php
+      - app/Services/Tts/GoogleCloudTtsProvider.php
 
 permissions:
   contents: read
@@ -32,16 +33,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build the check script with this branch's mapping
+      - name: Build the check script with this branch's code
         run: |
           set -euo pipefail
-          cp scripts/tts/standard_voice_check.php check.php
-          # The mapping class under another name, without its namespace and imports,
-          # so the check runs it even where the branch is not deployed yet.
-          sed -e '1d' -e '/^namespace /d' -e '/^use /d' \
-              -e 's/class StandardVoiceEngine$/class StandardVoiceEngineUnderTest/' \
-              -e 's/SiteSetting::/\\App\\Models\\SiteSetting::/g' \
-              app/Support/StandardVoiceEngine.php >> check.php
+          # This branch's engine and Google provider, moved to the ListenUnderTest
+          # namespace so they load next to the server's own copies. The engine copy
+          # reads its choice from $GLOBALS['standard_engine'] instead of the database.
+          {
+            echo '<?php'
+            sed -e '1d' \
+                -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' \
+                -e "s/SiteSetting::get(self::SETTING_KEY, self::WAVENET)/(\$GLOBALS['standard_engine'] ?? self::WAVENET)/" \
+                app/Support/StandardVoiceEngine.php
+            sed -e '1d' \
+                -e 's/^namespace App\\Services\\Tts;/namespace ListenUnderTest;/' \
+                -e '/^use App\\Support\\StandardVoiceEngine;/d' \
+                app/Services/Tts/GoogleCloudTtsProvider.php
+          } > under_test.php
+          php -l under_test.php
+          grep -q "GLOBALS\['standard_engine'\]" under_test.php
+          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = 2
+          python3 - <<'PY'
+          import base64
+          code = base64.b64encode(open('under_test.php', 'rb').read()).decode()
+          script = open('scripts/tts/standard_voice_check.php').read()
+          assert '__UNDER_TEST__' in script
+          open('check.php', 'w').write(script.replace('__UNDER_TEST__', code))
+          PY
           php -l check.php
 
       - name: Run against staging over SSH
