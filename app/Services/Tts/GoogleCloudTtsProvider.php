@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\StandardVoiceEngine;
 use App\Support\TextChunker;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -276,7 +277,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 if ($provider === 'google_cloud') {
                     $resolvedVoice = VoiceCatalog::providerVoiceIdForName($voiceName) ?: $voiceName;
 
-                    return $this->enforceWaveNetForStandard($resolvedVoice, $baseLanguage, $tier, $gender);
+                    return $this->enforceStandardEngine($resolvedVoice, $baseLanguage, $tier, $gender);
                 }
 
                 // Selected voice belongs to another provider (Gemini, etc.).
@@ -289,7 +290,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 || str_contains(strtolower($voiceName), '-neural2-')
                 || str_contains(strtolower($voiceName), '-chirp3-')
             ) {
-                return $this->enforceWaveNetForStandard($voiceName, $baseLanguage, $tier, $gender);
+                return $this->enforceStandardEngine($voiceName, $baseLanguage, $tier, $gender);
             }
         }
 
@@ -306,7 +307,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
 
             return $normalizedTier === VoiceTier::STANDARD
-                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                ? $this->standardVoice($resolved, $targetLanguage, $gender)
                 : $resolved;
         }
 
@@ -316,13 +317,13 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
 
             return $normalizedTier === VoiceTier::STANDARD
-                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                ? $this->standardVoice($resolved, $targetLanguage, $gender)
                 : $resolved;
         }
 
-        // Let Google auto-pick for non-standard tiers. Standard must stay WaveNet.
+        // Let Google auto-pick for non-standard tiers. Standard uses the admin's engine.
         return $normalizedTier === VoiceTier::STANDARD
-            ? $this->coerceToWaveNetVoice('', $targetLanguage, $gender)
+            ? $this->standardVoice('', $targetLanguage, $gender)
             : '';
     }
 
@@ -331,10 +332,29 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         return VoiceTier::normalize($tier);
     }
 
-    private function enforceWaveNetForStandard(string $voiceName, string $targetLanguage, string $tier, string $gender): string
+    private function enforceStandardEngine(string $voiceName, string $targetLanguage, string $tier, string $gender): string
     {
         if (VoiceTier::normalize($tier) !== VoiceTier::STANDARD) {
             return $voiceName;
+        }
+
+        return $this->standardVoice($voiceName, $targetLanguage, $gender);
+    }
+
+    /**
+     * Standard quality reads with WaveNet, or with the matching Chirp 3 HD
+     * voice when the admin picked Chirp 3 HD for standard voices.
+     */
+    private function standardVoice(string $voiceName, string $targetLanguage, string $gender): string
+    {
+        if (StandardVoiceEngine::usesChirp()) {
+            return StandardVoiceEngine::isChirpVoice($voiceName)
+                ? $voiceName
+                : StandardVoiceEngine::chirpVoiceFor(
+                    $this->coerceToWaveNetVoice($voiceName, $targetLanguage, $gender),
+                    $targetLanguage,
+                    $gender,
+                );
         }
 
         return $this->coerceToWaveNetVoice($voiceName, $targetLanguage, $gender);
