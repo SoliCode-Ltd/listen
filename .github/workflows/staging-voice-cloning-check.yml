@@ -90,14 +90,17 @@ jobs:
                   case['audio_seconds'] = round(float(probe.stdout.strip() or 0), 1) if probe.returncode == 0 else None
               heard = case.get('heard') or {}
               score = difflib.SequenceMatcher(None, norm(case.get('spoken_text')), norm(heard.get('transcript'))).ratio() if heard.get('transcript') else 0.0
-              want = 'arabic' if case['name'].startswith('ar_') else 'english'
-              lang_ok = want in str(heard.get('language', '')).lower()
+              # "ar"/"Arabic", "en"/"English": the transcriber answers either way.
+              want = 'ar' if case['name'].startswith('ar_') else 'en'
+              lang_ok = str(heard.get('language', '')).strip().lower().startswith(want)
               case['match'] = round(score, 3)
               case['language_ok'] = lang_ok
               good = case.get('ok') and score >= 0.85 and lang_ok
               if not good:
                   problems.append(f"voice {case['voice_row']} {case['name']}: ok={case.get('ok')} match={score:.2f} heard_language={heard.get('language')} {case.get('error', '')} {heard.get('error', '')}".strip())
-              rows.append(f"{'PASS' if good else 'FAIL'}  voice {case['voice_row']} ({case['voice_language']})  {case['name']:<14} {str(case.get('audio_seconds')):>5}s  match {score:.2f}  heard: {heard.get('language')} / {heard.get('accent_or_dialect')}")
+              # The accent is reported, not gated: a cloned voice keeps some of the
+              # speaker's own accent, and the transcriber's accent label is a guess.
+              rows.append(f"{'PASS' if good else 'FAIL'}  voice {case['voice_row']} ({case['voice_language']})  {case['name']:<14} {str(case.get('audio_seconds')):>5}s  match {score:.2f}  language {heard.get('language')}  accent heard: {heard.get('accent_or_dialect')}")
 
           print(json.dumps(data, ensure_ascii=False, indent=2))
           json.dump(data, open('summary.json', 'w'), ensure_ascii=False, indent=2)
