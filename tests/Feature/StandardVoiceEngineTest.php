@@ -3,12 +3,16 @@
 namespace Tests\Feature;
 
 use App\Filament\Pages\TtsSettings;
+use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Models\Voice;
+use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use App\Support\StandardVoiceEngine;
+use App\Support\VoiceCatalog;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
@@ -246,5 +250,76 @@ class StandardVoiceEngineTest extends TestCase
         foreach ($this->sentVoices() as $data) {
             $this->assertSame('ar-XA-Chirp3-HD-Aoede', $data['voice']['name']);
         }
+    }
+
+    public function test_demo_stays_on_gemini_hd_when_standard_voices_use_chirp(): void
+    {
+        $this->useEngine(StandardVoiceEngine::CHIRP3_HD);
+
+        $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $manager = \Mockery::mock(GeminiKeyManager::class);
+        $manager->shouldReceive('getAllKeys')->andReturn([$key]);
+        $manager->shouldReceive('getAvailableKey')->andReturn($key);
+        $manager->shouldReceive('recordUsage')->andReturnNull();
+        $manager->shouldReceive('markKeyExhausted')->andReturnNull();
+        $this->app->instance(GeminiKeyManager::class, $manager);
+
+        Plan::query()->create([
+            'slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'monthly_minutes' => 10,
+            'monthly_chars' => 10000, 'monthly_requests' => 60, 'max_chars_per_request' => 1200,
+            'voice_tier' => 'standard', 'tts_provider_policy' => 'google_cloud', 'is_active' => true,
+        ]);
+        $gemini = Voice::query()->create([
+            'language' => 'en', 'gender' => 'female', 'tier' => 'hd', 'display_name' => 'Serene',
+            'internal_voice_id' => 'en-Gemini-HD-Kore', 'provider' => 'gemini', 'provider_voice_id' => 'Kore', 'is_active' => true,
+        ]);
+        $standard = Voice::query()->create([
+            'language' => 'en', 'gender' => 'female', 'tier' => 'standard', 'display_name' => 'Emma',
+            'internal_voice_id' => 'en-US-Wavenet-C', 'provider' => 'google_cloud', 'provider_voice_id' => 'en-US-Wavenet-C', 'is_active' => true,
+        ]);
+
+        $calls = ['gemini' => 0, 'google' => []];
+        Http::swap(new Factory);
+        Http::fake(function ($request) use (&$calls) {
+            if (str_contains($request->url(), 'texttospeech')) {
+                $calls['google'][] = $request->data()['voice']['name'] ?? null;
+
+                return Http::response(['audioContent' => base64_encode('ID3google-audio')]);
+            }
+            $calls['gemini']++;
+
+            return Http::response(['candidates' => [['content' => ['parts' => [[
+                'inlineData' => ['mimeType' => 'audio/l16', 'data' => base64_encode(pack('v*', 0, 1200, -1200, 0))],
+            ]]]]]]);
+        });
+
+        $this->actingAs(User::factory()->create());
+
+        // The demo page opens on HD.
+        $this->getLocalizedRoute('demo.page')->assertOk()->assertSee('value="hd" selected', false);
+        $this->postJsonLocalizedRoute('demo.preview', [
+            'text' => 'Hello world',
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_tier' => 'hd',
+            'voice_key' => VoiceCatalog::keyFromId((int) $gemini->id),
+            'performance_style' => 'neutral',
+            'emotion' => 'neutral',
+        ])->assertOk()->assertJson(['voice_tier' => 'hd']);
+
+        $this->assertSame(1, $calls['gemini'], 'HD demo must be spoken by Gemini');
+        $this->assertSame([], $calls['google'], 'HD demo must not touch Google');
+
+        // Only a visitor who picks Standard in the demo hears the standard engine.
+        $this->postJsonLocalizedRoute('demo.preview', [
+            'text' => 'Hello again',
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $standard->id),
+        ])->assertOk();
+
+        $this->assertSame(1, $calls['gemini']);
+        $this->assertSame(['en-US-Chirp3-HD-Leda'], $calls['google']);
     }
 }
