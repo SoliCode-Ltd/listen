@@ -74,11 +74,14 @@
 
   /* Horizontal share bars */
   .share { width: 100%; border-collapse: collapse; font-size: 8.2pt; }
-  .share td { padding: 1.4mm 0; vertical-align: middle; }
+  .share td { padding: 1.1mm 0; vertical-align: middle; }
   .track { background: #efeff6; height: 2.6mm; border-radius: 1.3mm; }
   .fill { background: {{ $brand }}; height: 2.6mm; border-radius: 1.3mm; }
 
   .two { width: 100%; border-collapse: collapse; }
+  .three { width: 100%; border-collapse: collapse; }
+  .three > tbody > tr > td { width: 33.3%; vertical-align: top; padding-right: 5mm; }
+  .three > tbody > tr > td:last-child { padding-right: 0; }
   .two > tbody > tr > td { width: 50%; vertical-align: top; }
   .two > tbody > tr > td.l { padding-right: 4mm; }
   .two > tbody > tr > td.r { padding-left: 4mm; }
@@ -88,8 +91,8 @@
   .stat-row td.num { font-weight: bold; }
 
   .callout { border-left: 1mm solid {{ $brand }}; background: #f6f5ff; padding: 3mm 4mm; font-size: 8.4pt; color: #33354a; }
-  .defs dt { font-weight: bold; font-size: 8.4pt; margin-top: 2.6mm; }
-  .defs dd { margin: 0.6mm 0 0 0; font-size: 8.2pt; color: #4b4e63; }
+  .defs dt { font-weight: bold; font-size: 8.2pt; margin-top: 2mm; }
+  .defs dd { margin: 0.4mm 0 0 0; font-size: 8pt; color: #4b4e63; line-height: 1.35; }
 </style>
 </head>
 <body>
@@ -220,9 +223,108 @@
   </div>
 </div>
 
+{{-- ============================== Audience ============================ --}}
+<div class="page">
+  <div class="eyebrow">03 · Audience</div>
+  <div class="h1">Who our members are</div>
+  <div class="lead">Where members are based, how they sign up and what they ask for. Country comes from the network location of each member's sign-in; only the country is stored.</div>
+
+  @if ($audience['has_countries'])
+    <table class="kpis">
+      <tr>
+        <td class="kpi"><div class="k">Countries reached</div><div class="v">{{ $r->num($audience['country_count']) }}</div><div class="n">With at least one member</div></td>
+        <td class="kpi"><div class="k">Arab world</div><div class="v">{{ $r->pct($audience['arab_share'], 0) }}</div><div class="n">Of members with a known country</div></td>
+        <td class="kpi"><div class="k">Largest market</div><div class="v" style="font-size: 12pt; margin-top: 2.6mm">{{ $audience['top_country'] }}</div><div class="n">{{ $r->pct($audience['top_country_share'], 0) }} of members</div></td>
+        <td class="kpi"><div class="k">Work email</div><div class="v">{{ $r->pct($audience['work_email_share'], 0) }}</div><div class="n">Sign-ups with a company or school address</div></td>
+      </tr>
+    </table>
+
+    <table class="two section">
+      <tr>
+        <td class="l">
+          <div class="h2">Top countries</div>
+          <table class="data" style="font-size: 7.8pt">
+            <thead>
+              <tr>
+                <th>Country</th>
+                <th class="num">Members</th>
+                <th class="num">Share</th>
+                <th class="num">Active</th>
+                <th class="num">Paying</th>
+              </tr>
+            </thead>
+            <tbody>
+              @foreach ($audience['countries'] as $c)
+                <tr>
+                  <td style="white-space: nowrap">{{ $c['country'] }}</td>
+                  <td class="num">{{ $r->num($c['members']) }}</td>
+                  <td class="num">{{ $r->pct($c['share'], 0) }}</td>
+                  <td class="num">{{ $r->num($c['active_30d']) }}</td>
+                  <td class="num">{{ $r->num($c['paying']) }}</td>
+                </tr>
+              @endforeach
+              @if ($audience['other'])
+                <tr>
+                  <td class="muted" style="white-space: nowrap">{{ $audience['other']['country'] }}</td>
+                  <td class="num">{{ $r->num($audience['other']['members']) }}</td>
+                  <td class="num">{{ $r->pct($audience['other']['share'], 0) }}</td>
+                  <td class="num">{{ $r->num($audience['other']['active_30d']) }}</td>
+                  <td class="num">{{ $r->num($audience['other']['paying']) }}</td>
+                </tr>
+              @endif
+            </tbody>
+          </table>
+          <div class="small muted" style="margin-top: 2mm">
+            Active: created audio in the last 30 days. Country known for {{ $r->num($audience['known']) }} of {{ $r->num($audience['members']) }} members ({{ $r->pct($audience['coverage'], 0) }}){{ $audience['unknown'] > 0 ? '; the rest are added at their next sign-in' : '' }}.
+          </div>
+        </td>
+        <td class="r">
+          <div class="h2">Members by region</div>
+          @include('reports.partials.share-bars', ['rows' => $audience['regions']])
+        </td>
+      </tr>
+    </table>
+
+    <table class="three section">
+      <tr>
+        <td><div class="h2">How members sign up</div>@include('reports.partials.share-bars', ['rows' => $audience['signup'], 'compact' => true])</td>
+        <td><div class="h2">Email type</div>@include('reports.partials.share-bars', ['rows' => $audience['emails'], 'compact' => true])</td>
+        <td><div class="h2">Audio language, 30 days</div>@include('reports.partials.share-bars', ['rows' => $languages, 'compact' => true])</td>
+      </tr>
+    </table>
+
+  @else
+    <div class="section callout">
+      Member countries are being collected: each member's country is saved automatically the next time they sign in.
+      The country breakdown will appear here as soon as it is available.
+    </div>
+    <table class="two section">
+      <tr>
+        <td class="l">
+          <div class="h2">How members sign up</div>
+          @include('reports.partials.share-bars', ['rows' => $audience['signup']])
+        </td>
+        <td class="r">
+          <div class="h2">Email type</div>
+          @include('reports.partials.share-bars', ['rows' => $audience['emails']])
+        </td>
+      </tr>
+    </table>
+    <table class="two section">
+      <tr>
+        <td class="l">
+          <div class="h2">Language of the audio, 30 days</div>
+          @include('reports.partials.share-bars', ['rows' => $languages])
+        </td>
+        <td class="r"></td>
+      </tr>
+    </table>
+  @endif
+</div>
+
 {{-- ======================= Engagement & retention ===================== --}}
 <div class="page">
-  <div class="eyebrow">03 · Engagement</div>
+  <div class="eyebrow">04 · Engagement</div>
   <div class="h1">Usage, engagement and retention</div>
   <div class="lead">How much audio members create, how usage is spread across the base, and how sign-up cohorts keep using the product.</div>
 
@@ -293,17 +395,19 @@
 
 {{-- ============================ Product usage ========================= --}}
 <div class="page">
-  <div class="eyebrow">04 · Product</div>
+  <div class="eyebrow">05 · Product</div>
   <div class="h1">What customers create</div>
-  <div class="lead">The mix of languages, voice quality and delivery styles in the last 30 days, and how the voice infrastructure performed.</div>
+  <div class="lead">The mix of voice quality, Arabic dialects and delivery styles in the last 30 days, and how the voice infrastructure performed.</div>
 
   <table class="two section">
     <tr>
       <td class="l">
-        <div class="h2">Languages</div>
-        @include('reports.partials.share-bars', ['rows' => $languages])
-        <div class="h2" style="margin-top: 6mm">Voice quality</div>
+        <div class="h2">Voice quality</div>
         @include('reports.partials.share-bars', ['rows' => $tiers])
+        @if (count($audience['dialects']))
+          <div class="h2" style="margin-top: 6mm">Arabic dialects requested <span class="muted small" style="font-weight: normal">(report period)</span></div>
+          @include('reports.partials.share-bars', ['rows' => $audience['dialects']])
+        @endif
       </td>
       <td class="r">
         @if (count($styles))
@@ -356,7 +460,7 @@
 
 {{-- ========================= Revenue & economics ====================== --}}
 <div class="page">
-  <div class="eyebrow">05 · Revenue</div>
+  <div class="eyebrow">06 · Revenue</div>
   <div class="h1">Revenue and unit economics</div>
   <div class="lead">Recurring revenue at list price from active subscriptions, plan mix, and what the voice infrastructure costs to serve.</div>
 
@@ -456,7 +560,7 @@
 
 {{-- ============================ Methodology =========================== --}}
 <div class="page">
-  <div class="eyebrow">06 · Notes</div>
+  <div class="eyebrow">07 · Notes</div>
   <div class="h1">Definitions and methodology</div>
 
   <div class="section callout">
@@ -475,6 +579,8 @@
     <dt>Voice API cost</dt><dd>What the speech providers charge for the audio produced, using the cost recorded per request or, where none was recorded, provider list prices.</dd>
     <dt>Gross margin after API cost</dt><dd>MRR minus voice API cost for the last 30 days, divided by MRR. Hosting and other costs are not included.</dd>
     <dt>Cohort retention</dt><dd>Of the members who joined in a month, the share who created audio in the following month (+1) and the month after (+2).</dd>
+    <dt>Country and region</dt><dd>The country of the network a member signed in from, saved once per member; no address, city or IP address is kept. Regions group countries: Gulf (GCC), Egypt, Levant &amp; Iraq, North Africa, other Arab states, Europe, North America and the rest of the world.</dd>
+    <dt>Work email</dt><dd>A sign-up email on a company, school or other organisation domain rather than a personal webmail service.</dd>
     <dt>Current month</dt><dd>Shown "to date" and in a lighter colour, as it is not yet complete.</dd>
   </dl>
 

@@ -2,6 +2,7 @@
 
 namespace App\Services\Analytics;
 
+use App\Support\Countries;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Support\Carbon;
@@ -141,6 +142,8 @@ class BusinessReportPdf
                 'label' => $this->providerLabel((string) ($p['provider'] ?? '')),
             ])->all(),
 
+            'audience' => $this->audience($s),
+
             'revenue' => $revenue,
             'mrr' => $mrr,
             'plans' => $s['plans'] ?? [],
@@ -149,6 +152,55 @@ class BusinessReportPdf
             'unit' => $unit,
             'api' => $apiTotals,
             'channels' => $s['growth_channels'] ?? [],
+        ];
+    }
+
+    /**
+     * Where members are and what they are like, ready for the Audience page.
+     */
+    private function audience(array $s): array
+    {
+        $a = $s['audience'] ?? [];
+        $members = max(1, (int) ($a['members'] ?? ($s['members']['total'] ?? 0)));
+        $known = (int) ($a['with_country'] ?? 0);
+        $rows = collect($a['countries'] ?? []);
+        $knownRows = $rows->whereNotNull('code')->values();
+        $top = $knownRows->take(8)->all();
+        $rest = $knownRows->slice(8);
+
+        $other = $rest->isEmpty() ? null : [
+            'country' => $rest->count().' more countries',
+            'region' => '',
+            'members' => $rest->sum('members'),
+            'active_30d' => $rest->sum('active_30d'),
+            'paying' => $rest->sum('paying'),
+        ];
+        $unknown = $rows->firstWhere('code', null);
+
+        $regions = collect($a['regions'] ?? [])->reject(fn ($r) => $r['region'] === Countries::UNKNOWN);
+        $topCountry = $knownRows->first();
+        $emails = $a['email_types'] ?? [];
+        $emailTotal = max(1, array_sum($emails));
+
+        return [
+            'has_countries' => $known > 0,
+            'members' => $members,
+            'known' => $known,
+            'coverage' => $known / $members,
+            'country_count' => (int) ($a['country_count'] ?? 0),
+            'arab_share' => $known > 0 ? ($a['arab_world_members'] ?? 0) / $known : 0,
+            'top_country' => $topCountry ? $topCountry['country'] : null,
+            'top_country_share' => $topCountry && $known > 0 ? $topCountry['members'] / $known : 0,
+            'work_email_share' => ($emails['Work email'] ?? 0) / $emailTotal,
+            'countries' => array_map(fn (array $r) => $r + ['share' => $known > 0 ? $r['members'] / $known : 0], $top),
+            'other' => $other ? $other + ['share' => $known > 0 ? $other['members'] / $known : 0] : null,
+            'unknown' => $unknown ? (int) $unknown['members'] : 0,
+            'regions' => $this->share($regions->mapWithKeys(fn ($r) => [$r['region'] => $r['members']])->all()),
+            'region_rows' => $regions->values()->all(),
+            'signup' => $this->share($s['members']['signup_method'] ?? []),
+            'emails' => $this->share($emails),
+            'dialects' => $this->share(collect($a['dialects'] ?? [])
+                ->mapWithKeys(fn ($n, $label) => [$label === 'Modern Standard Arabic' ? 'Fusha (MSA)' : $label => $n])->all()),
         ];
     }
 
@@ -185,6 +237,19 @@ class BusinessReportPdf
                     $this->signedPct(($last['active_members'] - $first['active_members']) / $first['active_members'])
                 );
             }
+        }
+
+        $audience = $s['audience'] ?? [];
+        $known = (int) ($audience['with_country'] ?? 0);
+        if ($known >= 20) {
+            $leaders = collect($audience['countries'] ?? [])->whereNotNull('code')->take(2)
+                ->map(fn ($r) => sprintf('%s (%s)', $r['country'], $this->pct($r['members'] / $known, 0)))->implode(' and ');
+            $out[] = sprintf(
+                'Members come from %s countries; %s are in the Arab world, led by %s.',
+                $this->num($audience['country_count'] ?? 0),
+                $this->pct(($audience['arab_world_members'] ?? 0) / $known, 0),
+                $leaders
+            );
         }
 
         $arabic = (int) ($languages['ar'] ?? 0);
