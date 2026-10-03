@@ -271,7 +271,10 @@ class ClonedVoiceResource extends Resource
         $record->update([
             'status' => 'pending',
             'failure_reason' => null,
-            'metadata' => array_merge($record->metadata ?? [], ['failure_code' => null]),
+            'metadata' => array_merge($record->metadata ?? [], [
+                'failure_code' => null,
+                'retried_at' => now()->toIso8601String(),
+            ]),
         ]);
 
         (new ProcessVoiceCloningJob($record->id))->handle(app(VoiceCloningService::class));
