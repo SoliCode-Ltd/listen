@@ -6,8 +6,10 @@ use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
 use App\Support\GeminiTtsModel;
+use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceTier;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -216,6 +218,15 @@ class TtsService
             if (is_string($encoded) && $encoded !== '' && $encoded !== '[]') {
                 $parts[] = 'speakers:'.$encoded;
             }
+        }
+
+        // Chirp 3 HD standard voices sound different from WaveNet ones, so they
+        // get their own cache entries; WaveNet keys stay as they were.
+        if ($provider === 'google_cloud'
+            && VoiceTier::normalize((string) ($config['tier'] ?? VoiceTier::STANDARD)) === VoiceTier::STANDARD
+            && StandardVoiceEngine::usesChirp()
+        ) {
+            $parts[] = 'standard:'.StandardVoiceEngine::CHIRP3_HD;
         }
 
         if ($provider === 'gemini') {

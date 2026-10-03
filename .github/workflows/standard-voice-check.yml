@@ -1,0 +1,135 @@
+name: Standard voice check
+
+# Live check of the Chirp 3 HD standard voice engine on STAGING only.
+# Pipes scripts/tts/standard_voice_check.php (plus this branch's engine and provider)
+# over SSH into the staging app's PHP, which calls Google with its own
+# credentials. Nothing is deployed and nothing is written to the database.
+# The audio comes back as a downloadable artifact so it can be listened to.
+#
+# Uses the same secrets as the SaaS stats workflow:
+#   STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY, optional STAGING_APP_PATH
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/standard-voice-check.yml
+      - scripts/tts/**
+      - app/Support/StandardVoiceEngine.php
+      - app/Services/Tts/GoogleCloudTtsProvider.php
+
+permissions:
+  contents: read
+
+concurrency:
+  group: standard-voice-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the check script with this branch's code
+        run: |
+          set -euo pipefail
+          # This branch's engine and Google provider, moved to the ListenUnderTest
+          # namespace so they load next to the server's own copies. The engine copy
+          # reads its choice from $GLOBALS['standard_engine'] instead of the database.
+          {
+            echo '<?php'
+            sed -e '1d' \
+                -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' \
+                -e "s/SiteSetting::get(self::SETTING_KEY, self::WAVENET)/(\$GLOBALS['standard_engine'] ?? self::WAVENET)/" \
+                app/Support/StandardVoiceEngine.php
+            sed -e '1d' \
+                -e 's/^namespace App\\Services\\Tts;/namespace ListenUnderTest;/' \
+                -e '/^use App\\Support\\StandardVoiceEngine;/d' \
+                app/Services/Tts/GoogleCloudTtsProvider.php
+          } > under_test.php
+          php -l under_test.php
+          grep -q "GLOBALS\['standard_engine'\]" under_test.php
+          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = 2
+          python3 - <<'PY'
+          import base64
+          code = base64.b64encode(open('under_test.php', 'rb').read()).decode()
+          script = open('scripts/tts/standard_voice_check.php').read()
+          assert '__UNDER_TEST__' in script
+          open('check.php', 'w').write(script.replace('__UNDER_TEST__', code))
+          PY
+          php -l check.php
+
+      - name: Run against staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::error::Staging SSH secrets are not set."
+            exit 1
+          fi
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < check.php > result.json
+          rm -f ~/.ssh/id_check
+
+      - name: Install ffprobe
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+
+      - name: Summarise and save the audio
+        run: |
+          set -euo pipefail
+          mkdir -p audio
+          python3 - <<'EOF'
+          import base64, json, re, subprocess
+          data = json.load(open('result.json'))
+          print('Environment:', data['meta'])
+          print('\nVoice list check:')
+          for locale, row in data['voice_list'].items():
+              print(f"  {locale}: HTTP {row['http_status']}, {row['chirp_voices_available']} Chirp 3 HD voices, missing from mapping: {row['mapped_voices_missing'] or 'none'}")
+          print('\nSynthesis:')
+          failures = 0
+          for case in data['cases']:
+              seconds = ''
+              audio = case.pop('audio_base64', None)
+              if audio:
+                  name = re.sub(r'[^A-Za-z0-9.+-]+', '_', case['name']).strip('_') + '.mp3'
+                  open('audio/' + name, 'wb').write(base64.b64decode(audio))
+                  try:
+                      probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', 'audio/' + name], capture_output=True, text=True)
+                      seconds = f" audio={float(probe.stdout.strip() or 0):.1f}s" if probe.returncode == 0 else ' audio=unreadable'
+                      case['audio_seconds'] = float(probe.stdout.strip() or 0) if probe.returncode == 0 else None
+                  except FileNotFoundError:
+                      seconds = ''
+              status = 'OK  ' if case['ok'] else 'FAIL'
+              failures += 0 if case['ok'] else 1
+              print(f"  {status} {case['name']:<45} {case['voice']:<32} {case['latency_ms']:>6} ms {case.get('bytes', 0):>8} B{seconds} {case.get('error', '')}")
+          missing = sum(len(r['mapped_voices_missing']) for r in data['voice_list'].values())
+          print(f"\n{failures} synthesis failures, {missing} mapped voices missing.")
+          json.dump(data, open('summary.json', 'w'), ensure_ascii=False, indent=2)
+          if failures or missing:
+              raise SystemExit(1)
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: standard-voice-check-${{ github.run_number }}
+          path: |
+            audio/
+            summary.json
+          if-no-files-found: ignore
+          retention-days: 14

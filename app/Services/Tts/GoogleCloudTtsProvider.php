@@ -3,9 +3,12 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\StandardVoiceEngine;
 use App\Support\TextChunker;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -77,7 +80,11 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         $verifySsl = (bool) config('services.google_tts.verify_ssl', true);
 
         $languageCode = $this->resolveLanguageCode($targetLanguage);
-        $gender = strtoupper($voiceConfig['gender'] ?? $this->resolveSsmlGender($voiceName));
+        // Google rejects anything but MALE, FEMALE or NEUTRAL (an empty value is a 400).
+        $gender = strtoupper(trim((string) ($voiceConfig['gender'] ?? '')));
+        if (! in_array($gender, ['MALE', 'FEMALE', 'NEUTRAL'], true)) {
+            $gender = $this->resolveSsmlGender($voiceName);
+        }
 
         // Chirp voices (chirp, chirp3, chirp2) don't support pitch parameters
         $supportsProsodicParams = !$this->isChirpVoice($voiceName);
@@ -108,11 +115,9 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             ? self::splitForByteLimit($text, self::MAX_INPUT_BYTES)
             : [mb_substr($text, 0, 5000)];
 
-        $binary = '';
-        foreach ($chunks as $chunk) {
-            $payload['input']['text'] = $chunk;
-            $binary .= $this->requestAudio($payload, $endpoint, $timeout, $verifySsl);
-        }
+        $binary = count($chunks) === 1
+            ? $this->requestAudio(array_replace_recursive($payload, ['input' => ['text' => $chunks[0]]]), $endpoint, $timeout, $verifySsl)
+            : $this->requestAudioPieces($payload, $chunks, $endpoint, $timeout, $verifySsl);
 
         $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
         $disk = Storage::disk('public');
@@ -199,6 +204,65 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         return TextChunker::split($text, $maxBytes, 'strlen');
     }
 
+    /**
+     * Long texts are read in pieces. The pieces go out in parallel batches
+     * (Chirp 3 HD takes about three times longer than WaveNet per piece, so
+     * one after another would run past the job timeout), and are joined in
+     * order. A piece that fails is sent again on its own.
+     *
+     * @param  array<int, string>  $chunks
+     */
+    private function requestAudioPieces(array $payload, array $chunks, string $endpoint, int $timeout, bool $verifySsl): string
+    {
+        $parallel = max(1, (int) config('services.google_tts.max_parallel_requests', 4));
+        $apiKey = trim((string) config('services.google_tts.api_key', ''));
+        $headers = $apiKey !== ''
+            ? ['X-Goog-Api-Key' => $apiKey]
+            : ['Authorization' => 'Bearer '.$this->getGoogleAccessToken()];
+        $parts = [];
+
+        foreach (array_chunk($chunks, $parallel, true) as $batch) {
+            $responses = Http::pool(function (Pool $pool) use ($batch, $payload, $endpoint, $timeout, $verifySsl, $headers) {
+                foreach ($batch as $index => $chunk) {
+                    $pool->as('part'.$index)
+                        ->timeout($timeout)
+                        ->withOptions(['verify' => $verifySsl])
+                        ->withHeaders($headers)
+                        ->post($endpoint, array_replace_recursive($payload, ['input' => ['text' => $chunk]]));
+                }
+            });
+
+            foreach ($batch as $index => $chunk) {
+                $response = $responses['part'.$index] ?? null;
+                $audio = $response instanceof Response && $response->ok()
+                    ? base64_decode((string) ($response->json('audioContent') ?? ''), true)
+                    : false;
+
+                if (is_string($audio) && $audio !== '') {
+                    $parts[$index] = $audio;
+
+                    continue;
+                }
+
+                Log::warning('Speech piece failed; sending it again on its own.', [
+                    'piece' => $index + 1,
+                    'pieces' => count($chunks),
+                    'status' => $response instanceof Response ? $response->status() : null,
+                ]);
+                $parts[$index] = $this->requestAudio(
+                    array_replace_recursive($payload, ['input' => ['text' => $chunk]]),
+                    $endpoint,
+                    $timeout,
+                    $verifySsl,
+                );
+            }
+        }
+
+        ksort($parts);
+
+        return implode('', $parts);
+    }
+
     private function requestAudio(array $payload, string $endpoint, int $timeout, bool $verifySsl): string
     {
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
@@ -276,7 +340,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 if ($provider === 'google_cloud') {
                     $resolvedVoice = VoiceCatalog::providerVoiceIdForName($voiceName) ?: $voiceName;
 
-                    return $this->enforceWaveNetForStandard($resolvedVoice, $baseLanguage, $tier, $gender);
+                    return $this->enforceStandardEngine($resolvedVoice, $baseLanguage, $tier, $gender);
                 }
 
                 // Selected voice belongs to another provider (Gemini, etc.).
@@ -289,7 +353,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
                 || str_contains(strtolower($voiceName), '-neural2-')
                 || str_contains(strtolower($voiceName), '-chirp3-')
             ) {
-                return $this->enforceWaveNetForStandard($voiceName, $baseLanguage, $tier, $gender);
+                return $this->enforceStandardEngine($voiceName, $baseLanguage, $tier, $gender);
             }
         }
 
@@ -306,7 +370,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
 
             return $normalizedTier === VoiceTier::STANDARD
-                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                ? $this->standardVoice($resolved, $targetLanguage, $gender)
                 : $resolved;
         }
 
@@ -316,13 +380,13 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $resolved = VoiceCatalog::providerVoiceIdForName($voice) ?: $voice;
 
             return $normalizedTier === VoiceTier::STANDARD
-                ? $this->coerceToWaveNetVoice($resolved, $targetLanguage, $gender)
+                ? $this->standardVoice($resolved, $targetLanguage, $gender)
                 : $resolved;
         }
 
-        // Let Google auto-pick for non-standard tiers. Standard must stay WaveNet.
+        // Let Google auto-pick for non-standard tiers. Standard uses the admin's engine.
         return $normalizedTier === VoiceTier::STANDARD
-            ? $this->coerceToWaveNetVoice('', $targetLanguage, $gender)
+            ? $this->standardVoice('', $targetLanguage, $gender)
             : '';
     }
 
@@ -331,10 +395,29 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
         return VoiceTier::normalize($tier);
     }
 
-    private function enforceWaveNetForStandard(string $voiceName, string $targetLanguage, string $tier, string $gender): string
+    private function enforceStandardEngine(string $voiceName, string $targetLanguage, string $tier, string $gender): string
     {
         if (VoiceTier::normalize($tier) !== VoiceTier::STANDARD) {
             return $voiceName;
+        }
+
+        return $this->standardVoice($voiceName, $targetLanguage, $gender);
+    }
+
+    /**
+     * Standard quality reads with WaveNet, or with the matching Chirp 3 HD
+     * voice when the admin picked Chirp 3 HD for standard voices.
+     */
+    private function standardVoice(string $voiceName, string $targetLanguage, string $gender): string
+    {
+        if (StandardVoiceEngine::usesChirp()) {
+            return StandardVoiceEngine::isChirpVoice($voiceName)
+                ? $voiceName
+                : StandardVoiceEngine::chirpVoiceFor(
+                    $this->coerceToWaveNetVoice($voiceName, $targetLanguage, $gender),
+                    $targetLanguage,
+                    $gender,
+                );
         }
 
         return $this->coerceToWaveNetVoice($voiceName, $targetLanguage, $gender);

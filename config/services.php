@@ -55,6 +55,8 @@ return [
         'speaking_rate' => (float) env('SPEECH_TTS_SPEAKING_RATE', env('GOOGLE_TTS_SPEAKING_RATE', 1.0)),
         'pitch' => (float) env('SPEECH_TTS_PITCH', env('GOOGLE_TTS_PITCH', 0.0)),
         'timeout_seconds' => (int) env('SPEECH_TTS_TIMEOUT_SECONDS', env('GOOGLE_TTS_TIMEOUT_SECONDS', 30)),
+        // Pieces of one long text sent to Google at the same time.
+        'max_parallel_requests' => (int) env('SPEECH_TTS_MAX_PARALLEL_REQUESTS', 4),
     ],
 
     /*

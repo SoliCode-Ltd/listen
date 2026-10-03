@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Voice;
 use App\Support\GeminiTtsModel;
+use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -44,6 +45,7 @@ class TtsSettings extends Page implements HasForms
             // Global mode
             'tts_mode' => SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
             'tts_fallback_enabled' => (string) SiteSetting::get('tts_fallback_enabled', '1') === '1',
+            StandardVoiceEngine::SETTING_KEY => StandardVoiceEngine::current(),
 
             // Gemini config
             'gemini_api_key_set' => count(app(\App\Services\Tts\GeminiKeyManager::class)->getAllKeys()) > 0,
@@ -100,11 +102,17 @@ class TtsSettings extends Page implements HasForms
                             ->label('TTS Routing Mode')
                             ->options([
                                 'google' => 'Google Cloud TTS (WaveNet & Chirp)',
-                                'hybrid' => 'Hybrid (Free → Google WaveNet, Paid → Gemini)',
+                                'hybrid' => 'Hybrid (Standard → Google, HD → Gemini)',
                             ])
                             ->required()
-                            ->helperText('Google: all users get Google Cloud TTS (WaveNet + Chirp). Hybrid: free plans get Google WaveNet, paid plans get the Gemini model selected below, with automatic fallback.')
+                            ->helperText('Google: all users get Google Cloud TTS (WaveNet + Chirp). Hybrid: standard voices use Google (the engine chosen here), HD voices on paid plans use the Gemini model selected below, with automatic fallback.')
                             ->reactive(),
+                        Forms\Components\Select::make(StandardVoiceEngine::SETTING_KEY)
+                            ->label('Standard voice engine')
+                            ->options(StandardVoiceEngine::options())
+                            ->default(StandardVoiceEngine::WAVENET)
+                            ->required()
+                            ->helperText('Reads Standard-quality generations only: the free plan, and the demo if a visitor switches it to Standard. Paid plans and the demo default use HD (Gemini) and are not affected. With Chirp 3 HD, each standard voice in the picker is read by a matching Chirp 3 HD voice of the same language and gender. Pitch is ignored by Chirp 3 HD. Switch back at any time.'),
                         Forms\Components\Toggle::make('tts_fallback_enabled')
                             ->label('Enable Fallback')
                             ->helperText('If Gemini fails, automatically fall back to Google Cloud TTS.')
@@ -286,6 +294,7 @@ class TtsSettings extends Page implements HasForms
         $scalarKeys = [
             'tts_mode',
             'tts_fallback_enabled',
+            StandardVoiceEngine::SETTING_KEY,
             'gemini_tts_model',
             'gemini_default_voice',
             'gemini_timeout_seconds',
