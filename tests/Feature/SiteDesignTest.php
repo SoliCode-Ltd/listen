@@ -191,18 +191,34 @@ class SiteDesignTest extends TestCase
         }
     }
 
-    public function test_not_found_page_follows_the_selected_design(): void
+    public function test_not_found_page_uses_the_listen_design_in_both_themes(): void
     {
-        $this->get('/en/this-page-does-not-exist-'.uniqid())
-            ->assertNotFound()
-            ->assertDontSee('nt-flatline', false);
+        foreach ([SiteDesign::MAIN, SiteDesign::NEW] as $design) {
+            SiteSetting::set(SiteDesign::SETTING_KEY, $design, 'general');
 
-        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+            $this->get('/en/this-page-does-not-exist-'.uniqid())
+                ->assertNotFound()
+                ->assertSee('nt-flatline', false)
+                ->assertSee('css/design-new.css', false)
+                ->assertSee('lang="en"', false)
+                ->assertSee(__('design.system.h404', [], 'en'), false);
 
-        $this->get('/en/this-page-does-not-exist-'.uniqid())
+            $this->get('/ar/this-page-does-not-exist-'.uniqid())
+                ->assertNotFound()
+                ->assertSee('lang="ar"', false)
+                ->assertSee('dir="rtl"', false)
+                ->assertSee(__('design.system.h404', [], 'ar'), false);
+        }
+    }
+
+    public function test_not_found_page_without_a_language_prefix_uses_the_main_language(): void
+    {
+        SiteSetting::set('site_main_language', 'ar', 'general');
+
+        $this->get('/this-page-does-not-exist-'.uniqid())
             ->assertNotFound()
-            ->assertSee('nt-flatline', false)
-            ->assertSee('css/design-new.css', false);
+            ->assertSee('lang="ar"', false)
+            ->assertSee('href="'.url('/ar').'"', false);
     }
 
     public function test_unsubscribe_page_follows_the_selected_design(): void
