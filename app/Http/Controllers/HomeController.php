@@ -17,6 +17,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
 use App\Support\SeoHelper;
+use App\Support\SiteDesign;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -79,13 +80,78 @@ class HomeController extends Controller
             $homepageSampleLimit
         );
 
-        return view('landing', [
+        $view = [
             'highlightPlans' => $highlightPlans,
             'heroVoiceSample' => $heroVoiceSample,
             'voiceSamples' => $voiceSamples,
             'countryContext' => $countryContext,
             'trialPromo' => app(TrialEligibilityService::class)->promoFor(request()->user()),
-        ]);
+        ];
+
+        if (SiteDesign::isNew()) {
+            $view += $this->newDesignHomeData($isArabicLocale, $pricingPlans);
+        }
+
+        return view('landing', $view);
+    }
+
+    /**
+     * Extra homepage data used only by the new site design: one real sample per Arabic
+     * dialect, the sample library in both languages, and the plans for the pricing teaser.
+     *
+     * @param  array<int, array<string, mixed>>  $pricingPlans
+     * @return array<string, mixed>
+     */
+    private function newDesignHomeData(bool $isArabicLocale, array $pricingPlans): array
+    {
+        $samples = Cache::remember('nt_home_samples:'.($isArabicLocale ? 'ar' : 'en'), 300, function () use ($isArabicLocale): array {
+            $all = VoiceSample::query()
+                ->active()
+                ->where('category', 'hero')
+                ->orderByDesc('is_featured')
+                ->ordered()
+                ->get();
+
+            $dialectOrder = ['ar-XA', 'ar-SA', 'ar-EG', 'ar-LB', 'ar-MA', 'ar-AE', 'ar-KW', 'ar-JO', 'ar-SY', 'ar-IQ'];
+            $dialects = [];
+            foreach ($dialectOrder as $code) {
+                $match = $all->first(fn (VoiceSample $sample): bool => $sample->language === 'ar'
+                    && strcasecmp((string) $sample->dialect, $code) === 0
+                    && trim((string) $sample->audio_path) !== '');
+                if ($match) {
+                    $dialects[] = $this->mapVoiceSample($match, $isArabicLocale);
+                }
+                if (count($dialects) >= 5) {
+                    break;
+                }
+            }
+
+            $library = [];
+            foreach (['ar', 'en'] as $language) {
+                $library[$language] = $all
+                    ->filter(fn (VoiceSample $sample): bool => $sample->language === $language && (bool) $sample->show_in_showcase)
+                    ->take(6)
+                    ->map(fn (VoiceSample $sample): array => $this->mapVoiceSample($sample, $isArabicLocale))
+                    ->values()
+                    ->all();
+            }
+
+            return ['dialects' => $dialects, 'library' => $library];
+        });
+
+        $byPrice = collect($pricingPlans)->values();
+        $teaser = collect([
+            $byPrice->first(),
+            $byPrice->firstWhere('is_popular', true),
+            $byPrice->last(),
+        ])->filter()->unique('slug')->values()->all();
+
+        return [
+            'ntDialectSamples' => $samples['dialects'],
+            'ntLibrary' => $samples['library'],
+            'ntTeaserPlans' => $teaser,
+            'ntFreePlan' => $byPrice->first(fn (array $plan): bool => (int) ($plan['price_monthly_cents'] ?? 1) === 0),
+        ];
     }
 
     public function pricingPage(Request $request)

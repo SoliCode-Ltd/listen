@@ -20,7 +20,7 @@ class SiteDesignTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-design="new"', false)
             ->assertDontSee('css/design-new.css', false)
-            ->assertDontSee('nt-steps', false)
+            ->assertDontSee('id="ntHome"', false)
             ->assertDontSee('design-preview-badge', false);
     }
 
@@ -32,9 +32,9 @@ class SiteDesignTest extends TestCase
             ->assertOk()
             ->assertSee('class="nt" data-design="new" data-page="home"', false)
             ->assertSee('css/design-new.css', false)
-            ->assertSee('nt-steps', false)
-            ->assertSee('nt-dialects', false)
-            ->assertSee(__('design.home.steps_title'), false)
+            ->assertSee('id="ntHome"', false)
+            ->assertSee(__('design.home.h1_line1'), false)
+            ->assertSee(__('design.home.clone_title'), false)
             ->assertDontSee('design-preview-badge', false);
     }
 
