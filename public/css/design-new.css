@@ -1,0 +1,1480 @@
+/*
+ * Listen — New Theme
+ *
+ * Loaded only when Site Settings → Appearance → Site Design is "New theme"
+ * (or an admin previews it). Every rule is scoped to html.nt, so the main
+ * design is untouched when this file is not loaded. Markup, ids and scripts
+ * are shared with the main design; this file only restyles them.
+ */
+
+/* ===================================================================
+   1. Tokens
+   =================================================================== */
+html.nt {
+  --font-display: 'Readex Pro', 'IBM Plex Sans', sans-serif;
+  --font-body: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
+  --font-display-ar: 'Readex Pro', 'IBM Plex Sans Arabic', sans-serif;
+  --font-body-ar: 'IBM Plex Sans Arabic', 'IBM Plex Sans', sans-serif;
+
+  --btn-radius: 12px;
+  --radius: .75rem;
+  --radius-lg: 1.15rem;
+
+  --bg: #0A0A0F;
+  --surface: #14131B;
+  --surface2: #0F0E15;
+  --line: #27262F;
+  --text: #F5F4F8;
+  --muted: #A9A7B8;
+  --a: #7B5CFF;
+  --b: #8E74FF;
+  --brand-accent: #6D4AFF;
+  --brand-hover: #7E5FFF;
+  --brand-active: #5B38F0;
+  --brand-subtle: #B6A6FF;
+  --brand-accent-glow: rgba(109, 74, 255, .38);
+  --ok: #3DD68C;
+  --danger: #FF7D8B;
+  --shadow: 0 16px 40px rgba(0, 0, 0, .38);
+  --shadow-sm: 0 4px 14px rgba(0, 0, 0, .28);
+
+  /* New theme only */
+  --nt-raised: #1C1B25;
+  --nt-brand-text: #A995FF;
+  --nt-accent: #F2B544;
+  --nt-accent-soft: rgba(242, 181, 68, .14);
+  --nt-soft: rgba(123, 92, 255, .14);
+  --nt-soft-line: rgba(160, 138, 255, .38);
+  --nt-glass: rgba(20, 19, 27, .72);
+  --nt-grad: linear-gradient(120deg, #9C84FF 0%, #C77DFF 48%, #F2B544 100%);
+  --nt-grad-fill: linear-gradient(135deg, #7B5CFF 0%, #5B38F0 100%);
+  --nt-card-shadow: 0 1px 0 rgba(255, 255, 255, .04) inset, 0 18px 50px rgba(0, 0, 0, .32);
+  --nt-ring: 0 0 0 3px rgba(123, 92, 255, .45);
+  --nt-aurora-1: rgba(109, 74, 255, .22);
+  --nt-aurora-2: rgba(199, 125, 255, .10);
+  --nt-aurora-3: rgba(242, 181, 68, .07);
+}
+
+html.nt[data-theme="light"] {
+  --bg: #F6F6F9;
+  --surface: #FFFFFF;
+  --surface2: #F1F0F6;
+  --line: #E2E0EA;
+  --text: #15141B;
+  --muted: #585667;
+  --a: #5B36E8;
+  --b: #6A47F0;
+  --brand-accent: #5B36E8;
+  --brand-hover: #4B27D9;
+  --brand-active: #3F1FC2;
+  --brand-subtle: #5B36E8;
+  --brand-accent-glow: rgba(91, 54, 232, .20);
+  --ok: #0F7A49;
+  --danger: #C0262D;
+  --shadow: 0 16px 40px rgba(21, 20, 27, .08);
+  --shadow-sm: 0 4px 14px rgba(21, 20, 27, .06);
+
+  --nt-raised: #EFEEF5;
+  --nt-brand-text: #5B36E8;
+  --nt-accent: #8A5A00;
+  --nt-accent-soft: rgba(242, 181, 68, .22);
+  --nt-soft: rgba(91, 54, 232, .08);
+  --nt-soft-line: rgba(91, 54, 232, .32);
+  --nt-glass: rgba(255, 255, 255, .78);
+  --nt-grad: linear-gradient(120deg, #5B36E8 0%, #A23BD6 55%, #C27A00 100%);
+  --nt-grad-fill: linear-gradient(135deg, #6A47F0 0%, #4B27D9 100%);
+  --nt-card-shadow: 0 1px 2px rgba(21, 20, 27, .04), 0 12px 32px rgba(21, 20, 27, .06);
+  --nt-ring: 0 0 0 3px rgba(91, 54, 232, .30);
+  --nt-aurora-1: rgba(91, 54, 232, .10);
+  --nt-aurora-2: rgba(162, 59, 214, .06);
+  --nt-aurora-3: rgba(242, 181, 68, .10);
+}
+
+/* ===================================================================
+   2. Base: page, type, focus
+   =================================================================== */
+html.nt body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 12% -8%, var(--nt-aurora-1), transparent 62%),
+    radial-gradient(900px 520px at 92% -6%, var(--nt-aurora-2), transparent 60%),
+    radial-gradient(760px 420px at 60% 0%, var(--nt-aurora-3), transparent 64%);
+  background-repeat: no-repeat;
+  background-size: 100% 1100px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html.nt h1, html.nt h2, html.nt h3, html.nt h4, html.nt h5, html.nt h6, html.nt .font-display {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+html.nt h1 {
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+html.nt[dir="rtl"] h1, html.nt[dir="rtl"] h2, html.nt[dir="rtl"] h3,
+html.nt[dir="rtl"] h4, html.nt[dir="rtl"] h5, html.nt[dir="rtl"] h6,
+html.nt[dir="rtl"] .font-display {
+  font-family: var(--font-display-ar);
+  letter-spacing: 0;
+}
+
+html.nt ::selection {
+  background: color-mix(in oklab, var(--brand-accent) 45%, transparent);
+  color: var(--text);
+}
+
+html.nt a:focus-visible,
+html.nt button:focus-visible,
+html.nt [role="button"]:focus-visible,
+html.nt summary:focus-visible {
+  outline: 2px solid var(--nt-brand-text);
+  outline-offset: 2px;
+}
+
+html.nt .brand-text,
+html.nt .text-gradient-accent {
+  background: var(--nt-grad);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ===================================================================
+   3. Header
+   =================================================================== */
+html.nt .app-header {
+  background: color-mix(in oklab, var(--bg) 70%, transparent);
+  backdrop-filter: saturate(160%) blur(18px);
+  -webkit-backdrop-filter: saturate(160%) blur(18px);
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+}
+html.nt .header-inner {
+  min-height: 68px;
+}
+html.nt .site-logo {
+  height: 2.15rem;
+}
+
+html.nt .desktop-nav {
+  gap: .15rem;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  background: color-mix(in oklab, var(--surface) 55%, transparent);
+}
+html.nt .nav-link {
+  border-radius: 999px;
+  padding: .5rem .95rem;
+  font-weight: 500;
+  font-size: .94rem;
+  color: var(--muted);
+}
+html.nt .nav-link:hover {
+  color: var(--text);
+  background: color-mix(in oklab, var(--nt-raised) 80%, transparent);
+}
+html.nt .nav-link.active {
+  color: var(--text);
+  background: var(--nt-raised);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 80%, transparent);
+  font-weight: 600;
+}
+
+/* Language switch: same mechanics (sliding indicator), new skin. */
+html.nt .locale-switch,
+html.nt .mobile-locale-switch {
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  border-color: color-mix(in oklab, var(--line) 85%, transparent);
+  min-width: 12rem;
+}
+html.nt .locale-switch .locale-indicator,
+html.nt .mobile-locale-switch .locale-indicator {
+  background: var(--nt-grad-fill);
+  border-color: transparent;
+  box-shadow: 0 6px 18px var(--brand-accent-glow);
+}
+html.nt .locale-link {
+  font-weight: 600;
+  letter-spacing: 0;
+  font-size: .82rem;
+  min-height: 1.75rem;
+}
+html.nt .locale-link.active {
+  color: #FFFFFF;
+  font-weight: 700;
+}
+html.nt .locale-link[hreflang="ar"] {
+  font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', sans-serif;
+}
+
+html.nt .btn-icon,
+html.nt .mobile-toggle {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  border-color: color-mix(in oklab, var(--line) 85%, transparent);
+}
+html.nt .btn-icon:hover,
+html.nt .mobile-toggle:hover {
+  background: var(--nt-raised);
+  border-color: var(--nt-soft-line);
+}
+
+html.nt .user-trigger {
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+  border-color: color-mix(in oklab, var(--line) 85%, transparent);
+  padding-block: .28rem;
+}
+html.nt .user-trigger:hover {
+  background: var(--nt-raised);
+}
+html.nt .user-avatar,
+html.nt .dropdown-avatar {
+  background: var(--nt-grad-fill);
+}
+html.nt .user-dropdown {
+  border-radius: 16px;
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  padding: 6px;
+}
+html.nt .dropdown-header {
+  border-radius: 12px;
+  background: var(--nt-raised);
+  border-bottom: 0;
+  margin-bottom: 4px;
+}
+html.nt .dropdown-divider {
+  height: 1px;
+  margin: 4px 6px;
+}
+html.nt .dropdown-item {
+  border-radius: 10px;
+  font-size: .93rem;
+}
+html.nt .dropdown-item:hover {
+  background: var(--nt-raised);
+}
+
+/* Mobile menu */
+html.nt .mobile-nav,
+html.nt .mobile-nav-top {
+  background: var(--bg);
+}
+html.nt .mobile-nav-link {
+  border-radius: 12px;
+  font-weight: 500;
+  font-size: 1rem;
+}
+html.nt .mobile-nav-link:hover,
+html.nt .mobile-nav-link.active {
+  background: var(--nt-raised);
+  color: var(--text);
+}
+html.nt .mobile-nav-link.active {
+  box-shadow: inset 3px 0 0 var(--brand-accent);
+}
+html.nt[dir="rtl"] .mobile-nav-link.active {
+  box-shadow: inset -3px 0 0 var(--brand-accent);
+}
+html.nt .mobile-nav-link.logout {
+  box-shadow: none;
+}
+html.nt .mobile-cta {
+  min-height: 52px;
+}
+
+/* ===================================================================
+   4. Buttons
+   =================================================================== */
+html.nt .btn {
+  font-family: var(--font-body);
+  font-weight: 600;
+  border-radius: var(--btn-radius);
+  min-height: 46px;
+  padding: .75rem 1.4rem;
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  border: 1px solid var(--line);
+  transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease, color .18s ease;
+}
+html.nt[dir="rtl"] .btn {
+  font-family: var(--font-body-ar);
+}
+html.nt .btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--nt-soft-line);
+  box-shadow: var(--shadow-sm);
+}
+html.nt .btn-primary,
+html.nt .btn.btn-primary {
+  background: var(--nt-grad-fill);
+  border: 0;
+  color: #FFFFFF;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .18) inset, 0 8px 22px var(--brand-accent-glow);
+}
+html.nt .btn-primary:hover,
+html.nt .btn.btn-primary:hover {
+  background: var(--nt-grad-fill);
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, .2) inset, 0 12px 30px var(--brand-accent-glow);
+}
+html.nt .btn-primary:active,
+html.nt .btn.btn-primary:active {
+  filter: brightness(.96);
+  transform: translateY(0);
+}
+html.nt .btn-ghost {
+  background: transparent;
+  border-color: transparent;
+}
+html.nt .btn-ghost:hover {
+  background: var(--nt-raised);
+  border-color: transparent;
+  box-shadow: none;
+}
+html.nt .header-actions .auth-buttons .btn {
+  min-height: 42px;
+  padding: .6rem 1.15rem;
+  font-size: .93rem;
+}
+
+/* ===================================================================
+   5. Forms, alerts, toggles (shared)
+   =================================================================== */
+html.nt .styled-form label {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+html.nt .styled-form .form-control {
+  border-width: 1px;
+  border-radius: 12px;
+  background: var(--surface2);
+  box-shadow: none;
+}
+html.nt .styled-form .form-control:focus {
+  border-color: var(--brand-accent);
+  box-shadow: var(--nt-ring);
+  transform: none;
+  background: var(--surface);
+}
+html.nt .contact-submit-btn {
+  background: var(--nt-grad-fill);
+  border-radius: 12px;
+  box-shadow: 0 10px 26px var(--brand-accent-glow);
+}
+
+html.nt .alert {
+  border-radius: 14px;
+}
+
+html.nt .setting-card {
+  border-radius: 14px;
+  background: var(--surface);
+}
+html.nt .setting-card:hover {
+  border-color: var(--nt-soft-line);
+  background: var(--surface);
+}
+html.nt .toggle-switch input:checked + .toggle-slider {
+  background: var(--nt-grad-fill);
+}
+
+/* Shared audio player */
+html.nt .custom-audio-wrapper {
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  border-color: var(--line);
+  box-shadow: none;
+}
+html.nt[data-theme="light"] .custom-audio-wrapper {
+  background: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(21, 20, 27, .05);
+}
+html.nt .custom-audio-play {
+  background: var(--nt-grad-fill);
+  width: 34px;
+  height: 34px;
+  box-shadow: 0 6px 16px var(--brand-accent-glow);
+}
+html.nt .custom-audio-progress {
+  background: var(--nt-grad);
+}
+
+/* ===================================================================
+   6. Footer
+   =================================================================== */
+html.nt .app-footer {
+  background: transparent;
+  border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  position: relative;
+}
+html.nt .app-footer::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  top: -1px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--nt-soft-line), transparent);
+  pointer-events: none;
+}
+html.nt .footer-container {
+  padding-top: 3.25rem;
+}
+html.nt .footer-column h4 {
+  font-family: var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+html.nt[dir="rtl"] .footer-column h4 {
+  font-family: var(--font-body-ar);
+}
+html.nt .footer-column a {
+  font-size: .94rem;
+}
+html.nt .footer-column a:hover {
+  color: var(--nt-brand-text);
+}
+html.nt .social-link {
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--surface) 70%, transparent);
+}
+html.nt .social-link:hover {
+  color: var(--nt-brand-text);
+  border-color: var(--nt-soft-line);
+}
+
+html.nt .btn:disabled,
+html.nt .btn[disabled],
+html.nt .btn[aria-disabled="true"] {
+  opacity: .55;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+}
+
+/* ===================================================================
+   7. New-theme components (markup rendered only in the new design)
+   =================================================================== */
+html.nt .nt-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  margin: 0 0 1.1rem;
+  padding: .38rem .85rem .38rem .7rem;
+  border-radius: 999px;
+  border: 1px solid var(--nt-soft-line);
+  background: var(--nt-soft);
+  color: var(--nt-brand-text);
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+html.nt .nt-eyebrow-dot {
+  width: .5rem;
+  height: .5rem;
+  border-radius: 50%;
+  background: var(--nt-accent);
+  box-shadow: 0 0 0 4px var(--nt-accent-soft);
+  flex: none;
+}
+
+html.nt .nt-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: .32rem .75rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface) 75%, transparent);
+  color: var(--text);
+  font-size: .84rem;
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+html.nt .nt-chip-more {
+  color: var(--nt-brand-text);
+  border-color: var(--nt-soft-line);
+  background: var(--nt-soft);
+}
+
+/* ===================================================================
+   8. Home
+   =================================================================== */
+html.nt[data-page="home"] .hero {
+  padding-top: clamp(2.5rem, 6vw, 4.5rem);
+}
+html.nt[data-page="home"] .hero-grid {
+  gap: clamp(1.75rem, 4vw, 3.5rem);
+}
+html.nt[data-page="home"] .hero h1 {
+  font-size: clamp(2.6rem, 6.2vw, 4.9rem);
+  line-height: 1.02;
+  margin-bottom: 1.15rem;
+}
+html.nt[data-page="home"][dir="rtl"] .hero h1 {
+  font-size: clamp(2.4rem, 5.6vw, 4.4rem);
+  line-height: 1.25;
+}
+html.nt[data-page="home"] .lead {
+  font-size: 1.14rem;
+  line-height: 1.65;
+  margin-bottom: 1.75rem;
+}
+html.nt[data-page="home"] .hero-cta .btn {
+  min-height: 52px;
+  padding-inline: 1.6rem;
+  font-size: 1rem;
+}
+html.nt[data-page="home"] .btn-trial {
+  border-color: var(--nt-soft-line);
+  color: var(--nt-brand-text);
+  background: var(--nt-soft);
+}
+
+html.nt .nt-dialects {
+  margin-top: 1.75rem;
+}
+html.nt .nt-dialects-label {
+  margin: 0 0 .65rem;
+  color: var(--muted);
+  font-size: .88rem;
+  font-weight: 500;
+}
+html.nt .nt-dialects-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .45rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Hero studio card: flat glass card with a soft glow instead of the tilt. */
+html.nt[data-page="home"] .tts-illustration {
+  aspect-ratio: auto;
+  min-height: 420px;
+  perspective: none;
+}
+html.nt[data-page="home"] .tts-glowing-orb {
+  display: block;
+  position: absolute;
+  inset: 12% 10%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(123, 92, 255, .45), rgba(199, 125, 255, .18) 55%, transparent 75%);
+  filter: blur(30px);
+  z-index: 0;
+  pointer-events: none;
+  animation: ntOrbBreath 7s ease-in-out infinite alternate;
+}
+html.nt[data-page="home"][data-theme="light"] .tts-glowing-orb {
+  background: radial-gradient(closest-side, rgba(91, 54, 232, .22), rgba(162, 59, 214, .10) 55%, transparent 75%);
+}
+@keyframes ntOrbBreath {
+  from { transform: scale(.92); opacity: .75; }
+  to { transform: scale(1.06); opacity: 1; }
+}
+html.nt[data-page="home"] .tts-card,
+html.nt[data-page="home"][dir="rtl"] .tts-card {
+  transform: none;
+  width: 100%;
+  min-height: 380px;
+  border-radius: 24px;
+  border: 1px solid transparent;
+  background:
+    linear-gradient(var(--nt-glass), var(--nt-glass)) padding-box,
+    linear-gradient(140deg, rgba(160, 138, 255, .55), rgba(255, 255, 255, .06) 40%, rgba(242, 181, 68, .35)) border-box;
+  backdrop-filter: blur(22px) saturate(140%);
+  -webkit-backdrop-filter: blur(22px) saturate(140%);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, .45);
+  z-index: 1;
+}
+html.nt[data-page="home"][data-theme="light"] .tts-card {
+  background:
+    linear-gradient(var(--nt-glass), var(--nt-glass)) padding-box,
+    linear-gradient(140deg, rgba(91, 54, 232, .45), rgba(21, 20, 27, .06) 40%, rgba(194, 122, 0, .30)) border-box;
+  box-shadow: 0 30px 70px rgba(21, 20, 27, .12);
+}
+html.nt[data-page="home"] .tts-header {
+  border-bottom-color: color-mix(in oklab, var(--line) 70%, transparent);
+  padding: .95rem 1.25rem;
+}
+html.nt[data-page="home"] .tts-dot {
+  width: 10px;
+  height: 10px;
+}
+html.nt[data-page="home"] .tts-dot:nth-child(1) { background: #FF6B6B; }
+html.nt[data-page="home"] .tts-dot:nth-child(2) { background: #F2B544; }
+html.nt[data-page="home"] .tts-dot:nth-child(3) { background: #3DD68C; }
+html.nt[data-page="home"] .hero-audio-btn {
+  width: 76px;
+  height: 76px;
+  background: var(--nt-grad-fill);
+  border-color: rgba(255, 255, 255, .25);
+}
+html.nt[data-page="home"] .hero-audio-btn.is-playing {
+  background: var(--nt-grad-fill);
+  filter: brightness(.92);
+}
+html.nt[data-page="home"] .hero-audio-caption {
+  letter-spacing: .08em;
+}
+html.nt[data-page="home"][dir="rtl"] .hero-audio-caption {
+  letter-spacing: 0;
+}
+html.nt[data-page="home"] .idle-caption::after {
+  background: var(--nt-accent);
+  box-shadow: 0 0 10px var(--nt-accent);
+}
+/* Keep a calm waveform visible while idle; the player animates it on play. */
+html.nt[data-page="home"] .tts-audio-wave {
+  height: 48px;
+  opacity: 1;
+  margin-top: 2.5rem;
+}
+html.nt[data-page="home"] .tts-bar {
+  background: linear-gradient(180deg, #C77DFF, #7B5CFF);
+  opacity: .45;
+}
+html.nt[data-page="home"][data-theme="light"] .tts-bar {
+  background: linear-gradient(180deg, #A23BD6, #5B36E8);
+}
+html.nt[data-page="home"] .tts-bar:nth-child(3n+1) { transform: scaleY(.42); }
+html.nt[data-page="home"] .tts-bar:nth-child(4n+2) { transform: scaleY(.62); }
+html.nt[data-page="home"] .tts-bar:nth-child(5n+3) { transform: scaleY(.34); }
+html.nt[data-page="home"] .tts-body.is-playing .tts-bar {
+  opacity: 1;
+}
+
+/* Voice cloning announcement */
+html.nt[data-page="home"] .clone-announce-card,
+html.nt[data-page="home"][dir="rtl"] .clone-announce-card {
+  border-radius: 22px;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(70% 160% at 0% 0%, var(--nt-soft), transparent 60%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--nt-grad) border-box;
+  box-shadow: var(--nt-card-shadow);
+  padding: 1.25rem 1.4rem;
+}
+html.nt[data-page="home"] .clone-announce-mark {
+  border-radius: 16px;
+  color: #FFFFFF;
+  background: var(--nt-grad-fill);
+  border: 0;
+  box-shadow: 0 10px 24px var(--brand-accent-glow);
+}
+
+/* Sections */
+html.nt[data-page="home"] .section {
+  padding-block: clamp(2.75rem, 6vw, 4.5rem);
+}
+html.nt[data-page="home"] .section h2,
+html.nt[data-page="home"] .voice-gallery-title {
+  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+  line-height: 1.15;
+}
+html.nt[data-page="home"][dir="rtl"] .section h2,
+html.nt[data-page="home"][dir="rtl"] .voice-gallery-title {
+  line-height: 1.4;
+}
+html.nt[data-page="home"] .section .section-lead,
+html.nt[data-page="home"] .voice-gallery-subtitle {
+  font-size: 1.06rem;
+  max-width: 62ch;
+}
+
+/* Voice sample cards */
+html.nt[data-page="home"] .sample-showcase-track {
+  gap: 1.1rem;
+}
+html.nt[data-page="home"] .sample-card {
+  border-radius: 20px;
+  border-color: var(--line);
+  background: var(--surface);
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt[data-page="home"] .sample-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--nt-soft-line);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, .35);
+}
+html.nt[data-page="home"][data-theme="light"] .sample-card:hover {
+  box-shadow: 0 22px 50px rgba(21, 20, 27, .10);
+}
+html.nt[data-page="home"] .sample-card.is-active-card,
+html.nt[data-page="home"] .sample-card.is-playing-card {
+  border-color: var(--brand-accent);
+  box-shadow: 0 0 0 1px var(--brand-accent), 0 22px 50px var(--brand-accent-glow);
+}
+html.nt[data-page="home"] .sample-card-hero {
+  border-radius: 20px 20px 0 0;
+  min-height: 8.5rem;
+}
+html.nt[data-page="home"] .sample-card-hero::before {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 55%;
+  background: linear-gradient(180deg, transparent, var(--surface));
+  z-index: 2;
+  pointer-events: none;
+}
+html.nt[data-page="home"] .sample-card-body {
+  padding: .5rem 1.25rem 1.1rem;
+  gap: .4rem;
+}
+html.nt[data-page="home"] .sample-card-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.06rem;
+}
+html.nt[data-page="home"][dir="rtl"] .sample-card-title {
+  font-family: var(--font-display-ar);
+}
+html.nt[data-page="home"] .sample-eq-bar {
+  background: linear-gradient(180deg, #C77DFF, #7B5CFF);
+}
+html.nt[data-page="home"] .sample-play-btn {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: .55rem auto .2rem;
+  background: var(--nt-grad-fill);
+  box-shadow: 0 10px 24px var(--brand-accent-glow);
+}
+html.nt[data-page="home"] .sample-play-btn:hover {
+  background: var(--nt-grad-fill);
+  transform: translateY(-2px) scale(1.06);
+  filter: brightness(1.08);
+  box-shadow: 0 14px 30px var(--brand-accent-glow);
+}
+html.nt[data-page="home"] .sample-play-btn.is-playing {
+  background: var(--nt-grad-fill);
+  box-shadow: 0 0 0 6px var(--nt-soft), 0 10px 24px var(--brand-accent-glow);
+}
+
+/* "Listen anywhere" app cards */
+html.nt[data-page="home"] .apps-shell::after {
+  display: none;
+}
+html.nt[data-page="home"] .apps-grid {
+  gap: 1.25rem;
+}
+html.nt[data-page="home"] .app-card {
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--nt-card-shadow);
+  padding: 1.75rem;
+}
+html.nt[data-page="home"] .app-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--nt-soft-line);
+}
+html.nt[data-page="home"] .app-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 14px;
+  border: 0;
+  background: var(--nt-grad-fill);
+  box-shadow: 0 10px 22px var(--brand-accent-glow);
+  filter: none !important;
+}
+html.nt[data-page="home"] .app-icon svg {
+  stroke: #FFFFFF;
+  width: 1.3rem;
+  height: 1.3rem;
+}
+html.nt[data-page="home"] .app-card h3 {
+  font-size: 1.22rem;
+  font-weight: 600;
+}
+html.nt[data-page="home"] .app-card-footer {
+  border-top-color: color-mix(in oklab, var(--line) 80%, transparent);
+}
+html.nt[data-page="home"] .app-link {
+  min-height: 40px;
+  padding: .5rem 1.1rem;
+  border-radius: 10px;
+  background: var(--nt-soft);
+  color: var(--nt-brand-text);
+  border: 1px solid var(--nt-soft-line);
+  font-weight: 600;
+}
+html.nt[data-page="home"] .app-link:hover {
+  opacity: 1;
+  transform: none;
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: #FFFFFF;
+}
+
+/* How it works (new design only) */
+html.nt .nt-steps-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.25rem;
+  counter-reset: none;
+}
+html.nt .nt-step {
+  position: relative;
+  padding: 1.6rem 1.5rem 1.5rem;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--nt-card-shadow);
+  overflow: hidden;
+}
+html.nt .nt-step::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--nt-grad);
+  opacity: .8;
+}
+html.nt .nt-step-num {
+  position: absolute;
+  top: .9rem;
+  inset-inline-end: 1.2rem;
+  font-family: var(--font-display);
+  font-size: 3.2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: color-mix(in oklab, var(--text) 7%, transparent);
+}
+html.nt .nt-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 14px;
+  color: var(--nt-brand-text);
+  background: var(--nt-soft);
+  border: 1px solid var(--nt-soft-line);
+  margin-bottom: 1rem;
+}
+html.nt .nt-step-icon svg {
+  width: 1.3rem;
+  height: 1.3rem;
+}
+html.nt .nt-step h3 {
+  margin: 0 0 .45rem;
+  font-size: 1.15rem;
+  line-height: 1.35;
+  text-align: start;
+}
+html.nt .nt-step p {
+  margin: 0;
+  color: var(--muted);
+  font-size: .96rem;
+  line-height: 1.6;
+}
+
+/* Why creators love Listen */
+html.nt[data-page="home"] .premium-grid {
+  gap: 1.25rem;
+}
+html.nt[data-page="home"] .premium-card {
+  position: relative;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: var(--nt-card-shadow);
+  padding: 1.7rem 1.6rem;
+  overflow: hidden;
+}
+html.nt[data-page="home"] .premium-card::before {
+  content: "";
+  position: absolute;
+  inset-block-start: -40%;
+  inset-inline-end: -20%;
+  width: 60%;
+  height: 120%;
+  background: radial-gradient(closest-side, var(--nt-soft), transparent);
+  pointer-events: none;
+}
+html.nt[data-page="home"] .premium-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--nt-soft-line);
+}
+html.nt[data-page="home"] .premium-card h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: .6rem;
+}
+html.nt[data-page="home"] .premium-metric {
+  border-color: var(--nt-soft-line);
+  background: var(--nt-soft);
+  color: var(--nt-brand-text);
+  font-weight: 600;
+  font-size: .85rem;
+}
+
+/* Final call to action */
+html.nt .cta-section {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(2.5rem, 6vw, 4.5rem) clamp(1.25rem, 4vw, 3rem);
+  border-radius: 28px;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(60% 120% at 50% 0%, rgba(123, 92, 255, .30), transparent 70%) padding-box,
+    radial-gradient(40% 90% at 100% 100%, rgba(242, 181, 68, .14), transparent 70%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--nt-grad) border-box;
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt[data-theme="light"] .cta-section {
+  background:
+    radial-gradient(60% 120% at 50% 0%, rgba(91, 54, 232, .12), transparent 70%) padding-box,
+    radial-gradient(40% 90% at 100% 100%, rgba(242, 181, 68, .16), transparent 70%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--nt-grad) border-box;
+}
+html.nt .cta-section h2 {
+  font-size: clamp(1.9rem, 4vw, 2.9rem);
+}
+html.nt .cta-section p {
+  font-size: 1.08rem;
+  margin-bottom: 1.6rem;
+}
+html.nt .cta-section .btn {
+  min-height: 54px;
+  padding-inline: 2rem;
+  font-size: 1.02rem;
+}
+
+@media (max-width: 980px) {
+  html.nt .nt-dialects-list {
+    justify-content: center;
+  }
+  html.nt[data-page="home"] .tts-illustration {
+    min-height: 0;
+  }
+}
+@media (max-width: 860px) {
+  html.nt .nt-steps-list {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 640px) {
+  html.nt[data-page="home"] .tts-card,
+  html.nt[data-page="home"][dir="rtl"] .tts-card {
+    transform: none;
+    min-height: 0;
+  }
+  html.nt[data-page="home"] .tts-audio-wave {
+    margin-top: 1.4rem;
+  }
+  html.nt .nt-dialects {
+    margin-top: 1.4rem;
+  }
+  html.nt .nt-chip {
+    font-size: .8rem;
+    padding: .28rem .65rem;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.nt .tts-glowing-orb {
+    animation: none !important;
+  }
+}
+
+/* ===================================================================
+   9. Marketing pages: shared building blocks
+   (pricing, extension, contact, keyword landing pages, legal)
+   =================================================================== */
+html.nt .page-hero {
+  padding-top: clamp(2.75rem, 6vw, 4.5rem);
+}
+html.nt .page-hero h1,
+html.nt .seo-hero h1,
+html.nt .legal-shell h1 {
+  font-size: clamp(2.2rem, 5vw, 3.6rem);
+  line-height: 1.08;
+}
+html.nt[dir="rtl"] .page-hero h1,
+html.nt[dir="rtl"] .seo-hero h1,
+html.nt[dir="rtl"] .legal-shell h1 {
+  line-height: 1.3;
+}
+html.nt .page-hero .lead {
+  font-size: 1.1rem;
+  max-width: 56ch;
+}
+html.nt .section-title {
+  font-size: clamp(1.75rem, 3.4vw, 2.5rem);
+}
+html.nt[data-page="pricing"] .eyebrow,
+html.nt .seo-eyebrow,
+html.nt .legal-kicker {
+  border-color: var(--nt-soft-line);
+  background: var(--nt-soft);
+  color: var(--nt-brand-text);
+  letter-spacing: .02em;
+  text-transform: none;
+  font-weight: 600;
+  font-size: .82rem;
+}
+html.nt[dir="rtl"][data-page="pricing"] .eyebrow,
+html.nt[dir="rtl"] .seo-eyebrow,
+html.nt[dir="rtl"] .legal-kicker {
+  letter-spacing: 0;
+}
+
+/* Cards */
+html.nt .plan-card,
+html.nt .feature-card,
+html.nt .faq-item,
+html.nt .page-card,
+html.nt .api-card,
+html.nt .seo-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt .plan-card:hover,
+html.nt .feature-card:hover,
+html.nt .seo-card:hover {
+  border-color: var(--nt-soft-line);
+}
+
+/* Pricing */
+html.nt .billing-toggle {
+  padding: .28rem;
+  background: color-mix(in oklab, var(--surface) 80%, transparent);
+}
+html.nt .billing-indicator {
+  background: var(--nt-grad-fill);
+  box-shadow: 0 6px 18px var(--brand-accent-glow);
+}
+html.nt .billing-toggle button {
+  min-height: 40px;
+}
+html.nt .plan-card {
+  padding: 1.75rem 1.6rem;
+}
+html.nt .plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 26px 60px rgba(0, 0, 0, .35);
+}
+html.nt[data-theme="light"] .plan-card:hover {
+  box-shadow: 0 26px 60px rgba(21, 20, 27, .10);
+}
+html.nt .plan-card.popular {
+  border: 1px solid transparent;
+  background:
+    radial-gradient(90% 60% at 50% 0%, var(--nt-soft), transparent 70%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--nt-grad) border-box;
+  box-shadow: 0 24px 60px var(--brand-accent-glow);
+}
+html.nt .popular-badge {
+  background: var(--nt-grad-fill);
+  border-radius: 999px;
+  letter-spacing: .04em;
+  box-shadow: 0 6px 16px var(--brand-accent-glow);
+}
+html.nt .plan-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+html.nt[dir="rtl"] .plan-name {
+  font-family: var(--font-display-ar);
+}
+html.nt .price-amount {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+html.nt .plan-quota {
+  border-radius: 999px;
+  border-color: var(--nt-soft-line);
+  background: var(--nt-soft);
+  color: var(--nt-brand-text);
+}
+html.nt .feature-label svg {
+  color: var(--nt-brand-text);
+  stroke: currentColor;
+}
+html.nt .plan-btn {
+  min-height: 48px;
+  border-radius: 12px;
+}
+html.nt .plan-btn.btn-primary {
+  background: var(--nt-grad-fill);
+  box-shadow: 0 8px 20px var(--brand-accent-glow);
+}
+html.nt .plan-card:not(.popular) .plan-btn.btn-primary {
+  background: var(--nt-raised);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+html.nt .plan-card:not(.popular) .plan-btn.btn-primary:hover {
+  background: var(--nt-grad-fill);
+  color: #FFFFFF;
+  box-shadow: 0 8px 20px var(--brand-accent-glow);
+}
+
+html.nt .feature-icon {
+  box-sizing: border-box;
+  width: 3rem;
+  height: 3rem;
+  padding: .7rem;
+  border-radius: 14px;
+  color: var(--nt-brand-text);
+  background: var(--nt-soft);
+  border: 1px solid var(--nt-soft-line);
+}
+html.nt .feature-card h3,
+html.nt .faq-item h3 {
+  font-weight: 600;
+}
+
+/* Keyword landing pages */
+html.nt .seo-hero {
+  padding-top: clamp(2.5rem, 6vw, 4rem);
+}
+html.nt .seo-cta {
+  border-radius: 28px;
+  border: 1px solid transparent;
+  background:
+    radial-gradient(60% 120% at 50% 0%, var(--nt-soft), transparent 70%) padding-box,
+    linear-gradient(var(--surface), var(--surface)) padding-box,
+    var(--nt-grad) border-box;
+}
+
+/* Legal pages */
+html.nt .legal-shell {
+  border-radius: 24px;
+}
+html.nt .legal-section h2 {
+  font-weight: 600;
+}
+
+/* Contact */
+html.nt .contact-form-card {
+  border-radius: 26px;
+  background: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--line);
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt .contact-form-card:hover {
+  transform: none;
+  border-color: var(--nt-soft-line);
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt .contact-hero .hero-title {
+  font-size: clamp(2.2rem, 5vw, 3.4rem);
+}
+
+/* ===================================================================
+   10. App pages (dashboard, demo, billing, account)
+   =================================================================== */
+html.nt[data-page="dashboard"] .page-card,
+html.nt[data-page="demo"] .s-card,
+html.nt[data-page="billing"] .manual-card,
+html.nt .auth-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: var(--nt-card-shadow);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.nt[data-page="dashboard"] .page-card:hover {
+  border-color: var(--line);
+  box-shadow: var(--nt-card-shadow);
+}
+html.nt[data-page="dashboard"] .page-card h1,
+html.nt[data-page="dashboard"] .page-card h2 {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+html.nt[dir="rtl"][data-page="dashboard"] .page-card h1,
+html.nt[dir="rtl"][data-page="dashboard"] .page-card h2 {
+  letter-spacing: 0;
+}
+
+/* Side menu */
+html.nt .dashboard-menu-link {
+  border-radius: 12px;
+  font-weight: 500;
+}
+html.nt .dashboard-menu-link:hover {
+  background: var(--nt-raised);
+  transform: none;
+}
+html.nt[dir="rtl"] .dashboard-menu-link:hover {
+  transform: none;
+}
+html.nt .dashboard-menu-link.active {
+  background: var(--nt-raised);
+  border-color: color-mix(in oklab, var(--line) 80%, transparent);
+  font-weight: 600;
+}
+html.nt .dashboard-menu-link::before {
+  background: var(--nt-grad-fill);
+}
+
+/* Usage meters and numbers */
+html.nt .page-card .meter,
+html.nt .kpi {
+  border-radius: 16px;
+  background: var(--surface2);
+  border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html.nt .meter-track {
+  height: 8px;
+  border: 0;
+  box-shadow: none;
+  background: var(--nt-raised);
+}
+html.nt .meter-fill,
+html.nt .meter-fill.requests,
+html.nt[dir="rtl"] .meter-fill,
+html.nt[dir="rtl"] .meter-fill.requests {
+  background: var(--nt-grad-fill);
+  border-radius: 999px;
+}
+html.nt .kpi b {
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+html.nt .kpi small {
+  font-weight: 500;
+}
+
+/* Form controls inside app cards */
+html.nt[data-page="dashboard"] select,
+html.nt[data-page="dashboard"] textarea,
+html.nt[data-page="dashboard"] input[type="text"],
+html.nt[data-page="dashboard"] input[type="email"],
+html.nt[data-page="dashboard"] input[type="search"],
+html.nt[data-page="demo"] select,
+html.nt[data-page="demo"] textarea {
+  border-radius: 12px;
+}
+html.nt[data-page="dashboard"] select:focus,
+html.nt[data-page="dashboard"] textarea:focus,
+html.nt[data-page="dashboard"] input[type="text"]:focus,
+html.nt[data-page="demo"] select:focus,
+html.nt[data-page="demo"] textarea:focus {
+  border-color: var(--brand-accent);
+  box-shadow: var(--nt-ring);
+  outline: none;
+}
+
+/* Sign in / register */
+html.nt .auth-card {
+  position: relative;
+  overflow: hidden;
+}
+html.nt .auth-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--nt-grad);
+  pointer-events: none;
+}
+html.nt .auth-card h1,
+html.nt .auth-card h2 {
+  font-weight: 600;
+}
+
+/* ===================================================================
+   11. Dashboard app sidebar (desktop); falls back to the pill menu
+   on tablets and phones.
+   =================================================================== */
+html.nt .nt-side-heading {
+  margin: 0;
+  padding: .2rem .8rem .45rem;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+html.nt[dir="rtl"] .nt-side-heading {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: .82rem;
+}
+
+/* Section icons, drawn with masks so the existing links keep their markup. */
+html.nt .dashboard-menu-link,
+html.nt .nt-side-link {
+  justify-content: flex-start;
+}
+html.nt .dashboard-menu-link span:first-child,
+html.nt .nt-side-link span {
+  display: inline-flex;
+  align-items: center;
+  gap: .7rem;
+  min-width: 0;
+}
+html.nt .dashboard-menu-link span:first-child::before,
+html.nt .nt-side-link span::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background: currentColor;
+  opacity: .85;
+  -webkit-mask: var(--nt-icon) center / contain no-repeat;
+  mask: var(--nt-icon) center / contain no-repeat;
+}
+html.nt .dashboard-menu-link span:last-child:empty {
+  display: none;
+}
+html.nt a[href="#commandCenterSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-7 9 7M5 10v10h14V10'/%3E%3C/svg%3E"); }
+html.nt a[href="#generateVoiceSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18M7 8v8M17 6v12M2 11v2M22 10v4'/%3E%3C/svg%3E"); }
+html.nt a[href="#voiceCloningSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3'/%3E%3C/svg%3E"); }
+html.nt a[href="#planDefaultsSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0'/%3E%3Ccircle cx='16' cy='6' r='2'/%3E%3Ccircle cx='10' cy='12' r='2'/%3E%3Ccircle cx='18' cy='18' r='2'/%3E%3C/svg%3E"); }
+html.nt a[href="#recentVoicesSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v5h-5'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="billing"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="subscription"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="extension"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'/%3E%3C/svg%3E"); }
+
+html.nt .nt-side-links {
+  display: grid;
+  gap: .2rem;
+}
+html.nt .nt-side-link {
+  display: flex;
+  align-items: center;
+  padding: .7rem .85rem;
+  border-radius: 12px;
+  color: color-mix(in oklab, var(--text) 72%, var(--muted));
+  text-decoration: none;
+  font-size: .93rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: background-color .18s ease, color .18s ease;
+}
+html.nt .nt-side-link:hover {
+  color: var(--text);
+  background: var(--nt-raised);
+}
+
+html.nt .nt-plan-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--nt-soft-line);
+  background:
+    radial-gradient(120% 90% at 0% 0%, var(--nt-soft), transparent 70%),
+    var(--surface2);
+}
+html.nt .nt-plan-label {
+  margin: 0;
+  font-size: .78rem;
+  color: var(--muted);
+}
+html.nt .nt-plan-name {
+  margin: .1rem 0 .7rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+html.nt[dir="rtl"] .nt-plan-name {
+  font-family: var(--font-display-ar);
+}
+html.nt .nt-plan-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--nt-raised);
+  overflow: hidden;
+}
+html.nt .nt-plan-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nt-grad-fill);
+  transition: width .4s ease;
+}
+html.nt .nt-plan-left {
+  margin: .45rem 0 .85rem;
+  font-size: .8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+html.nt .nt-plan-btn {
+  width: 100%;
+  min-height: 40px;
+  padding: .5rem 1rem;
+  font-size: .9rem;
+}
+
+@media (min-width: 981px) {
+  html.nt[data-page="dashboard"] .dashboard-layout {
+    grid-template-columns: 272px minmax(0, 1fr);
+    gap: 2rem;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu,
+  html.nt[data-page="dashboard"][dir="rtl"] .dashboard-menu {
+    position: sticky;
+    top: 88px;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-height: calc(100vh - 120px);
+    padding: 1rem .75rem;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    box-shadow: var(--nt-card-shadow);
+  }
+  html.nt[data-page="dashboard"] .nt-side-extra {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-top: .9rem;
+    padding-top: .9rem;
+    border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  }
+  html.nt[data-page="dashboard"] .nt-plan-card {
+    margin-top: auto;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu-link {
+    padding: .7rem .85rem;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu-link::before {
+    top: 22%;
+    bottom: 22%;
+  }
+}
+@media (max-width: 980px) {
+  html.nt .nt-side-extra,
+  html.nt .nt-side-heading {
+    display: none;
+  }
+}

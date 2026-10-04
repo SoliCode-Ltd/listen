@@ -1488,6 +1488,7 @@
       <div class="hero-grid">
         <div class="reveal">
           <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.home-eyebrow')
           <h1>{{ __('ui.landing.hero_title_before') }} <span class="brand-text">{{ __('ui.landing.hero_title_highlight') }}</span> {{ __('ui.landing.hero_title_after') }}</h1>
           <p class="lead">{{ __('ui.landing.hero_subtitle') }}</p>
           <div class="hero-cta">
@@ -1507,6 +1508,7 @@
               @endif
             @endguest
           </div>
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.home-dialects')
         </div>
 
         <aside class="hero-art reveal">
@@ -1826,6 +1828,7 @@ SVG;
       </div>
     </section>
 
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.home-steps')
     <section class="section reveal">
       <h2>{{ __('ui.landing.section2_title') }}</h2>
       <p class="section-lead">{{ __('ui.landing.section2_subtitle') }}</p>
