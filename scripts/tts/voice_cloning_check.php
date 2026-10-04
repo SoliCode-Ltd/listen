@@ -170,8 +170,10 @@ if (getenv('CLONE_SYNTH') === '1' && $readyVoices->isNotEmpty() && $probe['ok'])
         ['name' => 'ar_egyptian', 'text' => $arText, 'dialect' => 'ar-EG'],
         ['name' => 'en_us', 'text' => $enText, 'dialect' => 'en-US'],
         ['name' => 'en_gb', 'text' => $enText, 'dialect' => 'en-GB'],
-        ['name' => 'ar_two_pieces', 'text' => str_repeat('هذه جملة لاختبار تقسيم النص الطويل إلى أجزاء ثم دمجها في ملف واحد. ', 4), 'dialect' => null, 'max_chars' => 200],
-        ['name' => 'en_two_pieces', 'text' => str_repeat('This sentence checks that a long script is split into pieces and joined into one file. ', 4), 'dialect' => null, 'max_chars' => 200],
+        // Four different sentences, so a piece dropped in the join cannot hide
+        // behind a repeated one (transcribers collapse identical repeats).
+        ['name' => 'ar_two_pieces', 'text' => 'في الصباح نكتب النص ونختار الصوت المناسب له. بعد ذلك نضبط السرعة والنبرة حتى يبدو الكلام طبيعياً. ثم نستمع إلى المقطع كاملاً ونصحح أي كلمة تحتاج إلى تعديل. وفي النهاية نحفظ الملف وننشره لجمهورنا. ونعود في الأسبوع القادم بحلقة جديدة وأفكار أكثر.', 'dialect' => null, 'max_chars' => 200],
+        ['name' => 'en_two_pieces', 'text' => 'In the morning we write the script and choose a voice for it. Next we adjust the speed and pitch until the reading sounds natural. Then we listen to the whole clip and fix any word that needs a change. Finally we save the file and share it with our audience.', 'dialect' => null, 'max_chars' => 200],
     ];
     foreach ($readyVoices as $voice) {
         foreach ($cases as $c) {
