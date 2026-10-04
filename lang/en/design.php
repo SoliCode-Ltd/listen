@@ -15,4 +15,12 @@ return [
         'step3_title' => 'Listen and download',
         'step3_body' => 'Generate in seconds, play it back, then download the audio.',
     ],
+    'dashboard' => [
+        'workspace' => 'Workspace',
+        'account' => 'Account',
+        'plan_label' => 'Your plan',
+        'upgrade' => 'Upgrade plan',
+        'manage' => 'Manage plan',
+        'chars_left' => ':count characters left',
+    ],
 ];

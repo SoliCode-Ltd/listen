@@ -152,6 +152,28 @@ class SiteDesignTest extends TestCase
         $this->assertSame(SiteDesign::MAIN, SiteDesign::configured());
     }
 
+    public function test_dashboard_sidebar_extras_render_only_in_the_new_design(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)
+            ->getLocalizedRoute('dashboard')
+            ->assertOk()
+            ->assertSee('data-dashboard-nav', false)
+            ->assertDontSee('nt-plan-card', false);
+
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+
+        $this->actingAs($user)
+            ->getLocalizedRoute('dashboard')
+            ->assertOk()
+            ->assertSee('data-dashboard-nav', false)
+            ->assertSee('nt-plan-card', false)
+            ->assertSee('id="ntPlanMeter"', false)
+            ->assertSee(__('design.dashboard.upgrade'), false)
+            ->assertSee(route('billing.page'), false);
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([

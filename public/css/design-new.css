@@ -1308,3 +1308,173 @@ html.nt .auth-card h1,
 html.nt .auth-card h2 {
   font-weight: 600;
 }
+
+/* ===================================================================
+   11. Dashboard app sidebar (desktop); falls back to the pill menu
+   on tablets and phones.
+   =================================================================== */
+html.nt .nt-side-heading {
+  margin: 0;
+  padding: .2rem .8rem .45rem;
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+html.nt[dir="rtl"] .nt-side-heading {
+  letter-spacing: 0;
+  text-transform: none;
+  font-size: .82rem;
+}
+
+/* Section icons, drawn with masks so the existing links keep their markup. */
+html.nt .dashboard-menu-link,
+html.nt .nt-side-link {
+  justify-content: flex-start;
+}
+html.nt .dashboard-menu-link span:first-child,
+html.nt .nt-side-link span {
+  display: inline-flex;
+  align-items: center;
+  gap: .7rem;
+  min-width: 0;
+}
+html.nt .dashboard-menu-link span:first-child::before,
+html.nt .nt-side-link span::before {
+  content: "";
+  width: 18px;
+  height: 18px;
+  flex: none;
+  background: currentColor;
+  opacity: .85;
+  -webkit-mask: var(--nt-icon) center / contain no-repeat;
+  mask: var(--nt-icon) center / contain no-repeat;
+}
+html.nt .dashboard-menu-link span:last-child:empty {
+  display: none;
+}
+html.nt a[href="#commandCenterSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 11l9-7 9 7M5 10v10h14V10'/%3E%3C/svg%3E"); }
+html.nt a[href="#generateVoiceSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3v18M7 8v8M17 6v12M2 11v2M22 10v4'/%3E%3C/svg%3E"); }
+html.nt a[href="#voiceCloningSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3zM5 11a7 7 0 0 0 14 0M12 18v3'/%3E%3C/svg%3E"); }
+html.nt a[href="#planDefaultsSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Cpath d='M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0'/%3E%3Ccircle cx='16' cy='6' r='2'/%3E%3Ccircle cx='10' cy='12' r='2'/%3E%3Ccircle cx='18' cy='18' r='2'/%3E%3C/svg%3E"); }
+html.nt a[href="#recentVoicesSection"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 7v5l3 2M21 12a9 9 0 1 1-3-6.7M21 4v5h-5'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="billing"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Crect x='3' y='5' width='18' height='14' rx='2'/%3E%3Cpath d='M3 10h18'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="subscription"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12a8 8 0 0 1 14-5.3L20 9M20 4v5h-5M20 12a8 8 0 0 1-14 5.3L4 15M4 20v-5h5'/%3E%3C/svg%3E"); }
+html.nt .nt-side-link[data-nt-icon="extension"] { --nt-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linejoin='round'%3E%3Cpath d='M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z'/%3E%3C/svg%3E"); }
+
+html.nt .nt-side-links {
+  display: grid;
+  gap: .2rem;
+}
+html.nt .nt-side-link {
+  display: flex;
+  align-items: center;
+  padding: .7rem .85rem;
+  border-radius: 12px;
+  color: color-mix(in oklab, var(--text) 72%, var(--muted));
+  text-decoration: none;
+  font-size: .93rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  transition: background-color .18s ease, color .18s ease;
+}
+html.nt .nt-side-link:hover {
+  color: var(--text);
+  background: var(--nt-raised);
+}
+
+html.nt .nt-plan-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 16px;
+  border: 1px solid var(--nt-soft-line);
+  background:
+    radial-gradient(120% 90% at 0% 0%, var(--nt-soft), transparent 70%),
+    var(--surface2);
+}
+html.nt .nt-plan-label {
+  margin: 0;
+  font-size: .78rem;
+  color: var(--muted);
+}
+html.nt .nt-plan-name {
+  margin: .1rem 0 .7rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+html.nt[dir="rtl"] .nt-plan-name {
+  font-family: var(--font-display-ar);
+}
+html.nt .nt-plan-meter {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--nt-raised);
+  overflow: hidden;
+}
+html.nt .nt-plan-meter span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--nt-grad-fill);
+  transition: width .4s ease;
+}
+html.nt .nt-plan-left {
+  margin: .45rem 0 .85rem;
+  font-size: .8rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+html.nt .nt-plan-btn {
+  width: 100%;
+  min-height: 40px;
+  padding: .5rem 1rem;
+  font-size: .9rem;
+}
+
+@media (min-width: 981px) {
+  html.nt[data-page="dashboard"] .dashboard-layout {
+    grid-template-columns: 272px minmax(0, 1fr);
+    gap: 2rem;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu,
+  html.nt[data-page="dashboard"][dir="rtl"] .dashboard-menu {
+    position: sticky;
+    top: 88px;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-height: calc(100vh - 120px);
+    padding: 1rem .75rem;
+    border-radius: 22px;
+    border: 1px solid var(--line);
+    background: color-mix(in oklab, var(--surface) 92%, transparent);
+    box-shadow: var(--nt-card-shadow);
+  }
+  html.nt[data-page="dashboard"] .nt-side-extra {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    margin-top: .9rem;
+    padding-top: .9rem;
+    border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+  }
+  html.nt[data-page="dashboard"] .nt-plan-card {
+    margin-top: auto;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu-link {
+    padding: .7rem .85rem;
+  }
+  html.nt[data-page="dashboard"] .dashboard-menu-link::before {
+    top: 22%;
+    bottom: 22%;
+  }
+}
+@media (max-width: 980px) {
+  html.nt .nt-side-extra,
+  html.nt .nt-side-heading {
+    display: none;
+  }
+}
