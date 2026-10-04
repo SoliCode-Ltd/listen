@@ -20,7 +20,7 @@ class SiteDesignTest extends TestCase
             ->assertOk()
             ->assertDontSee('data-design="new"', false)
             ->assertDontSee('css/design-new.css', false)
-            ->assertDontSee('nt-steps', false)
+            ->assertDontSee('id="ntHome"', false)
             ->assertDontSee('design-preview-badge', false);
     }
 
@@ -32,9 +32,9 @@ class SiteDesignTest extends TestCase
             ->assertOk()
             ->assertSee('class="nt" data-design="new" data-page="home"', false)
             ->assertSee('css/design-new.css', false)
-            ->assertSee('nt-steps', false)
-            ->assertSee('nt-dialects', false)
-            ->assertSee(__('design.home.steps_title'), false)
+            ->assertSee('id="ntHome"', false)
+            ->assertSee(__('design.home.h1_line1'), false)
+            ->assertSee(__('design.home.clone_title'), false)
             ->assertDontSee('design-preview-badge', false);
     }
 
@@ -172,6 +172,52 @@ class SiteDesignTest extends TestCase
             ->assertSee('id="ntPlanMeter"', false)
             ->assertSee(__('design.dashboard.upgrade'), false)
             ->assertSee(route('billing.page'), false);
+    }
+
+    public function test_new_dashboard_overview_keeps_every_live_element_exactly_once(): void
+    {
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+        $user = User::factory()->create();
+
+        $html = $this->actingAs($user)
+            ->getLocalizedRoute('dashboard')
+            ->assertOk()
+            ->assertSee('data-nt-overview', false)
+            ->getContent();
+
+        foreach (['usageCharsText', 'usageCharsMeter', 'usageRequestsText', 'usageRequestsMeter', 'kpiRequests', 'kpiChars', 'kpiTotal',
+            'statProcessing', 'statDone', 'statFailed', 'contentTextarea', 'generateBtn', 'voiceForm', 'commandCenterSection'] as $id) {
+            $this->assertSame(1, substr_count($html, 'id="'.$id.'"'), "id {$id} should appear exactly once");
+        }
+    }
+
+    public function test_not_found_page_follows_the_selected_design(): void
+    {
+        $this->get('/en/this-page-does-not-exist-'.uniqid())
+            ->assertNotFound()
+            ->assertDontSee('nt-flatline', false);
+
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+
+        $this->get('/en/this-page-does-not-exist-'.uniqid())
+            ->assertNotFound()
+            ->assertSee('nt-flatline', false)
+            ->assertSee('css/design-new.css', false);
+    }
+
+    public function test_unsubscribe_page_follows_the_selected_design(): void
+    {
+        $url = \Illuminate\Support\Facades\URL::signedRoute('newsletter.unsubscribe', ['email' => 'sara@example.com', 'lang' => 'ar']);
+
+        $this->get($url)->assertOk()->assertDontSee('data-design="new"', false)->assertSee('sara@example.com');
+
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('data-design="new"', false)
+            ->assertSee('sara@example.com')
+            ->assertSee(__('design.system.unsub_title', [], 'ar'), false);
     }
 
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse

@@ -2055,6 +2055,9 @@
 
       <div class="dashboard-content">
     <section id="commandCenterSection" class="dashboard-panel active" data-dashboard-section>
+@if(\App\Support\SiteDesign::isNew())
+@include('components.design-new.dashboard-overview')
+@else
       <div class="hero-grid">
         <article class="page-card reveal command-card">
           <h1>
@@ -2108,6 +2111,7 @@
 
         </article>
       </div>
+@endif
     </section>
 
     <section id="generateVoiceSection" class="dashboard-panel" data-dashboard-section>

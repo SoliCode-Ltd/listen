@@ -40,6 +40,9 @@
     if (left && match) {
       left.textContent = left.getAttribute('data-template').replace('__COUNT__', match[0]);
     }
+    if (match) {
+      document.querySelectorAll('[data-nt-chars-left]').forEach(function (el) { el.textContent = match[0]; });
+    }
   }
   new MutationObserver(sync).observe(source, { attributes: true, attributeFilter: ['style'] });
   if (sourceText) new MutationObserver(sync).observe(sourceText, { childList: true, characterData: true, subtree: true });
@@ -51,3 +54,4 @@
   }
 })();
 </script>
+@include('components.design-new.player-script')

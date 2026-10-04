@@ -867,6 +867,7 @@
       @endif
     </section>
 
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.pricing-compare')
     {{-- ─── Top-ups Section ──────────────────────────────────────── --}}
     <section class="features-section">
       <h2 class="section-title reveal">{{ __('ui.pricing.included_title') }}</h2>

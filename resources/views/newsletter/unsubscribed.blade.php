@@ -1,6 +1,9 @@
 @php
     $arabic = ($locale ?? 'en') === 'ar';
 @endphp
+@if(\App\Support\SiteDesign::isNew())
+@include('components.design-new.unsubscribed')
+@else
 <!DOCTYPE html>
 <html lang="{{ $arabic ? 'ar' : 'en' }}" dir="{{ $arabic ? 'rtl' : 'ltr' }}">
 <head>
@@ -108,3 +111,4 @@
     </div>
 </body>
 </html>
+@endif
