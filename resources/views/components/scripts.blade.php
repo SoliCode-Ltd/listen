@@ -774,3 +774,6 @@
 })();
 </script>
 @include('components.whatsapp-widget')
+@if(\App\Support\SiteDesign::isPreviewing())
+@include('components.design-new.preview-badge')
+@endif
