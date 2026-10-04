@@ -191,6 +191,35 @@ class SiteDesignTest extends TestCase
         }
     }
 
+    public function test_not_found_page_follows_the_selected_design(): void
+    {
+        $this->get('/en/this-page-does-not-exist-'.uniqid())
+            ->assertNotFound()
+            ->assertDontSee('nt-flatline', false);
+
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+
+        $this->get('/en/this-page-does-not-exist-'.uniqid())
+            ->assertNotFound()
+            ->assertSee('nt-flatline', false)
+            ->assertSee('css/design-new.css', false);
+    }
+
+    public function test_unsubscribe_page_follows_the_selected_design(): void
+    {
+        $url = \Illuminate\Support\Facades\URL::signedRoute('newsletter.unsubscribe', ['email' => 'sara@example.com', 'lang' => 'ar']);
+
+        $this->get($url)->assertOk()->assertDontSee('data-design="new"', false)->assertSee('sara@example.com');
+
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+
+        $this->get($url)
+            ->assertOk()
+            ->assertSee('data-design="new"', false)
+            ->assertSee('sara@example.com')
+            ->assertSee(__('design.system.unsub_title', [], 'ar'), false);
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([

@@ -614,6 +614,7 @@
         {{ __('ui.auth.no_account') }} <a href="{{ route('register') }}">{{ __('ui.auth.create_one') }}</a>
       </p>
     </div>
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.auth-side', ['ntMode' => 'login'])
   </main>
 
   @php($blockedI18n = [

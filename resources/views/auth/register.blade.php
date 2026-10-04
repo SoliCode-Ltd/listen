@@ -591,6 +591,7 @@
         {{ __('ui.auth.already_account') }} <a href="{{ route('login') }}">{{ __('ui.nav.sign_in') }}</a>
       </p>
     </div>
+@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.auth-side', ['ntMode' => 'register'])
   </main>
 
   @php($blockedI18n = [
