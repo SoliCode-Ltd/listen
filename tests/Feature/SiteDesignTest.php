@@ -174,6 +174,23 @@ class SiteDesignTest extends TestCase
             ->assertSee(route('billing.page'), false);
     }
 
+    public function test_new_dashboard_overview_keeps_every_live_element_exactly_once(): void
+    {
+        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW, 'general');
+        $user = User::factory()->create();
+
+        $html = $this->actingAs($user)
+            ->getLocalizedRoute('dashboard')
+            ->assertOk()
+            ->assertSee('data-nt-overview', false)
+            ->getContent();
+
+        foreach (['usageCharsText', 'usageCharsMeter', 'usageRequestsText', 'usageRequestsMeter', 'kpiRequests', 'kpiChars', 'kpiTotal',
+            'statProcessing', 'statDone', 'statFailed', 'contentTextarea', 'generateBtn', 'voiceForm', 'commandCenterSection'] as $id) {
+            $this->assertSame(1, substr_count($html, 'id="'.$id.'"'), "id {$id} should appear exactly once");
+        }
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([
