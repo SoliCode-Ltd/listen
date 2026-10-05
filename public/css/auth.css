@@ -466,15 +466,6 @@ html body.auth-split-body .auth-showcase-inner {
   justify-content: center;
   gap: 24px;
 }
-html body.auth-split-body .auth-badge {
-  align-self: flex-start;
-  padding: 5px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, .18);
-  background: rgba(255, 255, 255, .08);
-  font-size: 13px;
-  font-weight: 600;
-}
 html body.auth-split-body .auth-headline {
   margin: 0;
   max-width: 540px;
@@ -576,6 +567,11 @@ html body.auth-split-body .auth-player-text {
   line-height: 1.8;
   color: var(--au-text);
   text-align: start;
+}
+html body.auth-split-body .auth-player-text[lang="en"] {
+  font-family: var(--au-font);
+  font-size: 16px;
+  line-height: 1.7;
 }
 html body.auth-split-body .auth-player-bar {
   display: flex;

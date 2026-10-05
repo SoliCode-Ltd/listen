@@ -264,6 +264,34 @@ class SiteDesignTest extends TestCase
         }
     }
 
+    public function test_auth_sample_player_speaks_the_page_language(): void
+    {
+        foreach ([['ar', 'ar-SA', 'مرحبا بكم في إسمع'], ['en', 'en-GB', 'Welcome to Listen, in a British voice']] as [$language, $dialect, $text]) {
+            \App\Models\VoiceSample::create([
+                'title' => 'Sample '.$dialect,
+                'sample_text' => $text,
+                'sample_text_ar' => $language === 'ar' ? $text : null,
+                'audio_path' => 'audio/'.$dialect.'.mp3',
+                'language' => $language,
+                'dialect' => $dialect,
+                'category' => 'hero',
+                'emotion' => 'neutral',
+                'is_active' => true,
+            ]);
+        }
+
+        $this->getLocalizedRoute('login')
+            ->assertOk()
+            ->assertSee('Welcome to Listen, in a British voice', false)
+            ->assertSee(__('ui.dialects.british', [], 'en'), false)
+            ->assertDontSee('مرحبا بكم في إسمع', false);
+
+        $arabic = \App\Support\NewDesignSamples::forLocale('ar');
+        $this->assertSame(['ar-SA'], array_column($arabic, 'dialect'));
+        $this->assertSame('مرحبا بكم في إسمع', $arabic[0]['text']);
+        $this->assertSame(['en-GB'], array_column(\App\Support\NewDesignSamples::forLocale('en'), 'dialect'));
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([

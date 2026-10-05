@@ -1,7 +1,8 @@
 {{-- Brand panel beside the sign in / register form. Real dialect samples and plan data only. --}}
 @php
   $authMode = $authMode ?? 'login';
-  $authSamples = \App\Support\NewDesignSamples::dialects(5);
+  $authSamples = \App\Support\NewDesignSamples::forLocale(null, 5);
+  $authSampleArabic = str_starts_with(strtolower(app()->getLocale()), 'ar');
   $authFirst = $authSamples[0] ?? null;
   $authFreeChars = $authMode === 'register' ? \App\Support\NewDesignSamples::freePlanChars() : null;
   // Smooth, speech-like envelope for the waveform bars (4px to 30px).
@@ -15,7 +16,6 @@
 <aside class="auth-showcase" aria-label="{{ __('design.auth.sample_label') }}">
   <div class="auth-showcase-inner">
     @if($authMode === 'register')
-      <span class="auth-badge">{{ __('design.auth.free_badge') }}</span>
       <h2 class="auth-headline">{{ __('design.auth.register_headline') }}</h2>
       <ul class="auth-perks">
         @if($authFreeChars)
@@ -40,7 +40,7 @@
             <span class="auth-player-voice" data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
           </span>
         </div>
-        <p class="auth-player-text" dir="rtl" lang="ar" data-nt-try-text>{{ \Illuminate\Support\Str::limit($authFirst['text'], 120) }}</p>
+        <p class="auth-player-text" dir="{{ $authSampleArabic ? 'rtl' : 'ltr' }}" lang="{{ $authSampleArabic ? 'ar' : 'en' }}" data-nt-try-text>{{ \Illuminate\Support\Str::limit($authFirst['text'], 120) }}</p>
         <div class="auth-player-bar" data-nt-track data-src="{{ $authFirst['audio_url'] }}">
           <button type="button" class="auth-play" data-nt-play aria-label="{{ __('design.home.play') }}" data-label-play="{{ __('design.home.play') }}" data-label-pause="{{ __('design.home.pause') }}">
             <svg class="auth-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
@@ -52,7 +52,7 @@
           <span class="auth-time" data-nt-time>0:00</span>
         </div>
         @if(count($authSamples) > 1)
-          <div class="auth-chips" role="radiogroup" aria-label="{{ __('design.home.try_dialect') }}">
+          <div class="auth-chips" role="radiogroup" aria-label="{{ $authSampleArabic ? __('design.home.try_dialect') : __('design.auth.sample_label') }}">
             @foreach($authSamples as $i => $sample)
               <button type="button" class="auth-chip" role="radio" aria-checked="{{ $i === 0 ? 'true' : 'false' }}"
                 data-nt-chip

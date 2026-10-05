@@ -89,8 +89,6 @@ return [
         'privacy' => 'Privacy Policy',
         'home' => 'Listen home',
         'switch_language' => 'Switch language',
-        'free_badge' => 'Free plan',
-        'free_title' => 'What you get, free',
         'perk_chars' => ':chars characters every month',
         'perk_voices' => 'Arabic and English standard voices',
         'perk_extension' => 'The Chrome extension',

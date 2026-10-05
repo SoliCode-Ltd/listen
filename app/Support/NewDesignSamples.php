@@ -15,6 +15,8 @@ final class NewDesignSamples
 {
     private const DIALECT_ORDER = ['ar-XA', 'ar-SA', 'ar-EG', 'ar-LB', 'ar-MA', 'ar-AE', 'ar-KW', 'ar-JO', 'ar-SY', 'ar-IQ'];
 
+    private const ACCENT_ORDER = ['en-US', 'en-GB', 'en-AU', 'en-IN', 'en-ZA'];
+
     /**
      * One real Arabic sample per dialect, for the dialect rows.
      *
@@ -22,26 +24,55 @@ final class NewDesignSamples
      */
     public static function dialects(int $limit = 4): array
     {
+        return self::samples('ar', $limit);
+    }
+
+    /**
+     * Samples in the visitor's language: Arabic dialects on Arabic pages,
+     * English accents on English pages.
+     *
+     * @return array<int, array{dialect: string, text: string, audio_url: string}>
+     */
+    public static function forLocale(?string $locale = null, int $limit = 5): array
+    {
+        $locale = strtolower((string) ($locale ?? app()->getLocale()));
+
+        return self::samples(str_starts_with($locale, 'ar') ? 'ar' : 'en', $limit);
+    }
+
+    /**
+     * One real sample per dialect or accent of the given language.
+     *
+     * @return array<int, array{dialect: string, text: string, audio_url: string}>
+     */
+    private static function samples(string $language, int $limit): array
+    {
+        $order = $language === 'ar' ? self::DIALECT_ORDER : self::ACCENT_ORDER;
+        $cacheKey = $language === 'ar' ? 'nt_dialect_rows:'.$limit : 'nt_sample_rows:'.$language.':'.$limit;
+
         try {
-            return Cache::remember('nt_dialect_rows:'.$limit, 300, function () use ($limit): array {
+            return Cache::remember($cacheKey, 300, function () use ($language, $order, $limit): array {
                 $samples = VoiceSample::query()
                     ->active()
                     ->where('category', 'hero')
-                    ->where('language', 'ar')
+                    ->where('language', $language)
                     ->orderByDesc('is_featured')
                     ->ordered()
                     ->get();
 
                 $rows = [];
-                foreach (self::DIALECT_ORDER as $code) {
+                foreach ($order as $code) {
                     $sample = $samples->first(fn (VoiceSample $s): bool => strcasecmp((string) $s->dialect, $code) === 0
                         && trim((string) $s->audio_path) !== '');
                     if (! $sample) {
                         continue;
                     }
+                    $text = $language === 'ar'
+                        ? ($sample->sample_text_ar ?: $sample->sample_text)
+                        : $sample->sample_text;
                     $rows[] = [
                         'dialect' => (string) $sample->dialect,
-                        'text' => trim((string) ($sample->sample_text_ar ?: $sample->sample_text)),
+                        'text' => trim((string) $text),
                         'audio_url' => AudioUrl::fromPath(ltrim((string) $sample->audio_path, '/')),
                     ];
                     if (count($rows) >= $limit) {
@@ -76,7 +107,8 @@ final class NewDesignSamples
     public static function dialectLabel(string $code): string
     {
         $keys = ['XA' => 'msa', 'SA' => 'saudi', 'EG' => 'egyptian', 'LB' => 'lebanese', 'MA' => 'moroccan', 'AE' => 'emirati',
-            'KW' => 'kuwaiti', 'JO' => 'jordanian', 'SY' => 'syrian', 'IQ' => 'iraqi', 'TN' => 'tunisian', 'OM' => 'omani'];
+            'KW' => 'kuwaiti', 'JO' => 'jordanian', 'SY' => 'syrian', 'IQ' => 'iraqi', 'TN' => 'tunisian', 'OM' => 'omani',
+            'US' => 'american', 'GB' => 'british', 'AU' => 'australian', 'IN' => 'indian', 'ZA' => 'south_african'];
         $region = strtoupper((string) substr((string) strrchr('-'.$code, '-'), 1));
         $key = $keys[$region] ?? null;
         if ($key === 'msa') {

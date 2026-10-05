@@ -89,8 +89,6 @@ return [
         'privacy' => 'سياسة الخصوصية',
         'home' => 'الصفحة الرئيسية لإسمع',
         'switch_language' => 'تغيير اللغة',
-        'free_badge' => 'الخطة المجانية',
-        'free_title' => 'ما تحصل عليه مجاناً',
         'perk_chars' => ':chars حرف كل شهر',
         'perk_voices' => 'أصوات قياسية بالعربية والإنجليزية',
         'perk_extension' => 'إضافة كروم',
