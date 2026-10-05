@@ -434,11 +434,10 @@ html body.auth-split-body button:focus-visible {
 html body.auth-split-body .auth-showcase {
   position: sticky;
   top: 0;
-  height: calc(100vh - 24px);
-  height: calc(100dvh - 24px);
-  margin: 12px;
-  margin-inline-start: 0;
-  border-radius: 16px;
+  height: 100vh;
+  height: 100dvh;
+  margin: 0;
+  border-radius: 0;
   overflow: hidden;
   color: #FFFFFF;
   background:
