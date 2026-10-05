@@ -484,8 +484,10 @@
       document.documentElement.setAttribute('data-theme', saved || document.documentElement.getAttribute('data-theme') || 'dark');
     })();
   </script>
+  @php($authCssFile = public_path('css/auth.css'))
+  <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ is_file($authCssFile) ? filemtime($authCssFile) : '1' }}">
 </head>
-<body>
+<body class="auth-split-body">
   <script>
     window.addEventListener('pageshow', function (event) {
       if (event.persisted) window.location.reload();
@@ -493,6 +495,9 @@
   </script>
   @include('components.header')
 
+  <div class="auth-split">
+  <div class="auth-pane">
+  @include('components.auth.topbar')
   <main class="container auth-page">
     <div class="auth-card reveal">
       <h1>{{ __('ui.auth.login_title') }}</h1>
@@ -614,8 +619,11 @@
         {{ __('ui.auth.no_account') }} <a href="{{ route('register') }}">{{ __('ui.auth.create_one') }}</a>
       </p>
     </div>
-@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.auth-side', ['ntMode' => 'login'])
   </main>
+  @include('components.auth.legal')
+  </div>
+  @include('components.auth.showcase', ['authMode' => 'login'])
+  </div>
 
   @php($blockedI18n = [
     'title' => __('ui.auth.blocked_notice_title'),

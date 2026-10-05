@@ -1,0 +1,686 @@
+/*
+ * Listen — sign in and register (both site designs)
+ *
+ * Split screen: a focused form on one side (no site header or footer) and a
+ * brand panel with a playable voice sample on the other. Loaded only by
+ * resources/views/auth/{login,register}.blade.php, after the page's own styles.
+ * Everything is scoped to body.auth-split-body. The form markup, ids and
+ * scripts are unchanged; this file only lays them out and restyles them.
+ */
+
+/* ---------- Tokens (dark by default, light follows the site theme) ---------- */
+html body.auth-split-body {
+  --au-bg: #0B0B0F;
+  --au-surface: #141419;
+  --au-hover: #1C1C23;
+  --au-line: #2A2A33;
+  --au-input: #101015;
+  --au-text: #F4F4F6;
+  --au-muted: #9B9BA7;
+  --au-primary: #F4F4F6;
+  --au-primary-hover: #FFFFFF;
+  --au-on-primary: #0B0B0F;
+  --au-brand: #A08AFF;
+  --au-ring: rgba(160, 138, 255, .35);
+  --au-danger: #FF8A80;
+  --au-danger-soft: rgba(255, 138, 128, .10);
+  --au-ok: #3DD68C;
+  --au-ok-soft: rgba(61, 214, 140, .10);
+  --au-font: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --au-font-ar: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+
+  margin: 0;
+  min-height: 100vh;
+  background: var(--au-bg);
+  background-image: none;
+  color: var(--au-text);
+  font-family: var(--au-font);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+html[data-theme="light"] body.auth-split-body {
+  --au-bg: #FFFFFF;
+  --au-surface: #FFFFFF;
+  --au-hover: #F4F4F6;
+  --au-line: #E4E4E9;
+  --au-input: #FFFFFF;
+  --au-text: #0B0B0F;
+  --au-muted: #63636E;
+  --au-primary: #0B0B0F;
+  --au-primary-hover: #26262D;
+  --au-on-primary: #FFFFFF;
+  --au-brand: #5B36E8;
+  --au-ring: rgba(91, 54, 232, .22);
+  --au-danger: #B3261E;
+  --au-danger-soft: rgba(179, 38, 30, .06);
+  --au-ok: #0F7A49;
+  --au-ok-soft: rgba(15, 122, 73, .08);
+}
+html[dir="rtl"] body.auth-split-body {
+  font-family: var(--au-font-ar);
+}
+
+/* The site header, footer and background decorations stay in the page (shared
+   scripts expect them) but are not shown on these focused pages. */
+html body.auth-split-body .app-header,
+html body.auth-split-body .app-footer,
+html body.auth-split-body .mobile-nav,
+html body.auth-split-body .bg-orb {
+  display: none !important;
+}
+
+/* ---------- Layout ---------- */
+html body.auth-split-body .auth-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+html body.auth-split-body .auth-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: 24px clamp(20px, 4vw, 48px) 28px;
+  box-sizing: border-box;
+}
+html body.auth-split-body .auth-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+html body.auth-split-body .auth-logo {
+  display: inline-flex;
+  align-items: center;
+}
+html body.auth-split-body .auth-logo .site-logo {
+  height: 28px;
+  width: auto;
+}
+html body.auth-split-body .auth-topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+html body.auth-split-body .auth-lang {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--au-muted);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+html body.auth-split-body .auth-lang[lang="ar"] {
+  font-family: var(--au-font-ar);
+}
+html body.auth-split-body .auth-lang:hover {
+  color: var(--au-text);
+  background: var(--au-hover);
+}
+html body.auth-split-body .auth-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--au-muted);
+  cursor: pointer;
+}
+html body.auth-split-body .auth-icon-btn:hover {
+  color: var(--au-text);
+  background: var(--au-hover);
+}
+html body.auth-split-body .auth-icon-btn .icon {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+html body.auth-split-body main.auth-page {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  min-height: 0;
+  margin: 0;
+  padding: 40px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+/* ---------- Form card ---------- */
+html body.auth-split-body .auth-card {
+  width: min(400px, 100%);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  color: var(--au-text);
+}
+html body.auth-split-body .auth-card::before {
+  display: none;
+}
+html body.auth-split-body .auth-card h1 {
+  margin: 0;
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--au-text);
+}
+html[dir="rtl"] body.auth-split-body .auth-card h1 {
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+html body.auth-split-body .auth-card .subtitle {
+  margin: 8px 0 28px;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--au-muted);
+}
+
+html body.auth-split-body .google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  margin: 0 0 10px;
+  padding: 0 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--au-line);
+  border-radius: 10px;
+  background: var(--au-surface);
+  color: var(--au-text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+html body.auth-split-body .google-btn:hover {
+  background: var(--au-hover);
+  transform: none;
+  box-shadow: none;
+}
+html body.auth-split-body .google-btn svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+html body.auth-split-body .auth-card .divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0;
+  font-size: 13px;
+  color: var(--au-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+html body.auth-split-body .auth-card .divider::before,
+html body.auth-split-body .auth-card .divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--au-line);
+}
+
+html body.auth-split-body .auth-card .form-grid {
+  display: grid;
+  gap: 16px;
+}
+html body.auth-split-body .auth-card label {
+  display: block;
+  margin: 0 0 6px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--au-text);
+  text-transform: none;
+  letter-spacing: 0;
+}
+html body.auth-split-body .auth-card input[type="email"],
+html body.auth-split-body .auth-card input[type="password"],
+html body.auth-split-body .auth-card input[type="text"],
+html body.auth-split-body .auth-card input[type="tel"] {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--au-line);
+  border-radius: 10px;
+  background: var(--au-input);
+  color: var(--au-text);
+  font-family: inherit;
+  font-size: 15px;
+  box-shadow: none;
+  transition: border-color .15s ease, box-shadow .15s ease;
+}
+html body.auth-split-body .auth-card input::placeholder {
+  color: var(--au-muted);
+  opacity: .7;
+}
+html body.auth-split-body .auth-card input:focus {
+  outline: none;
+  border-color: var(--au-brand);
+  box-shadow: 0 0 0 3px var(--au-ring);
+}
+html body.auth-split-body .auth-card .two-col {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+html body.auth-split-body .auth-card .remember-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--au-muted);
+  cursor: pointer;
+}
+html body.auth-split-body .auth-card .remember-row input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--au-brand);
+}
+
+html body.auth-split-body .auth-card .submit-btn,
+html body.auth-split-body .auth-card button[type="submit"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  margin: 4px 0 0;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--au-primary);
+  color: var(--au-on-primary);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  box-shadow: none;
+  cursor: pointer;
+  transition: background-color .15s ease;
+}
+html body.auth-split-body .auth-card .submit-btn:hover,
+html body.auth-split-body .auth-card button[type="submit"]:hover {
+  background: var(--au-primary-hover);
+  transform: none;
+  box-shadow: none;
+}
+html body.auth-split-body .auth-card .submit-btn:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* Phone sign in */
+html body.auth-split-body .auth-card .phone-grid {
+  display: grid;
+  gap: 12px;
+}
+html body.auth-split-body .auth-card .phone-input-row {
+  display: flex;
+  gap: 8px;
+}
+html body.auth-split-body .auth-card .phone-send-btn,
+html body.auth-split-body .auth-card .phone-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--au-line);
+  border-radius: 10px;
+  background: var(--au-surface);
+  color: var(--au-text);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  box-shadow: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+html body.auth-split-body .auth-card .phone-send-btn:hover,
+html body.auth-split-body .auth-card .phone-btn:hover {
+  background: var(--au-hover);
+}
+
+/* Messages */
+html body.auth-split-body .auth-card .error-box,
+html body.auth-split-body .auth-card .status-box {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+html body.auth-split-body .auth-card .error-box {
+  border: 1px solid color-mix(in oklab, var(--au-danger) 35%, transparent);
+  background: var(--au-danger-soft);
+  color: var(--au-danger);
+}
+html body.auth-split-body .auth-card .blocked-notice {
+  margin: 0 0 16px;
+  border-radius: 12px;
+}
+
+html body.auth-split-body .auth-card .auth-footer {
+  margin: 24px 0 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--au-muted);
+}
+html body.auth-split-body .auth-card .auth-footer a {
+  color: var(--au-text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--au-line);
+}
+html body.auth-split-body .auth-card .auth-footer a:hover {
+  text-decoration-color: currentColor;
+}
+html body.auth-split-body .auth-legal {
+  width: min(400px, 100%);
+  margin: 0 auto;
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--au-muted);
+}
+html body.auth-split-body .auth-legal a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+html body.auth-split-body .auth-legal a:hover {
+  color: var(--au-text);
+}
+
+html body.auth-split-body a:focus-visible,
+html body.auth-split-body button:focus-visible {
+  outline: 2px solid var(--au-brand);
+  outline-offset: 2px;
+}
+
+/* ---------- Brand panel ---------- */
+html body.auth-split-body .auth-showcase {
+  position: sticky;
+  top: 0;
+  height: calc(100vh - 24px);
+  height: calc(100dvh - 24px);
+  margin: 12px;
+  margin-inline-start: 0;
+  border-radius: 24px;
+  overflow: hidden;
+  color: #FFFFFF;
+  background:
+    radial-gradient(70% 60% at 18% 12%, rgba(106, 69, 242, .55), transparent 70%),
+    radial-gradient(60% 50% at 88% 92%, rgba(242, 181, 68, .20), transparent 70%),
+    radial-gradient(50% 45% at 78% 28%, rgba(160, 138, 255, .22), transparent 70%),
+    #0B0A14;
+}
+html body.auth-split-body .auth-showcase::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, .10) 1px, transparent 1px);
+  background-size: 22px 22px;
+  -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), transparent 75%);
+  mask-image: linear-gradient(180deg, rgba(0, 0, 0, .9), transparent 75%);
+  pointer-events: none;
+}
+html body.auth-split-body .auth-showcase-inner {
+  position: relative;
+  height: 100%;
+  box-sizing: border-box;
+  padding: clamp(32px, 5vw, 64px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 22px;
+}
+html body.auth-split-body .auth-badge {
+  align-self: flex-start;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  background: rgba(255, 255, 255, .08);
+  font-size: 13px;
+  font-weight: 600;
+}
+html body.auth-split-body .auth-headline {
+  margin: 0;
+  max-width: 540px;
+  font-family: inherit;
+  font-size: clamp(30px, 3.2vw, 42px);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+  color: #FFFFFF;
+}
+html[dir="rtl"] body.auth-split-body .auth-headline {
+  letter-spacing: 0;
+  line-height: 1.4;
+}
+html body.auth-split-body .auth-subline {
+  margin: 0;
+  max-width: 470px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, .72);
+}
+html body.auth-split-body .auth-perks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+html body.auth-split-body .auth-perks li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 16px;
+  color: rgba(255, 255, 255, .9);
+}
+html body.auth-split-body .auth-perks li::before {
+  content: "";
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(61, 214, 140, .16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233DD68C' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / 12px no-repeat;
+}
+
+html body.auth-split-body .auth-player {
+  max-width: 500px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, .14);
+  background: rgba(255, 255, 255, .07);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 30px 60px rgba(0, 0, 0, .35);
+}
+html body.auth-split-body .auth-player-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, .65);
+}
+html body.auth-split-body .auth-player-voice {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .10);
+  color: #FFFFFF;
+  font-weight: 600;
+}
+html body.auth-split-body .auth-player-text {
+  margin: 12px 0 16px;
+  min-height: 3.6em;
+  font-family: 'IBM Plex Sans Arabic', sans-serif;
+  font-size: 18px;
+  line-height: 1.8;
+  color: rgba(255, 255, 255, .92);
+  text-align: start;
+}
+html body.auth-split-body .auth-player-bar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+html body.auth-split-body .auth-play {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #FFFFFF;
+  color: #0B0A14;
+  cursor: pointer;
+  transition: transform .15s ease;
+}
+html body.auth-split-body .auth-play:hover {
+  transform: scale(1.05);
+}
+html body.auth-split-body .auth-play .auth-icon-pause,
+html body.auth-split-body .is-playing .auth-play .auth-icon-play {
+  display: none;
+}
+html body.auth-split-body .is-playing .auth-play .auth-icon-pause {
+  display: block;
+}
+html[dir="rtl"] body.auth-split-body .auth-play .auth-icon-play {
+  transform: scaleX(-1);
+}
+html body.auth-split-body .auth-wave {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 40px;
+  overflow: hidden;
+}
+html body.auth-split-body .auth-wave span {
+  flex: none;
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .22);
+  transition: background-color .12s ease;
+}
+html body.auth-split-body .auth-wave span.is-lit {
+  background: #FFFFFF;
+}
+html body.auth-split-body .auth-time {
+  flex: none;
+  min-width: 2.6rem;
+  font-size: 12px;
+  color: rgba(255, 255, 255, .65);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+html body.auth-split-body .auth-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 16px;
+}
+html body.auth-split-body .auth-chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, .8);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+html body.auth-split-body .auth-chip:hover {
+  background: rgba(255, 255, 255, .12);
+  color: #FFFFFF;
+}
+html body.auth-split-body .auth-chip[aria-checked="true"] {
+  background: #FFFFFF;
+  border-color: #FFFFFF;
+  color: #0B0A14;
+}
+html body.auth-split-body .auth-facts {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 13.5px;
+  color: rgba(255, 255, 255, .62);
+}
+html body.auth-split-body .auth-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+html body.auth-split-body .auth-facts li::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .5);
+}
+
+/* ---------- Tablets and phones: form only ---------- */
+@media (max-width: 980px) {
+  html body.auth-split-body .auth-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  html body.auth-split-body .auth-showcase {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  html body.auth-split-body .auth-pane {
+    padding: 16px 16px 24px;
+  }
+  html body.auth-split-body main.auth-page {
+    align-items: flex-start;
+    padding: 28px 0;
+  }
+  html body.auth-split-body .auth-card h1 {
+    font-size: 24px;
+  }
+  html body.auth-split-body .auth-card .two-col {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -236,6 +236,33 @@ class SiteDesignTest extends TestCase
             ->assertSee(__('design.system.unsub_title', [], 'ar'), false);
     }
 
+    public function test_sign_in_and_register_use_the_split_layout_in_both_designs(): void
+    {
+        foreach ([SiteDesign::MAIN, SiteDesign::NEW] as $design) {
+            SiteSetting::set(SiteDesign::SETTING_KEY, $design, 'general');
+
+            $this->getLocalizedRoute('login')
+                ->assertOk()
+                ->assertSee('class="auth-split-body"', false)
+                ->assertSee('css/auth.css', false)
+                ->assertSee('class="auth-showcase"', false)
+                ->assertSee('data-theme-toggle', false)
+                ->assertSee('action="'.route('login.submit').'"', false)
+                ->assertSee('id="email"', false)
+                ->assertSee('id="password"', false)
+                ->assertSee(route('legal.terms'), false)
+                ->assertSee(__('design.auth.login_headline'), false);
+
+            $this->getLocalizedRoute('register')
+                ->assertOk()
+                ->assertSee('class="auth-split-body"', false)
+                ->assertSee('action="'.route('register.submit').'"', false)
+                ->assertSee('id="password_confirmation"', false)
+                ->assertSee(__('design.auth.register_headline'), false)
+                ->assertSee(__('design.auth.perk_card'), false);
+        }
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([
