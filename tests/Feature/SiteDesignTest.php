@@ -259,7 +259,8 @@ class SiteDesignTest extends TestCase
                 ->assertSee('action="'.route('register.submit').'"', false)
                 ->assertSee('id="password_confirmation"', false)
                 ->assertSee(__('design.auth.register_headline'), false)
-                ->assertSee(__('design.auth.perk_card'), false);
+                ->assertSee(__('design.auth.perk_extension'), false)
+                ->assertDontSee('auth-facts', false);
         }
     }
 

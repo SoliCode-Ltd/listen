@@ -84,9 +84,6 @@ return [
         'login_body' => 'Arabic dialects, English accents and your own cloned voice, in one studio.',
         'register_headline' => 'Start free. Sound professional from the first line.',
         'sample_label' => 'Hear a sample',
-        'fact_dialects' => ':count Arabic dialects',
-        'fact_accents' => ':count English accents',
-        'fact_cloning' => 'Voice cloning',
         'legal' => 'By continuing, you agree to our :terms and :privacy.',
         'terms' => 'Terms of Service',
         'privacy' => 'Privacy Policy',
@@ -97,7 +94,6 @@ return [
         'perk_chars' => ':chars characters every month',
         'perk_voices' => 'Arabic and English standard voices',
         'perk_extension' => 'The Chrome extension',
-        'perk_card' => 'No card needed',
     ],
     'system' => [
         'h404' => 'This page went quiet',

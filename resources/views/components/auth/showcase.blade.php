@@ -3,15 +3,13 @@
   $authMode = $authMode ?? 'login';
   $authSamples = \App\Support\NewDesignSamples::dialects(5);
   $authFirst = $authSamples[0] ?? null;
-  $authDialects = __('ui.dialects');
-  $authDialects = is_array($authDialects) ? $authDialects : [];
-  $authEnglishKeys = ['american', 'british', 'australian', 'indian', 'south_african'];
-  $authArabicCount = count(array_diff(array_keys($authDialects), $authEnglishKeys));
-  $authEnglishCount = count(array_intersect(array_keys($authDialects), $authEnglishKeys));
   $authFreeChars = $authMode === 'register' ? \App\Support\NewDesignSamples::freePlanChars() : null;
+  // Smooth, speech-like envelope for the waveform bars (4px to 30px).
   $authWave = [];
-  for ($i = 0; $i < 56; $i++) {
-    $authWave[] = (int) round(6 + abs(sin($i * 1.37) * cos($i * 0.41)) * 30);
+  for ($i = 0; $i < 46; $i++) {
+    $envelope = 0.35 + 0.65 * abs(sin($i / 46 * M_PI * 1.6 + 0.4));
+    $detail = 0.55 + 0.45 * abs(sin($i * 1.13) * cos($i * 0.37));
+    $authWave[] = (int) round(4 + 26 * $envelope * $detail);
   }
 @endphp
 <aside class="auth-showcase" aria-label="{{ __('design.auth.sample_label') }}">
@@ -25,7 +23,6 @@
         @endif
         <li>{{ __('design.auth.perk_voices') }}</li>
         <li>{{ __('design.auth.perk_extension') }}</li>
-        <li>{{ __('design.auth.perk_card') }}</li>
       </ul>
     @else
       <h2 class="auth-headline">{{ __('design.auth.login_headline') }}</h2>
@@ -34,9 +31,14 @@
 
     @if($authFirst)
       <div class="auth-player" data-nt-try>
-        <div class="auth-player-head">
-          <span>{{ __('design.auth.sample_label') }}</span>
-          <span class="auth-player-voice" data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
+        <div class="auth-player-top">
+          <span class="auth-player-avatar" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg>
+          </span>
+          <span class="auth-player-meta">
+            <span class="auth-player-title">{{ __('design.auth.sample_label') }}</span>
+            <span class="auth-player-voice" data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
+          </span>
         </div>
         <p class="auth-player-text" dir="rtl" lang="ar" data-nt-try-text>{{ \Illuminate\Support\Str::limit($authFirst['text'], 120) }}</p>
         <div class="auth-player-bar" data-nt-track data-src="{{ $authFirst['audio_url'] }}">
@@ -63,11 +65,6 @@
       </div>
     @endif
 
-    <ul class="auth-facts">
-      @if($authArabicCount > 0)<li>{{ __('design.auth.fact_dialects', ['count' => $authArabicCount]) }}</li>@endif
-      @if($authEnglishCount > 0)<li>{{ __('design.auth.fact_accents', ['count' => $authEnglishCount]) }}</li>@endif
-      <li>{{ __('design.auth.fact_cloning') }}</li>
-    </ul>
   </div>
 </aside>
 @include('components.design-new.player-script')
