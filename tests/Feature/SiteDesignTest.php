@@ -236,6 +236,62 @@ class SiteDesignTest extends TestCase
             ->assertSee(__('design.system.unsub_title', [], 'ar'), false);
     }
 
+    public function test_sign_in_and_register_use_the_split_layout_in_both_designs(): void
+    {
+        foreach ([SiteDesign::MAIN, SiteDesign::NEW] as $design) {
+            SiteSetting::set(SiteDesign::SETTING_KEY, $design, 'general');
+
+            $this->getLocalizedRoute('login')
+                ->assertOk()
+                ->assertSee('class="auth-split-body"', false)
+                ->assertSee('css/auth.css', false)
+                ->assertSee('class="auth-showcase"', false)
+                ->assertSee('data-theme-toggle', false)
+                ->assertSee('action="'.route('login.submit').'"', false)
+                ->assertSee('id="email"', false)
+                ->assertSee('id="password"', false)
+                ->assertSee(route('legal.terms'), false)
+                ->assertSee(__('design.auth.login_headline'), false);
+
+            $this->getLocalizedRoute('register')
+                ->assertOk()
+                ->assertSee('class="auth-split-body"', false)
+                ->assertSee('action="'.route('register.submit').'"', false)
+                ->assertSee('id="password_confirmation"', false)
+                ->assertSee(__('design.auth.register_headline'), false)
+                ->assertSee(__('design.auth.perk_extension'), false)
+                ->assertDontSee('auth-facts', false);
+        }
+    }
+
+    public function test_auth_sample_player_speaks_the_page_language(): void
+    {
+        foreach ([['ar', 'ar-SA', 'مرحبا بكم في إسمع'], ['en', 'en-GB', 'Welcome to Listen, in a British voice']] as [$language, $dialect, $text]) {
+            \App\Models\VoiceSample::create([
+                'title' => 'Sample '.$dialect,
+                'sample_text' => $text,
+                'sample_text_ar' => $language === 'ar' ? $text : null,
+                'audio_path' => 'audio/'.$dialect.'.mp3',
+                'language' => $language,
+                'dialect' => $dialect,
+                'category' => 'hero',
+                'emotion' => 'neutral',
+                'is_active' => true,
+            ]);
+        }
+
+        $this->getLocalizedRoute('login')
+            ->assertOk()
+            ->assertSee('Welcome to Listen, in a British voice', false)
+            ->assertSee(__('ui.dialects.british', [], 'en'), false)
+            ->assertDontSee('مرحبا بكم في إسمع', false);
+
+        $arabic = \App\Support\NewDesignSamples::forLocale('ar');
+        $this->assertSame(['ar-SA'], array_column($arabic, 'dialect'));
+        $this->assertSame('مرحبا بكم في إسمع', $arabic[0]['text']);
+        $this->assertSame(['en-GB'], array_column(\App\Support\NewDesignSamples::forLocale('en'), 'dialect'));
+    }
+
     private function getWithDesignQuery(string $design): \Illuminate\Testing\TestResponse
     {
         return $this->withoutMiddleware([

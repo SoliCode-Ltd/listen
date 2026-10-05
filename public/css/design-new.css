@@ -1319,8 +1319,7 @@ html.nt .styled-form .form-control {
    =================================================================== */
 html.nt[data-page="dashboard"] .page-card,
 html.nt[data-page="demo"] .s-card,
-html.nt[data-page="billing"] .manual-card,
-html.nt .auth-card {
+html.nt[data-page="billing"] .manual-card {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -1415,24 +1414,6 @@ html.nt[data-page="demo"] textarea:focus {
   border-color: var(--brand-accent);
   box-shadow: var(--nt-ring);
   outline: none;
-}
-
-/* Sign in / register */
-html.nt .auth-card {
-  position: relative;
-  overflow: hidden;
-}
-html.nt .auth-card::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 3px;
-  background: var(--nt-grad);
-  pointer-events: none;
-}
-html.nt .auth-card h1,
-html.nt .auth-card h2 {
-  font-weight: 600;
 }
 
 /* ===================================================================
@@ -2090,117 +2071,6 @@ html.nt[data-page="dashboard"] .s-card:hover {
     font-size: .84rem;
     gap: .5rem;
   }
-}
-
-/* ===================================================================
-   13. Sign in / register (SignIn and Register boards): form beside a
-   sunken panel with dialect samples or the free plan perks.
-   =================================================================== */
-@media (min-width: 981px) {
-  html.nt main.auth-page:has(.nt-auth-side) {
-    width: min(1280px, 100%);
-    max-width: none;
-    margin: 0 auto;
-    padding: 0;
-    min-height: calc(100vh - 73px);
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: stretch;
-  }
-  html.nt main.auth-page:has(.nt-auth-side) .auth-card {
-    align-self: center;
-    justify-self: center;
-    width: min(420px, 100%);
-    margin: 3rem 1.5rem;
-    padding: 0;
-    border: 0;
-    background: none;
-  }
-  html.nt main.auth-page:has(.nt-auth-side) .auth-card::before {
-    display: none;
-  }
-}
-html.nt .auth-card {
-  box-shadow: none;
-}
-html.nt .auth-card h1 {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 2.25rem;
-  line-height: 1.18;
-  letter-spacing: -0.015em;
-}
-html.nt[dir="rtl"] .auth-card h1 {
-  font-family: var(--font-display-ar);
-  letter-spacing: 0;
-}
-html.nt .auth-card .subtitle {
-  font-size: 1.06rem;
-  color: var(--muted);
-}
-html.nt .auth-card input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
-  min-height: 48px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: var(--surface2);
-}
-html.nt .auth-card input:focus {
-  border-color: var(--brand-accent);
-  box-shadow: var(--nt-ring);
-  outline: none;
-}
-html.nt .auth-card .google-btn {
-  min-height: 48px;
-  border-radius: 12px;
-  border: 1px solid var(--line);
-  background: transparent;
-  box-shadow: none;
-}
-html.nt .auth-card button[type="submit"] {
-  min-height: 48px;
-  border-radius: 12px;
-  background: var(--brand-accent);
-  box-shadow: none;
-}
-html.nt .nt-auth-side {
-  display: none;
-}
-@media (min-width: 981px) {
-  html.nt .nt-auth-side {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    gap: 22px;
-    padding: 56px;
-    background: var(--surface2);
-    border-inline-start: 1px solid var(--line);
-  }
-}
-html.nt .nt-auth-side .nt-pill,
-html.nt .nt-auth-side .nt-eyebrow {
-  align-self: flex-start;
-}
-html.nt .nt-perks {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-html.nt .nt-perks li {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 1.06rem;
-}
-html.nt .nt-perks li::before {
-  content: "";
-  flex: none;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--nt-ok-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233DD68C' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / 13px no-repeat;
 }
 
 /* ===================================================================
