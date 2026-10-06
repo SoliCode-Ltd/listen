@@ -1,0 +1,411 @@
+/*
+ * Voice studio: the editor and the side panel used by the dashboard
+ * generator and the demo page (components/voice-studio/*, js/voice-studio.js).
+ * Uses each page's colour tokens (--surface, --surface2, --line, --text,
+ * --muted, --a), so it follows light and dark themes.
+ */
+
+.vs-layout {
+  --vs-sound: var(--a, #6A45F2);
+  --vs-delivery: #E8A33D;
+  --vs-voice: #3DB8A8;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  align-items: start;
+  gap: 1.25rem;
+}
+.vs-layout > * { min-width: 0; }
+.vs-main {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.vs-side {
+  position: sticky;
+  top: 84px;
+  min-width: 0;
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  scrollbar-width: thin;
+}
+@media (max-width: 1180px) {
+  .vs-layout { grid-template-columns: minmax(0, 1fr); }
+  .vs-side { position: static; max-height: none; overflow: visible; }
+}
+
+/* ---------- Editor ---------- */
+.vs-editor-card {
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.tag-editor {
+  position: relative;
+  background: transparent;
+}
+.tag-editor textarea {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 300px;
+  margin: 0 !important;
+  padding: 1.1rem 1.2rem !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  color: var(--text);
+  font-family: var(--font-body, inherit) !important;
+  font-size: 1.05rem !important;
+  line-height: 1.8 !important;
+  letter-spacing: normal !important;
+  resize: vertical;
+  outline: none;
+  scrollbar-gutter: stable;
+}
+.tag-editor-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  scrollbar-gutter: stable;
+  padding: 1.1rem 1.2rem;
+  border: 0;
+  font-family: var(--font-body, inherit);
+  font-size: 1.05rem;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+  color: transparent;
+  unicode-bidi: plaintext;
+  text-align: start;
+}
+html[lang="ar"] .tag-editor-backdrop { direction: rtl; text-align: right; }
+.tag-editor-backdrop mark {
+  color: transparent;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--mark-bg);
+  background: var(--mark-bg);
+}
+.tag-editor-backdrop mark.t-sound { --mark-bg: color-mix(in oklab, var(--a, #6A45F2) 20%, transparent); }
+.tag-editor-backdrop mark.t-delivery { --mark-bg: color-mix(in oklab, #F2B544 26%, transparent); }
+.vs-editor-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .7rem .9rem .7rem 1.2rem;
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  background: color-mix(in oklab, var(--surface2) 45%, var(--surface));
+}
+html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
+.vs-editor-foot .char-counter { margin: 0; padding: 0; }
+
+/* ---------- Side panel ---------- */
+.vs-panel {
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+.vs-panel-head {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: 1rem 1.1rem .4rem;
+}
+.vs-panel-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--a, #6A45F2) 12%, transparent);
+  color: var(--a, #6A45F2);
+}
+.vs-panel-head strong {
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.vs-panel-head small {
+  display: block;
+  margin-top: .15rem;
+  font-size: .93rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+.vs-tabs {
+  display: flex;
+  gap: 1.1rem;
+  padding: 0 1.1rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.vs-tabs::-webkit-scrollbar { display: none; }
+.vs-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color .15s ease;
+}
+.vs-tab::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: transparent;
+  transition: background-color .15s ease;
+}
+.vs-tab:hover { color: var(--text); }
+.vs-tab[aria-selected="true"] { color: var(--text); }
+.vs-tab[aria-selected="true"]::after { background: var(--text); }
+.vs-tab[hidden] { display: none; }
+.vs-kind {
+  display: inline-block;
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.vs-kind-settings { background: var(--vs-voice, #3DB8A8); }
+.vs-kind-sounds { background: var(--vs-sound, #6A45F2); }
+.vs-kind-delivery { background: var(--vs-delivery, #E8A33D); }
+
+.vs-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: .9rem 1.1rem 0;
+  color: var(--muted);
+}
+.vs-search[hidden] { display: none; }
+.vs-search svg {
+  position: absolute;
+  inset-inline-start: .8rem;
+  pointer-events: none;
+}
+.vs-search input {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 0 .9rem;
+  padding-inline-start: 2.3rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--surface2) 40%, var(--surface));
+  color: var(--text);
+  font-family: inherit;
+  font-size: .95rem;
+}
+.vs-search input:focus {
+  outline: none;
+  border-color: var(--a, #6A45F2);
+}
+
+.vs-pane { padding: .4rem 1.1rem 1.1rem; }
+.vs-pane[hidden] { display: none; }
+.vs-pane-hint {
+  display: flex;
+  align-items: flex-start;
+  gap: .5rem;
+  margin: .7rem 0 .2rem;
+  font-size: .95rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+.vs-pane-hint .vs-kind { margin-top: .45rem; }
+
+/* Fields in the voice tab */
+.vs-field { margin-top: 1rem; }
+.vs-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .5rem;
+  margin-bottom: .45rem;
+  font-size: .88rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.vs-field-label .slider-value,
+.vs-field-label .vs-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-weight: 600;
+}
+.vs-panel select,
+.vs-panel textarea {
+  width: 100%;
+  box-sizing: border-box;
+}
+.vs-panel textarea { min-height: 72px; resize: vertical; line-height: 1.5; }
+.vs-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .8rem;
+}
+.vs-hidden-field {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  opacity: 0;
+  pointer-events: none;
+}
+.vs-divider {
+  height: 1px;
+  margin: 1.1rem 0 .1rem;
+  background: color-mix(in oklab, var(--line) 70%, transparent);
+}
+
+/* Tag groups and chips */
+.vs-groups {
+  display: grid;
+  gap: 1rem;
+  margin-top: .8rem;
+}
+.vs-group[hidden] { display: none; }
+.vs-group-label {
+  margin-bottom: .45rem;
+  font-size: .74rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
+.vs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem;
+}
+.vs-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  min-height: 34px;
+  padding: 0 .75rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, transform .1s ease;
+}
+.vs-chip[hidden] { display: none; }
+.vs-chip::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--chip-dot);
+  opacity: .85;
+}
+.vs-chip-sounds { --chip-dot: var(--vs-sound, #6A45F2); }
+.vs-chip-delivery { --chip-dot: var(--vs-delivery, #E8A33D); }
+.vs-chip-dialect { --chip-dot: var(--a, #6A45F2); }
+.vs-chip-dialect::before { display: none; }
+.vs-chip:hover {
+  border-color: var(--chip-dot);
+  background: color-mix(in oklab, var(--chip-dot) 8%, var(--surface));
+}
+.vs-chip:active { transform: scale(.97); }
+.vs-chip:focus-visible,
+.vs-tab:focus-visible {
+  outline: 2px solid var(--a, #6A45F2);
+  outline-offset: 2px;
+}
+.vs-chip.is-added {
+  border-color: var(--chip-dot);
+  background: color-mix(in oklab, var(--chip-dot) 16%, var(--surface));
+}
+.vs-chip-dialect[aria-checked="true"] {
+  border-color: var(--a, #6A45F2);
+  background: var(--a, #6A45F2);
+  color: #fff;
+}
+.vs-dialect-current {
+  padding: .05rem .55rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--a, #6A45F2) 12%, transparent);
+  color: var(--a, #6A45F2);
+  font-size: .8rem;
+  font-weight: 600;
+}
+.vs-dialect-current:empty { display: none; }
+.vs-dialects { display: grid; gap: .8rem; }
+.vs-results-title {
+  margin: 1rem 0 .1rem;
+  font-size: .86rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.vs-results-title[hidden] { display: none; }
+.vs-empty {
+  margin: 1rem 0 .2rem;
+  font-size: .92rem;
+  color: var(--muted);
+}
+.vs-empty[hidden] { display: none; }
+.vs-guide {
+  border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  padding: .8rem 1.1rem;
+  font-size: .92rem;
+}
+.vs-guide summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+.vs-guide ul {
+  margin: .6rem 0 .2rem;
+  padding-inline-start: 1.1rem;
+  display: grid;
+  gap: .4rem;
+  line-height: 1.8;
+  color: var(--muted);
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-chip, .vs-tab, .vs-tab::after { transition: none; }
+}
+
+/* Demo page: the editor sits inside the demo's own card */
+.demo-tag-editor {
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--surface2) 35%, var(--surface));
+}
+.demo-tag-editor textarea { min-height: 220px; }
+.vs-panel .ctrl-group { min-width: 0; }
+.vs-panel .ctrl-group label { display: block; margin-bottom: .45rem; font-size: .88rem; font-weight: 600; color: var(--text); }

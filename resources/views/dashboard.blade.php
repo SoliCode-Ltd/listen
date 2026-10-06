@@ -1,4 +1,5 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
+  <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <style>
     /* Background orbs */
     .bg-orb {
@@ -1295,303 +1296,9 @@
       color: var(--muted);
 
     }
-    /* ---------- Text box with tag highlighting ---------- */
-    .tag-editor {
-      position: relative;
-      border-radius: .85rem;
-      background: color-mix(in oklab, var(--surface2) 40%, transparent);
-    }
-    .tag-editor textarea {
-      position: relative;
-      z-index: 1;
-      display: block;
-      width: 100%;
-      box-sizing: border-box;
-      background: transparent !important;
-      scrollbar-gutter: stable;
-    }
-    .tag-editor-backdrop {
-      position: absolute;
-      inset: 0;
-      z-index: 0;
-      box-sizing: border-box;
-      overflow: hidden;
-      scrollbar-gutter: stable;
-      padding: 1rem;
-      border: 1px solid transparent;
-      border-radius: .85rem;
-      font-family: var(--font-body);
-      font-size: 1rem;
-      line-height: 1.7;
-      white-space: pre-wrap;
-      overflow-wrap: break-word;
-      word-break: normal;
-      color: transparent;
-      unicode-bidi: plaintext;
-      text-align: start;
-    }
-    html[lang="ar"] .tag-editor-backdrop { direction: rtl; text-align: right; }
-    .tag-editor-backdrop mark {
-      color: transparent;
-      border-radius: 6px;
-      box-shadow: 0 0 0 2px var(--mark-bg);
-      background: var(--mark-bg);
-    }
-    .tag-editor-backdrop mark.t-sound { --mark-bg: color-mix(in oklab, var(--a) 20%, transparent); }
-    .tag-editor-backdrop mark.t-delivery { --mark-bg: color-mix(in oklab, #F2B544 26%, transparent); }
-
-    /* The form is a grid: let its column shrink to the screen, not to the widest row. */
-    #voiceForm > * { min-width: 0; }
-
-    /* ---------- Tag panel ---------- */
-    .tag-studio {
-      --tag-sound: var(--a);
-      --tag-delivery: #E8A33D;
-      margin-top: .75rem;
-      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-      border-radius: 16px;
-      background: var(--surface);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
-      overflow: hidden;
-    }
-    .tag-studio-head {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: .75rem 1rem;
-      padding: .9rem 1rem;
-      border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .tag-studio-title {
-      display: flex;
-      align-items: center;
-      gap: .7rem;
-      min-width: 0;
-    }
-    .tag-studio-icon {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: none;
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      background: color-mix(in oklab, var(--a) 12%, transparent);
-      color: var(--a);
-    }
-    .tag-studio-title strong {
-      display: block;
-      font-size: .98rem;
-      font-weight: 700;
-      color: var(--text);
-    }
-    .tag-studio-title small {
-      display: block;
-      margin-top: .15rem;
-      font-size: .93rem;
-      color: var(--muted);
-    }
-    .tag-studio-tools {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: .6rem;
-    }
-    .tag-tabs {
-      display: inline-flex;
-      max-width: 100%;
-      overflow-x: auto;
-      scrollbar-width: none;
-      gap: 2px;
-      padding: 3px;
-      border-radius: 11px;
-      background: color-mix(in oklab, var(--surface2) 70%, var(--line) 10%);
-    }
-    .tag-tab {
-      display: inline-flex;
-      align-items: center;
-      gap: .45rem;
-      min-height: 32px;
-      padding: 0 .8rem;
-      border: 0;
-      border-radius: 8px;
-      background: transparent;
-      color: var(--muted);
-      font-family: inherit;
-      font-size: .86rem;
-      font-weight: 600;
-      white-space: nowrap;
-      cursor: pointer;
-      transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
-    }
-    .tag-tab:hover { color: var(--text); }
-    .tag-tab[aria-selected="true"] {
-      background: var(--surface);
-      color: var(--text);
-      box-shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .tag-kind {
-      display: inline-block;
-      flex: none;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-    }
-    .tag-kind-settings { background: #3DB8A8; }
-    .tag-kind-sounds { background: var(--tag-sound); }
-    .tag-kind-delivery { background: var(--tag-delivery); }
-    .tag-search {
-      position: relative;
-      display: inline-flex;
-      align-items: center;
-      color: var(--muted);
-    }
-    .tag-search[hidden] { display: none; }
-    .tag-search svg {
-      position: absolute;
-      inset-inline-start: .7rem;
-      pointer-events: none;
-    }
-    .tag-search input {
-      width: 190px;
-      min-height: 38px;
-      padding: 0 .8rem;
-      padding-inline-start: 2.1rem;
-      border-radius: 10px;
-      font-size: .88rem;
-    }
-    .tag-pane { padding: .4rem 1rem 1rem; }
-    .tag-pane-hint {
-      display: flex;
-      align-items: center;
-      gap: .5rem;
-      margin: .55rem 0 .3rem;
-      font-size: .95rem;
-      color: var(--muted);
-    }
-    .tag-pane-settings .perf-row-2 { margin-top: .4rem; }
-    .tag-pane-settings .perf-section { padding-inline: 0; }
-    .dialect-native {
-      position: absolute !important;
-      width: 1px !important;
-      height: 1px !important;
-      opacity: 0;
-      pointer-events: none;
-    }
-    .dialect-section { position: relative; }
-    .dialect-current {
-      margin-inline-start: .4rem;
-      padding: .05rem .55rem;
-      border-radius: 999px;
-      background: color-mix(in oklab, var(--a) 12%, transparent);
-      color: var(--a);
-      font-size: .8rem;
-      font-weight: 600;
-    }
-    .dialect-current:empty { display: none; }
-    .dialect-picker {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
-      gap: .8rem 1.4rem;
-      margin-top: .5rem;
-    }
-    .dialect-chip::before { display: none; }
-    .dialect-chip[aria-checked="true"] {
-      border-color: var(--a);
-      background: var(--a);
-      color: #fff;
-    }
-    .tag-groups {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
-      gap: .9rem 1.4rem;
-      margin-top: .6rem;
-    }
-    .tag-group-label {
-      margin-bottom: .45rem;
-      font-size: .74rem;
-      font-weight: 700;
-      letter-spacing: .04em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    html[lang="ar"] .tag-group-label { letter-spacing: 0; font-size: .84rem; }
-    .tag-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: .4rem;
-    }
-    .tag-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      min-height: 34px;
-      padding: 0 .75rem;
-      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-      border-radius: 9px;
-      background: var(--surface);
-      color: var(--text);
-      font-family: inherit;
-      font-size: .88rem;
-      font-weight: 500;
-      line-height: 1.3;
-      cursor: pointer;
-      transition: border-color .15s ease, background-color .15s ease, transform .1s ease;
-    }
-    .tag-chip::before {
-      content: "";
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--chip-dot);
-      opacity: .85;
-    }
-    .tag-chip-sounds { --chip-dot: var(--tag-sound); }
-    .dialect-chip { --chip-dot: var(--a); }
-    .tag-chip-delivery { --chip-dot: var(--tag-delivery); }
-    .tag-chip:hover {
-      border-color: var(--chip-dot);
-      background: color-mix(in oklab, var(--chip-dot) 8%, var(--surface));
-    }
-    .tag-chip:active { transform: scale(.97); }
-    .tag-chip:focus-visible,
-    .tag-tab:focus-visible {
-      outline: 2px solid var(--a);
-      outline-offset: 2px;
-    }
-    .tag-chip.is-added {
-      border-color: var(--chip-dot);
-      background: color-mix(in oklab, var(--chip-dot) 16%, var(--surface));
-    }
-    .tag-empty {
-      margin: .8rem 0 .2rem;
-      font-size: .88rem;
-      color: var(--muted);
-    }
-    .tag-guide {
-      border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
-      padding: .7rem 1rem;
-      font-size: .9rem;
-    }
-    .tag-guide summary {
-      cursor: pointer;
-      font-weight: 600;
-      color: var(--text);
-    }
-    .tag-guide ul {
-      margin: .6rem 0 .2rem;
-      padding-inline-start: 1.1rem;
-      display: grid;
-      gap: .4rem;
-      line-height: 1.8;
-      color: var(--muted);
-    }
-    @media (max-width: 640px) {
-      .tag-studio-tools, .tag-tabs { width: 100%; }
-      .tag-tab { flex: 1; justify-content: center; padding: 0 .5rem; font-size: .82rem; }
-      .tag-search, .tag-search input { width: 100%; }
-    }
+    /* Generate button in the editor's bottom bar */
+    .vs-editor-foot .dashboard-generate-btn { margin: 0; min-width: 0; padding: .75rem 1.4rem; }
+    .vs-main .editor-panel { margin: 0; }
     .char-counter.warning {
       color: var(--warning, #f59e0b);
     }
@@ -2426,122 +2133,88 @@
           <div class="note">{{ __('ui.dashboard.reusing_settings_notice', ['number' => $reusePreset['display_number'] ?? $reusePreset['job_id']]) }}</div>
         @endif
 
-        <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="form-grid">
+        <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="vs-layout">
           @csrf
-          <div class="editor-panel">
+          <div class="vs-main">
+            <div class="editor-panel">
             <label>{{ __('ui.dashboard.title_optional') }}</label>
             <input name="title" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ $prefillValue('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
           </div>
 
-          <div class="editor-panel">
-            <label>{{ __('ui.dashboard.text_content') }}</label>
-            <div class="tag-editor" id="tagEditor">
-              <div class="tag-editor-backdrop" id="tagEditorBackdrop" aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
-              <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
-            </div>
+            <div class="vs-editor-card">
+              <div class="tag-editor" id="tagEditor" data-vs-editor>
+                <div class="tag-editor-backdrop" id="tagEditorBackdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
+                <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
+              </div>
+              <div class="vs-editor-foot">
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
             </div>
-            @if(($planTier ?? 'standard') === 'hd')
-            @php
-              $tagTabs = [
-                'settings' => null,
-                'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::label($t), 'groupKey' => 'vocal_tag_groups', 'count' => count(\App\Support\GeminiVocalTags::all())],
-                'delivery' => ['groups' => \App\Support\GeminiVocalTags::DELIVERY_GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::deliveryLabel($t), 'groupKey' => 'vocal_delivery_groups', 'count' => count(\App\Support\GeminiVocalTags::deliveries())],
-              ];
-            @endphp
-            <section class="tag-studio" id="vocalTags" aria-label="{{ __('ui.dashboard.vocal_tags') }}">
-              <header class="tag-studio-head">
-                <div class="tag-studio-title">
-                  <span class="tag-studio-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg></span>
-                  <div>
-                    <strong>{{ __('ui.dashboard.voice_studio') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span></strong>
-                    <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small>
-                  </div>
-                </div>
-                <div class="tag-studio-tools">
-                  <div class="tag-tabs" role="tablist">
-                    @foreach($tagTabs as $tabKey => $tab)
-                      <button type="button" class="tag-tab" role="tab" id="tagTab-{{ $tabKey }}" aria-controls="tagPane-{{ $tabKey }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}" data-tag-tab="{{ $tabKey }}">
-                        <span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_'.$tabKey) }}
-                      </button>
+                <button class="dashboard-generate-btn" id="generateBtn" type="submit">
+            <span>
+              <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+              {{ __('ui.dashboard.generate_voice_now') }}
+            </span>
+          </button>
+              </div>
+            </div>
+            <div id="formMessage"></div>
+          </div>
+
+          <aside class="vs-side">
+            <x-voice-studio.panel :show-tags="($planTier ?? 'standard') === 'hd'">
+          <div class="vs-row-2">
+            <div>
+              <label class="vs-field-label">{{ __('ui.dashboard.voice_language') }}</label>
+              <select name="target_language" id="target_language">
+                <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
+                <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
+              </select>
+            </div>
+            <div>
+              <label class="vs-field-label">{{ __('ui.dashboard.speaker') }}</label>
+              <select name="voice_key" id="voice_key"></select>
+            </div>
+          </div>
+
+
+              @if(($planTier ?? 'standard') === 'hd')
+                {{-- Whole-script style and emotion keep the site defaults; delivery tags change them where the member wants. --}}
+                <div class="vs-hidden-field" aria-hidden="true">
+                  <select name="performance_style" id="performance_style" tabindex="-1">
+                    <option value=""></option>
+                    @foreach(($studioPerformanceStyles ?? []) as $styleOption)
+                      <option value="{{ $styleOption['value'] ?? '' }}">{{ $styleOption['label'] ?? ($styleOption['value'] ?? '') }}</option>
                     @endforeach
-                  </div>
-                  <label class="tag-search" id="tagSearchWrap" hidden>
-                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-                    <input type="search" id="tagSearch" placeholder="{{ __('ui.dashboard.vocal_search') }}" autocomplete="off" aria-label="{{ __('ui.dashboard.vocal_search') }}">
-                  </label>
+                  </select>
+                  <select name="emotion" id="emotion" tabindex="-1">
+                    <option value=""></option>
+                    @foreach(($studioEmotions ?? []) as $emotionOption)
+                      <option value="{{ $emotionOption['value'] ?? '' }}">{{ $emotionOption['label'] ?? ($emotionOption['value'] ?? '') }}</option>
+                    @endforeach
+                  </select>
                 </div>
-              </header>
-              <div class="tag-pane tag-pane-settings" role="tabpanel" id="tagPane-settings" aria-labelledby="tagTab-settings" data-tag-pane="settings">
-                <p class="tag-pane-hint"><span class="tag-kind tag-kind-settings" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_settings_hint') }}</p>
-                  <div class="perf-row-2">
-                    <div class="perf-section">
-                      <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
-                      <select name="performance_style" id="performance_style" required>
-                        <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
-                        @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                          <option value="{{ $styleOption['value'] ?? '' }}">
-                            {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
-                          </option>
-                        @endforeach
-                      </select>
-                    </div>
-
-                    <div class="perf-section">
-                      <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
-                      <select name="emotion" id="emotion" required>
-                        <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
-                        @foreach(($studioEmotions ?? []) as $emotionOption)
-                          <option value="{{ $emotionOption['value'] ?? '' }}">
-                            {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
-                          </option>
-                        @endforeach
-                      </select>
+                @include('components.voice-studio.dialect-field')
+                <div class="vs-row-2 vs-field">
+                  <div>
+                    <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value"><span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x</span></div>
+                    <div class="slider-wrap">
+                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value" aria-label="{{ __('ui.dashboard.speed') }}">
                     </div>
                   </div>
-
-                  @if($customPromptEnabled ?? false)
-                  <div class="perf-section" style="margin-top:.6rem;">
-                    <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }}</div>
-                    <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;">{{ $prefillValue('style_prompt') }}</textarea>
-                  </div>
-                  @endif
-
-                  <div class="perf-section dialect-section">
-                    <div class="perf-section-label">🌍 {{ __('ui.dashboard.dialect') }} <span class="dialect-current" id="dialectCurrent"></span></div>
-                    <select name="dialect" id="dialect" class="dialect-native" aria-label="{{ __('ui.dashboard.dialect') }}">
-                      <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>
-                    </select>
-                    @php
-                      $dialectRegionLabels = [];
-                      foreach (\App\Support\ArabicDialects::regions() as $regionKey => $regionNames) {
-                          $dialectRegionLabels[$regionKey] = app()->getLocale() === 'ar' ? $regionNames['ar'] : $regionNames['en'];
-                      }
-                    @endphp
-                    <div class="dialect-picker" id="dialectPicker" role="radiogroup" aria-label="{{ __('ui.dashboard.dialect') }}" data-regions="{{ json_encode($dialectRegionLabels, JSON_UNESCAPED_UNICODE) }}"></div>
-                  </div>
-
-                  <div class="perf-row-2">
-                    <div class="perf-section">
-                      <div class="perf-section-label">
-                        ⚡ {{ __('ui.dashboard.speed') }}
-                        <span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x
-                      </div>
-                      <div class="slider-wrap">
-                        <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value">
-                      </div>
-                    </div>
-                    <div class="perf-section">
-                      <div class="perf-section-label">
-                        🎵 {{ __('ui.dashboard.pitch') }}
-                        <span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span>
-                      </div>
-                      <div class="slider-wrap">
-                        <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value">
-                      </div>
+                  <div>
+                    <div class="vs-field-label"><span>{{ __('ui.dashboard.pitch') }}</span><span class="vs-value"><span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span></span></div>
+                    <div class="slider-wrap">
+                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value" aria-label="{{ __('ui.dashboard.pitch') }}">
                     </div>
                   </div>
+                </div>
+                @if($customPromptEnabled ?? false)
+                  <div class="vs-field">
+                    <label class="vs-field-label" for="style_prompt">{{ __('ui.dashboard.style_prompt') }}</label>
+                    <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}">{{ $prefillValue('style_prompt') }}</textarea>
+                  </div>
+                @endif
                   @if($dialogueEnabled ?? false)
                   <div class="s-card" style="margin-top: .6rem;">
                     <label class="compact-toggle-row" for="dialogueToggle">
@@ -2557,54 +2230,8 @@
                     <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
                   </div>
                   @endif
-              </div>
-              @foreach(array_filter($tagTabs) as $tabKey => $tab)
-                <div class="tag-pane" role="tabpanel" id="tagPane-{{ $tabKey }}" aria-labelledby="tagTab-{{ $tabKey }}" data-tag-pane="{{ $tabKey }}" hidden>
-                  <p class="tag-pane-hint"><span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
-                  <div class="tag-groups">
-                    @foreach($tab['groups'] as $group => $groupTags)
-                      <div class="tag-group" data-tag-group>
-                        <div class="tag-group-label">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }}</div>
-                        <div class="tag-chips">
-                          @foreach($groupTags as $vocalTag)
-                            @php
-                              $tagLabel = ($tab['label'])($vocalTag);
-                            @endphp
-                            <button type="button" class="tag-chip tag-chip-{{ $tabKey }}" data-vocal-tag="{{ $tagLabel }}" data-tag-kind="{{ $tabKey }}" data-search="{{ mb_strtolower($tagLabel.' '.$vocalTag) }}" title="{{ $tabKey === 'sounds' ? '<'.$tagLabel.'>' : '['.$tagLabel.']' }}">{{ $tagLabel }}</button>
-                          @endforeach
-                        </div>
-                      </div>
-                    @endforeach
-                  </div>
-                  <p class="tag-empty" hidden>{{ __('ui.dashboard.vocal_no_results') }}</p>
-                </div>
-              @endforeach
-              <details class="tag-guide">
-                <summary>{{ __('ui.dashboard.vocal_tags_tips') }}</summary>
-                <ul>
-                  @foreach(__('ui.dashboard.vocal_tags_tip_items') as $tip)
-                    <li>{{ $tip }}</li>
-                  @endforeach
-                </ul>
-              </details>
-            </section>
-            @endif
-          </div>
-
-          <div class="two-col control-pair">
-            <div>
-              <label>{{ __('ui.dashboard.voice_language') }}</label>
-              <select name="target_language" id="target_language">
-                <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
-                <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
-              </select>
-            </div>
-            <div>
-              <label>{{ __('ui.dashboard.speaker') }}</label>
-              <select name="voice_key" id="voice_key"></select>
-            </div>
-          </div>
-
+              @endif
+              <div class="vs-divider"></div>
           <div class="s-card">
             <label class="compact-toggle-row" for="translateToggle">
               <div class="txt">
@@ -2618,14 +2245,8 @@
             </label>
             <input type="hidden" name="translate" id="translateSelect" value="{{ $prefillTranslate }}">
           </div>
-
-          <button class="dashboard-generate-btn" id="generateBtn" type="submit">
-            <span>
-              <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-              {{ __('ui.dashboard.generate_voice_now') }}
-            </span>
-          </button>
-          <div id="formMessage"></div>
+            </x-voice-studio.panel>
+          </aside>
         </form>
 
         <div class="s-card output-panel" id="generatedAudioWrap" style="display:none;">
@@ -3344,61 +2965,9 @@
         opt.textContent = d.label;
         dialectSelect.appendChild(opt);
       }
-      renderDialectPicker();
     }
 
-    // Dialect picker: every dialect as a button, grouped by region; the select stays the form field.
-    const dialectPicker = document.getElementById('dialectPicker');
-    let dialectRegionLabels = {};
-    try { dialectRegionLabels = JSON.parse(dialectPicker?.dataset.regions || '{}'); } catch (e) { dialectRegionLabels = {}; }
-    const dialectCurrent = document.getElementById('dialectCurrent');
-    function syncDialectPicker() {
-      if (!dialectPicker || !dialectSelect) return;
-      dialectPicker.querySelectorAll('[data-dialect]').forEach((b) => b.setAttribute('aria-checked', b.dataset.dialect === dialectSelect.value ? 'true' : 'false'));
-      const picked = dialectSelect.options[dialectSelect.selectedIndex];
-      if (dialectCurrent) dialectCurrent.textContent = picked ? picked.textContent : '';
-    }
-    function renderDialectPicker() {
-      if (!dialectPicker || !dialectSelect) return;
-      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
-      const groups = new Map();
-      (dialectsByLanguage[lang] || []).forEach((d) => {
-        const key = d.value === '' ? '_auto' : (d.region || '_other');
-        if (!groups.has(key)) groups.set(key, []);
-        groups.get(key).push(d);
-      });
-      dialectPicker.innerHTML = '';
-      groups.forEach((rows, key) => {
-        const group = document.createElement('div');
-        group.className = 'dialect-group';
-        if (key !== '_auto' && key !== '_other' && dialectRegionLabels[key]) {
-          const label = document.createElement('div');
-          label.className = 'tag-group-label';
-          label.textContent = dialectRegionLabels[key];
-          group.appendChild(label);
-        }
-        const chips = document.createElement('div');
-        chips.className = 'tag-chips';
-        rows.forEach((d) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'tag-chip dialect-chip';
-          b.setAttribute('role', 'radio');
-          b.dataset.dialect = d.value;
-          b.textContent = d.label;
-          b.addEventListener('click', () => {
-            dialectSelect.value = d.value;
-            dialectSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            syncDialectPicker();
-          });
-          chips.appendChild(b);
-        });
-        group.appendChild(chips);
-        dialectPicker.appendChild(group);
-      });
-      syncDialectPicker();
-    }
-    dialectSelect?.addEventListener('change', syncDialectPicker);
+
 
     function setSelectValueIfAvailable(selectEl, value) {
       const normalized = String(value || '').trim();
@@ -3429,7 +2998,6 @@
       if (dialectSelect && !String(dialectSelect.value || '').trim()) {
         setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
-      syncDialectPicker();
     }
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
@@ -4298,78 +3866,6 @@
     }
     if (contentInput) {
       contentInput.addEventListener('input', updateCharCounter);
-      // Tags: insert at the cursor (sounds as <tag>, delivery as [tag]), with spaces around it.
-      document.querySelectorAll('[data-vocal-tag]').forEach((chip) => {
-        chip.addEventListener('click', () => {
-          const isDelivery = chip.dataset.tagKind === 'delivery';
-          const tag = isDelivery ? '[' + chip.dataset.vocalTag + ']' : '<' + chip.dataset.vocalTag + '>';
-          const value = contentInput.value;
-          const start = contentInput.selectionStart ?? value.length;
-          const end = contentInput.selectionEnd ?? start;
-          const before = value.slice(0, start);
-          const after = value.slice(end);
-          const insert = (before && !/\s$/.test(before) ? ' ' : '') + tag + (after && !/^\s/.test(after) ? ' ' : (isDelivery && !after ? ' ' : ''));
-          contentInput.value = before + insert + after;
-          const caret = before.length + insert.length;
-          contentInput.focus();
-          contentInput.setSelectionRange(caret, caret);
-          contentInput.dispatchEvent(new Event('input', { bubbles: true }));
-          chip.classList.add('is-added');
-          setTimeout(() => chip.classList.remove('is-added'), 450);
-        });
-      });
-
-      // Tabs and search in the tag panel.
-      const tagSearch = document.getElementById('tagSearch');
-      const tagTabs = document.querySelectorAll('[data-tag-tab]');
-      const filterTags = () => {
-        const q = (tagSearch?.value || '').trim().toLowerCase();
-        document.querySelectorAll('[data-tag-pane]').forEach((pane) => {
-          let shown = 0;
-          pane.querySelectorAll('[data-tag-group]').forEach((group) => {
-            let inGroup = 0;
-            group.querySelectorAll('.tag-chip').forEach((chip) => {
-              const match = !q || chip.dataset.search.includes(q);
-              chip.hidden = !match;
-              if (match) inGroup++;
-            });
-            group.hidden = inGroup === 0;
-            shown += inGroup;
-          });
-          const empty = pane.querySelector('.tag-empty');
-          if (empty) empty.hidden = shown > 0;
-        });
-      };
-      const showTagTab = (name) => {
-        tagTabs.forEach((t) => t.setAttribute('aria-selected', t.dataset.tagTab === name ? 'true' : 'false'));
-        document.querySelectorAll('[data-tag-pane]').forEach((pane) => { pane.hidden = pane.dataset.tagPane !== name; });
-        const searchWrap = document.getElementById('tagSearchWrap');
-        if (searchWrap) searchWrap.hidden = name === 'settings';
-      };
-      tagTabs.forEach((tab) => tab.addEventListener('click', () => showTagTab(tab.dataset.tagTab)));
-      // A required setting left empty in a hidden tab: open that tab so the browser can point at it.
-      document.getElementById('voiceForm')?.addEventListener('invalid', (event) => {
-        const pane = event.target.closest?.('[data-tag-pane]');
-        if (pane && pane.hidden) showTagTab(pane.dataset.tagPane);
-      }, true);
-      tagSearch?.addEventListener('input', filterTags);
-
-      // Colour the tags inside the text box: a backdrop with the same text sits behind it.
-      const tagBackdrop = document.getElementById('tagEditorBackdrop');
-      if (tagBackdrop && document.getElementById('vocalTags')) {
-        const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        const paintTags = () => {
-          const html = esc(contentInput.value)
-            .replace(/&lt;([^&\n]{1,40}?)&gt;/g, '<mark class="t-sound">&lt;$1&gt;</mark>')
-            .replace(/\[([^\[\]\n]{1,40})\]/g, '<mark class="t-delivery">[$1]</mark>');
-          tagBackdrop.innerHTML = html + '\n ';
-          tagBackdrop.scrollTop = contentInput.scrollTop;
-        };
-        contentInput.addEventListener('input', paintTags);
-        contentInput.addEventListener('scroll', () => { tagBackdrop.scrollTop = contentInput.scrollTop; });
-        new ResizeObserver(paintTags).observe(contentInput);
-        paintTags();
-      }
       updateCharCounter(); // initial count for old('content')
     }
     if (dashboardNavLinks.length) {
@@ -5931,5 +5427,6 @@
     })();
   </script>
   @endif
+  <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>
 </html>

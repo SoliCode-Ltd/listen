@@ -198,14 +198,17 @@ class GeminiVocalTagsTest extends TestCase
 
         $this->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertSee('id="vocalTags"', false)
+            ->assertSee('data-vs-panel', false)
+            ->assertSee('data-vs-tab="sounds"', false)
+            ->assertSee('data-vs-tab="delivery"', false)
             ->assertSee('data-vocal-tag="laugh"', false)
             ->assertSee('data-vocal-tag="short pause"', false)
             ->assertSee('data-vocal-tag="excited"', false)
             ->assertSee('data-tag-kind="delivery"', false)
-            ->assertSee('id="tagEditorBackdrop"', false)
+            ->assertSee('data-vs-backdrop', false)
+            ->assertSee('js/voice-studio.js', false)
+            ->assertSee('css/voice-studio.css', false)
             ->assertDontSee('&lt;laugh&gt;</button>', false)
-            ->assertSee(__('ui.dashboard.vocal_tags'))
             ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0]);
     }
 
@@ -215,7 +218,10 @@ class GeminiVocalTagsTest extends TestCase
 
         $this->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertDontSee('id="vocalTags"', false);
+            ->assertSee('data-vs-panel', false)
+            ->assertSee('name="voice_key"', false)
+            ->assertDontSee('data-vs-tab="sounds"', false)
+            ->assertDontSee('data-vocal-tag=', false);
     }
 
     public function test_tag_texts_exist_in_english_and_arabic(): void
@@ -340,15 +346,31 @@ class GeminiVocalTagsTest extends TestCase
 
         $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('id="studioPanel"', $html, 'the separate panel is gone');
-        $this->assertStringNotContainsString('tag-tab-count', $html);
-        $settings = substr($html, strpos($html, 'id="tagPane-settings"'));
-        $settings = substr($settings, 0, strpos($settings, 'id="tagPane-sounds"'));
-        foreach (['name="performance_style"', 'name="emotion"', 'name="dialect"', 'name="speed"', 'name="pitch"', 'id="dialectPicker"'] as $field) {
-            $this->assertStringContainsString($field, $settings, $field.' is in the settings tab');
+        $this->assertStringNotContainsString('class="perf-panel"', $html, 'the separate panel is gone');
+        $settings = substr($html, strpos($html, 'data-vs-pane="settings"'));
+        $settings = substr($settings, 0, strpos($settings, 'data-vs-pane="sounds"'));
+        foreach (['name="target_language"', 'name="voice_key"', 'name="performance_style"', 'name="emotion"', 'name="dialect"', 'name="speed"', 'name="pitch"', 'data-vs-dialects', 'id="translateToggle"'] as $field) {
+            $this->assertStringContainsString($field, $settings, $field.' is in the voice tab');
         }
-        $this->assertMatchesRegularExpression('/data-tag-tab="settings"[^>]*>|aria-selected="true"[^>]*data-tag-tab="settings"/', $html);
-        $this->assertStringContainsString('data-tag-pane="sounds" hidden', $html);
+        // Style and emotion are no longer dropdowns: delivery tags replace them, the site defaults stay as hidden fields.
+        $this->assertMatchesRegularExpression('/class="vs-hidden-field" aria-hidden="true">\s*<select name="performance_style"/', $settings);
+        $this->assertStringNotContainsString('name="performance_style" id="performance_style" required', $html);
+        // The editor and the generate button sit together in the main column.
+        $main = substr($html, strpos($html, 'class="vs-main"'), 4000);
+        $this->assertStringContainsString('id="contentTextarea"', $main);
+        $this->assertStringContainsString('id="generateBtn"', $main);
+    }
+
+    public function test_demo_page_has_the_same_studio_panel(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $html = $this->getLocalizedRoute('demo.page')->assertOk()->getContent();
+
+        foreach (['data-vs-panel', 'data-vs-editor', 'data-vs-backdrop', 'data-vocal-tag="laugh"', 'data-tag-kind="delivery"', 'data-vs-dialects', 'id="voice_tier"', 'id="voice_key"', 'id="studioPanel"', 'js/voice-studio.js'] as $needle) {
+            $this->assertStringContainsString($needle, $html, $needle);
+        }
+        $this->assertStringContainsString('[calm] How long have you been telling yourself', $html, 'the Premium sample uses the tags');
     }
 
     public function test_every_arab_dialect_is_offered_with_directions(): void
