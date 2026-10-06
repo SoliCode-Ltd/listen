@@ -453,9 +453,8 @@ html body.auth-split-body .auth-showcase {
   height: 100dvh;
   box-sizing: border-box;
   margin: 0;
-  padding: 12px;
-  padding-inline-start: 0;
-  background: var(--au-bg);
+  padding: 0;
+  background: var(--sc-bg);
   color: var(--sc-text);
 }
 html[data-theme="light"] body.auth-split-body .auth-showcase {
@@ -484,18 +483,23 @@ html body.auth-split-body .auth-showcase-inner {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
   gap: 20px;
   overflow: hidden;
-  border-radius: 24px;
-  border: 1px solid var(--sc-card-line);
+  border-inline-start: 1px solid var(--sc-card-line);
   background:
     radial-gradient(60% 50% at 85% 8%, var(--sc-glow), transparent 70%),
     radial-gradient(55% 45% at 10% 100%, var(--sc-glow-2), transparent 70%),
     var(--sc-bg);
 }
+/* One centred column: headline, text and player share the same width and edge. */
+html body.auth-split-body .auth-showcase-inner > * {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 520px;
+}
 html body.auth-split-body .auth-headline {
   margin: 0;
-  max-width: 520px;
   font-family: inherit;
   font-size: clamp(30px, 3.1vw, 44px);
   font-weight: 600;
@@ -509,7 +513,6 @@ html[dir="rtl"] body.auth-split-body .auth-headline {
 }
 html body.auth-split-body .auth-subline {
   margin: 0;
-  max-width: 460px;
   font-size: 17px;
   line-height: 1.6;
   color: var(--sc-muted);
@@ -539,7 +542,6 @@ html body.auth-split-body .auth-perks li::before {
 
 /* ---------- Sample player ---------- */
 html body.auth-split-body .auth-player {
-  max-width: 500px;
   margin-top: 12px;
   padding: 8px 8px 0;
   border-radius: 20px;
@@ -607,14 +609,23 @@ html body.auth-split-body .auth-player-text[lang="en"] {
   line-height: 1.6;
   letter-spacing: -0.01em;
 }
-html body.auth-split-body .auth-player-text .w {
-  transition: color .18s ease;
-}
 html body.auth-split-body .auth-player-text.is-reading .w {
   color: var(--sc-word-dim);
 }
 html body.auth-split-body .auth-player-text.is-reading .w.is-spoken {
   color: var(--sc-text);
+}
+/* The word being spoken fills letter by letter, in reading direction. */
+html body.auth-split-body .auth-player-text.is-reading .w.is-current {
+  color: transparent;
+  background: linear-gradient(90deg, var(--sc-text) var(--wp, 0%), var(--sc-word-dim) var(--wp, 0%));
+  -webkit-background-clip: text;
+  background-clip: text;
+}
+html body.auth-split-body .auth-player-text[dir="rtl"].is-reading .w.is-current {
+  background: linear-gradient(270deg, var(--sc-text) var(--wp, 0%), var(--sc-word-dim) var(--wp, 0%));
+  -webkit-background-clip: text;
+  background-clip: text;
 }
 /* Controls */
 html body.auth-split-body .auth-player-bar {
@@ -684,6 +695,8 @@ html body.auth-split-body .auth-wave-bars i {
   min-width: 2px;
   border-radius: 3px;
   background: var(--sc-bar);
+  /* Bars ease into the sample's real shape once it is analysed. */
+  transition: height .45s cubic-bezier(.2, .8, .2, 1);
 }
 /* The played part: the same bars in the brand colour, revealed smoothly. */
 html body.auth-split-body .auth-wave-fill {
@@ -724,7 +737,7 @@ html body.auth-split-body .auth-player-sep {
 }
 @media (prefers-reduced-motion: reduce) {
   html body.auth-split-body .auth-play,
-  html body.auth-split-body .auth-player-text .w {
+  html body.auth-split-body .auth-wave-bars i {
     transition: none;
   }
 }
