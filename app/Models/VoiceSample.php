@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\AudioUrl;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Cache;
@@ -57,6 +58,11 @@ class VoiceSample extends Model
         foreach (['ar', 'en'] as $language) {
             Cache::forget("landing_voice_samples_showcase:{$language}");
             Cache::forget("landing_voice_sample_hero:{$language}");
+        }
+        // Sign-in and new-design sample rows (NewDesignSamples), cached per row limit.
+        foreach (range(1, 12) as $limit) {
+            Cache::forget("nt_dialect_rows:{$limit}");
+            Cache::forget("nt_sample_rows:en:{$limit}");
         }
     }
 
@@ -115,6 +121,6 @@ class VoiceSample extends Model
      */
     public function getAudioUrlAttribute(): ?string
     {
-        return \App\Support\AudioUrl::fromPath($this->audio_path);
+        return AudioUrl::fromPath($this->audio_path);
     }
 }
