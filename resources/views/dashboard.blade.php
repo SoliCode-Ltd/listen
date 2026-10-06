@@ -1304,8 +1304,8 @@
     }
     .vocal-tags > summary {
       cursor: pointer;
-      font-weight: 600;
-      font-size: .9rem;
+      font-weight: 700;
+      font-size: 1rem;
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
@@ -1314,7 +1314,7 @@
     .vocal-tags > summary small {
       font-weight: 400;
       color: var(--muted);
-      font-size: .78rem;
+      font-size: .88rem;
     }
     .vocal-tag-groups {
       display: grid;
@@ -1328,20 +1328,23 @@
       gap: .35rem;
     }
     .vocal-tag-group-label {
-      min-width: 5.5rem;
-      font-size: .78rem;
+      min-width: 6rem;
+      font-size: .88rem;
+      font-weight: 600;
       color: var(--muted);
     }
     .vocal-tag-chip {
       border: 1px solid var(--line, rgba(255,255,255,.14));
       background: var(--surface, transparent);
-      color: inherit;
+      color: var(--text, inherit);
       border-radius: 999px;
-      padding: .2rem .6rem;
-      font-size: .78rem;
-      font-family: var(--font-mono, ui-monospace, monospace);
+      padding: .3rem .85rem;
+      font-family: inherit;
+      font-size: .9rem;
+      font-weight: 500;
+      line-height: 1.4;
       cursor: pointer;
-      min-height: 32px;
+      min-height: 36px;
     }
     .vocal-tag-chip:hover,
     .vocal-tag-chip:focus-visible {
@@ -1349,19 +1352,21 @@
       outline: none;
     }
     .vocal-tag-tips {
-      margin-top: .6rem;
-      font-size: .82rem;
+      margin-top: .75rem;
+      font-size: .95rem;
     }
     .vocal-tag-tips summary {
       cursor: pointer;
-      color: var(--muted);
+      color: var(--text, inherit);
+      font-weight: 600;
     }
     .vocal-tag-tips ul {
       margin: .4rem 0 0;
       padding-inline-start: 1.1rem;
       display: grid;
-      gap: .3rem;
-      line-height: 1.6;
+      gap: .45rem;
+      line-height: 1.85;
+      color: var(--text, inherit);
     }
     .char-counter.warning {
       color: var(--warning, #f59e0b);
@@ -2218,7 +2223,7 @@
                   <div class="vocal-tag-group">
                     <span class="vocal-tag-group-label">{{ __('ui.dashboard.vocal_tag_groups.'.$group) }}</span>
                     @foreach($groupTags as $vocalTag)
-                      <button type="button" class="vocal-tag-chip" data-vocal-tag="{{ $vocalTag }}" dir="ltr">&lt;{{ $vocalTag }}&gt;</button>
+                      <button type="button" class="vocal-tag-chip" data-vocal-tag="{{ \App\Support\GeminiVocalTags::label($vocalTag) }}">{{ \App\Support\GeminiVocalTags::label($vocalTag) }}</button>
                     @endforeach
                   </div>
                 @endforeach

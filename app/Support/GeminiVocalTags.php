@@ -10,8 +10,9 @@ namespace App\Support;
  * <short pause>, placed where the sound happens. Moods and delivery
  * belong in the style instructions instead.
  *
- * Writers often use the ElevenLabs style ([laughs], [whispering],
- * [excited]), so known sounds are rewritten to the Gemini tag and mood
+ * Members may also write other common styles ([laughs], [whispering],
+ * [excited]) or the Arabic tag names the Arabic editor inserts
+ * (<ضحكة>), so known sounds are rewritten to the Gemini tag and mood
  * tags are moved out of the spoken text into the style.
  */
 class GeminiVocalTags
@@ -31,7 +32,7 @@ class GeminiVocalTags
     ];
 
     /**
-     * Other spellings, mostly from ElevenLabs scripts, mapped to a Gemini tag.
+     * Other common spellings, mapped to a Gemini tag.
      *
      * @var array<string, string>
      */
@@ -60,6 +61,24 @@ class GeminiVocalTags
         'whimpers' => 'whimper', 'groans' => 'groan', 'growls' => 'growl', 'grunts' => 'grunt',
     ];
 
+    /**
+     * Arabic name for each tag. The Arabic editor shows and inserts these,
+     * and they are read back as the English tag the model needs.
+     *
+     * @var array<string, string>
+     */
+    public const ARABIC_NAMES = [
+        'laugh' => 'ضحكة', 'chuckle' => 'ضحكة خفيفة', 'giggle' => 'قهقهة', 'cackle' => 'قهقهة عالية', 'snicker' => 'ضحكة ساخرة',
+        'sigh' => 'تنهيدة', 'gasp' => 'شهقة', 'breath' => 'نفس', 'heavy breath' => 'نفس ثقيل', 'exhales' => 'زفير',
+        'pant' => 'لهاث', 'phew' => 'تنفس ارتياح',
+        'short pause' => 'وقفة قصيرة', 'long pause' => 'وقفة طويلة',
+        'whispers' => 'همس', 'shout' => 'صياح', 'scream' => 'صرخة', 'shriek' => 'صرخة حادة', 'cheer' => 'هتاف',
+        'cough' => 'سعال', 'sneeze' => 'عطسة', 'throat-clearing' => 'تنحنح', 'yawn' => 'تثاؤب', 'snort' => 'نخرة',
+        'tsk' => 'طقطقة لسان', 'pff' => 'تأفف',
+        'cry' => 'بكاء', 'sob' => 'نحيب', 'whimper' => 'أنين', 'groan' => 'تأوه', 'moan' => 'آهة',
+        'growl' => 'زمجرة', 'grunt' => 'همهمة', 'grr' => 'زمجرة خفيفة', 'hiss' => 'فحيح', 'argh' => 'تذمر',
+    ];
+
     /** Longest text a mood tag may hold, so ordinary bracketed text is left alone. */
     private const MAX_CUE_LENGTH = 40;
 
@@ -76,12 +95,61 @@ class GeminiVocalTags
      */
     public static function canonical(string $cue): ?string
     {
-        $key = strtolower(trim((string) preg_replace('/\s+/u', ' ', $cue)));
+        $key = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $cue)));
         if (in_array($key, self::all(), true)) {
             return $key;
         }
+        if (isset(self::ALIASES[$key])) {
+            return self::ALIASES[$key];
+        }
 
-        return self::ALIASES[$key] ?? null;
+        return self::arabicIndex()[self::plainArabic($key)] ?? null;
+    }
+
+    /**
+     * Every written form of the tags: English names and Arabic names.
+     *
+     * @return array<int, string>
+     */
+    public static function allSpellings(): array
+    {
+        return array_merge(self::all(), array_values(self::ARABIC_NAMES));
+    }
+
+    /**
+     * What the editor shows and inserts for a tag in the given language.
+     */
+    public static function label(string $tag, ?string $locale = null): string
+    {
+        $locale = strtolower((string) ($locale ?? app()->getLocale()));
+
+        return str_starts_with($locale, 'ar') ? (self::ARABIC_NAMES[$tag] ?? $tag) : $tag;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function arabicIndex(): array
+    {
+        static $index = null;
+        if ($index === null) {
+            $index = [];
+            foreach (self::ARABIC_NAMES as $tag => $name) {
+                $index[self::plainArabic($name)] = $tag;
+            }
+        }
+
+        return $index;
+    }
+
+    /**
+     * Arabic without diacritics and with the letter forms people type either way.
+     */
+    private static function plainArabic(string $text): string
+    {
+        $text = (string) preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $text);
+
+        return strtr($text, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ى' => 'ي', 'ة' => 'ه']);
     }
 
     /**

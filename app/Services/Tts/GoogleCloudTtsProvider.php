@@ -156,7 +156,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         // <laugh>, <short pause>: Gemini sound tags, with the space before them.
         $text = preg_replace(
-            '/[ \t]*<\s*(?:'.implode('|', array_map(fn (string $tag) => preg_quote($tag, '/'), GeminiVocalTags::all())).')\s*>/iu',
+            '/[ \t]*<\s*(?:'.implode('|', array_map(fn (string $tag) => preg_quote($tag, '/'), GeminiVocalTags::allSpellings())).')\s*>/iu',
             '',
             $text,
         ) ?? $text;
