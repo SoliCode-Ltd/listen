@@ -10,13 +10,18 @@ use Illuminate\Support\Facades\Storage;
 use Throwable;
 
 /**
- * Make each sample's text match its audio.
+ * Make each sample's text and dialect label match its audio.
  *
  * The sign-in page and landing page show a sample's text next to its audio.
  * When an audio file is replaced and the text is not, they disagree. This
  * transcribes the audio with a Gemini text model and, with --fix, saves the
  * transcript as the text when the two differ by more than a few words.
  * Small differences (punctuation, "twelfth" vs "12th") keep the stored text.
+ *
+ * It also asks which dialect or accent the audio is in. When that is a
+ * different family from the label (Fusha labelled audio that speaks
+ * Egyptian, say), --fix corrects the label so the right tab plays it.
+ * Neighbours in one family (Saudi and Kuwaiti) are left as labelled.
  */
 class SyncVoiceSampleTextCommand extends Command
 {
@@ -24,11 +29,33 @@ class SyncVoiceSampleTextCommand extends Command
         {--fix : Save the transcript when the text does not match the audio}
         {--category=hero : Sample category to check ("all" for every category)}
         {--id=* : Only these sample ids}
-        {--threshold=0.15 : Share of words that may differ before the text is replaced}';
+        {--threshold=0.15 : Share of words that may differ before the text is replaced}
+        {--skip-dialect : Do not check the dialect labels}';
 
     protected $description = 'Check that each voice sample\'s text matches what its audio says, and fix it with --fix';
 
     private const MODELS = ['gemini-3.5-flash', 'gemini-2.5-flash'];
+
+    /**
+     * Dialect family of each label, and the label a family gets when a sample is relabelled.
+     *
+     * @var array<string, string>
+     */
+    private const FAMILY_OF = [
+        'ar-XA' => 'msa',
+        'ar-EG' => 'egyptian',
+        'ar-SA' => 'gulf', 'ar-KW' => 'gulf', 'ar-AE' => 'gulf', 'ar-QA' => 'gulf', 'ar-BH' => 'gulf', 'ar-OM' => 'gulf',
+        'ar-LB' => 'levantine', 'ar-SY' => 'levantine', 'ar-JO' => 'levantine', 'ar-PS' => 'levantine',
+        'ar-IQ' => 'iraqi', 'ar-YE' => 'yemeni', 'ar-SD' => 'sudanese',
+        'ar-MA' => 'maghrebi', 'ar-TN' => 'maghrebi', 'ar-DZ' => 'maghrebi', 'ar-LY' => 'maghrebi',
+        'en-US' => 'american', 'en-GB' => 'british', 'en-AU' => 'australian', 'en-IN' => 'indian', 'en-ZA' => 'south_african',
+    ];
+
+    private const LABEL_FOR = [
+        'msa' => 'ar-XA', 'egyptian' => 'ar-EG', 'gulf' => 'ar-SA', 'levantine' => 'ar-LB', 'iraqi' => 'ar-IQ',
+        'yemeni' => 'ar-YE', 'sudanese' => 'ar-SD', 'maghrebi' => 'ar-MA',
+        'american' => 'en-US', 'british' => 'en-GB', 'australian' => 'en-AU', 'indian' => 'en-IN', 'south_african' => 'en-ZA',
+    ];
 
     public function handle(): int
     {
@@ -49,7 +76,8 @@ class SyncVoiceSampleTextCommand extends Command
 
         $threshold = max(0.0, (float) $this->option('threshold'));
         $fix = (bool) $this->option('fix');
-        $counts = ['match' => 0, 'mismatch' => 0, 'fixed' => 0, 'skipped' => 0];
+        $checkDialect = ! $this->option('skip-dialect');
+        $counts = ['match' => 0, 'mismatch' => 0, 'fixed' => 0, 'skipped' => 0, 'relabel' => 0, 'relabelled' => 0];
 
         foreach ($query->get() as $sample) {
             $field = $sample->language === 'ar' && trim((string) $sample->sample_text_ar) !== '' ? 'sample_text_ar' : 'sample_text';
@@ -64,12 +92,26 @@ class SyncVoiceSampleTextCommand extends Command
                 continue;
             }
 
-            $spoken = $this->transcribe($audio, $key);
-            if ($spoken === null) {
+            $heard = $this->transcribe($audio, $key, (string) $sample->language);
+            if ($heard === null) {
                 $this->warn("{$label}: could not transcribe, skipped.");
                 $counts['skipped']++;
 
                 continue;
+            }
+            $spoken = $heard['text'];
+
+            if ($checkDialect && ($newDialect = self::relabel($sample->dialect, $heard['variety'])) !== null) {
+                $counts['relabel']++;
+                $this->line("{$label}: the audio is {$heard['variety']}, labelled ".($sample->dialect ?: 'none').", should be {$newDialect}.");
+                if ($fix) {
+                    $metadata = (array) ($sample->metadata ?? []);
+                    $metadata['dialect_before_sync'] = $sample->dialect;
+                    $metadata['dialect_heard'] = $heard['variety'];
+                    $sample->forceFill(['dialect' => $newDialect, 'metadata' => $metadata])->save();
+                    $counts['relabelled']++;
+                    $this->info("  label changed to {$newDialect}.");
+                }
             }
 
             $difference = self::difference($stored, $spoken);
@@ -100,11 +142,28 @@ class SyncVoiceSampleTextCommand extends Command
 
         $this->newLine();
         $this->info("Matching: {$counts['match']}, not matching: {$counts['mismatch']}, fixed: {$counts['fixed']}, skipped: {$counts['skipped']}.");
-        if ($counts['mismatch'] > $counts['fixed']) {
-            $this->line('Run again with --fix to save the transcripts.');
+        if ($checkDialect) {
+            $this->info("Wrong dialect labels: {$counts['relabel']}, relabelled: {$counts['relabelled']}.");
+        }
+        if ($counts['mismatch'] > $counts['fixed'] || $counts['relabel'] > $counts['relabelled']) {
+            $this->line('Run again with --fix to save the changes.');
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * The label a sample should have, or null when its label is right (or the audio could not be placed).
+     */
+    public static function relabel(?string $dialect, ?string $heard): ?string
+    {
+        $heard = strtolower(trim((string) $heard));
+        if (! isset(self::LABEL_FOR[$heard])) {
+            return null;
+        }
+        $current = self::FAMILY_OF[(string) $dialect] ?? null;
+
+        return $current === $heard ? null : self::LABEL_FOR[$heard];
     }
 
     /**
@@ -150,9 +209,18 @@ class SyncVoiceSampleTextCommand extends Command
         return ['bytes' => $bytes, 'mime' => str_starts_with($bytes, 'RIFF') ? 'audio/wav' : 'audio/mpeg'];
     }
 
-    private function transcribe(array $audio, string $key): ?string
+    /**
+     * @return array{text: string, variety: ?string}|null
+     */
+    private function transcribe(array $audio, string $key, string $language): ?array
     {
         $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
+        $families = $language === 'en'
+            ? 'american, british, australian, indian, south_african'
+            : 'msa (Modern Standard Arabic, Fusha), egyptian, gulf (Saudi, Kuwaiti, Emirati, Qatari, Bahraini, Omani), levantine (Lebanese, Syrian, Jordanian, Palestinian), iraqi, yemeni, sudanese, maghrebi (Moroccan, Tunisian, Algerian, Libyan)';
+        $prompt = 'Listen to this audio. Return JSON with two keys: "transcript" (exactly what is said, word for word, '
+            .'in the language and dialect spoken, with normal punctuation) and "variety" (the dialect or accent family of the speaker, '
+            .'one of: '.$families.'; use "unknown" if unsure).';
 
         foreach (self::MODELS as $model) {
             try {
@@ -162,14 +230,22 @@ class SyncVoiceSampleTextCommand extends Command
                             'role' => 'user',
                             'parts' => [
                                 ['inline_data' => ['mime_type' => $audio['mime'], 'data' => base64_encode($audio['bytes'])]],
-                                ['text' => 'Transcribe exactly what is said in this audio, word for word, in the language and dialect spoken, with normal punctuation. Return only the transcript.'],
+                                ['text' => $prompt],
                             ],
                         ]],
+                        'generationConfig' => ['responseMimeType' => 'application/json'],
                     ]);
-                $text = $response->json('candidates.0.content.parts.0.text');
-                if ($response->ok() && is_string($text) && trim($text) !== '') {
-                    return trim($text);
+                $raw = $response->json('candidates.0.content.parts.0.text');
+                if (! $response->ok() || ! is_string($raw) || trim($raw) === '') {
+                    continue;
                 }
+                $data = json_decode(trim((string) preg_replace('/^```(?:json)?|```$/m', '', $raw)), true);
+                if (is_array($data) && is_string($data['transcript'] ?? null) && trim($data['transcript']) !== '') {
+                    return ['text' => trim($data['transcript']), 'variety' => is_string($data['variety'] ?? null) ? $data['variety'] : null];
+                }
+
+                // A plain transcript without JSON still fixes the text.
+                return ['text' => trim($raw), 'variety' => null];
             } catch (Throwable) {
                 // Try the next model.
             }

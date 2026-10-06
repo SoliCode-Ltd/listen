@@ -67,15 +67,6 @@
       .catch(function () { return null; });
     return analyses[src];
   }
-  // Pauses of 200 ms or more split the speech into phrases.
-  function phrases(info) {
-    var out = [];
-    info.segments.forEach(function (s) {
-      var last = out[out.length - 1];
-      if (last && s[0] - last[1] < 0.2) last[1] = s[1]; else out.push([s[0], s[1]]);
-    });
-    return out;
-  }
   function paintBars(track, info) {
     var groups = track.querySelectorAll('.auth-wave-bars');
     if (!groups.length || !info) return;
@@ -115,37 +106,76 @@
     el.setAttribute('data-nt-wordified', el.textContent);
     el.setAttribute('data-chars', String(seen || 1));
   }
+  // Time the voice has been speaking by time t (silences skipped).
+  function voicedAt(info, t) {
+    var v = 0;
+    for (var i = 0; i < info.segments.length; i++) {
+      var s = info.segments[i];
+      if (t >= s[1]) v += s[1] - s[0];
+      else { if (t > s[0]) v += t - s[0]; break; }
+    }
+    return v;
+  }
+  // Anchors that tie the script to the audio: each sentence or clause end in
+  // the text is matched to the real pause that best fits it (dynamic
+  // programming, in order), so a phrase finishes exactly when the voice stops.
+  // Extra breaths in the audio are allowed; the highlight just waits there.
+  function anchorsFor(el, words, info) {
+    var key = el.getAttribute('data-nt-wordified') + '|' + info.duration;
+    if (el.__ntAnchors && el.__ntAnchors.key === key) return el.__ntAnchors.list;
+    var total = parseFloat(el.getAttribute('data-chars')) || 1;
+    var voiced = voicedAt(info, info.duration) || info.duration;
+    var bounds = [];
+    for (var i = 0; i < words.length - 1; i++) {
+      if (words[i + 1].getAttribute('data-phrase') !== words[i].getAttribute('data-phrase')) bounds.push(parseFloat(words[i].getAttribute('data-end')));
+    }
+    var pauses = [];
+    for (var j = 1; j < info.segments.length; j++) {
+      if (info.segments[j][0] - info.segments[j - 1][1] >= 0.15) pauses.push(voicedAt(info, info.segments[j - 1][1]));
+    }
+    var K = bounds.length, P = pauses.length, MISS = 0.06, MAXD = 0.15;
+    // cost[k][p]: best cost placing the first k boundaries using pauses before p.
+    var cost = [], pick = [];
+    for (var k = 0; k <= K; k++) { cost.push([]); pick.push([]); for (var p = 0; p <= P; p++) { cost[k].push(k === 0 ? 0 : Infinity); pick[k].push(null); } }
+    for (k = 1; k <= K; k++) {
+      var expect = bounds[k - 1] / total;
+      for (p = 0; p <= P; p++) {
+        // Boundary k not matched to any pause.
+        var best = cost[k - 1][p] + MISS, how = [-1, p];
+        if (p > 0 && cost[k][p - 1] < best) { best = cost[k][p - 1]; how = [-2, p - 1]; }
+        if (p > 0) {
+          var d = Math.abs(pauses[p - 1] / voiced - expect);
+          if (d <= MAXD && cost[k - 1][p - 1] + d < best) { best = cost[k - 1][p - 1] + d; how = [p - 1, p - 1]; }
+        }
+        cost[k][p] = best; pick[k][p] = how;
+      }
+    }
+    var list = [[total, voiced]];
+    k = K; p = P;
+    while (k > 0) {
+      var h = pick[k][p];
+      if (!h) break;
+      if (h[0] === -2) { p = h[1]; continue; }
+      if (h[0] >= 0) list.push([bounds[k - 1], pauses[h[0]]]);
+      k--; p = h[1];
+    }
+    list.push([0, 0]);
+    list.reverse();
+    el.__ntAnchors = { key: key, list: list };
+    return list;
+  }
   // How far through the script (in letters) the voice is at time t.
   function spokenChars(el, words, t, info, ratio) {
     var total = parseFloat(el.getAttribute('data-chars')) || 1;
     if (!info || !info.segments.length) return ratio * total;
-    var spans = phrases(info);
-    var textPhrases = parseInt(words[words.length - 1].getAttribute('data-phrase'), 10) + 1;
-    if (spans.length === textPhrases) {
-      // One pause in the audio for each phrase in the text: follow phrase by phrase.
-      for (var p = 0; p < spans.length; p++) {
-        if (t < spans[p][0]) return phraseStart(words, p);
-        if (t <= spans[p][1]) {
-          var a = phraseStart(words, p), z = phraseStart(words, p + 1, total);
-          return a + (z - a) * (t - spans[p][0]) / Math.max(0.01, spans[p][1] - spans[p][0]);
-        }
+    var v = voicedAt(info, t), list = anchorsFor(el, words, info);
+    for (var i = 1; i < list.length; i++) {
+      if (v <= list[i][1]) {
+        var a = list[i - 1], b = list[i];
+        return a[0] + (b[0] - a[0]) * (b[1] > a[1] ? (v - a[1]) / (b[1] - a[1]) : 1);
       }
-      return total;
     }
-    // Otherwise follow the time the voice is speaking, skipping the silences.
-    var voiced = 0, before = 0;
-    info.segments.forEach(function (s) {
-      voiced += s[1] - s[0];
-      if (t >= s[1]) before += s[1] - s[0];
-      else if (t > s[0]) before += t - s[0];
-    });
-    return voiced > 0 ? total * before / voiced : ratio * total;
-  }
-  function phraseStart(words, p, fallback) {
-    for (var i = 0; i < words.length; i++) {
-      if (parseInt(words[i].getAttribute('data-phrase'), 10) >= p) return parseFloat(words[i].getAttribute('data-start'));
-    }
-    return fallback;
+    return total;
   }
   function paintWords(track, ratio, t) {
     var card = track ? track.closest('[data-nt-try]') : null;
@@ -163,7 +193,9 @@
       var fill = pos >= e ? 1 : pos <= s ? 0 : (pos - s) / Math.max(1, e - s);
       w.classList.toggle('is-spoken', fill >= 1);
       w.classList.toggle('is-current', fill > 0 && fill < 1);
-      if (fill > 0 && fill < 1) w.style.setProperty('--wp', (fill * 100).toFixed(1) + '%');
+      // The soft edge (36% wide) starts fully before the word and ends fully past it,
+      // so a word goes from dim to lit without any step.
+      if (fill > 0 && fill < 1) w.style.setProperty('--wp', (fill * 136 - 18).toFixed(1) + '%');
     }
   }
 
@@ -181,12 +213,31 @@
     return guess;
   }
 
+  // Bars near the playhead lift with the voice's real loudness at that moment,
+  // so the waveform moves with the speech; elsewhere they rest at their shape.
+  function pulseBars(track, ratio, t) {
+    var info = track.__ntInfo && track.__ntInfo.src === track.getAttribute('data-src') ? track.__ntInfo.data : null;
+    var groups = track.querySelectorAll('.auth-wave-bars');
+    if (!info || !groups.length) return;
+    var playing = track.classList.contains('is-playing');
+    var frame = Math.min(info.rms.length - 1, Math.max(0, Math.round(t * 100)));
+    var level = playing ? Math.min(1, Math.sqrt((info.rms[frame] || 0) / info.loud)) : 0;
+    var count = groups[0].children.length, head = ratio * count;
+    groups.forEach(function (g) {
+      for (var i = 0; i < count; i++) {
+        var near = Math.exp(-Math.pow((i + 0.5 - head) / 2.2, 2));
+        var lift = 1 + 0.55 * level * near;
+        g.children[i].style.transform = lift > 1.001 ? 'scaleY(' + lift.toFixed(3) + ')' : '';
+      }
+    });
+  }
   function paintWave(track, ratio, t) {
     if (t === undefined) t = audio.currentTime;
     paintWords(track, ratio, t);
     var wave = track ? track.querySelector('.nt-wave') : null;
     // Waves with a fill layer sweep smoothly instead of lighting bar by bar.
     if (wave) wave.style.setProperty('--nt-progress', String(Math.max(0, Math.min(1, ratio))));
+    if (wave) pulseBars(track, ratio, t);
     var bars = track ? track.querySelectorAll('.nt-wave > span') : [];
     var lit = Math.round(bars.length * ratio);
     for (var i = 0; i < bars.length; i++) bars[i].classList.toggle('is-lit', i < lit);
