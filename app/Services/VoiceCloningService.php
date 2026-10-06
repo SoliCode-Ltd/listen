@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
+use App\Support\GeminiVocalTags;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Http\Client\ConnectionException;
@@ -207,7 +208,12 @@ class VoiceCloningService
         }
 
         $startTime = microtime(true);
-        $style = trim($style);
+        $prepared = GeminiVocalTags::prepare($text);
+        $text = $prepared['text'];
+        $style = GeminiVocalTags::withCues($style, $prepared['cues']);
+        if (trim(GeminiVocalTags::strip($text)) === '') {
+            throw new \RuntimeException('TTS text is empty.');
+        }
 
         // Long outputs end with no audio, so long scripts are read in pieces
         // and joined, the same way the stock Gemini voices are.
@@ -495,6 +501,7 @@ class VoiceCloningService
             ."- Keep the same meaning, names, numbers, and sentence order.\n"
             ."- Use the everyday words and grammar of that variety.\n"
             ."- Do not add a title, notes, labels, or quotation marks.\n"
+            ."- Keep every tag in square or angle brackets, such as [excited] or <laugh>, exactly as written and in the same place.\n"
             ."- If it is already in that variety, return it unchanged.\n"
             ."- Return only the spoken transcript.\n\n"
             ."Transcript:\n".$text;

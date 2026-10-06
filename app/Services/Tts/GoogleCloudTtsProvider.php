@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\GeminiVocalTags;
 use App\Support\StandardVoiceEngine;
 use App\Support\TextChunker;
 use App\Support\VoiceCatalog;
@@ -152,6 +153,13 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
     {
         $cueWords = 'pause|silence|beat|laugh|laughs|laughing|chuckle|chuckles|giggle|sigh|sighs|breath|breathes|inhale|exhale|whisper|whispers|whispering|softly|cough|clears throat|smile|smiles'
             .'|سكتة|سكوت|صمت|وقفة|توقف|يضحك|تضحك|ضحكة|ضحك|يبتسم|تبتسم|ابتسامة|تنهد|تنهيدة|يتنهد|تتنهد|همس|يهمس|تهمس|نفس|شهيق|زفير|بهدوء';
+
+        // <laugh>, <short pause>: Gemini sound tags, with the space before them.
+        $text = preg_replace(
+            '/[ \t]*<\s*(?:'.implode('|', array_map(fn (string $tag) => preg_quote($tag, '/'), GeminiVocalTags::all())).')\s*>/iu',
+            '',
+            $text,
+        ) ?? $text;
 
         $clean = preg_replace([
             // [calm + questioning], [هادئ + تساؤل]
