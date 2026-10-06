@@ -80,4 +80,28 @@ class GeminiKeyRotationTest extends TestCase
         app(GeminiTtsProvider::class)->synthesize('أهلا وسهلا', 'ar', ['voice_name' => 'Kore']);
         $this->assertSame(['k2'], $calls, 'later requests skip the cut-off key');
     }
+
+    public function test_a_key_google_refuses_is_skipped_and_the_member_still_gets_audio(): void
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $manager = $this->threeKeys();
+        $manager->markOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH);
+        $manager->markOutForToday('GEMINI_TTS_API_KEY_2', GeminiTtsModel::FLASH);
+        $calls = [];
+        Http::fake(function ($request) use (&$calls) {
+            $key = $request->header('x-goog-api-key')[0] ?? '';
+            $calls[] = $key;
+
+            return $key === 'k3'
+                ? Http::response(['error' => ['code' => 400, 'message' => 'API key not valid. Please pass a valid API key.', 'status' => 'INVALID_ARGUMENT', 'details' => [['reason' => 'API_KEY_INVALID']]]], 400)
+                : Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;rate=24000', 'data' => base64_encode(str_repeat("\0", 4800))]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم', 'ar', ['voice_name' => 'Kore']);
+        $this->assertSame('k3', $calls[0], 'the only key with room was tried first');
+        $this->assertNotContains('k3', array_slice($calls, 1), 'then the refused key is set aside');
+        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY_3', GeminiTtsModel::FLASH));
+    }
 }

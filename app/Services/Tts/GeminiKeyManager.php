@@ -233,6 +233,16 @@ class GeminiKeyManager
     }
 
     /**
+     * Google refused the key itself (invalid, expired, or not allowed): the
+     * request can still succeed on another key.
+     */
+    public static function isKeyProblem(int $status, string $body): bool
+    {
+        return in_array($status, [400, 401, 403], true)
+            && (bool) preg_match('/API_KEY_INVALID|API key not valid|API key expired|API_KEY_SERVICE_BLOCKED|PERMISSION_DENIED|SERVICE_DISABLED|billing/i', $body);
+    }
+
+    /**
      * The model a request path is for (/models/{model}:generateContent).
      */
     public static function modelFromPath(string $path, string $fallback): string

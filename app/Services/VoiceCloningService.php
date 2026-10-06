@@ -324,7 +324,7 @@ class VoiceCloningService
      */
     public static function isQuotaOrMissing(string $message): bool
     {
-        return (bool) preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b|\b404\b|\b403\b|not found|NOT_FOUND|PERMISSION_DENIED/i', $message);
+        return (bool) preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b|\b404\b|\b403\b|not found|NOT_FOUND|PERMISSION_DENIED|API_KEY_INVALID|API key not valid|API key expired/i', $message);
     }
 
     /**
@@ -1330,8 +1330,14 @@ class VoiceCloningService
 
             $last = $response;
             $this->lastKeyName = $keyInfo['name'] ?? null;
-            if (GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body()) && filled($keyInfo['name'] ?? null)) {
+            $badKey = GeminiKeyManager::isKeyProblem($response->status(), (string) $response->body());
+            if ((GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body()) || $badKey) && filled($keyInfo['name'] ?? null)) {
                 app(GeminiKeyManager::class)->markOutForToday((string) $keyInfo['name'], $model);
+            }
+            if ($badKey && $index !== array_key_last($keys)) {
+                Log::error('Gemini key refused by Google; using the other keys.', ['key' => $keyInfo['name'] ?? null, 'status' => $response->status()]);
+
+                continue;
             }
             // Out of quota, or the voice belongs to another key's project: try the next key.
             if (! in_array($response->status(), [403, 404, 429], true) || $index === array_key_last($keys)) {

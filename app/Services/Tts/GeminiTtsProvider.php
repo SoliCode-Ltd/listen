@@ -353,7 +353,8 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function getAvailableKey(): array
     {
-        $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel);
+        $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel)
+            ?? ($this->getKeyManager()->keysInOrder($this->currentModel)[0] ?? null);
         if ($keyInfo === null) {
             throw new \RuntimeException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
         }
@@ -366,13 +367,25 @@ class GeminiTtsProvider implements TtsProviderInterface
      *
      * @return bool True if another key is available
      */
-    private function rotateToNextKey(): bool
+    private function rotateToNextKey(array $tried = []): bool
     {
         if ($this->currentKeyInfo !== null) {
             $this->getKeyManager()->markKeyExhausted($this->currentKeyInfo['name']);
+            $tried[] = $this->currentKeyInfo['name'];
         }
 
+        // A key with room first; failing that, any key not tried yet for this
+        // request (a cut-off key may have its quota back) before giving up.
         $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel);
+        if ($keyInfo === null || in_array($keyInfo['name'], $tried, true)) {
+            $keyInfo = null;
+            foreach ($this->getKeyManager()->keysInOrder($this->currentModel) as $candidate) {
+                if (! in_array($candidate['name'], $tried, true)) {
+                    $keyInfo = $candidate;
+                    break;
+                }
+            }
+        }
         if ($keyInfo === null) {
             return false;
         }
@@ -913,6 +926,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
         $maxAttempts = count($this->getKeyManager()->getAllKeys());
         $attempts = 0;
+        $tried = [];
 
         while ($attempts < $maxAttempts) {
             // Get current available key (already set in synthesize, or get a new one)
@@ -953,14 +967,30 @@ class GeminiTtsProvider implements TtsProviderInterface
                 );
             }
 
-            // On 429, rotate to next key and retry
-            if ($response->status() === 429 && $attempts < $maxAttempts) {
+            // A key Google refuses (invalid, expired, blocked) is set aside for
+            // today on this model, and the request moves to the next key.
+            $badKey = GeminiKeyManager::isKeyProblem($response->status(), (string) $response->body());
+            if ($badKey) {
+                Log::error('Gemini key refused by Google; using the other keys.', [
+                    'key' => $keyInfo['name'],
+                    'status' => $response->status(),
+                    'body' => mb_substr($response->body(), 0, 300),
+                ]);
+                $this->getKeyManager()->markOutForToday(
+                    $keyInfo['name'],
+                    GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
+                );
+            }
+
+            // On 429 or a refused key, rotate to next key and retry
+            if (($response->status() === 429 || $badKey) && $attempts < $maxAttempts) {
                 Log::warning('Gemini TTS key hit 429, rotating to next key.', [
                     'key' => $keyInfo['name'],
                     'attempts' => $attempts,
                 ]);
 
-                if (!$this->rotateToNextKey()) {
+                $tried[] = $keyInfo['name'];
+                if (!$this->rotateToNextKey($tried)) {
                     break; // No more keys available
                 }
                 continue;
