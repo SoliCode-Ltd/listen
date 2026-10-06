@@ -354,11 +354,16 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringNotContainsString('class="perf-panel"', $html, 'the separate panel is gone');
         $settings = substr($html, strpos($html, 'data-vs-pane="settings"'));
         $settings = substr($settings, 0, strpos($settings, 'data-vs-pane="sounds"'));
-        foreach (['name="target_language"', 'name="voice_key"', 'name="performance_style"', 'name="emotion"', 'name="dialect"', 'name="speed"', 'name="pitch"', 'data-vs-dialects', 'id="translateToggle"'] as $field) {
-            $this->assertStringContainsString($field, $settings, $field.' is in the voice tab');
+        foreach (['name="target_language"', 'name="voice_key"', 'name="dialect"', 'data-vs-dialects', 'id="translateToggle"'] as $field) {
+            $this->assertStringContainsString($field, $settings, $field.' is in the language tab');
         }
-        // Style and emotion are no longer dropdowns: delivery tags replace them, the site defaults stay as hidden fields.
-        $this->assertMatchesRegularExpression('/class="vs-hidden-field" aria-hidden="true">\s*<select name="performance_style"/', $settings);
+        // Style, emotion, speed and pitch shape the reading: they open the delivery tab.
+        $delivery = substr($html, strpos($html, 'data-vs-pane="delivery"'));
+        $whole = substr($delivery, strpos($delivery, 'data-vs-whole'), 9000);
+        foreach (['name="performance_style"', 'name="emotion"', 'name="speed"', 'name="pitch"'] as $field) {
+            $this->assertStringNotContainsString($field, $settings, $field.' is not in the language tab');
+            $this->assertStringContainsString($field, $whole, $field.' is in the delivery tab');
+        }
         $this->assertStringNotContainsString('name="performance_style" id="performance_style" required', $html);
         // The editor and the generate button sit together in the main column.
         $main = substr($html, strpos($html, 'class="vs-main"'), 4000);
@@ -376,9 +381,13 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringContainsString('إعدادات اللغة', $html);
         $this->assertStringNotContainsString('إعدادات الأداء', $html);
         $this->assertStringContainsString('data-vs-country', $html);
+        // Each tag tab: a category list, then that category's tags.
+        $sounds = substr($html, strpos($html, 'data-vs-pane="sounds"'));
+        $this->assertMatchesRegularExpression('/<select id="vsCategory-sounds" data-vs-category>\s*<option value="laughter">ضحك \(5\)<\/option>/u', $sounds);
+        $this->assertStringContainsString('data-vs-group="laughter"', $sounds);
         $delivery = substr($html, strpos($html, 'data-vs-pane="delivery"'));
-        $this->assertStringContainsString('data-vs-choice="performance_style"', $delivery);
-        $this->assertStringContainsString('data-vs-choice="emotion"', $delivery);
+        $this->assertStringContainsString('id="vsCategory-delivery" data-vs-category', $delivery);
+        $this->assertStringContainsString('<option value="">افتراضي</option>', $delivery);
         // The choices show the Arabic names of the styles.
         $this->assertMatchesRegularExpression('/<option value="cinematic">[^<]*[\x{0600}-\x{06FF}]/u', $html);
 

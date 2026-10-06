@@ -542,3 +542,11 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
   .vs-search { margin: 1rem 1rem 0; }
   .vs-row-2 { gap: .8rem; }
 }
+
+/* ---------- Tag tabs: a category, then its tags ---------- */
+.vs-pane [hidden] { display: none !important; }
+.vs-category { margin-top: 1rem; }
+/* The category list names the group; headings return in search results. */
+.vs-pane:not(.is-searching) .vs-groups .vs-group-label { display: none; }
+.vs-chips { min-width: 0; }
+.vs-chip { max-width: 100%; }

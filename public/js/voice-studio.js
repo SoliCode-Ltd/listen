@@ -6,7 +6,7 @@
  *  - tags inserted at the cursor and highlighted inside the text box;
  *  - dialects: a country list, then that country's dialects as buttons,
  *    kept in step with the dialect select, which stays the form field;
- *  - whole-script style and emotion as buttons for their selects;
+ *  - tag tabs: a category list, then that category's tags;
  *  - every visible dropdown drawn as a styled list over its select.
  */
 (function () {
@@ -213,14 +213,30 @@
       panel.querySelectorAll('[data-vs-results-title]').forEach(function (h) { h.hidden = true; });
     }
 
+    // ---------- Categories: one group of tags at a time ----------
+    function showCategory(pane) {
+      var picker = pane.querySelector('[data-vs-category]');
+      if (!picker) return;
+      pane.querySelectorAll('.vs-groups [data-vs-group]').forEach(function (g) { g.hidden = g.dataset.vsGroup !== picker.value; });
+    }
+    panel.querySelectorAll('[data-vs-category]').forEach(function (picker) {
+      var pane = picker.closest('[data-vs-pane]');
+      picker.addEventListener('change', function () { showCategory(pane); });
+      showCategory(pane);
+    });
+
     // ---------- Search: one query, results from both tag tabs ----------
     function applySearch() {
       var q = fold(searchInput ? searchInput.value : '');
       var tagPanes = panel.querySelectorAll('[data-vs-pane="sounds"], [data-vs-pane="delivery"]');
+      tagPanes.forEach(function (pane) {
+        pane.classList.toggle('is-searching', !!q);
+        pane.querySelectorAll('[data-vs-whole], [data-vs-category-wrap], [data-vs-tag-hint]').forEach(function (el) { el.hidden = !!q; });
+      });
       if (!q) {
         tagPanes.forEach(function (pane) {
           pane.querySelectorAll('.vs-chip').forEach(function (c) { c.hidden = false; });
-          pane.querySelectorAll('[data-vs-group]').forEach(function (g) { g.hidden = false; });
+          showCategory(pane);
           var empty = pane.querySelector('.vs-empty');
           if (empty) empty.hidden = true;
         });
@@ -231,7 +247,7 @@
       var total = 0;
       tagPanes.forEach(function (pane) {
         var inPane = 0;
-        pane.querySelectorAll('[data-vs-group]').forEach(function (group) {
+        pane.querySelectorAll('.vs-groups [data-vs-group]').forEach(function (group) {
           var inGroup = 0;
           group.querySelectorAll('.vs-chip').forEach(function (chip) {
             var match = (chip.__vsKey || (chip.__vsKey = fold(chip.dataset.search || chip.textContent))).indexOf(q) !== -1;
@@ -427,47 +443,6 @@
       setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; onValue(); } }, 300);
       render();
     }
-
-    // ---------- Whole-script choices (performance style, emotion) as buttons ----------
-    panel.querySelectorAll('[data-vs-choice]').forEach(function (box) {
-      var field = form.querySelector('select[name="' + box.dataset.vsChoice + '"]');
-      var group = box.closest('[data-vs-group]');
-      if (!field) { if (group) group.hidden = true; return; }
-      var syncChoice = function () {
-        box.querySelectorAll('[data-choice]').forEach(function (b) {
-          b.setAttribute('aria-checked', b.dataset.choice === field.value ? 'true' : 'false');
-        });
-      };
-      var drawChoice = function () {
-        box.innerHTML = '';
-        Array.prototype.forEach.call(field.options, function (opt) {
-          if (!opt.textContent.trim()) return;
-          var b = document.createElement('button');
-          b.type = 'button';
-          b.className = 'vs-chip vs-chip-choice';
-          b.setAttribute('role', 'radio');
-          b.dataset.choice = opt.value;
-          b.dataset.search = opt.textContent;
-          b.textContent = opt.textContent;
-          b.disabled = field.disabled || opt.disabled;
-          b.addEventListener('click', function () {
-            field.value = opt.value;
-            field.dispatchEvent(new Event('change', { bubbles: true }));
-            syncChoice();
-          });
-          box.appendChild(b);
-        });
-        if (group) group.hidden = field.options.length === 0;
-        syncChoice();
-      };
-      if (window.MutationObserver) {
-        new MutationObserver(drawChoice).observe(field, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
-      }
-      field.addEventListener('change', syncChoice);
-      var lastChoice = field.value;
-      setInterval(function () { if (field.value !== lastChoice) { lastChoice = field.value; syncChoice(); } }, 300);
-      drawChoice();
-    });
 
     // A required setting left empty in a hidden tab: open it so the browser can point at it.
     if (form.addEventListener) {
