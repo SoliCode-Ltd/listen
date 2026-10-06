@@ -73,6 +73,8 @@ return [
         'endpoint' => env('GEMINI_TTS_ENDPOINT', 'https://generativelanguage.googleapis.com/v1beta'),
         'model' => env('GEMINI_TTS_MODEL', 'gemini-2.5-flash-preview-tts'),
         'api_key' => env('GEMINI_TTS_API_KEY', ''),
+        // Rewrite an Arabic script into the chosen dialect before a stock voice reads it.
+        'dialect_rewrite' => (bool) env('GEMINI_TTS_DIALECT_REWRITE', true),
         'timeout_seconds' => (int) env('GEMINI_TTS_TIMEOUT', 60),
         'verify_ssl' => env('GEMINI_TTS_VERIFY_SSL', true),
         'default_voice' => env('GEMINI_TTS_DEFAULT_VOICE', 'Kore'),

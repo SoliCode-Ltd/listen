@@ -3,17 +3,11 @@ name: Studio options check
 # Live check on STAGING that Gemini 3.8 follows the studio's accents,
 # dialects, emotions and styles: the exact style text this branch builds
 # (scripts/tts/studio_options_cases.json) is spoken, and a second Gemini
-# model names what it hears without being told the target. Uses about 45
-# Gemini requests. Uploads the audio.
+# model names what it hears without being told the target. Uploads the audio.
 
 on:
+  # Run by hand: it uses about 72 speech requests, most of a day's quota.
   workflow_dispatch:
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/studio-options-check.yml
-      - scripts/tts/studio_options_check.php
-      - scripts/tts/studio_options_cases.json
 
 permissions:
   contents: read
@@ -21,7 +15,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: Build the check script with the cases
@@ -67,7 +61,8 @@ jobs:
               if a:
                   open('audio/' + re.sub(r'[^A-Za-z0-9_-]+', '_', name) + '.wav', 'wb').write(base64.b64decode(a))
               h = c.get('heard', {})
-              print(f"{name} || heard: {h.get('accent_or_dialect')} ({h.get('confidence')}) | emotion: {h.get('emotion')} | style: {h.get('delivery_style')} | reads instructions: {h.get('reads_instructions_aloud')} | {c.get('error', '')}")
+              mark = 'OK ' if h.get('closest') == t.get('dialect') else ('2nd' if h.get('second') == t.get('dialect') else 'MISS')
+              print(f"{mark} {name} || picked {h.get('closest')} / {h.get('second')} ({h.get('confidence')}) | heard: {h.get('accent_or_dialect')} | why: {h.get('why')} | emotion: {h.get('emotion')} | style: {h.get('delivery_style')} | reads instructions: {h.get('reads_instructions_aloud')} | spoken: {c.get('spoken', '')} | {c.get('error', '')}")
           print('\nFULL')
           print(json.dumps(d['cases'], ensure_ascii=False, indent=1))
           PY

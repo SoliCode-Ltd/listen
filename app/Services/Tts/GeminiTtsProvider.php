@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
@@ -407,6 +408,12 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $text = $prepared['text'];
                 $voiceConfig['vocal_cues'] = $prepared['cues'];
             } else {
+                // A dialect lives in its words as much as its accent: the script is
+                // rewritten into the chosen Arabic variety first, as for cloned voices.
+                $dialect = trim((string) ($voiceConfig['dialect'] ?? ''));
+                if ($dialect !== '' && $this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
+                    $text = app(VoiceCloningService::class)->speakableText($text, $dialect);
+                }
                 $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
                 $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
             }
@@ -1152,6 +1159,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? ArabicDialects::prompt($dialect);
             if ($dialectName !== null) {
                 $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
+                $markers = ArabicDialects::markers($dialect);
+                if ($markers !== null) {
+                    $dialectInstruction .= "Dialect markers to make clearly audible: {$markers} ";
+                }
             } else {
                 $dialectInstruction = "Voice dialect/language variant: {$dialect}. Keep pronunciation consistent with this dialect setting. ";
             }
