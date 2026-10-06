@@ -47,8 +47,8 @@ class GeminiVocalTagsTest extends TestCase
         $prepared = GeminiVocalTags::prepare("[excited] We won! [sarcastic, dry] Great.\n<happy> يا سلام! <laugh>");
 
         $this->assertSame("We won! Great.\nيا سلام! <laugh>", $prepared['text']);
-        $this->assertSame(['excited', 'sarcastic, dry', 'happy'], $prepared['cues']);
-        $this->assertSame("Read warmly.\nDelivery cues from the script: excited, sarcastic, dry, happy.", GeminiVocalTags::withCues('Read warmly.', $prepared['cues']));
+        $this->assertSame(['excited and energetic', 'sarcastic, dry', 'happy and bright'], $prepared['cues']);
+        $this->assertSame("Read warmly.\nDelivery cues from the script: excited and energetic, sarcastic, dry, happy and bright.", GeminiVocalTags::withCues('Read warmly.', $prepared['cues']));
         $this->assertSame('Read warmly.', GeminiVocalTags::withCues(' Read warmly. ', []));
     }
 
@@ -86,7 +86,7 @@ class GeminiVocalTagsTest extends TestCase
 
         $part = $captured->bodies[0]['contents'][0]['parts'][0];
         $this->assertSame('We did it! <laugh> يا سلام.', $part['text']);
-        $this->assertStringContainsString('Delivery cues from the script: excited.', $part['speech_metadata']['style']);
+        $this->assertStringContainsString('Delivery cues from the script: excited and energetic.', $part['speech_metadata']['style']);
     }
 
     public function test_gemini_38_custom_prompt_keeps_the_cues_too(): void
@@ -102,7 +102,7 @@ class GeminiVocalTagsTest extends TestCase
 
         $part = $captured->bodies[0]['contents'][0]['parts'][0];
         $this->assertSame('Hello <gasp> there.', $part['text']);
-        $this->assertSame("Speak like a radio host.\nDelivery cues from the script: nervous.", $part['speech_metadata']['style']);
+        $this->assertSame("Speak like a radio host.\nDelivery cues from the script: nervous and hesitant.", $part['speech_metadata']['style']);
     }
 
     public function test_gemini_38_dialogue_keeps_tags_on_each_turn(): void
@@ -161,7 +161,7 @@ class GeminiVocalTagsTest extends TestCase
 
             return str_contains($request->url(), '/interactions')
                 && ($content['text'] ?? null) === 'Hi <laugh> there.'
-                && ($content['annotations'][0]['style'] ?? null) === "Calm and clear.\nDelivery cues from the script: excited.";
+                && ($content['annotations'][0]['style'] ?? null) === "Calm and clear.\nDelivery cues from the script: excited and energetic.";
         });
     }
 
@@ -199,6 +199,9 @@ class GeminiVocalTagsTest extends TestCase
             ->assertSee('id="vocalTags"', false)
             ->assertSee('data-vocal-tag="laugh"', false)
             ->assertSee('data-vocal-tag="short pause"', false)
+            ->assertSee('data-vocal-tag="excited"', false)
+            ->assertSee('data-tag-kind="delivery"', false)
+            ->assertSee('id="tagEditorBackdrop"', false)
             ->assertDontSee('&lt;laugh&gt;</button>', false)
             ->assertSee(__('ui.dashboard.vocal_tags'))
             ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0]);
@@ -226,7 +229,8 @@ class GeminiVocalTagsTest extends TestCase
             // Members never see other companies' names in the studio.
             $this->assertDoesNotMatchRegularExpression('/\b(?:eleven\w*|openai|gemini|google)\b/i', json_encode(__('ui.dashboard', [], $locale), JSON_UNESCAPED_UNICODE));
         }
-        $this->assertSame('المؤثرات الصوتية', __('ui.dashboard.vocal_tags', [], 'ar'));
+        $this->assertSame('وسوم الصوت', __('ui.dashboard.vocal_tags', [], 'ar'));
+        $this->assertSame('طريقة الأداء', __('ui.dashboard.vocal_tab_delivery', [], 'ar'));
     }
 
     public function test_arabic_tag_names_work_like_the_english_ones(): void
@@ -271,8 +275,61 @@ class GeminiVocalTagsTest extends TestCase
 
         $this->assertStringContainsString('data-vocal-tag="ضحكة"', $html);
         $this->assertStringContainsString('data-vocal-tag="وقفة قصيرة"', $html);
+        $this->assertStringContainsString('data-vocal-tag="متحمس"', $html);
         $this->assertStringNotContainsString('data-vocal-tag="laugh"', $html);
         $this->assertStringContainsString('المؤثرات الصوتية', $html);
+    }
+
+    public function test_delivery_tags_split_the_script_into_directed_parts(): void
+    {
+        $this->fakeGeminiKeys();
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $captured = $this->fakeAudio();
+
+        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم. [متحمس] فزنا بالمباراة! <ضحكة> [هادئ] والآن لنرتاح.', 'ar', [
+            'voice_name' => 'Kore',
+            'style_prompt' => 'Read clearly.',
+        ]);
+
+        $this->assertCount(3, $captured->bodies, 'one request per part');
+        $parts = array_map(fn ($b) => $b['contents'][0]['parts'][0], $captured->bodies);
+        $this->assertSame(['مرحبا بكم.', 'فزنا بالمباراة! <laugh>', 'والآن لنرتاح.'], array_column($parts, 'text'));
+        $this->assertSame('Read clearly.', $parts[0]['speech_metadata']['style']);
+        $this->assertSame("Read clearly.\nDelivery cues from the script: excited and energetic.", $parts[1]['speech_metadata']['style']);
+        $this->assertSame("Read clearly.\nDelivery cues from the script: calm and relaxed.", $parts[2]['speech_metadata']['style']);
+    }
+
+    public function test_every_delivery_tag_has_arabic_and_reads_back(): void
+    {
+        $this->assertCount(27, GeminiVocalTags::deliveries());
+        $this->assertSame(GeminiVocalTags::deliveries(), array_keys(GeminiVocalTags::DELIVERY_ARABIC));
+        foreach (GeminiVocalTags::DELIVERY_ARABIC as $tag => $name) {
+            $this->assertSame($tag, GeminiVocalTags::delivery($name), $name);
+            $this->assertSame($tag, GeminiVocalTags::delivery(strtoupper($tag)), $tag);
+            $this->assertNull(GeminiVocalTags::canonical($name), 'delivery names never clash with sounds: '.$name);
+        }
+        $this->assertSame('Hi [excited] there', GeminiVocalTags::forLegacyModel('Hi [متحمس] there'));
+        $this->assertSame('Hi there.', GoogleCloudTtsProvider::stripPerformanceMarkup('Hi [متحمس] there.'));
+        $this->assertSame('متحمس', GeminiVocalTags::deliveryLabel('excited', 'ar'));
+    }
+
+    public function test_cloned_voice_reads_each_delivery_part_with_its_direction(): void
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.api_key' => 'test-key', 'services.gemini_tts.voice_retry_pause' => false]);
+        Http::fake(fn () => Http::response(['output_audio' => ['data' => base64_encode($this->wavBytes())]]));
+
+        app(VoiceCloningService::class)->synthesizeWithClonedVoice('Hello. [sad] I lost it.', 'en-US', 'voice_x', 'Clear.');
+
+        $styles = [];
+        Http::assertSent(function ($request) use (&$styles): bool {
+            $content = $request->data()['input'][0]['content'][0] ?? [];
+            $styles[$content['text'] ?? ''] = $content['annotations'][0]['style'] ?? null;
+
+            return true;
+        });
+        $this->assertSame('Clear.', $styles['Hello.']);
+        $this->assertSame("Clear.\nDelivery cues from the script: sad and subdued.", $styles['I lost it.']);
     }
 
     private function memberOn(string $tier): User

@@ -79,6 +79,45 @@ class GeminiVocalTags
         'growl' => 'زمجرة', 'grunt' => 'همهمة', 'grr' => 'زمجرة خفيفة', 'hiss' => 'فحيح', 'argh' => 'تذمر',
     ];
 
+    /**
+     * Delivery tags, written in square brackets ([excited], [متحمس]). Each
+     * one sets how the voice performs from that point until the next one.
+     * The model has no inline tags for these, so the script is read in parts
+     * and each part gets its own direction.
+     *
+     * @var array<string, array<int, string>>
+     */
+    public const DELIVERY_GROUPS = [
+        'mood' => ['happy', 'excited', 'warm', 'calm', 'serious', 'sad', 'angry', 'nervous', 'scared', 'surprised', 'curious', 'sarcastic', 'playful', 'confident', 'tired'],
+        'pace' => ['slowly', 'quickly', 'softly', 'loudly', 'whispering'],
+        'style' => ['storytelling', 'newsreader', 'advertising', 'conversational', 'dramatic', 'motivational', 'documentary'],
+    ];
+
+    /** @var array<string, string> */
+    public const DELIVERY_ARABIC = [
+        'happy' => 'سعيد', 'excited' => 'متحمس', 'warm' => 'دافئ', 'calm' => 'هادئ', 'serious' => 'جاد', 'sad' => 'حزين',
+        'angry' => 'غاضب', 'nervous' => 'متوتر', 'scared' => 'خائف', 'surprised' => 'متفاجئ', 'curious' => 'فضولي',
+        'sarcastic' => 'ساخر', 'playful' => 'مرح', 'confident' => 'واثق', 'tired' => 'متعب',
+        'slowly' => 'ببطء', 'quickly' => 'بسرعة', 'softly' => 'بنعومة', 'loudly' => 'بصوت عالٍ', 'whispering' => 'هامس',
+        'storytelling' => 'راوي قصص', 'newsreader' => 'مذيع أخبار', 'advertising' => 'إعلاني', 'conversational' => 'حواري',
+        'dramatic' => 'درامي', 'motivational' => 'تحفيزي', 'documentary' => 'وثائقي',
+    ];
+
+    /** What each delivery tag asks of the voice. @var array<string, string> */
+    private const DELIVERY_DIRECTIONS = [
+        'happy' => 'happy and bright', 'excited' => 'excited and energetic', 'warm' => 'warm and friendly',
+        'calm' => 'calm and relaxed', 'serious' => 'serious and measured', 'sad' => 'sad and subdued',
+        'angry' => 'angry and intense', 'nervous' => 'nervous and hesitant', 'scared' => 'scared and tense',
+        'surprised' => 'surprised', 'curious' => 'curious and questioning', 'sarcastic' => 'sarcastic and dry',
+        'playful' => 'playful and light', 'confident' => 'confident and assured', 'tired' => 'tired and low-energy',
+        'slowly' => 'slowly, with a relaxed pace', 'quickly' => 'quickly, with a brisk pace', 'softly' => 'softly and gently',
+        'loudly' => 'loudly and projected', 'whispering' => 'in a whisper',
+        'storytelling' => 'like a storyteller, vivid and engaging', 'newsreader' => 'like a news anchor, clear and authoritative',
+        'advertising' => 'like an advert voiceover, upbeat and persuasive', 'conversational' => 'conversationally, natural and casual',
+        'dramatic' => 'dramatically, with tension', 'motivational' => 'like a motivational speaker, uplifting and strong',
+        'documentary' => 'like a documentary narrator, deep and steady',
+    ];
+
     /** Longest text a mood tag may hold, so ordinary bracketed text is left alone. */
     private const MAX_CUE_LENGTH = 40;
 
@@ -153,6 +192,86 @@ class GeminiVocalTags
     }
 
     /**
+     * Every delivery tag, in order.
+     *
+     * @return array<int, string>
+     */
+    public static function deliveries(): array
+    {
+        return array_merge(...array_values(self::DELIVERY_GROUPS));
+    }
+
+    /**
+     * The delivery tag for a written cue (English or Arabic), or null.
+     */
+    public static function delivery(string $cue): ?string
+    {
+        $key = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $cue)));
+        if (isset(self::DELIVERY_DIRECTIONS[$key])) {
+            return $key;
+        }
+        static $arabic = null;
+        if ($arabic === null) {
+            $arabic = [];
+            foreach (self::DELIVERY_ARABIC as $tag => $name) {
+                $arabic[self::plainArabic($name)] = $tag;
+            }
+        }
+
+        return $arabic[self::plainArabic($key)] ?? null;
+    }
+
+    /**
+     * What the editor shows and inserts for a delivery tag.
+     */
+    public static function deliveryLabel(string $tag, ?string $locale = null): string
+    {
+        $locale = strtolower((string) ($locale ?? app()->getLocale()));
+
+        return str_starts_with($locale, 'ar') ? (self::DELIVERY_ARABIC[$tag] ?? $tag) : $tag;
+    }
+
+    /**
+     * The script in parts, split at each delivery tag. Each part carries the
+     * directions for it: the delivery in force there and any mood written
+     * inside it. Sounds become <tag> as in prepare().
+     *
+     * @return array<int, array{text: string, cues: array<int, string>}>
+     */
+    public static function parts(string $text): array
+    {
+        $pieces = preg_split('/(\[[^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'}\])/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$text];
+        $parts = [];
+        $current = null;
+        $buffer = '';
+        $flush = function () use (&$parts, &$buffer, &$current): void {
+            $prepared = self::prepare($buffer);
+            if (trim(self::strip($prepared['text'])) !== '') {
+                $cues = $current !== null ? array_merge([$current], $prepared['cues']) : $prepared['cues'];
+                $parts[] = ['text' => $prepared['text'], 'cues' => array_values(array_unique($cues))];
+            }
+            $buffer = '';
+        };
+
+        foreach ($pieces as $piece) {
+            if (preg_match('/^\[([^\[\]\n]+)\]$/u', $piece, $m)) {
+                $inner = $m[1];
+                $tag = self::delivery($inner);
+                if ($tag !== null || (self::canonical($inner) === null && self::looksLikeCue($inner))) {
+                    $flush();
+                    $current = $tag !== null ? self::DELIVERY_DIRECTIONS[$tag] : mb_strtolower(trim($inner));
+
+                    continue;
+                }
+            }
+            $buffer .= $piece;
+        }
+        $flush();
+
+        return $parts;
+    }
+
+    /**
      * Ready a transcript for Gemini 3.8: sounds become <tag>, moods are
      * removed from the spoken text and returned as style cues.
      *
@@ -175,7 +294,8 @@ class GeminiVocalTags
                 if ($isParenthesis || ! self::looksLikeCue($inner)) {
                     return $m[0];
                 }
-                $cues[] = strtolower(trim($inner));
+                $delivery = self::delivery($inner);
+                $cues[] = $delivery !== null ? self::DELIVERY_DIRECTIONS[$delivery] : mb_strtolower(trim($inner));
 
                 return ' ';
             },
@@ -194,6 +314,12 @@ class GeminiVocalTags
      */
     public static function forLegacyModel(string $text): string
     {
+        $text = (string) preg_replace_callback(
+            '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]/u',
+            fn (array $m) => ($tag = self::delivery($m[1])) !== null ? '['.$tag.']' : $m[0],
+            $text,
+        );
+
         return (string) preg_replace_callback(
             '/<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>/u',
             fn (array $m) => ($tag = self::canonical($m[1])) !== null ? '['.$tag.']' : $m[0],

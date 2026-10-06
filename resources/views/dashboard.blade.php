@@ -1295,78 +1295,272 @@
       color: var(--muted);
 
     }
-    .vocal-tags {
-      margin-top: .5rem;
-      border: 1px solid var(--line, rgba(255,255,255,.12));
-      border-radius: 12px;
-      padding: .5rem .75rem;
-      background: color-mix(in oklab, var(--surface2, #1b1b24) 60%, transparent);
+    /* ---------- Text box with tag highlighting ---------- */
+    .tag-editor {
+      position: relative;
+      border-radius: .85rem;
+      background: color-mix(in oklab, var(--surface2) 40%, transparent);
     }
-    .vocal-tags > summary {
-      cursor: pointer;
-      font-weight: 700;
+    .tag-editor textarea {
+      position: relative;
+      z-index: 1;
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      background: transparent !important;
+      scrollbar-gutter: stable;
+    }
+    .tag-editor-backdrop {
+      position: absolute;
+      inset: 0;
+      z-index: 0;
+      box-sizing: border-box;
+      overflow: hidden;
+      scrollbar-gutter: stable;
+      padding: 1rem;
+      border: 1px solid transparent;
+      border-radius: .85rem;
+      font-family: var(--font-body);
       font-size: 1rem;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: .5rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      overflow-wrap: break-word;
+      word-break: normal;
+      color: transparent;
+      unicode-bidi: plaintext;
+      text-align: start;
     }
-    .vocal-tags > summary small {
-      font-weight: 400;
-      color: var(--muted);
-      font-size: .88rem;
+    html[lang="ar"] .tag-editor-backdrop { direction: rtl; text-align: right; }
+    .tag-editor-backdrop mark {
+      color: transparent;
+      border-radius: 6px;
+      box-shadow: 0 0 0 2px var(--mark-bg);
+      background: var(--mark-bg);
     }
-    .vocal-tag-groups {
-      display: grid;
-      gap: .45rem;
-      margin-top: .6rem;
+    .tag-editor-backdrop mark.t-sound { --mark-bg: color-mix(in oklab, var(--a) 20%, transparent); }
+    .tag-editor-backdrop mark.t-delivery { --mark-bg: color-mix(in oklab, #F2B544 26%, transparent); }
+
+    /* ---------- Tag panel ---------- */
+    .tag-studio {
+      --tag-sound: var(--a);
+      --tag-delivery: #E8A33D;
+      margin-top: .75rem;
+      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+      border-radius: 16px;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .04);
+      overflow: hidden;
     }
-    .vocal-tag-group {
+    .tag-studio-head {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: .35rem;
+      justify-content: space-between;
+      gap: .75rem 1rem;
+      padding: .9rem 1rem;
+      border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
     }
-    .vocal-tag-group-label {
-      min-width: 6rem;
-      font-size: .88rem;
-      font-weight: 600;
+    .tag-studio-title {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      min-width: 0;
+    }
+    .tag-studio-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      width: 34px;
+      height: 34px;
+      border-radius: 10px;
+      background: color-mix(in oklab, var(--a) 12%, transparent);
+      color: var(--a);
+    }
+    .tag-studio-title strong {
+      display: block;
+      font-size: .98rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .tag-studio-title small {
+      display: block;
+      margin-top: .1rem;
+      font-size: .82rem;
       color: var(--muted);
     }
-    .vocal-tag-chip {
-      border: 1px solid var(--line, rgba(255,255,255,.14));
-      background: var(--surface, transparent);
-      color: var(--text, inherit);
-      border-radius: 999px;
-      padding: .3rem .85rem;
+    .tag-studio-tools {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .6rem;
+    }
+    .tag-tabs {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      border-radius: 11px;
+      background: color-mix(in oklab, var(--surface2) 70%, var(--line) 10%);
+    }
+    .tag-tab {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      min-height: 32px;
+      padding: 0 .8rem;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--muted);
       font-family: inherit;
-      font-size: .9rem;
-      font-weight: 500;
-      line-height: 1.4;
-      cursor: pointer;
-      min-height: 36px;
-    }
-    .vocal-tag-chip:hover,
-    .vocal-tag-chip:focus-visible {
-      border-color: var(--a);
-      outline: none;
-    }
-    .vocal-tag-tips {
-      margin-top: .75rem;
-      font-size: .95rem;
-    }
-    .vocal-tag-tips summary {
-      cursor: pointer;
-      color: var(--text, inherit);
+      font-size: .86rem;
       font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
     }
-    .vocal-tag-tips ul {
-      margin: .4rem 0 0;
+    .tag-tab:hover { color: var(--text); }
+    .tag-tab[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
+    }
+    .tag-tab-count {
+      min-width: 1.4rem;
+      padding: 0 .35rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--line) 60%, transparent);
+      color: var(--muted);
+      font-size: .72rem;
+      font-weight: 600;
+      line-height: 1.35rem;
+      text-align: center;
+    }
+    .tag-kind {
+      display: inline-block;
+      flex: none;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .tag-kind-sounds { background: var(--tag-sound); }
+    .tag-kind-delivery { background: var(--tag-delivery); }
+    .tag-search {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      color: var(--muted);
+    }
+    .tag-search svg {
+      position: absolute;
+      inset-inline-start: .7rem;
+      pointer-events: none;
+    }
+    .tag-search input {
+      width: 190px;
+      min-height: 38px;
+      padding: 0 .8rem;
+      padding-inline-start: 2.1rem;
+      border-radius: 10px;
+      font-size: .88rem;
+    }
+    .tag-pane { padding: .4rem 1rem 1rem; }
+    .tag-pane-hint {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      margin: .5rem 0 .2rem;
+      font-size: .84rem;
+      color: var(--muted);
+    }
+    .tag-groups {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: .9rem 1.4rem;
+      margin-top: .6rem;
+    }
+    .tag-group-label {
+      margin-bottom: .45rem;
+      font-size: .74rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    html[lang="ar"] .tag-group-label { letter-spacing: 0; font-size: .84rem; }
+    .tag-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+    }
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      min-height: 34px;
+      padding: 0 .75rem;
+      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+      border-radius: 9px;
+      background: var(--surface);
+      color: var(--text);
+      font-family: inherit;
+      font-size: .88rem;
+      font-weight: 500;
+      line-height: 1.3;
+      cursor: pointer;
+      transition: border-color .15s ease, background-color .15s ease, transform .1s ease;
+    }
+    .tag-chip::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--chip-dot);
+      opacity: .85;
+    }
+    .tag-chip-sounds { --chip-dot: var(--tag-sound); }
+    .tag-chip-delivery { --chip-dot: var(--tag-delivery); }
+    .tag-chip:hover {
+      border-color: var(--chip-dot);
+      background: color-mix(in oklab, var(--chip-dot) 8%, var(--surface));
+    }
+    .tag-chip:active { transform: scale(.97); }
+    .tag-chip:focus-visible,
+    .tag-tab:focus-visible {
+      outline: 2px solid var(--a);
+      outline-offset: 2px;
+    }
+    .tag-chip.is-added {
+      border-color: var(--chip-dot);
+      background: color-mix(in oklab, var(--chip-dot) 16%, var(--surface));
+    }
+    .tag-empty {
+      margin: .8rem 0 .2rem;
+      font-size: .88rem;
+      color: var(--muted);
+    }
+    .tag-guide {
+      border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+      padding: .7rem 1rem;
+      font-size: .9rem;
+    }
+    .tag-guide summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .tag-guide ul {
+      margin: .6rem 0 .2rem;
       padding-inline-start: 1.1rem;
       display: grid;
-      gap: .45rem;
-      line-height: 1.85;
-      color: var(--text, inherit);
+      gap: .4rem;
+      line-height: 1.8;
+      color: var(--muted);
+    }
+    @media (max-width: 640px) {
+      .tag-studio-tools, .tag-tabs { width: 100%; }
+      .tag-tab { flex: 1; justify-content: center; padding: 0 .5rem; font-size: .82rem; }
+      .tag-search, .tag-search input { width: 100%; }
     }
     .char-counter.warning {
       color: var(--warning, #f59e0b);
@@ -2211,32 +2405,73 @@
 
           <div class="editor-panel">
             <label>{{ __('ui.dashboard.text_content') }}</label>
-            <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
+            <div class="tag-editor" id="tagEditor">
+              <div class="tag-editor-backdrop" id="tagEditorBackdrop" aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
+              <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
+            </div>
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
             </div>
             @if(($planTier ?? 'standard') === 'hd')
-            <details class="vocal-tags" id="vocalTags">
-              <summary>🎙️ {{ __('ui.dashboard.vocal_tags') }} <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small></summary>
-              <div class="vocal-tag-groups">
-                @foreach(\App\Support\GeminiVocalTags::GROUPS as $group => $groupTags)
-                  <div class="vocal-tag-group">
-                    <span class="vocal-tag-group-label">{{ __('ui.dashboard.vocal_tag_groups.'.$group) }}</span>
-                    @foreach($groupTags as $vocalTag)
-                      <button type="button" class="vocal-tag-chip" data-vocal-tag="{{ \App\Support\GeminiVocalTags::label($vocalTag) }}">{{ \App\Support\GeminiVocalTags::label($vocalTag) }}</button>
+            @php
+              $tagTabs = [
+                'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::label($t), 'groupKey' => 'vocal_tag_groups', 'count' => count(\App\Support\GeminiVocalTags::all())],
+                'delivery' => ['groups' => \App\Support\GeminiVocalTags::DELIVERY_GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::deliveryLabel($t), 'groupKey' => 'vocal_delivery_groups', 'count' => count(\App\Support\GeminiVocalTags::deliveries())],
+              ];
+            @endphp
+            <section class="tag-studio" id="vocalTags" aria-label="{{ __('ui.dashboard.vocal_tags') }}">
+              <header class="tag-studio-head">
+                <div class="tag-studio-title">
+                  <span class="tag-studio-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg></span>
+                  <div>
+                    <strong>{{ __('ui.dashboard.vocal_tags') }}</strong>
+                    <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small>
+                  </div>
+                </div>
+                <div class="tag-studio-tools">
+                  <div class="tag-tabs" role="tablist">
+                    @foreach($tagTabs as $tabKey => $tab)
+                      <button type="button" class="tag-tab" role="tab" id="tagTab-{{ $tabKey }}" aria-controls="tagPane-{{ $tabKey }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}" data-tag-tab="{{ $tabKey }}">
+                        <span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_'.$tabKey) }}<span class="tag-tab-count">{{ $tab['count'] }}</span>
+                      </button>
                     @endforeach
                   </div>
-                @endforeach
-              </div>
-              <details class="vocal-tag-tips">
-                <summary>💡 {{ __('ui.dashboard.vocal_tags_tips') }}</summary>
+                  <label class="tag-search">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+                    <input type="search" id="tagSearch" placeholder="{{ __('ui.dashboard.vocal_search') }}" autocomplete="off" aria-label="{{ __('ui.dashboard.vocal_search') }}">
+                  </label>
+                </div>
+              </header>
+              @foreach($tagTabs as $tabKey => $tab)
+                <div class="tag-pane" role="tabpanel" id="tagPane-{{ $tabKey }}" aria-labelledby="tagTab-{{ $tabKey }}" data-tag-pane="{{ $tabKey }}" @unless($loop->first) hidden @endunless>
+                  <p class="tag-pane-hint"><span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
+                  <div class="tag-groups">
+                    @foreach($tab['groups'] as $group => $groupTags)
+                      <div class="tag-group" data-tag-group>
+                        <div class="tag-group-label">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }}</div>
+                        <div class="tag-chips">
+                          @foreach($groupTags as $vocalTag)
+                            @php
+                              $tagLabel = ($tab['label'])($vocalTag);
+                            @endphp
+                            <button type="button" class="tag-chip tag-chip-{{ $tabKey }}" data-vocal-tag="{{ $tagLabel }}" data-tag-kind="{{ $tabKey }}" data-search="{{ mb_strtolower($tagLabel.' '.$vocalTag) }}" title="{{ $tabKey === 'sounds' ? '<'.$tagLabel.'>' : '['.$tagLabel.']' }}">{{ $tagLabel }}</button>
+                          @endforeach
+                        </div>
+                      </div>
+                    @endforeach
+                  </div>
+                  <p class="tag-empty" hidden>{{ __('ui.dashboard.vocal_no_results') }}</p>
+                </div>
+              @endforeach
+              <details class="tag-guide">
+                <summary>{{ __('ui.dashboard.vocal_tags_tips') }}</summary>
                 <ul>
                   @foreach(__('ui.dashboard.vocal_tags_tip_items') as $tip)
                     <li>{{ $tip }}</li>
                   @endforeach
                 </ul>
               </details>
-            </details>
+            </section>
             @endif
           </div>
 
@@ -3978,23 +4213,72 @@
     }
     if (contentInput) {
       contentInput.addEventListener('input', updateCharCounter);
-      // Sound tags: insert <tag> at the cursor, with spaces around it.
+      // Tags: insert at the cursor (sounds as <tag>, delivery as [tag]), with spaces around it.
       document.querySelectorAll('[data-vocal-tag]').forEach((chip) => {
         chip.addEventListener('click', () => {
-          const tag = '<' + chip.dataset.vocalTag + '>';
+          const isDelivery = chip.dataset.tagKind === 'delivery';
+          const tag = isDelivery ? '[' + chip.dataset.vocalTag + ']' : '<' + chip.dataset.vocalTag + '>';
           const value = contentInput.value;
           const start = contentInput.selectionStart ?? value.length;
           const end = contentInput.selectionEnd ?? start;
           const before = value.slice(0, start);
           const after = value.slice(end);
-          const insert = (before && !/\s$/.test(before) ? ' ' : '') + tag + (after && !/^\s/.test(after) ? ' ' : '');
+          const insert = (before && !/\s$/.test(before) ? ' ' : '') + tag + (after && !/^\s/.test(after) ? ' ' : (isDelivery && !after ? ' ' : ''));
           contentInput.value = before + insert + after;
           const caret = before.length + insert.length;
           contentInput.focus();
           contentInput.setSelectionRange(caret, caret);
           contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+          chip.classList.add('is-added');
+          setTimeout(() => chip.classList.remove('is-added'), 450);
         });
       });
+
+      // Tabs and search in the tag panel.
+      const tagSearch = document.getElementById('tagSearch');
+      const tagTabs = document.querySelectorAll('[data-tag-tab]');
+      const filterTags = () => {
+        const q = (tagSearch?.value || '').trim().toLowerCase();
+        document.querySelectorAll('[data-tag-pane]').forEach((pane) => {
+          let shown = 0;
+          pane.querySelectorAll('[data-tag-group]').forEach((group) => {
+            let inGroup = 0;
+            group.querySelectorAll('.tag-chip').forEach((chip) => {
+              const match = !q || chip.dataset.search.includes(q);
+              chip.hidden = !match;
+              if (match) inGroup++;
+            });
+            group.hidden = inGroup === 0;
+            shown += inGroup;
+          });
+          const empty = pane.querySelector('.tag-empty');
+          if (empty) empty.hidden = shown > 0;
+        });
+      };
+      tagTabs.forEach((tab) => {
+        tab.addEventListener('click', () => {
+          tagTabs.forEach((t) => t.setAttribute('aria-selected', t === tab ? 'true' : 'false'));
+          document.querySelectorAll('[data-tag-pane]').forEach((pane) => { pane.hidden = pane.dataset.tagPane !== tab.dataset.tagTab; });
+        });
+      });
+      tagSearch?.addEventListener('input', filterTags);
+
+      // Colour the tags inside the text box: a backdrop with the same text sits behind it.
+      const tagBackdrop = document.getElementById('tagEditorBackdrop');
+      if (tagBackdrop && document.getElementById('vocalTags')) {
+        const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const paintTags = () => {
+          const html = esc(contentInput.value)
+            .replace(/&lt;([^&\n]{1,40}?)&gt;/g, '<mark class="t-sound">&lt;$1&gt;</mark>')
+            .replace(/\[([^\[\]\n]{1,40})\]/g, '<mark class="t-delivery">[$1]</mark>');
+          tagBackdrop.innerHTML = html + '\n ';
+          tagBackdrop.scrollTop = contentInput.scrollTop;
+        };
+        contentInput.addEventListener('input', paintTags);
+        contentInput.addEventListener('scroll', () => { tagBackdrop.scrollTop = contentInput.scrollTop; });
+        new ResizeObserver(paintTags).observe(contentInput);
+        paintTags();
+      }
       updateCharCounter(); // initial count for old('content')
     }
     if (dashboardNavLinks.length) {
