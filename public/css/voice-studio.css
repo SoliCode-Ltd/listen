@@ -10,7 +10,7 @@
   --vs-delivery: #E8A33D;
   --vs-voice: #3DB8A8;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
   align-items: start;
   gap: 1.25rem;
 }
@@ -20,17 +20,14 @@
   gap: 1rem;
   min-width: 0;
 }
-.vs-side {
-  position: sticky;
-  top: 84px;
-  min-width: 0;
-  max-height: calc(100vh - 100px);
-  overflow: auto;
-  scrollbar-width: thin;
-}
+/* The panel runs its full height with the page: no inner scroll box. */
+.vs-side { min-width: 0; }
 @media (max-width: 1180px) {
   .vs-layout { grid-template-columns: minmax(0, 1fr); }
-  .vs-side { position: static; max-height: none; overflow: visible; }
+}
+@media (min-width: 1181px) {
+  /* Side by side: a writing area as tall as the studio's language tab. */
+  .vs-layout .tag-editor textarea { min-height: 470px; }
 }
 
 /* ---------- Editor ---------- */
@@ -361,15 +358,6 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   background: var(--a, #6A45F2);
   color: #fff;
 }
-.vs-dialect-current {
-  padding: .05rem .55rem;
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--a, #6A45F2) 12%, transparent);
-  color: var(--a, #6A45F2);
-  font-size: .8rem;
-  font-weight: 600;
-}
-.vs-dialect-current:empty { display: none; }
 .vs-dialects { display: grid; gap: .8rem; margin-top: .7rem; }
 .vs-dialects[hidden], .vs-country[hidden] { display: none; }
 .vs-sub-label {

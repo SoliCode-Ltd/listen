@@ -627,8 +627,8 @@
     }
     .dashboard-layout {
       display: grid;
-      grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
-      gap: 2.75rem;
+      grid-template-columns: 200px minmax(0, 1fr);
+      gap: 1.75rem;
       align-items: start;
     }
     .dashboard-content {
