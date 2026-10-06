@@ -23,7 +23,40 @@
       if (label) btn.setAttribute('aria-label', label);
     }
   }
+  // Script text that lights up word by word ([data-nt-words]): each word is
+  // wrapped once, with its position in the text, so progress can mark it spoken.
+  function wordify(el) {
+    if (!el || el.getAttribute('data-nt-wordified') === el.textContent) return;
+    var text = el.textContent;
+    var total = text.replace(/\s+/g, '').length || 1;
+    var seen = 0;
+    el.textContent = '';
+    text.split(/(\s+)/).forEach(function (part) {
+      if (!part) return;
+      if (/^\s+$/.test(part)) { el.appendChild(document.createTextNode(part)); return; }
+      var span = document.createElement('span');
+      span.className = 'w';
+      span.textContent = part;
+      seen += part.length;
+      span.setAttribute('data-end', String(seen / total));
+      el.appendChild(span);
+    });
+    el.setAttribute('data-nt-wordified', el.textContent);
+  }
+  function paintWords(track, ratio) {
+    var card = track ? track.closest('[data-nt-try]') : null;
+    var el = card ? card.querySelector('[data-nt-words]') : null;
+    if (!el) return;
+    wordify(el);
+    el.classList.toggle('is-reading', ratio > 0 && ratio < 1);
+    var words = el.querySelectorAll('.w');
+    for (var i = 0; i < words.length; i++) {
+      // A word counts as spoken a little before its last letter, so it lights as it is heard.
+      words[i].classList.toggle('is-spoken', parseFloat(words[i].getAttribute('data-end')) <= ratio + 0.02);
+    }
+  }
   function paintWave(track, ratio) {
+    paintWords(track, ratio);
     var wave = track ? track.querySelector('.nt-wave') : null;
     // Waves with a fill layer sweep smoothly instead of lighting bar by bar.
     if (wave) wave.style.setProperty('--nt-progress', String(Math.max(0, Math.min(1, ratio))));
@@ -81,7 +114,7 @@
       card.querySelectorAll('[data-nt-chip]').forEach(function (c) { c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); });
       var text = card.querySelector('[data-nt-try-text]');
       var voice = card.querySelector('[data-nt-try-voice]');
-      if (text) text.textContent = chip.getAttribute('data-text') || '';
+      if (text) { text.textContent = chip.getAttribute('data-text') || ''; text.classList.remove('is-reading'); }
       if (voice) voice.textContent = chip.getAttribute('data-voice') || '';
       var wasPlaying = current === track && !audio.paused;
       if (current === track) { audio.pause(); stop(); }

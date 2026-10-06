@@ -5,12 +5,12 @@
   $authSampleArabic = str_starts_with(strtolower(app()->getLocale()), 'ar');
   $authFirst = $authSamples[0] ?? null;
   $authFreeChars = $authMode === 'register' ? \App\Support\NewDesignSamples::freePlanChars() : null;
-  // Smooth, speech-like envelope for the waveform bars (4px to 30px).
+  // Smooth, speech-like envelope for the waveform bars (6px to 32px).
   $authWave = [];
-  for ($i = 0; $i < 46; $i++) {
-    $envelope = 0.35 + 0.65 * abs(sin($i / 46 * M_PI * 1.6 + 0.4));
+  for ($i = 0; $i < 56; $i++) {
+    $envelope = 0.35 + 0.65 * abs(sin($i / 56 * M_PI * 1.6 + 0.4));
     $detail = 0.55 + 0.45 * abs(sin($i * 1.13) * cos($i * 0.37));
-    $authWave[] = (int) round(4 + 26 * $envelope * $detail);
+    $authWave[] = (int) round(6 + 26 * $envelope * $detail);
   }
 @endphp
 <aside class="auth-showcase" aria-label="{{ __('design.auth.sample_label') }}">
@@ -31,38 +31,35 @@
 
     @if($authFirst)
       <div class="auth-player" data-nt-try>
-        <div class="auth-player-top">
-          <span class="auth-player-avatar" aria-hidden="true">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg>
-          </span>
-          <span class="auth-player-meta">
-            <span class="auth-player-title">{{ __('design.auth.sample_label') }}</span>
-            <span class="auth-player-voice" data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
-          </span>
-        </div>
-        <p class="auth-player-text" dir="{{ $authSampleArabic ? 'rtl' : 'ltr' }}" lang="{{ $authSampleArabic ? 'ar' : 'en' }}" data-nt-try-text>{{ \Illuminate\Support\Str::limit($authFirst['text'], 120) }}</p>
+        @if(count($authSamples) > 1)
+          <div class="auth-tabs" role="radiogroup" aria-label="{{ $authSampleArabic ? __('design.home.try_dialect') : __('design.auth.sample_label') }}">
+            @foreach($authSamples as $i => $sample)
+              <button type="button" class="auth-tab" role="radio" aria-checked="{{ $i === 0 ? 'true' : 'false' }}"
+                data-nt-chip
+                data-src="{{ $sample['audio_url'] }}"
+                data-text="{{ \Illuminate\Support\Str::limit($sample['text'], 240) }}"
+                data-voice="{{ \App\Support\NewDesignSamples::dialectLabel($sample['dialect']) }}">{{ \App\Support\NewDesignSamples::dialectLabel($sample['dialect']) }}</button>
+            @endforeach
+          </div>
+        @endif
+        <p class="auth-player-text" dir="{{ $authSampleArabic ? 'rtl' : 'ltr' }}" lang="{{ $authSampleArabic ? 'ar' : 'en' }}" data-nt-try-text data-nt-words>{{ \Illuminate\Support\Str::limit($authFirst['text'], 240) }}</p>
         <div class="auth-player-bar" data-nt-track data-src="{{ $authFirst['audio_url'] }}">
           <button type="button" class="auth-play" data-nt-play aria-label="{{ __('design.home.play') }}" data-label-play="{{ __('design.home.play') }}" data-label-pause="{{ __('design.home.pause') }}">
-            <svg class="auth-icon-play" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
-            <svg class="auth-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+            <svg class="auth-icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></svg>
+            <svg class="auth-icon-pause" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
           </button>
           <div class="nt-wave auth-wave" aria-hidden="true">
             <div class="auth-wave-bars">@foreach($authWave as $h)<i style="height: {{ $h }}px"></i>@endforeach</div>
             <div class="auth-wave-bars auth-wave-fill">@foreach($authWave as $h)<i style="height: {{ $h }}px"></i>@endforeach</div>
           </div>
-          <span class="auth-time" data-nt-time>0:00</span>
+          <span class="auth-time" dir="ltr" data-nt-time>0:00</span>
         </div>
-        @if(count($authSamples) > 1)
-          <div class="auth-chips" role="radiogroup" aria-label="{{ $authSampleArabic ? __('design.home.try_dialect') : __('design.auth.sample_label') }}">
-            @foreach($authSamples as $i => $sample)
-              <button type="button" class="auth-chip" role="radio" aria-checked="{{ $i === 0 ? 'true' : 'false' }}"
-                data-nt-chip
-                data-src="{{ $sample['audio_url'] }}"
-                data-text="{{ \Illuminate\Support\Str::limit($sample['text'], 120) }}"
-                data-voice="{{ \App\Support\NewDesignSamples::dialectLabel($sample['dialect']) }}">{{ \App\Support\NewDesignSamples::dialectLabel($sample['dialect']) }}</button>
-            @endforeach
-          </div>
-        @endif
+        <div class="auth-player-foot">
+          <span class="auth-player-dot" aria-hidden="true"></span>
+          <span data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
+          <span class="auth-player-sep" aria-hidden="true">·</span>
+          <span>{{ __('design.auth.sample_label') }}</span>
+        </div>
       </div>
     @endif
 

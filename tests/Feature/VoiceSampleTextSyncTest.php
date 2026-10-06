@@ -88,6 +88,20 @@ class VoiceSampleTextSyncTest extends TestCase
         $this->assertStringContainsString("setProperty('--nt-progress'", $html);
     }
 
+    public function test_sign_in_player_has_voice_tabs_and_a_word_by_word_script(): void
+    {
+        $this->sample('en', 'en-US', 'Welcome. Turn your words into natural voice.', 'a.mp3');
+        $this->sample('en', 'en-GB', 'For over a century, Ellsworth has curated timeless elegance.', 'b.mp3');
+
+        $html = $this->getLocalizedRoute('login')->assertOk()->getContent();
+
+        $this->assertSame(2, substr_count($html, 'class="auth-tab"'));
+        $this->assertStringContainsString('data-nt-words', $html);
+        $this->assertStringContainsString('Welcome. Turn your words into natural voice.', $html);
+        $this->assertStringContainsString('dir="ltr" data-nt-time', $html);
+        $this->assertStringContainsString('function wordify', $html);
+    }
+
     private function sample(string $language, string $dialect, string $text, string $file, ?string $textAr = null): VoiceSample
     {
         Storage::disk('public')->put('samples/'.$file, 'ID3'.$file);
