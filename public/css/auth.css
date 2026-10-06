@@ -440,16 +440,18 @@ html body.auth-split-body .auth-showcase {
   border-radius: 0;
   overflow: hidden;
   color: #FFFFFF;
+  /* Deep indigo with a soft accent glow, quieter than the flat brand violet. */
   background:
-    radial-gradient(80% 60% at 15% 0%, rgba(169, 156, 255, .45), transparent 65%),
-    radial-gradient(70% 60% at 100% 100%, rgba(11, 11, 15, .55), transparent 70%),
-    linear-gradient(155deg, #7659FA 0%, #5B3DF5 45%, #4C2DEB 75%, #3A20C4 100%);
+    radial-gradient(70% 55% at 10% 0%, rgba(118, 89, 250, .30), transparent 70%),
+    radial-gradient(60% 50% at 100% 100%, rgba(91, 61, 245, .16), transparent 70%),
+    linear-gradient(160deg, #1D1838 0%, #161230 45%, #100D22 100%);
+  border-inline-start: 1px solid rgba(255, 255, 255, .06);
 }
 html body.auth-split-body .auth-showcase::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, .16) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(255, 255, 255, .07) 1px, transparent 1px);
   background-size: 22px 22px;
   -webkit-mask-image: linear-gradient(180deg, rgba(0, 0, 0, .8), transparent 70%);
   mask-image: linear-gradient(180deg, rgba(0, 0, 0, .8), transparent 70%);
@@ -484,7 +486,7 @@ html body.auth-split-body .auth-subline {
   max-width: 470px;
   font-size: 17px;
   line-height: 1.6;
-  color: rgba(255, 255, 255, .80);
+  color: rgba(255, 255, 255, .68);
 }
 html body.auth-split-body .auth-perks {
   list-style: none;
@@ -506,7 +508,7 @@ html body.auth-split-body .auth-perks li::before {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, .16) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / 12px no-repeat;
+  background: rgba(118, 89, 250, .28) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23FFFFFF' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5 9-10'/%3E%3C/svg%3E") center / 12px no-repeat;
 }
 
 
@@ -519,7 +521,7 @@ html body.auth-split-body .auth-player {
   border: 1px solid var(--au-line);
   background: var(--au-surface);
   color: var(--au-text);
-  box-shadow: 0 24px 48px -12px rgba(20, 8, 80, .45);
+  box-shadow: 0 24px 48px -16px rgba(0, 0, 0, .55);
 }
 html body.auth-split-body .auth-player-top {
   display: flex;
@@ -610,26 +612,39 @@ html[dir="rtl"] body.auth-split-body .auth-play .auth-icon-play {
   transform: scaleX(-1);
 }
 html body.auth-split-body .auth-wave {
+  --nt-progress: 0;
+  position: relative;
   flex: 1;
   min-width: 0;
+  height: 34px;
+  overflow: hidden;
+}
+html body.auth-split-body .auth-wave-bars {
+  position: absolute;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 2px;
-  height: 34px;
-  overflow: hidden;
 }
-html body.auth-split-body .auth-wave span {
+html body.auth-split-body .auth-wave-bars i {
   flex: 0 1 3px;
   min-width: 2px;
   border-radius: 3px;
   background: var(--au-line);
-  transition: background-color .12s ease;
 }
-html[data-theme="light"] body.auth-split-body .auth-wave span {
+html[data-theme="light"] body.auth-split-body .auth-wave-bars i {
   background: #D7DAE6;
 }
-html body.auth-split-body .auth-wave span.is-lit {
+/* The played part: the same bars in the accent colour, revealed smoothly. */
+html body.auth-split-body .auth-wave-fill {
+  clip-path: inset(0 calc((1 - var(--nt-progress)) * 100%) 0 0);
+}
+html[dir="rtl"] body.auth-split-body .auth-wave-fill {
+  clip-path: inset(0 0 0 calc((1 - var(--nt-progress)) * 100%));
+}
+html body.auth-split-body .auth-wave-fill i,
+html[data-theme="light"] body.auth-split-body .auth-wave-fill i {
   background: var(--au-accent);
 }
 html body.auth-split-body .auth-time {
