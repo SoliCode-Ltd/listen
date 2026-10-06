@@ -376,7 +376,7 @@ class GeminiVocalTagsTest extends TestCase
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(22, $codes);
+        $this->assertCount(41, $codes);
         foreach (['ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
