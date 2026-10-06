@@ -118,6 +118,32 @@ class GeminiVocalTags
         'documentary' => 'like a documentary narrator, deep and steady',
     ];
 
+    /**
+     * Other Arabic ways members write the sounds (verbs, short forms).
+     *
+     * @var array<string, string>
+     */
+    private const ARABIC_ALIASES = [
+        'ضحك' => 'laugh', 'يضحك' => 'laugh', 'تضحك' => 'laugh', 'ضحكات' => 'laugh',
+        'ضحكة عالية' => 'cackle', 'ضحكة صغيرة' => 'chuckle', 'ابتسامة' => 'chuckle',
+        'تنهد' => 'sigh', 'يتنهد' => 'sigh', 'تتنهد' => 'sigh', 'تنهيد' => 'sigh',
+        'شهيق' => 'gasp', 'يشهق' => 'gasp', 'تشهق' => 'gasp',
+        'تنفس' => 'breath', 'يتنفس' => 'breath', 'تتنفس' => 'breath', 'نفس عميق' => 'heavy breath',
+        'زفرة' => 'exhales', 'يزفر' => 'exhales',
+        'يلهث' => 'pant', 'تلهث' => 'pant',
+        'وقفة' => 'short pause', 'سكتة' => 'short pause', 'توقف' => 'short pause', 'سكوت' => 'short pause',
+        'صمت' => 'long pause', 'سكتة طويلة' => 'long pause', 'توقف طويل' => 'long pause',
+        'همسة' => 'whispers', 'يهمس' => 'whispers', 'تهمس' => 'whispers', 'بهمس' => 'whispers',
+        'صراخ' => 'scream', 'يصرخ' => 'scream', 'تصرخ' => 'scream',
+        'زعيق' => 'shout', 'يزعق' => 'shout', 'تزعق' => 'shout', 'يصيح' => 'shout', 'تصيح' => 'shout',
+        'سعلة' => 'cough', 'كحة' => 'cough', 'يكح' => 'cough', 'تكح' => 'cough', 'يسعل' => 'cough',
+        'عطس' => 'sneeze', 'يعطس' => 'sneeze', 'تعطس' => 'sneeze',
+        'يتثاءب' => 'yawn', 'تتثاءب' => 'yawn',
+        'بكى' => 'cry', 'يبكي' => 'cry', 'تبكي' => 'cry', 'عياط' => 'cry', 'يعيط' => 'cry', 'تعيط' => 'cry',
+        'ينتحب' => 'sob', 'أنين' => 'whimper', 'يئن' => 'whimper', 'آه' => 'groan', 'يتأوه' => 'groan',
+        'هتاف' => 'cheer', 'يهتف' => 'cheer', 'تصفيق' => 'cheer',
+    ];
+
     /** Longest text a mood tag may hold, so ordinary bracketed text is left alone. */
     private const MAX_CUE_LENGTH = 40;
 
@@ -152,7 +178,7 @@ class GeminiVocalTags
      */
     public static function allSpellings(): array
     {
-        return array_merge(self::all(), array_values(self::ARABIC_NAMES));
+        return array_merge(self::all(), array_values(self::ARABIC_NAMES), array_keys(self::ARABIC_ALIASES), array_keys(self::ALIASES));
     }
 
     /**
@@ -173,6 +199,9 @@ class GeminiVocalTags
         static $index = null;
         if ($index === null) {
             $index = [];
+            foreach (self::ARABIC_ALIASES as $name => $tag) {
+                $index[self::plainArabic($name)] = $tag;
+            }
             foreach (self::ARABIC_NAMES as $tag => $name) {
                 $index[self::plainArabic($name)] = $tag;
             }
@@ -218,6 +247,10 @@ class GeminiVocalTags
             }
         }
 
+        if (in_array(self::plainArabic($key), ['همس', 'هامسا', 'بهمس', 'whisper', 'whispers'], true)) {
+            return 'whispering';
+        }
+
         return $arabic[self::plainArabic($key)] ?? null;
     }
 
@@ -238,8 +271,51 @@ class GeminiVocalTags
      *
      * @return array<int, array{text: string, cues: array<int, string>}>
      */
+    /**
+     * Bring the ways members write tags to the two forms parts() reads:
+     *  - <همس> words </همس>: the words are whispered (a delivery span);
+     *    any delivery or mood can be used this way;
+     *  - a closing tag after a sound (<نفس> … </نفس>) is dropped;
+     *  - a direction in angle brackets that is not a sound (<تقليد صوت سيدة>)
+     *    works like one in square brackets.
+     */
+    public static function normalizeMarkup(string $text): string
+    {
+        $text = str_replace("\r\n", "\n", $text);
+        $name = '[^<>\/\n]{1,'.self::MAX_CUE_LENGTH.'}';
+        $text = (string) preg_replace_callback(
+            '/<\s*('.$name.')\s*>(.*?)<\s*\/\s*\1\s*>/su',
+            function (array $m): string {
+                $inner = trim($m[1]);
+                $sound = self::canonical($inner);
+                if ($sound !== null && $sound !== 'whispers') {
+                    return '<'.$inner.'>'.$m[2];
+                }
+                if ($sound === 'whispers' || self::delivery($inner) !== null || self::looksLikeCue($inner)) {
+                    return '['.($sound === 'whispers' ? 'whispering' : $inner).']'.$m[2].' [/] ';
+                }
+
+                return $m[0];
+            },
+            $text,
+        );
+        // Closing tags left over: never spoken.
+        $text = (string) preg_replace_callback('/<\s*\/\s*('.$name.')\s*>/u', function (array $m): string {
+            $inner = trim($m[1]);
+
+            return self::canonical($inner) !== null || self::delivery($inner) !== null || self::looksLikeCue($inner) ? ' ' : $m[0];
+        }, $text);
+        // Angle-bracket directions that are not sounds act from that point on.
+        $text = (string) preg_replace_callback('/<([^<>\s\/](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>/u', function (array $m): string {
+            return self::canonical($m[1]) === null && self::looksLikeCue($m[1]) ? '['.$m[1].']' : $m[0];
+        }, $text);
+
+        return $text;
+    }
+
     public static function parts(string $text): array
     {
+        $text = self::normalizeMarkup($text);
         $pieces = preg_split('/(\[[^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'}\])/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$text];
         $parts = [];
         $current = null;
@@ -256,6 +332,13 @@ class GeminiVocalTags
         foreach ($pieces as $piece) {
             if (preg_match('/^\[([^\[\]\n]+)\]$/u', $piece, $m)) {
                 $inner = $m[1];
+                if (trim($inner) === '/') {
+                    // End of a <tag> … </tag> span: back to the script's own delivery.
+                    $flush();
+                    $current = null;
+
+                    continue;
+                }
                 $tag = self::delivery($inner);
                 if ($tag !== null || (self::canonical($inner) === null && self::looksLikeCue($inner))) {
                     $flush();
@@ -340,6 +423,85 @@ class GeminiVocalTags
     }
 
     /**
+     * What each sound should be, for the perform instruction.
+     *
+     * @var array<string, string>
+     */
+    private const SOUND_DIRECTIONS = [
+        'laugh' => 'real, audible laughter (ha ha ha)',
+        'chuckle' => 'a short, soft laugh',
+        'giggle' => 'a light, playful giggle',
+        'cackle' => 'a loud, wild cackle of laughter',
+        'snicker' => 'a sly, half-suppressed laugh',
+        'sigh' => 'a long, audible sigh',
+        'gasp' => 'a sharp, audible gasp of surprise',
+        'breath' => 'an audible breath in',
+        'heavy breath' => 'heavy, audible breathing',
+        'exhales' => 'a long, audible breath out',
+        'pant' => 'fast, out-of-breath panting',
+        'phew' => 'a relieved "phew"',
+        'shout' => 'a loud shout',
+        'scream' => 'a real, loud scream',
+        'shriek' => 'a sharp, high shriek',
+        'cheer' => 'a happy cheer',
+        'cough' => 'a real cough',
+        'sneeze' => 'a real sneeze',
+        'throat-clearing' => 'clearing the throat',
+        'yawn' => 'a real, audible yawn',
+        'snort' => 'a short snort',
+        'tsk' => 'a disapproving "tsk" click',
+        'pff' => 'a dismissive "pff" puff of air',
+        'cry' => 'real crying',
+        'sob' => 'real sobbing',
+        'whimper' => 'a soft whimper',
+        'groan' => 'a long groan',
+        'moan' => 'a low moan',
+        'growl' => 'an angry growl',
+        'grunt' => 'a short grunt',
+        'grr' => 'an angry "grr"',
+        'hiss' => 'a sharp hiss',
+        'argh' => 'a frustrated "argh"',
+    ];
+
+    /**
+     * Ready one request so its sound tags are performed, not skipped: each
+     * sound gets its own beat in the text, and the style says what every
+     * sound in it is. Listening tests on Arabic scripts: a scream was heard
+     * 0 times in 4 without this, 3 in 4 with it.
+     *
+     * @return array{text: string, style: string}
+     */
+    public static function forPerformance(string $text, string $style): array
+    {
+        $found = [];
+        if (preg_match_all('/<([^<>\n]{1,'.self::MAX_CUE_LENGTH.'})>/u', $text, $m)) {
+            foreach ($m[1] as $tag) {
+                if (isset(self::SOUND_DIRECTIONS[$tag])) {
+                    $found[$tag] = true;
+                }
+            }
+        }
+        if ($found === []) {
+            return ['text' => $text, 'style' => $style];
+        }
+
+        // A sound inside a running sentence is often swallowed: end the words before it.
+        $names = implode('|', array_map(fn ($t) => preg_quote($t, '/'), array_keys($found)));
+        $text = (string) preg_replace('/(?<=[^\s.!?؟،,…:;>])[ \t]*<('.$names.')>/u', '. <$1>', $text);
+
+        $lines = [];
+        foreach (array_keys($found) as $tag) {
+            $lines[] = '<'.$tag.'> means: '.self::SOUND_DIRECTIONS[$tag].'.';
+        }
+        $line = 'The transcript contains sound tags in angle brackets. Never read a tag aloud. '
+            .'At each tag, stop speaking and actually perform that sound with your voice, clearly and fully, then continue. '
+            .implode(' ', $lines);
+        $style = trim($style);
+
+        return ['text' => $text, 'style' => $style === '' ? $line : $style."\n".$line];
+    }
+
+    /**
      * Add the moods taken from the script to the style instructions.
      *
      * @param  array<int, string>  $cues
@@ -368,7 +530,7 @@ class GeminiVocalTags
             '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]|<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>/u',
             function (array $m) use (&$tags): string {
                 $inner = isset($m[2]) && $m[2] !== '' ? $m[2] : $m[1];
-                if (self::canonical($inner) === null && ! self::looksLikeCue($inner)) {
+                if (trim($inner) !== '/' && self::canonical($inner) === null && self::delivery($inner) === null && ! self::looksLikeCue($inner)) {
                     return $m[0];
                 }
                 $tags[] = $m[0];
@@ -379,6 +541,16 @@ class GeminiVocalTags
         );
 
         return ['text' => $text, 'tags' => $tags];
+    }
+
+    /**
+     * True when a rewrite kept every placeholder from protect(), once each and in order.
+     */
+    public static function placeholdersIntact(string $text, int $count): bool
+    {
+        preg_match_all('/\[\s*\[\s*(\d+)\s*\]\s*\]/u', $text, $m);
+
+        return array_map('intval', $m[1]) === ($count > 0 ? range(0, $count - 1) : []);
     }
 
     /**

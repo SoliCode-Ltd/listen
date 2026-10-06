@@ -350,7 +350,13 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   border-color: var(--chip-dot);
   background: color-mix(in oklab, var(--chip-dot) 16%, var(--surface));
 }
-.vs-chip-dialect[aria-checked="true"] {
+.vs-chip-choice { --chip-dot: var(--a, #6A45F2); }
+.vs-chip-choice::before { display: none; }
+.vs-chip:disabled { opacity: .45; cursor: not-allowed; }
+.vs-chip-choice[aria-checked="true"],
+.vs-chip-dialect[aria-checked="true"],
+.vs-chip-choice[aria-checked="true"]:hover,
+.vs-chip-dialect[aria-checked="true"]:hover {
   border-color: var(--a, #6A45F2);
   background: var(--a, #6A45F2);
   color: #fff;
@@ -364,7 +370,22 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   font-weight: 600;
 }
 .vs-dialect-current:empty { display: none; }
-.vs-dialects { display: grid; gap: .8rem; }
+.vs-dialects { display: grid; gap: .8rem; margin-top: .7rem; }
+.vs-dialects[hidden], .vs-country[hidden] { display: none; }
+.vs-sub-label {
+  display: block;
+  margin-bottom: .35rem;
+  font-size: .8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.vs-section-title {
+  margin-top: .9rem;
+  font-size: .95rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.vs-section-title + .vs-pane-hint { margin-top: .2rem; }
 .vs-results-title {
   margin: 1rem 0 .1rem;
   font-size: .86rem;
@@ -409,3 +430,10 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
 .demo-tag-editor textarea { min-height: 220px; }
 .vs-panel .ctrl-group { min-width: 0; }
 .vs-panel .ctrl-group label { display: block; margin-bottom: .45rem; font-size: .88rem; font-weight: 600; color: var(--text); }
+
+@media (max-width: 480px) {
+  /* All three tabs fit on a phone: tighter spacing, no colour dots. */
+  .vs-tabs { gap: .55rem; padding: 0 .75rem; justify-content: space-between; }
+  .vs-tab { flex: 1 1 0; justify-content: center; font-size: .86rem; gap: .3rem; white-space: normal; text-align: center; line-height: 1.25; }
+  .vs-tab .vs-kind { display: none; }
+}

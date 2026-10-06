@@ -41,6 +41,23 @@
     @foreach($vsTagTabs as $tabKey => $tab)
       <div class="vs-pane" role="tabpanel" data-vs-pane="{{ $tabKey }}" hidden>
         <div class="vs-results-title" data-vs-results-title hidden><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span> {{ __('ui.dashboard.vocal_tab_'.$tabKey) }}</div>
+        @if($tabKey === 'delivery')
+          {{-- Whole-script style and emotion: buttons for the form's performance_style and emotion fields. --}}
+          <div class="vs-section-title">{{ __('ui.dashboard.vocal_whole_script') }}</div>
+          <p class="vs-pane-hint">{{ __('ui.dashboard.vocal_whole_script_hint') }}</p>
+          <div class="vs-groups">
+            <div class="vs-group" data-vs-group>
+              <div class="vs-group-label">{{ __('ui.dashboard.performance_style') }}</div>
+              <div class="vs-chips" data-vs-choice="performance_style"></div>
+            </div>
+            <div class="vs-group" data-vs-group>
+              <div class="vs-group-label">{{ __('ui.dashboard.emotion_tone') }}</div>
+              <div class="vs-chips" data-vs-choice="emotion"></div>
+            </div>
+          </div>
+          <div class="vs-divider"></div>
+          <div class="vs-section-title">{{ __('ui.dashboard.vocal_inline_tags') }}</div>
+        @endif
         <p class="vs-pane-hint"><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
         <div class="vs-groups">
           @foreach($tab['groups'] as $group => $groupTags)

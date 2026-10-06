@@ -23,6 +23,8 @@ use Tests\TestCase;
 
 class GeminiVocalTagsTest extends TestCase
 {
+    private const PERFORM = 'The transcript contains sound tags in angle brackets. Never read a tag aloud. At each tag, stop speaking and actually perform that sound with your voice, clearly and fully, then continue. ';
+
     use RefreshDatabase;
 
     public function test_every_supported_tag_is_kept_as_written(): void
@@ -103,8 +105,9 @@ class GeminiVocalTagsTest extends TestCase
         ]);
 
         $part = $captured->bodies[0]['contents'][0]['parts'][0];
-        $this->assertSame('Hello <gasp> there.', $part['text']);
-        $this->assertSame("Speak like a radio host.\nDelivery cues from the script: nervous and hesitant.", $part['speech_metadata']['style']);
+        $this->assertSame('Hello. <gasp> there.', $part['text']);
+        $this->assertSame("Speak like a radio host.\nDelivery cues from the script: nervous and hesitant.\n"
+            .self::PERFORM.'<gasp> means: a sharp, audible gasp of surprise.', $part['speech_metadata']['style']);
     }
 
     public function test_gemini_38_dialogue_keeps_tags_on_each_turn(): void
@@ -162,8 +165,9 @@ class GeminiVocalTagsTest extends TestCase
             $content = $request->data()['input'][0]['content'][0] ?? [];
 
             return str_contains($request->url(), '/interactions')
-                && ($content['text'] ?? null) === 'Hi <laugh> there.'
-                && ($content['annotations'][0]['style'] ?? null) === "Calm and clear.\nDelivery cues from the script: excited and energetic.";
+                && ($content['text'] ?? null) === 'Hi. <laugh> there.'
+                && ($content['annotations'][0]['style'] ?? null) === "Calm and clear.\nDelivery cues from the script: excited and energetic.\n"
+                    .self::PERFORM.'<laugh> means: real, audible laughter (ha ha ha).';
         });
     }
 
@@ -303,7 +307,8 @@ class GeminiVocalTagsTest extends TestCase
         $parts = array_map(fn ($b) => $b['contents'][0]['parts'][0], $captured->bodies);
         $this->assertSame(['مرحبا بكم.', 'فزنا بالمباراة! <laugh>', 'والآن لنرتاح.'], array_column($parts, 'text'));
         $this->assertSame('Read clearly.', $parts[0]['speech_metadata']['style']);
-        $this->assertSame("Read clearly.\nDelivery cues from the script: excited and energetic.", $parts[1]['speech_metadata']['style']);
+        $this->assertSame("Read clearly.\nDelivery cues from the script: excited and energetic.\n"
+            .self::PERFORM.'<laugh> means: real, audible laughter (ha ha ha).', $parts[1]['speech_metadata']['style']);
         $this->assertSame("Read clearly.\nDelivery cues from the script: calm and relaxed.", $parts[2]['speech_metadata']['style']);
     }
 
@@ -361,6 +366,35 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringContainsString('id="generateBtn"', $main);
     }
 
+    public function test_language_tab_has_a_country_list_and_delivery_tab_the_whole_script_choices(): void
+    {
+        $this->actingAs($this->memberOn(VoiceTier::HD));
+
+        app()->setLocale('ar');
+        $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+        $this->assertStringContainsString('إعدادات اللغة', $html);
+        $this->assertStringNotContainsString('إعدادات الأداء', $html);
+        $this->assertStringContainsString('data-vs-country', $html);
+        $delivery = substr($html, strpos($html, 'data-vs-pane="delivery"'));
+        $this->assertStringContainsString('data-vs-choice="performance_style"', $delivery);
+        $this->assertStringContainsString('data-vs-choice="emotion"', $delivery);
+        // The choices show the Arabic names of the styles.
+        $this->assertMatchesRegularExpression('/<option value="cinematic">[^<]*[\x{0600}-\x{06FF}]/u', $html);
+
+        // Every dialect belongs to a listed country, and every country has a dialect.
+        $countries = [];
+        foreach (array_keys(ArabicDialects::ALL) as $code) {
+            $country = ArabicDialects::countryOf($code);
+            $this->assertNotNull($country, $code);
+            $countries[$country] = true;
+        }
+        $this->assertSame(array_keys(ArabicDialects::COUNTRIES), array_values(array_intersect(array_keys(ArabicDialects::COUNTRIES), array_keys($countries))));
+        $this->assertCount(count(ArabicDialects::COUNTRIES), $countries);
+        $this->assertSame('EG', ArabicDialects::countryOf('ar-EG-AL'));
+        $this->assertNull(ArabicDialects::countryOf('en-US'));
+    }
+
     public function test_demo_page_has_the_same_studio_panel(): void
     {
         $this->actingAs(User::factory()->create());
@@ -376,7 +410,7 @@ class GeminiVocalTagsTest extends TestCase
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(22, $codes);
+        $this->assertCount(41, $codes);
         foreach (['ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
@@ -432,5 +466,28 @@ class GeminiVocalTagsTest extends TestCase
 
         return 'RIFF'.pack('V', 36 + strlen($pcm)).'WAVEfmt '.pack('V', 16).pack('v', 1).pack('v', 1)
             .pack('V', 24000).pack('V', 48000).pack('v', 2).pack('v', 16).'data'.pack('V', strlen($pcm)).$pcm;
+    }
+
+    public function test_sound_tags_get_their_own_beat_and_a_perform_instruction(): void
+    {
+        $performed = GeminiVocalTags::forPerformance('انا مش عايز وجع دماغ يا واد انت <scream> ده انت مستفز جدا', 'Egyptian Arabic.');
+        $this->assertSame('انا مش عايز وجع دماغ يا واد انت. <scream> ده انت مستفز جدا', $performed['text']);
+        $this->assertSame("Egyptian Arabic.\n".self::PERFORM.'<scream> means: a real, loud scream.', $performed['style']);
+
+        // Already a beat, a line break kept, pauses left alone, no tags: unchanged text.
+        $this->assertSame('يا سلام! <laugh> تمام', GeminiVocalTags::forPerformance('يا سلام! <laugh> تمام', '')['text']);
+        $this->assertSame("A: hi\n<laugh> B: ok", GeminiVocalTags::forPerformance("A: hi\n<laugh> B: ok", '')['text']);
+        $this->assertSame(['text' => 'wait <short pause> now', 'style' => 'Calm.'], GeminiVocalTags::forPerformance('wait <short pause> now', 'Calm.'));
+        $this->assertSame(['text' => 'no tags', 'style' => 'Calm.'], GeminiVocalTags::forPerformance('no tags', 'Calm.'));
+
+        // Every sound the panel offers has a direction.
+        foreach (GeminiVocalTags::GROUPS as $group => $tags) {
+            foreach ($tags as $tag) {
+                if ($group === 'pauses' || $tag === 'whispers') {
+                    continue;
+                }
+                $this->assertStringContainsString('<'.$tag.'> means:', GeminiVocalTags::forPerformance('x <'.$tag.'>', '')['style'], $tag);
+            }
+        }
     }
 }

@@ -217,6 +217,25 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-MR' => 'Mauritanian Hassaniya Arabic',
         'ar-SD' => 'Sudanese Arabic',
         'ar-XA' => 'Modern Standard Arabic (Fusha)',
+        'ar-SA-SO' => 'Southern Saudi Arabic (Asir and Jazan)',
+        'ar-SA-QS' => 'Qassimi Saudi Arabic (Al-Qassim, Najdi)',
+        'ar-SA-EA' => 'Eastern Province Saudi Arabic (Al-Ahsa and Dammam)',
+        'ar-SA-NO' => 'Northern Saudi Arabic (Hail and Al-Jouf, Bedouin)',
+        'ar-OM-DH' => 'Dhofari Omani Arabic (Salalah)',
+        'ar-SY-AL' => 'Aleppine Syrian Arabic (Aleppo)',
+        'ar-JO-BD' => 'Jordanian Bedouin Arabic',
+        'ar-PS-GZ' => 'Gazan Palestinian Arabic (Gaza)',
+        'ar-EG-AL' => 'Alexandrian Egyptian Arabic (Alexandria)',
+        'ar-EG-DL' => 'Rural Delta Egyptian Arabic (Fallahi)',
+        'ar-EG-PO' => 'Port Said and Canal cities Egyptian Arabic',
+        'ar-EG-BD' => 'Sinai Bedouin Arabic (Egypt)',
+        'ar-IQ-BS' => 'Basrawi Iraqi Arabic (Basra, Gulf-influenced)',
+        'ar-IQ-MS' => 'Maslawi Iraqi Arabic (Mosul)',
+        'ar-YE-AD' => 'Adeni Yemeni Arabic (Aden)',
+        'ar-YE-HD' => 'Hadrami Yemeni Arabic (Hadramawt)',
+        'ar-MA-NO' => 'Northern Moroccan Arabic (Tangier and Tetouan, Jebli)',
+        'ar-DZ-OR' => 'Oranian Algerian Arabic (Oran)',
+        'ar-LY-BG' => 'Eastern Libyan Arabic (Benghazi, Cyrenaican)',
     ];
 
     /** @var array<int, string> */
@@ -440,7 +459,8 @@ class GeminiTtsProvider implements TtsProviderInterface
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
             $chunks = mb_strlen($part['text']) > $maxChars ? TextChunker::split($part['text'], $maxChars, 'mb_strlen') : [$part['text']];
             foreach ($chunks as $chunk) {
-                $payloads[] = $this->buildSingleSpeakerPayload($model, $chunk, $partStyle, $voiceName, $languageCode);
+                $performed = GeminiVocalTags::forPerformance($chunk, $partStyle);
+                $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
             }
         }
 
@@ -613,6 +633,10 @@ class GeminiTtsProvider implements TtsProviderInterface
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
         $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
+        if (GeminiTtsModel::usesStructuredSpeech($model)) {
+            $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
+            [$text, $stylePrompt] = [$performed['text'], $performed['style']];
+        }
         $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
 
         $audio = $this->requestAudio($endpoint, $payload);

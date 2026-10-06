@@ -1,0 +1,39 @@
+name: Tag generation inspect
+
+# Read-only: on STAGING, shows the latest generations that used tags, the
+# Gemini model in use, and what would be sent to the voice model.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/tag-generation-inspect.yml
+      - scripts/tts/tag_generation_inspect.php
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/tts/tag_generation_inspect.php
+          rm -f ~/.ssh/id_inspect

@@ -2179,18 +2179,18 @@
 
 
               @if(($planTier ?? 'standard') === 'hd')
-                {{-- Whole-script style and emotion keep the site defaults; delivery tags change them where the member wants. --}}
+                {{-- Whole-script style and emotion: chosen with the buttons in the Delivery tab (site defaults until then). --}}
                 <div class="vs-hidden-field" aria-hidden="true">
                   <select name="performance_style" id="performance_style" tabindex="-1">
                     <option value=""></option>
                     @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                      <option value="{{ $styleOption['value'] ?? '' }}">{{ $styleOption['label'] ?? ($styleOption['value'] ?? '') }}</option>
+                      <option value="{{ $styleOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? '') : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}</option>
                     @endforeach
                   </select>
                   <select name="emotion" id="emotion" tabindex="-1">
                     <option value=""></option>
                     @foreach(($studioEmotions ?? []) as $emotionOption)
-                      <option value="{{ $emotionOption['value'] ?? '' }}">{{ $emotionOption['label'] ?? ($emotionOption['value'] ?? '') }}</option>
+                      <option value="{{ $emotionOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? '') : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}</option>
                     @endforeach
                   </select>
                 </div>

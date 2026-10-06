@@ -223,8 +223,9 @@ class VoiceCloningService
         $styles = [];
         foreach ($parts as $part) {
             foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen') as $chunk) {
-                $chunks[] = $chunk;
-                $styles[] = GeminiVocalTags::withCues($style, $part['cues']);
+                $performed = GeminiVocalTags::forPerformance($chunk, GeminiVocalTags::withCues($style, $part['cues']));
+                $chunks[] = $performed['text'];
+                $styles[] = $performed['style'];
             }
         }
         $audioContent = count($chunks) === 1
@@ -400,21 +401,30 @@ class VoiceCloningService
      */
     public function speakableText(string $text, ?string $dialect): string
     {
-        $text = trim($text);
+        $text = trim(GeminiVocalTags::normalizeMarkup(trim($text)));
         $instruction = $this->clonedAccentInstruction($dialect);
         if ($text === '' || $instruction === '') {
             return $text;
         }
 
-        $cacheKey = 'listen:clone-dialect:v1:'.sha1($instruction.'|'.$text);
+        $cacheKey = 'listen:clone-dialect:v2:'.sha1($instruction.'|'.$text);
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
             return $cached;
         }
 
-        $rewritten = $this->rewriteTranscript($text, $instruction);
+        // Tags are locked as [[0]], [[1]] … so the rewrite cannot drop or translate them.
+        $protected = GeminiVocalTags::protect($text);
+        $rewritten = $this->rewriteTranscript($protected['text'], $instruction);
         if ($rewritten === null || $rewritten === '') {
             return $text;
+        }
+        if ($protected['tags'] !== []) {
+            if (! GeminiVocalTags::placeholdersIntact($rewritten, count($protected['tags']))) {
+                // A tag went missing in the rewrite: keep the member's own text and tags.
+                return $text;
+            }
+            $rewritten = GeminiVocalTags::restore($rewritten, $protected['tags']);
         }
 
         Cache::put($cacheKey, $rewritten, now()->addDays(7));
@@ -516,7 +526,7 @@ class VoiceCloningService
             ."- Keep the same meaning, names, numbers, and sentence order.\n"
             ."- Use the everyday words and grammar of that variety.\n"
             ."- Do not add a title, notes, labels, or quotation marks.\n"
-            ."- Keep every tag in square or angle brackets, such as [excited] or <laugh>, exactly as written and in the same place.\n"
+            ."- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n"
             ."- If it is already in that variety, return it unchanged.\n"
             ."- Return only the spoken transcript.\n\n"
             ."Transcript:\n".$text;
