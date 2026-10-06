@@ -403,12 +403,12 @@ class VoiceCloningService
     public function speakableText(string $text, ?string $dialect): string
     {
         $text = trim(GeminiVocalTags::normalizeMarkup(trim($text)));
-        $instruction = $this->clonedAccentInstruction($dialect);
+        $instruction = $this->rewriteInstruction($dialect);
         if ($text === '' || $instruction === '') {
             return $text;
         }
 
-        $cacheKey = 'listen:clone-dialect:v2:'.sha1($instruction.'|'.$text);
+        $cacheKey = 'listen:clone-dialect:v3:'.sha1($instruction.'|'.$text);
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
             return $cached;
@@ -519,18 +519,39 @@ class VoiceCloningService
         };
     }
 
-    private function rewriteTranscript(string $text, string $instruction): ?string
+    /**
+     * The variety a script is rewritten into: its direction and, for Arabic,
+     * what it sounds like.
+     */
+    private function rewriteInstruction(?string $dialect): string
     {
-        $prompt = "Rewrite this transcript so it is spoken in this variety:\n"
+        $instruction = $this->clonedAccentInstruction($dialect);
+        $markers = ArabicDialects::markers($dialect);
+        if ($instruction !== '' && $markers !== null) {
+            $instruction .= "\nWhat this variety sounds like: ".$markers;
+        }
+
+        return $instruction;
+    }
+
+    private function rewritePrompt(string $text, string $instruction): string
+    {
+        return "Rewrite this transcript so it is spoken in this variety:\n"
             .$instruction."\n\n"
             ."Rules:\n"
             ."- Keep the same meaning, names, numbers, and sentence order.\n"
             ."- Use the everyday words and grammar of that variety.\n"
+            .(preg_match('/\p{Arabic}/u', $text) ? "- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n" : '')
             ."- Do not add a title, notes, labels, or quotation marks.\n"
             ."- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n"
             ."- If it is already in that variety, return it unchanged.\n"
             ."- Return only the spoken transcript.\n\n"
             ."Transcript:\n".$text;
+    }
+
+    private function rewriteTranscript(string $text, string $instruction): ?string
+    {
+        $prompt = $this->rewritePrompt($text, $instruction);
 
         foreach (self::TRANSCRIPT_MODELS as $model) {
             try {

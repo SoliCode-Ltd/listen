@@ -450,6 +450,36 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertCount(27, GeminiVocalTags::deliveries());
     }
 
+    public function test_stock_voice_script_is_rewritten_into_the_chosen_dialect(): void
+    {
+        $this->fakeGeminiKeys();
+        config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $bodies = [];
+        Http::fake(function ($request) use (&$bodies) {
+            $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
+            if (str_contains($request->url(), 'gemini-3.5-flash:generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => 'أنا عاوز أروح دلوك [[0]] إكده']]]]]]);
+            }
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;rate=24000', 'data' => base64_encode(str_repeat("\0", 4800))]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize('أنا عايز أروح دلوقتي <ضحكة> كده', 'ar', ['voice_name' => 'Iapetus', 'dialect' => 'ar-EG-SA']);
+
+        $rewrite = collect($bodies)->first(fn ($b) => str_contains($b['url'], 'gemini-3.5-flash'));
+        $this->assertNotNull($rewrite, 'the script goes through the dialect rewrite');
+        $prompt = $rewrite['body']['contents'][0]['parts'][0]['text'];
+        $this->assertStringContainsString('ق as g', $prompt, 'with the Saidi markers');
+        $this->assertStringContainsString('گ for a g sound', $prompt);
+        $this->assertStringContainsString('[[0]]', $prompt, 'tags locked during the rewrite');
+
+        $speech = collect($bodies)->first(fn ($b) => str_contains($b['url'], 'gemini-3.8-flash-tts'));
+        $part = $speech['body']['contents'][0]['parts'][0];
+        $this->assertSame('أنا عاوز أروح دلوك. <laugh> إكده', $part['text']);
+        $this->assertStringContainsString('Dialect markers to make clearly audible: Saidi', $part['speech_metadata']['style']);
+    }
+
     private function memberOn(string $tier): User
     {
         $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true]);

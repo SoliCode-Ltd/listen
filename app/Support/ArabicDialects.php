@@ -246,6 +246,71 @@ final class ArabicDialects
         return self::ALL[self::normalize($code)]['prompt'] ?? null;
     }
 
+    /**
+     * What makes each variety recognisable: how ق, ج and ك are said, the
+     * words people of that place use, and the rhythm. Given to the speech
+     * model with the dialect name, and to the rewrite of the script.
+     *
+     * @var array<string, string>
+     */
+    public const MARKERS = [
+        'ar-XA' => 'Formal Fusha: every letter pronounced in full (ق as a true q, ج as j, ث and ذ as th sounds), full case endings where natural, no colloquial words.',
+        'ar-SA' => 'Najdi: ق as g (گال), ج as j, ك of feminine you as ts in traditional speech; words وش (what), أبي (I want), زين (good), مرّه (very), الحين (now); steady, low Najdi rhythm.',
+        'ar-SA-HJ' => 'Hejazi: ق as g or a light glottal stop in Jeddah, ج as j, ث as t or s, ذ as d or z; words إيش (what), أبغى (I want), دحين (now), كدا (like this), مرّة (very); quick, sing-song Jeddah rhythm.',
+        'ar-SA-SO' => 'Southern Saudi (Asir and Jazan): ق as g, ج as j; southern words and rhythm of Abha and Jazan, clearly not Najdi or Hejazi.',
+        'ar-SA-QS' => 'Qassimi Najdi: ق as g, feminine ك as ts (تس), ج as j; words وش, أبي, الحين; the slower, drawn Qassim intonation.',
+        'ar-SA-EA' => 'Eastern Saudi (Al-Ahsa, Dammam): close to Bahraini and Kuwaiti; ج often as y (ريّال), ق as g; words وايد (very), شلون (how), شنو (what).',
+        'ar-SA-NO' => 'Northern Saudi Bedouin (Hail, Al-Jouf, Shammar): ق as g, feminine ك as ch (چ), ج as j; Bedouin words زين, وش, هقيت (I thought); strong Bedouin melody.',
+        'ar-AE' => 'Emirati: ج as y (ريّال, ياي), ك sometimes as ch (چ), ق as g or j; words شو (what), وايد (very), ابا (I want), الحين (now).',
+        'ar-KW' => 'Kuwaiti: ج as y (يبي), ق as g or j, ك as ch (چ) in some words; words شلونك (how are you), شنو (what), وايد (very), زين, الحين.',
+        'ar-QA' => 'Qatari: ج as y, ق as g, ك as ch (چ) in some words; words شلونك, شو/شنو, وايد, زين, الحين.',
+        'ar-BH' => 'Bahraini: ج as y, ق as g; words شلونك, شنو (what), وايد (very), زين; soft, quick Bahraini rhythm.',
+        'ar-OM' => 'Omani: ق as g, ج as j; words شو (what), كيف حالك, بغيت (I want), واجد (a lot); calm Omani rhythm.',
+        'ar-OM-DH' => 'Dhofari (Salalah): ق as g, ج as j; southern Omani words and the distinct Dhofari melody, not northern Omani.',
+        'ar-LB' => 'Lebanese: ق as a glottal stop (ألّي for قلّي), strong imala (final a toward e); words شو (what), كيفك, هيدا/هيدي (this), كتير (very), هلّق (now), بدّي (I want).',
+        'ar-LB-TR' => 'Tripolitan (North Lebanon): ق as a glottal stop, Lebanese words شو, هيدا, كتير, with the heavier, drawn Tripoli intonation.',
+        'ar-SY' => 'Damascene Syrian: ق as a glottal stop, ث as t or s; words شو (what), شلونك/كيفك, هاد/هي (this), كتير, هلّق (now), بدّي; soft, melodic Damascus rhythm.',
+        'ar-SY-AL' => 'Aleppine: ق as a glottal stop, very strong imala, words شلونك, هلّق, كتير; the distinctive Aleppo melody and lengthened vowels.',
+        'ar-SY-DZ' => 'Deiri (Euphrates): ق as g, ك as ch (چ), close to Iraqi; words شلونك, هسّه (now), هواية (a lot), عيني.',
+        'ar-JO' => 'Urban Jordanian (Amman): ق as a glottal stop or g, words شو (what), هسّا (now), زلمة (man), كثير/كتير, بدّي; firm Jordanian rhythm.',
+        'ar-JO-BD' => 'Jordanian Bedouin: ق as g, ك as ch (چ), ج as j; words هسّاع (now), زلمة, وش (what), يا رجّال.',
+        'ar-JO-HR' => 'Horani (Irbid, Hauran): ق as g, ك as ch (چ); words هسّع (now), زلمة, شو; rural Hauran melody.',
+        'ar-PS' => 'Palestinian: ق as a glottal stop in cities, ك as ch (چ) in villages; words شو/إيش (what), هلقيت (now), إشي (something), بدّي, كتير; strong imala.',
+        'ar-PS-GZ' => 'Gazan: ق as g, ج as j; words إيش (what), هلقيت, بدّي; the Gaza accent with its coastal, slightly Egyptian-influenced rhythm.',
+        'ar-PS-HB' => 'Khalili (Hebron): ق as a glottal stop or g, distinct Hebron vowels and melody; words إيش, هسّا, بدّي.',
+        'ar-EG' => 'Cairene: ج as g (جميل = gameel), ق as a glottal stop (قال = aal), ث as t or s, ذ as d or z; words عايز (I want), إزيّك (how are you), دلوقتي (now), أوي (very), ده/دي (this); negation ما...ش.',
+        'ar-EG-SA' => 'Saidi (Upper Egypt): ق as g (قال = گال, قلبي = گلبي), ج as j (not g); words إكده (like this), دلوك (now), عاوز (I want), يا ولد; slower, heavier southern rhythm.',
+        'ar-EG-AL' => 'Alexandrian: Cairene sounds (ج as g, ق as a glottal stop) but the n- prefix for I in the present (نروح = I go, نقول = I say, نكتبوا = we write); words أهو, يا عم, خالص; quicker, more emphatic coastal intonation.',
+        'ar-EG-DL' => 'Rural Delta (Fallahi): Egyptian base with broad rural vowels and countryside words like يا وله, يابا, ياما, اللي; slower, drawn village rhythm, clearly not Cairo city speech.',
+        'ar-EG-PO' => 'Port Said (Canal cities): Cairene base sounds with the Port Said sing-song intonation, lengthened final vowels and a quick coastal pace; words يا واد, يا معلّم, بقى, أوي.',
+        'ar-EG-BD' => 'Sinai Bedouin: ق as g, ج as j; Bedouin words وش (what), زين (good), هسّا (now); Bedouin melody, not Cairo speech.',
+        'ar-SD' => 'Sudanese: ق as g, ج as j; words زول (person), شنو (what), كيفنك (how are you), ياخ/ياخي, شديد (very), هسّي (now); measured Sudanese rhythm.',
+        'ar-IQ' => 'Baghdadi: ق as g in many words (گال), ك as ch (چ) in some (چبير); words شلونك (how are you), هسّه (now), هواية (a lot), شكو ماكو, أريد/أريدك; Baghdad melody.',
+        'ar-IQ-BS' => 'Basrawi: Baghdadi base with Gulf influence; words شلونك, هواية, هسّه, وايد; the southern Basra melody.',
+        'ar-IQ-MS' => 'Maslawi (Mosul): ق kept as a true q, ر pronounced like غ (راح = غاح), first person ending -tu/-tu (كنتو for I was); words شلونك, هوايي.',
+        'ar-IQ-AN' => 'Anbari (western Iraq): ق as g, ك as ch (چ); Bedouin-influenced words شلونك, هسّه, زين; the western Iraqi melody.',
+        'ar-YE' => 'Sanaani: ق as g, ج as j; words إيش (what), شَيْ, قد (already); the high-plateau Sanaa melody.',
+        'ar-YE-TZ' => 'Taizzi (Taiz): ق kept close to q, ج as j; words إيش, اشتي (I want), خبيري (my friend); the Taiz melody.',
+        'ar-YE-AD' => 'Adeni (Aden): ق as g, ج as j; words إيش, شُوف, اشتي; the coastal Aden rhythm.',
+        'ar-YE-HD' => 'Hadrami (Hadramawt): ج often as y, ق as g; words إيش, با (will); the Hadrami melody, not Sanaani.',
+        'ar-MA' => 'Moroccan Darija: short vowels dropped (كتب = ktb), ق as q or g; words واش (question), بغيت (I want), دابا (now), بزاف (a lot), ديال (of), مزيان (good); fast Moroccan rhythm.',
+        'ar-MA-MK' => 'Marrakchi Darija: Moroccan words واش, بغيت, دابا, بزاف, ديال with the broad, drawn Marrakech intonation.',
+        'ar-MA-NO' => 'Northern Moroccan (Tetouan, Tangier): ق as a glottal stop in the cities, Spanish loanwords, Moroccan words دابا, بزاف, ديال; the Jebli northern melody.',
+        'ar-DZ' => 'Algerian: words واش (what), راني/راك (I am/you are), درك (now), بزاف (a lot), برك (only), ماكاش; French loanwords; quick Algerian rhythm.',
+        'ar-DZ-OR' => 'Oranian: ق as g, Algerian words واش, راك, درك, بزاف; the Oran melody.',
+        'ar-DZ-CO' => 'Constantinois: ق kept as q, Algerian words واش, درك, بزاف with the eastern Algerian melody close to Tunisian.',
+        'ar-TN' => 'Tunisian: words برشا (a lot), شنوة (what), توا (now), باهي (good), نحب (I want), يزّي (enough); French loanwords; quick Tunis rhythm.',
+        'ar-TN-SF' => 'Sfaxi: Tunisian words برشا, شنية, توا, باهي with the distinct Sfax vowels and melody.',
+        'ar-LY' => 'Tripoli Libyan: ق as g, words شن (what), توا (now), باهي (good), هلبا (a lot), نبّي (I want).',
+        'ar-LY-BG' => 'Benghazi (eastern Libyan): ق as g, Bedouin-influenced; words شن, توا, هلبا, باهي; the eastern Libyan melody.',
+        'ar-MR' => 'Mauritanian Hassaniya: ق as g, ذ and ث kept; Hassaniya words and the Mauritanian melody, not Moroccan Darija.',
+    ];
+
+    public static function markers(?string $code): ?string
+    {
+        return self::MARKERS[self::normalize($code)] ?? null;
+    }
+
     public static function cloneInstruction(?string $code): ?string
     {
         return self::ALL[self::normalize($code)]['clone'] ?? null;

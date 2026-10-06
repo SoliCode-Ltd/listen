@@ -1,13 +1,13 @@
 <?php
 
 /*
- * Live check on STAGING that the studio's accents, dialects, emotions and
- * styles are followed by Gemini 3.8. The workflow injects the cases
- * (scripts/tts/studio_options_cases.json): each has the exact style text
- * this branch builds. Stock cases go straight to the speech model, cloned
- * cases through the server's cloned-voice service. A second Gemini model
- * listens to each result WITHOUT being told the target and names the
- * language, accent or dialect, emotion and style it hears.
+ * Live check on STAGING that every dialect and accent sounds like itself.
+ * The workflow injects the cases (scripts/tts/studio_options_cases.json),
+ * built from this branch: the dialect rewrite prompt and the exact style
+ * text. Each script is rewritten into its dialect, spoken by Gemini 3.8
+ * (stock voice directly, cloned voice through the server's service), and a
+ * second Gemini model listens WITHOUT being told the target: it names the
+ * variety, then picks the closest one from that region's list.
  * Nothing is written; saved audio is deleted. Prints JSON with the audio.
  */
 
@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 
 ini_set('display_errors', 'stderr');
-set_time_limit(1500);
+set_time_limit(3300);
 $root = getcwd();
 require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
@@ -60,13 +60,34 @@ function speak(array $case, string $base, string $key): string
     throw new RuntimeException('no audio: HTTP '.$r->status().' '.mb_substr($r->body(), 0, 200));
 }
 
-function hear(string $bytes, string $base, string $key): array
+function rewrite(string $prompt, string $base, string $key): ?string
+{
+    foreach (['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'] as $model) {
+        $r = Http::timeout(60)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/'.$model.':generateContent', [
+            'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+            'generationConfig' => ['temperature' => 0.2],
+        ]);
+        $t = $r->json('candidates.0.content.parts.0.text');
+        if ($r->ok() && is_string($t) && trim($t) !== '') {
+            $t = preg_replace('/^```[a-z]*\s*|\s*```$/i', '', trim($t));
+
+            return trim((string) $t, "\"' \n");
+        }
+    }
+
+    return null;
+}
+
+function hear(string $bytes, string $base, string $key, array $candidates): array
 {
     $mime = str_starts_with($bytes, 'RIFF') ? 'audio/wav' : 'audio/mpeg';
+    $list = implode('; ', array_map(fn ($c) => $c['code'].' = '.$c['name'], $candidates));
     $prompt = 'You are an expert dialectologist and voice director. Listen to this recording and return JSON: '
-        .'{"transcript": "...", "language": "...", "accent_or_dialect": "as specific as you can: country and city or region", '
-        .'"confidence": "high|medium|low", "emotion": "...", "delivery_style": "...", "reads_instructions_aloud": true|false}. '
-        .'Judge only from the voice. reads_instructions_aloud is true if the speaker says words like "voice accent", "emotional tone" or "performance style".';
+        .'{"transcript": "...", "accent_or_dialect": "first, in your own words, as specific as you can: country and city or region", '
+        .'"closest": "the code of the closest variety from the list below", "second": "the next closest code", '
+        .'"confidence": "high|medium|low", "why": "the sounds and words that decided it", "emotion": "...", "delivery_style": "...", "reads_instructions_aloud": true|false}. '
+        .'Varieties: '.$list.'. Judge only from the voice and words you hear. '
+        .'reads_instructions_aloud is true if the speaker says words like "voice accent", "emotional tone" or "performance style".';
     foreach (['gemini-3.5-flash', 'gemini-2.5-flash'] as $model) {
         $r = Http::timeout(120)->withHeaders(['x-goog-api-key' => $key])->post($base.'/models/'.$model.':generateContent', [
             'contents' => [['role' => 'user', 'parts' => [
@@ -89,6 +110,13 @@ $disk = Storage::disk('public');
 foreach ($cases as $case) {
     $row = ['target' => array_intersect_key($case, array_flip(['kind', 'dialect', 'style', 'emotion', 'voice'])), 'text' => $case['text']];
     try {
+        if (! empty($case['rewrite_prompt'])) {
+            $spoken = rewrite($case['rewrite_prompt'], $base, $key);
+            if ($spoken !== null && $spoken !== '') {
+                $case['text'] = $spoken;
+            }
+            $row['spoken'] = $case['text'];
+        }
         if ($case['kind'] === 'stock') {
             $bytes = speak($case, $base, $key);
         } else {
@@ -100,7 +128,7 @@ foreach ($cases as $case) {
             $bytes = (string) $result['audio_content'];
             $disk->delete($result['audio_path']);
         }
-        $row['heard'] = hear($bytes, $base, $key);
+        $row['heard'] = hear($bytes, $base, $key, $case['candidates'] ?? []);
         $row['audio_base64'] = base64_encode($bytes);
     } catch (Throwable $e) {
         $row['error'] = mb_substr($e->getMessage(), 0, 400);
