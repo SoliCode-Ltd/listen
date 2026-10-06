@@ -294,6 +294,9 @@ class HomeController extends Controller
             $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
             $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
 
+            if (VoiceTier::normalize($requestedTier) === VoiceTier::HD) {
+                $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
+            }
             $this->ensureRequiredStudioSelections($requestedTier, [
                 'performance_style' => $request->input('performance_style'),
                 'emotion' => $request->input('emotion'),
@@ -397,6 +400,9 @@ class HomeController extends Controller
         $defaultTier = $this->planAccessService->resolveTierForPlan($demoPlan);
         $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $defaultTier));
 
+        if (VoiceTier::normalize($requestedTier) === VoiceTier::HD) {
+            $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
+        }
         $this->ensureRequiredStudioSelections($requestedTier, [
             'performance_style' => $request->input('performance_style'),
             'emotion' => $request->input('emotion'),

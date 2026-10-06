@@ -41,4 +41,16 @@ class TtsStudioConfigTest extends TestCase
         $this->assertSame('Sports Commentator', $row['label'] ?? null);
         $this->assertSame('Sports Commentator', $row['label_ar'] ?? null);
     }
+
+    public function test_style_and_emotion_left_on_default_get_the_site_defaults(): void
+    {
+        $this->assertSame(
+            ['performance_style' => \App\Support\TtsStudioConfig::defaultPerformanceStyle('ar'), 'emotion' => \App\Support\TtsStudioConfig::defaultEmotion('ar')],
+            \App\Support\TtsStudioConfig::withDefaultChoices(['performance_style' => '', 'emotion' => null], 'ar'),
+        );
+        $this->assertSame(
+            ['performance_style' => 'cinematic', 'emotion' => \App\Support\TtsStudioConfig::defaultEmotion('en')],
+            \App\Support\TtsStudioConfig::withDefaultChoices(['performance_style' => 'cinematic'], 'en'),
+        );
+    }
 }

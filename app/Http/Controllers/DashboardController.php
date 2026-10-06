@@ -200,6 +200,10 @@ class DashboardController extends Controller
             return $this->rejectTierAccess($request);
         }
 
+        // Style and emotion left on "Default" get the site's defaults for the language.
+        if (VoiceTier::normalize($requestedTier) === VoiceTier::HD) {
+            $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
+        }
         $this->ensureRequiredStudioSelections($requestedTier, [
             'performance_style' => $request->input('performance_style'),
             'emotion' => $request->input('emotion'),

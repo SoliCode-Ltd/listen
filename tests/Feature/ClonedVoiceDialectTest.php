@@ -142,4 +142,72 @@ class ClonedVoiceDialectTest extends TestCase
                 && ! isset($content['annotations']);
         });
     }
+
+    /**
+     * @param  callable(string $key): \GuzzleHttp\Promise\PromiseInterface  $speak
+     */
+    private function clonedGeneration(array $metadata, callable $speak): AudioGeneration
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false]);
+        $manager = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        $manager->shouldReceive('getAllKeys')->andReturn([
+            ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
+            ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
+        ]);
+        $manager->shouldReceive('getAvailableKey')->andReturn(['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]);
+        $manager->shouldIgnoreMissing();
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $manager);
+
+        $user = User::query()->firstOrCreate(['email' => 'solicode.co.uk@gmail.com'], User::factory()->raw(['email' => 'solicode.co.uk@gmail.com']));
+        $voice = ClonedVoice::factory()->ready()->forUser($user)->create([
+            'provider_voice_key' => 'voice_x', 'language_code' => 'ar-XA', 'metadata' => $metadata,
+        ]);
+        $generation = AudioGeneration::create([
+            'user_id' => $user->id, 'input_text' => 'مرحبا', 'source_language' => 'ar', 'target_language' => 'ar',
+            'voice_tier' => 'hd', 'voice_name' => 'cloned_'.$voice->id, 'performance_style' => 'neutral',
+            'emotion' => 'neutral', 'translate' => false, 'status' => 'processing',
+        ]);
+        Http::fake(fn ($request) => str_contains($request->url(), '/interactions') || str_contains($request->url(), 'tts:generateContent')
+            ? $speak($request->header('x-goog-api-key')[0] ?? '')
+            : Http::response(['error' => ['message' => 'not found']], 404));
+
+        try {
+            (new GenerateAudioJob($generation->id))->handle(app(TranslationService::class), app(TtsService::class));
+        } catch (\Throwable) {
+            // The job records the failure on the generation.
+        }
+
+        return $generation->refresh();
+    }
+
+    public function test_cloned_voice_uses_the_key_that_made_it_first(): void
+    {
+        $generation = $this->clonedGeneration(['key_name' => 'GEMINI_TTS_API_KEY_2'], fn (string $key) => $key === 'k2'
+            ? Http::response(['output_audio' => ['data' => base64_encode('RIFF....WAVE')]])
+            : Http::response(['error' => ['message' => 'Voice not found']], 404));
+
+        $this->assertSame('done', $generation->status, (string) $generation->error_message);
+        $first = collect(Http::recorded())->map(fn ($pair) => $pair[0])->first(fn ($r) => str_contains($r->url(), '/interactions'));
+        $this->assertSame('k2', $first->header('x-goog-api-key')[0], 'the voice\'s own key goes first');
+    }
+
+    public function test_cloned_voice_moves_to_the_next_key_when_one_cannot_serve_it(): void
+    {
+        foreach ([404 => 'Voice not found', 429 => 'Rate limit exceeded'] as $status => $message) {
+            $generation = $this->clonedGeneration([], fn (string $key) => $key === 'k2'
+                ? Http::response(['output_audio' => ['data' => base64_encode('RIFF....WAVE')]])
+                : Http::response(['error' => ['message' => $message]], $status));
+
+            $this->assertSame('done', $generation->status, $status.': '.$generation->error_message);
+        }
+    }
+
+    public function test_cloned_voice_out_of_daily_quota_says_so(): void
+    {
+        $generation = $this->clonedGeneration([], fn () => Http::response(['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']], 429));
+
+        $this->assertSame('failed', $generation->status);
+        $this->assertSame(__('ui.backend.cloned_voice_daily_limit'), $generation->error_message);
+    }
 }

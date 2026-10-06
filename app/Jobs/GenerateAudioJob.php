@@ -142,6 +142,7 @@ class GenerateAudioJob implements ShouldQueue
                         (float) ($studioOptions['speed'] ?? 1),
                         (float) ($studioOptions['pitch'] ?? 0),
                     ),
+                    $clonedVoice->metadata['key_name'] ?? null,
                 );
             } else {
                 $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);
@@ -220,7 +221,7 @@ class GenerateAudioJob implements ShouldQueue
         } catch (\Throwable $e) {
             $generation->update([
                 'status' => 'failed',
-                'error_message' => 'Voice generation failed. Please try again.',
+                'error_message' => $this->failureMessage($generation, $e),
             ]);
 
             // Log TTS failure telemetry
@@ -232,6 +233,20 @@ class GenerateAudioJob implements ShouldQueue
 
             throw $e;
         }
+    }
+
+    /**
+     * What the member is told. A cloned voice has no other engine to fall
+     * back on, so a used-up daily limit is said plainly.
+     */
+    private function failureMessage(AudioGeneration $generation, \Throwable $e): string
+    {
+        if (str_starts_with((string) $generation->voice_name, 'cloned_')
+            && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
+            return __('ui.backend.cloned_voice_daily_limit');
+        }
+
+        return 'Voice generation failed. Please try again.';
     }
 
     /**
@@ -278,7 +293,7 @@ class GenerateAudioJob implements ShouldQueue
 
         $generation->update([
             'status' => 'failed',
-            'error_message' => 'Voice generation failed. Please try again.',
+            'error_message' => $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.',
         ]);
 
         // Only release usage for async (queued) jobs.

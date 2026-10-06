@@ -86,6 +86,8 @@ class ProcessVoiceCloningJob implements ShouldQueue
                     'processed_at' => now()->toIso8601String(),
                     'model' => VoiceCloningService::MODEL,
                     'failure_code' => null,
+                    // The voice lives in this key's project; generations try it first.
+                    'key_name' => $result['key_name'] ?? null,
                 ]),
             ]);
 
