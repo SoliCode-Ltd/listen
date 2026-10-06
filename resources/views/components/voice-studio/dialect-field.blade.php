@@ -5,12 +5,15 @@
 @php
   $vsAr = app()->getLocale() === 'ar';
   $vsCountries = [];
-  foreach (\App\Support\ArabicDialects::COUNTRIES as $vsCode => $vsNames) {
+  foreach (\App\Support\ArabicDialects::COUNTRIES + \App\Support\EnglishAccents::COUNTRIES as $vsCode => $vsNames) {
       $vsCountries[] = [$vsCode, $vsAr ? $vsNames['ar'] : $vsNames['en']];
   }
   $vsCountryOf = [];
   foreach (array_keys(\App\Support\ArabicDialects::ALL) as $vsDialect) {
       $vsCountryOf[$vsDialect] = \App\Support\ArabicDialects::countryOf($vsDialect);
+  }
+  foreach (array_keys(\App\Support\EnglishAccents::ALL) as $vsDialect) {
+      $vsCountryOf[$vsDialect] = \App\Support\EnglishAccents::countryOf($vsDialect);
   }
 @endphp
 <div class="vs-field">

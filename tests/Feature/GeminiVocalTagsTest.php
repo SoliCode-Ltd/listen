@@ -419,8 +419,8 @@ class GeminiVocalTagsTest extends TestCase
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(41, $codes);
-        foreach (['ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+        $this->assertCount(50, $codes);
+        foreach (['ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
             $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
@@ -429,6 +429,25 @@ class GeminiVocalTagsTest extends TestCase
         $row = collect(TtsStudioConfig::dialectCatalogForLanguage('ar'))->firstWhere('value', 'ar-MR');
         $this->assertSame('موريتاني (حساني)', $row['label_ar']);
         $this->assertSame('maghreb', $row['region']);
+    }
+
+    public function test_english_accents_cloned_voices_and_panel_groups(): void
+    {
+        $codes = TtsStudioConfig::dialectValues('en');
+        $this->assertCount(count(\App\Support\EnglishAccents::ALL), $codes);
+        foreach (['en-US', 'en-US-SO', 'en-GB-SC', 'en-IE', 'en-NG', 'en-AR'] as $code) {
+            $this->assertContains($code, $codes);
+            $this->assertNotNull(\App\Support\EnglishAccents::countryOf($code), $code);
+        }
+        $service = app(VoiceCloningService::class);
+        $this->assertStringContainsString('Irish English accent', $service->deliveryStyle('en-IE'));
+        $this->assertStringContainsString('Sfaxi Tunisian Arabic', $service->deliveryStyle('ar-TN-SF'));
+        $this->assertStringContainsString('Emotional tone: nostalgic.', $service->deliveryStyle(null, 'neutral', 'nostalgic'));
+
+        // Style tags repeat the whole-script style: gone from the panel, still read when typed.
+        $this->assertArrayNotHasKey('style', GeminiVocalTags::panelDeliveryGroups());
+        $this->assertSame('storytelling', GeminiVocalTags::delivery('storytelling'));
+        $this->assertCount(27, GeminiVocalTags::deliveries());
     }
 
     private function memberOn(string $tier): User

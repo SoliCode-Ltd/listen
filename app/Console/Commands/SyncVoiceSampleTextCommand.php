@@ -67,6 +67,15 @@ class SyncVoiceSampleTextCommand extends Command
         'ar-MA-NO' => 'maghrebi',
         'ar-DZ-OR' => 'maghrebi',
         'ar-LY-BG' => 'maghrebi',
+        'ar-LB-TR' => 'levantine',
+        'ar-SY-DZ' => 'levantine',
+        'ar-JO-HR' => 'levantine',
+        'ar-PS-HB' => 'levantine',
+        'ar-IQ-AN' => 'iraqi',
+        'ar-YE-TZ' => 'yemeni',
+        'ar-MA-MK' => 'maghrebi',
+        'ar-DZ-CO' => 'maghrebi',
+        'ar-TN-SF' => 'maghrebi',
         'en-US' => 'american', 'en-GB' => 'british', 'en-AU' => 'australian', 'en-IN' => 'indian', 'en-ZA' => 'south_african',
     ];
 

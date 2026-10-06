@@ -8,7 +8,7 @@
 @php
   $vsTagTabs = [
     'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'groupKey' => 'vocal_tag_groups'],
-    'delivery' => ['groups' => \App\Support\GeminiVocalTags::DELIVERY_GROUPS, 'groupKey' => 'vocal_delivery_groups'],
+    'delivery' => ['groups' => \App\Support\GeminiVocalTags::panelDeliveryGroups(), 'groupKey' => 'vocal_delivery_groups'],
   ];
 @endphp
 <section class="vs-panel" data-vs-panel aria-label="{{ __('ui.dashboard.voice_studio') }}">

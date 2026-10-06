@@ -719,4 +719,35 @@ class GeminiStylePromptTest extends TestCase
         
         return $matrix;
     }
+
+    public function test_every_english_accent_travels_in_the_style_text(): void
+    {
+        foreach (\App\Support\EnglishAccents::ALL as $code => $row) {
+            $prompt = $this->buildStylePrompt->invoke($this->provider, 'neutral', 'neutral', 'en', 1.0, $code, 0.0, true);
+            $this->assertStringContainsString('Voice accent: ', $prompt, $code);
+            $this->assertLessThanOrEqual(10, strlen($code), 'fits the dialect columns');
+        }
+        $prompt = $this->buildStylePrompt->invoke($this->provider, 'neutral', 'neutral', 'en', 1.0, 'en-GB-SC', 0.0, true);
+        $this->assertStringContainsString('Voice accent: Scottish English.', $prompt);
+    }
+
+    public function test_every_style_and_emotion_has_a_direction(): void
+    {
+        foreach (\App\Support\TtsStudioConfig::performanceStyleValues() as $style) {
+            if ($style === 'neutral') {
+                continue;
+            }
+            $description = $this->getPerformanceStyleDescription->invoke($this->provider, $style, false);
+            $this->assertStringStartsNotWith('Performance style:', $description, $style.' has its own direction');
+        }
+        foreach (\App\Support\TtsStudioConfig::emotionValues() as $emotion) {
+            if (in_array($emotion, ['neutral', 'hopeful', 'serious', 'playful', 'mysterious', 'confident', 'formal'], true)) {
+                continue;
+            }
+            $this->assertNotSame('', $this->getEmotionDescription->invoke($this->provider, $emotion, false), $emotion);
+        }
+        $prompt = $this->buildStylePrompt->invoke($this->provider, 'movie_trailer', 'nostalgic', 'en', 1.0, null, 0.0, true);
+        $this->assertStringContainsString('movie-trailer voiceover', $prompt);
+        $this->assertStringContainsString('Emotional tone: wistful and nostalgic', $prompt);
+    }
 }

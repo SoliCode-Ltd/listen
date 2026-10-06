@@ -225,6 +225,16 @@ class GeminiVocalTags
      *
      * @return array<int, string>
      */
+    public static function panelDeliveryGroups(): array
+    {
+        // Style tags repeat the whole-script performance style above them in the
+        // panel; they are still read when typed.
+        return array_diff_key(self::DELIVERY_GROUPS, ['style' => true]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
     public static function deliveries(): array
     {
         return array_merge(...array_values(self::DELIVERY_GROUPS));
