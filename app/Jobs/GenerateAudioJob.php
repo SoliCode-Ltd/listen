@@ -130,10 +130,10 @@ class GenerateAudioJob implements ShouldQueue
                     $textForSpeech,
                     $studioOptions['dialect'] ?? null,
                 );
-                $audio = $voiceCloningService->synthesizeWithClonedVoice(
+                // Any of the site's keys with room today (each keeps its own copy of the voice).
+                $audio = $voiceCloningService->synthesizeForVoice(
+                    $clonedVoice,
                     $textForSpeech,
-                    $clonedVoice->language_code,
-                    $clonedVoice->provider_voice_key,
                     $voiceCloningService->deliveryStyle(
                         $studioOptions['dialect'] ?? null,
                         (string) ($studioOptions['performance_style'] ?? 'neutral'),
@@ -142,7 +142,6 @@ class GenerateAudioJob implements ShouldQueue
                         (float) ($studioOptions['speed'] ?? 1),
                         (float) ($studioOptions['pitch'] ?? 0),
                     ),
-                    $clonedVoice->metadata['key_name'] ?? null,
                 );
             } else {
                 $voiceMeta = VoiceCatalog::voiceMeta($generation->voice_name);

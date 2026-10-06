@@ -35,6 +35,9 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private ?array $currentKeyInfo = null;
 
+    /** The speech model of the current request: daily limits are per key and per model. */
+    private ?string $currentModel = null;
+
     /**
      * GeminiKeyManager instance.
      */
@@ -350,7 +353,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function getAvailableKey(): array
     {
-        $keyInfo = $this->getKeyManager()->getAvailableKey();
+        $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel);
         if ($keyInfo === null) {
             throw new \RuntimeException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
         }
@@ -369,7 +372,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             $this->getKeyManager()->markKeyExhausted($this->currentKeyInfo['name']);
         }
 
-        $keyInfo = $this->getKeyManager()->getAvailableKey();
+        $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel);
         if ($keyInfo === null) {
             return false;
         }
@@ -393,11 +396,13 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         // Get an available key (throws if all exhausted)
+        $model = GeminiTtsModel::resolve();
+        $this->currentModel = $model;
+        $this->currentKeyInfo = null;
         $keyInfo = $this->getAvailableKey();
 
         $speakers = $voiceConfig['speakers'] ?? null;
         $isDialogue = is_array($speakers) && count($speakers) > 1;
-        $model = GeminiTtsModel::resolve();
 
         // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
         // Delivery tags ([excited]) split a single voice's script into parts,
@@ -431,7 +436,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         // Record successful usage for current key
-        $this->getKeyManager()->recordUsage($keyInfo['name'], $charCount);
+        // Count it against the key that answered (it may have rotated).
+        $this->getKeyManager()->recordUsage(($this->currentKeyInfo ?? $keyInfo)['name'], $charCount);
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
 
@@ -937,6 +943,14 @@ class GeminiTtsProvider implements TtsProviderInterface
                     'key' => $keyInfo['name'],
                 ]);
                 throw new \RuntimeException('Gemini TTS API call failed: ' . $e->getMessage(), 0, $e);
+            }
+
+            // A used-up daily quota stays skipped until Google resets it.
+            if (GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body())) {
+                $this->getKeyManager()->markOutForToday(
+                    $keyInfo['name'],
+                    GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
+                );
             }
 
             // On 429, rotate to next key and retry
