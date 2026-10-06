@@ -1218,7 +1218,7 @@ return [
         'generation_text_prohibited' => 'Audio could not be generated because the entered text contains inappropriate or prohibited language. Listen does not allow abusive content.',
         'account_blocked' => 'Your account is currently blocked from accessing Listen. If you would like to request access again, please contact :email.',
         'account_blocked_with_reason' => 'Your account is currently blocked from accessing Listen. Reason: :reason. If you would like to request access again, please contact :email.',
-        'cloned_voice_daily_limit' => "Cloned voices have reached today's limit. Please try again later, or use one of the studio voices for now.",
+        'cloned_voice_daily_limit' => "Cloned voices are unavailable right now: the site's daily limit for premium voices has been reached. Please try again later, or use one of the studio voices for now.",
         'performance_style_required' => 'Choose a performance style to continue.',
         'performance_style_invalid' => 'The selected performance style is invalid.',
         'emotion_required' => 'Choose an emotion to continue.',
