@@ -71,13 +71,21 @@
     var groups = track.querySelectorAll('.auth-wave-bars');
     if (!groups.length || !info) return;
     var count = groups[0].children.length;
-    var heights = [];
+    // Average loudness per bar, spread between the quiet and loud ends of this
+    // sample, so the bars show the shape of the speech instead of all reaching the top.
+    var levels = [];
     var per = info.rms.length / count;
     for (var b = 0; b < count; b++) {
-      var peak = 0;
-      for (var k = Math.floor(b * per); k < Math.floor((b + 1) * per); k++) peak = Math.max(peak, info.rms[k] || 0);
-      heights.push(Math.round(5 + 27 * Math.sqrt(Math.min(1, peak / info.loud))));
+      var sum = 0, n = 0;
+      for (var k = Math.floor(b * per); k < Math.floor((b + 1) * per); k++) { sum += info.rms[k] || 0; n++; }
+      levels.push(n ? sum / n : 0);
     }
+    var ordered = levels.slice().sort(function (x, y) { return x - y; });
+    var low = ordered[Math.floor(count * 0.08)] || 0, high = ordered[Math.floor(count * 0.96)] || 1;
+    var heights = levels.map(function (l) {
+      var x = Math.max(0, Math.min(1, (l - low) / Math.max(1e-6, high - low)));
+      return Math.round(5 + 27 * Math.pow(x, 0.9));
+    });
     groups.forEach(function (g) {
       for (var i = 0; i < g.children.length; i++) g.children[i].style.height = heights[i] + 'px';
     });

@@ -543,7 +543,7 @@ html body.auth-split-body .auth-perks li::before {
 /* ---------- Sample player ---------- */
 html body.auth-split-body .auth-player {
   margin-top: 12px;
-  padding: 8px 8px 0;
+  padding: 8px;
   border-radius: 20px;
   border: 1px solid var(--sc-card-line);
   background: var(--sc-card);
@@ -701,12 +701,15 @@ html body.auth-split-body .auth-wave-bars i {
   transform-origin: center;
   will-change: transform;
 }
-/* The played part: the same bars in the brand colour, revealed smoothly. */
+/* The played part: the same bars in the brand colour, revealed with the same
+   soft edge as the words (fully hidden at 0, fully shown at the end). */
 html body.auth-split-body .auth-wave-fill {
-  clip-path: inset(0 calc((1 - var(--nt-progress)) * 100%) 0 0);
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(var(--nt-progress) * 108% - 8%), transparent calc(var(--nt-progress) * 108%));
+  mask-image: linear-gradient(90deg, #000 calc(var(--nt-progress) * 108% - 8%), transparent calc(var(--nt-progress) * 108%));
 }
 html[dir="rtl"] body.auth-split-body .auth-wave-fill {
-  clip-path: inset(0 0 0 calc((1 - var(--nt-progress)) * 100%));
+  -webkit-mask-image: linear-gradient(270deg, #000 calc(var(--nt-progress) * 108% - 8%), transparent calc(var(--nt-progress) * 108%));
+  mask-image: linear-gradient(270deg, #000 calc(var(--nt-progress) * 108% - 8%), transparent calc(var(--nt-progress) * 108%));
 }
 html body.auth-split-body .auth-wave-fill i {
   background: var(--au-accent);
@@ -719,24 +722,6 @@ html body.auth-split-body .auth-time {
   color: var(--sc-muted);
   font-variant-numeric: tabular-nums;
   text-align: end;
-}
-html body.auth-split-body .auth-player-foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 10px 14px;
-  font-size: 13px;
-  color: var(--sc-muted);
-}
-html body.auth-split-body .auth-player-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--au-ok);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--au-ok) 22%, transparent);
-}
-html body.auth-split-body .auth-player-sep {
-  opacity: .6;
 }
 @media (prefers-reduced-motion: reduce) {
   html body.auth-split-body .auth-play,
