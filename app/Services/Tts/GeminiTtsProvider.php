@@ -355,10 +355,17 @@ class GeminiTtsProvider implements TtsProviderInterface
         $model = GeminiTtsModel::resolve();
 
         // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
+        // Delivery tags ([excited]) split a single voice's script into parts,
+        // each read with its own direction; in a dialogue they apply to the whole script.
         if (GeminiTtsModel::usesStructuredSpeech($model)) {
-            $prepared = GeminiVocalTags::prepare($text);
-            $text = $prepared['text'];
-            $voiceConfig['vocal_cues'] = $prepared['cues'];
+            if ($isDialogue) {
+                $prepared = GeminiVocalTags::prepare($text);
+                $text = $prepared['text'];
+                $voiceConfig['vocal_cues'] = $prepared['cues'];
+            } else {
+                $voiceConfig['vocal_parts'] = GeminiVocalTags::parts($text);
+                $text = implode(' ', array_column($voiceConfig['vocal_parts'], 'text'));
+            }
             if (trim(GeminiVocalTags::strip($text)) === '') {
                 throw new \RuntimeException('TTS text is empty.');
             }
@@ -424,11 +431,14 @@ class GeminiTtsProvider implements TtsProviderInterface
         // Long outputs end with finishReason OTHER and no audio, so long
         // texts are read in pieces and the audio is joined.
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
-        $chunks = mb_strlen($text) > $maxChars ? TextChunker::split($text, $maxChars, 'mb_strlen') : [$text];
-        $payloads = array_map(
-            fn(string $chunk) => $this->buildSingleSpeakerPayload($model, $chunk, $stylePrompt, $voiceName, $languageCode),
-            $chunks,
-        );
+        $payloads = [];
+        foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $part) {
+            $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
+            $chunks = mb_strlen($part['text']) > $maxChars ? TextChunker::split($part['text'], $maxChars, 'mb_strlen') : [$part['text']];
+            foreach ($chunks as $chunk) {
+                $payloads[] = $this->buildSingleSpeakerPayload($model, $chunk, $partStyle, $voiceName, $languageCode);
+            }
+        }
 
         $audio = count($payloads) === 1
             ? $this->requestAudio($endpoint, $payloads[0])

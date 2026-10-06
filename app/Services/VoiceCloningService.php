@@ -208,9 +208,9 @@ class VoiceCloningService
         }
 
         $startTime = microtime(true);
-        $prepared = GeminiVocalTags::prepare($text);
-        $text = $prepared['text'];
-        $style = GeminiVocalTags::withCues($style, $prepared['cues']);
+        // Delivery tags ([excited]) split the script into parts, each with its own direction.
+        $parts = GeminiVocalTags::parts($text);
+        $text = implode(' ', array_column($parts, 'text'));
         if (trim(GeminiVocalTags::strip($text)) === '') {
             throw new \RuntimeException('TTS text is empty.');
         }
@@ -218,10 +218,17 @@ class VoiceCloningService
         // Long outputs end with no audio, so long scripts are read in pieces
         // and joined, the same way the stock Gemini voices are.
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
-        $chunks = TextChunker::split($text, $maxChars, 'mb_strlen');
+        $chunks = [];
+        $styles = [];
+        foreach ($parts as $part) {
+            foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen') as $chunk) {
+                $chunks[] = $chunk;
+                $styles[] = GeminiVocalTags::withCues($style, $part['cues']);
+            }
+        }
         $audioContent = count($chunks) === 1
-            ? $this->speakPiece($chunks[0], $voiceCloningKey, $style)
-            : $this->joinWavPieces($this->speakPieces($chunks, $voiceCloningKey, $style));
+            ? $this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])
+            : $this->joinWavPieces($this->speakPieces($chunks, $voiceCloningKey, $styles));
 
         $packaged = \App\Support\ShareableAudio::package($audioContent);
         $audioContent = $packaged['bytes'];
@@ -276,7 +283,10 @@ class VoiceCloningService
      * @param  array<int, string>  $chunks
      * @return array<int, string>
      */
-    private function speakPieces(array $chunks, string $voiceId, string $style): array
+    /**
+     * @param  string|array<int, string>  $style  One direction for all pieces, or one per piece.
+     */
+    private function speakPieces(array $chunks, string $voiceId, string|array $style): array
     {
         $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $keys = $this->apiKeys();
@@ -299,7 +309,7 @@ class VoiceCloningService
                             'Content-Type' => 'application/json',
                             'x-goog-api-key' => $key,
                         ])
-                        ->post($baseUrl.'/interactions', $this->interactionPayload($chunk, $voiceId, $style));
+                        ->post($baseUrl.'/interactions', $this->interactionPayload($chunk, $voiceId, is_array($style) ? $style[$index] : $style));
                 }
             });
 
@@ -320,7 +330,7 @@ class VoiceCloningService
                     'pieces' => count($chunks),
                     'status' => $response instanceof Response ? $response->status() : null,
                 ]);
-                $parts[$index] = $this->speakPiece($chunk, $voiceId, $style);
+                $parts[$index] = $this->speakPiece($chunk, $voiceId, is_array($style) ? $style[$index] : $style);
             }
         }
 
