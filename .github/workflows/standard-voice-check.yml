@@ -18,6 +18,7 @@ on:
       - scripts/tts/**
       - app/Support/StandardVoiceEngine.php
       - app/Services/Tts/GoogleCloudTtsProvider.php
+      - app/Support/GeminiVocalTags.php
 
 permissions:
   contents: read
@@ -45,14 +46,17 @@ jobs:
                 -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' \
                 -e "s/SiteSetting::get(self::SETTING_KEY, self::WAVENET)/(\$GLOBALS['standard_engine'] ?? self::WAVENET)/" \
                 app/Support/StandardVoiceEngine.php
+            sed -e '1d' -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' \
+                app/Support/GeminiVocalTags.php
             sed -e '1d' \
                 -e 's/^namespace App\\Services\\Tts;/namespace ListenUnderTest;/' \
                 -e '/^use App\\Support\\StandardVoiceEngine;/d' \
+                -e '/^use App\\Support\\GeminiVocalTags;/d' \
                 app/Services/Tts/GoogleCloudTtsProvider.php
           } > under_test.php
           php -l under_test.php
           grep -q "GLOBALS\['standard_engine'\]" under_test.php
-          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = 2
+          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = 3
           python3 - <<'PY'
           import base64
           code = base64.b64encode(open('under_test.php', 'rb').read()).decode()
@@ -116,7 +120,7 @@ jobs:
                       seconds = ''
               status = 'OK  ' if case['ok'] else 'FAIL'
               failures += 0 if case['ok'] else 1
-              print(f"  {status} {case['name']:<45} {case['voice']:<32} {case['latency_ms']:>6} ms {case.get('bytes', 0):>8} B{seconds} {case.get('error', '')}")
+              print(f"  {status} {case['name']:<45} {str(case.get('voice')):<32} {case.get('latency_ms') or 0:>6} ms {case.get('bytes') or 0:>8} B{seconds} {case.get('error', '')}")
           missing = sum(len(r['mapped_voices_missing']) for r in data['voice_list'].values())
           print(f"\n{failures} synthesis failures, {missing} mapped voices missing.")
           json.dump(data, open('summary.json', 'w'), ensure_ascii=False, indent=2)

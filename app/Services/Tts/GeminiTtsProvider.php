@@ -4,6 +4,7 @@ namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
 use App\Support\GeminiTtsModel;
+use App\Support\GeminiVocalTags;
 use App\Support\ShareableAudio;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
@@ -353,6 +354,18 @@ class GeminiTtsProvider implements TtsProviderInterface
         $isDialogue = is_array($speakers) && count($speakers) > 1;
         $model = GeminiTtsModel::resolve();
 
+        // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
+        if (GeminiTtsModel::usesStructuredSpeech($model)) {
+            $prepared = GeminiVocalTags::prepare($text);
+            $text = $prepared['text'];
+            $voiceConfig['vocal_cues'] = $prepared['cues'];
+            if (trim(GeminiVocalTags::strip($text)) === '') {
+                throw new \RuntimeException('TTS text is empty.');
+            }
+        } else {
+            $text = GeminiVocalTags::forLegacyModel($text);
+        }
+
         if ($isDialogue) {
             $result = $this->synthesizeDialogue($text, $targetLanguage, $speakers, $voiceConfig, $model);
         } else {
@@ -405,6 +418,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $pitch,
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
+        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
         $endpoint = $this->buildEndpoint($model);
 
         // Long outputs end with finishReason OTHER and no audio, so long
@@ -584,6 +598,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $pitch,
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
+        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
         $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
 
         $audio = $this->requestAudio($endpoint, $payload);

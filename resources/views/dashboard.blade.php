@@ -1295,6 +1295,74 @@
       color: var(--muted);
 
     }
+    .vocal-tags {
+      margin-top: .5rem;
+      border: 1px solid var(--line, rgba(255,255,255,.12));
+      border-radius: 12px;
+      padding: .5rem .75rem;
+      background: color-mix(in oklab, var(--surface2, #1b1b24) 60%, transparent);
+    }
+    .vocal-tags > summary {
+      cursor: pointer;
+      font-weight: 600;
+      font-size: .9rem;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: .5rem;
+    }
+    .vocal-tags > summary small {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: .78rem;
+    }
+    .vocal-tag-groups {
+      display: grid;
+      gap: .45rem;
+      margin-top: .6rem;
+    }
+    .vocal-tag-group {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: .35rem;
+    }
+    .vocal-tag-group-label {
+      min-width: 5.5rem;
+      font-size: .78rem;
+      color: var(--muted);
+    }
+    .vocal-tag-chip {
+      border: 1px solid var(--line, rgba(255,255,255,.14));
+      background: var(--surface, transparent);
+      color: inherit;
+      border-radius: 999px;
+      padding: .2rem .6rem;
+      font-size: .78rem;
+      font-family: var(--font-mono, ui-monospace, monospace);
+      cursor: pointer;
+      min-height: 32px;
+    }
+    .vocal-tag-chip:hover,
+    .vocal-tag-chip:focus-visible {
+      border-color: var(--a);
+      outline: none;
+    }
+    .vocal-tag-tips {
+      margin-top: .6rem;
+      font-size: .82rem;
+    }
+    .vocal-tag-tips summary {
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .vocal-tag-tips ul {
+      margin: .4rem 0 0;
+      padding-inline-start: 1.1rem;
+      display: grid;
+      gap: .3rem;
+      line-height: 1.6;
+    }
     .char-counter.warning {
       color: var(--warning, #f59e0b);
     }
@@ -2142,6 +2210,29 @@
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
             </div>
+            @if(($planTier ?? 'standard') === 'hd')
+            <details class="vocal-tags" id="vocalTags">
+              <summary>🎙️ {{ __('ui.dashboard.vocal_tags') }} <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small></summary>
+              <div class="vocal-tag-groups">
+                @foreach(\App\Support\GeminiVocalTags::GROUPS as $group => $groupTags)
+                  <div class="vocal-tag-group">
+                    <span class="vocal-tag-group-label">{{ __('ui.dashboard.vocal_tag_groups.'.$group) }}</span>
+                    @foreach($groupTags as $vocalTag)
+                      <button type="button" class="vocal-tag-chip" data-vocal-tag="{{ $vocalTag }}" dir="ltr">&lt;{{ $vocalTag }}&gt;</button>
+                    @endforeach
+                  </div>
+                @endforeach
+              </div>
+              <details class="vocal-tag-tips">
+                <summary>💡 {{ __('ui.dashboard.vocal_tags_tips') }}</summary>
+                <ul>
+                  @foreach(__('ui.dashboard.vocal_tags_tip_items') as $tip)
+                    <li>{{ $tip }}</li>
+                  @endforeach
+                </ul>
+              </details>
+            </details>
+            @endif
           </div>
 
           <div class="two-col control-pair">
@@ -3882,6 +3973,23 @@
     }
     if (contentInput) {
       contentInput.addEventListener('input', updateCharCounter);
+      // Sound tags: insert <tag> at the cursor, with spaces around it.
+      document.querySelectorAll('[data-vocal-tag]').forEach((chip) => {
+        chip.addEventListener('click', () => {
+          const tag = '<' + chip.dataset.vocalTag + '>';
+          const value = contentInput.value;
+          const start = contentInput.selectionStart ?? value.length;
+          const end = contentInput.selectionEnd ?? start;
+          const before = value.slice(0, start);
+          const after = value.slice(end);
+          const insert = (before && !/\s$/.test(before) ? ' ' : '') + tag + (after && !/^\s/.test(after) ? ' ' : '');
+          contentInput.value = before + insert + after;
+          const caret = before.length + insert.length;
+          contentInput.focus();
+          contentInput.setSelectionRange(caret, caret);
+          contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+      });
       updateCharCounter(); // initial count for old('content')
     }
     if (dashboardNavLinks.length) {

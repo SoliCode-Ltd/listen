@@ -893,6 +893,26 @@ return [
         'style_prompt' => 'Custom Prompt',
         'style_prompt_placeholder' => 'Describe how you want the voice to sound (e.g., "Speak with enthusiasm and energy, like a sports commentator")',
         'style_prompt_hint' => 'Custom voice styling for Premium voices on Listen Studio. Max 2000 characters.',
+        'vocal_tags' => 'Sound tags',
+        'vocal_tags_hint' => 'Tap a sound to add it where the cursor is. Premium voices only.',
+        'vocal_tags_tips' => 'How to use sound tags',
+        'vocal_tag_groups' => [
+            'laughter' => 'Laughter',
+            'breath' => 'Breath',
+            'pauses' => 'Pauses',
+            'voice' => 'Voice',
+            'body' => 'Body',
+            'emotion' => 'Emotion',
+        ],
+        'vocal_tags_tip_items' => [
+            'Put the tag exactly where the sound should happen, usually between sentences: "That was close. <phew> Let\'s go."',
+            'Tags are sounds, not moods. For a whole mood (happy, angry, calm) use Emotion & tone or the Custom Prompt.',
+            'Keep tags in English, even in Arabic text: "يا سلام! <laugh> ما توقعت هذا أبداً."',
+            'Use them sparingly: one or two per paragraph sounds natural, too many sounds forced.',
+            'Use <short pause> or <long pause> for a beat of silence. Punctuation (… , .) also shapes the pacing.',
+            'Scripts written for ElevenLabs work too: [laughs] becomes <laugh>, and mood tags like [excited] are applied as delivery style.',
+            'Standard voices skip sound tags, so they are never read aloud.',
+        ],
     ],
 
     // ===== AUTH =====

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\GeminiVocalTags;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -19,14 +20,17 @@ class TranslationService
             return $text;
         }
 
-        $cacheKey = 'listen:tr:v2:'.sha1($sourceLanguage.'|'.$targetLanguage.'|'.$text);
+        $cacheKey = 'listen:tr:v3:'.sha1($sourceLanguage.'|'.$targetLanguage.'|'.$text);
         $cached = Cache::get($cacheKey);
         if (is_string($cached) && $cached !== '') {
             return $cached;
         }
 
-        $translated = $this->googleTranslate($text, $sourceLanguage, $targetLanguage);
+        // Sound and mood tags like <laugh> or [excited] stay in English.
+        $protected = GeminiVocalTags::protect($text);
+        $translated = $this->googleTranslate($protected['text'], $sourceLanguage, $targetLanguage);
         if (is_string($translated) && $translated !== '') {
+            $translated = GeminiVocalTags::restore($translated, $protected['tags']);
             Cache::put($cacheKey, $translated, now()->addDays(14));
             return $translated;
         }
