@@ -47,7 +47,8 @@
             <svg class="auth-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
           </button>
           <div class="nt-wave auth-wave" aria-hidden="true">
-            @foreach($authWave as $h)<span style="height: {{ $h }}px"></span>@endforeach
+            <div class="auth-wave-bars">@foreach($authWave as $h)<i style="height: {{ $h }}px"></i>@endforeach</div>
+            <div class="auth-wave-bars auth-wave-fill">@foreach($authWave as $h)<i style="height: {{ $h }}px"></i>@endforeach</div>
           </div>
           <span class="auth-time" data-nt-time>0:00</span>
         </div>

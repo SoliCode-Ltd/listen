@@ -24,7 +24,10 @@
     }
   }
   function paintWave(track, ratio) {
-    var bars = track ? track.querySelectorAll('.nt-wave span') : [];
+    var wave = track ? track.querySelector('.nt-wave') : null;
+    // Waves with a fill layer sweep smoothly instead of lighting bar by bar.
+    if (wave) wave.style.setProperty('--nt-progress', String(Math.max(0, Math.min(1, ratio))));
+    var bars = track ? track.querySelectorAll('.nt-wave > span') : [];
     var lit = Math.round(bars.length * ratio);
     for (var i = 0; i < bars.length; i++) bars[i].classList.toggle('is-lit', i < lit);
     var time = track ? track.querySelector('[data-nt-time]') : null;
@@ -56,9 +59,14 @@
   });
   audio.addEventListener('pause', function () { if (current) setState(current, false); });
   audio.addEventListener('ended', function () { if (current) { paintWave(current, 1); setState(current, false); } });
-  audio.addEventListener('timeupdate', function () {
+  // timeupdate fires only about four times a second, so progress is painted every frame while playing.
+  var frame = 0;
+  function tick() {
     if (current && isFinite(audio.duration) && audio.duration > 0) paintWave(current, audio.currentTime / audio.duration);
-  });
+    frame = audio.paused ? 0 : requestAnimationFrame(tick);
+  }
+  audio.addEventListener('playing', function () { if (!frame) frame = requestAnimationFrame(tick); });
+  audio.addEventListener('timeupdate', function () { if (!frame) tick(); });
 
   root.addEventListener('click', function (event) {
     var btn = event.target.closest('[data-nt-play]');
