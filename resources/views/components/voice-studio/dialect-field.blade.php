@@ -16,7 +16,6 @@
 <div class="vs-field">
   <div class="vs-field-label">
     <span>{{ __('ui.dashboard.dialect') }}</span>
-    <span class="vs-dialect-current" data-vs-dialect-current></span>
   </div>
   <select name="dialect" id="dialect" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
     <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>

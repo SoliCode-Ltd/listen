@@ -157,7 +157,6 @@
     // ---------- Dialect picker: country, then that country's dialects ----------
     var picker = panel.querySelector('[data-vs-dialects]');
     var select = form.querySelector('select[name="dialect"]');
-    var current = panel.querySelector('[data-vs-dialect-current]');
     var countrySelect = panel.querySelector('[data-vs-country]');
     var countryWrap = panel.querySelector('[data-vs-country-wrap]');
     if (picker && select) {
@@ -179,8 +178,6 @@
         picker.querySelectorAll('[data-dialect]').forEach(function (b) {
           b.setAttribute('aria-checked', b.dataset.dialect === select.value ? 'true' : 'false');
         });
-        var picked = select.options[select.selectedIndex];
-        if (current) current.textContent = picked && picked.value ? picked.textContent : '';
       };
       // Inside a country the country is already shown: "Saudi (Hejazi)" reads as "Hejazi".
       var shortLabel = function (text) {
