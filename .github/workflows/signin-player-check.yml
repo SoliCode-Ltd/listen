@@ -1,0 +1,51 @@
+name: Sign-in player check
+
+# Plays every sample on the STAGING sign-in page in Chromium, with this
+# branch's player script and auth.css swapped in, and reports frame by frame
+# how smoothly the waveform and word highlight follow the real audio.
+# Uploads videos and screenshots. Read-only: it only loads public pages.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/signin-player-check.yml
+      - scripts/ui/signin_player_check.mjs
+      - resources/views/components/design-new/player-script.blade.php
+      - public/css/auth.css
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install Playwright
+        run: |
+          mkdir -p /tmp/pw && cd /tmp/pw && npm init -y >/dev/null && npm i playwright@1.56.1 >/dev/null
+          npx --prefix /tmp/pw playwright install --with-deps chromium >/dev/null
+      - name: Play the samples
+        env:
+          STAGING_URL: https://phplaravel-1516130-6707450.cloudwaysapps.com
+          NODE_PATH: /tmp/pw/node_modules
+        run: |
+          cp scripts/ui/signin_player_check.mjs /tmp/pw/check.mjs
+          mkdir -p /tmp/pw/resources/views/components/design-new /tmp/pw/public/css
+          cp resources/views/components/design-new/player-script.blade.php /tmp/pw/resources/views/components/design-new/
+          cp public/css/auth.css /tmp/pw/public/css/
+          cd /tmp/pw && node check.mjs
+          cp -r out "$GITHUB_WORKSPACE/out"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: signin-player-check-${{ github.run_number }}
+          path: out/
+          if-no-files-found: ignore
+          retention-days: 14
