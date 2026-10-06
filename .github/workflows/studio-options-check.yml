@@ -1,0 +1,80 @@
+name: Studio options check
+
+# Live check on STAGING that Gemini 3.8 follows the studio's accents,
+# dialects, emotions and styles: the exact style text this branch builds
+# (scripts/tts/studio_options_cases.json) is spoken, and a second Gemini
+# model names what it hears without being told the target. Uses about 45
+# Gemini requests. Uploads the audio.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/studio-options-check.yml
+      - scripts/tts/studio_options_check.php
+      - scripts/tts/studio_options_cases.json
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the check script with the cases
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json
+          cases = json.load(open('scripts/tts/studio_options_cases.json'))
+          assert cases and all('style_text' in c for c in cases)
+          script = open('scripts/tts/studio_options_check.php').read()
+          assert '__CASES__' in script
+          open('check.php', 'w').write(script.replace('__CASES__', base64.b64encode(json.dumps(cases).encode()).decode()))
+          PY
+          php -l check.php
+      - name: Run on staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < check.php > result.json
+          rm -f ~/.ssh/id_check
+      - name: Summarise
+        run: |
+          mkdir -p audio
+          python3 - <<'PY'
+          import json, base64, re
+          d = json.load(open('result.json'))
+          print(d['meta'])
+          for c in d['cases']:
+              a = c.pop('audio_base64', None)
+              t = c['target']
+              name = '_'.join(str(t.get(k, '')) for k in ('kind', 'dialect', 'style', 'emotion'))
+              if a:
+                  open('audio/' + re.sub(r'[^A-Za-z0-9_-]+', '_', name) + '.wav', 'wb').write(base64.b64decode(a))
+              h = c.get('heard', {})
+              print(f"{name} || heard: {h.get('accent_or_dialect')} ({h.get('confidence')}) | emotion: {h.get('emotion')} | style: {h.get('delivery_style')} | reads instructions: {h.get('reads_instructions_aloud')} | {c.get('error', '')}")
+          print('\nFULL')
+          print(json.dumps(d['cases'], ensure_ascii=False, indent=1))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: studio-options-check-${{ github.run_number }}
+          path: audio/
+          if-no-files-found: ignore
+          retention-days: 14

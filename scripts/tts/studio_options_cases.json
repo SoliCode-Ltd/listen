@@ -1,0 +1,218 @@
+[
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-TN-SF",
+        "style": "neutral",
+        "emotion": "joyful",
+        "voice": "Iapetus",
+        "text": "شنوة أحوالك؟ اليوم مشيت للسوق وشريت برشا حاجات، الدنيا باهية برشا.",
+        "style_text": "Voice dialect: Sfaxi Tunisian Arabic (Sfax). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: bright, joyful, and full of delight. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-MA-MK",
+        "style": "conversational",
+        "emotion": "neutral",
+        "voice": "Kore",
+        "text": "واش نتا لاباس؟ بغيت نقولك واحد الحاجة، غدا غادي نمشيو للمدينة القديمة.",
+        "style_text": "Voice dialect: Marrakchi Moroccan Arabic (Marrakech). Speak with authentic regional pronunciation and natural dialect characteristics. Speak this Arabic text naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth bleeding through. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-PS-HB",
+        "style": "storytelling",
+        "emotion": "nostalgic",
+        "voice": "Iapetus",
+        "text": "زمان كنا نقعد تحت الدالية ونحكي قصص لحد ما ينام الكل.",
+        "style_text": "Voice dialect: Khalili Palestinian Arabic (Hebron). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: wistful and nostalgic, remembering better days. Narrate this Arabic text like a master storyteller captivating an audience around a fire. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-JO-HR",
+        "style": "neutral",
+        "emotion": "proud",
+        "voice": "Charon",
+        "text": "والله يا زلمة هالشغلة بدها صبر، بس احنا قدها.",
+        "style_text": "Voice dialect: Horani Arabic (Irbid and the Hauran). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: proud and dignified, with quiet triumph. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-IQ-AN",
+        "style": "news",
+        "emotion": "serious",
+        "voice": "Charon",
+        "text": "شلونكم يا جماعة؟ اليوم راح نحچي عن الأخبار المهمة بالمنطقة.",
+        "style_text": "Voice dialect: Anbari Iraqi Arabic (Ramadi and western Iraq, Bedouin-influenced). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: serious. You are an urgent Arabic news anchor on live television. Deliver with sharp, commanding authority and rapid intensity. Deep, resonant voice with zero warmth \\xe2\\x80\\x94 pure broadcast professionalism and urgency. Punch each headline hard. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-YE-TZ",
+        "style": "neutral",
+        "emotion": "warm",
+        "voice": "Kore",
+        "text": "كيف حالك يا خبيري؟ اشتي اقلك شي مهم عن السفر.",
+        "style_text": "Voice dialect: Ta'izzi Yemeni Arabic (Taiz). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: warm, friendly, and approachable. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-LB-TR",
+        "style": "radio_host",
+        "emotion": "playful",
+        "voice": "Puck",
+        "text": "كيفكن يا شباب؟ اليوم عنا برنامج حلو كتير، خليكن معنا.",
+        "style_text": "Voice dialect: Tripolitan Lebanese Arabic (Tripoli, North Lebanon). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: playful. You are a charismatic Arabic radio host between songs. Smooth, warm, effortlessly cool delivery. Quick wit, playful energy, and that signature radio sparkle that keeps listeners tuned in. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-DZ-CO",
+        "style": "neutral",
+        "emotion": "calm",
+        "voice": "Iapetus",
+        "text": "واش راك خويا؟ اليوم الجو مليح بزاف، نروحو نتمشاو شوية.",
+        "style_text": "Voice dialect: Constantinois Algerian Arabic (Constantine, eastern Algeria). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: serene, peaceful, and deeply relaxing. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-SY-DZ",
+        "style": "neutral",
+        "emotion": "sad",
+        "voice": "Charon",
+        "text": "شلونك عيني؟ والله اشتقنالك هواية، الفرات مو مثل قبل.",
+        "style_text": "Voice dialect: Deiri Syrian Arabic (Deir ez-Zor, Euphrates). Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: melancholic, sorrowful, with deep emotional weight. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha."
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-EG",
+        "style": "movie_trailer",
+        "emotion": "suspenseful",
+        "voice": "Charon",
+        "text": "في عالم مفيش فيه أمان، واحد بس هيقدر يغير كل حاجة.",
+        "style_text": "Voice dialect: Egyptian Arabic. Speak with authentic regional pronunciation and natural dialect characteristics. Emotional tone: tense and suspenseful, keeping the listener on edge. Deliver this Arabic text like an epic movie-trailer voiceover: deep, resonant, with dramatic pauses between lines and every phrase landing with weight. Stay in Cairene Egyptian colloquial Arabic, not Modern Standard Arabic. Pronounce ج like the English g, and use Cairo rhythm, the way someone from Cairo talks to a friend. Do not switch to formal Fusha or news-anchor pronunciation."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-US-SO",
+        "style": "conversational",
+        "emotion": "warm",
+        "voice": "Puck",
+        "text": "Well hey there, y'all. Come on in and sit a spell, supper is almost ready.",
+        "style_text": "Emotional tone: warm, friendly, and approachable. Speak naturally and spontaneously, like chatting with a close friend over coffee. Relaxed, genuine, with natural laughter moments and real human warmth. Voice accent: Southern American English, a warm Texas and Georgia drawl. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-GB-SC",
+        "style": "neutral",
+        "emotion": "joyful",
+        "voice": "Iapetus",
+        "text": "It is a braw day the night, so we will head down to the loch after work.",
+        "style_text": "Emotional tone: bright, joyful, and full of delight.  Voice accent: Scottish English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-IE",
+        "style": "storytelling",
+        "emotion": "nostalgic",
+        "voice": "Kore",
+        "text": "When I was a young lad we used to walk to the village every Sunday morning.",
+        "style_text": "Emotional tone: wistful and nostalgic, remembering better days. Narrate like a master storyteller captivating an audience. Use dramatic pauses, vary your pace, whisper the tense moments, and build suspense with every sentence. Voice accent: Irish English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-IN",
+        "style": "customer_service",
+        "emotion": "empathetic",
+        "voice": "Kore",
+        "text": "Thank you for calling. I completely understand the problem, and I will fix it for you right away.",
+        "style_text": "Emotional tone: understanding, gentle, and compassionate. Speak like a friendly, professional customer-service agent: clear, patient, polite, and reassuring, with a smile in the voice. Voice accent: Indian English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-NG",
+        "style": "neutral",
+        "emotion": "determined",
+        "voice": "Charon",
+        "text": "We are going to finish this project on time, no matter what it takes.",
+        "style_text": "Emotional tone: firm, determined, and resolute.  Voice accent: Nigerian English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-AR",
+        "style": "neutral",
+        "emotion": "neutral",
+        "voice": "Iapetus",
+        "text": "Welcome to our company. We are very happy to work with you this year.",
+        "style_text": "Read the following text naturally with clear pronunciation and a balanced, professional tone. Voice accent: English spoken by a native Arabic speaker, with a natural Arabic accent. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-GB-LD",
+        "style": "comedic",
+        "emotion": "sarcastic",
+        "voice": "Puck",
+        "text": "Oh brilliant, another Monday. Just what I needed, mate.",
+        "style_text": "Emotional tone: dry and sarcastic, with ironic emphasis. Deliver with sharp wit, mischievous humor, and perfect comedic timing. Add playful sarcasm and cheeky pauses. Sound like you are trying not to laugh at your own cleverness. Voice accent: London English (Estuary English). Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-US",
+        "style": "asmr",
+        "emotion": "tender",
+        "voice": "Kore",
+        "text": "Close your eyes, take a slow breath, and let the day drift away.",
+        "style_text": "Emotional tone: soft, tender, and caring, like speaking to someone you love. Speak in a very soft, close, intimate whisper, slow and gentle, as in an ASMR recording. Voice accent: American English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-AU",
+        "style": "sports_commentator",
+        "emotion": "excited",
+        "voice": "Puck",
+        "text": "And he goes for it, down the wing, he shoots, and it is in the back of the net!",
+        "style_text": "Emotional tone: highly energetic, enthusiastic, and thrilling. You are an ELECTRIC sports commentator during the most intense football match! EXPLODE with energy on every play! Build tension, SCREAM the goals with raw passion! Let your voice crack with excitement! GOOOOOAL! Voice accent: Australian English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "stock",
+        "lang": "en",
+        "dialect": "en-US",
+        "style": "neutral",
+        "emotion": "fearful",
+        "voice": "Kore",
+        "text": "Did you hear that? Something is moving in the dark behind the door.",
+        "style_text": "Emotional tone: frightened and fearful, with a slightly trembling voice.  Voice accent: American English. Keep this accent consistent and do not switch to a different English accent."
+    },
+    {
+        "kind": "cloned",
+        "dialect": "ar-TN-SF",
+        "style": "neutral",
+        "emotion": "joyful",
+        "text": "شنوة أحوالك؟ اليوم مشيت للسوق وشريت برشا حاجات، الدنيا باهية برشا.",
+        "style_text": "Sfaxi Tunisian Arabic, the way someone from Sfax talks. Do not use an Egyptian accent. Emotional tone: joyful."
+    },
+    {
+        "kind": "cloned",
+        "dialect": "en-IE",
+        "style": "storytelling",
+        "emotion": "nostalgic",
+        "text": "When I was a young lad we used to walk to the village every Sunday morning.",
+        "style_text": "Irish English accent, the way someone from Dublin talks. Performance style: storytelling. Emotional tone: nostalgic."
+    }
+]
