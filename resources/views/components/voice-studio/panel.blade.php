@@ -1,13 +1,14 @@
 {{--
-  Voice studio side panel: voice settings, sound effects and delivery tags.
+  Voice studio side panel: language settings, sound effects and delivery.
   Used by the dashboard generator and the demo page; behaviour in js/voice-studio.js.
-  The slot is the voice tab (each page passes its own fields).
+  The slot is the language tab; the optional wholeScript slot (style, emotion,
+  speed, pitch) opens the delivery tab. Each tag tab picks a category, then its tags.
 --}}
 @props(['showTags' => true])
 @php
   $vsTagTabs = [
     'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'groupKey' => 'vocal_tag_groups'],
-    'delivery' => ['groups' => \App\Support\GeminiVocalTags::DELIVERY_GROUPS, 'groupKey' => 'vocal_delivery_groups'],
+    'delivery' => ['groups' => \App\Support\GeminiVocalTags::panelDeliveryGroups(), 'groupKey' => 'vocal_delivery_groups'],
   ];
 @endphp
 <section class="vs-panel" data-vs-panel aria-label="{{ __('ui.dashboard.voice_studio') }}">
@@ -41,27 +42,27 @@
     @foreach($vsTagTabs as $tabKey => $tab)
       <div class="vs-pane" role="tabpanel" data-vs-pane="{{ $tabKey }}" hidden>
         <div class="vs-results-title" data-vs-results-title hidden><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span> {{ __('ui.dashboard.vocal_tab_'.$tabKey) }}</div>
-        @if($tabKey === 'delivery')
-          {{-- Whole-script style and emotion: buttons for the form's performance_style and emotion fields. --}}
-          <div class="vs-section-title">{{ __('ui.dashboard.vocal_whole_script') }}</div>
-          <p class="vs-pane-hint">{{ __('ui.dashboard.vocal_whole_script_hint') }}</p>
-          <div class="vs-groups">
-            <div class="vs-group" data-vs-group>
-              <div class="vs-group-label">{{ __('ui.dashboard.performance_style') }}</div>
-              <div class="vs-chips" data-vs-choice="performance_style"></div>
-            </div>
-            <div class="vs-group" data-vs-group>
-              <div class="vs-group-label">{{ __('ui.dashboard.emotion_tone') }}</div>
-              <div class="vs-chips" data-vs-choice="emotion"></div>
-            </div>
+        @if($tabKey === 'delivery' && isset($wholeScript))
+          <div class="vs-whole" data-vs-whole>
+            <div class="vs-section-title">{{ __('ui.dashboard.vocal_whole_script') }}</div>
+            <p class="vs-pane-hint">{{ __('ui.dashboard.vocal_whole_script_hint') }}</p>
+            {{ $wholeScript }}
+            <div class="vs-divider"></div>
+            <div class="vs-section-title">{{ __('ui.dashboard.vocal_inline_tags') }}</div>
           </div>
-          <div class="vs-divider"></div>
-          <div class="vs-section-title">{{ __('ui.dashboard.vocal_inline_tags') }}</div>
         @endif
-        <p class="vs-pane-hint"><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
+        <p class="vs-pane-hint" data-vs-tag-hint><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
+        <div class="vs-field vs-category" data-vs-category-wrap>
+          <label class="vs-sub-label" for="vsCategory-{{ $tabKey }}">{{ __('ui.dashboard.vocal_category') }}</label>
+          <select id="vsCategory-{{ $tabKey }}" data-vs-category>
+            @foreach($tab['groups'] as $group => $groupTags)
+              <option value="{{ $group }}">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }} ({{ count($groupTags) }})</option>
+            @endforeach
+          </select>
+        </div>
         <div class="vs-groups">
           @foreach($tab['groups'] as $group => $groupTags)
-            <div class="vs-group" data-vs-group>
+            <div class="vs-group" data-vs-group="{{ $group }}">
               <div class="vs-group-label">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }}</div>
               <div class="vs-chips">
                 @foreach($groupTags as $vocalTag)

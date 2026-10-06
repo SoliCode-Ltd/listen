@@ -4,6 +4,7 @@ namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
 use App\Support\ArabicDialects;
+use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\ShareableAudio;
@@ -236,6 +237,15 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-MA-NO' => 'Northern Moroccan Arabic (Tangier and Tetouan, Jebli)',
         'ar-DZ-OR' => 'Oranian Algerian Arabic (Oran)',
         'ar-LY-BG' => 'Eastern Libyan Arabic (Benghazi, Cyrenaican)',
+        'ar-LB-TR' => 'Tripolitan Lebanese Arabic (Tripoli, North Lebanon)',
+        'ar-SY-DZ' => 'Deiri Syrian Arabic (Deir ez-Zor, Euphrates)',
+        'ar-JO-HR' => 'Horani Arabic (Irbid and the Hauran)',
+        'ar-PS-HB' => 'Khalili Palestinian Arabic (Hebron)',
+        'ar-IQ-AN' => 'Anbari Iraqi Arabic (Ramadi and western Iraq, Bedouin-influenced)',
+        'ar-YE-TZ' => "Ta'izzi Yemeni Arabic (Taiz)",
+        'ar-MA-MK' => 'Marrakchi Moroccan Arabic (Marrakech)',
+        'ar-DZ-CO' => 'Constantinois Algerian Arabic (Constantine, eastern Algeria)',
+        'ar-TN-SF' => 'Sfaxi Tunisian Arabic (Sfax)',
     ];
 
     /** @var array<int, string> */
@@ -303,6 +313,17 @@ class GeminiTtsProvider implements TtsProviderInterface
         'playful'        => 'Read this Arabic text with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
         'mysterious'     => 'Speak this Arabic text with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
         'confident'      => 'Deliver this Arabic text with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
+        'movie_trailer' => 'Deliver this Arabic text like an epic movie-trailer voiceover: deep, resonant, with dramatic pauses between lines and every phrase landing with weight.',
+        'poetry' => 'Recite this Arabic text like a poet performing on stage: musical rhythm, deliberate pauses at line breaks, and rich emotional emphasis on key images.',
+        'bedtime_story' => 'Read this Arabic text like a parent telling a bedtime story: soft, slow, soothing, and warm, growing gentler toward the end.',
+        'customer_service' => 'Speak this Arabic text like a friendly, professional customer-service agent: clear, patient, polite, and reassuring, with a smile in the voice.',
+        'phone_system' => 'Speak this Arabic text like a phone-system announcement: clear, evenly paced, neutral, and polite, with every number and option easy to follow.',
+        'game_narrator' => 'Narrate this Arabic text like a video-game narrator: epic, immersive, and energetic, building excitement for what comes next.',
+        'asmr' => 'Speak this Arabic text in a very soft, close, intimate whisper, slow and gentle, as in an ASMR recording.',
+        'event_host' => 'Host this Arabic text like a charismatic MC at a live event: loud, warm, and energetic, welcoming the crowd and building moments for applause.',
+        'tour_guide' => 'Speak this Arabic text like an enthusiastic tour guide: friendly, informative, and vivid, pointing out details with curiosity.',
+        'true_crime' => 'Narrate this Arabic text like a true-crime podcast host: low, measured, and suspenseful, revealing each detail carefully.',
+        'luxury_brand' => 'Speak this Arabic text like a luxury-brand advertisement: smooth, slow, elegant, and refined, with understated confidence.',
     ];
 
     public function name(): string
@@ -1205,7 +1226,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 'EN-US' => 'American English',
                 'EN-GB' => 'British English',
                 'EN-AU' => 'Australian English',
-                default => '',
+                default => (string) EnglishAccents::prompt($dialectCode),
             };
             if ($accentName !== '') {
                 $prompt .= " Voice accent: {$accentName}. Keep this accent consistent and do not switch to a different English accent.";
@@ -1247,6 +1268,19 @@ class GeminiTtsProvider implements TtsProviderInterface
             'formal' => 'professional, authoritative, and dignified',
             'calm' => 'serene, peaceful, and deeply relaxing',
             'angry' => 'intense, passionate, with controlled fury',
+            'joyful' => 'bright, joyful, and full of delight',
+            'tender' => 'soft, tender, and caring, like speaking to someone you love',
+            'empathetic' => 'understanding, gentle, and compassionate',
+            'romantic' => 'intimate, soft, and romantic',
+            'nostalgic' => 'wistful and nostalgic, remembering better days',
+            'proud' => 'proud and dignified, with quiet triumph',
+            'grateful' => 'sincerely grateful and appreciative',
+            'determined' => 'firm, determined, and resolute',
+            'anxious' => 'uneasy and anxious, with nervous tension',
+            'fearful' => 'frightened and fearful, with a slightly trembling voice',
+            'surprised' => 'genuinely surprised and amazed',
+            'sarcastic' => 'dry and sarcastic, with ironic emphasis',
+            'suspenseful' => 'tense and suspenseful, keeping the listener on edge',
             default => '',
         };
     }
@@ -1303,6 +1337,17 @@ class GeminiTtsProvider implements TtsProviderInterface
             'playful'        => 'Read with infectious playfulness and lighthearted joy. Bouncy, fun delivery with a mischievous twinkle. Make listeners smile with your delightful, carefree energy.',
             'mysterious'     => 'Speak with an air of mystery and intrigue. Low, hushed tones that hint at secrets. Slow, deliberate pacing that builds suspense and keeps listeners on edge.',
             'confident'      => 'Deliver with unwavering confidence and authority. Strong, assured tones that command attention. Speak like someone who knows exactly what they are talking about.',
+            'movie_trailer' => 'Deliver like an epic movie-trailer voiceover: deep, resonant, with dramatic pauses between lines and every phrase landing with weight.',
+            'poetry' => 'Recite like a poet performing on stage: musical rhythm, deliberate pauses at line breaks, and rich emotional emphasis on key images.',
+            'bedtime_story' => 'Read like a parent telling a bedtime story: soft, slow, soothing, and warm, growing gentler toward the end.',
+            'customer_service' => 'Speak like a friendly, professional customer-service agent: clear, patient, polite, and reassuring, with a smile in the voice.',
+            'phone_system' => 'Speak like a phone-system announcement: clear, evenly paced, neutral, and polite, with every number and option easy to follow.',
+            'game_narrator' => 'Narrate like a video-game narrator: epic, immersive, and energetic, building excitement for what comes next.',
+            'asmr' => 'Speak in a very soft, close, intimate whisper, slow and gentle, as in an ASMR recording.',
+            'event_host' => 'Host like a charismatic MC at a live event: loud, warm, and energetic, welcoming the crowd and building moments for applause.',
+            'tour_guide' => 'Speak like an enthusiastic tour guide: friendly, informative, and vivid, pointing out details with curiosity.',
+            'true_crime' => 'Narrate like a true-crime podcast host: low, measured, and suspenseful, revealing each detail carefully.',
+            'luxury_brand' => 'Speak like a luxury-brand advertisement: smooth, slow, elegant, and refined, with understated confidence.',
             default          => 'Performance style: '.str_replace(['_', '-'], ' ', $style).'. Keep this style clear and consistent throughout.',
         };
     }
@@ -1398,6 +1443,11 @@ class GeminiTtsProvider implements TtsProviderInterface
         $candidate = trim((string) $dialect);
         if ($candidate !== '' && in_array($candidate, self::SUPPORTED_LANGUAGE_CODES, true)) {
             return $candidate;
+        }
+        // A regional accent (en-GB-SC) falls back to its country's code (en-GB).
+        $base = implode('-', array_slice(explode('-', $candidate), 0, 2));
+        if ($base !== $candidate && in_array($base, self::SUPPORTED_LANGUAGE_CODES, true)) {
+            return $base;
         }
 
         $normalized = strtolower(trim($targetLanguage));

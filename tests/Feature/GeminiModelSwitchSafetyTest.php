@@ -257,7 +257,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $reflection = new ReflectionClass($provider);
         $dialects = $reflection->getReflectionConstant('ARABIC_DIALECT_PROMPTS')->getValue();
         $styles = array_keys($reflection->getReflectionConstant('ARABIC_STYLE_HINTS')->getValue());
-        $emotions = ['neutral', 'warm', 'sad', 'excited', 'formal', 'calm', 'angry', 'hopeful', 'serious', 'playful', 'mysterious', 'confident'];
+        $emotions = TtsStudioConfig::emotionValues();
         $buildStyle = $reflection->getMethod('buildStylePrompt');
         $buildPayload = $reflection->getMethod('buildSingleSpeakerPayload');
         $resolveLanguage = $reflection->getMethod('resolveLanguageCode');
@@ -278,7 +278,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
         foreach ($dialects as $dialect => $dialectName) {
             $cases[] = ['ar', $dialect, $dialectName];
         }
-        foreach (['en-US' => 'American English', 'en-GB' => 'British English', 'en-AU' => 'Australian English'] as $dialect => $dialectName) {
+        foreach (['en-US' => 'American English', 'en-GB' => 'British English', 'en-AU' => 'Australian English'] + array_map(fn ($row) => $row['prompt'], \App\Support\EnglishAccents::ALL) as $dialect => $dialectName) {
             $cases[] = ['en', $dialect, $dialectName];
         }
 
@@ -350,8 +350,10 @@ class GeminiModelSwitchSafetyTest extends TestCase
                             if ($language === 'ar' && $sentCode !== 'ar-XA') {
                                 $failures[] = "{$label} sent {$sentCode} instead of ar-XA";
                             }
-                            if ($language === 'en' && $sentCode !== $dialect) {
-                                $failures[] = "{$label} sent {$sentCode} instead of {$dialect}";
+                            $expectedCode = in_array($dialect, ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? $dialect
+                                : (in_array(substr($dialect, 0, 5), ['en-US', 'en-GB'], true) ? substr($dialect, 0, 5) : 'en-US');
+                            if ($language === 'en' && $sentCode !== $expectedCode) {
+                                $failures[] = "{$label} sent {$sentCode} instead of {$expectedCode}";
                             }
                         }
 

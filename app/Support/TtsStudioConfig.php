@@ -31,6 +31,17 @@ class TtsStudioConfig
         ['value' => 'audiobook', 'label' => 'Audiobook', 'translation_key' => 'ui.dashboard.style_audiobook'],
         ['value' => 'children_story', 'label' => 'Children Story', 'translation_key' => 'ui.dashboard.style_children_story'],
         ['value' => 'radio_host', 'label' => 'Radio Host', 'translation_key' => 'ui.dashboard.style_radio_host'],
+        ['value' => 'movie_trailer', 'label' => 'Movie Trailer', 'translation_key' => 'ui.dashboard.style_movie_trailer'],
+        ['value' => 'poetry', 'label' => 'Poetry Recital', 'translation_key' => 'ui.dashboard.style_poetry'],
+        ['value' => 'bedtime_story', 'label' => 'Bedtime Story', 'translation_key' => 'ui.dashboard.style_bedtime_story'],
+        ['value' => 'customer_service', 'label' => 'Customer Service', 'translation_key' => 'ui.dashboard.style_customer_service'],
+        ['value' => 'phone_system', 'label' => 'Phone System', 'translation_key' => 'ui.dashboard.style_phone_system'],
+        ['value' => 'game_narrator', 'label' => 'Game Narrator', 'translation_key' => 'ui.dashboard.style_game_narrator'],
+        ['value' => 'asmr', 'label' => 'ASMR', 'translation_key' => 'ui.dashboard.style_asmr'],
+        ['value' => 'event_host', 'label' => 'Event Host', 'translation_key' => 'ui.dashboard.style_event_host'],
+        ['value' => 'tour_guide', 'label' => 'Tour Guide', 'translation_key' => 'ui.dashboard.style_tour_guide'],
+        ['value' => 'true_crime', 'label' => 'True Crime', 'translation_key' => 'ui.dashboard.style_true_crime'],
+        ['value' => 'luxury_brand', 'label' => 'Luxury Brand', 'translation_key' => 'ui.dashboard.style_luxury_brand'],
     ];
 
     /**
@@ -49,6 +60,19 @@ class TtsStudioConfig
         ['value' => 'playful', 'label' => 'Playful', 'translation_key' => 'ui.dashboard.emotion_playful'],
         ['value' => 'mysterious', 'label' => 'Mysterious', 'translation_key' => 'ui.dashboard.emotion_mysterious'],
         ['value' => 'confident', 'label' => 'Confident', 'translation_key' => 'ui.dashboard.emotion_confident'],
+        ['value' => 'joyful', 'label' => 'Joyful', 'translation_key' => 'ui.dashboard.emotion_joyful'],
+        ['value' => 'tender', 'label' => 'Tender', 'translation_key' => 'ui.dashboard.emotion_tender'],
+        ['value' => 'empathetic', 'label' => 'Empathetic', 'translation_key' => 'ui.dashboard.emotion_empathetic'],
+        ['value' => 'romantic', 'label' => 'Romantic', 'translation_key' => 'ui.dashboard.emotion_romantic'],
+        ['value' => 'nostalgic', 'label' => 'Nostalgic', 'translation_key' => 'ui.dashboard.emotion_nostalgic'],
+        ['value' => 'proud', 'label' => 'Proud', 'translation_key' => 'ui.dashboard.emotion_proud'],
+        ['value' => 'grateful', 'label' => 'Grateful', 'translation_key' => 'ui.dashboard.emotion_grateful'],
+        ['value' => 'determined', 'label' => 'Determined', 'translation_key' => 'ui.dashboard.emotion_determined'],
+        ['value' => 'anxious', 'label' => 'Anxious', 'translation_key' => 'ui.dashboard.emotion_anxious'],
+        ['value' => 'fearful', 'label' => 'Fearful', 'translation_key' => 'ui.dashboard.emotion_fearful'],
+        ['value' => 'surprised', 'label' => 'Surprised', 'translation_key' => 'ui.dashboard.emotion_surprised'],
+        ['value' => 'sarcastic', 'label' => 'Sarcastic', 'translation_key' => 'ui.dashboard.emotion_sarcastic'],
+        ['value' => 'suspenseful', 'label' => 'Suspenseful', 'translation_key' => 'ui.dashboard.emotion_suspenseful'],
     ];
 
     /**
@@ -159,9 +183,11 @@ class TtsStudioConfig
         $normalizedLanguage = self::normalizeLanguage($language);
         $customKey = "tts_dialects_catalog_{$normalizedLanguage}";
         $custom = self::normalizeCatalogRows(self::decodeJsonArraySetting($customKey));
-        $defaults = $normalizedLanguage === 'ar'
-            ? ArabicDialects::catalogRows()
-            : (self::DEFAULT_DIALECTS_BY_LANGUAGE[$normalizedLanguage] ?? []);
+        $defaults = match ($normalizedLanguage) {
+            'ar' => ArabicDialects::catalogRows(),
+            'en' => EnglishAccents::catalogRows(),
+            default => self::DEFAULT_DIALECTS_BY_LANGUAGE[$normalizedLanguage] ?? [],
+        };
 
         return self::mergeCatalogRows($defaults, $custom);
     }

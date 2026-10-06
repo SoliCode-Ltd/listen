@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\ArabicDialects;
+use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
@@ -514,7 +515,7 @@ class VoiceCloningService
             'EN-AU' => 'Australian English accent.',
             'EN-IN' => 'Indian English accent.',
             'EN-ZA' => 'South African English accent.',
-            default => 'Speak in this accent: '.$code.'.',
+            default => EnglishAccents::cloneInstruction($code) ?? 'Speak in this accent: '.$code.'.',
         };
     }
 

@@ -158,22 +158,30 @@
 
               {{-- Premium-only settings; the page script shows them for the Premium tier. --}}
               <div id="studioPanel" style="display:none;">
-                {{-- Whole-script style and emotion: chosen with the buttons in the Delivery tab (site defaults until then). --}}
-                <div class="vs-hidden-field" aria-hidden="true">
-                  <select name="performance_style" id="performance_style" tabindex="-1">
-                    <option value=""></option>
-                    @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                      <option value="{{ $styleOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? '') : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}</option>
-                    @endforeach
-                  </select>
-                  <select name="emotion" id="emotion" tabindex="-1">
-                    <option value=""></option>
-                    @foreach(($studioEmotions ?? []) as $emotionOption)
-                      <option value="{{ $emotionOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? '') : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}</option>
-                    @endforeach
-                  </select>
-                </div>
                 @include('components.voice-studio.dialect-field')
+              </div>
+
+              <x-slot:whole-script>
+                  <div class="vs-row-2 vs-field">
+                    <div>
+                      <label class="vs-field-label" for="performance_style">{{ __('ui.dashboard.performance_style') }}</label>
+                      <select name="performance_style" id="performance_style">
+                        <option value="">{{ __('ui.dashboard.vocal_default') }}</option>
+                        @foreach(($studioPerformanceStyles ?? []) as $styleOption)
+                          <option value="{{ $styleOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? '') : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}</option>
+                        @endforeach
+                      </select>
+                    </div>
+                    <div>
+                      <label class="vs-field-label" for="emotion">{{ __('ui.dashboard.emotion_tone') }}</label>
+                      <select name="emotion" id="emotion">
+                        <option value="">{{ __('ui.dashboard.vocal_default') }}</option>
+                        @foreach(($studioEmotions ?? []) as $emotionOption)
+                          <option value="{{ $emotionOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? '') : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}</option>
+                        @endforeach
+                      </select>
+                    </div>
+                  </div>
                 <div class="vs-row-2 vs-field">
                   <div>
                     <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value"><span class="slider-value" id="speedVal">1.0</span>x</span></div>
@@ -188,7 +196,7 @@
                     </div>
                   </div>
                 </div>
-              </div>
+              </x-slot:whole-script>
 
               <div class="vs-divider"></div>
               <div class="translate-row">

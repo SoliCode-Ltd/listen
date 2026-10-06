@@ -10,9 +10,9 @@
   --vs-delivery: #E8A33D;
   --vs-voice: #3DB8A8;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(340px, 430px);
+  grid-template-columns: minmax(0, 1fr) minmax(420px, 520px);
   align-items: start;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 .vs-layout > * { min-width: 0; }
 .vs-main {
@@ -109,13 +109,14 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
   border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
   border-radius: 16px;
   background: var(--surface);
-  overflow: hidden;
+  /* Visible, so an open dropdown list is never cut off at the panel's edge. */
+  overflow: visible;
 }
 .vs-panel-head {
   display: flex;
   align-items: center;
   gap: .7rem;
-  padding: 1rem 1.1rem .4rem;
+  padding: 1.35rem 1.6rem .6rem;
 }
 .vs-panel-icon {
   display: inline-flex;
@@ -145,8 +146,8 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 }
 .vs-tabs {
   display: flex;
-  gap: 1.1rem;
-  padding: 0 1.1rem;
+  gap: 1.4rem;
+  padding: 0 1.6rem;
   border-bottom: 1px solid color-mix(in oklab, var(--line) 75%, transparent);
   overflow-x: auto;
   scrollbar-width: none;
@@ -198,7 +199,7 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
   position: relative;
   display: flex;
   align-items: center;
-  margin: .9rem 1.1rem 0;
+  margin: 1.1rem 1.6rem 0;
   color: var(--muted);
 }
 .vs-search[hidden] { display: none; }
@@ -225,7 +226,7 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
   border-color: var(--a, #6A45F2);
 }
 
-.vs-pane { padding: .4rem 1.1rem 1.1rem; }
+.vs-pane { padding: .5rem 1.6rem 1.6rem; }
 .vs-pane[hidden] { display: none; }
 .vs-pane-hint {
   display: flex;
@@ -239,14 +240,14 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 .vs-pane-hint .vs-kind { margin-top: .45rem; }
 
 /* Fields in the voice tab */
-.vs-field { margin-top: 1rem; }
+.vs-field { margin-top: 1.4rem; }
 .vs-field-label {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: .5rem;
-  margin-bottom: .45rem;
-  font-size: .88rem;
+  margin-bottom: .55rem;
+  font-size: .9rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -265,7 +266,7 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 .vs-row-2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: .8rem;
+  gap: 1.1rem;
 }
 .vs-hidden-field {
   position: absolute !important;
@@ -358,7 +359,7 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   background: var(--a, #6A45F2);
   color: #fff;
 }
-.vs-dialects { display: grid; gap: .8rem; margin-top: .7rem; }
+.vs-dialects { display: grid; gap: .8rem; margin-top: .85rem; }
 .vs-dialects[hidden], .vs-country[hidden] { display: none; }
 .vs-sub-label {
   display: block;
@@ -389,7 +390,7 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
 .vs-empty[hidden] { display: none; }
 .vs-guide {
   border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
-  padding: .8rem 1.1rem;
+  padding: 1rem 1.6rem;
   font-size: .92rem;
 }
 .vs-guide summary {
@@ -425,3 +426,127 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   .vs-tab { flex: 1 1 0; justify-content: center; font-size: .86rem; gap: .3rem; white-space: normal; text-align: center; line-height: 1.25; }
   .vs-tab .vs-kind { display: none; }
 }
+
+/* ---------- Dropdowns (a button and a list over the select) ---------- */
+.vs-select { position: relative; }
+.vs-select-native {
+  position: absolute !important;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+.vs-select-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .6rem;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 .9rem 0 1rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .97rem;
+  font-weight: 500;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease;
+}
+html[dir="rtl"] .vs-select-button { padding: 0 1rem 0 .9rem; }
+.vs-select-button:hover { border-color: color-mix(in oklab, var(--text) 28%, var(--line)); }
+.vs-select-button:focus-visible {
+  outline: none;
+  border-color: var(--a, #6A45F2);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #6A45F2) 18%, transparent);
+}
+.vs-select.is-open .vs-select-button {
+  border-color: color-mix(in oklab, var(--text) 28%, var(--line));
+  background: color-mix(in oklab, var(--surface2) 60%, var(--surface));
+}
+.vs-select-button:disabled { opacity: .55; cursor: not-allowed; }
+.vs-select-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vs-select-chevron,
+.vs-select-check {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vs-select-chevron { color: var(--muted); transition: transform .18s ease; }
+.vs-select.is-open .vs-select-chevron { transform: rotate(180deg); }
+.vs-select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 6px);
+  inset-inline: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 16px 40px -12px rgba(15, 15, 30, .22), 0 2px 6px rgba(15, 15, 30, .06);
+  scrollbar-width: thin;
+  animation: vs-select-in .14s ease-out;
+}
+.vs-select-list[hidden] { display: none; }
+.vs-select.is-up .vs-select-list { top: auto; bottom: calc(100% + 6px); animation-name: vs-select-in-up; }
+@keyframes vs-select-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes vs-select-in-up { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.vs-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .62rem .75rem;
+  border-radius: 8px;
+  color: var(--text);
+  font-size: .96rem;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.vs-select-option.is-active { background: color-mix(in oklab, var(--surface2) 85%, var(--line)); }
+.vs-select-option[aria-disabled="true"] { opacity: .45; cursor: not-allowed; }
+.vs-select-check { visibility: hidden; color: var(--text); }
+.vs-select-option[aria-selected="true"] { font-weight: 600; }
+.vs-select-option[aria-selected="true"] .vs-select-check { visibility: visible; }
+.vs-select-group {
+  padding: .55rem .75rem .3rem;
+  font-size: .76rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
+@media (prefers-reduced-motion: reduce) {
+  .vs-select-list, .vs-select-chevron { animation: none; transition: none; }
+}
+
+@media (max-width: 480px) {
+  .vs-panel-head { padding: 1.1rem 1rem .5rem; }
+  .vs-pane { padding: .4rem 1rem 1.2rem; }
+  .vs-search { margin: 1rem 1rem 0; }
+  .vs-row-2 { gap: .8rem; }
+}
+
+/* ---------- Tag tabs: a category, then its tags ---------- */
+.vs-pane [hidden] { display: none !important; }
+.vs-category { margin-top: 1rem; }
+/* The category list names the group; headings return in search results. */
+.vs-pane:not(.is-searching) .vs-groups .vs-group-label { display: none; }
+.vs-chips { min-width: 0; }
+.vs-chip { max-width: 100%; }
