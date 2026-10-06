@@ -40,6 +40,15 @@ class VoiceCloningService
      *
      * @var array<int, string>
      */
+    /**
+     * The key a stored voice was made with is tried first: a voice lives in
+     * the Google project of the key that created it.
+     */
+    private ?string $preferredKeyName = null;
+
+    /** The key that answered the last request. */
+    private ?string $lastKeyName = null;
+
     private const TRANSCRIPT_MODELS = [
         'gemini-3.5-flash',
         'gemini-3.6-flash',
@@ -118,7 +127,7 @@ class VoiceCloningService
 
                     $recovered = $this->findStoredVoiceByDisplayName($displayName);
                     if ($recovered !== null) {
-                        return ['success' => true, 'voice_cloning_key' => $recovered];
+                        return ['success' => true, 'voice_cloning_key' => $recovered, 'key_name' => $this->lastKeyName];
                     }
 
                     if ($index < count($attempts) - 1) {
@@ -131,7 +140,7 @@ class VoiceCloningService
                 $voiceId = $this->extractVoiceId($response);
 
                 if ($response->successful() && $voiceId !== null) {
-                    return ['success' => true, 'voice_cloning_key' => $voiceId];
+                    return ['success' => true, 'voice_cloning_key' => $voiceId, 'key_name' => $this->lastKeyName];
                 }
 
                 $serverSide = $response->serverError() || $response->successful();
@@ -148,7 +157,7 @@ class VoiceCloningService
 
                 $recovered = $this->findStoredVoiceByDisplayName($displayName);
                 if ($recovered !== null) {
-                    return ['success' => true, 'voice_cloning_key' => $recovered];
+                    return ['success' => true, 'voice_cloning_key' => $recovered, 'key_name' => $this->lastKeyName];
                 }
 
                 if ($index < count($attempts) - 1) {
@@ -203,7 +212,18 @@ class VoiceCloningService
         string $languageCode,
         string $voiceCloningKey,
         string $style = '',
+        ?string $keyName = null,
     ): array {
+        $this->preferredKeyName = $keyName;
+        try {
+            return $this->synthesizeClonedPieces($text, $voiceCloningKey, $style);
+        } finally {
+            $this->preferredKeyName = null;
+        }
+    }
+
+    private function synthesizeClonedPieces(string $text, string $voiceCloningKey, string $style): array
+    {
         $text = trim($text);
         if ($text === '') {
             throw new \RuntimeException('TTS text is empty.');
@@ -1176,9 +1196,16 @@ class VoiceCloningService
             };
 
             $last = $response;
-            if ($response->status() !== 429 || $index === array_key_last($keys)) {
+            $this->lastKeyName = $keyInfo['name'] ?? null;
+            // Out of quota, or the voice belongs to another key's project: try the next key.
+            if (! in_array($response->status(), [403, 404, 429], true) || $index === array_key_last($keys)) {
                 return $response;
             }
+            Log::warning('Gemini voice request moving to the next key.', [
+                'key' => $keyInfo['name'] ?? null,
+                'status' => $response->status(),
+                'path' => $path,
+            ]);
         }
 
         if (! $last instanceof Response) {
@@ -1200,15 +1227,24 @@ class VoiceCloningService
 
         try {
             $manager = app(GeminiKeyManager::class);
+            $all = array_values(array_filter($manager->getAllKeys(), fn ($k) => filled($k['key'] ?? null)));
             $available = $manager->getAvailableKey();
-            if (is_array($available) && filled($available['key'] ?? null)) {
-                return [$available];
-            }
-
-            return $manager->getAllKeys();
         } catch (\Throwable) {
             return [];
         }
+
+        // Every key, so a full or wrong one is not the end: the voice's own key
+        // first, then the one with room left, then the rest.
+        $rank = function (array $k) use ($available): int {
+            if ($this->preferredKeyName !== null && ($k['name'] ?? null) === $this->preferredKeyName) {
+                return 0;
+            }
+
+            return is_array($available) && ($k['name'] ?? null) === ($available['name'] ?? null) ? 1 : 2;
+        };
+        usort($all, fn ($a, $b) => $rank($a) <=> $rank($b));
+
+        return $all;
     }
 
     private function extractVoiceId(Response $response): ?string

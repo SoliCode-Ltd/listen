@@ -385,12 +385,7 @@
       if (tier !== 'hd') return;
       const defaults = studioDefaultsByLanguage?.[lang] || {};
 
-      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
-        setSelectValueIfAvailable(performanceStyleSelect, defaults.performance_style || 'neutral');
-      }
-      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
-        setSelectValueIfAvailable(emotionSelect, defaults.emotion || 'neutral');
-      }
+      // Style and emotion stay on "Default" until the visitor picks one.
       if (dialectSelect && !String(dialectSelect.value || '').trim()) {
         setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
@@ -1178,18 +1173,7 @@
         const trimmed = rawText.trim();
         const selectedChars = currentDraftBillableChars();
         if (!trimmed) { hideAudioPreview(); setError(i18n.text_required); return; }
-        if ((voiceTier?.value || 'standard') === 'hd' && !String(performanceStyleSelect?.value || '').trim()) {
-          hideAudioPreview();
-          setError(i18n.performance_style_required);
-          performanceStyleSelect?.focus();
-          return;
-        }
-        if ((voiceTier?.value || 'standard') === 'hd' && !String(emotionSelect?.value || '').trim()) {
-          hideAudioPreview();
-          setError(i18n.emotion_required);
-          emotionSelect?.focus();
-          return;
-        }
+        // Style and emotion left on "Default" are filled in by the server.
         const totalAllowed = Number(currentQuota.remaining_chars || 0) + Number(currentQuota.reward_chars_remaining || 0);
         if (selectedChars > totalAllowed) {
           hideAudioPreview();

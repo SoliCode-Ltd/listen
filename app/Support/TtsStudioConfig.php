@@ -205,6 +205,24 @@ class TtsStudioConfig
             : ($normalizedLanguage === 'ar' ? 'promo' : 'neutral');
     }
 
+    /**
+     * Style and emotion left on "Default" become the site's defaults for the language.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array{performance_style: string, emotion: string}
+     */
+    public static function withDefaultChoices(array $input, ?string $language): array
+    {
+        $language = (string) ($language ?: 'ar');
+        $style = is_string($input['performance_style'] ?? null) ? trim($input['performance_style']) : '';
+        $emotion = is_string($input['emotion'] ?? null) ? trim($input['emotion']) : '';
+
+        return [
+            'performance_style' => $style !== '' ? $style : self::defaultPerformanceStyle($language),
+            'emotion' => $emotion !== '' ? $emotion : self::defaultEmotion($language),
+        ];
+    }
+
     public static function defaultEmotion(string $language): string
     {
         $normalizedLanguage = self::normalizeLanguage($language);

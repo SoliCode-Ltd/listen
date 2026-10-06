@@ -2996,12 +2996,8 @@
       const lang = normalizeLanguage(targetLanguage?.value || 'ar');
       const defaults = studioDefaultsByLanguage?.[lang] || {};
 
-      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
-        setSelectValueIfAvailable(performanceStyleSelect, defaults.performance_style || 'neutral');
-      }
-      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
-        setSelectValueIfAvailable(emotionSelect, defaults.emotion || 'neutral');
-      }
+      // Style and emotion stay on "Default" until the member picks one;
+      // the server fills in the site defaults for the language.
       if (dialectSelect && !String(dialectSelect.value || '').trim()) {
         setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
@@ -3721,16 +3717,6 @@
         syncLanguageToCurrentTextWhenTranslationOff();
       }
       showFormMessage(null, '');
-      if (performanceStyleSelect && !String(performanceStyleSelect.value || '').trim()) {
-        showFormMessage('error', i18n.performance_style_required);
-        performanceStyleSelect.focus();
-        return;
-      }
-      if (emotionSelect && !String(emotionSelect.value || '').trim()) {
-        showFormMessage('error', i18n.emotion_required);
-        emotionSelect.focus();
-        return;
-      }
       const defaultText = i18n.generate_voice_now;
       generateBtn.disabled = true;
       renderGenerateButtonContent(i18n.generating, true);
