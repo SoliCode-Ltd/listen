@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Console\Commands\SyncVoiceSampleTextCommand;
 use App\Models\VoiceSample;
 use App\Services\Tts\GeminiKeyManager;
 use App\Support\NewDesignSamples;
@@ -62,6 +63,49 @@ class VoiceSampleTextSyncTest extends TestCase
         $this->assertSame($sample->id, $sample->fresh()->id);
     }
 
+    public function test_a_wrong_dialect_label_is_corrected(): void
+    {
+        $fusha = $this->sample('ar', 'ar-XA', 'الصوت ده بالذكاء الاصطناعي.', 'eg.mp3', 'الصوت ده بالذكاء الاصطناعي.');
+        $saudi = $this->sample('ar', 'ar-SA', 'وش تنتظر يا بطل؟', 'sa.mp3', 'وش تنتظر يا بطل؟');
+        $unlabelled = $this->sample('ar', '', 'لا تستسلم، كل عظيم في التاريخ سقط مرات.', 'msa.mp3', 'لا تستسلم، كل عظيم في التاريخ سقط مرات.');
+        $unlabelled->forceFill(['dialect' => null])->save();
+        $this->fakeHeard([
+            'eg.mp3' => ['الصوت ده بالذكاء الاصطناعي.', 'egyptian'],
+            'sa.mp3' => ['وش تنتظر يا بطل؟', 'gulf'],
+            'msa.mp3' => ['لا تستسلم، كل عظيم في التاريخ سقط مرات.', 'msa'],
+        ]);
+
+        $this->artisan('voice-samples:sync-text')
+            ->expectsOutputToContain('Wrong dialect labels: 2, relabelled: 0')
+            ->assertSuccessful();
+        $this->assertSame('ar-XA', $fusha->fresh()->dialect, 'a check alone changes nothing');
+
+        $this->artisan('voice-samples:sync-text', ['--fix' => true])
+            ->expectsOutputToContain('relabelled: 2')
+            ->assertSuccessful();
+
+        $this->assertSame('ar-EG', $fusha->fresh()->dialect);
+        $this->assertSame('ar-XA', $fusha->fresh()->metadata['dialect_before_sync']);
+        $this->assertSame('ar-SA', $saudi->fresh()->dialect, 'a Gulf sample stays as labelled');
+        $this->assertSame('ar-XA', $unlabelled->fresh()->dialect, 'real Fusha gets the Fusha label');
+
+        // The Fusha tab now plays the real Fusha sample.
+        $rows = NewDesignSamples::forLocale('ar', 5);
+        $this->assertSame('ar-XA', $rows[0]['dialect']);
+        $this->assertStringContainsString('لا تستسلم', $rows[0]['text']);
+    }
+
+    public function test_relabel_rules(): void
+    {
+        $this->assertNull(SyncVoiceSampleTextCommand::relabel('ar-KW', 'gulf'));
+        $this->assertNull(SyncVoiceSampleTextCommand::relabel('ar-SY', 'levantine'));
+        $this->assertNull(SyncVoiceSampleTextCommand::relabel('ar-XA', 'unknown'));
+        $this->assertNull(SyncVoiceSampleTextCommand::relabel('ar-XA', null));
+        $this->assertSame('ar-EG', SyncVoiceSampleTextCommand::relabel('ar-XA', 'Egyptian'));
+        $this->assertSame('ar-XA', SyncVoiceSampleTextCommand::relabel('ar-EG', 'msa'));
+        $this->assertSame('en-GB', SyncVoiceSampleTextCommand::relabel('en-US', 'british'));
+    }
+
     public function test_missing_audio_is_skipped(): void
     {
         $sample = VoiceSample::create([
@@ -110,6 +154,19 @@ class VoiceSampleTextSyncTest extends TestCase
             'title' => $file, 'category' => 'hero', 'language' => $language, 'dialect' => $dialect,
             'sample_text' => $text, 'sample_text_ar' => $textAr, 'audio_path' => 'samples/'.$file, 'is_active' => true,
         ]);
+    }
+
+    /**
+     * @param  array<string, array{0: string, 1: string}>  $byFile
+     */
+    private function fakeHeard(array $byFile): void
+    {
+        Http::fake(function ($request) use ($byFile) {
+            $audio = base64_decode($request->data()['contents'][0]['parts'][0]['inline_data']['data'] ?? '');
+            [$text, $variety] = $byFile[substr($audio, 3)] ?? ['', 'unknown'];
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['transcript' => $text, 'variety' => $variety], JSON_UNESCAPED_UNICODE)]]]]]]);
+        });
     }
 
     /**
