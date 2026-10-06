@@ -459,7 +459,8 @@ class GeminiTtsProvider implements TtsProviderInterface
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
             $chunks = mb_strlen($part['text']) > $maxChars ? TextChunker::split($part['text'], $maxChars, 'mb_strlen') : [$part['text']];
             foreach ($chunks as $chunk) {
-                $payloads[] = $this->buildSingleSpeakerPayload($model, $chunk, $partStyle, $voiceName, $languageCode);
+                $performed = GeminiVocalTags::forPerformance($chunk, $partStyle);
+                $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
             }
         }
 
@@ -632,6 +633,10 @@ class GeminiTtsProvider implements TtsProviderInterface
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
         $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
+        if (GeminiTtsModel::usesStructuredSpeech($model)) {
+            $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
+            [$text, $stylePrompt] = [$performed['text'], $performed['style']];
+        }
         $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
 
         $audio = $this->requestAudio($endpoint, $payload);

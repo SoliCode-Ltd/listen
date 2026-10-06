@@ -423,6 +423,85 @@ class GeminiVocalTags
     }
 
     /**
+     * What each sound should be, for the perform instruction.
+     *
+     * @var array<string, string>
+     */
+    private const SOUND_DIRECTIONS = [
+        'laugh' => 'real, audible laughter (ha ha ha)',
+        'chuckle' => 'a short, soft laugh',
+        'giggle' => 'a light, playful giggle',
+        'cackle' => 'a loud, wild cackle of laughter',
+        'snicker' => 'a sly, half-suppressed laugh',
+        'sigh' => 'a long, audible sigh',
+        'gasp' => 'a sharp, audible gasp of surprise',
+        'breath' => 'an audible breath in',
+        'heavy breath' => 'heavy, audible breathing',
+        'exhales' => 'a long, audible breath out',
+        'pant' => 'fast, out-of-breath panting',
+        'phew' => 'a relieved "phew"',
+        'shout' => 'a loud shout',
+        'scream' => 'a real, loud scream',
+        'shriek' => 'a sharp, high shriek',
+        'cheer' => 'a happy cheer',
+        'cough' => 'a real cough',
+        'sneeze' => 'a real sneeze',
+        'throat-clearing' => 'clearing the throat',
+        'yawn' => 'a real, audible yawn',
+        'snort' => 'a short snort',
+        'tsk' => 'a disapproving "tsk" click',
+        'pff' => 'a dismissive "pff" puff of air',
+        'cry' => 'real crying',
+        'sob' => 'real sobbing',
+        'whimper' => 'a soft whimper',
+        'groan' => 'a long groan',
+        'moan' => 'a low moan',
+        'growl' => 'an angry growl',
+        'grunt' => 'a short grunt',
+        'grr' => 'an angry "grr"',
+        'hiss' => 'a sharp hiss',
+        'argh' => 'a frustrated "argh"',
+    ];
+
+    /**
+     * Ready one request so its sound tags are performed, not skipped: each
+     * sound gets its own beat in the text, and the style says what every
+     * sound in it is. Listening tests on Arabic scripts: a scream was heard
+     * 0 times in 4 without this, 3 in 4 with it.
+     *
+     * @return array{text: string, style: string}
+     */
+    public static function forPerformance(string $text, string $style): array
+    {
+        $found = [];
+        if (preg_match_all('/<([^<>\n]{1,'.self::MAX_CUE_LENGTH.'})>/u', $text, $m)) {
+            foreach ($m[1] as $tag) {
+                if (isset(self::SOUND_DIRECTIONS[$tag])) {
+                    $found[$tag] = true;
+                }
+            }
+        }
+        if ($found === []) {
+            return ['text' => $text, 'style' => $style];
+        }
+
+        // A sound inside a running sentence is often swallowed: end the words before it.
+        $names = implode('|', array_map(fn ($t) => preg_quote($t, '/'), array_keys($found)));
+        $text = (string) preg_replace('/(?<=[^\s.!?؟،,…:;>])[ \t]*<('.$names.')>/u', '. <$1>', $text);
+
+        $lines = [];
+        foreach (array_keys($found) as $tag) {
+            $lines[] = '<'.$tag.'> means: '.self::SOUND_DIRECTIONS[$tag].'.';
+        }
+        $line = 'The transcript contains sound tags in angle brackets. Never read a tag aloud. '
+            .'At each tag, stop speaking and actually perform that sound with your voice, clearly and fully, then continue. '
+            .implode(' ', $lines);
+        $style = trim($style);
+
+        return ['text' => $text, 'style' => $style === '' ? $line : $style."\n".$line];
+    }
+
+    /**
      * Add the moods taken from the script to the style instructions.
      *
      * @param  array<int, string>  $cues

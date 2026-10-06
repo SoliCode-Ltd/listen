@@ -223,8 +223,9 @@ class VoiceCloningService
         $styles = [];
         foreach ($parts as $part) {
             foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen') as $chunk) {
-                $chunks[] = $chunk;
-                $styles[] = GeminiVocalTags::withCues($style, $part['cues']);
+                $performed = GeminiVocalTags::forPerformance($chunk, GeminiVocalTags::withCues($style, $part['cues']));
+                $chunks[] = $performed['text'];
+                $styles[] = $performed['style'];
             }
         }
         $audioContent = count($chunks) === 1

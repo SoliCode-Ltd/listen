@@ -1,11 +1,12 @@
 /*
  * Voice studio panel (components/voice-studio/panel.blade.php), shared by the
  * dashboard generator and the demo page:
- *  - tabs (voice / sound effects / delivery), hidden for standard voices;
+ *  - tabs (language / sound effects / delivery), hidden for standard voices;
  *  - search across both tag tabs, forgiving Arabic spelling;
  *  - tags inserted at the cursor and highlighted inside the text box;
- *  - every dialect as a button, grouped by region, kept in step with the
- *    dialect select, which stays the form field.
+ *  - dialects: a country list, then that country's dialects as buttons,
+ *    kept in step with the dialect select, which stays the form field;
+ *  - whole-script style and emotion as buttons for their selects.
  */
 (function () {
   'use strict';
@@ -153,15 +154,27 @@
     }
     if (tier) { tier.addEventListener('change', applyTier); applyTier(); }
 
-    // ---------- Dialect picker ----------
+    // ---------- Dialect picker: country, then that country's dialects ----------
     var picker = panel.querySelector('[data-vs-dialects]');
     var select = form.querySelector('select[name="dialect"]');
     var current = panel.querySelector('[data-vs-dialect-current]');
+    var countrySelect = panel.querySelector('[data-vs-country]');
+    var countryWrap = panel.querySelector('[data-vs-country-wrap]');
     if (picker && select) {
-      var regions = {};
-      var regionOf = {};
-      try { regions = JSON.parse(picker.dataset.regions || '{}'); } catch (e) { regions = {}; }
-      try { regionOf = JSON.parse(picker.dataset.regionOf || '{}'); } catch (e) { regionOf = {}; }
+      var countries = [];
+      var countryOf = {};
+      try { countries = JSON.parse(picker.dataset.countries || '[]'); } catch (e) { countries = []; }
+      try { countryOf = JSON.parse(picker.dataset.countryOf || '{}'); } catch (e) { countryOf = {}; }
+      var shownCountry = null;
+
+      var optionsOf = function (country) {
+        return Array.prototype.filter.call(select.options, function (opt) {
+          return opt.value !== '' && (countryOf[opt.value] || '') === country;
+        });
+      };
+      var hasCountries = function () {
+        return Array.prototype.some.call(select.options, function (opt) { return !!countryOf[opt.value]; });
+      };
       var sync = function () {
         picker.querySelectorAll('[data-dialect]').forEach(function (b) {
           b.setAttribute('aria-checked', b.dataset.dialect === select.value ? 'true' : 'false');
@@ -169,56 +182,131 @@
         var picked = select.options[select.selectedIndex];
         if (current) current.textContent = picked && picked.value ? picked.textContent : '';
       };
-      var render = function () {
-        var groups = [];
-        var byKey = {};
-        Array.prototype.forEach.call(select.options, function (opt) {
-          var key = opt.value === '' ? '_auto' : (regionOf[opt.value] || '_other');
-          if (!byKey[key]) { byKey[key] = []; groups.push(key); }
-          byKey[key].push(opt);
+      // Inside a country the country is already shown: "Saudi (Hejazi)" reads as "Hejazi".
+      var shortLabel = function (text) {
+        var m = /\(([^()]+)\)\s*$/.exec(text || '');
+        return m ? m[1].trim() : text;
+      };
+      var chip = function (opt, short) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'vs-chip vs-chip-dialect';
+        b.setAttribute('role', 'radio');
+        b.dataset.dialect = opt.value;
+        b.textContent = short ? shortLabel(opt.textContent) : opt.textContent;
+        b.title = opt.textContent;
+        b.disabled = select.disabled;
+        b.addEventListener('click', function () {
+          select.value = opt.value;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          sync();
         });
+        return b;
+      };
+      var drawChips = function (list, short) {
         picker.innerHTML = '';
-        groups.forEach(function (key) {
-          var group = document.createElement('div');
-          group.className = 'vs-group';
-          if (regions[key]) {
-            var label = document.createElement('div');
-            label.className = 'vs-group-label';
-            label.textContent = regions[key];
-            group.appendChild(label);
-          }
-          var chips = document.createElement('div');
-          chips.className = 'vs-chips';
-          byKey[key].forEach(function (opt) {
-            var b = document.createElement('button');
-            b.type = 'button';
-            b.className = 'vs-chip vs-chip-dialect';
-            b.setAttribute('role', 'radio');
-            b.dataset.dialect = opt.value;
-            b.textContent = opt.textContent;
-            b.disabled = select.disabled;
-            b.addEventListener('click', function () {
-              select.value = opt.value;
-              select.dispatchEvent(new Event('change', { bubbles: true }));
-              sync();
-            });
-            chips.appendChild(b);
-          });
-          group.appendChild(chips);
-          picker.appendChild(group);
+        if (!list.length) { picker.hidden = true; return; }
+        picker.hidden = false;
+        var chips = document.createElement('div');
+        chips.className = 'vs-chips';
+        list.forEach(function (opt) { chips.appendChild(chip(opt, short)); });
+        picker.appendChild(chips);
+      };
+      var render = function () {
+        if (!countrySelect || !hasCountries()) {
+          // No countries for this language (English accents): every option as a button.
+          if (countryWrap) countryWrap.hidden = true;
+          drawChips(Array.prototype.slice.call(select.options));
+          shownCountry = null;
+          sync();
+          return;
+        }
+        if (countryWrap) countryWrap.hidden = false;
+        var country = countryOf[select.value] || '';
+        countrySelect.innerHTML = '';
+        var auto = document.createElement('option');
+        auto.value = '';
+        auto.textContent = picker.dataset.autoLabel || '';
+        countrySelect.appendChild(auto);
+        countries.forEach(function (pair) {
+          if (!optionsOf(pair[0]).length) return;
+          var o = document.createElement('option');
+          o.value = pair[0];
+          o.textContent = pair[1];
+          countrySelect.appendChild(o);
         });
+        countrySelect.value = country;
+        countrySelect.disabled = select.disabled;
+        shownCountry = country;
+        // One dialect only (Fusha, Kuwait…) needs no buttons; the country says it all.
+        var list = country ? optionsOf(country) : [];
+        drawChips(list.length > 1 ? list : [], true);
         sync();
       };
+      if (countrySelect) {
+        countrySelect.addEventListener('change', function () {
+          var country = countrySelect.value;
+          var first = country ? optionsOf(country)[0] : null;
+          select.value = first ? first.value : '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          render();
+        });
+      }
       // The page rebuilds the options when the language changes, and sets values from code.
       if (window.MutationObserver) {
         new MutationObserver(render).observe(select, { childList: true });
         new MutationObserver(render).observe(select, { attributes: true, attributeFilter: ['disabled'] });
       }
-      select.addEventListener('change', sync);
+      var onValue = function () {
+        if (countrySelect && hasCountries() && (countryOf[select.value] || '') !== shownCountry) render();
+        else sync();
+      };
+      select.addEventListener('change', onValue);
       var lastValue = select.value;
-      setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; sync(); } }, 300);
+      setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; onValue(); } }, 300);
       render();
     }
+
+    // ---------- Whole-script choices (performance style, emotion) as buttons ----------
+    panel.querySelectorAll('[data-vs-choice]').forEach(function (box) {
+      var field = form.querySelector('select[name="' + box.dataset.vsChoice + '"]');
+      var group = box.closest('[data-vs-group]');
+      if (!field) { if (group) group.hidden = true; return; }
+      var syncChoice = function () {
+        box.querySelectorAll('[data-choice]').forEach(function (b) {
+          b.setAttribute('aria-checked', b.dataset.choice === field.value ? 'true' : 'false');
+        });
+      };
+      var drawChoice = function () {
+        box.innerHTML = '';
+        Array.prototype.forEach.call(field.options, function (opt) {
+          if (!opt.textContent.trim()) return;
+          var b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'vs-chip vs-chip-choice';
+          b.setAttribute('role', 'radio');
+          b.dataset.choice = opt.value;
+          b.dataset.search = opt.textContent;
+          b.textContent = opt.textContent;
+          b.disabled = field.disabled || opt.disabled;
+          b.addEventListener('click', function () {
+            field.value = opt.value;
+            field.dispatchEvent(new Event('change', { bubbles: true }));
+            syncChoice();
+          });
+          box.appendChild(b);
+        });
+        if (group) group.hidden = field.options.length === 0;
+        syncChoice();
+      };
+      if (window.MutationObserver) {
+        new MutationObserver(drawChoice).observe(field, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+      }
+      field.addEventListener('change', syncChoice);
+      var lastChoice = field.value;
+      setInterval(function () { if (field.value !== lastChoice) { lastChoice = field.value; syncChoice(); } }, 300);
+      drawChoice();
+    });
 
     // A required setting left empty in a hidden tab: open it so the browser can point at it.
     if (form.addEventListener) {

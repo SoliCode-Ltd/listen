@@ -161,6 +161,45 @@ final class ArabicDialects
     }
 
     /**
+     * Countries in the order the studio lists them; Standard Arabic first.
+     *
+     * @var array<string, array{en: string, ar: string}>
+     */
+    public const COUNTRIES = [
+        'XA' => ['en' => 'Standard Arabic (Fusha)', 'ar' => 'الفصحى'],
+        'EG' => ['en' => 'Egypt', 'ar' => 'مصر'],
+        'SA' => ['en' => 'Saudi Arabia', 'ar' => 'السعودية'],
+        'AE' => ['en' => 'UAE', 'ar' => 'الإمارات'],
+        'KW' => ['en' => 'Kuwait', 'ar' => 'الكويت'],
+        'QA' => ['en' => 'Qatar', 'ar' => 'قطر'],
+        'BH' => ['en' => 'Bahrain', 'ar' => 'البحرين'],
+        'OM' => ['en' => 'Oman', 'ar' => 'عُمان'],
+        'LB' => ['en' => 'Lebanon', 'ar' => 'لبنان'],
+        'SY' => ['en' => 'Syria', 'ar' => 'سوريا'],
+        'JO' => ['en' => 'Jordan', 'ar' => 'الأردن'],
+        'PS' => ['en' => 'Palestine', 'ar' => 'فلسطين'],
+        'IQ' => ['en' => 'Iraq', 'ar' => 'العراق'],
+        'YE' => ['en' => 'Yemen', 'ar' => 'اليمن'],
+        'SD' => ['en' => 'Sudan', 'ar' => 'السودان'],
+        'MA' => ['en' => 'Morocco', 'ar' => 'المغرب'],
+        'DZ' => ['en' => 'Algeria', 'ar' => 'الجزائر'],
+        'TN' => ['en' => 'Tunisia', 'ar' => 'تونس'],
+        'LY' => ['en' => 'Libya', 'ar' => 'ليبيا'],
+        'MR' => ['en' => 'Mauritania', 'ar' => 'موريتانيا'],
+    ];
+
+    /**
+     * The country a dialect code belongs to ("ar-EG-AL" → "EG"), or null.
+     */
+    public static function countryOf(string $code): ?string
+    {
+        $parts = explode('-', strtoupper(trim($code)));
+        $country = $parts[1] ?? '';
+
+        return ($parts[0] ?? '') === 'AR' && isset(self::COUNTRIES[$country]) ? $country : null;
+    }
+
+    /**
      * Rows for the studio dialect catalog.
      *
      * @return array<int, array{value: string, label: string, label_ar: string, region: string}>
