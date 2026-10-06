@@ -1,4 +1,5 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
+  <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v=20260423a">
   <script>
     (() => {
@@ -81,42 +82,9 @@
           <form id="demoForm" class="studio-main" style="gap:1rem">
             @php
               $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
-              $defaultDemoSampleAr = <<<'TXT'
-(00-03ث) [هادئ + تساؤل]:
-"بقالك قد إيه بتقول هبدأ؟"
-
-(03-07ث) [خفيف + ضحكة بسيطة]:
-"(يضحك بخفة) كل مرة تقول… بكرة."
-
-(07-11ث) [أهدى + تنهيدة خفيفة]:
-"…(تنهد خفيف) بس بكرة دي مش بتيجي."
-
-(سكتة 0.5 ثانية)
-
-(11-15ث) [صادق]:
-"مش محتاج تبقى جاهز 100%…"
-
-(15-19ث) [دافئ + مشجع]:
-"ابدأ بس… والباقي هييجي."
-TXT;
-              $defaultDemoSampleEn = <<<'TXT'
-(00–03s) [calm + questioning]:
-"How long have you been telling yourself you’ll start?"
-
-(03–07s) [light + soft laugh]:
-"(light chuckle) Every time you say… tomorrow."
-
-(07–11s) [softer + gentle sigh]:
-"(soft sigh)… but tomorrow never comes."
-
-(pause 0.5s)
-
-(11–15s) [honest]:
-"You don’t need to be 100% ready…"
-
-(15–19s) [warm + encouraging]:
-"Just start… and the rest will follow."
-TXT;
+              // Premium samples use the studio tags: [delivery] from that point on, <sound> where it happens.
+              $defaultDemoSampleAr = '[هادئ] بقالك قد إيه بتقول هبدأ؟ <ضحكة خفيفة> كل مرة تقول… بكرة. <تنهيدة> بس بكرة دي مش بتيجي. <وقفة قصيرة> [دافئ] مش محتاج تبقى جاهز مية في المية… ابدأ بس، والباقي هييجي.';
+              $defaultDemoSampleEn = "[calm] How long have you been telling yourself you'll start? <chuckle> Every time you say… tomorrow. <sigh> But tomorrow never comes. <short pause> [warm] You don't need to be completely ready… Just start, and the rest will follow.";
               // Standard voices (Google WaveNet / Chirp 3 HD) read every character,
               // so their samples are plain sentences: no timings, [tags] or (cues).
               $defaultStandardSampleAr = 'منذ متى وأنت تقول لنفسك إنك ستبدأ؟ في كل مرة تقول: غداً. لكن الغد لا يأتي أبداً. لست بحاجة إلى أن تكون مستعداً تماماً. ابدأ فقط، وسيأتي الباقي.';
@@ -139,21 +107,25 @@ TXT;
                 {{ __('ui.demo.text_input') }}
                 <span class="char-count" id="charCounter" dir="ltr"></span>
               </div>
-              <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+              <div class="tag-editor demo-tag-editor" data-vs-editor>
+                <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
+                <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+              </div>
               <div class="sample-chips">
                 <button class="sample-chip" type="button" data-sample-key="en">{{ __('ui.demo.english_sample') }}</button>
                 <button class="sample-chip" type="button" data-sample-key="ar">{{ __('ui.demo.arabic_sample') }}</button>
               </div>
               <div class="sample-human-note" role="note">
                 <strong>{{ $isArabicLocale ? 'ملاحظة احترافية' : 'Pro Tip' }}</strong>
-                <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة فورًا. هذا الأسلوب في الكتابة مع التوقفات والنبرة يعطي صوتًا بشريًا أكثر واقعية.' : 'Click the sample chips above (Arabic / English) to instantly load ready scripts. This writing style with timing, pauses, and tone cues makes the generated voice sound much more human.' }}</span>
+                <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة. ثم أضف المؤثرات وطريقة الأداء من استوديو الصوت بالأسفل ليبدو الصوت بشريًا أكثر.' : 'Click the sample chips above (Arabic / English) to load ready scripts, then add sound effects and delivery from the voice studio below for a more human voice.' }}</span>
               </div>
             </div>
 
-            {{-- Voice controls --}}
-            <div class="s-card reveal">
-              <div class="controls-row">
-                <div class="ctrl-group">
+            {{-- Voice studio: voice, sound effects and delivery (shared with the dashboard) --}}
+            <div class="reveal">
+            <x-voice-studio.panel :show-tags="true">
+              <div class="vs-row-2">
+                <div class="ctrl-group vs-field-compact">
                   <label for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
                   <select id="voice_tier" name="voice_tier">
                     @foreach($demoTiers as $tier)
@@ -161,14 +133,16 @@ TXT;
                     @endforeach
                   </select>
                 </div>
-                <div class="ctrl-group">
+                <div class="ctrl-group vs-field-compact">
                   <label for="target_language">{{ __('ui.demo.voice_language') }}</label>
                   <select id="target_language" name="target_language">
                     <option value="ar">{{ __('ui.demo.arabic') }}</option>
                     <option value="en">{{ __('ui.demo.english') }}</option>
                   </select>
                 </div>
-                <div class="ctrl-group">
+              </div>
+              <div class="vs-row-2 vs-field">
+                <div class="ctrl-group vs-field-compact">
                   <label for="voice_gender">{{ __('ui.demo.gender') }}</label>
                   <select id="voice_gender">
                     <option value="all">{{ __('ui.demo.any') }}</option>
@@ -176,71 +150,47 @@ TXT;
                     <option value="male">{{ __('ui.demo.male') }}</option>
                   </select>
                 </div>
-                <div class="ctrl-group">
+                <div class="ctrl-group vs-field-compact">
                   <label for="voice_key">{{ __('ui.demo.speaker') }}</label>
                   <select id="voice_key" name="voice_key"></select>
                 </div>
               </div>
-            </div>
 
-            {{-- Performance Controls (HD only) --}}
-            <div class="s-card perf-panel reveal" id="studioPanel" style="display:none;">
-              <div class="perf-header">
-                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                {{ __('ui.demo.voice_studio', ['default' => 'Performance Controls']) }} <span class="premium-badge">{{ __('ui.pricing.premium', ['default' => 'Premium']) }}</span>
-              </div>
-              <div class="perf-row-2">
-                <div class="perf-section">
-                  <div class="perf-section-label">🎭 {{ __('ui.demo.performance_style', ['default' => 'Performance Style']) }}</div>
-                  <select name="performance_style" id="performance_style" required>
-                    <option value="">-- {{ __('ui.demo.choose_performance_style', ['default' => 'Choose Performance Style']) }} --</option>
+              {{-- Premium-only settings; the page script shows them for the Premium tier. --}}
+              <div id="studioPanel" style="display:none;">
+                {{-- Whole-script style and emotion keep the site defaults; delivery tags change them where the visitor wants. --}}
+                <div class="vs-hidden-field" aria-hidden="true">
+                  <select name="performance_style" id="performance_style" tabindex="-1">
+                    <option value=""></option>
                     @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                      <option value="{{ $styleOption['value'] ?? '' }}">
-                        {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
-                      </option>
+                      <option value="{{ $styleOption['value'] ?? '' }}">{{ $styleOption['label'] ?? ($styleOption['value'] ?? '') }}</option>
                     @endforeach
                   </select>
-                </div>
-                <div class="perf-section">
-                  <div class="perf-section-label">💫 {{ __('ui.demo.emotion', ['default' => 'Emotion']) }}</div>
-                  <select name="emotion" id="emotion" required>
-                    <option value="">-- {{ __('ui.demo.choose_emotion', ['default' => 'Choose Emotion']) }} --</option>
+                  <select name="emotion" id="emotion" tabindex="-1">
+                    <option value=""></option>
                     @foreach(($studioEmotions ?? []) as $emotionOption)
-                      <option value="{{ $emotionOption['value'] ?? '' }}">
-                        {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
-                      </option>
+                      <option value="{{ $emotionOption['value'] ?? '' }}">{{ $emotionOption['label'] ?? ($emotionOption['value'] ?? '') }}</option>
                     @endforeach
                   </select>
                 </div>
-              </div>
-              <div class="perf-section">
-                <div class="perf-section-label">🌍 {{ __('ui.demo.dialect', ['default' => 'Dialect']) }}</div>
-                <select name="dialect" id="dialect"><option value="">{{ __('ui.dashboard.dialect_auto', ['default' => 'Auto-detect']) }}</option></select>
-              </div>
-              <div class="perf-row-2">
-                <div class="perf-section">
-                  <div class="perf-section-label">
-                    ⚡ {{ __('ui.demo.speed', ['default' => 'Speed']) }}
-                    <span class="slider-value" id="speedVal">1.0</span>x
+                @include('components.voice-studio.dialect-field')
+                <div class="vs-row-2 vs-field">
+                  <div>
+                    <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value"><span class="slider-value" id="speedVal">1.0</span>x</span></div>
+                    <div class="slider-wrap">
+                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
+                    </div>
                   </div>
-                  <div class="slider-wrap">
-                    <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value">
-                  </div>
-                </div>
-                <div class="perf-section">
-                  <div class="perf-section-label">
-                    🎵 {{ __('ui.demo.pitch', ['default' => 'Pitch']) }}
-                    <span class="slider-value" id="pitchVal">0</span>
-                  </div>
-                  <div class="slider-wrap">
-                    <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value">
+                  <div>
+                    <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value"><span class="slider-value" id="pitchVal">0</span></span></div>
+                    <div class="slider-wrap">
+                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {{-- Translate toggle --}}
-            <div class="s-card reveal" style="padding:0">
+              <div class="vs-divider"></div>
               <div class="translate-row">
                 <div class="translate-info">
                   <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
@@ -252,6 +202,7 @@ TXT;
                 </label>
                 <input type="hidden" name="translate" id="translate" value="0">
               </div>
+            </x-voice-studio.panel>
             </div>
 
             {{-- Generate row with waveform --}}
@@ -1395,5 +1346,6 @@ TXT;
   @auth
     @include('referral.popup')
   @endauth
+  <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>
 </html>

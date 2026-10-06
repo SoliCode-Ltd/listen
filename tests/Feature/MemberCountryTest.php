@@ -138,7 +138,7 @@ class MemberCountryTest extends TestCase
         $this->assertSame(1, $a['countries'][0]['active_30d']);
         $this->assertSame(1, $a['countries'][0]['paying']);
         $this->assertSame(['Personal email' => 3, 'Work email' => 1], $a['email_types']);
-        $this->assertSame(['Saudi' => 1], $a['dialects']);
+        $this->assertSame(['Saudi (Najdi)' => 1], $a['dialects']);
 
         $report = app(BusinessReportPdf::class);
         $data = $report->viewData($snapshot);

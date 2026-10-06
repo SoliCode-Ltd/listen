@@ -159,7 +159,9 @@ class TtsStudioConfig
         $normalizedLanguage = self::normalizeLanguage($language);
         $customKey = "tts_dialects_catalog_{$normalizedLanguage}";
         $custom = self::normalizeCatalogRows(self::decodeJsonArraySetting($customKey));
-        $defaults = self::DEFAULT_DIALECTS_BY_LANGUAGE[$normalizedLanguage] ?? [];
+        $defaults = $normalizedLanguage === 'ar'
+            ? ArabicDialects::catalogRows()
+            : (self::DEFAULT_DIALECTS_BY_LANGUAGE[$normalizedLanguage] ?? []);
 
         return self::mergeCatalogRows($defaults, $custom);
     }
@@ -332,9 +334,10 @@ class TtsStudioConfig
             $mergedByValue[$value] = [
                 'value' => $value,
                 'label' => $translated,
-                'label_ar' => $translated,
+                'label_ar' => trim((string) ($row['label_ar'] ?? '')) ?: $translated,
                 'instruction_en' => '',
                 'instruction_ar' => '',
+                'region' => (string) ($row['region'] ?? ''),
             ];
         }
 
@@ -350,6 +353,7 @@ class TtsStudioConfig
                 'label_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? self::humanizeValue($value))),
                 'instruction_en' => trim((string) ($row['instruction_en'] ?? '')),
                 'instruction_ar' => trim((string) ($row['instruction_ar'] ?? $row['instruction_en'] ?? '')),
+                'region' => (string) ($mergedByValue[$value]['region'] ?? ''),
             ];
         }
 

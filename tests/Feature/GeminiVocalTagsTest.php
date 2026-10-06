@@ -11,8 +11,10 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\VoiceCloningService;
+use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceTier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -196,14 +198,17 @@ class GeminiVocalTagsTest extends TestCase
 
         $this->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertSee('id="vocalTags"', false)
+            ->assertSee('data-vs-panel', false)
+            ->assertSee('data-vs-tab="sounds"', false)
+            ->assertSee('data-vs-tab="delivery"', false)
             ->assertSee('data-vocal-tag="laugh"', false)
             ->assertSee('data-vocal-tag="short pause"', false)
             ->assertSee('data-vocal-tag="excited"', false)
             ->assertSee('data-tag-kind="delivery"', false)
-            ->assertSee('id="tagEditorBackdrop"', false)
+            ->assertSee('data-vs-backdrop', false)
+            ->assertSee('js/voice-studio.js', false)
+            ->assertSee('css/voice-studio.css', false)
             ->assertDontSee('&lt;laugh&gt;</button>', false)
-            ->assertSee(__('ui.dashboard.vocal_tags'))
             ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0]);
     }
 
@@ -213,7 +218,10 @@ class GeminiVocalTagsTest extends TestCase
 
         $this->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertDontSee('id="vocalTags"', false);
+            ->assertSee('data-vs-panel', false)
+            ->assertSee('name="voice_key"', false)
+            ->assertDontSee('data-vs-tab="sounds"', false)
+            ->assertDontSee('data-vocal-tag=', false);
     }
 
     public function test_tag_texts_exist_in_english_and_arabic(): void
@@ -330,6 +338,54 @@ class GeminiVocalTagsTest extends TestCase
         });
         $this->assertSame('Clear.', $styles['Hello.']);
         $this->assertSame("Clear.\nDelivery cues from the script: sad and subdued.", $styles['I lost it.']);
+    }
+
+    public function test_voice_settings_live_in_the_first_tab_of_the_studio(): void
+    {
+        $this->actingAs($this->memberOn(VoiceTier::HD));
+
+        $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('class="perf-panel"', $html, 'the separate panel is gone');
+        $settings = substr($html, strpos($html, 'data-vs-pane="settings"'));
+        $settings = substr($settings, 0, strpos($settings, 'data-vs-pane="sounds"'));
+        foreach (['name="target_language"', 'name="voice_key"', 'name="performance_style"', 'name="emotion"', 'name="dialect"', 'name="speed"', 'name="pitch"', 'data-vs-dialects', 'id="translateToggle"'] as $field) {
+            $this->assertStringContainsString($field, $settings, $field.' is in the voice tab');
+        }
+        // Style and emotion are no longer dropdowns: delivery tags replace them, the site defaults stay as hidden fields.
+        $this->assertMatchesRegularExpression('/class="vs-hidden-field" aria-hidden="true">\s*<select name="performance_style"/', $settings);
+        $this->assertStringNotContainsString('name="performance_style" id="performance_style" required', $html);
+        // The editor and the generate button sit together in the main column.
+        $main = substr($html, strpos($html, 'class="vs-main"'), 4000);
+        $this->assertStringContainsString('id="contentTextarea"', $main);
+        $this->assertStringContainsString('id="generateBtn"', $main);
+    }
+
+    public function test_demo_page_has_the_same_studio_panel(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $html = $this->getLocalizedRoute('demo.page')->assertOk()->getContent();
+
+        foreach (['data-vs-panel', 'data-vs-editor', 'data-vs-backdrop', 'data-vocal-tag="laugh"', 'data-tag-kind="delivery"', 'data-vs-dialects', 'id="voice_tier"', 'id="voice_key"', 'id="studioPanel"', 'js/voice-studio.js'] as $needle) {
+            $this->assertStringContainsString($needle, $html, $needle);
+        }
+        $this->assertStringContainsString('[calm] How long have you been telling yourself', $html, 'the Premium sample uses the tags');
+    }
+
+    public function test_every_arab_dialect_is_offered_with_directions(): void
+    {
+        $codes = TtsStudioConfig::dialectValues('ar');
+        $this->assertCount(22, $codes);
+        foreach (['ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+            $this->assertContains($code, $codes);
+            $this->assertNotNull(ArabicDialects::prompt($code), $code);
+            $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
+            $this->assertLessThanOrEqual(10, strlen($code), 'fits the dialect columns');
+        }
+        $row = collect(TtsStudioConfig::dialectCatalogForLanguage('ar'))->firstWhere('value', 'ar-MR');
+        $this->assertSame('موريتاني (حساني)', $row['label_ar']);
+        $this->assertSame('maghreb', $row['region']);
     }
 
     private function memberOn(string $tier): User

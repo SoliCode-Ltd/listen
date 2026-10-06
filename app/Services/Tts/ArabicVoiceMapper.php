@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Models\SiteSetting;
+use App\Support\ArabicDialects;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
 
@@ -46,23 +47,23 @@ class ArabicVoiceMapper
      * Performance style options.
      */
     public const PERFORMANCE_STYLES = [
-        'educational'    => ['name' => 'Educational',       'name_ar' => 'تعليمي (واضح ومرتّب)',       'icon' => '🎓'],
-        'commercial'     => ['name' => 'Commercial',        'name_ar' => 'تجاري (حيوي ومُقنع)',       'icon' => '📰'],
-        'promo'          => ['name' => 'Promotional',       'name_ar' => 'ترويجي',                  'icon' => '📣'],
-        'podcast'        => ['name' => 'Podcast',           'name_ar' => 'بودكاست (حواري ودافئ)',   'icon' => '🎧'],
-        'assistant'      => ['name' => 'Virtual Assistant', 'name_ar' => 'مساعد ذكي (ودي وداعم)',   'icon' => '🤖'],
-        'narrative'      => ['name' => 'Narrative',         'name_ar' => 'سردي (مُعبّر وشيّق)',        'icon' => '📖'],
-        'comedic'        => ['name' => 'Comedic',           'name_ar' => 'فكاهي (ساخر وخفيف)',       'icon' => '😄'],
-        'corporate'      => ['name' => 'Corporate',         'name_ar' => 'مؤسسي (احترافي ورسمي)',   'icon' => '💼'],
+        'educational' => ['name' => 'Educational',       'name_ar' => 'تعليمي (واضح ومرتّب)',       'icon' => '🎓'],
+        'commercial' => ['name' => 'Commercial',        'name_ar' => 'تجاري (حيوي ومُقنع)',       'icon' => '📰'],
+        'promo' => ['name' => 'Promotional',       'name_ar' => 'ترويجي',                  'icon' => '📣'],
+        'podcast' => ['name' => 'Podcast',           'name_ar' => 'بودكاست (حواري ودافئ)',   'icon' => '🎧'],
+        'assistant' => ['name' => 'Virtual Assistant', 'name_ar' => 'مساعد ذكي (ودي وداعم)',   'icon' => '🤖'],
+        'narrative' => ['name' => 'Narrative',         'name_ar' => 'سردي (مُعبّر وشيّق)',        'icon' => '📖'],
+        'comedic' => ['name' => 'Comedic',           'name_ar' => 'فكاهي (ساخر وخفيف)',       'icon' => '😄'],
+        'corporate' => ['name' => 'Corporate',         'name_ar' => 'مؤسسي (احترافي ورسمي)',   'icon' => '💼'],
         'conversational' => ['name' => 'Conversational',    'name_ar' => 'محادثة (عفوي وطبيعي)',    'icon' => '💬'],
-        'inspirational'  => ['name' => 'Inspirational',     'name_ar' => 'تحفيزي (مُلهم وحماسي)',   'icon' => '🔥'],
-        'cinematic'      => ['name' => 'Cinematic',         'name_ar' => 'سينمائي (درامي وعاطفي)',  'icon' => '🎥'],
-        'documentary'    => ['name' => 'Documentary',       'name_ar' => 'وثائقي (رصين وموضوعي)', 'icon' => '🌟'],
+        'inspirational' => ['name' => 'Inspirational',     'name_ar' => 'تحفيزي (مُلهم وحماسي)',   'icon' => '🔥'],
+        'cinematic' => ['name' => 'Cinematic',         'name_ar' => 'سينمائي (درامي وعاطفي)',  'icon' => '🎥'],
+        'documentary' => ['name' => 'Documentary',       'name_ar' => 'وثائقي (رصين وموضوعي)', 'icon' => '🌟'],
         'sports_commentator' => ['name' => 'Sports Commentator', 'name_ar' => 'معلق رياضي (حماسي ومثير)', 'icon' => '⚽'],
-        'meditation'     => ['name' => 'Meditation',        'name_ar' => 'تأمل (هادئ وروحاني)',      'icon' => '🧘'],
-        'audiobook'      => ['name' => 'Audiobook',         'name_ar' => 'كتاب مسموع (احترافي)',    'icon' => '📚'],
+        'meditation' => ['name' => 'Meditation',        'name_ar' => 'تأمل (هادئ وروحاني)',      'icon' => '🧘'],
+        'audiobook' => ['name' => 'Audiobook',         'name_ar' => 'كتاب مسموع (احترافي)',    'icon' => '📚'],
         'children_story' => ['name' => 'Children Story',    'name_ar' => 'قصة أطفال (مرح وساحر)',   'icon' => '🧸'],
-        'radio_host'     => ['name' => 'Radio Host',        'name_ar' => 'مذيع راديو (أنيق وجذاب)', 'icon' => '📻'],
+        'radio_host' => ['name' => 'Radio Host',        'name_ar' => 'مذيع راديو (أنيق وجذاب)', 'icon' => '📻'],
     ];
 
     /**
@@ -91,15 +92,15 @@ class ArabicVoiceMapper
     /**
      * Map user intent to provider-specific voice configuration.
      *
-     * @param  string  $provider       Provider name ('google_cloud' or 'gemini')
-     * @param  array   $userIntent     User selections:
-     *                                  - dialect: string (e.g. 'ar-SA')
-     *                                  - emotion: string (e.g. 'warm')
-     *                                  - gender: string ('male'|'female')
-     *                                  - speed: float
-     *                                  - pitch: float
-     *                                  - voice_name: string (if explicitly selected)
-     * @return array                   Provider-specific voice config
+     * @param  string  $provider  Provider name ('google_cloud' or 'gemini')
+     * @param  array  $userIntent  User selections:
+     *                             - dialect: string (e.g. 'ar-SA')
+     *                             - emotion: string (e.g. 'warm')
+     *                             - gender: string ('male'|'female')
+     *                             - speed: float
+     *                             - pitch: float
+     *                             - voice_name: string (if explicitly selected)
+     * @return array Provider-specific voice config
      */
     public function mapToProviderConfig(string $provider, array $userIntent): array
     {
@@ -231,7 +232,7 @@ class ArabicVoiceMapper
             'inspirational' => [1.05, 2.0],
             'cinematic' => [0.85, -1.5],
             'documentary' => [0.88, -1.0],
-            default          => [1.0, 0.0],
+            default => [1.0, 0.0],
         };
     }
 
@@ -254,6 +255,7 @@ class ArabicVoiceMapper
         }
 
         $decoded = is_string($mapping) ? json_decode($mapping, true) : null;
+
         return is_array($decoded) ? $decoded : null;
     }
 
@@ -278,11 +280,28 @@ class ArabicVoiceMapper
             $mapped[$code] = [
                 'name' => trim((string) ($row['label'] ?? $code)),
                 'name_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? $code)),
-                'region' => (string) ($legacy['region'] ?? 'custom'),
+                'region' => (string) ($legacy['region'] ?? self::regionFor($code)),
             ];
         }
 
         return $mapped;
+    }
+
+    /**
+     * Region for a dialect the legacy list does not have, from the full dialect list.
+     */
+    private static function regionFor(string $code): string
+    {
+        $region = ArabicDialects::ALL[$code]['region'] ?? null;
+
+        return match ($region) {
+            'fusha' => 'msa',
+            'gulf', 'iraq_yemen' => 'gulf',
+            'levant' => 'levant',
+            'nile' => 'north_africa',
+            'maghreb' => 'maghreb',
+            default => 'custom',
+        };
     }
 
     /**
@@ -295,6 +314,7 @@ class ArabicVoiceMapper
             $region = $dialect['region'];
             $grouped[$region][$code] = $dialect;
         }
+
         return $grouped;
     }
 

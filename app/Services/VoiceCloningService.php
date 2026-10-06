@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
+use App\Support\ArabicDialects;
 use App\Support\GeminiVocalTags;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
@@ -472,6 +473,10 @@ class VoiceCloningService
         $code = strtoupper(str_replace('_', '-', trim((string) $dialect)));
         if ($code === '') {
             return '';
+        }
+
+        if (str_starts_with($code, 'AR') && ($instruction = ArabicDialects::cloneInstruction($code)) !== null) {
+            return $instruction;
         }
 
         return match ($code) {

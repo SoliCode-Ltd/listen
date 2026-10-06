@@ -405,7 +405,7 @@ class GeminiVocalTags
 
         // Words only: "[1]", "[sic.]" and "[link](...)" stay as written.
         return $inner !== ''
-            && preg_match('/^[\p{L}][\p{L}\p{M}\s\-,&\']*$/u', $inner) === 1
+            && preg_match('/^[\p{L}][\p{L}\p{M}\s\-,&\'+،]*$/u', $inner) === 1
             && preg_match('/^(?:sic)$/iu', $inner) !== 1;
     }
 

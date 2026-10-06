@@ -43,11 +43,11 @@ class SyncVoiceSampleTextCommand extends Command
      */
     private const FAMILY_OF = [
         'ar-XA' => 'msa',
-        'ar-EG' => 'egyptian',
-        'ar-SA' => 'gulf', 'ar-KW' => 'gulf', 'ar-AE' => 'gulf', 'ar-QA' => 'gulf', 'ar-BH' => 'gulf', 'ar-OM' => 'gulf',
+        'ar-EG' => 'egyptian', 'ar-EG-SA' => 'egyptian',
+        'ar-SA' => 'gulf', 'ar-SA-HJ' => 'gulf', 'ar-KW' => 'gulf', 'ar-AE' => 'gulf', 'ar-QA' => 'gulf', 'ar-BH' => 'gulf', 'ar-OM' => 'gulf',
         'ar-LB' => 'levantine', 'ar-SY' => 'levantine', 'ar-JO' => 'levantine', 'ar-PS' => 'levantine',
         'ar-IQ' => 'iraqi', 'ar-YE' => 'yemeni', 'ar-SD' => 'sudanese',
-        'ar-MA' => 'maghrebi', 'ar-TN' => 'maghrebi', 'ar-DZ' => 'maghrebi', 'ar-LY' => 'maghrebi',
+        'ar-MA' => 'maghrebi', 'ar-TN' => 'maghrebi', 'ar-DZ' => 'maghrebi', 'ar-LY' => 'maghrebi', 'ar-MR' => 'maghrebi',
         'en-US' => 'american', 'en-GB' => 'british', 'en-AU' => 'australian', 'en-IN' => 'indian', 'en-ZA' => 'south_african',
     ];
 
