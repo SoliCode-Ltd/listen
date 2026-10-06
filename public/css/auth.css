@@ -618,12 +618,12 @@ html body.auth-split-body .auth-player-text.is-reading .w.is-spoken {
 /* The word being spoken fills letter by letter, in reading direction. */
 html body.auth-split-body .auth-player-text.is-reading .w.is-current {
   color: transparent;
-  background: linear-gradient(90deg, var(--sc-text) var(--wp, 0%), var(--sc-word-dim) var(--wp, 0%));
+  background: linear-gradient(90deg, var(--sc-text) calc(var(--wp, 0%) - 18%), var(--sc-word-dim) calc(var(--wp, 0%) + 18%));
   -webkit-background-clip: text;
   background-clip: text;
 }
 html body.auth-split-body .auth-player-text[dir="rtl"].is-reading .w.is-current {
-  background: linear-gradient(270deg, var(--sc-text) var(--wp, 0%), var(--sc-word-dim) var(--wp, 0%));
+  background: linear-gradient(270deg, var(--sc-text) calc(var(--wp, 0%) - 18%), var(--sc-word-dim) calc(var(--wp, 0%) + 18%));
   -webkit-background-clip: text;
   background-clip: text;
 }
@@ -695,8 +695,11 @@ html body.auth-split-body .auth-wave-bars i {
   min-width: 2px;
   border-radius: 3px;
   background: var(--sc-bar);
-  /* Bars ease into the sample's real shape once it is analysed. */
-  transition: height .45s cubic-bezier(.2, .8, .2, 1);
+  /* Bars ease into the sample's real shape once it is analysed, and lift
+     around the playhead with the voice (transform, set every frame). */
+  transition: height .45s cubic-bezier(.2, .8, .2, 1), transform .09s linear;
+  transform-origin: center;
+  will-change: transform;
 }
 /* The played part: the same bars in the brand colour, revealed smoothly. */
 html body.auth-split-body .auth-wave-fill {

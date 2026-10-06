@@ -51,6 +51,8 @@ for (const [name, path, theme] of [['en-dark', '/login', 'dark'], ['en-light', '
       return { src: track.getAttribute('data-src'), text: document.querySelector('[data-nt-try-text]').textContent };
     });
     await page.evaluate(() => {
+      window.__logId = (window.__logId || 0) + 1;
+      const id = window.__logId;
       window.__log = [];
       const a = window.__ntAudio || null;
       function rec() {
@@ -60,7 +62,7 @@ for (const [name, path, theme] of [['en-dark', '/login', 'dark'], ['en-light', '
         const wave = parseFloat(getComputedStyle(document.querySelector('.auth-wave')).getPropertyValue('--nt-progress')) || 0;
         const wp = cur >= 0 ? parseFloat(words[cur].style.getPropertyValue('--wp')) || 0 : null;
         window.__log.push({ now: performance.now(), wave, cur, wp, spoken, words: words.length, playing: !!document.querySelector('.auth-player-bar.is-playing') });
-        if (window.__log.length < 4000) requestAnimationFrame(rec);
+        if (window.__logId === id && window.__log.length < 4000) requestAnimationFrame(rec);
       }
       requestAnimationFrame(rec);
     });
@@ -72,7 +74,9 @@ for (const [name, path, theme] of [['en-dark', '/login', 'dark'], ['en-light', '
     const info = await page.evaluate(() => {
       const t = document.querySelector('[data-nt-track]');
       const d = t.__ntInfo && t.__ntInfo.data;
-      return d ? { duration: d.duration, segments: d.segments.length, phrases: (function () { const out = []; d.segments.forEach(s => { const l = out[out.length - 1]; if (l && s[0] - l[1] < 0.2) l[1] = s[1]; else out.push([s[0], s[1]]); }); return out.length; })(), textPhrases: (() => { const w = [...document.querySelectorAll('.auth-player-text .w')]; return w.length ? parseInt(w[w.length - 1].getAttribute('data-phrase'), 10) + 1 : 0; })() } : null;
+      const el = document.querySelector('[data-nt-words]');
+      const w = [...document.querySelectorAll('.auth-player-text .w')];
+      return d ? { duration: +d.duration.toFixed(2), speechStretches: d.segments.length, sentenceEnds: w.length ? parseInt(w[w.length - 1].getAttribute('data-phrase'), 10) : 0, matchedToPauses: el && el.__ntAnchors ? el.__ntAnchors.list.length - 2 : null } : null;
     });
     // Smoothness while playing.
     const playing = log.filter(l => l.playing && l.wave > 0 && l.wave < 0.999);
