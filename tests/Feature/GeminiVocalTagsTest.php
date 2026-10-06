@@ -34,7 +34,7 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertSame(GeminiVocalTags::all(), array_values(array_unique(GeminiVocalTags::all())));
     }
 
-    public function test_elevenlabs_style_sounds_become_gemini_tags(): void
+    public function test_bracketed_sounds_become_gemini_tags(): void
     {
         $prepared = GeminiVocalTags::prepare('[laughs] Really? [Sighs] Fine. (clears throat) Next. [whispering] Quiet. [pause] Done <Laughing>');
 
@@ -224,7 +224,7 @@ class GeminiVocalTagsTest extends TestCase
             }
             $this->assertCount(6, __('ui.dashboard.vocal_tags_tip_items', [], $locale));
             // Members never see other companies' names in the studio.
-            $this->assertDoesNotMatchRegularExpression('/eleven|gemini|google/i', json_encode(__('ui.dashboard', [], $locale), JSON_UNESCAPED_UNICODE));
+            $this->assertDoesNotMatchRegularExpression('/\b(?:eleven\w*|openai|gemini|google)\b/i', json_encode(__('ui.dashboard', [], $locale), JSON_UNESCAPED_UNICODE));
         }
         $this->assertSame('المؤثرات الصوتية', __('ui.dashboard.vocal_tags', [], 'ar'));
     }
