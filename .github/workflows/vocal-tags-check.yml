@@ -9,14 +9,9 @@ name: Vocal tags check
 # Uses the same secrets as the other staging checks:
 #   STAGING_SSH_HOST, STAGING_SSH_USER, STAGING_SSH_KEY, optional STAGING_APP_PATH
 
+# Run by hand only: each run uses Gemini requests from the staging key's daily quota.
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/vocal-tags-check.yml
-      - scripts/tts/vocal_tags_check.php
-      - app/Support/GeminiVocalTags.php
 
 permissions:
   contents: read

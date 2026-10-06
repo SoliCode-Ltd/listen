@@ -50,7 +50,7 @@ $endpoint = rtrim((string) config('services.gemini_tts.endpoint', 'https://gener
 $cases = [
     ['name' => 'en plain', 'voice' => 'Kore', 'text' => 'That was close. Let us go home now.'],
     ['name' => 'en tagged', 'voice' => 'Kore', 'text' => 'That was close. <phew> <long pause> Let us go home now. <laugh>'],
-    ['name' => 'en elevenlabs style', 'voice' => 'Puck', 'text' => '[excited] We won the match! [laughs] I cannot believe it. [sighs] What a day.'],
+    ['name' => 'en bracket style', 'voice' => 'Puck', 'text' => '[excited] We won the match! [laughs] I cannot believe it. [sighs] What a day.'],
     ['name' => 'ar plain', 'voice' => 'Kore', 'text' => 'يا سلام! ما توقعت هذا أبداً. يلا بينا.'],
     ['name' => 'ar tagged', 'voice' => 'Kore', 'text' => 'يا سلام! <laugh> ما توقعت هذا أبداً. <short pause> يلا بينا. <sigh>'],
     ['name' => 'ar whisper and gasp', 'voice' => 'Charon', 'text' => '<gasp> سمعت هذا الصوت؟ <whispers> لا تتكلم، في أحد هنا.'],

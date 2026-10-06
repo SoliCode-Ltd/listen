@@ -34,7 +34,7 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertSame(GeminiVocalTags::all(), array_values(array_unique(GeminiVocalTags::all())));
     }
 
-    public function test_elevenlabs_style_sounds_become_gemini_tags(): void
+    public function test_bracketed_sounds_become_gemini_tags(): void
     {
         $prepared = GeminiVocalTags::prepare('[laughs] Really? [Sighs] Fine. (clears throat) Next. [whispering] Quiet. [pause] Done <Laughing>');
 
@@ -199,6 +199,7 @@ class GeminiVocalTagsTest extends TestCase
             ->assertSee('id="vocalTags"', false)
             ->assertSee('data-vocal-tag="laugh"', false)
             ->assertSee('data-vocal-tag="short pause"', false)
+            ->assertDontSee('&lt;laugh&gt;</button>', false)
             ->assertSee(__('ui.dashboard.vocal_tags'))
             ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0]);
     }
@@ -221,9 +222,57 @@ class GeminiVocalTagsTest extends TestCase
             foreach (array_keys(GeminiVocalTags::GROUPS) as $group) {
                 $this->assertNotSame('ui.dashboard.vocal_tag_groups.'.$group, __('ui.dashboard.vocal_tag_groups.'.$group, [], $locale), $locale.' '.$group);
             }
-            $this->assertCount(7, __('ui.dashboard.vocal_tags_tip_items', [], $locale));
+            $this->assertCount(6, __('ui.dashboard.vocal_tags_tip_items', [], $locale));
+            // Members never see other companies' names in the studio.
+            $this->assertDoesNotMatchRegularExpression('/\b(?:eleven\w*|openai|gemini|google)\b/i', json_encode(__('ui.dashboard', [], $locale), JSON_UNESCAPED_UNICODE));
         }
         $this->assertSame('المؤثرات الصوتية', __('ui.dashboard.vocal_tags', [], 'ar'));
+    }
+
+    public function test_arabic_tag_names_work_like_the_english_ones(): void
+    {
+        $this->assertCount(36, array_unique(GeminiVocalTags::ARABIC_NAMES));
+        $this->assertSame(GeminiVocalTags::all(), array_keys(GeminiVocalTags::ARABIC_NAMES), 'every tag has an Arabic name, in order');
+
+        foreach (GeminiVocalTags::ARABIC_NAMES as $tag => $name) {
+            $this->assertSame($tag, GeminiVocalTags::canonical($name), $name);
+            $this->assertSame("مرحبا <{$tag}> بك.", GeminiVocalTags::prepare("مرحبا <{$name}> بك.")['text'], $name);
+        }
+
+        // Vowel marks and the ة/ه, أ/ا spellings people type either way.
+        $this->assertSame('<laugh> <laugh> <sigh> <short pause>', GeminiVocalTags::prepare('<ضحكه> <ضَحْكة> <تنهيده> <وقفه قصيرة>')['text']);
+        $this->assertSame('مرحبا [sigh]', GeminiVocalTags::forLegacyModel('مرحبا <تنهيدة>'));
+        $this->assertSame('مرحبا بك.', GoogleCloudTtsProvider::stripPerformanceMarkup('مرحبا <تنهيدة> بك.'));
+        $this->assertSame('ضحكة', GeminiVocalTags::label('laugh', 'ar'));
+        $this->assertSame('laugh', GeminiVocalTags::label('laugh', 'en'));
+    }
+
+    public function test_arabic_tags_reach_gemini_as_english_tags(): void
+    {
+        $this->fakeGeminiKeys();
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $captured = $this->fakeAudio();
+
+        app(GeminiTtsProvider::class)->synthesize('يا سلام! <ضحكة> ما توقعت هذا. <وقفة طويلة> يلا.', 'ar', ['voice_name' => 'Kore']);
+
+        $this->assertSame('يا سلام! <laugh> ما توقعت هذا. <long pause> يلا.', $captured->bodies[0]['contents'][0]['parts'][0]['text']);
+    }
+
+    public function test_arabic_dashboard_picker_is_in_arabic(): void
+    {
+        $this->actingAs($this->memberOn(VoiceTier::HD));
+
+        $html = $this->withSession(['locale' => 'ar'])->withHeader('Accept-Language', 'ar')
+            ->get('/ar'.$this->localizedRoute('dashboard'))->getContent();
+        if (! str_contains($html, 'vocalTags')) {
+            app()->setLocale('ar');
+            $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
+        }
+
+        $this->assertStringContainsString('data-vocal-tag="ضحكة"', $html);
+        $this->assertStringContainsString('data-vocal-tag="وقفة قصيرة"', $html);
+        $this->assertStringNotContainsString('data-vocal-tag="laugh"', $html);
+        $this->assertStringContainsString('المؤثرات الصوتية', $html);
     }
 
     private function memberOn(string $tier): User
