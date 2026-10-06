@@ -184,15 +184,15 @@
                   </div>
                 <div class="vs-row-2 vs-field">
                   <div>
-                    <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value"><span class="slider-value" id="speedVal">1.0</span>x</span></div>
+                    <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
                     <div class="slider-wrap">
-                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedVal').textContent=this.value" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
+                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
                     </div>
                   </div>
                   <div>
-                    <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value"><span class="slider-value" id="pitchVal">0</span></span></div>
+                    <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
                     <div class="slider-wrap">
-                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" oninput="document.getElementById('pitchVal').textContent=this.value" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
+                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
                     </div>
                   </div>
                 </div>

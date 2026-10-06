@@ -550,3 +550,22 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
 .vs-pane:not(.is-searching) .vs-groups .vs-group-label { display: none; }
 .vs-chips { min-width: 0; }
 .vs-chip { max-width: 100%; }
+
+/* ---------- Sliders: same thin track and round thumb as the demo ---------- */
+.vs-panel .slider-wrap input[type="range"] {
+  height: 6px;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+.vs-panel .slider-wrap input[type="range"]:focus { outline: none; box-shadow: none; }
+.vs-panel .slider-wrap input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--a, #6A45F2) 28%, transparent);
+}
+.vs-panel .slider-wrap input[type="range"]:focus-visible::-moz-range-thumb {
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--a, #6A45F2) 28%, transparent);
+}
+.vs-panel .slider-wrap input[type="range"]:disabled { opacity: .5; cursor: not-allowed; }
+.slider-value[data-unit]::after { content: attr(data-unit); margin-inline-start: 1px; }

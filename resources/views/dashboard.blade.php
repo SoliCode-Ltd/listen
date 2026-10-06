@@ -1203,13 +1203,13 @@
       border-color: color-mix(in oklab, var(--b) 45%, var(--line));
       background: color-mix(in oklab, var(--surface) 85%, transparent);
     }
-    input:focus, select:focus, textarea:focus {
+    input:not([type="range"]):not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus {
       outline: none;
       border-color: var(--brand-accent);
       box-shadow: 0 0 0 4px var(--brand-accent-glow);
       background: var(--surface);
     }
-    .editor-panel input,
+    .editor-panel input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
     .editor-panel textarea {
       border-radius: .85rem;
       border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
@@ -1218,7 +1218,7 @@
       font-family: var(--font-body);
       transition: all .25s ease;
     }
-    .editor-panel input {
+    .editor-panel input:not([type="range"]):not([type="checkbox"]):not([type="radio"]) {
       font-size: .98rem;
       line-height: 1.5;
       padding: .95rem 1rem;
@@ -1237,7 +1237,7 @@
       unicode-bidi: plaintext;
       text-align: start;
     }
-    html[dir="rtl"] .editor-panel input,
+    html[dir="rtl"] .editor-panel input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
     html[dir="rtl"] .editor-panel textarea {
       font-family: var(--font-body);
     }
@@ -2203,15 +2203,15 @@
                   </div>
                 <div class="vs-row-2 vs-field">
                   <div>
-                    <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value"><span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x</span></div>
+                    <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">{{ number_format((float) $prefillValue('speed', '1.0'), 1) }}</span></span></div>
                     <div class="slider-wrap">
-                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value" aria-label="{{ __('ui.dashboard.speed') }}">
+                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" aria-label="{{ __('ui.dashboard.speed') }}">
                     </div>
                   </div>
                   <div>
-                    <div class="vs-field-label"><span>{{ __('ui.dashboard.pitch') }}</span><span class="vs-value"><span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span></span></div>
+                    <div class="vs-field-label"><span>{{ __('ui.dashboard.pitch') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span></span></div>
                     <div class="slider-wrap">
-                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value" aria-label="{{ __('ui.dashboard.pitch') }}">
+                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" aria-label="{{ __('ui.dashboard.pitch') }}">
                     </div>
                   </div>
                 </div>

@@ -365,6 +365,11 @@ class GeminiVocalTagsTest extends TestCase
             $this->assertStringContainsString($field, $whole, $field.' is in the delivery tab');
         }
         $this->assertStringNotContainsString('name="performance_style" id="performance_style" required', $html);
+        // Sliders: the badge carries the unit and is kept up to date by the studio script;
+        // the page's text-field style no longer turns the slider into a thick box.
+        $this->assertStringContainsString('id="speedVal" data-unit="×"', $html);
+        $this->assertStringNotContainsString("oninput=\"document.getElementById('speedVal')", $html);
+        $this->assertStringContainsString('.editor-panel input:not([type="range"])', $html);
         // The editor and the generate button sit together in the main column.
         $main = substr($html, strpos($html, 'class="vs-main"'), 4000);
         $this->assertStringContainsString('id="contentTextarea"', $main);

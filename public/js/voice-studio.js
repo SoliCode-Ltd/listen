@@ -455,6 +455,24 @@
       }, true);
     }
 
+    // ---------- Sliders: the value badge follows the slider ----------
+    panel.querySelectorAll('input[type="range"]').forEach(function (range) {
+      var badge = range.id ? document.getElementById(range.id + 'Val') : null;
+      var step = parseFloat(range.step || '1');
+      var show = function () {
+        var n = parseFloat(range.value);
+        if (isNaN(n)) return;
+        var text = step < 1 ? n.toFixed(1) : (n > 0 && parseFloat(range.min) < 0 ? '+' : '') + Math.round(n);
+        if (badge && badge.textContent !== text) badge.textContent = text;
+        range.setAttribute('aria-valuetext', text + (badge && badge.dataset.unit ? badge.dataset.unit : ''));
+      };
+      range.addEventListener('input', show);
+      range.addEventListener('change', show);
+      // Pages reset the sliders and badges from code (tier switch, reuse a generation).
+      setInterval(show, 300);
+      show();
+    });
+
     // Every visible dropdown in the panel (hidden form fields stay as they are).
     panel.querySelectorAll('select').forEach(function (select) {
       if (select.closest('.vs-hidden-field') || select.classList.contains('vs-hidden-field') || select.getAttribute('aria-hidden') === 'true') return;
