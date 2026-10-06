@@ -1,0 +1,53 @@
+name: Sign-in samples inspect
+
+# Read-only: compares each sign-in page sample's stored text with what its
+# audio actually says (transcribed by Gemini) on STAGING. Nothing is written.
+# Same secrets as the other staging checks (STAGING_SSH_*).
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/hero-samples-inspect.yml
+      - scripts/tts/hero_samples_inspect.php
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Inspect staging over SSH
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/tts/hero_samples_inspect.php > inspect.json
+          rm -f ~/.ssh/id_inspect
+          python3 - <<'PY'
+          import json
+          data = json.load(open('inspect.json'))
+          print(data['meta'])
+          for s in data['samples']:
+              print(f"\n#{s['id']} {s['language']} {s['dialect']} active={s['active']} voice={s['voice']} provider={s['provider']} bytes={s.get('audio_bytes')} audio_modified={s.get('audio_modified')} row_updated={s['updated_at']}")
+              print('  stored   :', s.get('sample_text'))
+              if s['language'] == 'ar':
+                  print('  stored ar:', s.get('sample_text_ar'))
+              print('  spoken   :', s.get('spoken'), s.get('transcribe_error', '') or s.get('audio_error', ''))
+          PY
