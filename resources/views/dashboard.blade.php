@@ -1340,6 +1340,9 @@
     .tag-editor-backdrop mark.t-sound { --mark-bg: color-mix(in oklab, var(--a) 20%, transparent); }
     .tag-editor-backdrop mark.t-delivery { --mark-bg: color-mix(in oklab, #F2B544 26%, transparent); }
 
+    /* The form is a grid: let its column shrink to the screen, not to the widest row. */
+    #voiceForm > * { min-width: 0; }
+
     /* ---------- Tag panel ---------- */
     .tag-studio {
       --tag-sound: var(--a);
@@ -1385,8 +1388,8 @@
     }
     .tag-studio-title small {
       display: block;
-      margin-top: .1rem;
-      font-size: .82rem;
+      margin-top: .15rem;
+      font-size: .93rem;
       color: var(--muted);
     }
     .tag-studio-tools {
@@ -1397,6 +1400,9 @@
     }
     .tag-tabs {
       display: inline-flex;
+      max-width: 100%;
+      overflow-x: auto;
+      scrollbar-width: none;
       gap: 2px;
       padding: 3px;
       border-radius: 11px;
@@ -1425,17 +1431,6 @@
       color: var(--text);
       box-shadow: 0 1px 2px rgba(0, 0, 0, .1), 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
     }
-    .tag-tab-count {
-      min-width: 1.4rem;
-      padding: 0 .35rem;
-      border-radius: 999px;
-      background: color-mix(in oklab, var(--line) 60%, transparent);
-      color: var(--muted);
-      font-size: .72rem;
-      font-weight: 600;
-      line-height: 1.35rem;
-      text-align: center;
-    }
     .tag-kind {
       display: inline-block;
       flex: none;
@@ -1443,6 +1438,7 @@
       height: 8px;
       border-radius: 50%;
     }
+    .tag-kind-settings { background: #3DB8A8; }
     .tag-kind-sounds { background: var(--tag-sound); }
     .tag-kind-delivery { background: var(--tag-delivery); }
     .tag-search {
@@ -1451,6 +1447,7 @@
       align-items: center;
       color: var(--muted);
     }
+    .tag-search[hidden] { display: none; }
     .tag-search svg {
       position: absolute;
       inset-inline-start: .7rem;
@@ -1469,13 +1466,45 @@
       display: flex;
       align-items: center;
       gap: .5rem;
-      margin: .5rem 0 .2rem;
-      font-size: .84rem;
+      margin: .55rem 0 .3rem;
+      font-size: .95rem;
       color: var(--muted);
+    }
+    .tag-pane-settings .perf-row-2 { margin-top: .4rem; }
+    .tag-pane-settings .perf-section { padding-inline: 0; }
+    .dialect-native {
+      position: absolute !important;
+      width: 1px !important;
+      height: 1px !important;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .dialect-section { position: relative; }
+    .dialect-current {
+      margin-inline-start: .4rem;
+      padding: .05rem .55rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--a) 12%, transparent);
+      color: var(--a);
+      font-size: .8rem;
+      font-weight: 600;
+    }
+    .dialect-current:empty { display: none; }
+    .dialect-picker {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(min(230px, 100%), 1fr));
+      gap: .8rem 1.4rem;
+      margin-top: .5rem;
+    }
+    .dialect-chip::before { display: none; }
+    .dialect-chip[aria-checked="true"] {
+      border-color: var(--a);
+      background: var(--a);
+      color: #fff;
     }
     .tag-groups {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
       gap: .9rem 1.4rem;
       margin-top: .6rem;
     }
@@ -1519,6 +1548,7 @@
       opacity: .85;
     }
     .tag-chip-sounds { --chip-dot: var(--tag-sound); }
+    .dialect-chip { --chip-dot: var(--a); }
     .tag-chip-delivery { --chip-dot: var(--tag-delivery); }
     .tag-chip:hover {
       border-color: var(--chip-dot);
@@ -2415,6 +2445,7 @@
             @if(($planTier ?? 'standard') === 'hd')
             @php
               $tagTabs = [
+                'settings' => null,
                 'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::label($t), 'groupKey' => 'vocal_tag_groups', 'count' => count(\App\Support\GeminiVocalTags::all())],
                 'delivery' => ['groups' => \App\Support\GeminiVocalTags::DELIVERY_GROUPS, 'label' => fn ($t) => \App\Support\GeminiVocalTags::deliveryLabel($t), 'groupKey' => 'vocal_delivery_groups', 'count' => count(\App\Support\GeminiVocalTags::deliveries())],
               ];
@@ -2424,7 +2455,7 @@
                 <div class="tag-studio-title">
                   <span class="tag-studio-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg></span>
                   <div>
-                    <strong>{{ __('ui.dashboard.vocal_tags') }}</strong>
+                    <strong>{{ __('ui.dashboard.voice_studio') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span></strong>
                     <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small>
                   </div>
                 </div>
@@ -2432,18 +2463,103 @@
                   <div class="tag-tabs" role="tablist">
                     @foreach($tagTabs as $tabKey => $tab)
                       <button type="button" class="tag-tab" role="tab" id="tagTab-{{ $tabKey }}" aria-controls="tagPane-{{ $tabKey }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}" data-tag-tab="{{ $tabKey }}">
-                        <span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_'.$tabKey) }}<span class="tag-tab-count">{{ $tab['count'] }}</span>
+                        <span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_'.$tabKey) }}
                       </button>
                     @endforeach
                   </div>
-                  <label class="tag-search">
+                  <label class="tag-search" id="tagSearchWrap" hidden>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
                     <input type="search" id="tagSearch" placeholder="{{ __('ui.dashboard.vocal_search') }}" autocomplete="off" aria-label="{{ __('ui.dashboard.vocal_search') }}">
                   </label>
                 </div>
               </header>
-              @foreach($tagTabs as $tabKey => $tab)
-                <div class="tag-pane" role="tabpanel" id="tagPane-{{ $tabKey }}" aria-labelledby="tagTab-{{ $tabKey }}" data-tag-pane="{{ $tabKey }}" @unless($loop->first) hidden @endunless>
+              <div class="tag-pane tag-pane-settings" role="tabpanel" id="tagPane-settings" aria-labelledby="tagTab-settings" data-tag-pane="settings">
+                <p class="tag-pane-hint"><span class="tag-kind tag-kind-settings" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_settings_hint') }}</p>
+                  <div class="perf-row-2">
+                    <div class="perf-section">
+                      <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
+                      <select name="performance_style" id="performance_style" required>
+                        <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
+                        @foreach(($studioPerformanceStyles ?? []) as $styleOption)
+                          <option value="{{ $styleOption['value'] ?? '' }}">
+                            {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
+                          </option>
+                        @endforeach
+                      </select>
+                    </div>
+
+                    <div class="perf-section">
+                      <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
+                      <select name="emotion" id="emotion" required>
+                        <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
+                        @foreach(($studioEmotions ?? []) as $emotionOption)
+                          <option value="{{ $emotionOption['value'] ?? '' }}">
+                            {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
+                          </option>
+                        @endforeach
+                      </select>
+                    </div>
+                  </div>
+
+                  @if($customPromptEnabled ?? false)
+                  <div class="perf-section" style="margin-top:.6rem;">
+                    <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }}</div>
+                    <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;">{{ $prefillValue('style_prompt') }}</textarea>
+                  </div>
+                  @endif
+
+                  <div class="perf-section dialect-section">
+                    <div class="perf-section-label">🌍 {{ __('ui.dashboard.dialect') }} <span class="dialect-current" id="dialectCurrent"></span></div>
+                    <select name="dialect" id="dialect" class="dialect-native" aria-label="{{ __('ui.dashboard.dialect') }}">
+                      <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>
+                    </select>
+                    @php
+                      $dialectRegionLabels = [];
+                      foreach (\App\Support\ArabicDialects::regions() as $regionKey => $regionNames) {
+                          $dialectRegionLabels[$regionKey] = app()->getLocale() === 'ar' ? $regionNames['ar'] : $regionNames['en'];
+                      }
+                    @endphp
+                    <div class="dialect-picker" id="dialectPicker" role="radiogroup" aria-label="{{ __('ui.dashboard.dialect') }}" data-regions="{{ json_encode($dialectRegionLabels, JSON_UNESCAPED_UNICODE) }}"></div>
+                  </div>
+
+                  <div class="perf-row-2">
+                    <div class="perf-section">
+                      <div class="perf-section-label">
+                        ⚡ {{ __('ui.dashboard.speed') }}
+                        <span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x
+                      </div>
+                      <div class="slider-wrap">
+                        <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value">
+                      </div>
+                    </div>
+                    <div class="perf-section">
+                      <div class="perf-section-label">
+                        🎵 {{ __('ui.dashboard.pitch') }}
+                        <span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span>
+                      </div>
+                      <div class="slider-wrap">
+                        <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value">
+                      </div>
+                    </div>
+                  </div>
+                  @if($dialogueEnabled ?? false)
+                  <div class="s-card" style="margin-top: .6rem;">
+                    <label class="compact-toggle-row" for="dialogueToggle">
+                      <div class="txt">
+                        <div class="t-title">🗣️ {{ __('ui.dashboard.dialogue_mode') }}</div>
+                        <div class="t-desc" id="dialogueHint">{{ __('ui.dashboard.dialogue_hint') }}</div>
+                      </div>
+                      <div class="toggle-switch">
+                        <input type="checkbox" id="dialogueToggle" {{ $prefillDialogue === '1' ? 'checked' : '' }}>
+                        <span class="toggle-slider"></span>
+                      </div>
+                    </label>
+                    <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
+                  </div>
+                  @endif
+              </div>
+              @foreach(array_filter($tagTabs) as $tabKey => $tab)
+                <div class="tag-pane" role="tabpanel" id="tagPane-{{ $tabKey }}" aria-labelledby="tagTab-{{ $tabKey }}" data-tag-pane="{{ $tabKey }}" hidden>
                   <p class="tag-pane-hint"><span class="tag-kind tag-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
                   <div class="tag-groups">
                     @foreach($tab['groups'] as $group => $groupTags)
@@ -2488,92 +2604,6 @@
               <select name="voice_key" id="voice_key"></select>
             </div>
           </div>
-
-          {{-- Performance Controls --}}
-          @if(($planTier ?? 'standard') === 'hd')
-          <div class="perf-panel" id="studioPanel">
-            <div class="perf-header">
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-              {{ __('ui.dashboard.voice_studio') }} <span class="premium-badge">{{ __('ui.pricing.premium') }}</span>
-            </div>
-
-            <div class="perf-row-2">
-              <div class="perf-section">
-                <div class="perf-section-label">🎭 {{ __('ui.dashboard.performance_style') }}</div>
-                <select name="performance_style" id="performance_style" required>
-                  <option value="">-- {{ __('ui.dashboard.choose_performance_style') }} --</option>
-                  @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                    <option value="{{ $styleOption['value'] ?? '' }}">
-                      {{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? ($styleOption['value'] ?? '')) : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}
-                    </option>
-                  @endforeach
-                </select>
-              </div>
-
-              <div class="perf-section">
-                <div class="perf-section-label">💫 {{ __('ui.dashboard.emotion_tone') }}</div>
-                <select name="emotion" id="emotion" required>
-                  <option value="">-- {{ __('ui.dashboard.choose_emotion') }} --</option>
-                  @foreach(($studioEmotions ?? []) as $emotionOption)
-                    <option value="{{ $emotionOption['value'] ?? '' }}">
-                      {{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? ($emotionOption['value'] ?? '')) : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}
-                    </option>
-                  @endforeach
-                </select>
-              </div>
-            </div>
-
-            @if($customPromptEnabled ?? false)
-            <div class="perf-section" style="margin-top:.6rem;">
-              <div class="perf-section-label">✨ {{ __('ui.dashboard.style_prompt') }}</div>
-              <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}" style="resize:vertical; min-height:60px; line-height: 1.5;">{{ $prefillValue('style_prompt') }}</textarea>
-            </div>
-            @endif
-
-            <div class="perf-section">
-              <div class="perf-section-label">🌍 {{ __('ui.dashboard.dialect') }}</div>
-              <select name="dialect" id="dialect">
-                <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>
-              </select>
-            </div>
-
-            <div class="perf-row-2">
-              <div class="perf-section">
-                <div class="perf-section-label">
-                  ⚡ {{ __('ui.dashboard.speed') }}
-                  <span class="slider-value" id="speedVal">{{ $prefillValue('speed', '1.0') }}</span>x
-                </div>
-                <div class="slider-wrap">
-                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" oninput="document.getElementById('speedVal').textContent=this.value">
-                </div>
-              </div>
-              <div class="perf-section">
-                <div class="perf-section-label">
-                  🎵 {{ __('ui.dashboard.pitch') }}
-                  <span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span>
-                </div>
-                <div class="slider-wrap">
-                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" oninput="document.getElementById('pitchVal').textContent=this.value">
-                </div>
-              </div>
-            </div>
-            @if($dialogueEnabled ?? false)
-            <div class="s-card" style="margin-top: .6rem;">
-              <label class="compact-toggle-row" for="dialogueToggle">
-                <div class="txt">
-                  <div class="t-title">🗣️ {{ __('ui.dashboard.dialogue_mode') }}</div>
-                  <div class="t-desc" id="dialogueHint">{{ __('ui.dashboard.dialogue_hint') }}</div>
-                </div>
-                <div class="toggle-switch">
-                  <input type="checkbox" id="dialogueToggle" {{ $prefillDialogue === '1' ? 'checked' : '' }}>
-                  <span class="toggle-slider"></span>
-                </div>
-              </label>
-              <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
-            </div>
-            @endif
-          </div>
-          @endif
 
           <div class="s-card">
             <label class="compact-toggle-row" for="translateToggle">
@@ -3299,7 +3329,7 @@
         const localizedLabel = pageLocale === 'ar'
           ? String(row?.label_ar || row?.label || value).trim()
           : String(row?.label || row?.label_ar || value).trim();
-        dialectsByLanguage[langCode].push({ value, label: localizedLabel || value });
+        dialectsByLanguage[langCode].push({ value, label: localizedLabel || value, region: String(row?.region || '') });
       });
     });
 
@@ -3314,7 +3344,61 @@
         opt.textContent = d.label;
         dialectSelect.appendChild(opt);
       }
+      renderDialectPicker();
     }
+
+    // Dialect picker: every dialect as a button, grouped by region; the select stays the form field.
+    const dialectPicker = document.getElementById('dialectPicker');
+    let dialectRegionLabels = {};
+    try { dialectRegionLabels = JSON.parse(dialectPicker?.dataset.regions || '{}'); } catch (e) { dialectRegionLabels = {}; }
+    const dialectCurrent = document.getElementById('dialectCurrent');
+    function syncDialectPicker() {
+      if (!dialectPicker || !dialectSelect) return;
+      dialectPicker.querySelectorAll('[data-dialect]').forEach((b) => b.setAttribute('aria-checked', b.dataset.dialect === dialectSelect.value ? 'true' : 'false'));
+      const picked = dialectSelect.options[dialectSelect.selectedIndex];
+      if (dialectCurrent) dialectCurrent.textContent = picked ? picked.textContent : '';
+    }
+    function renderDialectPicker() {
+      if (!dialectPicker || !dialectSelect) return;
+      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
+      const groups = new Map();
+      (dialectsByLanguage[lang] || []).forEach((d) => {
+        const key = d.value === '' ? '_auto' : (d.region || '_other');
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(d);
+      });
+      dialectPicker.innerHTML = '';
+      groups.forEach((rows, key) => {
+        const group = document.createElement('div');
+        group.className = 'dialect-group';
+        if (key !== '_auto' && key !== '_other' && dialectRegionLabels[key]) {
+          const label = document.createElement('div');
+          label.className = 'tag-group-label';
+          label.textContent = dialectRegionLabels[key];
+          group.appendChild(label);
+        }
+        const chips = document.createElement('div');
+        chips.className = 'tag-chips';
+        rows.forEach((d) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'tag-chip dialect-chip';
+          b.setAttribute('role', 'radio');
+          b.dataset.dialect = d.value;
+          b.textContent = d.label;
+          b.addEventListener('click', () => {
+            dialectSelect.value = d.value;
+            dialectSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            syncDialectPicker();
+          });
+          chips.appendChild(b);
+        });
+        group.appendChild(chips);
+        dialectPicker.appendChild(group);
+      });
+      syncDialectPicker();
+    }
+    dialectSelect?.addEventListener('change', syncDialectPicker);
 
     function setSelectValueIfAvailable(selectEl, value) {
       const normalized = String(value || '').trim();
@@ -3345,6 +3429,7 @@
       if (dialectSelect && !String(dialectSelect.value || '').trim()) {
         setSelectValueIfAvailable(dialectSelect, defaults.dialect || '');
       }
+      syncDialectPicker();
     }
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
@@ -4255,12 +4340,18 @@
           if (empty) empty.hidden = shown > 0;
         });
       };
-      tagTabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-          tagTabs.forEach((t) => t.setAttribute('aria-selected', t === tab ? 'true' : 'false'));
-          document.querySelectorAll('[data-tag-pane]').forEach((pane) => { pane.hidden = pane.dataset.tagPane !== tab.dataset.tagTab; });
-        });
-      });
+      const showTagTab = (name) => {
+        tagTabs.forEach((t) => t.setAttribute('aria-selected', t.dataset.tagTab === name ? 'true' : 'false'));
+        document.querySelectorAll('[data-tag-pane]').forEach((pane) => { pane.hidden = pane.dataset.tagPane !== name; });
+        const searchWrap = document.getElementById('tagSearchWrap');
+        if (searchWrap) searchWrap.hidden = name === 'settings';
+      };
+      tagTabs.forEach((tab) => tab.addEventListener('click', () => showTagTab(tab.dataset.tagTab)));
+      // A required setting left empty in a hidden tab: open that tab so the browser can point at it.
+      document.getElementById('voiceForm')?.addEventListener('invalid', (event) => {
+        const pane = event.target.closest?.('[data-tag-pane]');
+        if (pane && pane.hidden) showTagTab(pane.dataset.tagPane);
+      }, true);
       tagSearch?.addEventListener('input', filterTags);
 
       // Colour the tags inside the text box: a backdrop with the same text sits behind it.

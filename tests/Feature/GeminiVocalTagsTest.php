@@ -11,8 +11,10 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\VoiceCloningService;
+use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceTier;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -330,6 +332,38 @@ class GeminiVocalTagsTest extends TestCase
         });
         $this->assertSame('Clear.', $styles['Hello.']);
         $this->assertSame("Clear.\nDelivery cues from the script: sad and subdued.", $styles['I lost it.']);
+    }
+
+    public function test_voice_settings_live_in_the_first_tab_of_the_studio(): void
+    {
+        $this->actingAs($this->memberOn(VoiceTier::HD));
+
+        $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('id="studioPanel"', $html, 'the separate panel is gone');
+        $this->assertStringNotContainsString('tag-tab-count', $html);
+        $settings = substr($html, strpos($html, 'id="tagPane-settings"'));
+        $settings = substr($settings, 0, strpos($settings, 'id="tagPane-sounds"'));
+        foreach (['name="performance_style"', 'name="emotion"', 'name="dialect"', 'name="speed"', 'name="pitch"', 'id="dialectPicker"'] as $field) {
+            $this->assertStringContainsString($field, $settings, $field.' is in the settings tab');
+        }
+        $this->assertMatchesRegularExpression('/data-tag-tab="settings"[^>]*>|aria-selected="true"[^>]*data-tag-tab="settings"/', $html);
+        $this->assertStringContainsString('data-tag-pane="sounds" hidden', $html);
+    }
+
+    public function test_every_arab_dialect_is_offered_with_directions(): void
+    {
+        $codes = TtsStudioConfig::dialectValues('ar');
+        $this->assertCount(22, $codes);
+        foreach (['ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+            $this->assertContains($code, $codes);
+            $this->assertNotNull(ArabicDialects::prompt($code), $code);
+            $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
+            $this->assertLessThanOrEqual(10, strlen($code), 'fits the dialect columns');
+        }
+        $row = collect(TtsStudioConfig::dialectCatalogForLanguage('ar'))->firstWhere('value', 'ar-MR');
+        $this->assertSame('موريتاني (حساني)', $row['label_ar']);
+        $this->assertSame('maghreb', $row['region']);
     }
 
     private function memberOn(string $tier): User

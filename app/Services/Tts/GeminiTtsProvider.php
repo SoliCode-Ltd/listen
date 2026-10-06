@@ -3,6 +3,7 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\ShareableAudio;
@@ -195,6 +196,7 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private const ARABIC_DIALECT_PROMPTS = [
         'ar-SA' => 'Saudi Arabic (Gulf dialect)',
+        'ar-SA-HJ' => 'Hejazi Saudi Arabic (Jeddah and Mecca)',
         'ar-AE' => 'Emirati Arabic (Gulf dialect)',
         'ar-KW' => 'Kuwaiti Arabic (Gulf dialect)',
         'ar-QA' => 'Qatari Arabic (Gulf dialect)',
@@ -202,6 +204,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-OM' => 'Omani Arabic (Gulf dialect)',
         'ar-YE' => 'Yemeni Arabic',
         'ar-EG' => 'Egyptian Arabic',
+        'ar-EG-SA' => 'Saidi Egyptian Arabic (Upper Egypt)',
         'ar-LB' => 'Lebanese Arabic (Levantine)',
         'ar-SY' => 'Syrian Arabic (Levantine)',
         'ar-JO' => 'Jordanian Arabic (Levantine)',
@@ -211,6 +214,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-DZ' => 'Algerian Arabic (Maghrebi)',
         'ar-TN' => 'Tunisian Arabic (Maghrebi)',
         'ar-LY' => 'Libyan Arabic (Maghrebi)',
+        'ar-MR' => 'Mauritanian Hassaniya Arabic',
         'ar-SD' => 'Sudanese Arabic',
         'ar-XA' => 'Modern Standard Arabic (Fusha)',
     ];
@@ -1100,7 +1104,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         // Build dialect instruction for Arabic
         $dialectInstruction = '';
         if ($isArabic && $dialect !== null && $dialect !== '') {
-            $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? null;
+            $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? ArabicDialects::prompt($dialect);
             if ($dialectName !== null) {
                 $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
             } else {
