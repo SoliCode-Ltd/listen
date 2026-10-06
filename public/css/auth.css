@@ -594,20 +594,20 @@ html body.auth-split-body .auth-play:focus-visible {
 /* Script: each word lights up as it is spoken */
 html body.auth-split-body .auth-player-text {
   margin: 0;
-  padding: 22px 16px 18px;
-  min-height: 6.2em;
+  padding: 18px 16px 16px;
+  min-height: 5.6em;
   font-family: var(--au-font-ar);
-  font-size: 19px;
+  font-size: 16.5px;
   font-weight: 500;
-  line-height: 1.75;
+  line-height: 1.8;
   color: var(--sc-text);
   text-align: start;
 }
 html body.auth-split-body .auth-player-text[lang="en"] {
   font-family: var(--au-font);
-  font-size: 18px;
-  line-height: 1.6;
-  letter-spacing: -0.01em;
+  font-size: 15.5px;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
 }
 html body.auth-split-body .auth-player-text.is-reading .w {
   color: var(--sc-word-dim);
