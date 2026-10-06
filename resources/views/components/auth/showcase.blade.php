@@ -54,12 +54,6 @@
           </div>
           <span class="auth-time" dir="ltr" data-nt-time>0:00</span>
         </div>
-        <div class="auth-player-foot">
-          <span class="auth-player-dot" aria-hidden="true"></span>
-          <span data-nt-try-voice>{{ \App\Support\NewDesignSamples::dialectLabel($authFirst['dialect']) }}</span>
-          <span class="auth-player-sep" aria-hidden="true">·</span>
-          <span>{{ __('design.auth.sample_label') }}</span>
-        </div>
       </div>
     @endif
 
