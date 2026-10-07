@@ -63,7 +63,7 @@ jobs:
           $S "$FIND; mkdir -p storage/app/listen-deploy"
           $S "$FIND; cat > storage/app/listen-deploy/manifest.md5" < manifest.md5
           echo "== Files that differ from main (or are missing) =="
-          $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED.*/  (changed)/; s/: FAILED open or read/  (missing)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
+          $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED open or read/  (missing)/; s/: FAILED$/  (changed)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
           echo "== $(wc -l < diff.txt) file(s) =="
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
           echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
