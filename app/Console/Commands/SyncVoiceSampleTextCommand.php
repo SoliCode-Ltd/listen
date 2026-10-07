@@ -53,6 +53,7 @@ class SyncVoiceSampleTextCommand extends Command
         'ar-SA-EA' => 'gulf',
         'ar-SA-NO' => 'gulf',
         'ar-OM-DH' => 'gulf',
+        'ar-QA-BD' => 'gulf',
         'ar-SY-AL' => 'levantine',
         'ar-JO-BD' => 'levantine',
         'ar-PS-GZ' => 'levantine',
