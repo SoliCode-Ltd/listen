@@ -60,20 +60,20 @@ jobs:
           ssh-keyscan -T 15 -H "$H" >> ~/.ssh/known_hosts 2>/dev/null
           S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 $U@$H"
           FIND="for d in ${P:+'$P'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done"
-          $S "$FIND; mkdir -p ~/.listen-deploy" 
-          $S "cat > ~/.listen-deploy/manifest.md5" < manifest.md5
+          $S "$FIND; mkdir -p storage/app/listen-deploy"
+          $S "$FIND; cat > storage/app/listen-deploy/manifest.md5" < manifest.md5
           echo "== Files that differ from main (or are missing) =="
-          $S "$FIND; md5sum -c --quiet ~/.listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED.*/  (changed)/; s/: FAILED open or read/  (missing)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
+          $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED.*/  (changed)/; s/: FAILED open or read/  (missing)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
           echo "== $(wc -l < diff.txt) file(s) =="
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
           echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
           if [ "$MODE" != deploy ]; then exit 0; fi
-          $S "cat > ~/.listen-deploy/bundle.tgz" < bundle.tgz
-          $S "$FIND; set -e; tar -xzf ~/.listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \
+          $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
+          $S "$FIND; set -e; tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \
             c=0; [ -f bootstrap/cache/config.php ] && c=1; r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1; \
             php artisan optimize:clear | tail -6; \
             [ \$c = 1 ] && php artisan config:cache | tail -1; [ \$r = 1 ] && php artisan route:cache | tail -1; \
             php artisan view:cache | tail -1; php artisan queue:restart | tail -1 || true; \
-            md5sum -c --quiet ~/.listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches main' || echo 'WARNING: some files still differ'; \
-            rm -f ~/.listen-deploy/bundle.tgz"
+            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches main' || echo 'WARNING: some files still differ'; \
+            rm -f storage/app/listen-deploy/bundle.tgz"
           rm -f ~/.ssh/id_deploy
