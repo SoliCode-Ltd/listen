@@ -1,0 +1,278 @@
+[
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-QA",
+        "style": "neutral",
+        "emotion": "warm",
+        "voice": "Kore",
+        "text": "مرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "rewrite_prompt": "Rewrite this transcript so it is spoken in this variety:\nQatari Gulf Arabic, the way someone from Doha talks to a friend. Pronounce ج as y (ريّال, يالس) and ق as g; Qatari Gulf rhythm and Qatari wording. Do not use an Egyptian, Levantine or Saudi Najdi accent.\nWhat this variety sounds like: Qatari (Doha): ج as y (ريّال = man, يالس = sitting, ماي = water), ق as g (گلب) and as j before front vowels (جريب = near), ك as ch (چ) near front vowels (چذي = like this, چلب); words شلونك/شخبارك (how are you), شنو (what), وايد (very), زين (good), الحين (now), مب (not), هني (here), عيل (then), أبي (I want), ترى; light, quick Qatari Gulf rhythm.\n\nRules:\n- Keep the same meaning, names, numbers, and sentence order.\n- Use the everyday words and grammar of that variety.\n- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n- Do not add a title, notes, labels, or quotation marks.\n- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n- If it is already in that variety, return it unchanged.\n- Return only the spoken transcript.\n\nTranscript:\nمرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "style_text": "Voice dialect: Qatari Arabic (urban Doha, Gulf dialect). Speak with authentic regional pronunciation and natural dialect characteristics. Dialect markers to make clearly audible: Qatari (Doha): ج as y (ريّال = man, يالس = sitting, ماي = water), ق as g (گلب) and as j before front vowels (جريب = near), ك as ch (چ) near front vowels (چذي = like this, چلب); words شلونك/شخبارك (how are you), شنو (what), وايد (very), زين (good), الحين (now), مب (not), هني (here), عيل (then), أبي (I want), ترى; light, quick Qatari Gulf rhythm. Emotional tone: warm, friendly, and approachable. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha.",
+        "candidates": [
+            {
+                "code": "ar-XA",
+                "name": "Modern Standard Arabic"
+            },
+            {
+                "code": "ar-SA",
+                "name": "Saudi (Najdi)"
+            },
+            {
+                "code": "ar-SA-HJ",
+                "name": "Saudi (Hejazi)"
+            },
+            {
+                "code": "ar-SA-SO",
+                "name": "Saudi (Southern)"
+            },
+            {
+                "code": "ar-SA-QS",
+                "name": "Saudi (Qassimi)"
+            },
+            {
+                "code": "ar-SA-EA",
+                "name": "Saudi (Eastern)"
+            },
+            {
+                "code": "ar-SA-NO",
+                "name": "Saudi (Northern)"
+            },
+            {
+                "code": "ar-AE",
+                "name": "Emirati"
+            },
+            {
+                "code": "ar-KW",
+                "name": "Kuwaiti"
+            },
+            {
+                "code": "ar-QA",
+                "name": "Qatari (Doha)"
+            },
+            {
+                "code": "ar-QA-BD",
+                "name": "Qatari (Bedouin)"
+            },
+            {
+                "code": "ar-BH",
+                "name": "Bahraini"
+            },
+            {
+                "code": "ar-OM",
+                "name": "Omani"
+            },
+            {
+                "code": "ar-OM-DH",
+                "name": "Omani (Dhofari)"
+            }
+        ]
+    },
+    {
+        "kind": "cloned",
+        "lang": "ar",
+        "dialect": "ar-QA",
+        "style": "neutral",
+        "emotion": "warm",
+        "voice": "Kore",
+        "text": "مرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "rewrite_prompt": "Rewrite this transcript so it is spoken in this variety:\nQatari Gulf Arabic, the way someone from Doha talks to a friend. Pronounce ج as y (ريّال, يالس) and ق as g; Qatari Gulf rhythm and Qatari wording. Do not use an Egyptian, Levantine or Saudi Najdi accent.\nWhat this variety sounds like: Qatari (Doha): ج as y (ريّال = man, يالس = sitting, ماي = water), ق as g (گلب) and as j before front vowels (جريب = near), ك as ch (چ) near front vowels (چذي = like this, چلب); words شلونك/شخبارك (how are you), شنو (what), وايد (very), زين (good), الحين (now), مب (not), هني (here), عيل (then), أبي (I want), ترى; light, quick Qatari Gulf rhythm.\n\nRules:\n- Keep the same meaning, names, numbers, and sentence order.\n- Use the everyday words and grammar of that variety.\n- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n- Do not add a title, notes, labels, or quotation marks.\n- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n- If it is already in that variety, return it unchanged.\n- Return only the spoken transcript.\n\nTranscript:\nمرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "style_text": "Qatari Gulf Arabic, the way someone from Doha talks to a friend. Pronounce ج as y (ريّال, يالس) and ق as g; Qatari Gulf rhythm and Qatari wording. Do not use an Egyptian, Levantine or Saudi Najdi accent. Emotional tone: warm.",
+        "candidates": [
+            {
+                "code": "ar-XA",
+                "name": "Modern Standard Arabic"
+            },
+            {
+                "code": "ar-SA",
+                "name": "Saudi (Najdi)"
+            },
+            {
+                "code": "ar-SA-HJ",
+                "name": "Saudi (Hejazi)"
+            },
+            {
+                "code": "ar-SA-SO",
+                "name": "Saudi (Southern)"
+            },
+            {
+                "code": "ar-SA-QS",
+                "name": "Saudi (Qassimi)"
+            },
+            {
+                "code": "ar-SA-EA",
+                "name": "Saudi (Eastern)"
+            },
+            {
+                "code": "ar-SA-NO",
+                "name": "Saudi (Northern)"
+            },
+            {
+                "code": "ar-AE",
+                "name": "Emirati"
+            },
+            {
+                "code": "ar-KW",
+                "name": "Kuwaiti"
+            },
+            {
+                "code": "ar-QA",
+                "name": "Qatari (Doha)"
+            },
+            {
+                "code": "ar-QA-BD",
+                "name": "Qatari (Bedouin)"
+            },
+            {
+                "code": "ar-BH",
+                "name": "Bahraini"
+            },
+            {
+                "code": "ar-OM",
+                "name": "Omani"
+            },
+            {
+                "code": "ar-OM-DH",
+                "name": "Omani (Dhofari)"
+            }
+        ]
+    },
+    {
+        "kind": "stock",
+        "lang": "ar",
+        "dialect": "ar-QA-BD",
+        "style": "neutral",
+        "emotion": "warm",
+        "voice": "Iapetus",
+        "text": "مرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "rewrite_prompt": "Rewrite this transcript so it is spoken in this variety:\nQatari Bedouin Arabic, the way the Bedouin tribes of Qatar talk. Keep ج as j, say ق as g, and use the slower, deeper Bedouin melody. Do not use an Egyptian or Levantine accent.\nWhat this variety sounds like: Qatari Bedouin: ج kept as j, ق as g, feminine ك as ch or ts (عليچ); Bedouin words وش (what), زين, هقيت (I thought), الحين, يا رجّال, أبي (I want); slower, deeper Bedouin melody, close to Najdi, clearly not Doha city speech.\n\nRules:\n- Keep the same meaning, names, numbers, and sentence order.\n- Use the everyday words and grammar of that variety.\n- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n- Do not add a title, notes, labels, or quotation marks.\n- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n- If it is already in that variety, return it unchanged.\n- Return only the spoken transcript.\n\nTranscript:\nمرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "style_text": "Voice dialect: Qatari Bedouin Arabic (Badu, Najdi-influenced Gulf dialect). Speak with authentic regional pronunciation and natural dialect characteristics. Dialect markers to make clearly audible: Qatari Bedouin: ج kept as j, ق as g, feminine ك as ch or ts (عليچ); Bedouin words وش (what), زين, هقيت (I thought), الحين, يا رجّال, أبي (I want); slower, deeper Bedouin melody, close to Najdi, clearly not Doha city speech. Emotional tone: warm, friendly, and approachable. Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone. Maintain natural Arabic speech rhythm and pacing. Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha.",
+        "candidates": [
+            {
+                "code": "ar-XA",
+                "name": "Modern Standard Arabic"
+            },
+            {
+                "code": "ar-SA",
+                "name": "Saudi (Najdi)"
+            },
+            {
+                "code": "ar-SA-HJ",
+                "name": "Saudi (Hejazi)"
+            },
+            {
+                "code": "ar-SA-SO",
+                "name": "Saudi (Southern)"
+            },
+            {
+                "code": "ar-SA-QS",
+                "name": "Saudi (Qassimi)"
+            },
+            {
+                "code": "ar-SA-EA",
+                "name": "Saudi (Eastern)"
+            },
+            {
+                "code": "ar-SA-NO",
+                "name": "Saudi (Northern)"
+            },
+            {
+                "code": "ar-AE",
+                "name": "Emirati"
+            },
+            {
+                "code": "ar-KW",
+                "name": "Kuwaiti"
+            },
+            {
+                "code": "ar-QA",
+                "name": "Qatari (Doha)"
+            },
+            {
+                "code": "ar-QA-BD",
+                "name": "Qatari (Bedouin)"
+            },
+            {
+                "code": "ar-BH",
+                "name": "Bahraini"
+            },
+            {
+                "code": "ar-OM",
+                "name": "Omani"
+            },
+            {
+                "code": "ar-OM-DH",
+                "name": "Omani (Dhofari)"
+            }
+        ]
+    },
+    {
+        "kind": "cloned",
+        "lang": "ar",
+        "dialect": "ar-QA-BD",
+        "style": "neutral",
+        "emotion": "warm",
+        "voice": "Iapetus",
+        "text": "مرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "rewrite_prompt": "Rewrite this transcript so it is spoken in this variety:\nQatari Bedouin Arabic, the way the Bedouin tribes of Qatar talk. Keep ج as j, say ق as g, and use the slower, deeper Bedouin melody. Do not use an Egyptian or Levantine accent.\nWhat this variety sounds like: Qatari Bedouin: ج kept as j, ق as g, feminine ك as ch or ts (عليچ); Bedouin words وش (what), زين, هقيت (I thought), الحين, يا رجّال, أبي (I want); slower, deeper Bedouin melody, close to Najdi, clearly not Doha city speech.\n\nRules:\n- Keep the same meaning, names, numbers, and sentence order.\n- Use the everyday words and grammar of that variety.\n- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n- Do not add a title, notes, labels, or quotation marks.\n- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n- If it is already in that variety, return it unchanged.\n- Return only the spoken transcript.\n\nTranscript:\nمرحبا يا صديقي، كيف حالك اليوم؟ أريد أن أخبرك أنني ذهبت إلى السوق في الصباح واشتريت أشياء كثيرة، وكان الجو جميلاً جداً. ماذا تريد أن نفعل الآن؟",
+        "style_text": "Qatari Bedouin Arabic, the way the Bedouin tribes of Qatar talk. Keep ج as j, say ق as g, and use the slower, deeper Bedouin melody. Do not use an Egyptian or Levantine accent. Emotional tone: warm.",
+        "candidates": [
+            {
+                "code": "ar-XA",
+                "name": "Modern Standard Arabic"
+            },
+            {
+                "code": "ar-SA",
+                "name": "Saudi (Najdi)"
+            },
+            {
+                "code": "ar-SA-HJ",
+                "name": "Saudi (Hejazi)"
+            },
+            {
+                "code": "ar-SA-SO",
+                "name": "Saudi (Southern)"
+            },
+            {
+                "code": "ar-SA-QS",
+                "name": "Saudi (Qassimi)"
+            },
+            {
+                "code": "ar-SA-EA",
+                "name": "Saudi (Eastern)"
+            },
+            {
+                "code": "ar-SA-NO",
+                "name": "Saudi (Northern)"
+            },
+            {
+                "code": "ar-AE",
+                "name": "Emirati"
+            },
+            {
+                "code": "ar-KW",
+                "name": "Kuwaiti"
+            },
+            {
+                "code": "ar-QA",
+                "name": "Qatari (Doha)"
+            },
+            {
+                "code": "ar-QA-BD",
+                "name": "Qatari (Bedouin)"
+            },
+            {
+                "code": "ar-BH",
+                "name": "Bahraini"
+            },
+            {
+                "code": "ar-OM",
+                "name": "Omani"
+            },
+            {
+                "code": "ar-OM-DH",
+                "name": "Omani (Dhofari)"
+            }
+        ]
+    }
+]

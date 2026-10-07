@@ -204,7 +204,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-SA-HJ' => 'Hejazi Saudi Arabic (Jeddah and Mecca)',
         'ar-AE' => 'Emirati Arabic (Gulf dialect)',
         'ar-KW' => 'Kuwaiti Arabic (Gulf dialect)',
-        'ar-QA' => 'Qatari Arabic (Gulf dialect)',
+        'ar-QA' => 'Qatari Arabic (urban Doha, Gulf dialect)',
         'ar-BH' => 'Bahraini Arabic (Gulf dialect)',
         'ar-OM' => 'Omani Arabic (Gulf dialect)',
         'ar-YE' => 'Yemeni Arabic',

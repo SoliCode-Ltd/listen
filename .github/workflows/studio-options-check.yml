@@ -8,6 +8,10 @@ name: Studio options check
 on:
   # Run by hand: it uses about 72 speech requests, most of a day's quota.
   workflow_dispatch:
+    inputs:
+      cases:
+        description: Cases file under scripts/tts (default all 72 cases)
+        default: studio_options_cases.json
 
 permissions:
   contents: read
@@ -19,11 +23,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build the check script with the cases
+        env:
+          CASES_FILE: ${{ inputs.cases || 'studio_options_cases.json' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, json
-          cases = json.load(open('scripts/tts/studio_options_cases.json'))
+          import base64, json, os, re
+          name = os.environ['CASES_FILE']
+          assert re.fullmatch(r'[a-z_]+\.json', name), name
+          cases = json.load(open('scripts/tts/' + name))
           assert cases and all('style_text' in c for c in cases)
           script = open('scripts/tts/studio_options_check.php').read()
           assert '__CASES__' in script

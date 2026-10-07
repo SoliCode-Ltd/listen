@@ -80,7 +80,7 @@ class GeminiStylePromptTest extends TestCase
             'Saudi Arabic' => ['ar-SA', 'Saudi Arabic (Gulf dialect)'],
             'Emirati Arabic' => ['ar-AE', 'Emirati Arabic (Gulf dialect)'],
             'Kuwaiti Arabic' => ['ar-KW', 'Kuwaiti Arabic (Gulf dialect)'],
-            'Qatari Arabic' => ['ar-QA', 'Qatari Arabic (Gulf dialect)'],
+            'Qatari Arabic' => ['ar-QA', 'Qatari Arabic (urban Doha, Gulf dialect)'],
             'Bahraini Arabic' => ['ar-BH', 'Bahraini Arabic (Gulf dialect)'],
             'Omani Arabic' => ['ar-OM', 'Omani Arabic (Gulf dialect)'],
             'Yemeni Arabic' => ['ar-YE', 'Yemeni Arabic'],
