@@ -1,10 +1,12 @@
 name: Server deploy
 
-# inspect: read-only look at the app checkout on the server.
-# deploy: fast-forward the checkout to origin/main, refresh dependencies only
-# if composer.lock changed, list (never run) new migrations, clear caches.
-# Stops without changing anything if the checkout has local edits or cannot
-# fast-forward.
+# The servers are plain uploads, not git checkouts. This copies the files
+# tracked on main onto the server. It never deletes, and never touches .env,
+# storage/, vendor/, node_modules/, uploads, or the per-server extension
+# config (public/extensions/*/config.js).
+#   inspect: lists the files that differ from main (nothing changes).
+#   deploy:  copies main over the app, then clears and rebuilds caches.
+# New migrations and composer.lock changes are reported, not run.
 
 on:
   workflow_dispatch:
@@ -26,6 +28,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 1
+      - name: Build the bundle and its checksums
+        run: |
+          set -euo pipefail
+          git ls-files | grep -v -E '^(\.github/|tests/|\.env|storage/|vendor/|node_modules/|public/storage)' \
+            | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' > files.txt
+          tar -czf bundle.tgz -T files.txt
+          xargs -d '\n' md5sum < files.txt > manifest.md5
+          echo "main: $(git log -1 --format='%h %s')"; wc -l < files.txt
       - name: Run over SSH
         env:
           TARGET: ${{ inputs.target }}
@@ -46,34 +60,31 @@ jobs:
           printf '%s\n' "$K" | tr -d '\r' > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -T 15 -H "$H" >> ~/.ssh/known_hosts 2>/dev/null
-          cat > remote.sh <<'SH'
-          set -u
-          for d in __PATH__ ~/public_html ~; do [ -f "$d/artisan" ] && cd "$d" && break; done
-          echo "APP DIR: $(pwd)"
-          if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then echo "NOT A GIT CHECKOUT"; ls -la | head -30; exit 0; fi
-          echo "BRANCH: $(git rev-parse --abbrev-ref HEAD)"
-          echo "HEAD: $(git log -1 --format='%h %s (%cr)')"
-          echo "REMOTE: $(git remote -v | head -1 | sed -E 's#//[^@]*@#//***@#')"
-          echo "LOCAL CHANGES:"; git status --porcelain --untracked-files=no | head -40
-          git fetch -q origin main 2>&1 | tail -3 || echo "FETCH FAILED"
-          echo "BEHIND main BY: $(git rev-list --count HEAD..origin/main 2>/dev/null)"
-          git log --oneline HEAD..origin/main 2>/dev/null | head -20
-          echo "AHEAD OF main BY: $(git rev-list --count origin/main..HEAD 2>/dev/null)"
-          echo "NEW MIGRATIONS:"; git diff --name-only HEAD origin/main -- database/migrations 2>/dev/null
-          echo "COMPOSER.LOCK CHANGED: $(git diff --quiet HEAD origin/main -- composer.lock && echo no || echo yes)"
-          if [ "__MODE__" != deploy ]; then exit 0; fi
-          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then echo "STOPPED: local edits on the server; nothing changed"; exit 3; fi
-          old="$(git rev-parse HEAD)"
-          git merge --ff-only origin/main || { echo "STOPPED: cannot fast-forward; nothing changed"; exit 4; }
-          if ! git diff --quiet "$old" HEAD -- composer.lock; then composer install --no-dev --optimize-autoloader --no-interaction 2>&1 | tail -5; fi
-          php artisan optimize:clear 2>&1 | tail -8
-          php artisan config:cache 2>&1 | tail -2
-          php artisan route:cache 2>&1 | tail -2
-          php artisan view:cache 2>&1 | tail -2
-          php artisan queue:restart 2>&1 | tail -1 || true
-          echo "DEPLOYED: $(git log -1 --format='%h %s')"
-          echo "MIGRATIONS NOT RUN (run by hand if any): $(git diff --name-only "$old" HEAD -- database/migrations | tr '\n' ' ')"
-          SH
-          sed -i "s#__PATH__#${P:+$P}#; s#__MODE__#$MODE#" remote.sh
-          ssh -i ~/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 "$U@$H" 'bash -s' < remote.sh
+          S="ssh -i $HOME/.ssh/id_deploy -o BatchMode=yes -o ConnectTimeout=20 $U@$H"
+          FIND="for d in ${P:+'$P'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done"
+          $S "$FIND; mkdir -p storage/app/listen-deploy"
+          $S "$FIND; cat > storage/app/listen-deploy/manifest.md5" < manifest.md5
+          echo "== Files that differ from main (or are missing) =="
+          $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED open or read/  (missing)/; s/: FAILED$/  (changed)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
+          echo "== $(wc -l < diff.txt) file(s) =="
+          echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
+          echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
+          if [ "$MODE" != deploy ]; then exit 0; fi
+          $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
+          $S "$FIND; set -e; tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \
+            c=0; [ -f bootstrap/cache/config.php ] && c=1; r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1; \
+            php artisan optimize:clear | tail -6; \
+            [ \$c = 1 ] && php artisan config:cache | tail -1; [ \$r = 1 ] && php artisan route:cache | tail -1; \
+            php artisan view:cache | tail -1; php artisan queue:restart | tail -1 || true; \
+            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches main' || echo 'WARNING: some files still differ'; \
+            rm -f storage/app/listen-deploy/bundle.tgz"
           rm -f ~/.ssh/id_deploy
+      - name: Check the public footer
+        env:
+          BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
+        run: |
+          for path in /ar /en; do
+            html="$(curl -s --max-time 30 -L "$BASE$path" || true)"
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
+            echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
+          done
