@@ -79,3 +79,12 @@ jobs:
             md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches main' || echo 'WARNING: some files still differ'; \
             rm -f storage/app/listen-deploy/bundle.tgz"
           rm -f ~/.ssh/id_deploy
+      - name: Check the public footer
+        env:
+          BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
+        run: |
+          for path in /ar /en; do
+            html="$(curl -s --max-time 30 -L "$BASE$path" || true)"
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
+            echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
+          done
