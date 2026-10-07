@@ -267,13 +267,24 @@ class SeoRoutesTest extends TestCase
             ->assertSee('images/og/listen-og-ar.png', false);
     }
 
-    public function test_footer_links_to_landing_and_dialect_pages(): void
+    public function test_footer_links_to_landing_pages_and_the_hubs_only(): void
     {
         $this->getLocalizedRoute('pricing')
             ->assertOk()
             ->assertSee('/text-to-speech"', false)
-            ->assertSee('/arabic-dialects/egyptian"', false)
-            ->assertSee('/arabic-dialects"', false);
+            ->assertSee('/arabic-dialects"', false)
+            ->assertSee('/english-accents"', false)
+            ->assertDontSee('/arabic-dialects/egyptian"', false)
+            ->assertDontSee('/english-accents/american"', false);
+    }
+
+    public function test_arabic_dialect_hub_links_every_dialect_page(): void
+    {
+        $response = $this->getPage('/arabic-dialects')->assertOk();
+
+        foreach (array_keys(\App\Support\SeoDialectPages::PAGES) as $slug) {
+            $response->assertSee('/arabic-dialects/'.$slug.'"', false);
+        }
     }
 
     public function test_english_accent_pages_render_in_both_languages(): void
@@ -315,7 +326,7 @@ class SeoRoutesTest extends TestCase
         }
     }
 
-    public function test_english_accent_pages_are_in_the_sitemap_and_footer(): void
+    public function test_english_accent_pages_are_in_the_sitemap_and_the_footer_links_the_hub(): void
     {
         $this->get('/sitemap.xml')
             ->assertOk()
@@ -325,7 +336,6 @@ class SeoRoutesTest extends TestCase
 
         $this->getLocalizedRoute('pricing')
             ->assertOk()
-            ->assertSee('/english-accents/american"', false)
             ->assertSee('/english-accents"', false);
     }
 
