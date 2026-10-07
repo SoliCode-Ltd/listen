@@ -128,6 +128,7 @@ class TrialPlanChangeTest extends TestCase
             ->postJson($this->localizedRoute('billing.subscribe'), [
                 'plan' => 'creator',
                 'billing_cycle' => 'monthly',
+                'end_trial' => true,
             ]);
 
         $response->assertOk();
@@ -141,6 +142,51 @@ class TrialPlanChangeTest extends TestCase
         $trial = BillingTrial::query()->where('stripe_subscription_id', 'sub_trial')->firstOrFail();
         $this->assertSame($this->creator->id, (int) $trial->plan_id);
         $this->assertSame((int) $this->creator->price_cents, (int) $trial->amount_cents);
+    }
+
+    private function subscribeAs(User $user, string $plan)
+    {
+        return $this->actingAs($user)
+            ->withoutMiddleware([
+                ValidateCsrfToken::class,
+                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            ])
+            ->postJson($this->localizedRoute('billing.subscribe'), [
+                'plan' => $plan,
+                'billing_cycle' => 'monthly',
+            ]);
+    }
+
+    public function test_another_plan_during_a_trial_asks_before_ending_the_trial(): void
+    {
+        $user = $this->trialingStarterUser();
+        $stripe = new FakeStripeHttpClient;
+        ApiRequestor::setHttpClient($stripe);
+        $this->mock(BillingSyncService::class, fn ($mock) => $mock->shouldReceive('syncIfStale')->andReturnNull());
+
+        $this->subscribeAs($user, 'creator')
+            ->assertStatus(409)
+            ->assertJsonPath('requires_trial_end_confirmation', true);
+
+        $this->assertNull($stripe->lastRequest('post', '/v1/subscriptions/sub_trial'), 'The trial was ended without consent.');
+        $this->assertSame(BillingTrial::STATUS_TRIALING, BillingTrial::query()->where('stripe_subscription_id', 'sub_trial')->value('status'));
+    }
+
+    public function test_the_same_plan_during_a_trial_keeps_the_trial_and_charges_nothing(): void
+    {
+        $user = $this->trialingStarterUser();
+        $stripe = new FakeStripeHttpClient;
+        ApiRequestor::setHttpClient($stripe);
+        $this->mock(BillingSyncService::class, fn ($mock) => $mock->shouldReceive('syncIfStale')->andReturnNull());
+
+        $this->subscribeAs($user, 'starter')
+            ->assertStatus(409)
+            ->assertJsonPath('already_on_trial', true);
+
+        $this->assertNull($stripe->lastRequest('post', '/v1/subscriptions/sub_trial'), 'The trial was ended for the same plan.');
+        $this->assertSame('trialing', BillingSubscription::query()->where('stripe_id', 'sub_trial')->value('stripe_status'));
     }
 
     public function test_plan_change_webhook_moves_the_trial_record_to_the_charged_plan(): void

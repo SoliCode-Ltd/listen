@@ -152,6 +152,7 @@ class BillingController extends Controller
             'billing_cycle' => ['required', 'in:monthly,yearly'],
             'payment_method' => ['nullable', 'string', 'max:255'],
             'save_card' => ['nullable', 'boolean'],
+            'end_trial' => ['nullable', 'boolean'],
         ]);
 
         // Dynamically validate plan slug exists as an active paid plan
@@ -195,8 +196,27 @@ class BillingController extends Controller
 
             $subscription = $this->currentDefaultSubscription($user);
 
+            if ($subscription && $subscription->valid() && $subscription->onTrial() && ! $request->boolean('end_trial')) {
+                // Never end a free trial without the member saying so: the same plan
+                // keeps the trial (nothing is charged), another plan asks first.
+                $trialEnds = $this->formatDateLabel($subscription->trial_ends_at?->toDateString());
+                if ($subscription->hasPrice($priceId)) {
+                    return response()->json([
+                        'ok' => false,
+                        'already_on_trial' => true,
+                        'message' => __('ui.backend.billing_already_on_trial', ['plan' => $planRecord->name, 'date' => $trialEnds]),
+                    ], 409);
+                }
+
+                return response()->json([
+                    'ok' => false,
+                    'requires_trial_end_confirmation' => true,
+                    'message' => __('ui.backend.billing_trial_end_confirm', ['plan' => $planRecord->name, 'date' => $trialEnds]),
+                ], 409);
+            }
+
             if ($subscription && $subscription->valid() && $subscription->onTrial()) {
-                // A plain swap keeps the trial running, so "pay now" would charge nothing today.
+                // Confirmed "pay now": a plain swap keeps the trial running, so it would charge nothing today.
                 if ($paymentMethod !== '') {
                     $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }

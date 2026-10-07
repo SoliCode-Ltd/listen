@@ -1811,12 +1811,26 @@
         }
 
         setSubscribeButtonBusy(true, i18n.finalizing_subscription);
-        const response = await post('{{ route('billing.subscribe') }}', {
+        const subscribeBody = {
           plan: String(selected.plan.slug || ''),
           billing_cycle: String(selected.cycle || 'monthly'),
           payment_method: paymentMethod || null,
           save_card: saveCardCheckbox ? saveCardCheckbox.checked : true,
-        });
+        };
+        let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
+
+        // On a free trial: the same plan charges nothing; another plan ends the trial only if the member agrees.
+        if (response.status === 409 && response.data?.already_on_trial) {
+          setMessage('ok', response.data.message);
+          return;
+        }
+        if (response.status === 409 && response.data?.requires_trial_end_confirmation) {
+          if (!window.confirm(String(response.data.message || ''))) {
+            setMessage('', '');
+            return;
+          }
+          response = await post('{{ route('billing.subscribe') }}', Object.assign({}, subscribeBody, { end_trial: true }));
+        }
 
         if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
           setSubscribeButtonBusy(true, i18n.waiting_bank_confirmation);
