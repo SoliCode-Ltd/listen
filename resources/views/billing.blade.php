@@ -1834,7 +1834,10 @@
 
         if (response.status === 402 && response.data?.requires_action && response.data?.client_secret) {
           setSubscribeButtonBusy(true, i18n.waiting_bank_confirmation);
-          const confirmation = await stripe.confirmCardPayment(String(response.data.client_secret));
+          const confirmation = await stripe.confirmCardPayment(
+            String(response.data.client_secret),
+            paymentMethod ? { payment_method: paymentMethod } : undefined
+          );
           if (confirmation.error) {
             throw new Error(normalizeStripeMessage(confirmation.error.message, i18n.payment_auth_failed));
           }
@@ -1849,7 +1852,10 @@
           throw new Error(response.data?.message || i18n.upgrade_failed);
         }
 
-        await trackPurchaseConversion(selected.meta);
+        // Only a real charge is a purchase (not a resumed plan or a card change).
+        if (response.data?.charged !== false) {
+          await trackPurchaseConversion(selected.meta);
+        }
         setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {

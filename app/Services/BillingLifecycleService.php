@@ -119,20 +119,17 @@ class BillingLifecycleService
             return;
         }
 
-        $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'now';
         $graceEnds = $graceEndsAt->format('M j, Y');
         $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
         $subject = 'Payment failed - action required';
         $body = $this->composeBody(
             $this->displayName($user),
             [
-                "We could not process your renewal around {$periodEnd}.",
-                "Please update your payment method within {$graceDays} days to keep paid access.",
+                'We could not take your latest payment, so your paid features are paused.',
+                'Update your card and pay the open invoice to get them back straight away.',
             ],
             [
                 'Plan' => $planName,
-                'Renewal Date' => $periodEnd,
-                'Grace Period Ends' => $graceEnds,
                 'Payment State' => 'Past due',
             ],
             'Update your payment method at '.$this->manageBillingUrl()

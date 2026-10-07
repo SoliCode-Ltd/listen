@@ -243,7 +243,8 @@ class TrialSubscriptionService
             throw new TrialStartException('ui.backend.trial_plan_not_ready');
         }
 
-        $cycle = strtolower(trim((string) ($intent['metadata']['listen_billing_cycle'] ?? 'monthly')));
+        $cycle = strtolower(trim((string) ($intent['metadata']['listen_billing_cycle'] ?? '')));
+        $cycle = $cycle === '' ? 'monthly' : $cycle;
         $plan = $this->eligibility->trialPlan($slug, $cycle);
         if (! $plan instanceof Plan) {
             throw new TrialStartException('ui.backend.trial_creator_monthly_only');
