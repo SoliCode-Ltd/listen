@@ -152,6 +152,7 @@ class BillingController extends Controller
             'billing_cycle' => ['required', 'in:monthly,yearly'],
             'payment_method' => ['nullable', 'string', 'max:255'],
             'save_card' => ['nullable', 'boolean'],
+            'end_trial' => ['nullable', 'boolean'],
         ]);
 
         // Dynamically validate plan slug exists as an active paid plan
@@ -194,35 +195,50 @@ class BillingController extends Controller
             }
 
             $subscription = $this->currentDefaultSubscription($user);
+            $charged = true;
+
+            // Same plan while a cancellation is scheduled: undo the cancellation, charge nothing now.
+            if ($subscription && $subscription->onGracePeriod() && $subscription->hasPrice($priceId)) {
+                $subscription->resume();
+                $charged = false;
+            }
+
+            if ($subscription && $subscription->valid() && $subscription->onTrial() && ($subscription->hasPrice($priceId) || ! $request->boolean('end_trial'))) {
+                // Never end a free trial without the member saying so: the same plan
+                // keeps the trial (nothing is charged), another plan asks first.
+                if ($paymentMethod !== '' && $subscription->hasPrice($priceId)) {
+                    $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+                }
+                $this->billingSyncService->syncIfStale($user, true);
+                $trialEnds = $this->formatDateLabel($subscription->trial_ends_at?->toDateString());
+                if ($subscription->hasPrice($priceId)) {
+                    return response()->json([
+                        'ok' => false,
+                        'already_on_trial' => true,
+                        'message' => __('ui.backend.billing_already_on_trial', ['plan' => $planRecord->name, 'date' => $trialEnds]),
+                    ], 409);
+                }
+
+                return response()->json([
+                    'ok' => false,
+                    'requires_trial_end_confirmation' => true,
+                    'message' => __('ui.backend.billing_trial_end_confirm', ['plan' => $planRecord->name, 'date' => $trialEnds]),
+                ], 409);
+            }
 
             if ($subscription && $subscription->valid() && $subscription->onTrial()) {
-                // A plain swap keeps the trial running, so "pay now" would charge nothing today.
+                // Confirmed "pay now" for another plan.
                 if ($paymentMethod !== '') {
                     $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }
-                // Before the swap: the invoice.paid webhook can land first and lock the trial record.
-                $this->trialOutcomes->followPrice((string) $subscription->stripe_id, $priceId);
-                $subscription->skipTrial()->swapAndInvoice(
-                    $priceId,
-                    $couponId ? ['discounts' => [['coupon' => $couponId]]] : []
-                );
+                $notCharged = $this->endTrialAndCharge($user, $subscription, $priceId, $couponId);
+                if ($notCharged !== null) {
+                    return $notCharged;
+                }
             } elseif ($subscription && $subscription->valid()) {
                 if (! $subscription->hasPrice($priceId)) {
                     try {
-                        $subscription->swap($priceId);
-                        // Apply coupon to existing subscription swap
-                        if ($couponId && $subscription->stripe_id) {
-                            try {
-                                Cashier::stripe()->subscriptions->update($subscription->stripe_id, [
-                                    'coupon' => $couponId,
-                                ]);
-                            } catch (\Throwable $e) {
-                                Log::warning('Could not apply discount coupon to swapped subscription', [
-                                    'coupon' => $couponId,
-                                    'error' => $e->getMessage(),
-                                ]);
-                            }
-                        }
+                        $subscription->swap($priceId, $couponId ? ['discounts' => [['coupon' => $couponId]]] : []);
                         if ($paymentMethod !== '') {
                             $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                         }
@@ -231,8 +247,11 @@ class BillingController extends Controller
                         $this->retireStaleSubscription($subscription);
                         $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
                     }
-                } elseif ($paymentMethod !== '') {
-                    $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+                } else {
+                    $charged = false;
+                    if ($paymentMethod !== '') {
+                        $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
+                    }
                 }
             } else {
                 if ($subscription) {
@@ -242,6 +261,15 @@ class BillingController extends Controller
                 $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
             }
         } catch (IncompletePayment $exception) {
+            $this->billingSyncService->syncIfStale($user, true);
+            if (! $exception->payment->requiresAction()) {
+                // Declined: nothing to confirm in the browser, say so plainly.
+                return response()->json([
+                    'ok' => false,
+                    'message' => __('ui.backend.billing_card_declined'),
+                ], 422);
+            }
+
             return response()->json([
                 'ok' => false,
                 'requires_action' => true,
@@ -294,6 +322,7 @@ class BillingController extends Controller
         // ok:true unless the subscription is fully active.
         return response()->json([
             'ok' => true,
+            'charged' => $charged,
             'message' => __('ui.backend.billing_subscription_updated'),
             'plan' => [
                 'slug' => (string) $activePlan->slug,
@@ -473,6 +502,107 @@ class BillingController extends Controller
         $builder->create($paymentMethod);
     }
 
+    /**
+     * Ends a trial and charges the new plan today. The change is applied only
+     * if the payment succeeds; a declined card leaves the trial exactly as it was.
+     * Returns null when paid, or the response to send when it was not.
+     */
+    private function endTrialAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId): ?\Illuminate\Http\JsonResponse
+    {
+        $stripeId = (string) $subscription->stripe_id;
+        $stripe = Cashier::stripe();
+        $current = $stripe->subscriptions->retrieve($stripeId, []);
+        $item = $current->items->data[0] ?? null;
+        $oldPrice = (string) ($item->price->id ?? $subscription->stripe_price ?? '');
+
+        // Before the update: the invoice.paid webhook can land first and lock the trial record.
+        $this->trialOutcomes->followPrice($stripeId, $priceId);
+
+        $payload = [
+            'items' => [array_filter(['id' => (string) ($item->id ?? ''), 'price' => $priceId])],
+            'trial_end' => 'now',
+            'proration_behavior' => 'always_invoice',
+            'payment_behavior' => 'pending_if_incomplete',
+            'cancel_at_period_end' => false,
+            'expand' => ['latest_invoice.payments'],
+        ];
+        if ($couponId) {
+            $payload['discounts'] = [['coupon' => $couponId]];
+        }
+
+        try {
+            $updated = $stripe->subscriptions->update($stripeId, $payload);
+        } catch (\Throwable $exception) {
+            $this->trialOutcomes->followPrice($stripeId, $oldPrice);
+            throw $exception;
+        }
+
+        if (empty($updated->pending_update)) {
+            return null;
+        }
+
+        // Not paid yet: the trial and its plan stay as they were.
+        $this->trialOutcomes->followPrice($stripeId, $oldPrice);
+        $invoice = $updated->latest_invoice ?? null;
+        $intent = $this->invoicePaymentIntent($invoice);
+
+        if ($intent && in_array((string) $intent->status, ['requires_action', 'requires_confirmation'], true)) {
+            $this->trialOutcomes->followPrice($stripeId, $priceId);
+
+            return response()->json([
+                'ok' => false,
+                'requires_action' => true,
+                'client_secret' => (string) $intent->client_secret,
+                'message' => __('ui.backend.billing_auth_required'),
+            ], 402);
+        }
+
+        // Declined: void the invoice so the pending change is dropped and nothing is owed.
+        $invoiceId = is_object($invoice) ? (string) ($invoice->id ?? '') : (string) $invoice;
+        if ($invoiceId !== '') {
+            try {
+                $stripe->invoices->voidInvoice($invoiceId, []);
+            } catch (\Throwable $exception) {
+                Log::warning('Could not void the invoice of a declined trial upgrade.', [
+                    'user_id' => $user->id,
+                    'invoice' => $invoiceId,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        }
+        $this->billingSyncService->syncIfStale($user, true);
+
+        return response()->json([
+            'ok' => false,
+            'message' => __('ui.backend.billing_trial_upgrade_declined', [
+                'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()),
+            ]),
+        ], 422);
+    }
+
+    private function invoicePaymentIntent(mixed $invoice): ?object
+    {
+        if (! is_object($invoice)) {
+            return null;
+        }
+
+        $payments = $invoice->payments->data ?? [];
+        $last = is_array($payments) && $payments !== [] ? end($payments) : null;
+        $intentId = $last->payment->payment_intent ?? null;
+        if (is_object($intentId)) {
+            return $intentId;
+        }
+        if (! is_string($intentId) || $intentId === '') {
+            return null;
+        }
+
+        try {
+            return Cashier::stripe()->paymentIntents->retrieve($intentId, []);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function setSubscriptionPaymentMethod(User $user, BillingSubscription $subscription, string $paymentMethod): void
     {
         $paymentMethod = trim($paymentMethod);
@@ -524,8 +654,31 @@ class BillingController extends Controller
             }
         }
 
+        if ($stripeId !== '') {
+            $this->voidOpenInvoices($stripeId);
+        }
+
         $subscription->items()->delete();
         $subscription->delete();
+    }
+
+    /**
+     * Canceling only pauses collection on open invoices; void them so an old
+     * invoice can never be paid on top of the new subscription.
+     */
+    private function voidOpenInvoices(string $stripeSubscriptionId): void
+    {
+        try {
+            $open = Cashier::stripe()->invoices->all(['subscription' => $stripeSubscriptionId, 'status' => 'open', 'limit' => 20]);
+            foreach ($open->data ?? [] as $invoice) {
+                Cashier::stripe()->invoices->voidInvoice((string) $invoice->id, []);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to void open invoices of a replaced subscription.', [
+                'stripe_subscription_id' => $stripeSubscriptionId,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function ensureStripeCustomer(User $user): void

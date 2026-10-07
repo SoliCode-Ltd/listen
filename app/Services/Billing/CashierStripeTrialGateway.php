@@ -49,6 +49,7 @@ class CashierStripeTrialGateway implements StripeTrialGateway
             'payment_method' => (string) $paymentMethod,
             'metadata' => [
                 'listen_plan_slug' => $this->metadataValue($intent->metadata ?? null, 'listen_plan_slug'),
+                'listen_billing_cycle' => $this->metadataValue($intent->metadata ?? null, 'listen_billing_cycle'),
             ],
         ];
     }

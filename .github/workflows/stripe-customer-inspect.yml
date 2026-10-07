@@ -1,0 +1,55 @@
+name: Stripe customer inspect
+
+# Read-only: why a customer's payment failed and whether Stripe will retry.
+# Runs the app's own Stripe key on the chosen server (GET requests only).
+
+on:
+  workflow_dispatch:
+    inputs:
+      customer:
+        description: Stripe customer id (cus_...)
+        required: true
+      target:
+        type: choice
+        options: [live, staging]
+        default: live
+  push:
+    branches: [claude/serene-albattani-ksbqof]
+    paths:
+      - .github/workflows/stripe-customer-inspect.yml
+      - scripts/billing/stripe_customer_inspect.php
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect over SSH
+        env:
+          TARGET: ${{ inputs.target || 'live' }}
+          CUSTOMER: ${{ inputs.customer || 'cus_VNPiD4ZfOINWsW' }}
+          LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
+          LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          LIVE_PATH: ${{ secrets.LIVE_APP_PATH }}
+          STAGING_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          STAGING_USER: ${{ secrets.STAGING_SSH_USER }}
+          STAGING_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          STAGING_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          if [ "$TARGET" = live ]; then H="$LIVE_HOST"; U="$LIVE_USER"; K="$LIVE_KEY"; P="$LIVE_PATH"; else H="$STAGING_HOST"; U="$STAGING_USER"; K="$STAGING_KEY"; P="$STAGING_PATH"; fi
+          [[ "$CUSTOMER" =~ ^cus_[A-Za-z0-9]+$ ]] || { echo "bad customer id"; exit 1; }
+          H="$(printf '%s' "$H" | tr -d '[:space:]')"; U="$(printf '%s' "$U" | tr -d '[:space:]')"
+          sed "s/__CUSTOMER__/$CUSTOMER/" scripts/billing/stripe_customer_inspect.php > check.php
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$K" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$H" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${P:+'$P'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$U@$H" "$remote" < check.php
+          rm -f ~/.ssh/id_inspect
