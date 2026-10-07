@@ -1,4 +1,4 @@
-@include('components.page-head', ['pageTitle' => ($pageTitle ?? __('ui.extension.title')), 'page' => 'extension'])
+@include('components.page-head', ['pageTitle' => __('ui.seo.extension_title'), 'page' => 'extension'])
   <style>
     .hero {
       padding: 3rem 0 2rem;

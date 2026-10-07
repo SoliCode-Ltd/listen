@@ -83,7 +83,7 @@ class SeoSettings extends Page implements HasForms
             'llms_txt' => SiteSetting::get('llms_txt', SeoHelper::defaultLlmsTxt()),
         ];
 
-        foreach (SeoHelper::pageDefinitions() as $page => $meta) {
+        foreach (SeoHelper::adminPageDefinitions() as $page => $meta) {
             $state["seo_{$page}_title_en"] = SiteSetting::get(
                 "seo_{$page}_title_en",
                 SiteSetting::get("seo_{$page}_title", $this->pageDefault($page, 'title', 'en', (string) ($meta['title'] ?? '')))
@@ -389,7 +389,7 @@ class SeoSettings extends Page implements HasForms
     {
         $schema = [];
 
-        foreach (SeoHelper::pageDefinitions() as $page => $meta) {
+        foreach (SeoHelper::adminPageDefinitions() as $page => $meta) {
             $fields = [
                 Forms\Components\TextInput::make("seo_{$page}_title_en")
                     ->label('English Title')
@@ -494,7 +494,8 @@ class SeoSettings extends Page implements HasForms
         return [
             'ai_text_to_speech' => ['en', 'ar'],
             'ai_voice_generator' => ['en', 'ar'],
-            'text_to_speech_arabic' => ['en'],
+            'text_to_speech_arabic' => ['en', 'ar'],
+            'text_to_speech' => ['en', 'ar'],
         ];
     }
 

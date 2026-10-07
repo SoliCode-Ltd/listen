@@ -16,6 +16,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
+use App\Support\SeoDialectPages;
 use App\Support\SeoHelper;
 use App\Support\SiteDesign;
 use App\Support\TtsStudioConfig;
@@ -192,22 +193,48 @@ class HomeController extends Controller
 
     public function seoLandingPage(Request $request, string $page)
     {
-        if (! in_array($page, ['ai_text_to_speech', 'ai_voice_generator', 'text_to_speech_arabic'], true)) {
+        if (! in_array($page, ['ai_text_to_speech', 'ai_voice_generator', 'text_to_speech_arabic', 'text_to_speech'], true)) {
             abort(404);
         }
 
         $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
-        if ($page === 'text_to_speech_arabic' && $locale === 'ar') {
-            return redirect('/en/text-to-speech-arabic', 301);
-        }
-
         $content = $this->seoLandingContent($page, $locale);
 
         return view('seo.landing-page', [
             'page' => $page,
             'pageContent' => $content,
+            'faqItems' => $content['faqs'] ?? [],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'sample' => SeoDialectPages::sample('egyptian', $locale) ?? SeoDialectPages::sample('fusha', $locale),
+        ]);
+    }
+
+    public function dialectHubPage(Request $request)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoDialectPages::hubContent($locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoDialectPages::HUB_PAGE,
+            'pageContent' => $content,
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'dialectGroups' => SeoDialectPages::hubGroups($locale),
+        ]);
+    }
+
+    public function dialectPage(Request $request, string $dialect)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoDialectPages::content($dialect, $locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoDialectPages::pageKey($dialect),
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'sample' => SeoDialectPages::sample($dialect, $locale),
+            'currentDialect' => $dialect,
         ]);
     }
 

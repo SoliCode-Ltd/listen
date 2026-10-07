@@ -1,4 +1,4 @@
-@include('components.page-head', ['pageTitle' => $pageContent['h1'] ?? '', 'page' => $page, 'faqItems' => $faqItems ?? []])
+@include('components.page-head', ['pageTitle' => '', 'page' => $page, 'faqItems' => $faqItems ?? []])
   <style>
     .seo-page {
       padding: 2.5rem 0 4rem;
@@ -160,87 +160,274 @@
         padding: 1.35rem;
       }
     }
+    .seo-crumbs {
+      width: min(1100px, 100%);
+      margin: 0 auto 1rem;
+      font-size: .85rem;
+      color: var(--muted);
+    }
+    .seo-crumbs ol {
+      list-style: none;
+      display: flex;
+      flex-wrap: wrap;
+      gap: .4rem;
+      margin: 0;
+      padding: 0;
+    }
+    .seo-crumbs li + li::before {
+      content: "/";
+      margin-inline-end: .4rem;
+      opacity: .6;
+    }
+    .seo-crumbs a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .seo-crumbs a:hover {
+      text-decoration: underline;
+    }
+    .seo-links-title {
+      margin: 0 0 1rem;
+      font-size: 1.05rem;
+      font-weight: 700;
+    }
+    .seo-sample {
+      margin-top: 1.4rem;
+      padding: 1rem 1.1rem;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+    }
+    .seo-sample-label {
+      display: block;
+      margin-bottom: .4rem;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+    .seo-sample q {
+      display: block;
+      margin-bottom: .7rem;
+      quotes: none;
+      color: var(--text);
+      line-height: 1.7;
+    }
+    .seo-sample audio {
+      width: 100%;
+    }
+    .seo-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .55rem;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .seo-chips li {
+      padding: .45rem .85rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      font-size: 1rem;
+    }
+    .seo-chips a {
+      color: inherit;
+      text-decoration: none;
+    }
+    .seo-chips a:hover {
+      color: var(--brand-accent);
+    }
+    .seo-region + .seo-region {
+      margin-top: 1.25rem;
+    }
+    .seo-region h3 {
+      margin: 0 0 .7rem;
+      font-size: 1rem;
+      color: var(--muted);
+    }
+    .seo-copy .seo-cta-actions {
+      justify-content: flex-start;
+    }
+    .seo-accent-note {
+      font-size: .92rem;
+    }
   </style>
 </head>
 <body>
   @php
+    $isArabic = app()->getLocale() === 'ar' || str_starts_with((string) app()->getLocale(), 'ar');
     $relatedLinks = [
-      ['label' => __('ui.nav.home'), 'url' => route('home')],
-      ['label' => __('ui.nav.ai_text_to_speech'), 'url' => route('seo.ai-text-to-speech')],
-      ['label' => __('ui.nav.ai_voice_generator'), 'url' => route('seo.ai-voice-generator')],
-      ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic')],
-      ['label' => __('ui.nav.pricing'), 'url' => route('pricing')],
-      ['label' => __('ui.nav.demo'), 'url' => route('demo.page')],
-      ['label' => __('ui.nav.extension'), 'url' => route('browsers-extension.page')],
-      ['label' => __('ui.nav.contact'), 'url' => route('contact')],
+      ['label' => __('ui.nav.text_to_speech'), 'url' => route('seo.text-to-speech'), 'page' => 'text_to_speech'],
+      ['label' => __('ui.nav.ai_text_to_speech'), 'url' => route('seo.ai-text-to-speech'), 'page' => 'ai_text_to_speech'],
+      ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic'), 'page' => 'text_to_speech_arabic'],
+      ['label' => __('ui.nav.arabic_dialects'), 'url' => route('seo.arabic-dialects'), 'page' => 'arabic_dialects'],
+      ['label' => __('ui.nav.ai_voice_generator'), 'url' => route('seo.ai-voice-generator'), 'page' => 'ai_voice_generator'],
+      ['label' => __('ui.nav.pricing'), 'url' => route('pricing'), 'page' => 'pricing'],
+      ['label' => __('ui.nav.extension'), 'url' => route('browsers-extension.page'), 'page' => 'extension'],
     ];
+    $relatedLinks = array_values(array_filter($relatedLinks, fn ($link) => $link['page'] !== $page));
+    $breadcrumbs = \App\Support\SeoHelper::breadcrumbs($page);
+    $dialectLinks = \App\Support\SeoDialectPages::popular($isArabic ? 'ar' : 'en', 13);
+    $dialectLinks = array_values(array_filter($dialectLinks, fn ($link) => $link['slug'] !== ($currentDialect ?? null)));
   @endphp
   @include('components.header')
 
   <main class="seo-page container">
+    @if(count($breadcrumbs) > 1)
+      <nav class="seo-crumbs" aria-label="{{ $isArabic ? 'مسار التنقل' : 'Breadcrumb' }}">
+        <ol>
+          @foreach($breadcrumbs as $crumb)
+            <li>
+              @if($loop->last)
+                <span aria-current="page">{{ $crumb['name'] }}</span>
+              @else
+                <a href="{{ $crumb['url'] }}">{{ $crumb['name'] }}</a>
+              @endif
+            </li>
+          @endforeach
+        </ol>
+      </nav>
+    @endif
+
     <section class="seo-hero">
       <article class="seo-card seo-copy">
         <span class="seo-eyebrow">{{ $pageContent['eyebrow'] ?? '' }}</span>
         <h1>{{ $pageContent['h1'] ?? '' }}</h1>
         <p>{{ $pageContent['intro'] ?? '' }}</p>
+        @if(! empty($sample['audio_url']))
+          <figure class="seo-sample">
+            <span class="seo-sample-label">{{ $isArabic ? 'استمع إلى عينة حقيقية' : 'Listen to a real sample' }}</span>
+            @if(($sample['text'] ?? '') !== '')
+              <q dir="rtl" lang="ar">{{ $sample['text'] }}</q>
+            @endif
+            <audio controls preload="none" src="{{ $sample['audio_url'] }}"></audio>
+          </figure>
+        @endif
+        <div class="seo-cta-actions">
+          <a class="btn btn-primary" href="{{ $ctaPrimaryUrl }}">{{ $pageContent['cta_primary'] ?? __('ui.nav.get_started_free') }}</a>
+        </div>
       </article>
 
-      <aside class="seo-card seo-links">
-        <h2>{{ __('ui.footer.product') }}</h2>
+      <nav class="seo-card seo-links" aria-label="{{ __('ui.footer.solutions') }}">
+        <p class="seo-links-title">{{ __('ui.footer.solutions') }}</p>
         <div class="seo-link-list">
           @foreach($relatedLinks as $link)
             <a class="seo-link-item" href="{{ $link['url'] }}">
               <span>{{ $link['label'] }}</span>
-              <span>{{ __('ui.nav.get_started') }}</span>
+              <span aria-hidden="true">{{ $isArabic ? '←' : '→' }}</span>
             </a>
           @endforeach
         </div>
-      </aside>
+      </nav>
     </section>
 
-    <section class="seo-section">
-      <h2>{{ $pageContent['highlights_title'] ?? __('ui.pricing.included_title') }}</h2>
-      <p class="seo-lead">{{ $pageContent['highlights_intro'] ?? ($pageContent['intro'] ?? '') }}</p>
-      <div class="seo-grid">
-        @foreach($pageContent['highlights'] ?? [] as $item)
-          <article class="seo-card seo-feature">
-            <h3>{{ $item['title'] ?? '' }}</h3>
-            <p>{{ $item['body'] ?? '' }}</p>
-          </article>
+    @if(! empty($dialectGroups))
+      <section class="seo-section">
+        <h2>{{ $isArabic ? 'اختر اللهجة' : 'Choose a dialect' }}</h2>
+        @foreach($dialectGroups as $group)
+          <div class="seo-region">
+            <h3>{{ $group['region'] }}</h3>
+            <ul class="seo-chips">
+              @foreach($group['items'] as $item)
+                <li><a href="{{ route('seo.dialect', ['dialect' => $item['slug']]) }}">{{ $item['label'] }}@if($item['accents'] > 1) <small>({{ $item['accents'] }})</small>@endif</a></li>
+              @endforeach
+            </ul>
+          </div>
         @endforeach
-      </div>
-    </section>
+      </section>
+    @endif
 
-    <section class="seo-section">
-      <h2>{{ $pageContent['use_cases_title'] ?? __('ui.pricing.feature3_title') }}</h2>
-      <p class="seo-lead">{{ $pageContent['use_cases_intro'] ?? __('ui.footer.tagline') }}</p>
-      <div class="seo-grid">
-        @foreach($pageContent['use_cases'] ?? [] as $useCase)
-          @php
-            $useCaseTitle = is_array($useCase) ? (string) ($useCase['title'] ?? '') : (string) $useCase;
-            $useCaseBody = is_array($useCase)
-              ? (string) ($useCase['body'] ?? '')
-              : (string) ($pageContent['intro'] ?? '');
-          @endphp
-          <article class="seo-card seo-use-case">
-            <h3>{{ $useCaseTitle }}</h3>
-            <p>{{ $useCaseBody }}</p>
-          </article>
-        @endforeach
-      </div>
-    </section>
+    @if(! empty($pageContent['accents']))
+      <section class="seo-section">
+        <h2>{{ $pageContent['accents_title'] ?? '' }}</h2>
+        <p class="seo-lead">{{ $pageContent['accents_intro'] ?? '' }}</p>
+        <div class="seo-grid">
+          @foreach($pageContent['accents'] as $accent)
+            <article class="seo-card seo-feature">
+              <h3>{{ $accent['title'] ?? '' }}</h3>
+              @if(($accent['body'] ?? '') !== '')
+                <p class="seo-accent-note">{{ $accent['body'] }}</p>
+              @endif
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
 
-    <section class="seo-section">
-      <h2>{{ $pageContent['faq_title'] ?? __('ui.pricing.faq_title') }}</h2>
-      <div class="seo-grid">
-        @foreach($faqItems ?? [] as $faq)
-          <article class="seo-card seo-faq-item">
-            <h3>{{ $faq['question'] ?? '' }}</h3>
-            <p>{{ $faq['answer'] ?? '' }}</p>
-          </article>
-        @endforeach
-      </div>
-    </section>
+    @if(! empty($pageContent['words_title']))
+      <section class="seo-section">
+        <h2>{{ $pageContent['words_title'] }}</h2>
+        <p class="seo-lead">{{ $pageContent['words_intro'] ?? '' }}</p>
+        @if(! empty($pageContent['words']))
+          <ul class="seo-chips" lang="ar" dir="rtl">
+            @foreach($pageContent['words'] as $word)
+              <li>{{ $word }}</li>
+            @endforeach
+          </ul>
+        @endif
+      </section>
+    @endif
+
+    @if(! empty($pageContent['highlights']))
+      <section class="seo-section">
+        <h2>{{ $pageContent['highlights_title'] ?? __('ui.pricing.included_title') }}</h2>
+        <p class="seo-lead">{{ $pageContent['highlights_intro'] ?? ($pageContent['intro'] ?? '') }}</p>
+        <div class="seo-grid">
+          @foreach($pageContent['highlights'] as $item)
+            <article class="seo-card seo-feature">
+              <h3>{{ $item['title'] ?? '' }}</h3>
+              <p>{{ $item['body'] ?? '' }}</p>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
+
+    @if(! empty($pageContent['use_cases']))
+      <section class="seo-section">
+        <h2>{{ $pageContent['use_cases_title'] ?? __('ui.pricing.feature3_title') }}</h2>
+        <p class="seo-lead">{{ $pageContent['use_cases_intro'] ?? __('ui.footer.tagline') }}</p>
+        <div class="seo-grid">
+          @foreach($pageContent['use_cases'] as $useCase)
+            @php
+              $useCaseTitle = is_array($useCase) ? (string) ($useCase['title'] ?? '') : (string) $useCase;
+              $useCaseBody = is_array($useCase)
+                ? (string) ($useCase['body'] ?? '')
+                : (string) ($pageContent['intro'] ?? '');
+            @endphp
+            <article class="seo-card seo-use-case">
+              <h3>{{ $useCaseTitle }}</h3>
+              <p>{{ $useCaseBody }}</p>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
+
+    @if(empty($dialectGroups) && $dialectLinks !== [])
+      <section class="seo-section">
+        <h2>{{ isset($currentDialect) ? ($isArabic ? 'لهجات عربية أخرى' : 'Other Arabic dialects') : ($isArabic ? 'تحويل النص إلى صوت باللهجات العربية' : 'Text to speech in Arabic dialects') }}</h2>
+        <ul class="seo-chips">
+          @foreach($dialectLinks as $link)
+            <li><a href="{{ route('seo.dialect', ['dialect' => $link['slug']]) }}">{{ $link['label'] }}</a></li>
+          @endforeach
+          <li><a href="{{ route('seo.arabic-dialects') }}">{{ $isArabic ? 'كل اللهجات' : 'All dialects' }}</a></li>
+        </ul>
+      </section>
+    @endif
+
+    @if(! empty($faqItems))
+      <section class="seo-section">
+        <h2>{{ $pageContent['faq_title'] ?? __('ui.pricing.faq_title') }}</h2>
+        <div class="seo-grid">
+          @foreach($faqItems as $faq)
+            <article class="seo-card seo-faq-item">
+              <h3>{{ $faq['question'] ?? '' }}</h3>
+              <p>{{ $faq['answer'] ?? '' }}</p>
+            </article>
+          @endforeach
+        </div>
+      </section>
+    @endif
 
     <section class="seo-card seo-cta">
       <h2>{{ $pageContent['cta_title'] ?? '' }}</h2>
