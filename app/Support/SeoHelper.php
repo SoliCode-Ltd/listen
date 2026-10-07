@@ -729,7 +729,7 @@ class SeoHelper
             '> Listen (Arabic: منصة إسمع) is an Arabic-first AI text to speech platform at ' . $base . '. It turns text into natural speech in English and Arabic, including Modern Standard Arabic (Fusha) and '
                 . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries, with HD voices, emotion and performance styles, translation, voice cloning and a Chrome extension.',
             '',
-            '## Product',
+            '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
             "- [Home (Arabic)]({$base}/ar)",
             "- [Text to speech online]({$base}/en/text-to-speech): free online text to speech in Arabic and English",
