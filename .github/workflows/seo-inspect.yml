@@ -15,7 +15,7 @@ on:
       - scripts/seo/**
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   inspect:
@@ -28,6 +28,8 @@ jobs:
 
       - name: Redirects and status codes
         run: |
+          mkdir -p /tmp/report
+          exec > >(tee /tmp/report/01-status.txt) 2>&1
           for path in / /en /ar /en/ /ar/ /en/pricing /ar/pricing /en/ai-text-to-speech /ar/ai-text-to-speech \
                       /en/ai-voice-generator /ar/ai-voice-generator /en/text-to-speech-arabic /ar/text-to-speech-arabic \
                       /en/browsers-extension /ar/browsers-extension /en/contact-us /en/demo /en/login /en/register \
@@ -37,7 +39,8 @@ jobs:
 
       - name: Public page SEO tags
         run: |
-          python3 - <<'PY'
+          exec > >(tee /tmp/report/02-pages.txt) 2>&1
+          python3 -u - <<'PY'
           import re, json, urllib.request, html
           base = "https://listenai.studio"
           pages = ["/en", "/ar", "/en/pricing", "/ar/pricing", "/en/ai-text-to-speech", "/ar/ai-text-to-speech",
@@ -97,6 +100,7 @@ jobs:
       - name: PageSpeed (mobile)
         continue-on-error: true
         run: |
+          exec > >(tee /tmp/report/03-pagespeed.txt) 2>&1
           for path in /en /ar; do
             curl -s --max-time 120 "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=https%3A%2F%2Flistenai.studio${path}&strategy=mobile&category=performance&category=seo&category=accessibility" \
               | python3 -c "
@@ -121,6 +125,7 @@ jobs:
           APP_PATH: ${{ secrets.LIVE_APP_PATH }}
         run: |
           set -euo pipefail
+          exec > >(tee /tmp/report/04-settings.txt) 2>&1
           if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
             echo "::notice::LIVE SSH secrets are not set; skipping."
             exit 0
@@ -137,3 +142,14 @@ jobs:
       - name: Remove SSH key
         if: always()
         run: rm -f ~/.ssh/id_inspect
+
+      - name: Save report to the seo-inspect-output branch
+        if: always()
+        run: |
+          cd /tmp/report
+          git init -q -b claude/seo-inspect-output
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "SEO inspect report ${{ github.run_id }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:claude/seo-inspect-output
