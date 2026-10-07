@@ -227,6 +227,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-SA-EA' => 'Eastern Province Saudi Arabic (Al-Ahsa and Dammam)',
         'ar-SA-NO' => 'Northern Saudi Arabic (Hail and Al-Jouf, Bedouin)',
         'ar-OM-DH' => 'Dhofari Omani Arabic (Salalah)',
+        'ar-QA-BD' => 'Qatari Bedouin Arabic (Badu, Najdi-influenced Gulf dialect)',
         'ar-SY-AL' => 'Aleppine Syrian Arabic (Aleppo)',
         'ar-JO-BD' => 'Jordanian Bedouin Arabic',
         'ar-PS-GZ' => 'Gazan Palestinian Arabic (Gaza)',

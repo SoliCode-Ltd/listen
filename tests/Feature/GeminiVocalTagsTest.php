@@ -421,11 +421,21 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringContainsString('[calm] How long have you been telling yourself', $html, 'the Premium sample uses the tags');
     }
 
+    public function test_qatar_offers_doha_and_bedouin_accents_with_their_markers(): void
+    {
+        $this->assertSame('QA', ArabicDialects::countryOf('ar-QA'));
+        $this->assertSame('QA', ArabicDialects::countryOf('ar-QA-BD'));
+        $this->assertStringContainsString('ريّال', (string) ArabicDialects::markers('ar-QA'));
+        $this->assertStringContainsString('ج kept as j', (string) ArabicDialects::markers('ar-QA-BD'));
+        $this->assertStringContainsString('Doha', (string) ArabicDialects::cloneInstruction('ar-QA'));
+        $this->assertStringContainsString('Bedouin', (string) ArabicDialects::cloneInstruction('ar-QA-BD'));
+    }
+
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(50, $codes);
-        foreach (['ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+        $this->assertCount(51, $codes);
+        foreach (['ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-QA-BD', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
             $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
