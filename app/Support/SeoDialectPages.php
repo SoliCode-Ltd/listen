@@ -128,7 +128,7 @@ final class SeoDialectPages
                 'label' => 'Arabic Dialects',
                 'title' => 'Arabic Dialects Text to Speech',
                 'title_key' => 'ui.seo.arabic_dialects_title',
-                'description' => 'AI text to speech in 20 Arabic dialects and Fusha: Egyptian, Saudi, Emirati, Kuwaiti, Lebanese, Syrian, Iraqi, Moroccan and more.',
+                'description' => 'AI text to speech in Fusha and 50 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
                 'description_key' => 'ui.seo.arabic_dialects_description',
                 'robots' => $robots,
                 'path' => '/arabic-dialects',
@@ -387,7 +387,7 @@ final class SeoDialectPages
             return [
                 'eyebrow' => 'اللهجات العربية',
                 'h1' => 'تحويل النص إلى صوت باللهجات العربية والفصحى',
-                'intro' => 'منصة إسمع تتكلم '.count(ArabicDialects::ALL).' لكنة عربية من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة بالإضافة إلى الفصحى: المصرية والسعودية والإماراتية والكويتية واللبنانية والسورية والعراقية والمغربية وغيرها. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
+                'intro' => 'منصة إسمع تتكلم '.count(ArabicDialects::ALL).' لكنة عربية من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة بالإضافة إلى الفصحى: لهجات الخليج والشام ومصر والسودان والعراق واليمن والمغرب العربي. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
                 'faq_title' => 'الأسئلة الشائعة',
                 'faqs' => [
                     ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => count(ArabicDialects::ALL).' لكنة من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة عربية، بالإضافة إلى العربية الفصحى.'],
@@ -403,7 +403,7 @@ final class SeoDialectPages
         return [
             'eyebrow' => 'Arabic dialects',
             'h1' => 'Text to Speech in Every Major Arabic Dialect',
-            'intro' => 'Listen speaks '.count(ArabicDialects::ALL).' Arabic accents from '.(count(ArabicDialects::COUNTRIES) - 1).' countries plus Modern Standard Arabic: Egyptian, Saudi, Emirati, Kuwaiti, Lebanese, Syrian, Iraqi, Moroccan and more. Pick your audience\'s dialect and hear your script the way locals say it.',
+            'intro' => 'Listen speaks '.count(ArabicDialects::ALL).' Arabic accents from '.(count(ArabicDialects::COUNTRIES) - 1).' countries plus Modern Standard Arabic: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi dialects. Pick your audience\'s dialect and hear your script the way locals say it.',
             'faq_title' => 'Frequently asked questions',
             'faqs' => [
                 ['question' => 'How many Arabic dialects does Listen support?', 'answer' => count(ArabicDialects::ALL).' accents from '.(count(ArabicDialects::COUNTRIES) - 1).' Arab countries, plus Modern Standard Arabic (Fusha).'],
@@ -434,6 +434,7 @@ final class SeoDialectPages
             $region = ArabicDialects::ALL[$accents[0]['code']]['region'] ?? 'fusha';
             $byRegion[$region][] = [
                 'slug' => $slug,
+                'url' => route('seo.dialect', ['dialect' => $slug]),
                 'label' => $locale === 'ar'
                     ? (self::isFusha($slug) ? 'العربية الفصحى' : 'اللهجة '.$row['ar'])
                     : ($row['en'].(self::isFusha($slug) ? '' : ' Arabic')),
@@ -459,7 +460,8 @@ final class SeoDialectPages
      */
     public static function popular(string $locale, int $limit = 8): array
     {
-        $order = ['egyptian', 'saudi', 'emirati', 'kuwaiti', 'lebanese', 'syrian', 'iraqi', 'moroccan', 'jordanian', 'qatari', 'algerian', 'tunisian', 'fusha'];
+        // Region by region (Fusha, Gulf, Levant, Egypt, Iraq, Maghreb), not one country first.
+        $order = ['fusha', 'saudi', 'emirati', 'lebanese', 'egyptian', 'iraqi', 'moroccan', 'kuwaiti', 'syrian', 'jordanian', 'qatari', 'algerian', 'tunisian'];
         $links = [];
 
         foreach (array_slice($order, 0, $limit) as $slug) {

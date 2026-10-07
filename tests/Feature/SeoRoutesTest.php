@@ -276,6 +276,59 @@ class SeoRoutesTest extends TestCase
             ->assertSee('/arabic-dialects"', false);
     }
 
+    public function test_english_accent_pages_render_in_both_languages(): void
+    {
+        SiteSetting::set('canonical_url', 'https://listen.example', 'seo');
+
+        $this->getPage('/english-accents/british')
+            ->assertOk()
+            ->assertSee('<h1>British Accent Text to Speech</h1>', false)
+            ->assertSee('<link rel="alternate" hreflang="ar" href="https://listen.example/ar/english-accents/british">', false)
+            ->assertSee('British (Scottish)', false)
+            ->assertSee('"@type":"BreadcrumbList"', false)
+            ->assertSee('"@type":"FAQPage"', false);
+
+        $this->getPage('/english-accents/american', 'ar')
+            ->assertOk()
+            ->assertSee('تحويل النص إلى صوت إنجليزي بلكنة أمريكية', false);
+
+        $this->getPage('/english-accents/martian')->assertNotFound();
+    }
+
+    public function test_english_accent_hub_links_every_accent_page(): void
+    {
+        $response = $this->getPage('/english-accents')->assertOk();
+
+        foreach (\App\Support\SeoEnglishPages::slugs() as $slug) {
+            $response->assertSee('/english-accents/'.$slug.'"', false);
+        }
+    }
+
+    public function test_every_public_page_exists_in_english_and_arabic(): void
+    {
+        foreach (SeoHelper::pageDefinitions() as $page => $definition) {
+            if (! ($definition['indexable'] ?? false)) {
+                continue;
+            }
+
+            $this->assertSame(['en', 'ar'], SeoHelper::pageLocales($page), "{$page} must have English and Arabic versions.");
+        }
+    }
+
+    public function test_english_accent_pages_are_in_the_sitemap_and_footer(): void
+    {
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('/en/english-accents<', false)
+            ->assertSee('/ar/english-accents/british<', false)
+            ->assertSee('/en/english-accents/arabic-accent<', false);
+
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('/english-accents/american"', false)
+            ->assertSee('/english-accents"', false);
+    }
+
     private function getPage(string $path, string $locale = 'en'): \Illuminate\Testing\TestResponse
     {
         app()->setLocale($locale);

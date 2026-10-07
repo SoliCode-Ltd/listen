@@ -249,7 +249,8 @@ class SeoHelper
                 'localized' => true,
                 'indexable' => false,
             ],
-        ] + SeoDialectPages::pageDefinitions(self::DEFAULT_META_ROBOTS);
+        ] + SeoDialectPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
+          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS);
     }
 
     /**
@@ -437,7 +438,7 @@ class SeoHelper
                     'highlights_intro' => 'لأن العربية ليست لغة إضافية عندنا، بل اللغة الأساسية.',
                     'highlights' => [
                         ['title' => 'نطق عربي صحيح', 'body' => 'مخارج حروف واضحة، ونطق سليم للأسماء والأرقام والتواريخ في النص العربي.'],
-                        ['title' => 'الفصحى وكل اللهجات', 'body' => 'اختر الفصحى للمحتوى الرسمي والتعليمي، أو اللهجة المصرية أو السعودية أو الخليجية أو الشامية أو المغاربية لجمهورك المحلي.'],
+                        ['title' => 'الفصحى وكل اللهجات', 'body' => 'اختر الفصحى للمحتوى الرسمي والتعليمي، أو لهجة جمهورك: الخليجية أو الشامية أو المصرية أو العراقية أو المغاربية.'],
                         ['title' => 'تحكم في الأداء والمشاعر', 'body' => 'اختر أسلوب الإلقاء: إعلاني، قصصي، تعليمي، أو حواري، مع تحديد النبرة والمشاعر.'],
                     ],
                     'use_cases_title' => 'استخدامات تحويل النص العربي إلى صوت',
@@ -452,7 +453,7 @@ class SeoHelper
                     'faqs' => [
                         ['question' => 'كيف أحول نص عربي إلى صوت؟', 'answer' => 'أنشئ حساباً مجانياً، الصق النص، اختر الصوت واللهجة، ثم اضغط توليد وحمّل الملف بصيغة MP3.'],
                         ['question' => 'هل يدعم التشكيل والنص غير المشكول؟', 'answer' => 'نعم، يقرأ النص المشكول وغير المشكول. إضافة التشكيل على الكلمات الملتبسة تساعد على نطق أدق.'],
-                        ['question' => 'هل يمكن تحويل النص إلى صوت باللهجة المصرية أو السعودية؟', 'answer' => 'نعم، اختر اللهجة من الاستوديو: المصرية، السعودية بلكناتها، الإماراتية، الكويتية، القطرية، اللبنانية، السورية، العراقية، المغربية وغيرها.'],
+                        ['question' => 'هل يمكن تحويل النص إلى صوت باللهجة السعودية أو المصرية أو المغربية؟', 'answer' => 'نعم، اختر اللهجة من الاستوديو: لهجات الخليج (السعودية بلكناتها، الإماراتية، الكويتية، القطرية، البحرينية، العُمانية)، والشام، ومصر والسودان، والعراق واليمن، والمغرب العربي.'],
                         ['question' => 'هل الخدمة مجانية؟', 'answer' => 'يمكنك البدء مجاناً بحساب مجاني، ثم الترقية إلى خطة مدفوعة عند الحاجة إلى عدد أحرف أكبر.'],
                     ],
                     'cta_title' => 'حوّل نصك العربي إلى صوت الآن',
@@ -469,7 +470,7 @@ class SeoHelper
                     'highlights_intro' => 'Human-sounding voices without the robotic tone.',
                     'highlights' => [
                         ['title' => 'Natural HD voices', 'body' => 'Choose Standard voices for everyday reading or HD voices with emotion and performance styles for professional voiceovers.'],
-                        ['title' => 'English and Arabic, every dialect', 'body' => 'American, British and Australian English, Modern Standard Arabic, and Egyptian, Gulf, Levantine, Iraqi and Maghrebi dialects.'],
+                        ['title' => 'English and Arabic, every dialect', 'body' => '18 English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
                         ['title' => 'Translate, then speak', 'body' => 'Write in one language and get audio in the other with built-in translation.'],
                     ],
                     'use_cases_title' => 'What people use it for',
@@ -499,7 +500,7 @@ class SeoHelper
                     'highlights_intro' => 'أصوات تشبه البشر، بلا نبرة آلية.',
                     'highlights' => [
                         ['title' => 'أصوات طبيعية عالية الدقة', 'body' => 'أصوات قياسية للقراءة اليومية، وأصوات عالية الدقة بالمشاعر وأساليب الأداء للتعليق الصوتي الاحترافي.'],
-                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، واللهجات المصرية والخليجية والشامية والعراقية والمغاربية، والإنجليزية الأمريكية والبريطانية والأسترالية.'],
+                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، و18 لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
                         ['title' => 'ترجم ثم حوّل إلى صوت', 'body' => 'اكتب بلغة واحصل على الصوت باللغة الأخرى عبر الترجمة المدمجة.'],
                     ],
                     'use_cases_title' => 'فيم يُستخدم',
@@ -726,8 +727,8 @@ class SeoHelper
         $lines = [
             "# {$siteName}",
             '',
-            '> Listen (Arabic: منصة إسمع) is an Arabic-first AI text to speech platform at ' . $base . '. It turns text into natural speech in English and Arabic, including Modern Standard Arabic (Fusha) and '
-                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries, with HD voices, emotion and performance styles, translation, voice cloning and a Chrome extension.',
+            '> Listen (Arabic: منصة إسمع) is an AI text to speech platform for Arabic and English at ' . $base . '. It speaks Modern Standard Arabic (Fusha), '
+                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with HD voices, emotion and performance styles, translation, voice cloning and a Chrome extension.',
             '',
             '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
@@ -746,6 +747,13 @@ class SeoHelper
 
         foreach (SeoDialectPages::PAGES as $slug => $row) {
             $lines[] = "- [{$row['en']}" . (SeoDialectPages::isFusha($slug) ? '' : ' Arabic') . " text to speech]({$base}/en/arabic-dialects/{$slug})";
+        }
+
+        $lines[] = '';
+        $lines[] = '## English accents';
+        $lines[] = "- [All English accents]({$base}/en/english-accents) · [Arabic version]({$base}/ar/english-accents)";
+        foreach (SeoEnglishPages::PAGES as $slug => $row) {
+            $lines[] = '- [' . SeoEnglishPages::title($slug, 'en') . "]({$base}/en/english-accents/{$slug})";
         }
 
         return implode("\n", array_merge($lines, [
@@ -839,6 +847,13 @@ class SeoHelper
             return $field === 'title'
                 ? SeoDialectPages::title($dialectSlug, $locale)
                 : SeoDialectPages::description($dialectSlug, $locale);
+        }
+
+        $accentSlug = SeoEnglishPages::slugForPageKey($page);
+        if ($accentSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoEnglishPages::title($accentSlug, $locale)
+                : SeoEnglishPages::description($accentSlug, $locale);
         }
 
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
@@ -1208,6 +1223,12 @@ class SeoHelper
             $trail[] = [
                 'name' => $locale === 'ar' ? 'اللهجات العربية' : 'Arabic dialects',
                 'url' => self::pageUrl(SeoDialectPages::HUB_PAGE, $locale),
+            ];
+        }
+        if (SeoEnglishPages::slugForPageKey($page) !== null) {
+            $trail[] = [
+                'name' => $locale === 'ar' ? 'اللكنات الإنجليزية' : 'English accents',
+                'url' => self::pageUrl(SeoEnglishPages::HUB_PAGE, $locale),
             ];
         }
 
@@ -1912,9 +1933,11 @@ HTML;
             'billing' => ['resources/views/billing.blade.php', 'resources/views/billing-manual.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'manage_subscription' => ['resources/views/manage-subscription.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'upgrade' => ['resources/views/upgrade.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
-            default => SeoDialectPages::slugForPageKey($page) !== null || $page === SeoDialectPages::HUB_PAGE
-                ? ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php']
-                : [],
+            default => match (true) {
+                SeoDialectPages::slugForPageKey($page) !== null, $page === SeoDialectPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php'],
+                SeoEnglishPages::slugForPageKey($page) !== null, $page === SeoEnglishPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoEnglishPages.php', 'app/Support/EnglishAccents.php'],
+                default => [],
+            },
         };
     }
 

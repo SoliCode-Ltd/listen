@@ -17,6 +17,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
 use App\Support\SeoDialectPages;
+use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SiteDesign;
 use App\Support\TtsStudioConfig;
@@ -205,7 +206,8 @@ class HomeController extends Controller
             'pageContent' => $content,
             'faqItems' => $content['faqs'] ?? [],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'sample' => SeoDialectPages::sample('egyptian', $locale) ?? SeoDialectPages::sample('fusha', $locale),
+            // English pages play an English voice, Arabic pages a Fusha one: no single dialect is favoured.
+            'sample' => $locale === 'ar' ? SeoDialectPages::sample('fusha', $locale) : SeoEnglishPages::sample('american'),
         ]);
     }
 
@@ -220,6 +222,36 @@ class HomeController extends Controller
             'faqItems' => $content['faqs'],
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'dialectGroups' => SeoDialectPages::hubGroups($locale),
+        ]);
+    }
+
+    public function accentHubPage(Request $request)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoEnglishPages::hubContent($locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoEnglishPages::HUB_PAGE,
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'dialectGroups' => SeoEnglishPages::hubGroups($locale),
+            'sample' => SeoEnglishPages::sample('american') ?? SeoEnglishPages::sample('british'),
+        ]);
+    }
+
+    public function accentPage(Request $request, string $accent)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoEnglishPages::content($accent, $locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoEnglishPages::pageKey($accent),
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'sample' => SeoEnglishPages::sample($accent),
+            'currentAccent' => $accent,
         ]);
     }
 

@@ -260,14 +260,37 @@
       ['label' => __('ui.nav.ai_text_to_speech'), 'url' => route('seo.ai-text-to-speech'), 'page' => 'ai_text_to_speech'],
       ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic'), 'page' => 'text_to_speech_arabic'],
       ['label' => __('ui.nav.arabic_dialects'), 'url' => route('seo.arabic-dialects'), 'page' => 'arabic_dialects'],
+      ['label' => __('ui.nav.english_accents'), 'url' => route('seo.english-accents'), 'page' => 'english_accents'],
       ['label' => __('ui.nav.ai_voice_generator'), 'url' => route('seo.ai-voice-generator'), 'page' => 'ai_voice_generator'],
       ['label' => __('ui.nav.pricing'), 'url' => route('pricing'), 'page' => 'pricing'],
       ['label' => __('ui.nav.extension'), 'url' => route('browsers-extension.page'), 'page' => 'extension'],
     ];
     $relatedLinks = array_values(array_filter($relatedLinks, fn ($link) => $link['page'] !== $page));
     $breadcrumbs = \App\Support\SeoHelper::breadcrumbs($page);
-    $dialectLinks = \App\Support\SeoDialectPages::popular($isArabic ? 'ar' : 'en', 13);
-    $dialectLinks = array_values(array_filter($dialectLinks, fn ($link) => $link['slug'] !== ($currentDialect ?? null)));
+    $voiceLocale = $isArabic ? 'ar' : 'en';
+    $dialectLinks = array_values(array_filter(
+      \App\Support\SeoDialectPages::popular($voiceLocale, 13),
+      fn ($link) => $link['slug'] !== ($currentDialect ?? null)
+    ));
+    $accentLinks = array_values(array_filter(
+      \App\Support\SeoEnglishPages::popular($voiceLocale, 7),
+      fn ($link) => $link['slug'] !== ($currentAccent ?? null)
+    ));
+    $voiceSections = [
+      [
+        'title' => isset($currentDialect) ? ($isArabic ? 'لهجات عربية أخرى' : 'Other Arabic dialects') : ($isArabic ? 'تحويل النص إلى صوت باللهجات العربية' : 'Text to speech in Arabic dialects'),
+        'links' => array_map(fn ($l) => ['url' => route('seo.dialect', ['dialect' => $l['slug']]), 'label' => $l['label']], $dialectLinks),
+        'all' => ['url' => route('seo.arabic-dialects'), 'label' => $isArabic ? 'كل اللهجات العربية' : 'All Arabic dialects'],
+      ],
+      [
+        'title' => isset($currentAccent) ? ($isArabic ? 'لكنات إنجليزية أخرى' : 'Other English accents') : ($isArabic ? 'تحويل النص إلى صوت باللكنات الإنجليزية' : 'Text to speech in English accents'),
+        'links' => array_map(fn ($l) => ['url' => route('seo.accent', ['accent' => $l['slug']]), 'label' => $l['label']], $accentLinks),
+        'all' => ['url' => route('seo.english-accents'), 'label' => $isArabic ? 'كل اللكنات الإنجليزية' : 'All English accents'],
+      ],
+    ];
+    if (isset($currentAccent) || $page === 'english_accents') {
+      $voiceSections = array_reverse($voiceSections);
+    }
   @endphp
   @include('components.header')
 
@@ -297,7 +320,7 @@
           <figure class="seo-sample">
             <span class="seo-sample-label">{{ $isArabic ? 'استمع إلى عينة حقيقية' : 'Listen to a real sample' }}</span>
             @if(($sample['text'] ?? '') !== '')
-              <q dir="rtl" lang="ar">{{ $sample['text'] }}</q>
+              <q dir="{{ ($sample['lang'] ?? 'ar') === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $sample['lang'] ?? 'ar' }}">{{ $sample['text'] }}</q>
             @endif
             <audio controls preload="none" src="{{ $sample['audio_url'] }}"></audio>
           </figure>
@@ -322,13 +345,13 @@
 
     @if(! empty($dialectGroups))
       <section class="seo-section">
-        <h2>{{ $isArabic ? 'اختر اللهجة' : 'Choose a dialect' }}</h2>
+        <h2>{{ $page === 'english_accents' ? ($isArabic ? 'اختر اللكنة' : 'Choose an accent') : ($isArabic ? 'اختر اللهجة' : 'Choose a dialect') }}</h2>
         @foreach($dialectGroups as $group)
           <div class="seo-region">
             <h3>{{ $group['region'] }}</h3>
             <ul class="seo-chips">
               @foreach($group['items'] as $item)
-                <li><a href="{{ route('seo.dialect', ['dialect' => $item['slug']]) }}">{{ $item['label'] }}@if($item['accents'] > 1) <small>({{ $item['accents'] }})</small>@endif</a></li>
+                <li><a href="{{ $item['url'] }}">{{ $item['label'] }}@if($item['accents'] > 1) <small>({{ $item['accents'] }})</small>@endif</a></li>
               @endforeach
             </ul>
           </div>
@@ -403,17 +426,19 @@
       </section>
     @endif
 
-    @if(empty($dialectGroups) && $dialectLinks !== [])
-      <section class="seo-section">
-        <h2>{{ isset($currentDialect) ? ($isArabic ? 'لهجات عربية أخرى' : 'Other Arabic dialects') : ($isArabic ? 'تحويل النص إلى صوت باللهجات العربية' : 'Text to speech in Arabic dialects') }}</h2>
-        <ul class="seo-chips">
-          @foreach($dialectLinks as $link)
-            <li><a href="{{ route('seo.dialect', ['dialect' => $link['slug']]) }}">{{ $link['label'] }}</a></li>
-          @endforeach
-          <li><a href="{{ route('seo.arabic-dialects') }}">{{ $isArabic ? 'كل اللهجات' : 'All dialects' }}</a></li>
-        </ul>
-      </section>
-    @endif
+    @foreach($voiceSections as $voiceSection)
+      @if($voiceSection['links'] !== [] && ! (! empty($dialectGroups) && $loop->first))
+        <section class="seo-section">
+          <h2>{{ $voiceSection['title'] }}</h2>
+          <ul class="seo-chips">
+            @foreach($voiceSection['links'] as $link)
+              <li><a href="{{ $link['url'] }}">{{ $link['label'] }}</a></li>
+            @endforeach
+            <li><a href="{{ $voiceSection['all']['url'] }}">{{ $voiceSection['all']['label'] }}</a></li>
+          </ul>
+        </section>
+      @endif
+    @endforeach
 
     @if(! empty($faqItems))
       <section class="seo-section">

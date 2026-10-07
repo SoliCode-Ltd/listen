@@ -4,7 +4,7 @@ return [
     // ===== SEO =====
     'seo' => [
         'home_title' => 'Arabic & English AI Text to Speech, 50+ Dialects',
-        'home_description' => 'Turn text into natural speech with AI. Listen speaks English and Arabic, including Fusha and 50+ dialects like Egyptian, Saudi and Gulf. Free to try, MP3 download.',
+        'home_description' => 'AI text to speech in Arabic and English: Fusha and 50 Arabic dialects from the Gulf, Levant, Egypt and Maghreb, plus 18 English accents. Free to try, MP3 download.',
         'demo_title' => 'Listen Demo',
         'demo_description' => 'Try Listen\'s AI text-to-speech demo with natural Arabic and English voice previews.',
         'pricing_title' => 'Pricing',
@@ -40,7 +40,9 @@ return [
         'text_to_speech_title' => 'Free Text to Speech Online in Arabic and English',
         'text_to_speech_description' => 'Free online text to speech with natural Arabic and English AI voices. Paste text, pick a voice or dialect, and download MP3.',
         'arabic_dialects_title' => 'Arabic Dialects Text to Speech',
-        'arabic_dialects_description' => 'AI text to speech in 50+ Arabic accents and Fusha: Egyptian, Saudi, Emirati, Kuwaiti, Lebanese, Syrian, Iraqi, Moroccan and more.',
+        'arabic_dialects_description' => 'AI text to speech in Fusha and 50 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
+        'english_accents_title' => 'English Accents Text to Speech',
+        'english_accents_description' => 'AI text to speech in 18 English accents: American, British, Australian, Canadian, Irish, Indian and more. Write in English or Arabic.',
     ],
 
     // ===== HEADER / NAV =====
@@ -62,6 +64,7 @@ return [
         'text_to_speech_arabic' => 'Arabic Text to Speech',
         'text_to_speech' => 'Text to Speech Online',
         'arabic_dialects' => 'Arabic Dialects',
+        'english_accents' => 'English Accents',
         'contact' => 'Contact Us',
         'dashboard' => 'Dashboard',
         'billing' => 'Billing',

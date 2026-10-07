@@ -33,8 +33,8 @@ $changes = [
     // Home: the old title had no search keyword ("Turn any text into human voice instantly.").
     'seo_home_title_en' => 'Arabic & English AI Text to Speech, 50+ Dialects',
     'seo_home_title_ar' => 'تحويل النص إلى صوت وكلام بالذكاء الاصطناعي',
-    'seo_home_description_en' => 'Turn text into natural speech with AI. Listen speaks English and Arabic, including Fusha and 50+ dialects like Egyptian, Saudi and Gulf. Free to try, MP3 download.',
-    'seo_home_description_ar' => 'حوّل النص إلى صوت طبيعي بالذكاء الاصطناعي. منصة إسمع تتكلم الفصحى وأكثر من 50 لهجة عربية مثل المصرية والسعودية والخليجية، والإنجليزية. جرّبها مجاناً وحمّل MP3.',
+    'seo_home_description_en' => 'AI text to speech in Arabic and English: Fusha and 50 Arabic dialects from the Gulf, Levant, Egypt and Maghreb, plus 18 English accents. Free to try, MP3 download.',
+    'seo_home_description_ar' => 'تحويل النص إلى صوت بالذكاء الاصطناعي بالعربية والإنجليزية: الفصحى و50 لهجة من الخليج والشام ومصر والمغرب العربي، و18 لكنة إنجليزية. جرّبها مجاناً وحمّل MP3.',
 
     // Pricing had no Arabic description, so it showed the site-wide one.
     'seo_pricing_title_en' => 'Text to Speech Pricing and Free Plan',

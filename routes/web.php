@@ -130,6 +130,10 @@ Route::group([
     Route::get('/arabic-dialects/{dialect}', [HomeController::class, 'dialectPage'])
         ->whereIn('dialect', \App\Support\SeoDialectPages::slugs())
         ->name('seo.dialect');
+    Route::get('/english-accents', [HomeController::class, 'accentHubPage'])->name('seo.english-accents');
+    Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
+        ->whereIn('accent', \App\Support\SeoEnglishPages::slugs())
+        ->name('seo.accent');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
