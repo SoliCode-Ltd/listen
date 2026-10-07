@@ -150,27 +150,38 @@ class ClonedVoiceDialectTest extends TestCase
     {
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false]);
-        $manager = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        // The site's two keys; everything else (order, daily cut-offs) is the real manager.
+        $manager = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class)->makePartial();
         $manager->shouldReceive('getAllKeys')->andReturn([
             ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
             ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
         ]);
-        $manager->shouldReceive('getAvailableKey')->andReturn(['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]);
-        $manager->shouldIgnoreMissing();
         $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $manager);
 
         $user = User::query()->firstOrCreate(['email' => 'solicode.co.uk@gmail.com'], User::factory()->raw(['email' => 'solicode.co.uk@gmail.com']));
+        Storage::fake('local');
+        Storage::disk('local')->put('voices/source.wav', 'RIFF....WAVEsource');
+        Storage::disk('local')->put('voices/consent.wav', 'RIFF....WAVEconsent');
         $voice = ClonedVoice::factory()->ready()->forUser($user)->create([
             'provider_voice_key' => 'voice_x', 'language_code' => 'ar-XA', 'metadata' => $metadata,
+            'source_audio_path' => 'voices/source.wav', 'consent_audio_path' => 'voices/consent.wav',
         ]);
         $generation = AudioGeneration::create([
             'user_id' => $user->id, 'input_text' => 'مرحبا', 'source_language' => 'ar', 'target_language' => 'ar',
             'voice_tier' => 'hd', 'voice_name' => 'cloned_'.$voice->id, 'performance_style' => 'neutral',
             'emotion' => 'neutral', 'translate' => false, 'status' => 'processing',
         ]);
-        Http::fake(fn ($request) => str_contains($request->url(), '/interactions') || str_contains($request->url(), 'tts:generateContent')
-            ? $speak($request->header('x-goog-api-key')[0] ?? '')
-            : Http::response(['error' => ['message' => 'not found']], 404));
+        Http::fake(function ($request) use ($speak) {
+            $key = $request->header('x-goog-api-key')[0] ?? '';
+            if (str_contains($request->url(), '/voices') && $request->method() === 'POST') {
+                // A copy of the voice made in this key's project.
+                return Http::response(['name' => 'voices/voice_copy_'.$key, 'voice' => ['name' => 'voices/voice_copy_'.$key]]);
+            }
+
+            return str_contains($request->url(), '/interactions') || str_contains($request->url(), 'tts:generateContent')
+                ? $speak($key, $request)
+                : Http::response(['error' => ['message' => 'not found']], 404);
+        });
 
         try {
             (new GenerateAudioJob($generation->id))->handle(app(TranslationService::class), app(TtsService::class));
@@ -209,5 +220,22 @@ class ClonedVoiceDialectTest extends TestCase
 
         $this->assertSame('failed', $generation->status);
         $this->assertSame(__('ui.backend.cloned_voice_daily_limit'), $generation->error_message);
+    }
+
+    public function test_cloned_voice_is_copied_to_a_key_with_room_when_its_own_key_is_out_for_the_day(): void
+    {
+        $daily = ['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']];
+        $generation = $this->clonedGeneration(['key_name' => 'GEMINI_TTS_API_KEY'], function (string $key, $request) use ($daily) {
+            $voiceId = $request->data()['generation_config']['speech_config'][0]['voice'] ?? '';
+
+            return $key === 'k2' && str_starts_with($voiceId, 'voice_copy_k2')
+                ? Http::response(['output_audio' => ['data' => base64_encode('RIFF....WAVE')]])
+                : Http::response($daily, 429);
+        });
+
+        $this->assertSame('done', $generation->status, (string) $generation->error_message);
+        $voice = ClonedVoice::query()->latest('id')->first();
+        $this->assertSame('voice_copy_k2', $voice->metadata['voice_copies']['GEMINI_TTS_API_KEY_2'] ?? null, 'the copy is kept for next time');
+        $this->assertTrue(app(\App\Services\Tts\GeminiKeyManager::class)->isOutForToday('GEMINI_TTS_API_KEY', 'gemini-3.8-flash-tts'));
     }
 }

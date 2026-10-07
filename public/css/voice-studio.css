@@ -265,7 +265,8 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 .vs-panel textarea { min-height: 72px; resize: vertical; line-height: 1.5; }
 .vs-row-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, …): a long option (a cloned voice's name) is cut with "…" instead of widening the column. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1.4rem;
 }
 .vs-hidden-field {
@@ -569,3 +570,10 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
 }
 .vs-panel .slider-wrap input[type="range"]:disabled { opacity: .5; cursor: not-allowed; }
 .slider-value[data-unit]::after { content: attr(data-unit); margin-inline-start: 1px; }
+
+/* Dropdowns never grow wider than their column. */
+.vs-row-2 > *, .vs-select, .vs-select-button { min-width: 0; max-width: 100%; }
+@media (max-width: 480px) {
+  /* Phones: dropdown rows stack, so a speaker's full name fits. */
+  .vs-row-2:has(.vs-select) { grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
+}

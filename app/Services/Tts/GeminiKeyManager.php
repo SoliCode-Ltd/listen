@@ -81,11 +81,14 @@ class GeminiKeyManager
      *
      * @return array{key: string, name: string, index: int}|null
      */
-    public function getAvailableKey(): ?array
+    public function getAvailableKey(?string $model = null): ?array
     {
         $keys = $this->getAllKeys();
 
         foreach ($keys as $keyInfo) {
+            if ($model !== null && $this->isOutForToday($keyInfo['name'], $model)) {
+                continue;
+            }
             $stats = $this->getKeyStats($keyInfo['name']);
             
             // Check if key has capacity
@@ -171,6 +174,85 @@ class GeminiKeyManager
         Cache::put($cacheKey, $this->rpmLimit(), self::CACHE_TTL_MINUTE);
 
         Log::warning('Gemini key marked as exhausted', ['key' => $keyName]);
+    }
+
+    /**
+     * Every key, best first: the preferred one, then those with room left,
+     * then the ones Google has cut off for today (a last resort, in case
+     * the quota came back early).
+     *
+     * @return array<int, array{key: string, name: string, index: int}>
+     */
+    public function keysInOrder(?string $model = null, ?string $preferred = null): array
+    {
+        $keys = $this->getAllKeys();
+        $rank = function (array $k) use ($model, $preferred): int {
+            $out = $model !== null && $this->isOutForToday($k['name'], $model);
+            if ($out) {
+                return 3;
+            }
+            if ($preferred !== null && $k['name'] === $preferred) {
+                return 0;
+            }
+
+            return $this->getKeyStats($k['name'])['is_exhausted'] ? 2 : 1;
+        };
+        usort($keys, fn ($a, $b) => [$rank($a), $a['index']] <=> [$rank($b), $b['index']]);
+
+        return $keys;
+    }
+
+    /**
+     * Google cut this key off for the day on this model (a "per day" 429).
+     * It stays skipped until Google's daily reset, midnight Pacific time,
+     * so later requests do not waste a call on it first.
+     */
+    public function markOutForToday(string $keyName, string $model): void
+    {
+        $reset = now('America/Los_Angeles')->addDay()->startOfDay();
+        Cache::put($this->outKey($keyName, $model), true, $reset->utc());
+
+        Log::warning('Gemini key reached its daily limit for this model; using the other keys until it resets.', [
+            'key' => $keyName,
+            'model' => $model,
+            'resets_at' => $reset->toIso8601String(),
+        ]);
+    }
+
+    public function isOutForToday(string $keyName, string $model): bool
+    {
+        return (bool) Cache::get($this->outKey($keyName, $model), false);
+    }
+
+    /**
+     * A 429 that means the daily quota is used up (not the per-minute one).
+     */
+    public static function isDailyQuotaError(int $status, string $body): bool
+    {
+        return $status === 429 && (bool) preg_match('/per ?day|PerDay|daily/i', $body);
+    }
+
+    /**
+     * Google refused the key itself (invalid, expired, or not allowed): the
+     * request can still succeed on another key.
+     */
+    public static function isKeyProblem(int $status, string $body): bool
+    {
+        return in_array($status, [400, 401, 403], true)
+            && (bool) preg_match('/API_KEY_INVALID|API key not valid|API key expired|API_KEY_SERVICE_BLOCKED|PERMISSION_DENIED|SERVICE_DISABLED|billing/i', $body);
+    }
+
+    /**
+     * The model a request path is for (/models/{model}:generateContent).
+     */
+    public static function modelFromPath(string $path, string $fallback): string
+    {
+        return preg_match('#/models/([^:/?]+)#', $path, $m) ? $m[1] : $fallback;
+    }
+
+    private function outKey(string $keyName, string $model): string
+    {
+        return self::CACHE_PREFIX."_dayout_{$model}_{$keyName}";
     }
 
     /**

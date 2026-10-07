@@ -49,6 +49,9 @@ class VoiceCloningService
     /** The key that answered the last request. */
     private ?string $lastKeyName = null;
 
+    /** Only this key: the voice id in use exists in that key's project only. */
+    private ?string $pinnedKeyName = null;
+
     private const TRANSCRIPT_MODELS = [
         'gemini-3.5-flash',
         'gemini-3.6-flash',
@@ -202,6 +205,126 @@ class VoiceCloningService
 
             return $this->failure($message, $code);
         }
+    }
+
+    /**
+     * Speak with a member's cloned voice, on whichever of the site's keys has
+     * room today. A voice exists only in the Google project of the key that
+     * made it, so each project gets its own copy (made from the saved
+     * recordings the first time it is needed, then kept in the voice's
+     * metadata). The member never sees a daily limit while any key has room.
+     *
+     * @return array<string, mixed>
+     */
+    public function synthesizeForVoice(ClonedVoice $voice, string $text, string $style = ''): array
+    {
+        $manager = app(GeminiKeyManager::class);
+        $metadata = $voice->metadata ?? [];
+        $copies = is_array($metadata['voice_copies'] ?? null) ? $metadata['voice_copies'] : [];
+        $ownerKey = filled($metadata['key_name'] ?? null) ? (string) $metadata['key_name'] : null;
+        if ($ownerKey !== null) {
+            $copies = [$ownerKey => (string) $voice->provider_voice_key] + $copies;
+        }
+
+        $keyNames = array_column($manager->keysInOrder(self::MODEL), 'name');
+        $usable = fn (string $name) => ! $manager->isOutForToday($name, self::MODEL);
+
+        // Order: copies on keys with room (the voice's own first), then the
+        // stored id on any key (older voices whose key was not saved), then a
+        // new copy on each key with room and no copy yet.
+        $plan = [];
+        foreach ($copies as $name => $id) {
+            if ($usable($name) && in_array($name, $keyNames, true)) {
+                $plan[] = ['key' => $name, 'voice' => $id];
+            }
+        }
+        if ($ownerKey === null) {
+            $plan[] = ['key' => null, 'voice' => (string) $voice->provider_voice_key];
+        }
+        foreach ($keyNames as $name) {
+            if (! isset($copies[$name]) && $usable($name)) {
+                $plan[] = ['key' => $name, 'voice' => null];
+            }
+        }
+
+        $last = null;
+        foreach ($plan as $step) {
+            try {
+                $voiceId = $step['voice'] ?? $this->copyVoiceTo($voice, (string) $step['key']);
+                if ($voiceId === null) {
+                    continue;
+                }
+
+                $this->pinnedKeyName = $step['key'];
+                $result = $this->synthesizeWithClonedVoice($text, (string) $voice->language_code, $voiceId, $style, $step['key'] ?? $ownerKey);
+
+                if ($step['key'] === null && $this->lastKeyName !== null && $ownerKey === null) {
+                    // An older voice: remember which key it lives under.
+                    $voice->forceFill(['metadata' => array_merge($voice->metadata ?? [], ['key_name' => $this->lastKeyName])])->save();
+                }
+
+                return $result;
+            } catch (\RuntimeException $e) {
+                $last = $e;
+                if (! self::isQuotaOrMissing($e->getMessage())) {
+                    throw $e;
+                }
+                Log::warning('Cloned voice could not be spoken on this key; trying the next one.', [
+                    'cloned_voice_id' => $voice->id,
+                    'key' => $step['key'],
+                    'error' => mb_substr($e->getMessage(), 0, 300),
+                ]);
+            } finally {
+                $this->pinnedKeyName = null;
+            }
+        }
+
+        throw $last ?? new \RuntimeException('Cloned voice synthesis failed: no Gemini key has room today (rate limit).');
+    }
+
+    /**
+     * Make a copy of the voice in this key's project from the saved
+     * recordings, and keep its id. Null when it cannot be made.
+     */
+    private function copyVoiceTo(ClonedVoice $voice, string $keyName): ?string
+    {
+        if (! filled($voice->source_audio_path) || ! filled($voice->consent_audio_path)
+            || ! Storage::disk('local')->exists((string) $voice->source_audio_path)
+            || ! Storage::disk('local')->exists((string) $voice->consent_audio_path)) {
+            return null;
+        }
+
+        $this->pinnedKeyName = $keyName;
+        try {
+            $result = $this->generateVoiceCloningKey($voice);
+        } finally {
+            $this->pinnedKeyName = null;
+        }
+        if (! ($result['success'] ?? false) || ! filled($result['voice_cloning_key'] ?? null)) {
+            Log::warning('Could not copy a cloned voice to another key.', [
+                'cloned_voice_id' => $voice->id,
+                'key' => $keyName,
+                'error' => $result['error'] ?? null,
+            ]);
+
+            return null;
+        }
+
+        $metadata = $voice->fresh()?->metadata ?? $voice->metadata ?? [];
+        $copies = is_array($metadata['voice_copies'] ?? null) ? $metadata['voice_copies'] : [];
+        $copies[$keyName] = (string) $result['voice_cloning_key'];
+        $voice->forceFill(['metadata' => array_merge($metadata, ['voice_copies' => $copies])])->save();
+        Log::info('Cloned voice copied to another key.', ['cloned_voice_id' => $voice->id, 'key' => $keyName]);
+
+        return (string) $result['voice_cloning_key'];
+    }
+
+    /**
+     * Out of quota, or the voice id is not in this key's project.
+     */
+    public static function isQuotaOrMissing(string $message): bool
+    {
+        return (bool) preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b|\b404\b|\b403\b|not found|NOT_FOUND|PERMISSION_DENIED|API_KEY_INVALID|API key not valid|API key expired/i', $message);
     }
 
     /**
@@ -749,6 +872,15 @@ class VoiceCloningService
     public function purge(ClonedVoice $voice): void
     {
         $this->deleteReplicatedVoice($voice->provider_voice_key);
+        $copies = $voice->metadata['voice_copies'] ?? [];
+        foreach (is_array($copies) ? $copies : [] as $keyName => $copyId) {
+            $this->pinnedKeyName = (string) $keyName;
+            try {
+                $this->deleteReplicatedVoice((string) $copyId);
+            } finally {
+                $this->pinnedKeyName = null;
+            }
+        }
 
         foreach ([$voice->source_audio_path, $voice->consent_audio_path] as $path) {
             if (filled($path)) {
@@ -1167,7 +1299,8 @@ class VoiceCloningService
         $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $url = $baseUrl.$path;
         $verify = (bool) config('services.gemini_tts.verify_ssl', true);
-        $keys = $this->apiKeys();
+        $model = GeminiKeyManager::modelFromPath($path, self::MODEL);
+        $keys = $this->apiKeys($model);
 
         if ($keys === []) {
             throw new \RuntimeException('Gemini API key is not configured.');
@@ -1197,6 +1330,15 @@ class VoiceCloningService
 
             $last = $response;
             $this->lastKeyName = $keyInfo['name'] ?? null;
+            $badKey = GeminiKeyManager::isKeyProblem($response->status(), (string) $response->body());
+            if ((GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body()) || $badKey) && filled($keyInfo['name'] ?? null)) {
+                app(GeminiKeyManager::class)->markOutForToday((string) $keyInfo['name'], $model);
+            }
+            if ($badKey && $index !== array_key_last($keys)) {
+                Log::error('Gemini key refused by Google; using the other keys.', ['key' => $keyInfo['name'] ?? null, 'status' => $response->status()]);
+
+                continue;
+            }
             // Out of quota, or the voice belongs to another key's project: try the next key.
             if (! in_array($response->status(), [403, 404, 429], true) || $index === array_key_last($keys)) {
                 return $response;
@@ -1216,35 +1358,32 @@ class VoiceCloningService
     }
 
     /**
+     * Every Gemini key on the site, best first (see GeminiKeyManager::keysInOrder):
+     * the keys from the admin page, plus GEMINI_TTS_API_KEY from the config if it
+     * is not one of them. Pinned to one key while a voice of that project is used.
+     *
      * @return array<int, array{key: string, name: string}>
      */
-    private function apiKeys(): array
+    private function apiKeys(?string $model = null): array
     {
-        $configured = trim((string) config('services.gemini_tts.api_key', ''));
-        if ($configured !== '') {
-            return [['key' => $configured, 'name' => 'config']];
-        }
-
         try {
-            $manager = app(GeminiKeyManager::class);
-            $all = array_values(array_filter($manager->getAllKeys(), fn ($k) => filled($k['key'] ?? null)));
-            $available = $manager->getAvailableKey();
+            $keys = app(GeminiKeyManager::class)->keysInOrder($model ?? self::MODEL, $this->preferredKeyName);
         } catch (\Throwable) {
-            return [];
+            $keys = [];
+        }
+        $keys = array_values(array_filter($keys, fn ($k) => filled($k['key'] ?? null)));
+
+        $configured = trim((string) config('services.gemini_tts.api_key', ''));
+        if ($configured !== '' && ! in_array($configured, array_column($keys, 'key'), true)) {
+            $names = array_column($keys, 'name');
+            array_unshift($keys, ['key' => $configured, 'name' => in_array('GEMINI_TTS_API_KEY', $names, true) ? 'config' : 'GEMINI_TTS_API_KEY']);
         }
 
-        // Every key, so a full or wrong one is not the end: the voice's own key
-        // first, then the one with room left, then the rest.
-        $rank = function (array $k) use ($available): int {
-            if ($this->preferredKeyName !== null && ($k['name'] ?? null) === $this->preferredKeyName) {
-                return 0;
-            }
+        if ($this->pinnedKeyName !== null) {
+            return array_values(array_filter($keys, fn ($k) => ($k['name'] ?? null) === $this->pinnedKeyName));
+        }
 
-            return is_array($available) && ($k['name'] ?? null) === ($available['name'] ?? null) ? 1 : 2;
-        };
-        usort($all, fn ($a, $b) => $rank($a) <=> $rank($b));
-
-        return $all;
+        return $keys;
     }
 
     private function extractVoiceId(Response $response): ?string
