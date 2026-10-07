@@ -86,17 +86,7 @@
               <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
             @endif
             <li><a href="{{ route('browsers-extension.page') }}">{{ __('ui.nav.extension') }}</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-column">
-          <h4>{{ __('ui.footer.solutions') }}</h4>
-          <ul>
-            <li><a href="{{ route('seo.text-to-speech') }}">{{ __('ui.nav.text_to_speech') }}</a></li>
-            <li><a href="{{ route('seo.ai-text-to-speech') }}">{{ __('ui.nav.ai_text_to_speech') }}</a></li>
-            <li><a href="{{ route('seo.text-to-speech-arabic') }}">{{ __('ui.nav.text_to_speech_arabic') }}</a></li>
-            <li><a href="{{ route('seo.ai-voice-generator') }}">{{ __('ui.nav.ai_voice_generator') }}</a></li>
-            {{-- One link to each hub; the hubs and the sitemap reach every dialect and accent page. --}}
+            {{-- The two SEO hubs: they link every dialect, accent and solution page, which are also in the sitemap. --}}
             <li><a href="{{ route('seo.arabic-dialects') }}">{{ __('ui.nav.arabic_dialects') }}</a></li>
             <li><a href="{{ route('seo.english-accents') }}">{{ __('ui.nav.english_accents') }}</a></li>
           </ul>

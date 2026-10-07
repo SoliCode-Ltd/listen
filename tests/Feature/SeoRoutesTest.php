@@ -267,15 +267,27 @@ class SeoRoutesTest extends TestCase
             ->assertSee('images/og/listen-og-ar.png', false);
     }
 
-    public function test_footer_links_to_landing_pages_and_the_hubs_only(): void
+    public function test_footer_links_only_the_two_hubs(): void
     {
         $this->getLocalizedRoute('pricing')
             ->assertOk()
-            ->assertSee('/text-to-speech"', false)
             ->assertSee('/arabic-dialects"', false)
             ->assertSee('/english-accents"', false)
             ->assertDontSee('/arabic-dialects/egyptian"', false)
-            ->assertDontSee('/english-accents/american"', false);
+            ->assertDontSee('/english-accents/american"', false)
+            ->assertDontSee('/ai-voice-generator"', false);
+    }
+
+    public function test_the_hubs_link_every_solution_page(): void
+    {
+        foreach (['/arabic-dialects', '/english-accents'] as $hub) {
+            $this->getPage($hub)
+                ->assertOk()
+                ->assertSee('/text-to-speech"', false)
+                ->assertSee('/ai-text-to-speech"', false)
+                ->assertSee('/text-to-speech-arabic"', false)
+                ->assertSee('/ai-voice-generator"', false);
+        }
     }
 
     public function test_arabic_dialect_hub_links_every_dialect_page(): void
