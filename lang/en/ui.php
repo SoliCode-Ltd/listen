@@ -3,8 +3,8 @@
 return [
     // ===== SEO =====
     'seo' => [
-        'home_title' => 'AI Text to Speech',
-        'home_description' => 'Convert text into natural Arabic and English speech with premium AI voices, instant demos, and workflow-ready tools.',
+        'home_title' => 'Arabic & English AI Text to Speech, 50+ Dialects',
+        'home_description' => 'AI text to speech in Arabic and English: Fusha and 50 Arabic dialects from the Gulf, Levant, Egypt and Maghreb, plus 18 English accents. Free to try, MP3 download.',
         'demo_title' => 'Listen Demo',
         'demo_description' => 'Try Listen\'s AI text-to-speech demo with natural Arabic and English voice previews.',
         'pricing_title' => 'Pricing',
@@ -29,14 +29,20 @@ return [
         'privacy_description' => 'Learn how Listen collects, uses, and protects personal and product usage data.',
         'cookies_title' => 'Cookie Policy',
         'cookies_description' => 'Understand how Listen uses cookies and similar technologies across the website.',
-        'extension_title' => 'Browser Extension',
-        'extension_description' => 'Use the Listen browser extension to convert web pages into natural Arabic and English audio.',
+        'extension_title' => 'Text to Speech Chrome Extension',
+        'extension_description' => 'Read any web page aloud in natural Arabic or English with the Listen Reader Chrome extension. Select text, press play.',
         'ai_text_to_speech_title' => 'AI Text to Speech',
         'ai_text_to_speech_description' => 'AI text to speech for Arabic and English websites, apps, support docs, and marketing content with natural voice quality.',
         'ai_voice_generator_title' => 'AI Voice Generator',
         'ai_voice_generator_description' => 'Generate AI voiceovers for demos, ads, onboarding, courses, and product communication in Arabic and English.',
         'text_to_speech_arabic_title' => 'Arabic Text to Speech',
         'text_to_speech_arabic_description' => 'Convert Arabic text to natural speech for onboarding, accessibility, training, support, and publish-ready media.',
+        'text_to_speech_title' => 'Free Text to Speech Online in Arabic and English',
+        'text_to_speech_description' => 'Free online text to speech with natural Arabic and English AI voices. Paste text, pick a voice or dialect, and download MP3.',
+        'arabic_dialects_title' => 'Arabic Dialects Text to Speech',
+        'arabic_dialects_description' => 'AI text to speech in Fusha and 50 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
+        'english_accents_title' => 'English Accents Text to Speech',
+        'english_accents_description' => 'AI text to speech in 18 English accents: American, British, Australian, Canadian, Irish, Indian and more. Write in English or Arabic.',
     ],
 
     // ===== HEADER / NAV =====
@@ -56,6 +62,9 @@ return [
         'ai_text_to_speech' => 'AI Text to Speech',
         'ai_voice_generator' => 'AI Voice Generator',
         'text_to_speech_arabic' => 'Arabic Text to Speech',
+        'text_to_speech' => 'Text to Speech Online',
+        'arabic_dialects' => 'Arabic Dialects',
+        'english_accents' => 'English Accents',
         'contact' => 'Contact Us',
         'dashboard' => 'Dashboard',
         'billing' => 'Billing',

@@ -53,14 +53,14 @@ class SeoRoutesTest extends TestCase
             ->assertSee('https://example.org/docs', false);
     }
 
-    public function test_sitemap_keeps_manual_entries_when_not_excluded(): void
+    public function test_sitemap_keeps_manual_entries_but_drops_noindex_pages(): void
     {
         SiteSetting::set('sitemap_paths', "/ar/demo|0.8|weekly\n/en/dashboard|0.8|weekly\n/en/private-docs|0.5|monthly", 'seo');
 
         $this->get('/sitemap.xml')
             ->assertOk()
-            ->assertSee('/ar/demo', false)
-            ->assertSee('/en/dashboard', false)
+            ->assertDontSee('/ar/demo<', false)
+            ->assertDontSee('/en/dashboard<', false)
             ->assertSee('/en/private-docs', false);
     }
 
@@ -161,16 +161,183 @@ class SeoRoutesTest extends TestCase
             ->assertOk();
     }
 
-    public function test_hreflang_map_for_english_only_page_excludes_arabic_variant(): void
+    public function test_arabic_text_to_speech_page_has_english_and_arabic_versions(): void
     {
         SiteSetting::set('canonical_url', 'https://listen.example', 'seo');
 
-        $map = SeoHelper::hreflangMap('text_to_speech_arabic');
-
         $this->assertSame([
             'en' => 'https://listen.example/en/text-to-speech-arabic',
+            'ar' => 'https://listen.example/ar/text-to-speech-arabic',
             'x-default' => 'https://listen.example/en/text-to-speech-arabic',
-        ], $map);
+        ], SeoHelper::hreflangMap('text_to_speech_arabic'));
+
+        $this->getPage('/text-to-speech-arabic', 'ar')
+            ->assertOk()
+            ->assertSee('تحويل النص العربي إلى كلام', false)
+            ->assertSee('<html lang="ar"', false);
+    }
+
+    public function test_robots_txt_is_served_by_the_app_not_a_static_file(): void
+    {
+        $this->assertFileDoesNotExist(public_path('robots.txt'), 'A static robots.txt would hide the sitemap line from crawlers.');
+
+        $this->get('/robots.txt')->assertOk()->assertSee('Sitemap: ', false);
+    }
+
+    public function test_private_pages_stay_noindex_even_with_an_index_override(): void
+    {
+        SiteSetting::set('seo_login_robots', 'index,follow', 'seo');
+        SiteSetting::set('seo_register_robots', 'index,follow', 'seo');
+        SiteSetting::set('seo_dashboard_robots', 'index,follow', 'seo');
+
+        $this->assertStringContainsString('noindex', SeoHelper::robots('login'));
+        $this->assertStringContainsString('noindex', SeoHelper::robots('register'));
+        $this->assertStringContainsString('noindex', SeoHelper::robots('dashboard'));
+        $this->assertStringNotContainsString('noindex', SeoHelper::robots('pricing'));
+
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertDontSee('/en/login<', false)
+            ->assertDontSee('/en/register<', false)
+            ->assertDontSee('/en/dashboard<', false);
+    }
+
+    public function test_page_description_wins_over_the_site_wide_description(): void
+    {
+        SiteSetting::set('meta_description_ar', 'وصف عام للموقع كله.', 'seo');
+
+        app()->setLocale('ar');
+
+        $this->assertSame(__('ui.seo.pricing_description', [], 'ar'), SeoHelper::description('pricing', 'ar'));
+    }
+
+    public function test_dialect_pages_render_with_alternates_breadcrumbs_and_schema(): void
+    {
+        SiteSetting::set('canonical_url', 'https://listen.example', 'seo');
+
+        $this->getPage('/arabic-dialects/egyptian')
+            ->assertOk()
+            ->assertSee('<h1>Egyptian Arabic Text to Speech with Real Dialect Voices</h1>', false)
+            ->assertSee('<link rel="canonical" href="https://listen.example/en/arabic-dialects/egyptian">', false)
+            ->assertSee('<link rel="alternate" hreflang="ar" href="https://listen.example/ar/arabic-dialects/egyptian">', false)
+            ->assertSee('Cairene', false)
+            ->assertSee('دلوقتي', false)
+            ->assertSee('"@type":"BreadcrumbList"', false)
+            ->assertSee('"@type":"SoftwareApplication"', false)
+            ->assertSee('"@type":"FAQPage"', false);
+
+        $this->getPage('/arabic-dialects/saudi', 'ar')
+            ->assertOk()
+            ->assertSee('تحويل النص إلى صوت باللهجة السعودية بالذكاء الاصطناعي', false)
+            ->assertSee('سعودي (حجازي)', false);
+
+        $this->getPage('/arabic-dialects/klingon')->assertNotFound();
+    }
+
+    public function test_dialect_hub_links_every_dialect_page(): void
+    {
+        $response = $this->getPage('/arabic-dialects')->assertOk();
+
+        foreach (\App\Support\SeoDialectPages::slugs() as $slug) {
+            $response->assertSee('/arabic-dialects/'.$slug.'"', false);
+        }
+    }
+
+    public function test_new_pages_are_in_the_sitemap(): void
+    {
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('/en/text-to-speech<', false)
+            ->assertSee('/ar/text-to-speech<', false)
+            ->assertSee('/ar/text-to-speech-arabic<', false)
+            ->assertSee('/ar/arabic-dialects<', false)
+            ->assertSee('/en/arabic-dialects/egyptian<', false)
+            ->assertSee('/ar/arabic-dialects/moroccan<', false);
+    }
+
+    public function test_pages_have_a_default_share_image_in_their_language(): void
+    {
+        $this->getPage('/text-to-speech')
+            ->assertOk()
+            ->assertSee('images/og/listen-og-en.png', false)
+            ->assertSee('<meta property="og:image:width" content="1200">', false);
+
+        $this->getPage('/text-to-speech', 'ar')
+            ->assertOk()
+            ->assertSee('images/og/listen-og-ar.png', false);
+    }
+
+    public function test_footer_links_to_landing_and_dialect_pages(): void
+    {
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('/text-to-speech"', false)
+            ->assertSee('/arabic-dialects/egyptian"', false)
+            ->assertSee('/arabic-dialects"', false);
+    }
+
+    public function test_english_accent_pages_render_in_both_languages(): void
+    {
+        SiteSetting::set('canonical_url', 'https://listen.example', 'seo');
+
+        $this->getPage('/english-accents/british')
+            ->assertOk()
+            ->assertSee('<h1>British Accent Text to Speech</h1>', false)
+            ->assertSee('<link rel="alternate" hreflang="ar" href="https://listen.example/ar/english-accents/british">', false)
+            ->assertSee('British (Scottish)', false)
+            ->assertSee('"@type":"BreadcrumbList"', false)
+            ->assertSee('"@type":"FAQPage"', false);
+
+        $this->getPage('/english-accents/american', 'ar')
+            ->assertOk()
+            ->assertSee('تحويل النص إلى صوت إنجليزي بلكنة أمريكية', false);
+
+        $this->getPage('/english-accents/martian')->assertNotFound();
+    }
+
+    public function test_english_accent_hub_links_every_accent_page(): void
+    {
+        $response = $this->getPage('/english-accents')->assertOk();
+
+        foreach (\App\Support\SeoEnglishPages::slugs() as $slug) {
+            $response->assertSee('/english-accents/'.$slug.'"', false);
+        }
+    }
+
+    public function test_every_public_page_exists_in_english_and_arabic(): void
+    {
+        foreach (SeoHelper::pageDefinitions() as $page => $definition) {
+            if (! ($definition['indexable'] ?? false)) {
+                continue;
+            }
+
+            $this->assertSame(['en', 'ar'], SeoHelper::pageLocales($page), "{$page} must have English and Arabic versions.");
+        }
+    }
+
+    public function test_english_accent_pages_are_in_the_sitemap_and_footer(): void
+    {
+        $this->get('/sitemap.xml')
+            ->assertOk()
+            ->assertSee('/en/english-accents<', false)
+            ->assertSee('/ar/english-accents/british<', false)
+            ->assertSee('/en/english-accents/arabic-accent<', false);
+
+        $this->getLocalizedRoute('pricing')
+            ->assertOk()
+            ->assertSee('/english-accents/american"', false)
+            ->assertSee('/english-accents"', false);
+    }
+
+    private function getPage(string $path, string $locale = 'en'): \Illuminate\Testing\TestResponse
+    {
+        app()->setLocale($locale);
+
+        return $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($path);
     }
 
     public function test_google_analytics_id_is_rendered_when_configured(): void

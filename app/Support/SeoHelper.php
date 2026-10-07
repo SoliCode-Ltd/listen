@@ -154,10 +154,22 @@ class SeoHelper
                 'description_key' => 'ui.seo.text_to_speech_arabic_description',
                 'robots' => self::DEFAULT_META_ROBOTS,
                 'path' => '/text-to-speech-arabic',
-                'localized' => false,
-                'allowed_locales' => ['en'],
+                'localized' => true,
                 'indexable' => true,
                 'sitemap_priority' => 0.82,
+                'sitemap_change_frequency' => 'weekly',
+            ],
+            'text_to_speech' => [
+                'label' => 'Text to Speech Online',
+                'title' => 'Free Text to Speech Online in Arabic and English',
+                'title_key' => 'ui.seo.text_to_speech_title',
+                'description' => 'Free online text to speech with natural Arabic and English AI voices. Paste text, pick a voice or dialect, and download MP3.',
+                'description_key' => 'ui.seo.text_to_speech_description',
+                'robots' => self::DEFAULT_META_ROBOTS,
+                'path' => '/text-to-speech',
+                'localized' => true,
+                'indexable' => true,
+                'sitemap_priority' => 0.9,
                 'sitemap_change_frequency' => 'weekly',
             ],
             'demo' => [
@@ -237,7 +249,22 @@ class SeoHelper
                 'localized' => true,
                 'indexable' => false,
             ],
-        ];
+        ] + SeoDialectPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
+          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS);
+    }
+
+    /**
+     * Pages edited one by one in the admin SEO settings. Generated pages (the
+     * Arabic dialect pages) take their metadata from SeoDialectPages instead.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function adminPageDefinitions(): array
+    {
+        return array_filter(
+            self::pageDefinitions(),
+            static fn (array $definition): bool => ! ($definition['generated'] ?? false)
+        );
     }
 
     /**
@@ -403,6 +430,98 @@ class SeoHelper
                     'cta_body' => 'Use Listen to transform written Arabic into premium voice output for products, content, and customer communication.',
                     'cta_primary' => 'Start with Listen',
                 ],
+                'ar' => [
+                    'eyebrow' => 'تحويل النص العربي إلى صوت',
+                    'h1' => 'تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات',
+                    'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى وأكثر من خمسين لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
+                    'highlights_title' => 'لماذا منصة إسمع للنص العربي؟',
+                    'highlights_intro' => 'لأن العربية ليست لغة إضافية عندنا، بل اللغة الأساسية.',
+                    'highlights' => [
+                        ['title' => 'نطق عربي صحيح', 'body' => 'مخارج حروف واضحة، ونطق سليم للأسماء والأرقام والتواريخ في النص العربي.'],
+                        ['title' => 'الفصحى وكل اللهجات', 'body' => 'اختر الفصحى للمحتوى الرسمي والتعليمي، أو لهجة جمهورك: الخليجية أو الشامية أو المصرية أو العراقية أو المغاربية.'],
+                        ['title' => 'تحكم في الأداء والمشاعر', 'body' => 'اختر أسلوب الإلقاء: إعلاني، قصصي، تعليمي، أو حواري، مع تحديد النبرة والمشاعر.'],
+                    ],
+                    'use_cases_title' => 'استخدامات تحويل النص العربي إلى صوت',
+                    'use_cases_intro' => 'من المحتوى التعليمي إلى الإعلانات.',
+                    'use_cases' => [
+                        ['title' => 'التعليق الصوتي للفيديو', 'body' => 'تعليق صوتي عربي لفيديوهات يوتيوب وتيك توك وإنستغرام والإعلانات.'],
+                        ['title' => 'الكتب الصوتية والمقالات', 'body' => 'حوّل الكتب والمقالات والقصص العربية إلى محتوى مسموع.'],
+                        ['title' => 'التعليم والدورات', 'body' => 'دروس مسموعة بالفصحى أو باللهجة القريبة من الطلاب.'],
+                        ['title' => 'إمكانية الوصول', 'body' => 'قراءة صفحات الويب والنصوص بصوت عالٍ لضعاف البصر ومن يفضّلون الاستماع، عبر إضافة المتصفح.'],
+                    ],
+                    'faq_title' => 'الأسئلة الشائعة',
+                    'faqs' => [
+                        ['question' => 'كيف أحول نص عربي إلى صوت؟', 'answer' => 'أنشئ حساباً مجانياً، الصق النص، اختر الصوت واللهجة، ثم اضغط توليد وحمّل الملف بصيغة MP3.'],
+                        ['question' => 'هل يدعم التشكيل والنص غير المشكول؟', 'answer' => 'نعم، يقرأ النص المشكول وغير المشكول. إضافة التشكيل على الكلمات الملتبسة تساعد على نطق أدق.'],
+                        ['question' => 'هل يمكن تحويل النص إلى صوت باللهجة السعودية أو المصرية أو المغربية؟', 'answer' => 'نعم، اختر اللهجة من الاستوديو: لهجات الخليج (السعودية بلكناتها، الإماراتية، الكويتية، القطرية، البحرينية، العُمانية)، والشام، ومصر والسودان، والعراق واليمن، والمغرب العربي.'],
+                        ['question' => 'هل الخدمة مجانية؟', 'answer' => 'يمكنك البدء مجاناً بحساب مجاني، ثم الترقية إلى خطة مدفوعة عند الحاجة إلى عدد أحرف أكبر.'],
+                    ],
+                    'cta_title' => 'حوّل نصك العربي إلى صوت الآن',
+                    'cta_body' => 'أنشئ حسابك المجاني واسمع نصك بصوت عربي طبيعي خلال ثوانٍ.',
+                    'cta_primary' => 'أنشئ حسابك المجاني',
+                ],
+            ],
+            'text_to_speech' => [
+                'en' => [
+                    'eyebrow' => 'Text to Speech Online',
+                    'h1' => 'Free Text to Speech Online with Natural Arabic and English Voices',
+                    'intro' => 'Paste any text, choose a voice, and get natural-sounding speech in seconds. Listen reads English and Arabic, including Fusha and more than fifty Arabic accents, and gives you an MP3 you can download and use.',
+                    'highlights_title' => 'Why use Listen for text to speech',
+                    'highlights_intro' => 'Human-sounding voices without the robotic tone.',
+                    'highlights' => [
+                        ['title' => 'Natural HD voices', 'body' => 'Choose Standard voices for everyday reading or HD voices with emotion and performance styles for professional voiceovers.'],
+                        ['title' => 'English and Arabic, every dialect', 'body' => '18 English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
+                        ['title' => 'Translate, then speak', 'body' => 'Write in one language and get audio in the other with built-in translation.'],
+                    ],
+                    'use_cases_title' => 'What people use it for',
+                    'use_cases_intro' => 'From quick listening to finished voiceovers.',
+                    'use_cases' => [
+                        ['title' => 'Video voiceovers', 'body' => 'Narration for YouTube, TikTok, Reels, ads and product videos.'],
+                        ['title' => 'Listening instead of reading', 'body' => 'Have articles, documents and web pages read aloud, including with the Chrome extension.'],
+                        ['title' => 'E-learning and training', 'body' => 'Turn lessons and training scripts into clear spoken audio.'],
+                        ['title' => 'Apps and customer service', 'body' => 'Voice prompts, IVR menus and announcements in English and Arabic.'],
+                    ],
+                    'faq_title' => 'Frequently asked questions',
+                    'faqs' => [
+                        ['question' => 'Is Listen text to speech free?', 'answer' => 'Yes, you can start with a free account. Paid plans add more characters per month, HD voices and higher limits.'],
+                        ['question' => 'How do I convert text to speech?', 'answer' => 'Sign up, paste your text, pick a language, voice and dialect, then generate and download the MP3.'],
+                        ['question' => 'Which languages are supported?', 'answer' => 'English and Arabic, including Modern Standard Arabic and dialects from Egypt, the Gulf, the Levant, Iraq, Yemen, Sudan and the Maghreb.'],
+                        ['question' => 'Can I read web pages aloud?', 'answer' => 'Yes. The Listen Reader Chrome extension reads selected text on any page.'],
+                    ],
+                    'cta_title' => 'Turn your text into speech now',
+                    'cta_body' => 'Create a free account and hear your first audio in seconds.',
+                    'cta_primary' => 'Create your free account',
+                ],
+                'ar' => [
+                    'eyebrow' => 'تحويل النص إلى كلام',
+                    'h1' => 'تحويل النص إلى كلام مجاناً أونلاين بصوت عربي وإنجليزي طبيعي',
+                    'intro' => 'الصق أي نص، اختر الصوت، واحصل على كلام طبيعي خلال ثوانٍ. منصة إسمع تقرأ العربية والإنجليزية، بالفصحى وبأكثر من خمسين لكنة عربية، وتعطيك ملف MP3 جاهزاً للتحميل والاستخدام.',
+                    'highlights_title' => 'لماذا منصة إسمع لتحويل الكتابة إلى صوت',
+                    'highlights_intro' => 'أصوات تشبه البشر، بلا نبرة آلية.',
+                    'highlights' => [
+                        ['title' => 'أصوات طبيعية عالية الدقة', 'body' => 'أصوات قياسية للقراءة اليومية، وأصوات عالية الدقة بالمشاعر وأساليب الأداء للتعليق الصوتي الاحترافي.'],
+                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، و18 لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
+                        ['title' => 'ترجم ثم حوّل إلى صوت', 'body' => 'اكتب بلغة واحصل على الصوت باللغة الأخرى عبر الترجمة المدمجة.'],
+                    ],
+                    'use_cases_title' => 'فيم يُستخدم',
+                    'use_cases_intro' => 'من الاستماع السريع إلى التعليق الصوتي الجاهز للنشر.',
+                    'use_cases' => [
+                        ['title' => 'التعليق الصوتي للفيديو', 'body' => 'تعليق صوتي لفيديوهات يوتيوب وتيك توك والريلز والإعلانات وفيديوهات المنتجات.'],
+                        ['title' => 'الاستماع بدل القراءة', 'body' => 'استمع إلى المقالات والمستندات وصفحات الويب، مع إضافة كروم للقراءة بصوت عالٍ.'],
+                        ['title' => 'التعليم والتدريب', 'body' => 'حوّل الدروس ونصوص التدريب إلى صوت واضح.'],
+                        ['title' => 'التطبيقات وخدمة العملاء', 'body' => 'رسائل صوتية وقوائم رد آلي وإعلانات بالعربية والإنجليزية.'],
+                    ],
+                    'faq_title' => 'الأسئلة الشائعة',
+                    'faqs' => [
+                        ['question' => 'هل تحويل النص إلى صوت في منصة إسمع مجاني؟', 'answer' => 'نعم، يمكنك البدء بحساب مجاني. الخطط المدفوعة تضيف أحرفاً أكثر شهرياً وأصواتاً عالية الدقة وحدوداً أعلى.'],
+                        ['question' => 'كيف أحول الكتابة إلى صوت؟', 'answer' => 'سجّل حساباً، الصق النص، اختر اللغة والصوت واللهجة، ثم اضغط توليد وحمّل ملف MP3.'],
+                        ['question' => 'ما اللغات المدعومة؟', 'answer' => 'العربية والإنجليزية، بما في ذلك الفصحى ولهجات مصر والخليج والشام والعراق واليمن والسودان والمغرب العربي.'],
+                        ['question' => 'هل يمكن قراءة صفحات الويب بصوت عالٍ؟', 'answer' => 'نعم، إضافة إسمع لمتصفح كروم تقرأ أي نص تحدده على أي صفحة.'],
+                    ],
+                    'cta_title' => 'حوّل نصك إلى كلام الآن',
+                    'cta_body' => 'أنشئ حسابك المجاني واسمع أول مقطع صوتي خلال ثوانٍ.',
+                    'cta_primary' => 'أنشئ حسابك المجاني',
+                ],
             ],
         ];
     }
@@ -522,6 +641,11 @@ class SeoHelper
                 continue;
             }
 
+            // A URL marked noindex in the sitemap is a contradiction Google reports as an error.
+            if (str_contains(strtolower(self::robots($page)), 'noindex')) {
+                continue;
+            }
+
             foreach (self::pageLocales($page) as $locale) {
                 $append([
                     'page' => $page,
@@ -536,6 +660,10 @@ class SeoHelper
         }
 
         foreach (self::sitemapEntries() as $entry) {
+            if (self::isNoindexPath($entry['path'])) {
+                continue;
+            }
+
             $append([
                 'page' => '',
                 'locale' => '',
@@ -551,6 +679,29 @@ class SeoHelper
     }
 
     /**
+     * Whether a sitemap path points at a page that is marked noindex.
+     */
+    private static function isNoindexPath(string $path): bool
+    {
+        if (Str::startsWith($path, ['http://', 'https://'])) {
+            $canonicalHost = strtolower((string) parse_url(rtrim((string) SiteSetting::get('canonical_url', config('app.url')), '/'), PHP_URL_HOST));
+            if (strtolower((string) parse_url($path, PHP_URL_HOST)) !== $canonicalHost) {
+                return false;
+            }
+            $path = (string) parse_url($path, PHP_URL_PATH);
+        }
+
+        $stripped = rtrim(self::stripLocaleFromPath($path), '/') ?: '/';
+        foreach (self::pageDefinitions() as $page => $definition) {
+            if (($definition['path'] ?? null) === $stripped) {
+                return str_contains(strtolower(self::robots($page)), 'noindex');
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Default robots.txt.
      */
     public static function defaultRobotsTxt(): string
@@ -558,6 +709,8 @@ class SeoHelper
         return implode("\n", [
             'User-agent: *',
             'Allow: /',
+            'Disallow: /admin',
+            'Disallow: /livewire/',
             '',
             'Sitemap: ' . url('/sitemap.xml'),
         ]);
@@ -570,28 +723,46 @@ class SeoHelper
     {
         $base = rtrim((string) SiteSetting::get('canonical_url', config('app.url')), '/');
         $siteName = self::siteName('en');
-        $description = self::siteDescription('en');
 
-        return implode("\n", [
+        $lines = [
             "# {$siteName}",
             '',
-            "> {$description}",
+            '> Listen (Arabic: منصة إسمع) is an AI text to speech platform for Arabic and English at ' . $base . '. It speaks Modern Standard Arabic (Fusha), '
+                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with HD voices, emotion and performance styles, translation, voice cloning and a Chrome extension.',
             '',
             '## Official URLs',
-            "- English Home: {$base}/en",
-            "- Arabic Home: {$base}/ar",
-            "- Pricing: {$base}/en/pricing",
-            "- Contact: {$base}/en/contact-us",
-            "- Browser Extension: {$base}/en/browsers-extension",
+            "- [Home (English)]({$base}/en): overview, voice samples",
+            "- [Home (Arabic)]({$base}/ar)",
+            "- [Text to speech online]({$base}/en/text-to-speech): free online text to speech in Arabic and English",
+            "- [Arabic text to speech]({$base}/en/text-to-speech-arabic) · [Arabic version]({$base}/ar/text-to-speech-arabic)",
+            "- [AI text to speech]({$base}/en/ai-text-to-speech)",
+            "- [AI voice generator]({$base}/en/ai-voice-generator)",
+            "- [Pricing]({$base}/en/pricing): free plan and paid plans",
+            "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
+            "- [Contact]({$base}/en/contact-us)",
             '',
-            '## Sitemap',
-            "- {$base}/sitemap.xml",
+            '## Arabic dialects',
+            "- [All Arabic dialects]({$base}/en/arabic-dialects) · [Arabic version]({$base}/ar/arabic-dialects)",
+        ];
+
+        foreach (SeoDialectPages::PAGES as $slug => $row) {
+            $lines[] = "- [{$row['en']}" . (SeoDialectPages::isFusha($slug) ? '' : ' Arabic') . " text to speech]({$base}/en/arabic-dialects/{$slug})";
+        }
+
+        $lines[] = '';
+        $lines[] = '## English accents';
+        $lines[] = "- [All English accents]({$base}/en/english-accents) · [Arabic version]({$base}/ar/english-accents)";
+        foreach (SeoEnglishPages::PAGES as $slug => $row) {
+            $lines[] = '- [' . SeoEnglishPages::title($slug, 'en') . "]({$base}/en/english-accents/{$slug})";
+        }
+
+        return implode("\n", array_merge($lines, [
             '',
-            '## Notes For AI Agents',
+            '## Notes for AI agents',
             '- Prefer canonical URLs from this domain.',
-            '- Respect robots.txt and per-page robots directives.',
-            '- Treat English and Arabic localized pages as language alternates, not duplicates.',
-        ]);
+            '- English pages live under /en and Arabic pages under /ar; they are language alternates, not duplicates.',
+            "- Sitemap: {$base}/sitemap.xml",
+        ]));
     }
 
     /**
@@ -671,6 +842,20 @@ class SeoHelper
             return '';
         }
 
+        $dialectSlug = SeoDialectPages::slugForPageKey($page);
+        if ($dialectSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoDialectPages::title($dialectSlug, $locale)
+                : SeoDialectPages::description($dialectSlug, $locale);
+        }
+
+        $accentSlug = SeoEnglishPages::slugForPageKey($page);
+        if ($accentSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoEnglishPages::title($accentSlug, $locale)
+                : SeoEnglishPages::description($accentSlug, $locale);
+        }
+
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
         if ($translationKey !== '') {
             $translated = trim((string) __($translationKey, [], $locale));
@@ -701,14 +886,19 @@ class SeoHelper
             }
         }
 
+        // A page's own description comes before the site-wide one, so pages
+        // without an override still get distinct snippets in search results.
+        $fallback = self::localizedDefault('description', $page, $locale);
+        if ($fallback !== '' && ($locale !== 'ar' || self::containsArabic($fallback))) {
+            return $fallback;
+        }
+
         $global = self::localizedOverride('meta_description', $locale, $locale === 'ar');
         if ($global !== '') {
             return $global;
         }
 
-        $fallback = self::localizedDefault('description', $page, $locale);
-
-        return $fallback !== '' ? $fallback : self::siteDescription($locale);
+        return self::siteDescription($locale);
     }
 
     /**
@@ -734,6 +924,15 @@ class SeoHelper
     public static function robots(string $page = ''): string
     {
         if ($page) {
+            $definition = self::pageDefinitions()[$page] ?? null;
+
+            // Sign-in, account and app pages stay out of search results whatever
+            // the dashboard says: an "index" override there only adds thin
+            // pages that compete with the real landing pages.
+            if (is_array($definition) && ($definition['indexable'] ?? true) === false) {
+                return (string) ($definition['robots'] ?? 'noindex,nofollow');
+            }
+
             $override = trim((string) SiteSetting::get("seo_{$page}_robots", ''));
             if ($override !== '') {
                 return $override;
@@ -828,7 +1027,7 @@ class SeoHelper
         $locale = self::currentLocale();
         $title = self::title($pageTitle, $page, $locale);
         $description = self::description($page, $locale);
-        $image = self::normalizeMediaUrl((string) SiteSetting::get('og_image_url', ''));
+        $image = self::shareImageUrl($locale);
         $siteName = self::siteName($locale);
         $type = (string) SiteSetting::get('og_type', 'website');
         $tags = [
@@ -850,6 +1049,11 @@ class SeoHelper
 
         if ($image !== '') {
             $tags[] = '<meta property="og:image" content="' . e($image) . '">';
+            $tags[] = '<meta property="og:image:alt" content="' . e($title) . '">';
+            if (self::usesDefaultShareImage()) {
+                $tags[] = '<meta property="og:image:width" content="1200">';
+                $tags[] = '<meta property="og:image:height" content="630">';
+            }
         }
 
         return implode("\n", $tags);
@@ -866,7 +1070,7 @@ class SeoHelper
         $description = self::description($page, $locale);
         $handle = trim((string) SiteSetting::get('twitter_handle', ''));
         $creator = trim((string) SiteSetting::get('twitter_creator', ''));
-        $image = self::normalizeMediaUrl((string) SiteSetting::get('og_image_url', ''));
+        $image = self::shareImageUrl($locale);
         $tags = [
             '<meta name="twitter:card" content="' . e($cardType) . '">',
             '<meta name="twitter:title" content="' . e($title) . '">',
@@ -898,34 +1102,74 @@ class SeoHelper
             return '';
         }
 
+        $page = $page !== '' ? $page : self::resolveCurrentPageKey();
         $locale = self::currentLocale();
+        $language = self::schemaLanguage($locale);
         $siteName = self::siteName($locale);
         $description = self::description($page, $locale);
         $url = self::currentCanonicalUrl($locale);
-        $logo = self::normalizeMediaUrl((string) SiteSetting::get('logo_url', ''));
+        $homeUrl = self::canonicalUrl('/' . self::defaultHreflangLocale(), self::defaultHreflangLocale());
+        $logo = self::normalizeMediaUrl((string) SiteSetting::get('logo_url', '')) ?: self::publicAssetUrl('images/email-logo-en.png');
+        $organizationId = $homeUrl . '#organization';
+        $websiteId = $homeUrl . '#website';
+        $appId = $homeUrl . '#app';
+        $names = array_values(array_unique(array_filter([self::siteName('en'), 'Listen', 'Listen AI', 'إسمع', 'منصة إسمع'])));
+        $alternateNames = array_values(array_filter($names, static fn (string $name): bool => $name !== $siteName));
+
         $graph = [
             array_filter([
                 '@type' => 'Organization',
+                '@id' => $organizationId,
                 'name' => $siteName,
-                'url' => self::canonicalUrl('/' . self::defaultHreflangLocale(), self::defaultHreflangLocale()),
+                'alternateName' => $alternateNames,
+                'url' => $homeUrl,
                 'description' => self::siteDescription($locale),
                 'logo' => $logo !== '' ? $logo : null,
-            ], static fn ($value) => $value !== null && $value !== ''),
+                'sameAs' => self::socialProfileUrls() ?: null,
+            ], static fn ($value) => $value !== null && $value !== '' && $value !== []),
             [
                 '@type' => 'WebSite',
+                '@id' => $websiteId,
                 'name' => $siteName,
-                'url' => self::canonicalUrl('/' . self::defaultHreflangLocale(), self::defaultHreflangLocale()),
+                'alternateName' => $alternateNames,
+                'url' => $homeUrl,
                 'description' => self::siteDescription($locale),
-                'inLanguage' => self::schemaLanguage($locale),
-            ],
-            [
-                '@type' => 'WebPage',
-                'name' => self::title($pageTitle, $page, $locale),
-                'url' => $url,
-                'description' => $description,
-                'inLanguage' => self::schemaLanguage($locale),
+                'inLanguage' => ['en', 'ar'],
+                'publisher' => ['@id' => $organizationId],
             ],
         ];
+
+        $webPage = [
+            '@type' => 'WebPage',
+            '@id' => $url . '#webpage',
+            'name' => self::title($pageTitle, $page, $locale),
+            'url' => $url,
+            'description' => $description,
+            'inLanguage' => $language,
+            'isPartOf' => ['@id' => $websiteId],
+        ];
+
+        $definition = self::pageDefinitions()[$page] ?? [];
+        $isPublicProductPage = ($definition['indexable'] ?? false) && ! in_array($page, ['privacy', 'terms', 'cookies', 'contact'], true);
+        if ($isPublicProductPage) {
+            $webPage['about'] = ['@id' => $appId];
+            $graph[] = self::softwareApplicationNode($appId, $organizationId, $homeUrl, $locale);
+        }
+        $graph[] = $webPage;
+
+        $breadcrumbs = self::breadcrumbs($page, $locale);
+        if (count($breadcrumbs) > 1) {
+            $items = [];
+            foreach ($breadcrumbs as $index => $crumb) {
+                $items[] = [
+                    '@type' => 'ListItem',
+                    'position' => $index + 1,
+                    'name' => $crumb['name'],
+                    'item' => $crumb['url'],
+                ];
+            }
+            $graph[] = ['@type' => 'BreadcrumbList', 'itemListElement' => $items];
+        }
 
         if ($faqItems !== []) {
             $questions = [];
@@ -950,7 +1194,7 @@ class SeoHelper
                 $graph[] = [
                     '@type' => 'FAQPage',
                     'mainEntity' => $questions,
-                    'inLanguage' => self::schemaLanguage($locale),
+                    'inLanguage' => $language,
                 ];
             }
         }
@@ -959,6 +1203,134 @@ class SeoHelper
             '@context' => 'https://schema.org',
             '@graph' => $graph,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . '</script>';
+    }
+
+    /**
+     * Breadcrumb trail (home first) for a page in the given locale.
+     *
+     * @return array<int, array{name: string, url: string}>
+     */
+    public static function breadcrumbs(string $page, ?string $locale = null): array
+    {
+        $locale = self::normalizeLocale($locale);
+        $definition = self::pageDefinitions()[$page] ?? null;
+        if ($page === '' || $page === 'home' || ! is_array($definition) || ! ($definition['indexable'] ?? false)) {
+            return [];
+        }
+
+        $trail = [['name' => $locale === 'ar' ? 'الرئيسية' : 'Home', 'url' => self::pageUrl('home', $locale)]];
+        if (SeoDialectPages::slugForPageKey($page) !== null) {
+            $trail[] = [
+                'name' => $locale === 'ar' ? 'اللهجات العربية' : 'Arabic dialects',
+                'url' => self::pageUrl(SeoDialectPages::HUB_PAGE, $locale),
+            ];
+        }
+        if (SeoEnglishPages::slugForPageKey($page) !== null) {
+            $trail[] = [
+                'name' => $locale === 'ar' ? 'اللكنات الإنجليزية' : 'English accents',
+                'url' => self::pageUrl(SeoEnglishPages::HUB_PAGE, $locale),
+            ];
+        }
+
+        $name = self::localizedOverride("seo_{$page}_title", $locale, $locale === 'ar') ?: self::localizedDefault('title', $page, $locale);
+        $trail[] = ['name' => $name, 'url' => self::pageUrl($page, $locale)];
+
+        return $trail;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function softwareApplicationNode(string $appId, string $organizationId, string $homeUrl, string $locale): array
+    {
+        $node = [
+            '@type' => 'SoftwareApplication',
+            '@id' => $appId,
+            'name' => self::siteName($locale),
+            'url' => $homeUrl,
+            'applicationCategory' => 'MultimediaApplication',
+            'applicationSubCategory' => 'Text to speech',
+            'operatingSystem' => 'Web, Chrome',
+            'description' => self::siteDescription($locale),
+            'inLanguage' => ['ar', 'en'],
+            'featureList' => $locale === 'ar'
+                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى وأكثر من خمسين لكنة عربية', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'ترجمة قبل التحويل إلى صوت', 'استنساخ الصوت', 'إضافة لمتصفح كروم']
+                : ['Arabic and English text to speech', 'Modern Standard Arabic and 50+ Arabic accents', 'HD voices with emotion and performance control', 'Translate before speech', 'Voice cloning', 'Chrome extension'],
+            'publisher' => ['@id' => $organizationId],
+        ];
+
+        $offers = self::planOffers();
+        if ($offers !== null) {
+            $node['offers'] = $offers;
+        }
+
+        $image = self::shareImageUrl($locale);
+        if ($image !== '') {
+            $node['image'] = $image;
+        }
+
+        return $node;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function planOffers(): ?array
+    {
+        try {
+            $prices = \App\Models\Plan::query()->where('is_active', true)->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        if ($prices === []) {
+            return null;
+        }
+
+        return [
+            '@type' => 'AggregateOffer',
+            'priceCurrency' => strtoupper((string) config('cashier.currency', 'usd')),
+            'lowPrice' => number_format(min($prices) / 100, 2, '.', ''),
+            'highPrice' => number_format(max($prices) / 100, 2, '.', ''),
+            'offerCount' => count($prices),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private static function socialProfileUrls(): array
+    {
+        $urls = [];
+        foreach (['twitter', 'github', 'linkedin', 'facebook', 'instagram', 'youtube', 'tiktok'] as $network) {
+            $value = trim((string) SiteSetting::get("footer_social_{$network}_url", ''));
+            if ($value !== '' && Str::startsWith($value, ['http://', 'https://'])) {
+                $urls[] = $value;
+            }
+        }
+
+        return $urls;
+    }
+
+    /**
+     * The image shown when a page is shared: the one set in the dashboard, or
+     * the bundled 1200x630 image in the page's language.
+     */
+    public static function shareImageUrl(?string $locale = null): string
+    {
+        $configured = self::normalizeMediaUrl((string) SiteSetting::get('og_image_url', ''));
+        if ($configured !== '') {
+            return $configured;
+        }
+
+        $locale = self::normalizeLocale($locale);
+
+        return self::versionedAssetUrl(self::publicAssetUrl("images/og/listen-og-{$locale}.png"));
+    }
+
+    private static function usesDefaultShareImage(): bool
+    {
+        return self::normalizeMediaUrl((string) SiteSetting::get('og_image_url', '')) === '';
     }
 
     public static function verificationTags(): string
@@ -1553,7 +1925,7 @@ HTML;
             'privacy' => ['resources/views/legal/privacy.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'terms' => ['resources/views/legal/terms.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'cookies' => ['resources/views/legal/cookies.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
-            'ai_text_to_speech', 'ai_voice_generator', 'text_to_speech_arabic' => ['resources/views/seo/landing-page.blade.php', 'app/Http/Controllers/HomeController.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
+            'ai_text_to_speech', 'ai_voice_generator', 'text_to_speech_arabic', 'text_to_speech' => ['resources/views/seo/landing-page.blade.php', 'app/Http/Controllers/HomeController.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'demo' => ['resources/views/demo.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'login' => ['resources/views/auth/login.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'register' => ['resources/views/auth/register.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
@@ -1561,7 +1933,11 @@ HTML;
             'billing' => ['resources/views/billing.blade.php', 'resources/views/billing-manual.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'manage_subscription' => ['resources/views/manage-subscription.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
             'upgrade' => ['resources/views/upgrade.blade.php', 'lang/en/ui.php', 'lang/ar/ui.php'],
-            default => [],
+            default => match (true) {
+                SeoDialectPages::slugForPageKey($page) !== null, $page === SeoDialectPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php'],
+                SeoEnglishPages::slugForPageKey($page) !== null, $page === SeoEnglishPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoEnglishPages.php', 'app/Support/EnglishAccents.php'],
+                default => [],
+            },
         };
     }
 

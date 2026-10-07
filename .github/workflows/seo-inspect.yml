@@ -1,0 +1,155 @@
+name: SEO inspect
+
+# Read-only SEO snapshot of the live site:
+#  1. From the outside: status, redirects and the SEO tags of public pages,
+#     plus robots.txt, sitemap.xml and llms.txt.
+#  2. Over SSH: SEO-related site settings (no secrets). Nothing is written.
+# Uses the same LIVE_SSH_* secrets as the "Site security check" workflow.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/seo-arabic-english-tts]
+    paths:
+      - .github/workflows/seo-inspect.yml
+      - scripts/seo/**
+
+permissions:
+  contents: write
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: https://listenai.studio
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Redirects and status codes
+        run: |
+          mkdir -p /tmp/report
+          exec > >(tee /tmp/report/01-status.txt) 2>&1
+          for path in / /en /ar /en/ /ar/ /en/pricing /ar/pricing /en/ai-text-to-speech /ar/ai-text-to-speech \
+                      /en/ai-voice-generator /ar/ai-voice-generator /en/text-to-speech-arabic /ar/text-to-speech-arabic \
+                      /en/browsers-extension /ar/browsers-extension /en/contact-us /en/demo /en/login /en/register \
+                      /en/free-trial /sitemap.xml /robots.txt /llms.txt /site.webmanifest /favicon.ico /does-not-exist; do
+            curl -s -o /dev/null --max-time 25 -w "%{http_code}  ${path}  ->  %{redirect_url}  (%{time_total}s, %{size_download}B)\n" "$BASE$path" || echo "ERR $path"
+          done
+
+      - name: Public page SEO tags
+        run: |
+          exec > >(tee /tmp/report/02-pages.txt) 2>&1
+          python3 -u - <<'PY'
+          import re, json, urllib.request, html
+          base = "https://listenai.studio"
+          pages = ["/en", "/ar", "/en/pricing", "/ar/pricing", "/en/ai-text-to-speech", "/ar/ai-text-to-speech",
+                   "/en/ai-voice-generator", "/ar/ai-voice-generator", "/en/text-to-speech-arabic",
+                   "/en/browsers-extension", "/ar/browsers-extension"]
+          def get(url):
+              req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"})
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return r.status, r.geturl(), r.read().decode("utf-8", "replace")
+          for p in pages:
+              print("\n" + "=" * 90 + "\n" + p)
+              try:
+                  status, final, body = get(base + p)
+              except Exception as e:
+                  print("  ERROR", e); continue
+              head = body.split("</head>")[0]
+              def all_(pat, s=head):
+                  return [html.unescape(m) for m in re.findall(pat, s, re.I | re.S)]
+              print("  status", status, "final", final, "bytes", len(body))
+              print("  html lang/dir:", all_(r"<html([^>]*)>", body)[:1])
+              print("  title:", all_(r"<title>(.*?)</title>"))
+              print("  description:", all_(r'<meta\s+name="description"\s+content="(.*?)"'))
+              print("  keywords:", all_(r'<meta\s+name="keywords"\s+content="(.*?)"'))
+              print("  robots:", all_(r'<meta\s+name="robots"\s+content="(.*?)"'))
+              print("  canonical:", all_(r'<link\s+rel="canonical"\s+href="(.*?)"'))
+              print("  hreflang:", all_(r'<link\s+rel="alternate"\s+hreflang="(.*?)"\s+href="(.*?)"'))
+              print("  og:title:", all_(r'<meta\s+property="og:title"\s+content="(.*?)"'))
+              print("  og:image:", all_(r'<meta\s+property="og:image"\s+content="(.*?)"'))
+              print("  verification:", all_(r'<meta\s+name="(google-site-verification|msvalidate\.01)"'))
+              h1 = [re.sub(r"<[^>]+>", " ", h).strip() for h in re.findall(r"<h1[^>]*>(.*?)</h1>", body, re.I | re.S)]
+              h2 = [re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", h)).strip() for h in re.findall(r"<h2[^>]*>(.*?)</h2>", body, re.I | re.S)]
+              print("  h1:", [re.sub(r"\s+", " ", h) for h in h1])
+              print("  h2:", h2[:12])
+              for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
+                  try:
+                      data = json.loads(block)
+                      types = [g.get("@type") for g in data.get("@graph", [data])]
+                      print("  json-ld types:", types)
+                  except Exception as e:
+                      print("  json-ld parse error", e)
+              text = re.sub(r"<script.*?</script>|<style.*?</style>", " ", body, flags=re.S | re.I)
+              text = re.sub(r"<[^>]+>", " ", text)
+              words = len(re.findall(r"\w+", html.unescape(text)))
+              print("  visible words:", words)
+              links = set(re.findall(r'href="(https?://listenai\.studio[^"#?]*|/[a-z]{2}/[^"#?]*)"', body))
+              print("  internal links:", sorted(links)[:40])
+              imgs = re.findall(r"<img[^>]*>", body, re.I)
+              print("  imgs:", len(imgs), "without alt:", sum(1 for i in imgs if "alt=" not in i.lower()))
+          for p in ["/robots.txt", "/llms.txt", "/sitemap.xml"]:
+              print("\n" + "=" * 90 + "\n" + p)
+              try:
+                  print(get(base + p)[2][:6000])
+              except Exception as e:
+                  print("  ERROR", e)
+          PY
+
+      - name: PageSpeed (mobile)
+        continue-on-error: true
+        run: |
+          exec > >(tee /tmp/report/03-pagespeed.txt) 2>&1
+          for path in /en /ar; do
+            curl -s --max-time 120 "https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url=https%3A%2F%2Flistenai.studio${path}&strategy=mobile&category=performance&category=seo&category=accessibility" \
+              | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          if 'error' in d: print('$path', d['error'].get('message')); sys.exit()
+          lh = d['lighthouseResult']
+          print('$path', {k: round(v['score']*100) for k, v in lh['categories'].items() if v.get('score') is not None})
+          for a in ['largest-contentful-paint','cumulative-layout-shift','total-blocking-time','first-contentful-paint','speed-index']:
+              print('   ', a, lh['audits'][a]['displayValue'])
+          for k, a in lh['audits'].items():
+              if a.get('score') is not None and a['score'] < 0.9 and a.get('details', {}).get('type') == 'opportunity':
+                  print('    opportunity:', a['title'], a.get('displayValue',''))
+          " || echo "PSI failed for $path"
+          done
+
+      - name: SEO settings over SSH
+        env:
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          exec > >(tee /tmp/report/04-settings.txt) 2>&1
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::notice::LIVE SSH secrets are not set; skipping."
+            exit 0
+          fi
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < scripts/seo/seo_settings_inspect.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_inspect
+
+      - name: Save report to the seo-inspect-output branch
+        if: always()
+        run: |
+          cd /tmp/report
+          git init -q -b claude/seo-inspect-output
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "SEO inspect report ${{ github.run_id }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:claude/seo-inspect-output

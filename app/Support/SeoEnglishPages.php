@@ -1,0 +1,393 @@
+<?php
+
+namespace App\Support;
+
+use App\Models\VoiceSample;
+use Illuminate\Support\Facades\Cache;
+use Throwable;
+
+/**
+ * Public SEO pages for English accent text to speech: one hub page
+ * (/english-accents) and one page per country (/english-accents/{slug}),
+ * in English and Arabic. Accents come from EnglishAccents, the catalog the
+ * studio uses.
+ */
+final class SeoEnglishPages
+{
+    public const HUB_PAGE = 'english_accents';
+
+    /**
+     * slug => country code, English adjective, Arabic adjective (as in "بلكنة …"),
+     * and one sentence about the accent in each language.
+     *
+     * @var array<string, array{country: string, en: string, ar: string, about_en: string, about_ar: string}>
+     */
+    public const PAGES = [
+        'american' => ['country' => 'US', 'en' => 'American', 'ar' => 'أمريكية',
+            'about_en' => 'American English is the most widely heard accent in film, apps and online video, from General American to a Southern drawl or a New York accent.',
+            'about_ar' => 'الإنجليزية الأمريكية هي اللكنة الأكثر انتشاراً في الأفلام والتطبيقات والفيديو، من الأمريكية العامة إلى اللكنة الجنوبية ولكنة نيويورك.'],
+        'british' => ['country' => 'GB', 'en' => 'British', 'ar' => 'بريطانية',
+            'about_en' => 'British English ranges from standard Received Pronunciation to London, Northern, Scottish and Welsh accents.',
+            'about_ar' => 'تتنوع الإنجليزية البريطانية من اللكنة القياسية إلى لكنات لندن والشمال واسكتلندا وويلز.'],
+        'canadian' => ['country' => 'CA', 'en' => 'Canadian', 'ar' => 'كندية',
+            'about_en' => 'Canadian English sounds close to American English, with its own vowels and a friendly, neutral tone.',
+            'about_ar' => 'الإنجليزية الكندية قريبة من الأمريكية، مع حروف علة خاصة بها ونبرة ودودة ومحايدة.'],
+        'irish' => ['country' => 'IE', 'en' => 'Irish', 'ar' => 'أيرلندية',
+            'about_en' => 'Irish English has a warm, melodic rhythm that stands out in storytelling and advertising.',
+            'about_ar' => 'للإنجليزية الأيرلندية إيقاع دافئ وموسيقي يبرز في القصص والإعلانات.'],
+        'australian' => ['country' => 'AU', 'en' => 'Australian', 'ar' => 'أسترالية',
+            'about_en' => 'Australian English is relaxed and instantly recognisable, popular for travel, lifestyle and friendly brand voices.',
+            'about_ar' => 'الإنجليزية الأسترالية مريحة ومميزة فوراً، ومحبوبة في محتوى السفر وأسلوب الحياة والعلامات التجارية الودودة.'],
+        'new-zealand' => ['country' => 'NZ', 'en' => 'New Zealand', 'ar' => 'نيوزيلندية',
+            'about_en' => 'New Zealand English has its own distinctive vowels, clearly different from Australian speech.',
+            'about_ar' => 'للإنجليزية النيوزيلندية حروف علة مميزة تختلف بوضوح عن اللكنة الأسترالية.'],
+        'south-african' => ['country' => 'ZA', 'en' => 'South African', 'ar' => 'جنوب أفريقية',
+            'about_en' => 'South African English has a crisp, clear delivery shaped by the country\'s many languages.',
+            'about_ar' => 'للإنجليزية الجنوب أفريقية إلقاء واضح ومحدد تأثر بتعدد لغات البلد.'],
+        'indian' => ['country' => 'IN', 'en' => 'Indian', 'ar' => 'هندية',
+            'about_en' => 'Indian English is spoken by hundreds of millions of people and is a natural choice for South Asian audiences.',
+            'about_ar' => 'يتحدث الإنجليزية الهندية مئات الملايين، وهي الخيار الطبيعي لجمهور جنوب آسيا.'],
+        'nigerian' => ['country' => 'NG', 'en' => 'Nigerian', 'ar' => 'نيجيرية',
+            'about_en' => 'Nigerian English is the voice of Africa\'s largest English-speaking audience.',
+            'about_ar' => 'الإنجليزية النيجيرية هي صوت أكبر جمهور ناطق بالإنجليزية في أفريقيا.'],
+        'jamaican' => ['country' => 'JM', 'en' => 'Jamaican', 'ar' => 'جامايكية',
+            'about_en' => 'Jamaican English carries a light, lively Caribbean accent while keeping standard English words.',
+            'about_ar' => 'تحمل الإنجليزية الجامايكية لكنة كاريبية خفيفة ونابضة مع الحفاظ على الكلمات الإنجليزية القياسية.'],
+        'singaporean' => ['country' => 'SG', 'en' => 'Singaporean', 'ar' => 'سنغافورية',
+            'about_en' => 'Singaporean English pairs standard English words with the quick rhythm of Singapore.',
+            'about_ar' => 'تجمع الإنجليزية السنغافورية بين الكلمات الإنجليزية القياسية وإيقاع سنغافورة السريع.'],
+        'arabic-accent' => ['country' => 'AR', 'en' => 'Arabic', 'ar' => 'عربية',
+            'about_en' => 'English with a natural Arabic accent sounds familiar to audiences across the Middle East and North Africa.',
+            'about_ar' => 'الإنجليزية بلكنة عربية طبيعية مألوفة لدى الجمهور في الشرق الأوسط وشمال أفريقيا.'],
+    ];
+
+    /**
+     * @return array<int, string>
+     */
+    public static function slugs(): array
+    {
+        return array_keys(self::PAGES);
+    }
+
+    public static function pageKey(string $slug): string
+    {
+        return 'accent_'.str_replace('-', '_', $slug);
+    }
+
+    public static function slugForPageKey(string $page): ?string
+    {
+        if (! str_starts_with($page, 'accent_')) {
+            return null;
+        }
+
+        $slug = str_replace('_', '-', substr($page, 7));
+
+        return isset(self::PAGES[$slug]) ? $slug : null;
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    public static function pageDefinitions(string $robots): array
+    {
+        $definitions = [
+            self::HUB_PAGE => [
+                'label' => 'English Accents',
+                'title' => 'English Accents Text to Speech',
+                'title_key' => 'ui.seo.english_accents_title',
+                'description' => 'AI text to speech in 18 English accents: American, British, Australian, Canadian, Irish, Indian and more.',
+                'description_key' => 'ui.seo.english_accents_description',
+                'robots' => $robots,
+                'path' => '/english-accents',
+                'localized' => true,
+                'indexable' => true,
+                'generated' => true,
+                'sitemap_priority' => 0.85,
+                'sitemap_change_frequency' => 'weekly',
+            ],
+        ];
+
+        foreach (self::PAGES as $slug => $row) {
+            $definitions[self::pageKey($slug)] = [
+                'label' => $row['en'].' Accent Text to Speech',
+                'title' => self::title($slug, 'en'),
+                'description' => self::description($slug, 'en'),
+                'robots' => $robots,
+                'path' => '/english-accents/'.$slug,
+                'localized' => true,
+                'indexable' => true,
+                'generated' => true,
+                'sitemap_priority' => 0.8,
+                'sitemap_change_frequency' => 'weekly',
+            ];
+        }
+
+        return $definitions;
+    }
+
+    public static function title(string $slug, string $locale): string
+    {
+        $row = self::PAGES[$slug];
+
+        if ($locale === 'ar') {
+            return 'تحويل النص إلى صوت إنجليزي بلكنة '.$row['ar'];
+        }
+
+        return $slug === 'arabic-accent'
+            ? 'English Text to Speech with an Arabic Accent'
+            : $row['en'].' Accent Text to Speech';
+    }
+
+    public static function description(string $slug, string $locale): string
+    {
+        $row = self::PAGES[$slug];
+        $accents = self::accents($slug);
+
+        if ($locale === 'ar') {
+            $names = implode('، ', array_map(fn (array $a): string => self::shortName($a['ar']), $accents));
+
+            return 'حوّل النص إلى صوت إنجليزي طبيعي بلكنة '.$row['ar'].' بالذكاء الاصطناعي'
+                .(count($accents) > 1 ? ' ('.$names.')' : '')
+                .'. اكتب بالعربية أو الإنجليزية، وحمّل MP3، وجرّبه مجاناً مع منصة إسمع.';
+        }
+
+        $names = implode(', ', array_map(fn (array $a): string => self::shortName($a['en']), $accents));
+        $subject = $slug === 'arabic-accent' ? 'English with a natural Arabic accent' : $row['en'].' English';
+
+        return 'Turn text into natural '.$subject.' speech with AI'
+            .(count($accents) > 1 ? ' ('.$names.')' : '')
+            .'. Write in English or Arabic, download MP3, free to try on Listen.';
+    }
+
+    /**
+     * @return array<int, array{code: string, en: string, ar: string, prompt: string}>
+     */
+    public static function accents(string $slug): array
+    {
+        $country = self::PAGES[$slug]['country'] ?? '';
+        $rows = [];
+        foreach (EnglishAccents::ALL as $code => $row) {
+            if ($row['country'] === $country) {
+                $rows[] = ['code' => $code, 'en' => $row['en'], 'ar' => $row['ar'], 'prompt' => $row['prompt']];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function content(string $slug, string $locale): array
+    {
+        $row = self::PAGES[$slug];
+        $accents = self::accents($slug);
+
+        if ($locale === 'ar') {
+            $accent = 'بلكنة '.$row['ar'];
+            $names = implode('، ', array_map(fn (array $a): string => $a['ar'], $accents));
+
+            return [
+                'eyebrow' => 'صوت إنجليزي '.$accent,
+                'h1' => self::title($slug, 'ar'),
+                'intro' => $row['about_ar'].' مع منصة إسمع تكتب نصك بالإنجليزية، أو بالعربية مع الترجمة المدمجة، وتحصل على تعليق صوتي إنجليزي '.$accent.' جاهز للتحميل خلال ثوانٍ.',
+                'accents_title' => count($accents) > 1 ? 'اللكنات المتاحة' : 'اللكنة المتاحة',
+                'accents_intro' => count($accents) > 1 ? 'اختر من داخل الاستوديو: '.$names.'.' : 'متاحة من داخل الاستوديو مع جميع الأصوات عالية الدقة.',
+                'accents' => array_map(fn (array $a): array => ['title' => $a['ar'], 'body' => ''], $accents),
+                'highlights_title' => 'لماذا منصة إسمع للصوت الإنجليزي؟',
+                'highlights_intro' => 'صوت إنجليزي طبيعي، مع ميزة لا تجدها في الأدوات الأخرى: اكتب بالعربية واسمع بالإنجليزية.',
+                'highlights' => [
+                    ['title' => 'اكتب بالعربية، اسمع بالإنجليزية', 'body' => 'الترجمة المدمجة تحوّل نصك العربي إلى إنجليزية قبل توليد الصوت '.$accent.'.'],
+                    ['title' => 'أصوات عالية الدقة مع تحكم في الأداء', 'body' => 'اختر النبرة والمشاعر وأسلوب الإلقاء: إعلاني، قصصي، تعليمي، أو حواري.'],
+                    ['title' => 'نسخة عربية ونسخة إنجليزية من مكان واحد', 'body' => 'أنشئ المحتوى نفسه بالإنجليزية وبأي لهجة عربية دون التنقل بين أدوات.'],
+                ],
+                'use_cases_title' => 'استخدامات شائعة',
+                'use_cases_intro' => 'تعليق صوتي إنجليزي '.$accent.' لكل ما تنشره.',
+                'use_cases' => [
+                    ['title' => 'فيديوهات يوتيوب وتيك توك والإعلانات', 'body' => 'تعليق صوتي إنجليزي احترافي لجمهورك الدولي.'],
+                    ['title' => 'الدورات وتعلم الإنجليزية', 'body' => 'دروس مسموعة ونطق واضح يساعد على التعلم والاستماع.'],
+                    ['title' => 'عروض المنتجات والشركات', 'body' => 'شروحات وعروض تقديمية بصوت إنجليزي واثق.'],
+                    ['title' => 'الكتب الصوتية والقصص', 'body' => 'حوّل المقالات والقصص الإنجليزية إلى محتوى مسموع.'],
+                ],
+                'faq_title' => 'الأسئلة الشائعة',
+                'faqs' => [
+                    ['question' => 'هل يمكنني كتابة النص بالعربية والحصول على صوت إنجليزي '.$accent.'؟', 'answer' => 'نعم، فعّل الترجمة في الاستوديو فيُترجم النص إلى الإنجليزية ثم يُحوَّل إلى صوت باللكنة التي تختارها.'],
+                    ['question' => 'ما اللكنات المتاحة؟', 'answer' => $names.'. وتتوفر لكنات إنجليزية أخرى من صفحة اللكنات الإنجليزية.'],
+                    ['question' => 'هل يمكن التجربة مجاناً؟', 'answer' => 'نعم، أنشئ حساباً مجانياً وجرّب الأصوات من صفحة التجربة.'],
+                    ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
+                ],
+                'cta_title' => 'ابدأ التعليق الصوتي الإنجليزي '.$accent,
+                'cta_body' => 'أنشئ حسابك المجاني واسمع نصك خلال ثوانٍ.',
+                'cta_primary' => 'أنشئ حسابك المجاني',
+            ];
+        }
+
+        $accentName = $slug === 'arabic-accent' ? 'an Arabic accent' : 'a '.$row['en'].' accent';
+        $names = implode(', ', array_map(fn (array $a): string => $a['en'], $accents));
+
+        return [
+            'eyebrow' => $row['en'].' accent AI voice',
+            'h1' => self::title($slug, 'en'),
+            'intro' => $row['about_en'].' With Listen you write your script in English, or in Arabic with built-in translation, and get a natural English voiceover with '.$accentName.', ready to download in seconds.',
+            'accents_title' => count($accents) > 1 ? 'Accents you can choose' : 'Available accent',
+            'accents_intro' => count($accents) > 1 ? 'Pick one in the studio: '.$names.'.' : 'Available in the studio with every HD voice.',
+            'accents' => array_map(fn (array $a): array => ['title' => $a['en'].' · '.$a['ar'], 'body' => $a['prompt'].'.'], $accents),
+            'highlights_title' => 'Why Listen for English voiceovers',
+            'highlights_intro' => 'Natural English voices, plus something other tools don\'t do: write in Arabic, hear it in English.',
+            'highlights' => [
+                ['title' => 'Write in Arabic, hear English', 'body' => 'Built-in translation turns your Arabic script into English before it is spoken with '.$accentName.'.'],
+                ['title' => 'HD voices with performance control', 'body' => 'Set tone, emotion and delivery: advert, storytelling, teaching or conversational.'],
+                ['title' => 'English and Arabic from one place', 'body' => 'Produce the same content in English and in any Arabic dialect without switching tools.'],
+            ],
+            'use_cases_title' => 'Popular uses',
+            'use_cases_intro' => 'English voiceovers with '.$accentName.' for everything you publish.',
+            'use_cases' => [
+                ['title' => 'YouTube, TikTok and ads', 'body' => 'Professional English narration for international audiences.'],
+                ['title' => 'Courses and language learning', 'body' => 'Clear spoken lessons and pronunciation practice.'],
+                ['title' => 'Product demos and presentations', 'body' => 'Explainers and pitches in a confident English voice.'],
+                ['title' => 'Audiobooks and stories', 'body' => 'Turn English articles and stories into audio.'],
+            ],
+            'faq_title' => 'Frequently asked questions',
+            'faqs' => [
+                ['question' => 'Can I write in Arabic and get English audio with '.$accentName.'?', 'answer' => 'Yes. Turn on translation in the studio and your script is translated into English, then spoken in the accent you choose.'],
+                ['question' => 'Which accents are available?', 'answer' => $names.'. More English accents are listed on the English accents page.'],
+                ['question' => 'Can I try it for free?', 'answer' => 'Yes. Create a free account and try the voices in the demo.'],
+                ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'Every clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
+            ],
+            'cta_title' => 'Start your English voiceover',
+            'cta_body' => 'Create a free account and hear your script with '.$accentName.' in seconds.',
+            'cta_primary' => 'Create your free account',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public static function hubContent(string $locale): array
+    {
+        $count = count(EnglishAccents::ALL);
+        $countries = count(EnglishAccents::COUNTRIES) - 1;
+
+        if ($locale === 'ar') {
+            return [
+                'eyebrow' => 'اللكنات الإنجليزية',
+                'h1' => 'تحويل النص إلى صوت إنجليزي بكل اللكنات',
+                'intro' => 'منصة إسمع تتكلم الإنجليزية بـ'.$count.' لكنة من '.$countries.' دولة: الأمريكية والبريطانية والأسترالية والكندية والأيرلندية والهندية وغيرها، بالإضافة إلى الإنجليزية بلكنة عربية. اكتب بالإنجليزية أو بالعربية مع الترجمة واختر اللكنة.',
+                'faq_title' => 'الأسئلة الشائعة',
+                'faqs' => [
+                    ['question' => 'كم لكنة إنجليزية تدعمها منصة إسمع؟', 'answer' => $count.' لكنة من '.$countries.' دولة، بالإضافة إلى الإنجليزية بلكنة عربية.'],
+                    ['question' => 'هل يمكنني الكتابة بالعربية والحصول على صوت إنجليزي؟', 'answer' => 'نعم، فعّل الترجمة في الاستوديو فيُترجم النص ثم يُحوَّل إلى صوت إنجليزي.'],
+                    ['question' => 'هل يمكن التجربة مجاناً؟', 'answer' => 'نعم، أنشئ حساباً مجانياً وجرّب الأصوات واللكنات من صفحة التجربة.'],
+                ],
+                'cta_title' => 'اسمع نصك بالإنجليزية',
+                'cta_body' => 'أنشئ حسابك المجاني واختر من '.$count.' لكنة إنجليزية.',
+                'cta_primary' => 'أنشئ حسابك المجاني',
+            ];
+        }
+
+        return [
+            'eyebrow' => 'English accents',
+            'h1' => 'English Text to Speech in Every Major Accent',
+            'intro' => 'Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, plus English with an Arabic accent. Write in English, or in Arabic with translation, and pick the accent.',
+            'faq_title' => 'Frequently asked questions',
+            'faqs' => [
+                ['question' => 'How many English accents does Listen support?', 'answer' => $count.' accents from '.$countries.' countries, plus English with an Arabic accent.'],
+                ['question' => 'Can I write in Arabic and get English audio?', 'answer' => 'Yes. Turn on translation in the studio and your script is translated, then spoken in English.'],
+                ['question' => 'Can I try it for free?', 'answer' => 'Yes. Create a free account and try the voices and accents in the demo.'],
+            ],
+            'cta_title' => 'Hear your script in English',
+            'cta_body' => 'Create a free account and choose from '.$count.' English accents.',
+            'cta_primary' => 'Create your free account',
+        ];
+    }
+
+    /**
+     * Hub cards in the shape the landing view renders.
+     *
+     * @return array<int, array{region: string, items: array<int, array{url: string, label: string, accents: int}>}>
+     */
+    public static function hubGroups(string $locale): array
+    {
+        $items = [];
+        foreach (self::PAGES as $slug => $row) {
+            $items[] = [
+                'url' => route('seo.accent', ['accent' => $slug]),
+                'label' => self::label($slug, $locale),
+                'accents' => count(self::accents($slug)),
+            ];
+        }
+
+        return [['region' => $locale === 'ar' ? 'اللكنات' : 'Accents', 'items' => $items]];
+    }
+
+    /**
+     * @return array<int, array{slug: string, label: string}>
+     */
+    public static function popular(string $locale, int $limit = 6): array
+    {
+        $links = [];
+        foreach (array_slice(['american', 'british', 'australian', 'canadian', 'irish', 'indian', 'arabic-accent'], 0, $limit) as $slug) {
+            $links[] = ['slug' => $slug, 'label' => self::label($slug, $locale)];
+        }
+
+        return $links;
+    }
+
+    public static function label(string $slug, string $locale): string
+    {
+        $row = self::PAGES[$slug];
+
+        if ($locale === 'ar') {
+            return 'إنجليزي بلكنة '.$row['ar'];
+        }
+
+        return $slug === 'arabic-accent' ? 'English, Arabic accent' : $row['en'].' English';
+    }
+
+    /**
+     * A real English sample for the page's accent, when one exists.
+     *
+     * @return array{text: string, audio_url: string, lang?: string}|null
+     */
+    public static function sample(string $slug): ?array
+    {
+        $codes = array_map(fn (array $a): string => $a['code'], self::accents($slug));
+        if ($codes === []) {
+            return null;
+        }
+
+        try {
+            return Cache::remember('seo_accent_sample:'.$slug, 600, function () use ($codes): ?array {
+                $samples = VoiceSample::query()
+                    ->active()
+                    ->where('category', 'hero')
+                    ->where('language', 'en')
+                    ->whereIn('dialect', $codes)
+                    ->orderByDesc('is_featured')
+                    ->ordered()
+                    ->get();
+
+                foreach ($codes as $code) {
+                    $sample = $samples->first(fn (VoiceSample $s): bool => strcasecmp((string) $s->dialect, $code) === 0
+                        && trim((string) $s->audio_path) !== '');
+                    if ($sample) {
+                        return [
+                            'text' => trim((string) $sample->sample_text),
+                            'audio_url' => AudioUrl::fromPath(ltrim((string) $sample->audio_path, '/')),
+                            'lang' => 'en',
+                        ];
+                    }
+                }
+
+                return null;
+            });
+        } catch (Throwable) {
+            return null;
+        }
+    }
+
+    private static function shortName(string $name): string
+    {
+        return preg_match('/\(([^)]+)\)/u', $name, $m) ? $m[1] : $name;
+    }
+}

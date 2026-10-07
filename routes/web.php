@@ -125,6 +125,15 @@ Route::group([
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
     Route::get('/ai-voice-generator', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_voice_generator')->name('seo.ai-voice-generator');
     Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');
+    Route::get('/text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech')->name('seo.text-to-speech');
+    Route::get('/arabic-dialects', [HomeController::class, 'dialectHubPage'])->name('seo.arabic-dialects');
+    Route::get('/arabic-dialects/{dialect}', [HomeController::class, 'dialectPage'])
+        ->whereIn('dialect', \App\Support\SeoDialectPages::slugs())
+        ->name('seo.dialect');
+    Route::get('/english-accents', [HomeController::class, 'accentHubPage'])->name('seo.english-accents');
+    Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
+        ->whereIn('accent', \App\Support\SeoEnglishPages::slugs())
+        ->name('seo.accent');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');

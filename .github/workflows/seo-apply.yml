@@ -1,0 +1,72 @@
+name: SEO settings apply
+
+# Updates the live SEO site settings with scripts/seo/apply_seo_settings.php.
+# The mode comes from scripts/seo/apply_mode.txt: "dry-run" (default) only
+# prints current and new values; "apply" writes them after saving a backup on
+# the server; "restore <backup file>" puts a backup back.
+# Uses the same LIVE_SSH_* secrets as the "Site security check" workflow.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [claude/seo-arabic-english-tts]
+    paths:
+      - .github/workflows/seo-apply.yml
+      - scripts/seo/apply_seo_settings.php
+      - scripts/seo/apply_mode.txt
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run on live over SSH
+        env:
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/report
+          mode="$(head -n1 scripts/seo/apply_mode.txt 2>/dev/null | tr -d '\r' || true)"
+          case "$mode" in
+            apply) envs="APPLY=1" ;;
+            restore\ *) envs="RESTORE=$(printf '%s' "${mode#restore }" | tr -cd 'A-Za-z0-9._-')" ;;
+            *) envs="" ;;
+          esac
+          echo "mode: ${mode:-dry-run}"
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_apply
+          chmod 600 ~/.ssh/id_apply
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; $envs php"
+          ssh -i ~/.ssh/id_apply -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/seo/apply_seo_settings.php | tee /tmp/report/05-apply.json
+          rm -f ~/.ssh/id_apply
+
+      - name: Check live pages after the run
+        run: |
+          sleep 70
+          for path in /en /ar /en/pricing /ar/pricing /en/login /robots.txt; do
+            echo "== $path"
+            curl -s --max-time 25 "https://listenai.studio$path" | grep -oE '<title>[^<]*|<meta name="(description|robots)" content="[^"]*"|^Sitemap:.*' | head -4
+          done | tee /tmp/report/06-after.txt
+
+      - name: Save report to the seo-inspect-output branch
+        if: always()
+        run: |
+          cd /tmp/report
+          git init -q -b claude/seo-inspect-output
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -qm "SEO apply report ${{ github.run_id }}"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" HEAD:claude/seo-inspect-output

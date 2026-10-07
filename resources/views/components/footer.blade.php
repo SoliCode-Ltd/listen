@@ -90,6 +90,36 @@
         </div>
 
         <div class="footer-column">
+          <h4>{{ __('ui.footer.solutions') }}</h4>
+          <ul>
+            <li><a href="{{ route('seo.text-to-speech') }}">{{ __('ui.nav.text_to_speech') }}</a></li>
+            <li><a href="{{ route('seo.ai-text-to-speech') }}">{{ __('ui.nav.ai_text_to_speech') }}</a></li>
+            <li><a href="{{ route('seo.text-to-speech-arabic') }}">{{ __('ui.nav.text_to_speech_arabic') }}</a></li>
+            <li><a href="{{ route('seo.ai-voice-generator') }}">{{ __('ui.nav.ai_voice_generator') }}</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>{{ __('ui.nav.arabic_dialects') }}</h4>
+          <ul>
+            @foreach(\App\Support\SeoDialectPages::popular($currentLocale === 'ar' ? 'ar' : 'en', 6) as $dialectLink)
+              <li><a href="{{ route('seo.dialect', ['dialect' => $dialectLink['slug']]) }}">{{ $dialectLink['label'] }}</a></li>
+            @endforeach
+            <li><a href="{{ route('seo.arabic-dialects') }}">{{ $currentLocale === 'ar' ? 'كل اللهجات' : 'All dialects' }}</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
+          <h4>{{ __('ui.nav.english_accents') }}</h4>
+          <ul>
+            @foreach(\App\Support\SeoEnglishPages::popular($currentLocale === 'ar' ? 'ar' : 'en', 6) as $accentLink)
+              <li><a href="{{ route('seo.accent', ['accent' => $accentLink['slug']]) }}">{{ $accentLink['label'] }}</a></li>
+            @endforeach
+            <li><a href="{{ route('seo.english-accents') }}">{{ $currentLocale === 'ar' ? 'كل اللكنات' : 'All accents' }}</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-column">
           <h4>{{ __('ui.footer.legal') }}</h4>
           <ul>
             <li><a href="{{ route('legal.privacy') }}">{{ __('ui.footer.privacy') }}</a></li>
