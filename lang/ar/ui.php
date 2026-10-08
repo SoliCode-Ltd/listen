@@ -1211,6 +1211,8 @@ return [
         'demo_voice_generation_failed' => 'فشل توليد الصوت. يرجى المحاولة مرة أخرى.',
         'demo_too_many_requests' => 'طلبات كثيرة جداً. يرجى الانتظار :seconds ثانية.',
         'demo_preview_capacity_reached' => 'تم الوصول إلى الحد الأقصى للمعاينة. يرجى المحاولة لاحقاً.',
+        'demo_daily_limit_reached' => 'لقد وصلت إلى حد التجربة لهذا اليوم. يرجى المحاولة غداً.',
+        'demo_access_blocked' => 'التجربة غير متاحة من هذا المتصفح. يرجى التواصل مع الدعم إذا كنت تعتقد أن هذا خطأ.',
         'demo_daily_request_limit' => 'تم الوصول إلى الحد اليومي للطلبات.',
         'demo_access_restricted' => 'تم تقييد الوصول للتجربة. يرجى إنشاء حساب للمتابعة.',
         'demo_language_not_available_for_quality' => 'هذه اللغة غير متاحة للجودة المحددة.',

@@ -405,6 +405,10 @@ class GeminiTtsProvider implements TtsProviderInterface
         $charCount = mb_strlen($text);
         $startTime = microtime(true);
 
+        // Over the daily ceiling this throws, and routing falls back to Google if allowed.
+        $guardrail = app(TtsCostGuardrail::class);
+        $guardrail->assertCanSynthesize($this->name(), $charCount);
+
         if (!$this->isAvailable()) {
             throw new \RuntimeException('Gemini TTS API key is not configured.');
         }
@@ -452,6 +456,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         // Record successful usage for current key
         // Count it against the key that answered (it may have rotated).
         $this->getKeyManager()->recordUsage(($this->currentKeyInfo ?? $keyInfo)['name'], $charCount);
+        $guardrail->record($this->name(), $charCount);
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
 
