@@ -65,6 +65,10 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('TTS text is empty.');
         }
 
+        $guardrail = app(TtsCostGuardrail::class);
+        $inputChars = mb_strlen($text);
+        $guardrail->assertCanSynthesize($this->name(), $inputChars);
+
         $startTime = microtime(true);
 
         $voiceName = $this->resolveGoogleVoiceName(
@@ -131,6 +135,7 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
         $charCount = mb_strlen($text);
+        $guardrail->record($this->name(), $inputChars);
 
         return [
             'audio_path' => $filename,

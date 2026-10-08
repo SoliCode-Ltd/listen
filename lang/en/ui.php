@@ -1206,6 +1206,8 @@ return [
         'demo_voice_generation_failed' => 'Voice generation failed. Please try again.',
         'demo_too_many_requests' => 'Too many requests. Please wait :seconds seconds.',
         'demo_preview_capacity_reached' => 'Preview capacity reached. Please try again later.',
+        'demo_daily_limit_reached' => 'You have reached today\'s demo limit. Please try again tomorrow.',
+        'demo_access_blocked' => 'The demo is not available from this browser. Please contact support if you think this is a mistake.',
         'demo_daily_request_limit' => 'Daily request limit reached.',
         'demo_access_restricted' => 'Demo access restricted. Please create an account to continue.',
         'demo_language_not_available_for_quality' => 'This language is not available for the selected quality.',

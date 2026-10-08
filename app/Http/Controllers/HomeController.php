@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Billing\TrialEligibilityService;
+use App\Services\DemoFraudService;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\Referral\DemoRewardLedgerService;
@@ -24,6 +25,7 @@ use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -35,6 +37,11 @@ use Illuminate\Validation\ValidationException;
 class HomeController extends Controller
 {
     private const DEMO_DEVICE_COOKIE = 'listen_demo_device';
+
+    private const DEMO_QUOTA_LOCK = 'demo:quota:lock';
+
+    // A request that dies mid-generation must not hold its chars forever.
+    private const DEMO_PENDING_TTL_SECONDS = 600;
 
     public function __construct(
         private readonly PlanAccessService $planAccessService,
@@ -589,6 +596,13 @@ class HomeController extends Controller
                 );
             }
 
+            // The stored row now counts these chars. If storing failed, the
+            // reservation is left to expire so the audio is still charged for a while.
+            $quotaReserved = false;
+            if ($generation !== null) {
+                $this->releaseDemoReservation($userId, (int) $estimate['chars']);
+            }
+
             // Trigger first-demo-generation qualification check for referrals.
             // Safe to call on every generation — idempotent via conversion status.
             try {
@@ -662,11 +676,28 @@ class HomeController extends Controller
         }
     }
 
+    /**
+     * Checks every demo limit and, when $commit is true, reserves the chars.
+     *
+     * The check and the reservation run under one lock, and reserved chars
+     * count as used until releaseDemoReservation() runs. Without that, many
+     * requests sent at once all saw the same "used" total and all passed.
+     */
     private function enforceDemoPolicy(Request $request, int $chars, bool $preview, bool $commit = true): array
     {
         $user = $request->user();
         $userId = (int) $user->id;
         $scope = $preview ? 'preview' : 'check';
+
+        $blockReason = app(DemoFraudService::class)->demoBlockReason($request);
+        if ($blockReason !== null) {
+            Log::warning('Demo request refused.', ['user_id' => $userId, 'reason' => $blockReason]);
+
+            throw ValidationException::withMessages([
+                'text' => __('ui.backend.demo_access_blocked'),
+            ]);
+        }
+
         $maxPerMinute = max(1, (int) config("listen.demo.{$scope}.user_rate_per_minute", 10));
 
         // Rate limiting per user
@@ -679,12 +710,57 @@ class HomeController extends Controller
         }
         RateLimiter::hit($rateKey, 60);
 
-        // Lifetime trial cap — shared across IP-linked and fingerprint-linked accounts.
+        try {
+            Cache::lock(self::DEMO_QUOTA_LOCK, 10)->block(5, function () use ($request, $user, $userId, $scope, $chars, $preview, $commit): void {
+                $this->assertDemoLimits($request, $user, $userId, $scope, $chars, $preview, $commit);
+            });
+        } catch (LockTimeoutException) {
+            throw ValidationException::withMessages([
+                'text' => __('ui.backend.demo_too_many_requests', ['seconds' => 5]),
+            ]);
+        }
+
+        return $this->demoQuotaForClient($request);
+    }
+
+    /**
+     * Runs inside the demo quota lock.
+     */
+    private function assertDemoLimits(Request $request, User $user, int $userId, string $scope, int $chars, bool $preview, bool $commit): void
+    {
+        $day = now()->format('Ymd');
+        $dayEnd = now()->endOfDay();
+
+        // Per-user daily caps. The check endpoint generates nothing, so only
+        // its request count is capped; previews are capped on chars too.
+        $userRequestKey = "demo:req:{$day}:{$scope}:u:{$userId}";
+        $userRequestCap = max(1, (int) config("listen.demo.{$scope}.user_daily_requests", 150));
+        $userUsedRequests = (int) Cache::get($userRequestKey, 0);
+        if (($userUsedRequests + 1) > $userRequestCap) {
+            throw ValidationException::withMessages([
+                'text' => __('ui.backend.demo_daily_limit_reached'),
+            ]);
+        }
+
+        $userCharKey = "demo:chars:{$day}:preview:u:{$userId}";
+        $userUsedChars = (int) Cache::get($userCharKey, 0);
+        if ($preview) {
+            $userCharCap = max(1, (int) config('listen.demo.preview.user_daily_chars', 50000));
+            if (($userUsedChars + $chars) > $userCharCap) {
+                throw ValidationException::withMessages([
+                    'text' => __('ui.backend.demo_daily_limit_reached'),
+                ]);
+            }
+        }
+
+        // Lifetime trial cap — shared across IP-linked and fingerprint-linked accounts,
+        // counting chars that are still being generated for any of them.
         // Referral reward characters (when present) act as an overflow bucket
         // consumed only AFTER the base lifetime cap is exhausted, so users see
         // their base allowance drain naturally first.
+        $linkedIds = $this->demoLinkedUserIds($userId, $request);
         $lifetimeCap = $this->demoCharAllowance($request);
-        $usedChars = $this->trialUsedCharsByUser($userId, $request);
+        $usedChars = $this->usedDemoCharsForUserIds($linkedIds) + $this->pendingDemoChars($linkedIds);
         $overflowNeeded = max(0, ($usedChars + $chars) - $lifetimeCap);
         $rewardBalance = app(DemoRewardLedgerService::class)->balanceFor($user);
 
@@ -695,10 +771,12 @@ class HomeController extends Controller
         }
 
         // Global preview capacity
+        $globalRequestKey = "demo:req:{$day}:preview:global";
+        $globalCharKey = "demo:chars:{$day}:preview:global";
+        $globalUsedRequests = (int) Cache::get($globalRequestKey, 0);
+        $globalUsedChars = (int) Cache::get($globalCharKey, 0);
         if ($preview) {
             $globalRequestCap = max(1, (int) config('listen.demo.global_preview_daily_requests', 3000));
-            $globalRequestKey = 'demo:req:'.now()->format('Ymd').':preview:global';
-            $globalUsedRequests = (int) Cache::get($globalRequestKey, 0);
             if (($globalUsedRequests + 1) > $globalRequestCap) {
                 throw ValidationException::withMessages([
                     'text' => __('ui.backend.demo_preview_capacity_reached'),
@@ -706,33 +784,66 @@ class HomeController extends Controller
             }
 
             $globalCharCap = max(1, (int) config('listen.demo.global_preview_daily_chars', 500000));
-            $globalCharKey = 'demo:chars:'.now()->format('Ymd').':preview:global';
-            $globalUsedChars = (int) Cache::get($globalCharKey, 0);
             if (($globalUsedChars + $chars) > $globalCharCap) {
                 throw ValidationException::withMessages([
                     'text' => __('ui.backend.demo_preview_capacity_reached'),
                 ]);
             }
-
-            if ($commit) {
-                Cache::put($globalRequestKey, $globalUsedRequests + 1, now()->endOfDay());
-                Cache::put($globalCharKey, $globalUsedChars + $chars, now()->endOfDay());
-            }
         }
 
-        return $this->demoQuotaForClient($request);
+        Cache::put($userRequestKey, $userUsedRequests + 1, $dayEnd);
+
+        if ($preview && $commit) {
+            Cache::put($userCharKey, $userUsedChars + $chars, $dayEnd);
+            Cache::put($globalRequestKey, $globalUsedRequests + 1, $dayEnd);
+            Cache::put($globalCharKey, $globalUsedChars + $chars, $dayEnd);
+
+            $pendingKey = $this->pendingDemoCharsKey($userId);
+            Cache::put($pendingKey, (int) Cache::get($pendingKey, 0) + $chars, self::DEMO_PENDING_TTL_SECONDS);
+        }
+    }
+
+    /**
+     * The generation has been stored (or failed), so its chars no longer
+     * need holding as pending.
+     */
+    private function releaseDemoReservation(int $userId, int $chars): void
+    {
+        $this->withDemoQuotaLock(function () use ($userId, $chars): void {
+            $this->decrementCacheCounter($this->pendingDemoCharsKey($userId), $chars, now()->addSeconds(self::DEMO_PENDING_TTL_SECONDS));
+        });
     }
 
     private function rollbackDemoPolicy(Request $request, int $chars, bool $preview): array
     {
         if ($preview) {
-            $globalRequestKey = 'demo:req:'.now()->format('Ymd').':preview:global';
-            $globalCharKey = 'demo:chars:'.now()->format('Ymd').':preview:global';
-            $this->decrementCacheCounter($globalRequestKey, 1, now()->endOfDay());
-            $this->decrementCacheCounter($globalCharKey, $chars, now()->endOfDay());
+            $userId = (int) $request->user()->id;
+            $day = now()->format('Ymd');
+            $dayEnd = now()->endOfDay();
+
+            $this->withDemoQuotaLock(function () use ($userId, $chars, $day, $dayEnd): void {
+                $this->decrementCacheCounter("demo:req:{$day}:preview:u:{$userId}", 1, $dayEnd);
+                $this->decrementCacheCounter("demo:chars:{$day}:preview:u:{$userId}", $chars, $dayEnd);
+                $this->decrementCacheCounter("demo:req:{$day}:preview:global", 1, $dayEnd);
+                $this->decrementCacheCounter("demo:chars:{$day}:preview:global", $chars, $dayEnd);
+                $this->decrementCacheCounter($this->pendingDemoCharsKey($userId), $chars, now()->addSeconds(self::DEMO_PENDING_TTL_SECONDS));
+            });
         }
 
         return $this->demoQuotaForClient($request);
+    }
+
+    /**
+     * Releasing must never fail the request: if the lock is busy the
+     * counters are corrected anyway, and pending chars expire on their own.
+     */
+    private function withDemoQuotaLock(callable $callback): void
+    {
+        try {
+            Cache::lock(self::DEMO_QUOTA_LOCK, 10)->block(5, $callback);
+        } catch (LockTimeoutException) {
+            $callback();
+        }
     }
 
     private function decrementCacheCounter(string $key, int $amount, \DateTimeInterface $ttl): void
@@ -740,6 +851,25 @@ class HomeController extends Controller
         $current = (int) Cache::get($key, 0);
         $next = max(0, $current - max(0, $amount));
         Cache::put($key, $next, $ttl);
+    }
+
+    private function pendingDemoCharsKey(int $userId): string
+    {
+        return "demo:pending_chars:u:{$userId}";
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     */
+    private function pendingDemoChars(array $userIds): int
+    {
+        if ($userIds === []) {
+            return 0;
+        }
+
+        $keys = array_map(fn (int $id) => $this->pendingDemoCharsKey($id), $userIds);
+
+        return (int) array_sum(array_map('intval', Cache::many($keys)));
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, string $tier): string
@@ -1120,6 +1250,26 @@ class HomeController extends Controller
 
     private function trialUsedCharsByUser(int $userId, ?Request $request = null): int
     {
+        return $this->usedDemoCharsForUserIds($this->demoLinkedUserIds($userId, $request));
+    }
+
+    /**
+     * @param  list<int>  $userIds
+     */
+    private function usedDemoCharsForUserIds(array $userIds): int
+    {
+        return (int) (DemoVoiceGeneration::query()
+            ->whereIn('user_id', $userIds)
+            ->sum('billable_chars') ?? 0);
+    }
+
+    /**
+     * The user plus every account that shares an IP, device or fingerprint with them.
+     *
+     * @return list<int>
+     */
+    private function demoLinkedUserIds(int $userId, ?Request $request = null): array
+    {
         $userIds = $this->ipLinkedUserIds($userId);
         $deviceLinkedIds = $this->deviceLinkedUserIds($userId, $request);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
@@ -1130,16 +1280,12 @@ class HomeController extends Controller
         // it would pool demo chars across unrelated users who simply share the
         // same browser version.
 
-        $allIds = array_values(array_unique(array_merge(
+        return array_values(array_unique(array_merge(
             $userIds,
             $deviceLinkedIds,
             $fpLinkedIds,
             $requestIpLinkedIds
         )));
-
-        return (int) (DemoVoiceGeneration::query()
-            ->whereIn('user_id', $allIds)
-            ->sum('billable_chars') ?? 0);
     }
 
     /**
@@ -1198,34 +1344,31 @@ class HomeController extends Controller
      */
     private function ipLinkedUserIds(int $userId): array
     {
-        $cacheKey = "demo:ip_linked_users:{$userId}";
+        // Not cached: a second account made a minute ago must count at once.
+        $user = User::query()->find($userId);
+        if (! $user) {
+            return [$userId];
+        }
 
-        return Cache::remember($cacheKey, 120, static function () use ($userId): array {
-            $user = \App\Models\User::query()->find($userId);
-            if (! $user) {
-                return [$userId];
-            }
+        $ips = array_values(array_unique(array_filter([
+            $user->registration_ip,
+            $user->last_login_ip,
+        ])));
 
-            $ips = array_values(array_unique(array_filter([
-                $user->registration_ip,
-                $user->last_login_ip,
-            ])));
+        if ($ips === []) {
+            return [$userId];
+        }
 
-            if ($ips === []) {
-                return [$userId];
-            }
+        $linkedIds = User::query()
+            ->where(function ($q) use ($ips) {
+                $q->whereIn('registration_ip', $ips)
+                  ->orWhereIn('last_login_ip', $ips);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-            $linkedIds = \App\Models\User::query()
-                ->where(function ($q) use ($ips) {
-                    $q->whereIn('registration_ip', $ips)
-                      ->orWhereIn('last_login_ip', $ips);
-                })
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
-
-            return $linkedIds !== [] ? $linkedIds : [$userId];
-        });
+        return $linkedIds !== [] ? $linkedIds : [$userId];
     }
 
     /**
@@ -1243,24 +1386,20 @@ class HomeController extends Controller
             return [$userId];
         }
 
-        $cacheKey = "demo:req_ip_linked:{$requestIp}";
+        $linkedIds = User::query()
+            ->where(function ($q) use ($requestIp) {
+                $q->where('registration_ip', $requestIp)
+                  ->orWhere('last_login_ip', $requestIp);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        return Cache::remember($cacheKey, 120, static function () use ($userId, $requestIp): array {
-            $linkedIds = \App\Models\User::query()
-                ->where(function ($q) use ($requestIp) {
-                    $q->where('registration_ip', $requestIp)
-                      ->orWhere('last_login_ip', $requestIp);
-                })
-                ->pluck('id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        if (! in_array($userId, $linkedIds, true)) {
+            $linkedIds[] = $userId;
+        }
 
-            if (! in_array($userId, $linkedIds, true)) {
-                $linkedIds[] = $userId;
-            }
-
-            return $linkedIds;
-        });
+        return $linkedIds;
     }
 
     /**
@@ -1277,22 +1416,19 @@ class HomeController extends Controller
             return [$userId];
         }
 
-        $cacheKey = "demo:fp_linked_users:{$fp}";
+        $linkedIds = DemoVoiceGeneration::query()
+            ->where('primary_identity_hash', $fp)
+            ->whereNotNull('user_id')
+            ->distinct()
+            ->pluck('user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
 
-        return Cache::remember($cacheKey, 120, static function () use ($userId, $fp): array {
-            $linkedIds = DemoVoiceGeneration::query()
-                ->where('primary_identity_hash', $fp)
-                ->distinct()
-                ->pluck('user_id')
-                ->map(fn ($id) => (int) $id)
-                ->all();
+        if (! in_array($userId, $linkedIds, true)) {
+            $linkedIds[] = $userId;
+        }
 
-            if (! in_array($userId, $linkedIds, true)) {
-                $linkedIds[] = $userId;
-            }
-
-            return $linkedIds;
-        });
+        return $linkedIds;
     }
 
     private function extractClientFingerprint(Request $request): string

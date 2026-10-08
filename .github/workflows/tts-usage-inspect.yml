@@ -1,0 +1,63 @@
+name: Speech usage per day
+
+# Read-only: speech characters and requests per day on LIVE, counted the way
+# the site-wide daily limits (listen.cost_guardrails) count them. Pipes
+# scripts/stats/tts_daily_usage.php over SSH into the app's own PHP, so
+# nothing is deployed or written on the server.
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: How many days of history to include (1-365)
+        default: '90'
+  push:
+    branches: [ccr-133b8b13-pcl57v]
+    paths:
+      - .github/workflows/tts-usage-inspect.yml
+      - scripts/stats/tts_daily_usage.php
+
+permissions:
+  contents: read
+
+jobs:
+  usage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read live usage over SSH
+        env:
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+          DAYS: ${{ inputs.days || '90' }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then
+            echo "::error::LIVE SSH secrets are not set."
+            exit 1
+          fi
+          case "$DAYS" in ''|*[!0-9]*) echo "::error::days must be a number"; exit 1 ;; esac
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_usage
+          chmod 600 ~/.ssh/id_usage
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; USAGE_DAYS=$DAYS php"
+          ssh -i ~/.ssh/id_usage -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" \
+            < scripts/stats/tts_daily_usage.php > usage.json
+
+          python3 -m json.tool usage.json > /dev/null
+          echo "===== TTS_USAGE_JSON_BEGIN ====="
+          cat usage.json
+          echo "===== TTS_USAGE_JSON_END ====="
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_usage

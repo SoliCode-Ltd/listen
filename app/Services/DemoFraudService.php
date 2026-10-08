@@ -17,6 +17,12 @@ class DemoFraudService
     private const STRONG_IDENTITY_TYPES = ['canvas', 'webgl', 'audio'];
     private const STRONG_LINK_GROUP_PREFIX = 'sg:';
 
+    // Signals that prove a script is driving the browser.
+    private const HARD_SIGNAL_TYPES = ['automation_detected', 'webdriver_detected'];
+
+    // Identities specific enough that an admin block on one is safe to honour.
+    private const BLOCKABLE_IDENTITY_TYPES = ['fp', 'canvas', 'webgl', 'audio'];
+
     // Known VPN/proxy ASN ranges (common providers)
     private const VPN_ASN_KEYWORDS = [
         'nordvpn', 'expressvpn', 'surfshark', 'cyberghost', 'protonvpn',
@@ -550,6 +556,73 @@ class DemoFraudService
             ->max('abuse_score');
 
         return $maxScore >= 100; // Block at score 100
+    }
+
+    /**
+     * Why this demo request must be refused, or null to let it through.
+     *
+     * Only hard evidence refuses a request: an automated browser, or an
+     * identity an admin blocked. Soft signals (VPN, blocked fingerprinting,
+     * missing headers) are recorded elsewhere but never block, because
+     * privacy browsers and shared networks trip them all the time.
+     */
+    public function demoBlockReason(Request $request): ?string
+    {
+        $extracted = $this->extractIdentities($request);
+
+        $hardSignals = array_values(array_filter(
+            $extracted['fraud_signals'],
+            static fn (array $signal) => in_array($signal['type'] ?? '', self::HARD_SIGNAL_TYPES, true)
+        ));
+
+        if ($hardSignals !== []) {
+            $this->recordFraudSignals($this->strongIdentitiesFrom($extracted['identity_types']), $hardSignals);
+
+            return 'automation';
+        }
+
+        if ($this->isExplicitlyBlocked($this->strongIdentitiesFrom($extracted['identity_types']))) {
+            return 'blocked';
+        }
+
+        return null;
+    }
+
+    /**
+     * An admin set is_blocked on one of these identities, or on one linked
+     * to them through a strong-signal group. Weak identities (user agent,
+     * device headers) are left out: thousands of people share them.
+     *
+     * @param  array<int, string>  $identities
+     */
+    public function isExplicitlyBlocked(array $identities): bool
+    {
+        if ($identities === []) {
+            return false;
+        }
+
+        $allIdentities = $this->getLinkedStrongIdentities($identities);
+
+        return DemoGuestUsage::query()
+            ->whereIn('identity_hash', $allIdentities)
+            ->where('is_blocked', true)
+            ->exists();
+    }
+
+    /**
+     * @param  array<string, string>  $identityTypes
+     * @return array<int, string>
+     */
+    private function strongIdentitiesFrom(array $identityTypes): array
+    {
+        $strong = [];
+        foreach (self::BLOCKABLE_IDENTITY_TYPES as $type) {
+            if (! empty($identityTypes[$type])) {
+                $strong[] = $identityTypes[$type];
+            }
+        }
+
+        return $this->normalizeIdentityHashes($strong);
     }
 
     /**
