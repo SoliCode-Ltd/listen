@@ -227,10 +227,8 @@ class NewsletterTest extends TestCase
             ->assertOk()
             ->assertSee('You are unsubscribed')
             ->assertSee('logo-light.svg')
-            ->assertSee('IBM+Plex+Sans:wght@400;500;600;700;800', false)
-            ->assertSee('IBM+Plex+Sans+Arabic:wght@400;500;600;700;800', false)
-            ->assertSee("font-family: 'IBM Plex Sans', sans-serif", false)
-            ->assertDontSee('Segoe UI')
+            ->assertSee('family=Alexandria:', false)
+            ->assertSee('font-family: var(--site-font, sans-serif)', false)
             ->assertDontSee('تم إلغاء الاشتراك')
             ->assertDontSee('logo-ar-light.svg');
 
@@ -239,8 +237,7 @@ class NewsletterTest extends TestCase
             ->assertSee('تم إلغاء الاشتراك')
             ->assertSee('منصة إسمع')
             ->assertSee('logo-ar-light.svg')
-            ->assertSee("font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif", false)
-            ->assertDontSee('Tahoma')
+            ->assertSee('family=Alexandria:', false)
             ->assertDontSee('You are unsubscribed')
             ->assertDontSee('logo-light.svg');
 

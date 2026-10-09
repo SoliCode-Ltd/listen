@@ -217,7 +217,7 @@
     .price-amount {
       font-size: 2.75rem;
       font-weight: 800;
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: var(--site-font, sans-serif);
       line-height: 1;
       transition: transform .16s ease, opacity .16s ease;
     }
@@ -703,7 +703,7 @@
       min-width: 3rem;
     }
     .countdown-num {
-      font-family: 'IBM Plex Sans', 'Inter', sans-serif;
+      font-family: var(--site-font, sans-serif);
       font-size: 1.2rem;
       font-weight: 800;
       line-height: 1.1;

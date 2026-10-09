@@ -1,5 +1,5 @@
-{{-- Two-voice dialogues in the page language. Each line carries when it is spoken, so it lights up
-     in time with the voice. --}}
+{{-- Two-voice dialogues in the page language, shown as a script: each line has its speaker's
+     avatar and name, and carries when it is spoken, so it lights up in time with the voice. --}}
 @php
   $vsDialogues = $showcaseDialogues ?? [];
   $vsUntagged = fn (string $text): string => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text));
@@ -33,10 +33,14 @@
         <ol class="vs-turns" dir="{{ $dialogue['language'] === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $dialogue['language'] }}">
           @foreach($dialogue['turns'] as $turn)
             @php $vsLine = $vsUntagged($turn['text']); @endphp
+            @php $vsWho = $vsPair[$turn['index']] ?? null; @endphp
             <li class="vs-turn vs-turn-{{ $turn['index'] % 2 }}" data-vp-turn data-weight="{{ mb_strlen($vsLine) }}"
               @if($turn['start'] !== null) data-start="{{ $turn['start'] }}" data-end="{{ $turn['end'] }}" @endif>
-              <span class="vs-turn-who">{{ $turn['speaker'] }}</span>
-              <span class="vs-turn-text">{{ $vsLine }}</span>
+              <x-home.speaker-avatar :avatar="$vsWho['avatar'] ?? null" :name="$turn['speaker']" :flag="false" class="vs-turn-avatar" />
+              <span class="vs-turn-body">
+                <span class="vs-turn-who">{{ $turn['speaker'] }}</span>
+                <span class="vs-turn-text">{{ $vsLine }}</span>
+              </span>
               <span class="vs-turn-bar" aria-hidden="true"></span>
             </li>
           @endforeach

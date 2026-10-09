@@ -643,7 +643,7 @@
     .quote-highlight .amount {
       font-size: 2rem;
       font-weight: 800;
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: var(--site-font, sans-serif);
       margin: 0;
       background: linear-gradient(135deg, var(--a), var(--b));
       -webkit-background-clip: text;
@@ -680,7 +680,7 @@
     .quote-row dd {
       font-weight: 600;
       font-size: .92rem;
-      font-family: 'IBM Plex Sans', sans-serif;
+      font-family: var(--site-font, sans-serif);
     }
     .quote-row.is-hidden {
       display: none;

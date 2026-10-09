@@ -52,7 +52,7 @@
     }
     html[dir="rtl"] .hero h1 {
       font-size: clamp(2.4rem, 6vw, 4.5rem);
-      line-height: 1.22;
+      line-height: 1.32;
       letter-spacing: 0;
       text-wrap: balance;
     }
@@ -577,6 +577,10 @@
       .apps-intro {
         grid-template-columns: 1fr;
         text-align: center;
+      }
+      /* Phones: the app cards line up with every other section. */
+      .apps-shell {
+        padding-inline: 0;
       }
       .apps-points {
         justify-content: center;

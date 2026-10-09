@@ -11,7 +11,7 @@
   --vs-wave: #34343F;
   --vs-accent: #F2B544;
   --vs-art-orbit: rgba(169, 156, 255, .22);
-  --vs-art-glass: rgba(26, 26, 34, .72);
+  --vs-art-glass: rgba(30, 28, 44, .42);
 }
 html[data-theme="light"] {
   --vs-card: #FFFFFF;
@@ -22,7 +22,7 @@ html[data-theme="light"] {
   --vs-wave: #DEDBEB;
   --vs-accent: #9A6400;
   --vs-art-orbit: rgba(118, 89, 250, .22);
-  --vs-art-glass: rgba(255, 255, 255, .82);
+  --vs-art-glass: rgba(255, 255, 255, .5);
 }
 
 [dir="rtl"] .vs-flip { transform: scaleX(-1); }
@@ -35,10 +35,21 @@ html[data-theme="light"] {
 .vs-art {
   position: relative;
   width: 100%;
-  max-width: 540px;
-  aspect-ratio: 1;
+  /* Never taller than the screen, e.g. on a phone turned sideways. */
+  max-width: min(560px, 82svh);
   margin-inline: auto;
+  container-type: inline-size;
   isolation: isolate;
+}
+/* The square the circle lives in. On wide stages the bottom speakers' bubbles
+   hang below it, so it keeps room underneath for them. */
+.vs-cast-ring {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+}
+@container (min-width: 460px) {
+  .vs-cast-ring { margin: 6% 0 15%; }
 }
 .vs-art-glow {
   position: absolute;
@@ -52,7 +63,7 @@ html[data-theme="light"] {
   z-index: -2;
 }
 html[data-theme="light"] .vs-art-glow { opacity: .55; }
-/* The circle the speakers sit on: centred, radius 38% of the stage. */
+/* The circle the speakers sit on: centred, radius 38% of the ring. */
 .vs-cast-orbit {
   position: absolute;
   inset: 12%;
@@ -185,53 +196,80 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
 .vs-speaker.is-live .vs-speaker-play .vs-icon-pause { display: block; }
 .vs-speaker.is-live .vs-speaker-play { background: rgba(15, 12, 30, .22); }
 
-/* Speech bubble: the line, then who says it and their dialect. */
-.vs-speech {
-  position: absolute;
-  width: max-content;
-  max-width: 240%;
+/* What the speaker says: the line, then who says it and their dialect. */
+.vs-speech, .vs-caption {
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 10px 14px;
-  border-radius: 16px;
+  border: 1px solid var(--vs-soft-line);
   background: var(--vs-art-glass);
-  border: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .45s ease;
-  z-index: 4;
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .18);
 }
-.vs-speaker.is-speaking .vs-speech { opacity: 1; }
-html[data-theme="light"] .vs-speech { box-shadow: 0 14px 34px rgba(15, 23, 42, .12); }
-.vs-speaker-right .vs-speech { left: 116%; top: 50%; transform: translateY(-50%); }
-.vs-speaker-left .vs-speech { right: 116%; top: 50%; transform: translateY(-50%); }
-.vs-speaker-down .vs-speech { top: 116%; left: 50%; transform: translateX(-50%); }
-.vs-speaker-up .vs-speech { bottom: 116%; left: 50%; transform: translateX(-50%); }
+html[data-theme="light"] .vs-speech, html[data-theme="light"] .vs-caption { box-shadow: 0 12px 30px rgba(15, 23, 42, .08); }
 .vs-speech-line {
-  font-size: .95rem;
+  font-size: .92rem;
   font-weight: 600;
-  line-height: 1.45;
+  line-height: 1.5;
   color: var(--text);
-  max-width: 14rem;
-  white-space: normal;
 }
-.vs-speech-line:lang(ar) { font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 1rem; }
 .vs-speech-meta {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: .75rem;
+  font-size: .74rem;
   color: var(--muted);
+  white-space: nowrap;
 }
-.vs-cast-hint {
-  margin: 10px 0 0;
-  text-align: center;
-  font-size: .85rem;
-  color: var(--muted);
+
+/* Wide stages: a bubble at the speaker's outer corner, away from the centre.
+   The top speaker's opens beside them, the side speakers' above them and the
+   bottom speakers' below them. The corner nearest the avatar is square, like a
+   speech-bubble tail. */
+.vs-speech {
+  position: absolute;
+  width: max-content;
+  max-width: min(17rem, 46cqw);
+  border-radius: 16px;
+  text-align: start;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .45s ease, visibility 0s linear .45s;
+  z-index: 4;
+}
+.vs-speaker.is-speaking .vs-speech { opacity: 1; visibility: visible; transition: opacity .45s ease; }
+.vs-seat-0 .vs-speech { inset-inline-start: calc(100% + 12px); top: -14%; border-start-start-radius: 4px; }
+.vs-seat-1 .vs-speech { bottom: calc(100% + 12px); right: 0; border-bottom-right-radius: 4px; }
+.vs-seat-4 .vs-speech { bottom: calc(100% + 12px); left: 0; border-bottom-left-radius: 4px; }
+.vs-seat-2 .vs-speech { top: calc(100% + 12px); right: 0; border-top-right-radius: 4px; }
+.vs-seat-3 .vs-speech { top: calc(100% + 12px); left: 0; border-top-left-radius: 4px; }
+/* Side bubbles stay clear of the top speaker; the top one stays inside the artwork. */
+.vs-seat-1 .vs-speech, .vs-seat-4 .vs-speech { max-width: 36cqw; }
+.vs-seat-0 .vs-speech { max-width: 38cqw; }
+
+/* Narrow stages: one caption card under the circle instead of bubbles. */
+.vs-cast-captions { display: none; }
+@container (max-width: 459.98px) {
+  .vs-speech { display: none; }
+  .vs-cast-captions {
+    display: grid;
+    margin-top: 6px;
+  }
+  .vs-caption {
+    grid-area: 1 / 1;
+    margin: 0;
+    align-items: center;
+    text-align: center;
+    border-radius: 18px;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .45s ease, visibility 0s linear .45s;
+  }
+  .vs-caption.is-active { opacity: 1; visibility: visible; transition: opacity .45s ease; }
+  .vs-caption .vs-speech-line { font-size: .9rem; }
 }
 
 /* ───────────── Section heads ───────────── */
@@ -283,7 +321,6 @@ html[data-theme="light"] .vs-speech { box-shadow: 0 14px 34px rgba(15, 23, 42, .
 .vs-flag-ar {
   background: linear-gradient(135deg, #0F7A49, #12A15F);
   color: #FFFFFF;
-  font-family: 'IBM Plex Sans Arabic', sans-serif;
   font-weight: 700;
   font-size: .8rem;
   line-height: 1;
@@ -409,7 +446,7 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.vs-card-text:lang(ar), .vs-turns:lang(ar) { font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 1.02rem; }
+.vs-card-text:lang(ar), .vs-turns:lang(ar) { font-size: 1.02rem; }
 .vs-card.is-playing .vs-card-text { color: var(--text); }
 .vs-card-foot {
   display: flex;
@@ -439,16 +476,16 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
 .vs-dialogue-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
+  gap: 20px;
 }
 .vs-dialogue {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 22px;
+  padding: 0;
   border-radius: 22px;
   border: 1px solid var(--line);
   background: var(--vs-card);
+  overflow: hidden;
   cursor: pointer;
   transition: border-color .2s ease, box-shadow .2s ease;
 }
@@ -457,8 +494,14 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   border-color: var(--brand-accent);
   box-shadow: 0 0 0 3px var(--vs-soft);
 }
-.vs-dialogue .vs-card-foot { margin-top: auto; }
-.vs-dialogue-head { display: flex; align-items: center; gap: 12px; }
+.vs-dialogue-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.vs-dialogue .vs-card-foot { margin: auto 18px 18px; }
 .vs-avatar-photo {
   position: relative;
   display: inline-grid;
@@ -490,10 +533,10 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
 .vs-flag-badge.vs-flag-ar { font-size: .6rem; }
 .vs-card.is-playing .vs-avatar-photo { box-shadow: 0 0 0 3px var(--brand-accent); }
 .vs-avatar-pair { display: inline-flex; flex: none; }
-.vs-avatar-pair .vs-avatar-photo { box-shadow: 0 0 0 3px var(--vs-card); }
+.vs-avatar-pair .vs-avatar-photo { width: 44px; height: 44px; box-shadow: 0 0 0 3px var(--vs-card); }
 .vs-avatar-pair .vs-avatar-photo + .vs-avatar-photo { margin-inline-start: -12px; }
-.vs-dialogue-id { display: flex; flex-direction: column; min-width: 0; }
-.vs-dialogue-title { font-weight: 700; }
+.vs-dialogue-id { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.vs-dialogue-title { font-weight: 700; font-size: 1.05rem; line-height: 1.35; }
 .vs-dialogue-meta {
   display: inline-flex;
   align-items: center;
@@ -501,51 +544,48 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   font-size: .8125rem;
   color: var(--muted);
 }
+
+/* The script: every line on the same grid, avatar then name and words. The line
+   being spoken is highlighted and fills a thin bar; spoken lines stay bright. */
 .vs-turns {
   list-style: none;
   margin: 0;
-  padding: 0;
+  padding: 14px 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
 }
 .vs-turn {
   position: relative;
-  max-width: 86%;
-  padding: 10px 14px 12px;
-  border-radius: 18px;
-  background: var(--vs-raised);
-  border: 1px solid transparent;
-  font-size: .94rem;
-  line-height: 1.55;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: start;
+  column-gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  font-size: .95rem;
+  line-height: 1.6;
   color: var(--muted);
   overflow: hidden;
-  transition: color .35s ease, background-color .35s ease, border-color .35s ease, transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s ease;
+  transition: color .35s ease, background-color .35s ease;
 }
-.vs-turn-0 { align-self: flex-start; border-end-start-radius: 6px; }
-.vs-turn-1 { align-self: flex-end; border-end-end-radius: 6px; }
+.vs-turn .vs-turn-avatar { width: 32px; height: 32px; font-size: .8rem; margin-top: 2px; }
+.vs-turn-body { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .vs-turn-who {
-  display: block;
-  margin-bottom: 2px;
-  font-size: .75rem;
+  font-size: .78rem;
   font-weight: 700;
+  line-height: 1.4;
   color: var(--vs-brand-text);
 }
 .vs-turn-1 .vs-turn-who { color: var(--vs-accent); }
-.vs-turn.is-active {
-  color: var(--text);
-  background: var(--vs-soft);
-  border-color: var(--vs-soft-line);
-  transform: scale(1.015);
-  box-shadow: 0 8px 22px rgba(118, 89, 250, .16);
-}
+.vs-turn.is-active { color: var(--text); background: var(--vs-soft); }
 .vs-turn.is-done { color: var(--text); }
-/* A thin line fills under the line while it is spoken. */
 .vs-turn-bar {
   position: absolute;
-  inset-inline: 0;
+  inset-inline: 12px;
   bottom: 0;
-  height: 3px;
+  height: 2px;
+  border-radius: 2px;
   background: linear-gradient(90deg, #A99CFF, var(--brand-accent));
   transform: scaleX(var(--turn-progress, 0));
   transform-origin: left center;
@@ -592,7 +632,6 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
 @media (max-width: 980px) {
   .vs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .vs-dialogue-grid { grid-template-columns: minmax(0, 1fr); }
-  .vs-art { max-width: 460px; }
 }
 @media (max-width: 640px) {
   /* Phones: cards and dialogues scroll sideways instead of stacking. */
@@ -610,11 +649,6 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   .vs-dialogue { flex: 0 0 88%; scroll-snap-align: start; }
   .vs-card:hover { transform: none; }
   .vs-more-wrap { display: none; }
-  .vs-turn { max-width: 94%; }
-  .vs-speech { padding: 8px 10px; gap: 4px; }
-  .vs-speech-line { font-size: .8rem; max-width: 9.5rem; }
-  .vs-speech-meta { font-size: .68rem; }
-  .vs-cast-hint { font-size: .78rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vs-art *, .vs-art *::before, .vs-art *::after { animation: none !important; }

@@ -16,10 +16,10 @@
             min-height: 100vh;
             background: #F3F1FA;
             color: #16161D;
-            font-family: 'IBM Plex Sans', sans-serif;
+            font-family: var(--site-font, sans-serif);
         }
         html[dir="rtl"] body {
-            font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif;
+            font-family: var(--site-font, sans-serif);
         }
         .wrap {
             min-height: 100vh;
@@ -43,7 +43,7 @@
         .logo { height: 48px; width: auto; display: block; margin: 0 auto; }
         .site {
             margin: 16px 0 0;
-            font-family: 'IBM Plex Sans', sans-serif;
+            font-family: var(--site-font, sans-serif);
             font-size: 13px;
             line-height: 1.4;
             letter-spacing: 0.14em;
@@ -56,7 +56,7 @@
             padding: 8px 14px;
             background: #F6F4FF;
             border-radius: 999px;
-            font-family: 'IBM Plex Sans', sans-serif;
+            font-family: var(--site-font, sans-serif);
             font-size: 14px;
             line-height: 1.4;
             color: #3F3F4A;
@@ -78,7 +78,7 @@
             font-size: 14px;
             letter-spacing: 0.04em;
             text-decoration: none;
-            font-family: 'IBM Plex Sans', sans-serif;
+            font-family: var(--site-font, sans-serif);
         }
     </style>
 </head>
