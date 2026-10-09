@@ -102,7 +102,7 @@ return [
         'showcase_signature' => 'Every sample ends with the Listen audio signature.',
         'showcase_title' => 'Voices from across the English-speaking world',
         'showcase_body' => ':count English accents, from London to Lagos, with natural delivery for every kind of content. Press play on any card.',
-        'hero_art_label' => 'Text turning into speech',
+        'hero_art_label' => 'Two people talking, with voice waves flowing between them',
         'dialogue_badge' => 'Two voices, one take',
         'dialogue_title' => 'Conversations that sound real',
         'dialogue_body' => 'Podcasts, sketches, interviews and audio drama. Write who says what, and two voices perform it together, with laughs, sighs and whispers where you put them.',
