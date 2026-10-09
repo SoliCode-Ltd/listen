@@ -2082,6 +2082,9 @@
               <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
             </div>
             <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
+            @if (($giftChars ?? 0) > 0)
+              <small class="gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</small>
+            @endif
           </div>
 
           <div class="meter">

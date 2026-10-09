@@ -766,6 +766,7 @@ return [
         'characters_usage' => ':plan – الأحرف',
         'chars' => 'حرف',
         'chars_remaining_of_total' => ':remaining / :total حرف متبقٍ',
+        'gift_chars_note' => 'يشمل :count حرفًا هدية من إسمع لهذا الشهر',
         'requests_usage' => 'استخدام الطلبات',
         'requests' => 'طلبات',
         'requests_remaining_of_total' => ':remaining / :total طلب متبقٍ',

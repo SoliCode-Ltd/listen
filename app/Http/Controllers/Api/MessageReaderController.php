@@ -48,7 +48,7 @@ class MessageReaderController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $counter);
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
 
