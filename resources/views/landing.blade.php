@@ -1598,9 +1598,7 @@
           @php
             $countryCode = strtolower(trim((string) ($sample['country'] ?? '')));
             $sampleLanguage = strtolower(trim((string) ($sample['language'] ?? '')));
-            $flagImage = preg_match('/^[a-z]{2}$/', $countryCode)
-              ? "https://flagcdn.com/{$countryCode}.svg"
-              : null;
+            $flagImage = \App\Support\VoiceFlag::url($sample['dialect'] ?? null, $countryCode);
             $usesInlineArabicFallback = ! $flagImage && $sampleLanguage === 'ar';
             $fallbackSvg = $sampleLanguage === 'ar'
               ? <<<'SVG'

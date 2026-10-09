@@ -18,6 +18,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
+use App\Support\GeminiTtsModel;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -25,6 +26,7 @@ use App\Support\SiteDesign;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceFlag;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
@@ -117,36 +119,38 @@ class HomeController extends Controller
         $samples = Cache::remember('nt_home_samples:'.($isArabicLocale ? 'ar' : 'en'), 300, function () use ($isArabicLocale): array {
             $all = VoiceSample::query()
                 ->active()
-                ->where('category', 'hero')
-                ->orderByDesc('is_featured')
-                ->ordered()
-                ->get();
+                ->whereIn('category', ['hero', 'dialogue'])
+                ->orderBy('sort_order')
+                ->orderBy('id')
+                ->get()
+                ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '');
 
-            $dialectOrder = ['ar-XA', 'ar-SA', 'ar-EG', 'ar-LB', 'ar-MA', 'ar-AE', 'ar-KW', 'ar-JO', 'ar-SY', 'ar-IQ'];
-            $dialects = [];
-            foreach ($dialectOrder as $code) {
-                $match = $all->first(fn (VoiceSample $sample): bool => $sample->language === 'ar'
-                    && strcasecmp((string) $sample->dialect, $code) === 0
-                    && trim((string) $sample->audio_path) !== '');
-                if ($match) {
-                    $dialects[] = $this->mapVoiceSample($match, $isArabicLocale);
+            // Every voice for the gallery, and one per dialect or accent for the hero picker.
+            $voices = ['ar' => [], 'en' => []];
+            $picker = ['ar' => [], 'en' => []];
+            foreach ($all->where('category', 'hero') as $sample) {
+                $language = $sample->language === 'ar' ? 'ar' : 'en';
+                if (! $sample->show_in_showcase && ! $sample->show_in_hero) {
+                    continue;
                 }
-                if (count($dialects) >= 5) {
-                    break;
+                $card = $this->ntVoiceCard($sample, $isArabicLocale);
+                $voices[$language][] = $card;
+                $dialectKey = strtolower((string) $sample->dialect);
+                if (! isset($picker[$language][$dialectKey]) && count($picker[$language]) < 14) {
+                    $picker[$language][$dialectKey] = $card;
                 }
             }
 
-            $library = [];
-            foreach (['ar', 'en'] as $language) {
-                $library[$language] = $all
-                    ->filter(fn (VoiceSample $sample): bool => $sample->language === $language && (bool) $sample->show_in_showcase)
-                    ->take(6)
-                    ->map(fn (VoiceSample $sample): array => $this->mapVoiceSample($sample, $isArabicLocale))
-                    ->values()
-                    ->all();
-            }
+            $dialogues = $all->where('category', 'dialogue')
+                ->map(fn (VoiceSample $sample): array => $this->ntVoiceCard($sample, $isArabicLocale))
+                ->values()
+                ->all();
 
-            return ['dialects' => $dialects, 'library' => $library];
+            return [
+                'voices' => $voices,
+                'picker' => ['ar' => array_values($picker['ar']), 'en' => array_values($picker['en'])],
+                'dialogues' => $dialogues,
+            ];
         });
 
         $byPrice = collect($pricingPlans)->values();
@@ -157,8 +161,9 @@ class HomeController extends Controller
         ])->filter()->unique('slug')->values()->all();
 
         return [
-            'ntDialectSamples' => $samples['dialects'],
-            'ntLibrary' => $samples['library'],
+            'ntVoices' => $samples['voices'],
+            'ntPicker' => $samples['picker'],
+            'ntDialogues' => $samples['dialogues'],
             'ntTeaserPlans' => $teaser,
             'ntFreePlan' => $byPrice->first(fn (array $plan): bool => (int) ($plan['price_monthly_cents'] ?? 1) === 0),
         ];
@@ -1732,6 +1737,61 @@ class HomeController extends Controller
             'voice_name' => $voiceMeta ? $sample->voice_name : null,
             'voice_label' => $speakerName,
             'is_featured' => (bool) $sample->is_featured,
+        ];
+    }
+
+    /**
+     * A sample as the new-design homepage shows it: flag, dialect or accent,
+     * speaker, and for dialogues the turns with each speaker's name.
+     *
+     * @return array<string, mixed>
+     */
+    private function ntVoiceCard(VoiceSample $sample, bool $isArabicLocale): array
+    {
+        $metadata = is_array($sample->metadata) ? $sample->metadata : [];
+        $speakers = [];
+        foreach ((array) ($metadata['speakers'] ?? []) as $speaker) {
+            $name = (string) ($speaker['name'] ?? '');
+            $speakers[$name] = [
+                'name' => $isArabicLocale ? (string) ($speaker['name_ar'] ?? $name) : $name,
+                'gender' => (string) ($speaker['gender'] ?? ''),
+                'dialect' => VoiceFlag::label($speaker['dialect'] ?? $sample->dialect, $isArabicLocale),
+                'flag' => VoiceFlag::url($speaker['dialect'] ?? $sample->dialect),
+            ];
+        }
+        $speakerName = trim((string) ($isArabicLocale
+            ? ($metadata['speaker_name_ar'] ?? $metadata['speaker_name'] ?? '')
+            : ($metadata['speaker_name'] ?? '')));
+
+        $turns = [];
+        foreach ((array) ($metadata['turns'] ?? []) as $turn) {
+            $key = (string) ($turn['speaker'] ?? '');
+            $turns[] = [
+                'speaker' => $speakers[$key]['name'] ?? $key,
+                'index' => max(0, (int) array_search($key, array_keys($speakers), true)),
+                'text' => (string) ($turn['text'] ?? ''),
+            ];
+        }
+
+        $text = trim((string) ($isArabicLocale ? ($sample->sample_text_ar ?: $sample->sample_text) : $sample->sample_text));
+
+        return [
+            'id' => (int) $sample->id,
+            'title' => trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title)),
+            'language' => $sample->language === 'ar' ? 'ar' : 'en',
+            'dialect' => (string) $sample->dialect,
+            'dialect_label' => VoiceFlag::label($sample->dialect, $isArabicLocale),
+            'flag' => VoiceFlag::url($sample->dialect, $sample->country),
+            'speaker' => $speakerName,
+            'gender' => (string) $sample->gender,
+            'speakers' => array_values($speakers),
+            'turns' => $turns,
+            // Vocal tags such as <laugh> are performed, not shown.
+            'text' => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text)),
+            'audio_url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
+            'duration' => (int) ($sample->duration_seconds ?? 0),
+            'sign_off' => trim((string) ($metadata['sign_off'] ?? '')),
+            'is_new_model' => ($metadata['model'] ?? '') === GeminiTtsModel::FLASH,
         ];
     }
 

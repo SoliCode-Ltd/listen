@@ -58,6 +58,7 @@ class VoiceSample extends Model
         foreach (['ar', 'en'] as $language) {
             Cache::forget("landing_voice_samples_showcase:{$language}");
             Cache::forget("landing_voice_sample_hero:{$language}");
+            Cache::forget("nt_home_samples:{$language}");
         }
         // Sign-in and new-design sample rows (NewDesignSamples), cached per row limit.
         foreach (range(1, 12) as $limit) {
