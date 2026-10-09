@@ -766,6 +766,7 @@ return [
         'characters_usage' => ':plan – Characters',
         'chars' => 'chars',
         'chars_remaining_of_total' => ':remaining / :total chars remaining',
+        'gift_chars_note' => 'Includes :count gift characters from Listen this month',
         'requests_usage' => 'Requests Usage',
         'requests' => 'requests',
         'requests_remaining_of_total' => ':remaining / :total requests remaining',

@@ -96,7 +96,8 @@ class DashboardController extends Controller
         $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
         $catalogByTier = VoiceCatalog::publicCatalogByTier();
         $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
-        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $usage);
+        $giftChars = PlanUsageGuard::giftChars($usage);
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
         $usageCharsPercent = min(100, (int) round(($usage->total_chars / $planChars) * 100));
@@ -131,6 +132,7 @@ class DashboardController extends Controller
             'planTier' => $planTier,
             'planTierLabel' => VoiceTier::label($planTier),
             'planChars' => $planChars,
+            'giftChars' => $giftChars,
             'maxCharsPerRequest' => PlanUsageGuard::maxCharsPerRequest($activePlan),
             'planRequests' => $requestsUnlimited ? null : $planRequests,
             'requestsUnlimited' => $requestsUnlimited,
@@ -365,7 +367,7 @@ class DashboardController extends Controller
             'total' => (clone $baseQuery)->count(),
         ];
 
-        $planChars = PlanUsageGuard::planChars($quotaPlan);
+        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $counter);
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
         $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
         $usageCharsPercent = min(100, (int) round(($counter->total_chars / $planChars) * 100));

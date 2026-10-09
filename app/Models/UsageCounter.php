@@ -14,6 +14,11 @@ class UsageCounter extends Model
         'period_ym',
         'total_minutes',
         'total_chars',
+        'bonus_chars',
         'total_requests',
+    ];
+
+    protected $casts = [
+        'bonus_chars' => 'integer',
     ];
 }

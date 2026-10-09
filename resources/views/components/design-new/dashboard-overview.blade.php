@@ -38,6 +38,9 @@
       <div class="nt-stat-value"><span data-nt-chars-left>{{ number_format($ntCharsLeft) }}</span><span class="nt-stat-of">{{ __('design.dashboard.of_total', ['total' => number_format($planChars)]) }}</span></div>
       <div class="meter-track nt-stat-meter"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
       <div class="nt-stat-label" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($ntCharsLeft), 'total' => number_format($planChars)]) }}</div>
+      @if (($giftChars ?? 0) > 0)
+        <div class="nt-stat-label gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</div>
+      @endif
     </div>
     <div class="nt-card nt-stat">
       <div class="nt-stat-label">{{ __('design.dashboard.requests_card') }}</div>

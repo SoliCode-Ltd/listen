@@ -78,7 +78,7 @@ class DiagnoseUserGenerationsCommand extends Command
 
         $this->section('Usage this month vs limits');
         $counter = UsageCounter::where('user_id', $user->id)->where('period_ym', now()->format('Y-m'))->first();
-        $planChars = PlanUsageGuard::planChars($quota);
+        $planChars = PlanUsageGuard::charsLimit($quota, $counter);
         $planRequests = PlanUsageGuard::planRequests($quota);
         $this->table(['metric', 'used', 'limit'], [
             ['characters', number_format((int) $counter?->total_chars), number_format($planChars)],

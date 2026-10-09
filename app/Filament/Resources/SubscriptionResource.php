@@ -4,11 +4,14 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\SubscriptionResource\Pages;
 use App\Models\BillingTrial;
+use App\Models\CharGift;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Services\Billing\CharGiftService;
 use App\Support\Countries;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -113,6 +116,7 @@ class SubscriptionResource extends Resource
                                     return '<tr style="' . $bg . '">'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">' . $label . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_chars) . '</td>'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . ((int) $c->bonus_chars > 0 ? '+' . number_format((int) $c->bonus_chars) : '—') . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_minutes, 1) . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_requests) . '</td>'
                                         . '</tr>';
@@ -123,6 +127,7 @@ class SubscriptionResource extends Resource
                                     . '<thead><tr style="background:rgba(0,0,0,0.03);font-weight:600;">'
                                     . '<th style="padding:8px 12px;text-align:left;">Period</th>'
                                     . '<th style="padding:8px 12px;text-align:right;">Characters</th>'
+                                    . '<th style="padding:8px 12px;text-align:right;">Gifted</th>'
                                     . '<th style="padding:8px 12px;text-align:right;">Minutes</th>'
                                     . '<th style="padding:8px 12px;text-align:right;">Requests</th>'
                                     . '</tr></thead>'
@@ -132,7 +137,62 @@ class SubscriptionResource extends Resource
                                 return new HtmlString($html);
                             }),
                     ]),
+                Forms\Components\Section::make('Gifts from Listen')
+                    ->visibleOn('view')
+                    ->schema([
+                        Forms\Components\Placeholder::make('gifts_table')
+                            ->label('')
+                            ->content(fn (?Subscription $record): HtmlString|string => self::giftsTable($record)),
+                    ]),
             ]);
+    }
+
+    private static function giftsTable(?Subscription $record): HtmlString|string
+    {
+        if (! $record || ! $record->user_id) {
+            return 'No subscription loaded.';
+        }
+
+        $gifts = rescue(fn () => CharGift::query()
+            ->with('grantedBy:id,email')
+            ->where('user_id', $record->user_id)
+            ->latest('id')
+            ->limit(50)
+            ->get(), null, false);
+
+        if ($gifts === null) {
+            return 'Gifts are not available until the database migration has run.';
+        }
+
+        if ($gifts->isEmpty()) {
+            return 'No characters gifted yet.';
+        }
+
+        $cell = 'padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);';
+        $rows = $gifts->map(function (CharGift $gift) use ($cell): string {
+            $status = $gift->isActive()
+                ? ($gift->period_ym === now()->format('Y-m') ? 'Active this month' : 'Ended with its month')
+                : 'Taken back '.$gift->revoked_at?->format('Y-m-d');
+
+            return '<tr>'
+                .'<td style="'.$cell.'">'.e($gift->created_at?->format('Y-m-d H:i')).'</td>'
+                .'<td style="'.$cell.'">'.e($gift->period_ym).'</td>'
+                .'<td style="'.$cell.'text-align:right;">+'.number_format($gift->chars).'</td>'
+                .'<td style="'.$cell.'">'.e((string) ($gift->note ?? '—')).'</td>'
+                .'<td style="'.$cell.'">'.e((string) ($gift->grantedBy?->email ?? '—')).'</td>'
+                .'<td style="'.$cell.'">'.e($status).'</td>'
+                .'</tr>';
+        })->implode('');
+
+        return new HtmlString('<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:14px;">'
+            .'<thead><tr style="background:rgba(0,0,0,0.03);font-weight:600;">'
+            .'<th style="padding:8px 12px;text-align:left;">Given</th>'
+            .'<th style="padding:8px 12px;text-align:left;">Month</th>'
+            .'<th style="padding:8px 12px;text-align:right;">Characters</th>'
+            .'<th style="padding:8px 12px;text-align:left;">Note</th>'
+            .'<th style="padding:8px 12px;text-align:left;">By</th>'
+            .'<th style="padding:8px 12px;text-align:left;">Status</th>'
+            .'</tr></thead><tbody>'.$rows.'</tbody></table></div>');
     }
 
     public static function table(Table $table): Table
@@ -225,6 +285,14 @@ class SubscriptionResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                Tables\Actions\Action::make('giftChars')
+                    ->label('Gift characters')
+                    ->icon('heroicon-o-gift')
+                    ->color('success')
+                    ->modalHeading(fn (Subscription $record): string => 'Gift characters to '.($record->user?->email ?? 'this member'))
+                    ->modalDescription(fn (Subscription $record): string => self::giftModalDescription($record))
+                    ->form(self::giftFormSchema())
+                    ->action(fn (Subscription $record, array $data) => self::grantGift($record, $data)),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -242,6 +310,65 @@ class SubscriptionResource extends Resource
             'view' => Pages\ViewSubscription::route('/{record}'),
             'edit' => Pages\EditSubscription::route('/{record}/edit'),
         ];
+    }
+
+    /**
+     * @return array<int, \Filament\Forms\Components\Component>
+     */
+    public static function giftFormSchema(): array
+    {
+        return [
+            Forms\Components\TextInput::make('chars')
+                ->label('Characters to gift')
+                ->numeric()
+                ->integer()
+                ->required()
+                ->minValue(1)
+                ->maxValue(CharGiftService::MAX_GIFT)
+                ->helperText('Added on top of the plan for the current billing month only ('.now()->format('F Y').'). They end with the month, like the plan\'s own characters.'),
+            Forms\Components\Textarea::make('note')
+                ->label('Note (only admins see this)')
+                ->rows(2)
+                ->maxLength(500),
+        ];
+    }
+
+    /**
+     * @param  array{chars?:mixed,note?:mixed}  $data
+     */
+    public static function grantGift(Subscription $record, array $data): void
+    {
+        try {
+            $gift = app(CharGiftService::class)->grant(
+                $record,
+                (int) ($data['chars'] ?? 0),
+                isset($data['note']) ? (string) $data['note'] : null,
+                auth()->user(),
+            );
+        } catch (\Throwable $e) {
+            Notification::make()
+                ->title('The gift was not added')
+                ->body($e instanceof \InvalidArgumentException ? $e->getMessage() : 'Something went wrong; nothing was changed. If this is a new server, run the database migration first.')
+                ->danger()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title(number_format($gift->chars).' characters gifted')
+            ->body('This month the member now has '.number_format(app(CharGiftService::class)->activeGiftChars((int) $record->user_id)).' gift characters on top of their plan.')
+            ->success()
+            ->send();
+    }
+
+    public static function giftModalDescription(Subscription $record): string
+    {
+        $current = rescue(fn () => app(CharGiftService::class)->activeGiftChars((int) $record->user_id), 0, false);
+        $plan = $record->plan?->name ?? 'their plan';
+
+        return 'Gift from Listen for '.now()->format('F Y').", on top of {$plan}."
+            .($current > 0 ? ' Already gifted this month: '.number_format($current).'.' : '');
     }
 
     /**

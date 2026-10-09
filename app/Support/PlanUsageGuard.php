@@ -13,6 +13,20 @@ class PlanUsageGuard
         return max(1, (int) ($plan?->monthly_chars ?? 30000));
     }
 
+    /**
+     * This month's character allowance: the plan's plus any characters
+     * Listen gifted for this month (usage_counters.bonus_chars).
+     */
+    public static function charsLimit(?Plan $plan, ?UsageCounter $counter): int
+    {
+        return self::planChars($plan) + self::giftChars($counter);
+    }
+
+    public static function giftChars(?UsageCounter $counter): int
+    {
+        return max(0, (int) ($counter?->bonus_chars ?? 0));
+    }
+
     public static function planRequests(?Plan $plan): int
     {
         return max(0, (int) ($plan?->monthly_requests ?? 60));
@@ -39,8 +53,8 @@ class PlanUsageGuard
     public static function assertWithinLimits(?Plan $plan, UsageCounter $counter, array $estimate): void
     {
         if (! self::allowsOverage($plan)) {
-            $planChars = self::planChars($plan);
-            if (((int) $counter->total_chars + (int) $estimate['chars']) > $planChars) {
+            $charsLimit = self::charsLimit($plan, $counter);
+            if (((int) $counter->total_chars + (int) $estimate['chars']) > $charsLimit) {
                 throw ValidationException::withMessages([
                     'content' => 'Monthly characters limit exceeded. Please upgrade your plan to continue.',
                 ]);

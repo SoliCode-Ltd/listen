@@ -67,6 +67,10 @@ class UsageCounterResource extends Resource
                 Tables\Columns\TextColumn::make('total_chars')
                     ->numeric()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('bonus_chars')
+                    ->label('Gifted chars')
+                    ->state(fn ($record): int => (int) ($record->bonus_chars ?? 0))
+                    ->numeric(),
                 Tables\Columns\TextColumn::make('total_requests')
                     ->numeric()
                     ->sortable(),
