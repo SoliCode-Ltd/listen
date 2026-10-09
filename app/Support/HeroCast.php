@@ -21,7 +21,7 @@ final class HeroCast
     public const CAST = [
         'ar' => [
             ['name' => 'Sultan', 'name_ar' => 'سلطان', 'voice' => 'Algenib', 'dialect' => 'ar-SA',
-                'style' => 'A young man from Riyadh hearing his own script read back for the first time. He gasps, then speaks fast, genuinely amazed and delighted, smiling and breathing like a real person.',
+                'style' => 'A young man from Riyadh hearing his own script read back for the first time. He starts with a short, sharp gasp of surprise (not a yawn), then speaks fast, genuinely amazed and delighted, smiling and breathing like a real person.',
                 'line' => '<gasp> لحظة! هذا صوتي؟ كتبتها في إسمع وطلعت بلهجتي بالضبط!'],
             ['name' => 'Sumaya', 'name_ar' => 'سمية', 'voice' => 'Callirrhoe', 'dialect' => 'ar-EG',
                 'style' => 'A cheerful woman from Cairo who bursts out laughing first, then talks playfully to her friends, warm and teasing, fully natural.',
