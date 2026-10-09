@@ -100,7 +100,9 @@ class HomeVoiceSamplesTest extends TestCase
         $this->artisan('tts:showcase', ['--import' => true]);
         app()->setLocale('ar');
         $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
-        $hero = substr($html, strpos($html, 'class="vs-art vs-cast"'), 12000);
+        // The whole hero artwork, up to its script.
+        $start = strpos($html, 'class="vs-art vs-cast"');
+        $hero = substr($html, $start, strpos($html, '// Hero conversation', $start) - $start);
 
         $this->assertStringContainsString('data-vs-play-all', $hero);
         $this->assertSame(5, substr_count($hero, 'class="vs-speaker-photo"'));
