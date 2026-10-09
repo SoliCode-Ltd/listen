@@ -194,29 +194,37 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
 .vs-speaker.is-live .vs-speaker-play .vs-icon-pause { display: block; }
 .vs-speaker.is-live .vs-speaker-play { background: rgba(15, 12, 30, .22); }
 
-/* What the speaker says, in a chat bubble: a brand gradient with white text,
-   the line, then who says it with a small live wave while they speak. */
+/* What the speaker says, on a clean card: the line, then who says it with a
+   small live wave while they speak. White in light theme, deep charcoal in
+   dark theme. */
 .vs-speech, .vs-caption {
   display: flex;
   flex-direction: column;
   gap: 8px;
   padding: 14px 18px 12px;
-  border-radius: 22px;
-  color: #FFFFFF;
-  background:
-    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, .22), transparent 55%),
-    linear-gradient(135deg, #8E70FF 0%, #6C47F4 52%, #5228E3 100%);
+  border-radius: 18px;
+  color: #15141B;
+  background: #FFFFFF;
+  border: 1px solid rgba(15, 23, 42, .07);
   box-shadow:
-    0 20px 40px -14px rgba(92, 56, 240, .6),
-    0 4px 12px -4px rgba(40, 20, 120, .25),
-    inset 0 1px 0 rgba(255, 255, 255, .35),
-    inset 0 -1px 0 rgba(30, 10, 110, .25);
+    0 1px 2px rgba(15, 23, 42, .06),
+    0 8px 18px -6px rgba(15, 23, 42, .10),
+    0 22px 44px -16px rgba(91, 61, 245, .28);
+}
+html:not([data-theme="light"]) .vs-speech, html:not([data-theme="light"]) .vs-caption {
+  color: #F5F4F8;
+  background: #1C1B26;
+  border-color: rgba(255, 255, 255, .09);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, .06) inset,
+    0 10px 24px -8px rgba(0, 0, 0, .55),
+    0 24px 48px -18px rgba(118, 89, 250, .45);
 }
 .vs-speech-line {
   font-size: .92rem;
   font-weight: 600;
   line-height: 1.55;
-  color: #FFFFFF;
+  color: inherit;
   text-wrap: pretty;
 }
 .vs-speech-meta {
@@ -225,13 +233,14 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
   align-items: center;
   gap: 8px;
   padding-top: 8px;
-  border-top: 1px solid rgba(255, 255, 255, .18);
+  border-top: 1px solid rgba(15, 23, 42, .07);
   font-size: .74rem;
   font-weight: 500;
-  color: rgba(255, 255, 255, .82);
+  color: #6B6880;
 }
-.vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
-/* Three little bars that move while the speaker talks. */
+html:not([data-theme="light"]) .vs-speech-meta { border-top-color: rgba(255, 255, 255, .08); color: #A9A7B8; }
+.vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px rgba(15, 23, 42, .06); }
+/* Three little bars in the brand colour that move while the speaker talks. */
 .vs-speech-live {
   display: inline-flex;
   align-items: center;
@@ -242,7 +251,7 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
   width: 3px;
   height: 100%;
   border-radius: 2px;
-  background: rgba(255, 255, 255, .9);
+  background: linear-gradient(180deg, #9C86FF, #6A45F2);
   transform-origin: center;
   animation: vs-live 1s ease-in-out infinite;
 }
