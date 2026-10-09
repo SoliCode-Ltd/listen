@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ClonedVoice;
+use App\Services\GenerationErrorRecorder;
 use App\Services\VoiceCloningService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -160,6 +161,8 @@ class ProcessVoiceCloningJob implements ShouldQueue
                 'failed_at' => now()->toIso8601String(),
             ]),
         ]);
+
+        app(GenerationErrorRecorder::class)->voiceCloningFailed($clonedVoice, $reason, $code, $httpStatus);
 
         Log::warning('Voice cloning failed.', [
             'cloned_voice_id' => $clonedVoice->id,

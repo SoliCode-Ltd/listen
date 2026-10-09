@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\TtsLog;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Services\GenerationErrorRecorder;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -18,6 +19,8 @@ use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -226,6 +229,15 @@ class GenerateAudioJob implements ShouldQueue
             // Log TTS failure telemetry
             $this->writeTtsLog($generation, [], 'failed', $e);
 
+            // A sync run is not retried, so its first failure is the last.
+            app(GenerationErrorRecorder::class)->audioGenerationFailed(
+                $generation,
+                $e,
+                $this->attempts(),
+                $this->connection === 'sync' ? 1 : $this->tries,
+                $generation->error_message,
+            );
+
             if ($generation->text_item_id) {
                 TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
             }
@@ -294,6 +306,18 @@ class GenerateAudioJob implements ShouldQueue
             'status' => 'failed',
             'error_message' => $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.',
         ]);
+
+        // Failures thrown from handle() are recorded there; a timeout or a
+        // worker killed mid-run only ever reaches this point.
+        if (! $e || $e instanceof MaxAttemptsExceededException || $e instanceof TimeoutExceededException) {
+            app(GenerationErrorRecorder::class)->audioGenerationFailed(
+                $generation,
+                $e ?? new \RuntimeException('The generation job failed without an error.'),
+                $this->tries,
+                $this->tries,
+                $generation->error_message,
+            );
+        }
 
         // Only release usage for async (queued) jobs.
         // For sync dispatches, the controller handles the refund
