@@ -47,7 +47,7 @@ html[data-theme="light"] {
   aspect-ratio: 1;
 }
 @container (min-width: 460px) {
-  .vs-cast-ring { margin: 6% 0 15%; }
+  .vs-cast-ring { margin: 9% 0 16%; }
 }
 .vs-art-glow {
   position: absolute;
@@ -194,63 +194,68 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
 .vs-speaker.is-live .vs-speaker-play .vs-icon-pause { display: block; }
 .vs-speaker.is-live .vs-speaker-play { background: rgba(15, 12, 30, .22); }
 
-/* What the speaker says, on frosted crystal glass: the line, then who says it
-   and their dialect. */
+/* What the speaker says, in a chat bubble: a brand gradient with white text,
+   the line, then who says it with a small live wave while they speak. */
 .vs-speech, .vs-caption {
-  --vs-glass-tail: rgba(36, 32, 56, .62);
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 16px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, .16);
-  background: linear-gradient(145deg, rgba(255, 255, 255, .16), rgba(255, 255, 255, .04) 60%, rgba(169, 156, 255, .08));
-  -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  backdrop-filter: blur(20px) saturate(1.8);
+  gap: 8px;
+  padding: 14px 18px 12px;
+  border-radius: 22px;
+  color: #FFFFFF;
+  background:
+    radial-gradient(120% 140% at 0% 0%, rgba(255, 255, 255, .22), transparent 55%),
+    linear-gradient(135deg, #8E70FF 0%, #6C47F4 52%, #5228E3 100%);
   box-shadow:
-    0 22px 44px -16px rgba(6, 4, 20, .65),
-    inset 0 1px 0 rgba(255, 255, 255, .22),
-    inset 0 -1px 0 rgba(169, 156, 255, .10);
+    0 20px 40px -14px rgba(92, 56, 240, .6),
+    0 4px 12px -4px rgba(40, 20, 120, .25),
+    inset 0 1px 0 rgba(255, 255, 255, .35),
+    inset 0 -1px 0 rgba(30, 10, 110, .25);
 }
-html[data-theme="light"] .vs-speech, html[data-theme="light"] .vs-caption {
-  --vs-glass-tail: rgba(255, 255, 255, .78);
-  border-color: rgba(255, 255, 255, .95);
-  background: linear-gradient(145deg, rgba(255, 255, 255, .86), rgba(255, 255, 255, .5) 60%, rgba(236, 232, 255, .6));
-  box-shadow:
-    0 22px 44px -18px rgba(76, 45, 235, .32),
-    0 2px 8px rgba(15, 23, 42, .05),
-    inset 0 1px 0 #FFFFFF,
-    inset 0 -1px 0 rgba(118, 89, 250, .10);
-}
-/* A soft light sheen across the top of the glass. */
-.vs-speech::before, .vs-caption::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .14), transparent 48%);
-  pointer-events: none;
-}
-.vs-caption { position: relative; }
 .vs-speech-line {
-  position: relative;
-  font-size: .9rem;
+  font-size: .92rem;
   font-weight: 600;
   line-height: 1.55;
-  color: var(--text);
+  color: #FFFFFF;
+  text-wrap: pretty;
 }
 .vs-speech-meta {
-  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+  font-size: .74rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .82);
+}
+.vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px rgba(255, 255, 255, .35); }
+/* Three little bars that move while the speaker talks. */
+.vs-speech-live {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: .74rem;
-  color: var(--muted);
-  white-space: nowrap;
+  gap: 2px;
+  height: 12px;
+}
+.vs-speech-live i {
+  width: 3px;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, .9);
+  transform-origin: center;
+  animation: vs-live 1s ease-in-out infinite;
+}
+.vs-speech-live i:nth-child(2) { animation-delay: -.35s; }
+.vs-speech-live i:nth-child(3) { animation-delay: -.7s; }
+@keyframes vs-live {
+  0%, 100% { transform: scaleY(.35); }
+  50% { transform: scaleY(1); }
 }
 
-/* Wide stages: a bubble beside or near each speaker, away from the centre, with
-   a small tail pointing at them. The top speaker's opens beside them, the side
+/* Wide stages: the bubble opens beside or near each speaker, away from the
+   centre, and gently grows out of the corner nearest them, which is pinched
+   like a message bubble. The top speaker's opens beside them, the side
    speakers' above them and the bottom speakers' below them. */
 .vs-speech {
   position: absolute;
@@ -259,35 +264,41 @@ html[data-theme="light"] .vs-speech, html[data-theme="light"] .vs-caption {
   text-align: start;
   pointer-events: none;
   opacity: 0;
+  scale: .92;
   visibility: hidden;
-  transition: opacity .45s ease, visibility 0s linear .45s;
+  transition: opacity .3s ease, scale .35s cubic-bezier(.2, .8, .2, 1), visibility 0s linear .35s;
   z-index: 4;
 }
-.vs-speaker.is-speaking .vs-speech { opacity: 1; visibility: visible; transition: opacity .45s ease; }
-.vs-speech::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  background: var(--vs-glass-tail);
-  -webkit-backdrop-filter: blur(20px);
-  backdrop-filter: blur(20px);
+.vs-speaker.is-speaking .vs-speech {
+  opacity: 1;
+  scale: 1;
+  visibility: visible;
+  transition: opacity .3s ease, scale .35s cubic-bezier(.2, .8, .2, 1);
 }
-.vs-seat-0 .vs-speech { inset-inline-start: calc(100% + 16px); top: 50%; transform: translateY(-50%); }
-.vs-seat-0 .vs-speech::after { top: calc(50% - 6px); inset-inline-start: -11px; clip-path: polygon(100% 0, 100% 100%, 0 50%); }
-[dir="rtl"] .vs-seat-0 .vs-speech::after { clip-path: polygon(0 0, 0 100%, 100% 50%); }
-.vs-seat-1 .vs-speech { bottom: calc(100% + 14px); right: 0; }
-.vs-seat-4 .vs-speech { bottom: calc(100% + 14px); left: 0; }
-.vs-seat-2 .vs-speech { top: calc(100% + 14px); right: 0; }
-.vs-seat-3 .vs-speech { top: calc(100% + 14px); left: 0; }
-/* Tails sit under the middle of the avatar (an avatar is 19% of the ring wide). */
-.vs-seat-1 .vs-speech::after { bottom: -11px; right: calc(9.5cqw - 6px); clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.vs-seat-4 .vs-speech::after { bottom: -11px; left: calc(9.5cqw - 6px); clip-path: polygon(0 0, 100% 0, 50% 100%); }
-.vs-seat-2 .vs-speech::after { top: -11px; right: calc(9.5cqw - 6px); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
-.vs-seat-3 .vs-speech::after { top: -11px; left: calc(9.5cqw - 6px); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.vs-seat-0 .vs-speech {
+  inset-inline-start: calc(100% + 14px);
+  top: 50%;
+  translate: 0 -56%;
+  border-end-start-radius: 6px;
+  transform-origin: left bottom;
+}
+[dir="rtl"] .vs-seat-0 .vs-speech { transform-origin: right bottom; }
+.vs-seat-1 .vs-speech { bottom: calc(100% + 12px); right: 0; border-bottom-right-radius: 6px; transform-origin: right bottom; }
+.vs-seat-4 .vs-speech { bottom: calc(100% + 12px); left: 0; border-bottom-left-radius: 6px; transform-origin: left bottom; }
+.vs-seat-2 .vs-speech { top: calc(100% + 12px); right: 0; border-top-right-radius: 6px; transform-origin: right top; }
+.vs-seat-3 .vs-speech { top: calc(100% + 12px); left: 0; border-top-left-radius: 6px; transform-origin: left top; }
 /* Side bubbles stay clear of the top speaker; the top one stays inside the artwork. */
 .vs-seat-1 .vs-speech, .vs-seat-4 .vs-speech { max-width: 34cqw; }
 .vs-seat-0 .vs-speech { max-width: 35cqw; }
+/* Below the circle there is room: the bottom bubbles go wider and shorter. */
+.vs-seat-2 .vs-speech, .vs-seat-3 .vs-speech { max-width: min(21rem, 58cqw); }
+
+/* Mid-size stages: slightly smaller bubbles so long lines still fit. */
+@container (min-width: 460px) and (max-width: 559.98px) {
+  .vs-speech { padding: 11px 14px 10px; gap: 6px; }
+  .vs-speech .vs-speech-line { font-size: .84rem; line-height: 1.5; }
+  .vs-speech .vs-speech-meta { font-size: .7rem; padding-top: 6px; }
+}
 
 /* Narrow stages: one caption card under the circle instead of bubbles. */
 .vs-cast-captions { display: none; }
@@ -309,6 +320,7 @@ html[data-theme="light"] .vs-speech, html[data-theme="light"] .vs-caption {
   }
   .vs-caption.is-active { opacity: 1; visibility: visible; transition: opacity .45s ease; }
   .vs-caption .vs-speech-line { font-size: .9rem; }
+  .vs-caption .vs-speech-meta { grid-template-columns: auto auto auto; justify-content: center; }
 }
 
 /* ───────────── Section heads ───────────── */

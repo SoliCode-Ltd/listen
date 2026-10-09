@@ -61,6 +61,7 @@
           <span class="vs-speech-meta">
             <x-home.flag :url="$person['flag']" size="xs" />
             <span>{{ $person['name'] }} · {{ $person['dialect_label'] }}</span>
+            <span class="vs-speech-live" aria-hidden="true"><i></i><i></i><i></i></span>
           </span>
         </span>
       </div>
@@ -74,6 +75,7 @@
         <span class="vs-speech-meta">
           <x-home.flag :url="$person['flag']" size="xs" />
           <span>{{ $person['name'] }} · {{ $person['dialect_label'] }}</span>
+          <span class="vs-speech-live" aria-hidden="true"><i></i><i></i><i></i></span>
         </span>
       </p>
     @endforeach
