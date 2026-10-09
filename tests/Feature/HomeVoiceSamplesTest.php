@@ -95,6 +95,32 @@ class HomeVoiceSamplesTest extends TestCase
         $this->assertStringNotContainsString('0:17', $html);
     }
 
+    public function test_hero_speakers_can_be_played_one_by_one_or_all_together(): void
+    {
+        $this->artisan('tts:showcase', ['--import' => true]);
+        app()->setLocale('ar');
+        $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
+        $hero = substr($html, strpos($html, 'class="vs-art vs-cast"'), 12000);
+
+        $this->assertStringContainsString('data-vs-play-all', $hero);
+        $this->assertSame(5, substr_count($hero, 'class="vs-speaker-photo"'));
+        $this->assertStringContainsString('audio/showcase/hero-ar-sultan.mp3', $hero);
+        // No mood chip in the bubbles.
+        $this->assertStringNotContainsString('vs-speech-mood', $hero);
+        $this->assertStringNotContainsString('حماس', $hero);
+        // The gallery intro does not count dialects.
+        $head = substr($html, strpos($html, 'id="voice-samples"'), 1500);
+        $this->assertStringContainsString(__('ui.landing.showcase_body'), $head);
+        $this->assertDoesNotMatchRegularExpression('/\d/u', strip_tags(substr($head, strpos($head, '>') + 1)));
+
+        foreach (['ar', 'en'] as $locale) {
+            foreach (\App\Support\HeroCast::for($locale) as $person) {
+                $this->assertNotNull($person['audio'], $locale.' '.$person['name']);
+                $this->assertGreaterThan(0.5, $person['line_end'], $locale.' '.$person['name']);
+            }
+        }
+    }
+
     public function test_homepage_announces_voice_cloning_under_the_hero_and_links_to_pricing(): void
     {
         app()->setLocale('ar');

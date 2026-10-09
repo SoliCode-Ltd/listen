@@ -109,7 +109,7 @@ html[dir="rtl"] h6 {
 }
 
 /* Recolor the hero graphic to match the new vibrant brand palette (#FF4433, #8A2BE2) */
-.hero-art img {
+.hero-art > img {
   /* Removed hue shift as new graphic matches native palette */
 }
 

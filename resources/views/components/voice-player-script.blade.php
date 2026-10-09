@@ -184,9 +184,13 @@
     return guess;
   }
 
-  // Pause any other audio on the page while ours plays.
+  // Pause any other audio on the page while ours plays, and stop when another player starts.
   audio.addEventListener('play', function () {
     document.querySelectorAll('audio').forEach(function (el) { if (el !== audio && !el.paused) el.pause(); });
+    document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: audio } }));
+  });
+  document.addEventListener('listen:audio-play', function (e) {
+    if (e.detail && e.detail.source !== audio && !audio.paused) audio.pause();
   });
   audio.addEventListener('pause', function () { if (current) setState(current, false); });
   audio.addEventListener('ended', function () { if (current) { var done = current; stop(); paint(done, 1, audio.duration); } });
