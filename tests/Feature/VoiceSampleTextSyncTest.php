@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Console\Commands\SyncVoiceSampleTextCommand;
 use App\Models\VoiceSample;
 use App\Services\Tts\GeminiKeyManager;
-use App\Support\AuthSamples;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -51,15 +50,16 @@ class VoiceSampleTextSyncTest extends TestCase
         $this->assertSame('أهلاً بيك في إسمع، حوّل كلامك لصوت طبيعي.', $arabic->fresh()->sample_text);
     }
 
-    public function test_sign_in_samples_show_the_fixed_text_straight_away(): void
+    public function test_the_homepage_shows_the_fixed_text_straight_away(): void
     {
         $sample = $this->sample('en', 'en-US', 'Old FlowSync script.', 'wrong.mp3');
-        $this->assertSame('Old FlowSync script.', AuthSamples::forLocale('en', 5)[0]['text']);
+        app()->setLocale('en');
+        $this->assertSame('Old FlowSync script.', $this->homeVoices()[0]['text']);
 
         $this->fakeTranscripts(['wrong.mp3' => 'Welcome. Turn your words into natural voice in seconds.']);
         $this->artisan('voice-samples:sync-text', ['--fix' => true])->assertSuccessful();
 
-        $this->assertSame('Welcome. Turn your words into natural voice in seconds.', AuthSamples::forLocale('en', 5)[0]['text']);
+        $this->assertSame('Welcome. Turn your words into natural voice in seconds.', $this->homeVoices()[0]['text']);
         $this->assertSame($sample->id, $sample->fresh()->id);
     }
 
@@ -89,10 +89,11 @@ class VoiceSampleTextSyncTest extends TestCase
         $this->assertSame('ar-SA', $saudi->fresh()->dialect, 'a Gulf sample stays as labelled');
         $this->assertSame('ar-XA', $unlabelled->fresh()->dialect, 'real Fusha gets the Fusha label');
 
-        // The Fusha tab now plays the real Fusha sample.
-        $rows = AuthSamples::forLocale('ar', 5);
-        $this->assertSame('ar-XA', $rows[0]['dialect']);
-        $this->assertStringContainsString('لا تستسلم', $rows[0]['text']);
+        // The homepage now labels the real Fusha sample as Fusha.
+        app()->setLocale('ar');
+        $fushaCards = array_values(array_filter($this->homeVoices(), fn (array $row): bool => $row['dialect'] === 'ar-XA'));
+        $this->assertCount(1, $fushaCards);
+        $this->assertStringContainsString('لا تستسلم', $fushaCards[0]['text']);
     }
 
     public function test_relabel_rules(): void
@@ -121,29 +122,12 @@ class VoiceSampleTextSyncTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_sign_in_wave_has_a_smooth_fill_layer(): void
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function homeVoices(): array
     {
-        $this->sample('en', 'en-US', 'Hello there.', 'a.mp3');
-
-        $html = $this->getLocalizedRoute('login')->assertOk()->getContent();
-
-        $this->assertStringContainsString('auth-wave-fill', $html);
-        $this->assertSame(2, substr_count($html, 'class="auth-wave-bars'));
-        $this->assertStringContainsString("setProperty('--vp-progress'", $html);
-    }
-
-    public function test_sign_in_player_has_voice_tabs_and_a_word_by_word_script(): void
-    {
-        $this->sample('en', 'en-US', 'Welcome. Turn your words into natural voice.', 'a.mp3');
-        $this->sample('en', 'en-GB', 'For over a century, Ellsworth has curated timeless elegance.', 'b.mp3');
-
-        $html = $this->getLocalizedRoute('login')->assertOk()->getContent();
-
-        $this->assertSame(2, substr_count($html, 'class="auth-tab"'));
-        $this->assertStringContainsString('data-vp-words', $html);
-        $this->assertStringContainsString('Welcome. Turn your words into natural voice.', $html);
-        $this->assertStringContainsString('dir="ltr" data-vp-time', $html);
-        $this->assertStringContainsString('function wordify', $html);
+        return $this->getLocalizedRoute('home')->assertOk()->viewData('showcaseVoices');
     }
 
     private function sample(string $language, string $dialect, string $text, string $file, ?string $textAr = null): VoiceSample

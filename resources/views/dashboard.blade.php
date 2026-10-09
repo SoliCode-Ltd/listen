@@ -2170,7 +2170,7 @@
             </div>
             <div>
               <label class="vs-field-label">{{ __('ui.dashboard.speaker') }}</label>
-              <select name="voice_key" id="voice_key"></select>
+              <select name="voice_key" id="voice_key" data-speaker-avatar></select>
             </div>
           </div>
 
@@ -3255,6 +3255,7 @@
           const option = document.createElement('option');
           option.value = voice.key;
           option.textContent = voiceDisplayLabel(voice);
+          option.dataset.avatar = voice.avatar || '';
           builtInGroup.appendChild(option);
         }
         voiceSelect.appendChild(builtInGroup);

@@ -738,22 +738,11 @@ class VoiceCatalog
             'label' => $displayName,
             'label_ar' => self::AR_NAME_MAP[$displayName] ?? $displayName,
             'gender' => (string) $voice->gender,
-            'avatar' => self::avatarFor((string) $voice->gender, (string) $voice->language),
+            // The speaker's Listen avatar (public/images/speakers), or null.
+            'avatar' => SpeakerAvatar::url($displayName, (string) $voice->language),
             'recommended' => false,
             'language' => (string) $voice->language,
             'tier' => VoiceTier::normalize((string) $voice->tier),
         ];
-    }
-
-    private static function avatarFor(string $gender, string $language): string
-    {
-        $gender = strtolower(trim($gender));
-        $language = strtolower(trim($language));
-
-        if ($gender === 'male') {
-            return $language === 'ar' ? 'male-ar' : 'male-en';
-        }
-
-        return $language === 'ar' ? 'female-ar' : 'female-en';
     }
 }

@@ -61,11 +61,6 @@ class VoiceSample extends Model
                 Cache::forget("home_showcase:{$language}:{$limit}");
             }
         }
-        // Sign-in and register sample rows (AuthSamples), cached per row limit.
-        foreach (range(1, 12) as $limit) {
-            Cache::forget("auth_sample_rows:ar:{$limit}");
-            Cache::forget("auth_sample_rows:en:{$limit}");
-        }
     }
 
     /**

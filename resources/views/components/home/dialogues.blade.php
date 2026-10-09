@@ -1,27 +1,25 @@
-{{-- Two-voice dialogues in the page language: the line being spoken lights up as it plays. --}}
+{{-- Two-voice dialogues in the page language. Each line carries when it is spoken, so it lights up
+     in time with the voice. --}}
 @php
   $vsDialogues = $showcaseDialogues ?? [];
-  $vsInitial = fn (string $name): string => mb_strtoupper(mb_substr(trim($name) !== '' ? trim($name) : '•', 0, 1));
   $vsUntagged = fn (string $text): string => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text));
 @endphp
 @if(!empty($vsDialogues))
 <section class="section vs-dialogues" id="dialogues">
   <div class="vs-head">
     <div>
-      <span class="vs-badge">{{ __('ui.landing.dialogue_badge') }}</span>
       <h2 class="vs-title">{{ __('ui.landing.dialogue_title') }}</h2>
       <p class="vs-lead">{{ __('ui.landing.dialogue_body') }}</p>
     </div>
-    <a class="vs-link vs-head-link" href="{{ auth()->check() ? route('dashboard').'#generateVoiceSection' : route('demo.page') }}">{{ __('ui.landing.dialogue_cta') }}</a>
   </div>
   <div class="vs-dialogue-grid">
-    @foreach($vsDialogues as $dialogue)
+    @foreach($vsDialogues as $i => $dialogue)
       @php $vsPair = $dialogue['speakers']; @endphp
-      <article class="vs-dialogue" data-vp-track data-vp-dialogue data-src="{{ $dialogue['audio_url'] }}">
+      <article class="vs-dialogue{{ $i >= 4 ? ' vs-more' : '' }}" data-vp-track data-vp-dialogue data-src="{{ $dialogue['audio_url'] }}">
         <header class="vs-dialogue-head">
           <span class="vs-avatar-pair" aria-hidden="true">
             @foreach(array_slice($vsPair, 0, 2) as $si => $speaker)
-              <span class="vs-avatar vs-avatar-{{ $si }}">{{ $vsInitial($speaker['name']) }}</span>
+              <x-home.speaker-avatar :avatar="$speaker['avatar'] ?? null" :name="$speaker['name']" :flag="false" class="vs-avatar-{{ $si }}" />
             @endforeach
           </span>
           <span class="vs-dialogue-id">
@@ -35,16 +33,13 @@
         <ol class="vs-turns" dir="{{ $dialogue['language'] === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $dialogue['language'] }}">
           @foreach($dialogue['turns'] as $turn)
             @php $vsLine = $vsUntagged($turn['text']); @endphp
-            <li class="vs-turn vs-turn-{{ $turn['index'] % 2 }}" data-vp-turn data-weight="{{ mb_strlen($vsLine) }}">
+            <li class="vs-turn vs-turn-{{ $turn['index'] % 2 }}" data-vp-turn data-weight="{{ mb_strlen($vsLine) }}"
+              @if($turn['start'] !== null) data-start="{{ $turn['start'] }}" data-end="{{ $turn['end'] }}" @endif>
               <span class="vs-turn-who">{{ $turn['speaker'] }}</span>
               <span class="vs-turn-text">{{ $vsLine }}</span>
+              <span class="vs-turn-bar" aria-hidden="true"></span>
             </li>
           @endforeach
-          @if($dialogue['sign_off'] !== '')
-            <li class="vs-turn vs-turn-sign" data-vp-turn data-weight="{{ mb_strlen($dialogue['sign_off']) }}">
-              <span class="vs-turn-text">{{ $dialogue['sign_off'] }}</span>
-            </li>
-          @endif
         </ol>
         <footer class="vs-card-foot">
           <button type="button" class="vs-play" data-vp-play aria-label="{{ __('ui.landing.showcase_play') }}: {{ $dialogue['title'] }}" data-label-play="{{ __('ui.landing.showcase_play') }}" data-label-pause="{{ __('ui.landing.showcase_pause') }}">
@@ -56,5 +51,8 @@
       </article>
     @endforeach
   </div>
+  @if(count($vsDialogues) > 4)
+    <div class="vs-more-wrap"><button type="button" class="vs-more-btn" data-vp-more>{{ __('ui.landing.dialogue_more') }}</button></div>
+  @endif
 </section>
 @endif

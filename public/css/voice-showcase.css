@@ -27,269 +27,231 @@ html[data-theme="light"] {
 
 [dir="rtl"] .vs-flip { transform: scaleX(-1); }
 
-/* ───────────── Hero artwork: people talking ───────────── */
+/* ───────────── Hero artwork: five speakers in conversation ───────────── */
 .hero-art { grid-template-columns: minmax(0, 1fr); }
 .hero-art .vs-art { width: 100%; }
 .vs-art {
   position: relative;
   width: 100%;
-  max-width: 580px;
-  aspect-ratio: 1 / .8;
+  max-width: 600px;
+  aspect-ratio: 1 / .82;
   margin-inline: auto;
   isolation: isolate;
 }
 .vs-art-glow {
   position: absolute;
-  inset: 4% 2%;
+  inset: 6% 4%;
   border-radius: 50%;
   background:
-    radial-gradient(closest-side at 50% 50%, rgba(118, 89, 250, .38), transparent 72%),
-    radial-gradient(closest-side at 22% 40%, rgba(196, 107, 255, .22), transparent 70%),
-    radial-gradient(closest-side at 80% 60%, rgba(242, 181, 68, .14), transparent 70%);
-  filter: blur(20px);
+    radial-gradient(closest-side at 50% 50%, rgba(118, 89, 250, .36), transparent 72%),
+    radial-gradient(closest-side at 25% 35%, rgba(59, 130, 246, .22), transparent 70%),
+    radial-gradient(closest-side at 78% 65%, rgba(196, 107, 255, .18), transparent 70%);
+  filter: blur(22px);
   z-index: -2;
 }
 html[data-theme="light"] .vs-art-glow { opacity: .55; }
 .vs-art-orbit {
   position: absolute;
-  inset: 10% 4%;
+  inset: 12% 8%;
   border-radius: 50%;
   border: 1px dashed var(--vs-art-orbit);
   z-index: -1;
 }
 
-/* Turn-taking: A speaks for the first half of the loop, B for the second. */
-.vs-turn-a { animation: vs-turn-a 8s ease-in-out infinite; }
-.vs-turn-b { animation: vs-turn-b 8s ease-in-out infinite; }
-@keyframes vs-turn-a {
-  0%, 44% { opacity: 1; }
-  50%, 94% { opacity: 0; }
-  100% { opacity: 1; }
+/* Turn-taking: five 3.6 s turns in an 18 s loop; speaker n starts n × 3.6 s in. */
+.vs-cast-0, .vs-cast-1, .vs-cast-2, .vs-cast-3, .vs-cast-4 { opacity: 0; animation: vs-cast-turn 18s ease-in-out infinite both; }
+.vs-cast-grow-0, .vs-cast-grow-1, .vs-cast-grow-2, .vs-cast-grow-3, .vs-cast-grow-4 { animation: vs-cast-grow 18s ease-in-out infinite both; }
+.vs-cast-1, .vs-cast-grow-1 { animation-delay: 3.6s; }
+.vs-cast-2, .vs-cast-grow-2 { animation-delay: 7.2s; }
+.vs-cast-3, .vs-cast-grow-3 { animation-delay: 10.8s; }
+.vs-cast-4, .vs-cast-grow-4 { animation-delay: 14.4s; }
+@keyframes vs-cast-turn {
+  0% { opacity: 0; }
+  3%, 17% { opacity: 1; }
+  20%, 100% { opacity: 0; }
 }
-@keyframes vs-turn-b {
-  0%, 44% { opacity: 0; }
-  50%, 94% { opacity: 1; }
-  100% { opacity: 0; }
+@keyframes vs-cast-grow {
+  0%, 20%, 100% { transform: scale(1); filter: saturate(.85); }
+  3%, 17% { transform: scale(1.12); filter: saturate(1.05); }
 }
 
-/* Waves between the two speakers */
-.vs-flow {
-  position: absolute;
-  inset-inline: 27%;
-  top: 50%;
-  height: 34%;
-  transform: translateY(-50%);
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-}
-[dir="rtl"] .vs-flow-set { transform: scaleX(-1); }
-.vs-flow-set {
+/* Paths from each speaker to the Listen mark */
+.vs-cast-links {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   overflow: visible;
 }
-.vs-flow-set path { stroke-linecap: round; }
-.vs-flow-1 { stroke-width: 3; opacity: .95; }
-.vs-flow-2 { stroke-width: 2; opacity: .6; }
-.vs-flow-3 { stroke-width: 1.5; opacity: .4; }
-.vs-flow-ab path { animation: vs-flow-forward 2.4s linear infinite; }
-.vs-flow-ba path { animation: vs-flow-back 2.4s linear infinite; }
-.vs-flow-2 { animation-duration: 1.9s !important; }
-.vs-flow-3 { animation-duration: 1.4s !important; }
-@keyframes vs-flow-forward {
-  from { transform: translateX(calc(var(--vs-wl) * -1)); }
-  to { transform: translateX(0); }
+.vs-cast-rest {
+  fill: none;
+  stroke: var(--vs-art-orbit);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 6;
 }
-@keyframes vs-flow-back {
-  from { transform: translateX(0); }
-  to { transform: translateX(calc(var(--vs-wl) * -1)); }
+.vs-cast-flow {
+  fill: none;
+  stroke: url(#vsCastFlow);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 10 14;
 }
-/* A bright pulse travels with the voice, from speaker to listener. */
-.vs-flow-pulse {
+.vs-cast-flow-2 { stroke-width: 7; opacity: .25; filter: blur(2px); }
+.vs-cast-links .vs-cast-flow { animation-name: vs-cast-turn, vs-cast-dash; animation-duration: 18s, 1.1s; animation-timing-function: ease-in-out, linear; animation-iteration-count: infinite, infinite; animation-fill-mode: both, none; }
+.vs-cast-links .vs-cast-1 { animation-delay: 3.6s, 0s; }
+.vs-cast-links .vs-cast-2 { animation-delay: 7.2s, 0s; }
+.vs-cast-links .vs-cast-3 { animation-delay: 10.8s, 0s; }
+.vs-cast-links .vs-cast-4 { animation-delay: 14.4s, 0s; }
+@keyframes vs-cast-dash {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* The Listen mark at the centre */
+.vs-cast-mark {
   position: absolute;
-  top: 50%;
-  width: 18px;
-  height: 18px;
-  margin-top: -9px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #FFFFFF 0 20%, rgba(196, 107, 255, .9) 40%, transparent 70%);
-  filter: blur(.5px);
-}
-.vs-flow-pulse-ab::before, .vs-flow-pulse-ba::before { content: ""; }
-.vs-flow-pulse-ab { animation: vs-turn-a 8s ease-in-out infinite, vs-pulse-forward 1.6s ease-in-out infinite; }
-.vs-flow-pulse-ba { animation: vs-turn-b 8s ease-in-out infinite, vs-pulse-back 1.6s ease-in-out infinite; }
-@keyframes vs-pulse-forward {
-  from { inset-inline-start: 0%; }
-  to { inset-inline-start: 100%; }
-}
-@keyframes vs-pulse-back {
-  from { inset-inline-start: 100%; }
-  to { inset-inline-start: 0%; }
-}
-.vs-flow-mark {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 54px;
-  height: 54px;
+  width: 16%;
+  aspect-ratio: 1;
   transform: translate(-50%, -50%);
   display: grid;
   place-items: center;
   border-radius: 50%;
   color: #FFFFFF;
   background: radial-gradient(circle at 30% 25%, #9C86FF, #7659FA 45%, #4C2DEB 100%);
-  box-shadow: 0 0 0 8px rgba(118, 89, 250, .14), 0 14px 34px rgba(118, 89, 250, .45);
+  box-shadow: 0 0 0 8px rgba(118, 89, 250, .14), 0 18px 44px rgba(118, 89, 250, .45);
+  z-index: 1;
 }
-.vs-flow-mark svg { width: 46%; height: auto; }
-
-/* People */
-.vs-person {
-  position: absolute;
-  aspect-ratio: 1;
-}
-.vs-person-face {
+.vs-cast-mark svg { width: 44%; height: auto; position: relative; }
+.vs-cast-mark-ring {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  overflow: hidden;
-  background: linear-gradient(160deg, var(--vs-face-bg-1), var(--vs-face-bg-2));
-  box-shadow: 0 0 0 4px var(--vs-card), 0 18px 40px rgba(0, 0, 0, .28);
+  border: 2px solid rgba(169, 156, 255, .55);
+  animation: vs-ring 2.4s ease-out infinite;
 }
-html[data-theme="light"] .vs-person-face { box-shadow: 0 0 0 4px #FFFFFF, 0 18px 40px rgba(15, 23, 42, .14); }
-.vs-person-face svg { display: block; width: 100%; height: 100%; }
-.vs-person-a { width: 24%; inset-inline-start: 5%; top: 34%; }
-.vs-person-b { width: 24%; inset-inline-end: 5%; top: 34%; }
-.vs-person-a .vs-person-face { --vs-face-bg-1: #2E2550; --vs-face-bg-2: #1B1830; }
-.vs-person-b .vs-person-face { --vs-face-bg-1: #3A2B1F; --vs-face-bg-2: #1E1A22; }
-html[data-theme="light"] .vs-person-a .vs-person-face { --vs-face-bg-1: #E6E0FF; --vs-face-bg-2: #CFC4FF; }
-html[data-theme="light"] .vs-person-b .vs-person-face { --vs-face-bg-1: #FFEBC8; --vs-face-bg-2: #F7D9A6; }
-
-/* Mouths: open and moving only on that person's turn. */
-.vs-mouth-open { transform-box: fill-box; transform-origin: center; opacity: 0; }
-.vs-speaks-a .vs-mouth-open { animation: vs-turn-a 8s ease-in-out infinite, vs-talk .26s ease-in-out infinite alternate; }
-.vs-speaks-a .vs-mouth-closed { animation: vs-turn-b 8s ease-in-out infinite; }
-.vs-speaks-b .vs-mouth-open { animation: vs-turn-b 8s ease-in-out infinite, vs-talk .26s ease-in-out infinite alternate; }
-.vs-speaks-b .vs-mouth-closed { animation: vs-turn-a 8s ease-in-out infinite; }
-@keyframes vs-talk {
-  from { transform: scaleY(.35); }
-  to { transform: scaleY(1.1); }
-}
-
-/* Rings spread out from whoever is speaking. */
-.vs-person-rings { position: absolute; inset: 0; }
-.vs-person-rings i {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(169, 156, 255, .7);
-  animation: vs-ring 1.8s ease-out infinite;
-}
-.vs-person-rings i:nth-child(2) { animation-delay: .9s; }
-.vs-person-b .vs-person-rings i { border-color: rgba(242, 181, 68, .7); }
+.vs-cast-mark-ring + .vs-cast-mark-ring { animation-delay: 1.2s; }
 @keyframes vs-ring {
   0% { transform: scale(1); opacity: .8; }
-  100% { transform: scale(1.32); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
 }
 
-/* Speech bubble with a live voice meter above the speaker. */
-.vs-bubble {
+/* Speakers */
+.vs-speaker {
   position: absolute;
-  bottom: 100%;
-  margin-bottom: 14px;
-  display: flex;
-  align-items: center;
-  gap: 3px;
-  height: 34px;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: var(--vs-art-glass);
-  border: 1px solid var(--line);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 10px 26px rgba(0, 0, 0, .22);
+  width: 17%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  z-index: 2;
 }
-.vs-bubble-a { inset-inline-start: 46%; }
-.vs-bubble-b { inset-inline-end: 46%; }
-.vs-bubble::after {
+.vs-speaker-photo {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #7659FA, #3B82F6);
+  box-shadow: 0 0 0 4px var(--vs-card), 0 16px 36px rgba(0, 0, 0, .3);
+}
+html[data-theme="light"] .vs-speaker-photo { box-shadow: 0 0 0 4px #FFFFFF, 0 16px 36px rgba(15, 23, 42, .14); }
+.vs-speaker-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vs-speaker-initial { color: #FFFFFF; font-weight: 700; font-size: 1.6rem; }
+.vs-speaker-ring {
+  position: absolute;
+  inset: -10%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, transparent 78%, rgba(169, 156, 255, .55) 80%, transparent 100%);
+}
+.vs-speaker-ring::before, .vs-speaker-ring::after {
   content: "";
   position: absolute;
-  bottom: -6px;
-  width: 11px;
-  height: 11px;
-  background: var(--vs-art-glass);
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  transform: rotate(45deg);
+  inset: 8%;
+  border-radius: 50%;
+  border: 2px solid rgba(169, 156, 255, .7);
+  animation: vs-ring 1.6s ease-out infinite;
 }
-.vs-bubble-a::after { inset-inline-start: 16px; }
-.vs-bubble-b::after { inset-inline-end: 16px; }
-.vs-bubble i {
-  width: 3px;
-  height: 16px;
-  border-radius: 2px;
-  background: var(--brand-accent);
-  animation: vs-meter .9s ease-in-out infinite alternate;
-}
-.vs-bubble-b i { background: var(--vs-accent); }
-.vs-bubble i:nth-child(2) { animation-delay: -.25s; }
-.vs-bubble i:nth-child(3) { animation-delay: -.5s; }
-.vs-bubble i:nth-child(4) { animation-delay: -.15s; }
-.vs-bubble i:nth-child(5) { animation-delay: -.4s; }
-@keyframes vs-meter {
-  from { transform: scaleY(.3); }
-  to { transform: scaleY(1); }
-}
-
-/* Smaller people around the conversation */
-.vs-person-sm { width: 14%; animation: vs-float 7s ease-in-out infinite; }
-.vs-person-sm .vs-person-face { --vs-face-bg-1: #22222C; --vs-face-bg-2: #17171E; box-shadow: 0 0 0 3px var(--vs-card), 0 12px 26px rgba(0, 0, 0, .25); }
-html[data-theme="light"] .vs-person-sm .vs-person-face { --vs-face-bg-1: #F1EFF8; --vs-face-bg-2: #E4E1F0; box-shadow: 0 0 0 3px #FFFFFF, 0 12px 26px rgba(15, 23, 42, .12); }
-.vs-person-c { inset-inline-start: 22%; top: 4%; }
-.vs-person-d { inset-inline-end: 24%; top: 2%; animation-delay: -2.4s; }
-.vs-person-e { inset-inline-start: 43%; bottom: 3%; animation-delay: -4.6s; }
-@keyframes vs-float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-8px); }
-}
-.vs-person-badge {
+.vs-speaker-ring::after { animation-delay: .8s; }
+.vs-speaker-meter {
   position: absolute;
-  inset-inline-end: -6%;
-  bottom: -2%;
+  inset-inline-end: -8%;
+  bottom: -4%;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 2px;
-  width: 40%;
+  width: 38%;
   aspect-ratio: 1;
   border-radius: 50%;
   background: var(--brand-accent);
   box-shadow: 0 0 0 3px var(--vs-card);
+  z-index: 3;
 }
-html[data-theme="light"] .vs-person-badge { box-shadow: 0 0 0 3px #FFFFFF; }
-.vs-person-badge i {
+html[data-theme="light"] .vs-speaker-meter { box-shadow: 0 0 0 3px #FFFFFF; }
+.vs-speaker-meter i {
   width: 2px;
-  height: 40%;
+  height: 42%;
   border-radius: 2px;
   background: #FFFFFF;
-  animation: vs-meter .8s ease-in-out infinite alternate;
+  animation: vs-meter .7s ease-in-out infinite alternate;
 }
-.vs-person-badge i:nth-child(2) { animation-delay: -.3s; height: 55%; }
-.vs-person-badge i:nth-child(3) { animation-delay: -.55s; }
+.vs-speaker-meter i:nth-child(2) { animation-delay: -.25s; height: 60%; }
+.vs-speaker-meter i:nth-child(3) { animation-delay: -.5s; }
+.vs-speaker-meter i:nth-child(4) { animation-delay: -.12s; height: 30%; }
+@keyframes vs-meter {
+  from { transform: scaleY(.35); }
+  to { transform: scaleY(1); }
+}
 
-.vs-art-spark {
+/* Speech bubble: the line, then who is speaking, their dialect and mood. */
+.vs-speech {
   position: absolute;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--vs-accent);
-  box-shadow: 0 0 16px var(--vs-accent);
-  animation: vs-float 6s ease-in-out infinite;
+  top: 50%;
+  width: max-content;
+  max-width: 250%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: var(--vs-art-glass);
+  border: 1px solid var(--line);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .28);
+  pointer-events: none;
+  z-index: 4;
 }
-.vs-art-spark-1 { inset-inline-end: 12%; top: 22%; }
-.vs-art-spark-2 { inset-inline-start: 12%; bottom: 20%; width: 7px; height: 7px; background: #C46BFF; box-shadow: 0 0 14px #C46BFF; animation-delay: -2s; }
-.vs-art-spark-3 { inset-inline-end: 30%; bottom: 14%; width: 6px; height: 6px; background: #3DD68C; box-shadow: 0 0 12px #3DD68C; animation-delay: -4s; }
+html[data-theme="light"] .vs-speech { box-shadow: 0 14px 34px rgba(15, 23, 42, .12); }
+.vs-speaker-end .vs-speech { inset-inline-start: 118%; transform: translateY(-50%); }
+.vs-speaker-start .vs-speech { inset-inline-end: 118%; transform: translateY(-50%); }
+.vs-speaker-up .vs-speech { top: auto; bottom: 120%; left: 50%; transform: translateX(-50%); }
+/* Stage positions are physical, so in Arabic the side bubbles swap to keep pointing inward. */
+[dir="rtl"] .vs-speaker-end .vs-speech { inset-inline-start: auto; inset-inline-end: 118%; }
+[dir="rtl"] .vs-speaker-start .vs-speech { inset-inline-end: auto; inset-inline-start: 118%; }
+.vs-speech-line {
+  font-size: .95rem;
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text);
+  max-width: 15rem;
+  white-space: normal;
+}
+.vs-speech-line:lang(ar) { font-family: 'IBM Plex Sans Arabic', sans-serif; font-size: 1rem; }
+.vs-speech-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: .75rem;
+  color: var(--muted);
+}
+.vs-speech-mood {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--vs-soft);
+  color: var(--vs-brand-text);
+  font-weight: 700;
+}
 
 /* ───────────── Section heads ───────────── */
 .vs-gallery, .vs-dialogues { scroll-margin-top: 90px; }
@@ -312,24 +274,6 @@ html[data-theme="light"] .vs-person-badge { box-shadow: 0 0 0 3px #FFFFFF; }
   font-size: 1.05rem;
   line-height: 1.65;
 }
-.vs-badge {
-  display: inline-flex;
-  margin-bottom: 10px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--vs-soft);
-  color: var(--vs-brand-text);
-  font-size: .8125rem;
-  font-weight: 600;
-}
-.vs-link {
-  flex: none;
-  color: var(--vs-brand-text);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-}
-.vs-link:hover { text-decoration: underline; }
 
 /* ───────────── Flags ───────────── */
 .vs-flag {
@@ -354,7 +298,6 @@ html[data-theme="light"] .vs-person-badge { box-shadow: 0 0 0 3px #FFFFFF; }
   pointer-events: none;
 }
 .vs-flag-xs { width: 16px; height: 16px; }
-.vs-flag-lg { width: 42px; height: 42px; }
 .vs-flag-ar {
   background: linear-gradient(135deg, #0F7A49, #12A15F);
   color: #FFFFFF;
@@ -364,7 +307,6 @@ html[data-theme="light"] .vs-person-badge { box-shadow: 0 0 0 3px #FFFFFF; }
   line-height: 1;
 }
 .vs-flag-xs.vs-flag-ar { font-size: .6rem; }
-.vs-flag-lg.vs-flag-ar { font-size: 1.25rem; }
 
 /* ───────────── Player: play button and filling waveform ───────────── */
 .vs-play {
@@ -423,6 +365,9 @@ html[data-theme="light"] .vs-person-badge { box-shadow: 0 0 0 3px #FFFFFF; }
   max-width: 4px;
   border-radius: 999px;
   background: var(--vs-wave);
+  transform-origin: center;
+  transition: height .6s cubic-bezier(.2, .8, .2, 1), transform .12s linear;
+  will-change: transform;
 }
 .vs-wave-fill i { background: linear-gradient(180deg, #A99CFF, var(--brand-accent)); }
 .vs-wave-fill { clip-path: inset(0 calc((1 - var(--vp-progress, 0)) * 100%) 0 0); }
@@ -493,15 +438,6 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   background: var(--vs-raised);
 }
 [dir="rtl"] .vs-card-foot { padding: 10px 10px 10px 14px; }
-.vs-signature {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin: 1.5rem 0 0;
-  font-size: .875rem;
-  color: var(--muted);
-}
 .vs-more-wrap { display: flex; justify-content: center; margin-top: 1.5rem; }
 .vs-more-btn {
   min-height: 44px;
@@ -541,23 +477,39 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
 }
 .vs-dialogue .vs-card-foot { margin-top: auto; }
 .vs-dialogue-head { display: flex; align-items: center; gap: 12px; }
-.vs-avatar {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+.vs-avatar-photo {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
   flex: none;
-  width: 38px;
-  height: 38px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #7B5CFF, #C46BFF);
+  background: linear-gradient(135deg, #7659FA, #3B82F6);
   color: #FFFFFF;
   font-weight: 700;
-  font-size: .95rem;
 }
-.vs-avatar-1 { background: linear-gradient(135deg, #F2B544, #F27A44); }
+.vs-avatar-photo > img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.vs-avatar-lg { width: 52px; height: 52px; }
+.vs-flag-badge {
+  position: absolute;
+  inset-inline-end: -3px;
+  bottom: -2px;
+  width: 20px;
+  height: 20px;
+  box-shadow: 0 0 0 2px var(--vs-card);
+}
+.vs-flag-badge.vs-flag-ar { font-size: .6rem; }
+.vs-card.is-playing .vs-avatar-photo { box-shadow: 0 0 0 3px var(--brand-accent); }
 .vs-avatar-pair { display: inline-flex; flex: none; }
-.vs-avatar-pair .vs-avatar { box-shadow: 0 0 0 3px var(--vs-card); }
-.vs-avatar-pair .vs-avatar + .vs-avatar { margin-inline-start: -10px; }
+.vs-avatar-pair .vs-avatar-photo { box-shadow: 0 0 0 3px var(--vs-card); }
+.vs-avatar-pair .vs-avatar-photo + .vs-avatar-photo { margin-inline-start: -12px; }
 .vs-dialogue-id { display: flex; flex-direction: column; min-width: 0; }
 .vs-dialogue-title { font-weight: 700; }
 .vs-dialogue-meta {
@@ -576,15 +528,17 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   gap: 8px;
 }
 .vs-turn {
+  position: relative;
   max-width: 86%;
-  padding: 10px 14px;
+  padding: 10px 14px 12px;
   border-radius: 18px;
   background: var(--vs-raised);
   border: 1px solid transparent;
   font-size: .94rem;
   line-height: 1.55;
   color: var(--muted);
-  transition: color .2s ease, background-color .2s ease, border-color .2s ease, transform .2s ease;
+  overflow: hidden;
+  transition: color .35s ease, background-color .35s ease, border-color .35s ease, transform .35s cubic-bezier(.2, .8, .2, 1), box-shadow .35s ease;
 }
 .vs-turn-0 { align-self: flex-start; border-end-start-radius: 6px; }
 .vs-turn-1 { align-self: flex-end; border-end-end-radius: 6px; }
@@ -600,22 +554,57 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   color: var(--text);
   background: var(--vs-soft);
   border-color: var(--vs-soft-line);
-  transform: scale(1.01);
+  transform: scale(1.015);
+  box-shadow: 0 8px 22px rgba(118, 89, 250, .16);
 }
 .vs-turn.is-done { color: var(--text); }
-.vs-turn-sign {
-  align-self: center;
-  max-width: none;
-  padding: 4px 12px;
-  background: transparent;
-  font-size: .8125rem;
+/* A thin line fills under the line while it is spoken. */
+.vs-turn-bar {
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #A99CFF, var(--brand-accent));
+  transform: scaleX(var(--turn-progress, 0));
+  transform-origin: left center;
+  opacity: 0;
+  transition: opacity .35s ease;
 }
-.vs-turn-sign.is-active { background: transparent; border-color: transparent; color: var(--vs-brand-text); transform: none; }
+[dir="rtl"] .vs-turn-bar, .vs-turns[dir="rtl"] .vs-turn-bar { transform-origin: right center; }
+.vs-turn.is-active .vs-turn-bar { opacity: 1; }
+.vs-turn-1 .vs-turn-bar { background: linear-gradient(90deg, #F2C66E, var(--vs-accent)); }
+
+/* Region chips */
+.vs-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: -.5rem 0 1.25rem;
+}
+.vs-chip {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color .15s ease, border-color .15s ease, background-color .15s ease;
+}
+.vs-chip:hover { color: var(--text); border-color: var(--vs-soft-line); }
+.vs-chip[aria-selected="true"] { background: var(--brand-accent); border-color: var(--brand-accent); color: #FFFFFF; }
+.vs-chip:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 2px; }
+.vs-card[hidden] { display: none !important; }
+.vs-more-wrap[hidden] { display: none !important; }
 
 /* ───────────── Responsive ───────────── */
 @media (min-width: 641px) {
-  .vs-grid:not(.is-expanded) .vs-card.vs-more { display: none; }
-  .vs-grid.is-expanded + .vs-more-wrap { display: none; }
+  .vs-grid:not(.is-expanded):not(.is-filtered) .vs-card.vs-more { display: none; }
+  .vs-dialogue-grid:not(.is-expanded) .vs-dialogue.vs-more { display: none; }
+  .vs-grid.is-expanded + .vs-more-wrap, .vs-dialogue-grid.is-expanded + .vs-more-wrap { display: none; }
 }
 @media (max-width: 980px) {
   .vs-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -643,17 +632,15 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   .vs-more-wrap { display: none; }
   .vs-turn { max-width: 94%; }
   .vs-art { aspect-ratio: 1 / .86; }
-  .vs-bubble { height: 26px; padding: 0 9px; margin-bottom: 10px; }
-  .vs-bubble i { height: 12px; }
-  .vs-flow-mark { width: 40px; height: 40px; }
+  .vs-speech { padding: 8px 10px; gap: 4px; }
+  .vs-speech-line { font-size: .8rem; max-width: 10.5rem; }
+  .vs-speech-meta { font-size: .68rem; }
 }
 @media (prefers-reduced-motion: reduce) {
-  /* Hold one moment of the conversation: A speaking, waves still. */
+  /* Hold one moment of the conversation: the first speaker talking. */
   .vs-art *, .vs-art *::before, .vs-art *::after { animation: none !important; }
-  .vs-turn-b, .vs-speaks-a .vs-mouth-closed { opacity: 0; }
-  .vs-turn-a, .vs-speaks-a .vs-mouth-open { opacity: 1; }
-  .vs-flow-pulse-ab { inset-inline-start: 50%; }
-  .vs-person-rings i { opacity: .35; transform: scale(1.12); }
+  .vs-cast-0 { opacity: 1; }
+  .vs-cast-grow-0 { transform: scale(1.12); }
   .is-playing .vs-play::after { animation: none; }
   .vs-card:hover, .vs-play:hover { transform: none; }
 }

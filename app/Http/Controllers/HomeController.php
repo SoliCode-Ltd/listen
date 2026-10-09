@@ -18,10 +18,10 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
-use App\Support\GeminiTtsModel;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
+use App\Support\SpeakerAvatar;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -1621,11 +1621,13 @@ class HomeController extends Controller
     private function showcaseCard(VoiceSample $sample, bool $isArabicLocale): array
     {
         $metadata = is_array($sample->metadata) ? $sample->metadata : [];
+        $language = $sample->language === 'ar' ? 'ar' : 'en';
         $speakers = [];
         foreach ((array) ($metadata['speakers'] ?? []) as $speaker) {
             $name = (string) ($speaker['name'] ?? '');
             $speakers[$name] = [
                 'name' => $isArabicLocale ? (string) ($speaker['name_ar'] ?? $name) : $name,
+                'avatar' => SpeakerAvatar::url($name, $language),
                 'gender' => (string) ($speaker['gender'] ?? ''),
                 'dialect' => VoiceFlag::label($speaker['dialect'] ?? $sample->dialect, $isArabicLocale),
                 'flag' => VoiceFlag::url($speaker['dialect'] ?? $sample->dialect),
@@ -1634,9 +1636,11 @@ class HomeController extends Controller
         $speakerName = trim((string) ($isArabicLocale
             ? ($metadata['speaker_name_ar'] ?? $metadata['speaker_name'] ?? '')
             : ($metadata['speaker_name'] ?? '')));
+        $avatarName = (string) (array_key_first($speakers) ?? '');
         if ($speakerName === '') {
             $voiceMeta = VoiceCatalog::voiceMeta($sample->voice_name);
             $speakerName = trim((string) ($isArabicLocale ? ($voiceMeta['label_ar'] ?? $voiceMeta['label'] ?? '') : ($voiceMeta['label'] ?? '')));
+            $avatarName = (string) ($voiceMeta['label'] ?? '');
         }
 
         $turns = [];
@@ -1646,6 +1650,9 @@ class HomeController extends Controller
                 'speaker' => $speakers[$key]['name'] ?? $key,
                 'index' => max(0, (int) array_search($key, array_keys($speakers), true)),
                 'text' => (string) ($turn['text'] ?? ''),
+                // When the line is spoken, in seconds, when known.
+                'start' => isset($turn['start']) ? (float) $turn['start'] : null,
+                'end' => isset($turn['end']) ? (float) $turn['end'] : null,
             ];
         }
 
@@ -1654,11 +1661,13 @@ class HomeController extends Controller
         return [
             'id' => (int) $sample->id,
             'title' => trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title)),
-            'language' => $sample->language === 'ar' ? 'ar' : 'en',
+            'language' => $language,
             'dialect' => (string) $sample->dialect,
+            'region' => VoiceFlag::region($sample->dialect),
             'dialect_label' => VoiceFlag::label($sample->dialect, $isArabicLocale),
             'flag' => VoiceFlag::url($sample->dialect, $sample->country),
             'speaker' => $speakerName,
+            'avatar' => SpeakerAvatar::url($avatarName, $language),
             'gender' => (string) $sample->gender,
             'speakers' => array_values($speakers),
             'turns' => $turns,
@@ -1666,8 +1675,6 @@ class HomeController extends Controller
             'text' => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text)),
             'audio_url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
             'duration' => (int) ($sample->duration_seconds ?? 0),
-            'sign_off' => trim((string) ($metadata['sign_off'] ?? '')),
-            'is_new_model' => ($metadata['model'] ?? '') === GeminiTtsModel::FLASH,
         ];
     }
 

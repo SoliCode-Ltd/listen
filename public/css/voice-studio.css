@@ -524,6 +524,24 @@ html[dir="rtl"] .vs-select-button { padding: 0 1rem 0 .9rem; }
 .vs-select-check { visibility: hidden; color: var(--text); }
 .vs-select-option[aria-selected="true"] { font-weight: 600; }
 .vs-select-option[aria-selected="true"] .vs-select-check { visibility: visible; }
+/* Speaker menus: each speaker's Listen avatar beside the name. */
+.vs-select-avatar {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: linear-gradient(135deg, #7659FA, #3B82F6);
+  color: #FFFFFF;
+  font-size: .8rem;
+  font-weight: 700;
+}
+.vs-select-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.vs-select-label:has(.vs-select-avatar) { display: inline-flex; align-items: center; gap: .6rem; }
+.vs-select-option:has(.vs-select-avatar) { justify-content: flex-start; }
+.vs-select-option:has(.vs-select-avatar) .vs-select-check { margin-inline-start: auto; }
 .vs-select-group {
   padding: .55rem .75rem .3rem;
   font-size: .76rem;

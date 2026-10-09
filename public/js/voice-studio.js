@@ -76,9 +76,26 @@
     var items = [];
     var active = -1;
 
+    // Speaker menus (data-speaker-avatar) show each speaker's avatar from the option's data-avatar.
+    var withAvatars = select.hasAttribute('data-speaker-avatar');
+    function avatarFor(opt) {
+      var box = document.createElement('span');
+      box.className = 'vs-select-avatar';
+      box.setAttribute('aria-hidden', 'true');
+      var url = opt ? String(opt.getAttribute('data-avatar') || '') : '';
+      if (url) {
+        var img = document.createElement('img');
+        img.src = url; img.alt = ''; img.width = 28; img.height = 28; img.loading = 'lazy'; img.decoding = 'async';
+        box.appendChild(img);
+      } else {
+        box.textContent = opt ? String(opt.textContent || '').trim().charAt(0).toUpperCase() : '';
+      }
+      return box;
+    }
     function syncLabel() {
       var picked = select.options[select.selectedIndex];
       label.textContent = picked ? picked.textContent : '';
+      if (withAvatars && picked) label.insertBefore(avatarFor(picked), label.firstChild);
       button.disabled = select.disabled || select.options.length === 0;
       items.forEach(function (item) {
         var on = item.__opt === picked;
@@ -108,6 +125,7 @@
       item.setAttribute('role', 'option');
       item.__opt = opt;
       item.textContent = opt.textContent;
+      if (withAvatars) item.insertBefore(avatarFor(opt), item.firstChild);
       item.insertAdjacentHTML('beforeend', '<svg class="vs-select-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>');
       if (opt.disabled) item.setAttribute('aria-disabled', 'true');
       item.addEventListener('mousemove', function () { setActive(items.indexOf(item)); });

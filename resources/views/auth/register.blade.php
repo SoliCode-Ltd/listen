@@ -483,6 +483,8 @@
   </script>
   @php($authCssFile = public_path('css/auth.css'))
   <link rel="stylesheet" href="{{ asset('css/auth.css') }}?v={{ is_file($authCssFile) ? filemtime($authCssFile) : '1' }}">
+  @php($voiceShowcaseCss = public_path('css/voice-showcase.css'))
+  <link rel="stylesheet" href="{{ asset('css/voice-showcase.css') }}?v={{ is_file($voiceShowcaseCss) ? filemtime($voiceShowcaseCss) : '1' }}">
 </head>
 <body class="auth-split-body">
   <script>

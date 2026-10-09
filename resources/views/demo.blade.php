@@ -152,7 +152,7 @@
                 </div>
                 <div class="ctrl-group vs-field-compact">
                   <label for="voice_key">{{ __('ui.demo.speaker') }}</label>
-                  <select id="voice_key" name="voice_key"></select>
+                  <select id="voice_key" name="voice_key" data-speaker-avatar></select>
                 </div>
               </div>
 
@@ -1024,7 +1024,7 @@
       const current = String(remembered || defaultVoiceKey || preferredArabicGeminiVoiceKey || '').trim();
       voiceSelect.innerHTML = '';
       if (!voices.length) { voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>'; preferredVoiceKeyByLanguageAndTier[preferenceBucket] = ''; return; }
-      for (const voice of voices) { const option = document.createElement('option'); option.value = voice.key; option.textContent = voiceDisplayLabel(voice); voiceSelect.appendChild(option); }
+      for (const voice of voices) { const option = document.createElement('option'); option.value = voice.key; option.textContent = voiceDisplayLabel(voice); option.dataset.avatar = voice.avatar || ''; voiceSelect.appendChild(option); }
       if (voices.some((v) => v.key === current)) voiceSelect.value = current;
       else voiceSelect.value = voices[0].key;
       preferredVoiceKeyByLanguageAndTier[preferenceBucket] = String(voiceSelect.value||'').trim();
