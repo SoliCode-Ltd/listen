@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SLUGS: hero-ar-sultan hero-ar-nawaf hero-ar-sawsan hero-en-theodore hero-en-charlie hero-en-miles hero-en-luna
+  SLUGS: hero-en-luna
 
 jobs:
   generate:

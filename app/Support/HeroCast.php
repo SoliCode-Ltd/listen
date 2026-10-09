@@ -50,8 +50,8 @@ final class HeroCast
                 'style' => 'A laid-back Australian man who laughs first, then tells his mates, relaxed and cheeky.',
                 'line' => '<laugh> Too easy, mate. I made a whole podcast intro with Listen before my coffee.'],
             ['name' => 'Luna', 'voice' => 'Despina', 'dialect' => 'en-IN',
-                'style' => 'A cheerful Indian content creator from Mumbai with a clear Indian English accent. She sighs happily, then speaks brightly and warmly.',
-                'line' => '<sigh> Honestly, Listen saves me hours every week. My channel has never sounded better!'],
+                'style' => 'A cheerful content creator from Mumbai speaking Indian English with a strong, unmistakable Indian accent and Indian rhythm and intonation, not American or British. She sighs happily, then speaks brightly and warmly.',
+                'line' => '<sigh> Arre yaar, honestly, Listen saves me hours every week. My channel has never sounded better!'],
         ],
     ];
 
