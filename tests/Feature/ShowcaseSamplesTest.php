@@ -69,7 +69,8 @@ class ShowcaseSamplesTest extends TestCase
         SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW);
         $this->artisan('tts:showcase', ['--import' => true]);
 
-        $en = $this->get('/en')->assertOk();
+        app()->setLocale('en');
+        $en = $this->getLocalizedRoute('home')->assertOk();
         $en->assertSee('images/flags/sa.svg', false);
         $en->assertSee('images/flags/gb-sct.svg', false);
         $en->assertSee('data-nt-dialogue', false);
@@ -78,7 +79,8 @@ class ShowcaseSamplesTest extends TestCase
         $en->assertDontSee('flagcdn.com', false);
         $en->assertDontSee('&lt;laugh&gt;', false);
 
-        $ar = $this->get('/ar')->assertOk();
+        app()->setLocale('ar');
+        $ar = $this->getLocalizedRoute('home')->assertOk();
         $ar->assertSee('سعودي (نجدي)');
         $ar->assertSee('هذا الصوت من إنتاج منصة إسمع.');
     }
