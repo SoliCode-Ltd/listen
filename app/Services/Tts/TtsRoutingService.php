@@ -5,6 +5,7 @@ namespace App\Services\Tts;
 use App\Contracts\TtsProviderInterface;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Services\GenerationErrorRecorder;
 use App\Support\VoiceTier;
 use Illuminate\Support\Facades\Log;
 
@@ -72,6 +73,7 @@ class TtsRoutingService
                     $fallbackVoiceConfig = $this->adaptVoiceConfigForFallback($voiceConfig, $targetLanguage);
                     $result = $this->googleProvider->synthesize($text, $targetLanguage, $fallbackVoiceConfig);
                     $fallbackUsed = true;
+                    app(GenerationErrorRecorder::class)->fallbackUsed($provider->name(), $primaryError, $userId, $targetLanguage, $voiceConfig);
                 } catch (\Throwable $fallbackError) {
                     Log::error('TTS fallback to Google Cloud also failed.', [
                         'primary_error' => $primaryError->getMessage(),

@@ -4,7 +4,11 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\AudioGenerationResource\Pages;
 use App\Models\AudioGeneration;
+use App\Models\GenerationError;
+use App\Models\TtsLog;
 use App\Support\AudioUrl;
+use App\Support\GenerationChoiceLabels;
+use App\Support\VoiceTier;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -37,25 +41,18 @@ class AudioGenerationResource extends Resource
                         Forms\Components\TextInput::make('text_item_id')
                             ->numeric(),
                         Forms\Components\TextInput::make('voice_name')
-                            ->maxLength(255),
+                            ->maxLength(255)
+                            ->helperText(fn (?AudioGeneration $record): ?string => $record ? GenerationChoiceLabels::voice($record->voice_name) : null),
                         Forms\Components\Select::make('voice_tier')
-                            ->options([
-                                'standard' => 'Standard',
-                                'premium' => 'Premium',
-                                'studio' => 'Studio',
-                            ]),
+                            ->label('Quality')
+                            ->options(self::tierOptions()),
                         Forms\Components\TextInput::make('source_language')
                             ->maxLength(10),
                         Forms\Components\TextInput::make('target_language')
                             ->maxLength(10),
                         Forms\Components\Toggle::make('translate'),
                         Forms\Components\Select::make('status')
-                            ->options([
-                                'pending' => 'Pending',
-                                'processing' => 'Processing',
-                                'completed' => 'Completed',
-                                'failed' => 'Failed',
-                            ]),
+                            ->options(self::statusOptions()),
                         Forms\Components\TextInput::make('duration_seconds')
                             ->numeric(),
                         Forms\Components\TextInput::make('audio_path')
@@ -67,13 +64,73 @@ class AudioGenerationResource extends Resource
                             ->dehydrated(false)
                             ->columnSpanFull(),
                     ]),
+                Forms\Components\Section::make('Studio Choices')
+                    ->description('What the member picked, named as the site offers it today.')
+                    ->columns(2)
+                    ->visibleOn(['view', 'edit'])
+                    ->schema([
+                        Forms\Components\Placeholder::make('accent_label')
+                            ->label('Accent')
+                            ->content(fn (?AudioGeneration $record): string => GenerationChoiceLabels::accent($record?->dialect, $record?->target_language, $record?->voice_tier))
+                            ->columnSpanFull(),
+                        Forms\Components\Placeholder::make('performance_style_label')
+                            ->label('Performance style')
+                            ->content(fn (?AudioGeneration $record): string => GenerationChoiceLabels::performanceStyle($record?->performance_style)),
+                        Forms\Components\Placeholder::make('emotion_label')
+                            ->label('Emotion')
+                            ->content(fn (?AudioGeneration $record): string => GenerationChoiceLabels::emotion($record?->emotion)),
+                        Forms\Components\Placeholder::make('speed_label')
+                            ->label('Speed')
+                            ->content(fn (?AudioGeneration $record): string => $record?->speed !== null ? $record->speed.'x' : '—'),
+                        Forms\Components\Placeholder::make('pitch_label')
+                            ->label('Pitch')
+                            ->content(fn (?AudioGeneration $record): string => $record?->pitch !== null ? (string) $record->pitch : '—'),
+                        Forms\Components\Placeholder::make('style_prompt_label')
+                            ->label('Custom direction')
+                            ->content(fn (?AudioGeneration $record): string => filled($record?->style_prompt) ? (string) $record->style_prompt : '—')
+                            ->columnSpanFull(),
+                        Forms\Components\Placeholder::make('dialogue_label')
+                            ->label('Dialogue speakers')
+                            ->content(fn (?AudioGeneration $record): string => self::dialogueSummary($record))
+                            ->visible(fn (?AudioGeneration $record): bool => (bool) $record?->is_dialogue)
+                            ->columnSpanFull(),
+                    ]),
+                Forms\Components\Section::make('Delivery')
+                    ->columns(3)
+                    ->visibleOn(['view', 'edit'])
+                    ->schema([
+                        Forms\Components\Placeholder::make('tts_provider_label')
+                            ->label('Voice engine')
+                            ->content(fn (?AudioGeneration $record): string => $record?->tts_provider ?: '—'),
+                        Forms\Components\Placeholder::make('tts_model_label')
+                            ->label('Model')
+                            ->content(fn (?AudioGeneration $record): string => $record?->tts_model ?: '—'),
+                        Forms\Components\Placeholder::make('tts_fallback_label')
+                            ->label('Backup engine used')
+                            ->content(fn (?AudioGeneration $record): string => $record?->tts_fallback_used ? 'Yes' : 'No'),
+                        Forms\Components\Placeholder::make('billable_chars_label')
+                            ->label('Characters')
+                            ->content(fn (?AudioGeneration $record): string => $record?->billable_chars !== null ? number_format((int) $record->billable_chars) : '—'),
+                        Forms\Components\Placeholder::make('tts_latency_label')
+                            ->label('Time taken')
+                            ->content(fn (?AudioGeneration $record): string => $record?->tts_latency_ms !== null ? number_format((int) $record->tts_latency_ms).' ms' : '—'),
+                        Forms\Components\Placeholder::make('tts_cost_label')
+                            ->label('Estimated cost')
+                            ->content(fn (?AudioGeneration $record): string => $record?->tts_cost_estimate_usd !== null ? '$'.number_format((float) $record->tts_cost_estimate_usd, 4) : '—'),
+                    ]),
                 Forms\Components\Section::make('Content')
                     ->schema([
                         Forms\Components\Textarea::make('input_text')
                             ->rows(6)
                             ->columnSpanFull(),
                         Forms\Components\Textarea::make('error_message')
-                            ->rows(3)
+                            ->label('What the member was told')
+                            ->rows(2)
+                            ->columnSpanFull(),
+                        Forms\Components\Placeholder::make('technical_error')
+                            ->label('Technical error')
+                            ->content(fn (?AudioGeneration $record): string => self::technicalError($record))
+                            ->visible(fn (?AudioGeneration $record): bool => $record?->status === 'failed')
                             ->columnSpanFull(),
                     ]),
             ]);
@@ -91,22 +148,31 @@ class AudioGenerationResource extends Resource
                     ->sortable()
                     ->placeholder('-'),
                 Tables\Columns\TextColumn::make('voice_name')
+                    ->label('Voice')
+                    ->formatStateUsing(fn (?string $state): string => GenerationChoiceLabels::voice($state))
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('voice_tier')
+                    ->label('Quality')
                     ->badge()
-                    ->color(fn (?string $state): string => match ($state) {
-                        'premium' => 'warning',
-                        'studio' => 'success',
-                        default => 'gray',
-                    })
+                    ->formatStateUsing(fn (?string $state): string => self::tierOptions()[VoiceTier::normalize($state)] ?? (string) $state)
+                    ->color(fn (?string $state): string => VoiceTier::normalize($state) === VoiceTier::HD ? 'warning' : 'gray')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('dialect')
+                    ->label('Accent')
+                    ->state(fn (AudioGeneration $record): string => $record->dialect
+                        ? GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier)
+                        : '—')
+                    ->wrap()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
+                    ->formatStateUsing(fn (?string $state): string => self::statusOptions()[$state] ?? (string) $state)
                     ->color(fn (?string $state): string => match ($state) {
-                        'completed' => 'success',
+                        'done' => 'success',
                         'processing' => 'info',
-                        'pending' => 'warning',
+                        'queued' => 'warning',
                         'failed' => 'danger',
                         default => 'gray',
                     })
@@ -130,18 +196,14 @@ class AudioGenerationResource extends Resource
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')
-                    ->options([
-                        'pending' => 'Pending',
-                        'processing' => 'Processing',
-                        'completed' => 'Completed',
-                        'failed' => 'Failed',
-                    ]),
+                    ->options(self::statusOptions()),
                 Tables\Filters\SelectFilter::make('voice_tier')
-                    ->options([
-                        'standard' => 'Standard',
-                        'premium' => 'Premium',
-                        'studio' => 'Studio',
-                    ]),
+                    ->label('Quality')
+                    ->options(self::tierOptions()),
+                Tables\Filters\SelectFilter::make('dialect')
+                    ->label('Accent')
+                    ->options(fn (): array => GenerationChoiceLabels::accentOptions())
+                    ->searchable(),
                 Tables\Filters\TernaryFilter::make('translate')
                     ->label('Translated'),
             ])
@@ -161,6 +223,76 @@ class AudioGenerationResource extends Resource
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    /**
+     * The statuses GenerateAudioJob and the controllers set.
+     *
+     * @return array<string, string>
+     */
+    public static function statusOptions(): array
+    {
+        return [
+            'queued' => 'Queued',
+            'processing' => 'Processing',
+            'done' => 'Done',
+            'failed' => 'Failed',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function tierOptions(): array
+    {
+        return [
+            VoiceTier::STANDARD => 'Standard',
+            VoiceTier::HD => 'Premium (HD)',
+        ];
+    }
+
+    private static function dialogueSummary(?AudioGeneration $record): string
+    {
+        $speakers = is_array($record?->dialogue_metadata) ? ($record->dialogue_metadata['speakers'] ?? []) : [];
+        if (! is_array($speakers) || $speakers === []) {
+            return '—';
+        }
+
+        $lines = [];
+        foreach ($speakers as $speaker) {
+            if (! is_array($speaker)) {
+                continue;
+            }
+            $name = trim((string) ($speaker['name'] ?? $speaker['speaker'] ?? ''));
+            $voice = GenerationChoiceLabels::voice((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''));
+            $lines[] = ($name !== '' ? $name.': ' : '').$voice;
+        }
+
+        return $lines !== [] ? implode(' | ', $lines) : '—';
+    }
+
+    /**
+     * Members only see a generic message; the real reason is in the logs.
+     */
+    private static function technicalError(?AudioGeneration $record): string
+    {
+        if (! $record) {
+            return '—';
+        }
+
+        $recorded = rescue(fn () => GenerationError::query()
+            ->where('subject_type', 'audio_generation')
+            ->where('subject_id', $record->id)
+            ->latest('id')
+            ->value('message'), null, false);
+
+        $reason = $recorded ?? TtsLog::query()
+            ->where('audio_generation_id', $record->id)
+            ->where('status', 'failed')
+            ->latest('id')
+            ->value('failure_reason');
+
+        return filled($reason) ? (string) $reason : 'No technical detail was recorded.';
     }
 
     public static function getPages(): array

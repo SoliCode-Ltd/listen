@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Services\PlanAccessService;
 use App\Support\AudioUrl;
+use App\Support\GenerationChoiceLabels;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -45,18 +46,21 @@ class DemoVoiceGenerationResource extends Resource
                             ->disabled()
                             ->dehydrated(false)
                             ->formatStateUsing(fn ($record) => $record?->user?->email),
-                        Forms\Components\TextInput::make('voice_label')
-                            ->disabled(),
-                        Forms\Components\TextInput::make('voice_name')
-                            ->disabled(),
+                        Forms\Components\Placeholder::make('voice_choice')
+                            ->label('Voice')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::voice($record?->voice_name)),
                         Forms\Components\TextInput::make('voice_provider')
+                            ->label('Voice engine')
                             ->disabled(),
-                        Forms\Components\TextInput::make('voice_tier')
-                            ->disabled(),
-                        Forms\Components\TextInput::make('source_language')
-                            ->disabled(),
-                        Forms\Components\TextInput::make('target_language')
-                            ->disabled(),
+                        Forms\Components\Placeholder::make('tier_choice')
+                            ->label('Quality')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::tier($record?->voice_tier)),
+                        Forms\Components\Placeholder::make('source_language_choice')
+                            ->label('Text language')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::language($record?->source_language)),
+                        Forms\Components\Placeholder::make('target_language_choice')
+                            ->label('Voice language')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::language($record?->target_language)),
                         Forms\Components\Toggle::make('translate')
                             ->disabled(),
                         Forms\Components\TextInput::make('billable_chars')
@@ -75,9 +79,16 @@ class DemoVoiceGenerationResource extends Resource
                 Forms\Components\Section::make('Studio Controls')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('dialect')->disabled(),
-                        Forms\Components\TextInput::make('performance_style')->disabled(),
-                        Forms\Components\TextInput::make('emotion')->disabled(),
+                        Forms\Components\Placeholder::make('accent_choice')
+                            ->label('Accent')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::accent($record?->dialect, $record?->target_language, $record?->voice_tier))
+                            ->columnSpanFull(),
+                        Forms\Components\Placeholder::make('performance_style_choice')
+                            ->label('Performance style')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::performanceStyle($record?->performance_style)),
+                        Forms\Components\Placeholder::make('emotion_choice')
+                            ->label('Emotion')
+                            ->content(fn (?DemoVoiceGeneration $record): string => GenerationChoiceLabels::emotion($record?->emotion)),
                         Forms\Components\TextInput::make('speed')->numeric()->disabled(),
                         Forms\Components\TextInput::make('pitch')->numeric()->disabled(),
                         Forms\Components\Textarea::make('style_prompt')
@@ -174,6 +185,13 @@ class DemoVoiceGenerationResource extends Resource
                 Tables\Columns\TextColumn::make('target_language')
                     ->badge()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('dialect')
+                    ->label('Accent')
+                    ->state(fn (DemoVoiceGeneration $record): string => $record->dialect
+                        ? GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier)
+                        : '—')
+                    ->wrap()
+                    ->toggleable(),
                 Tables\Columns\IconColumn::make('translate')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('billable_chars')
@@ -215,6 +233,10 @@ class DemoVoiceGenerationResource extends Resource
                         'gemini' => 'Gemini',
                         'cache' => 'Cache',
                     ]),
+                Tables\Filters\SelectFilter::make('dialect')
+                    ->label('Accent')
+                    ->options(fn (): array => GenerationChoiceLabels::accentOptions())
+                    ->searchable(),
                 Tables\Filters\TernaryFilter::make('translate')
                     ->label('Translated'),
                 Tables\Filters\TernaryFilter::make('paid_user')

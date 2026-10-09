@@ -10,6 +10,7 @@ use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
+use App\Services\GenerationErrorRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\Referral\DemoRewardLedgerService;
@@ -553,7 +554,7 @@ class HomeController extends Controller
                 $validated['target_language'],
                 $voiceOptions,
                 $demoRoutingPlan,
-                null,
+                (int) $request->user()->id,
             );
             $audio['audio_path'] = $this->storeDemoAudioCopy((string) ($audio['audio_path'] ?? ''));
 
@@ -667,6 +668,22 @@ class HomeController extends Controller
                 'exception_class' => get_class($e),
                 'exception_message' => $e->getMessage(),
             ]);
+
+            app(GenerationErrorRecorder::class)->demoFailed(
+                (int) $request->user()->id,
+                $e,
+                [
+                    'voice_name' => $voiceName ?? null,
+                    'voice_tier' => $tier ?? null,
+                    'target_language' => $validated['target_language'] ?? null,
+                    'dialect' => $validated['dialect'] ?? null,
+                    'performance_style' => $validated['performance_style'] ?? null,
+                    'emotion' => $validated['emotion'] ?? null,
+                    'translate' => (bool) ($validated['translate'] ?? false),
+                    'chars' => $estimate['chars'] ?? null,
+                ],
+                __('ui.backend.demo_voice_generation_failed'),
+            );
 
             return response()->json([
                 'ok' => false,

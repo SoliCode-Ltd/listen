@@ -44,7 +44,8 @@ class DemoPremiumRoutingTest extends TestCase
                         && $plan->slug === $freePlan->slug
                         && strtolower(trim((string) $plan->tts_provider_policy)) === 'auto';
                 }),
-                null,
+                // The member's id, so a backup-engine warning names who was affected.
+                $user->id,
             )
             ->willReturn([
                 'audio_path' => 'audio/demo-premium.wav',
@@ -99,7 +100,8 @@ class DemoPremiumRoutingTest extends TestCase
                         && $plan->slug === $freePlan->slug
                         && strtolower(trim((string) $plan->tts_provider_policy)) === 'google_cloud';
                 }),
-                null,
+                // The member's id, so a backup-engine warning names who was affected.
+                $user->id,
             )
             ->willReturn([
                 'audio_path' => 'audio/demo-standard.mp3',
