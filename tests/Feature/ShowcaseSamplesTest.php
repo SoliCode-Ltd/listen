@@ -110,6 +110,16 @@ class ShowcaseSamplesTest extends TestCase
         }
     }
 
+    public function test_every_active_speaker_has_an_avatar(): void
+    {
+        $this->seed(\Database\Seeders\VoiceSeeder::class);
+
+        $missing = \App\Models\Voice::query()->where('is_active', true)->get()
+            ->filter(fn ($voice) => \App\Support\SpeakerAvatar::url($voice->display_name, $voice->language) === null)
+            ->map(fn ($voice) => $voice->language.' '.$voice->display_name)->values()->all();
+        $this->assertSame([], $missing);
+    }
+
     public function test_speaker_avatars_cover_the_hero_and_fall_back_to_an_initial(): void
     {
         // Every hero speaker has an avatar, in both page languages.
