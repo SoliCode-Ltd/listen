@@ -110,17 +110,29 @@ class ShowcaseSamplesTest extends TestCase
         }
     }
 
-    public function test_every_active_speaker_has_an_avatar(): void
+    public function test_speaker_avatars_cover_the_hero_and_fall_back_to_an_initial(): void
     {
+        // Every hero speaker has an avatar, in both page languages.
+        foreach (['ar', 'en'] as $locale) {
+            foreach (\App\Support\HeroCast::for($locale) as $person) {
+                $this->assertNotNull($person['avatar'], $locale.' '.$person['name']);
+            }
+        }
+
+        // The speaker catalog carries each speaker's avatar, or null when there is none yet.
         $this->seed(\Database\Seeders\VoiceSeeder::class);
-
-        $missing = \App\Models\Voice::query()->where('is_active', true)->get()
-            ->filter(fn ($voice) => \App\Support\SpeakerAvatar::url($voice->display_name, $voice->language) === null)
-            ->map(fn ($voice) => $voice->language.' '.$voice->display_name)->values()->all();
-        $this->assertSame([], $missing);
-
         $catalog = \App\Support\VoiceCatalog::publicCatalog();
         $this->assertStringContainsString('images/speakers/', (string) $catalog['ar'][0]['avatar']);
+        $this->assertNull(\App\Support\SpeakerAvatar::url('Nobody', 'en'));
+
+        // A homepage card without an avatar shows the speaker's initial instead.
+        VoiceSample::create([
+            'title' => 'No avatar yet', 'sample_text' => 'Hello there.', 'audio_path' => 'audio/x.mp3', 'language' => 'en',
+            'dialect' => 'en-US', 'category' => 'hero', 'is_active' => true, 'show_in_showcase' => true,
+            'metadata' => ['speaker_name' => 'Zed', 'speakers' => [['name' => 'Zed', 'gender' => 'male']]],
+        ]);
+        app()->setLocale('en');
+        $this->getLocalizedRoute('home')->assertOk()->assertSee('<span class="vs-avatar-initial">Z</span>', false);
     }
 
     public function test_voice_flags(): void
