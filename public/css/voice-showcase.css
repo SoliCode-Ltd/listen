@@ -316,6 +316,56 @@ html:not([data-theme="light"]) .vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px 
 .vs-seat-4 .vs-speech { bottom: calc(100% + 12px); left: 0; transform-origin: left bottom; }
 .vs-seat-2 .vs-speech { top: calc(100% + 12px); right: 0; transform-origin: right top; }
 .vs-seat-3 .vs-speech { top: calc(100% + 12px); left: 0; transform-origin: left top; }
+/* A small crystal arrow pointing at the speaker: a rotated square of the same
+   glass, clipped to the half that sits outside the bubble. */
+.vs-speech::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: rgba(255, 255, 255, .62);
+  border: 0 solid rgba(118, 89, 250, .16);
+  -webkit-backdrop-filter: blur(22px) saturate(1.8);
+  backdrop-filter: blur(22px) saturate(1.8);
+  rotate: 45deg;
+}
+html:not([data-theme="light"]) .vs-speech::after {
+  background: rgba(44, 41, 62, .62);
+  border-color: rgba(255, 255, 255, .14);
+}
+/* Bubbles above their speaker point down, bubbles below point up; the arrow
+   sits under the middle of the avatar (an avatar is 19% of the ring wide). */
+.vs-seat-1 .vs-speech::after, .vs-seat-4 .vs-speech::after {
+  bottom: -7px;
+  border-right-width: 1px;
+  border-bottom-width: 1px;
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+}
+.vs-seat-2 .vs-speech::after, .vs-seat-3 .vs-speech::after {
+  top: -7px;
+  border-left-width: 1px;
+  border-top-width: 1px;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+.vs-seat-1 .vs-speech::after, .vs-seat-2 .vs-speech::after { right: calc(9.5cqw - 7px); }
+.vs-seat-3 .vs-speech::after, .vs-seat-4 .vs-speech::after { left: calc(9.5cqw - 7px); }
+/* The top speaker's bubble opens beside them and points sideways at them. */
+.vs-seat-0 .vs-speech::after {
+  top: calc(56% - 7px);
+  left: -7px;
+  border-left-width: 1px;
+  border-bottom-width: 1px;
+  clip-path: polygon(0 0, 0 100%, 100% 100%);
+}
+[dir="rtl"] .vs-seat-0 .vs-speech::after {
+  left: auto;
+  right: -7px;
+  border-left-width: 0;
+  border-bottom-width: 0;
+  border-right-width: 1px;
+  border-top-width: 1px;
+  clip-path: polygon(0 0, 100% 0, 100% 100%);
+}
 /* Side bubbles stay clear of the top speaker; the top one stays inside the artwork. */
 .vs-seat-1 .vs-speech, .vs-seat-4 .vs-speech { max-width: 34cqw; }
 .vs-seat-0 .vs-speech { max-width: 35cqw; }
