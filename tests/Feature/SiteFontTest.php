@@ -39,10 +39,36 @@ class SiteFontTest extends TestCase
         $this->assertSame(SiteFont::DEFAULT, SiteFont::current());
     }
 
-    public function test_every_font_option_has_weights_to_load(): void
+    public function test_every_font_option_has_weights_and_measured_sizes(): void
     {
-        foreach (SiteFont::OPTIONS as $font => $weights) {
-            $this->assertMatchesRegularExpression('/^wght@\d{3}(\.\.\d{3}|(;\d{3})+)$/', $weights, $font);
+        foreach (SiteFont::OPTIONS as $font => $metrics) {
+            $this->assertMatchesRegularExpression('/^wght@\d{3}(\.\.\d{3}|(;\d{3})+)$/', $metrics['weights'], $font);
+            foreach (['ex', 'ar', 'en'] as $key) {
+                $this->assertGreaterThan(0.3, $metrics[$key], $font.' '.$key);
+                $this->assertLessThan(1.6, $metrics[$key], $font.' '.$key);
+            }
         }
+    }
+
+    public function test_text_size_scales_the_letters_for_any_font(): void
+    {
+        // At 100% the original design's font is drawn at its natural size...
+        $this->assertSame(0.516, SiteFont::sizeAdjust('ar', 'IBM Plex Sans Arabic', 100));
+        // ...and a wider font is drawn smaller so it looks the same size.
+        $this->assertLessThan(0.516, SiteFont::sizeAdjust('ar', 'Alexandria', 100));
+        $this->assertEqualsWithDelta(SiteFont::sizeAdjust('en', 'Alexandria', 100) * 1.1, SiteFont::sizeAdjust('en', 'Alexandria', 110), 0.002);
+
+        app()->setLocale('ar');
+        $this->getLocalizedRoute('home')->assertOk()
+            ->assertSee('html[lang="ar"] { font-size-adjust: '.SiteFont::sizeAdjust('ar', 'Alexandria', 100).'; }', false);
+
+        SiteSetting::set('site_font_size', '90');
+        $this->assertSame(90, SiteFont::size());
+        $this->getLocalizedRoute('home')->assertOk()
+            ->assertSee('font-size-adjust: '.SiteFont::sizeAdjust('ar', 'Alexandria', 90).';', false);
+
+        // Sizes outside the list fall back to 100%.
+        SiteSetting::set('site_font_size', '400');
+        $this->assertSame(SiteFont::DEFAULT_SIZE, SiteFont::size());
     }
 }

@@ -52,7 +52,7 @@
     }
     html[dir="rtl"] .hero h1 {
       font-size: clamp(2.4rem, 6vw, 4.5rem);
-      line-height: 1.32;
+      line-height: 1.25;
       letter-spacing: 0;
       text-wrap: balance;
     }

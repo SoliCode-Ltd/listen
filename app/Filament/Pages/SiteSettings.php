@@ -42,6 +42,7 @@ class SiteSettings extends Page implements HasForms
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
             'site_font' => SiteFont::current(),
+            'site_font_size' => SiteFont::size(),
             'custom_css' => SiteSetting::get('custom_css', ''),
             'favicon_url' => SiteSetting::get('favicon_url', ''),
             'logo_url' => SiteSetting::get('logo_url', ''),
@@ -158,6 +159,13 @@ class SiteSettings extends Page implements HasForms
                             ->required()
                             ->native(false)
                             ->helperText('Used for everything on the website (text, headings, buttons and forms) in both Arabic and English.'),
+                        Forms\Components\Select::make('site_font_size')
+                            ->label('Text Size')
+                            ->options(SiteFont::sizeOptions())
+                            ->default(SiteFont::DEFAULT_SIZE)
+                            ->required()
+                            ->native(false)
+                            ->helperText('How big the letters look, for any font. 100% matches the original design; spacing and layout stay the same.'),
                         Forms\Components\FileUpload::make('logo_url')
                             ->label('Site Logo')
                             ->acceptedFileTypes([
