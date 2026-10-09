@@ -1,8 +1,7 @@
-{{-- Two-voice dialogues: the line being spoken lights up as it plays. --}}
+{{-- Two-voice dialogues in the page language: the line being spoken lights up as it plays. --}}
 @php
   $vsDialogues = $showcaseDialogues ?? [];
   $vsInitial = fn (string $name): string => mb_strtoupper(mb_substr(trim($name) !== '' ? trim($name) : '•', 0, 1));
-  $vsDuration = fn (int $s): string => $s > 0 ? intdiv($s, 60).':'.str_pad((string) ($s % 60), 2, '0', STR_PAD_LEFT) : '';
   $vsUntagged = fn (string $text): string => trim((string) preg_replace('/\s*<[^<>\n]{1,24}>\s*/u', ' ', $text));
 @endphp
 @if(!empty($vsDialogues))
@@ -49,11 +48,10 @@
         </ol>
         <footer class="vs-card-foot">
           <button type="button" class="vs-play" data-vp-play aria-label="{{ __('ui.landing.showcase_play') }}: {{ $dialogue['title'] }}" data-label-play="{{ __('ui.landing.showcase_play') }}" data-label-pause="{{ __('ui.landing.showcase_pause') }}">
-            <svg class="vs-icon-play vs-flip" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
-            <svg class="vs-icon-pause" width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+            <svg class="vs-icon-play vs-flip" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></svg>
+            <svg class="vs-icon-pause" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
           </button>
-          <span class="vs-progress" aria-hidden="true"><span></span></span>
-          <span class="vs-time" dir="ltr" data-vp-time>{{ $vsDuration((int) $dialogue['duration']) }}</span>
+          <x-home.mini-wave :seed="$dialogue['id']" :count="60" />
         </footer>
       </article>
     @endforeach

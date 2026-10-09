@@ -366,30 +366,10 @@
       play(pressed);
       return;
     }
-    var langTab = event.target.closest('[data-vp-lang]');
-    if (langTab) {
-      var studio = langTab.closest('[data-vp-try]');
-      var lang = langTab.getAttribute('data-vp-lang');
-      studio.querySelectorAll('[data-vp-lang]').forEach(function (b) { b.setAttribute('aria-selected', b === langTab ? 'true' : 'false'); });
-      studio.querySelectorAll('[data-vp-rail]').forEach(function (rail) { rail.hidden = rail.getAttribute('data-vp-rail') !== lang; });
-      var firstChip = studio.querySelector('[data-vp-rail="' + lang + '"] [data-vp-chip]');
-      if (firstChip) firstChip.click();
-      return;
-    }
     var more = event.target.closest('[data-vp-more]');
     if (more) {
       var grid = more.parentElement.previousElementSibling;
       if (grid) grid.classList.add('is-expanded');
-      return;
-    }
-    var galleryTab = event.target.closest('[data-vp-gallery]');
-    if (galleryTab) {
-      var show = galleryTab.getAttribute('data-vp-gallery');
-      galleryTab.parentElement.querySelectorAll('[data-vp-gallery]').forEach(function (b) { b.setAttribute('aria-selected', b === galleryTab ? 'true' : 'false'); });
-      root.querySelectorAll('.vs-card').forEach(function (c) {
-        c.hidden = c.getAttribute('data-lang') !== show;
-        if (c.hidden && current === c) { audio.pause(); stop(); rest(c); }
-      });
       return;
     }
     var chip = event.target.closest('[data-vp-chip]');
@@ -399,9 +379,6 @@
       card.querySelectorAll('[data-vp-chip]').forEach(function (c) { c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); });
       var text = card.querySelector('[data-vp-try-text]');
       var voice = card.querySelector('[data-vp-try-voice]');
-      var dialect = card.querySelector('[data-vp-try-dialect]');
-      var initial = card.querySelector('[data-vp-try-initial]');
-      var flag = card.querySelector('[data-vp-try-flag]');
       if (text) {
         text.textContent = chip.getAttribute('data-text') || '';
         text.classList.remove('is-reading');
@@ -411,10 +388,6 @@
         }
       }
       if (voice) voice.textContent = chip.getAttribute('data-voice') || '';
-      if (dialect) dialect.textContent = chip.getAttribute('data-dialect') || '';
-      if (initial) initial.textContent = chip.getAttribute('data-initial') || '';
-      var chipFlag = chip.querySelector('.vs-flag');
-      if (flag && chipFlag) { flag.innerHTML = ''; var copy = chipFlag.cloneNode(true); copy.classList.add('vs-flag-xs'); flag.appendChild(copy); }
       var wasPlaying = current === track && !audio.paused;
       if (current === track) { audio.pause(); stop(); }
       track.setAttribute('data-src', chip.getAttribute('data-src') || '');

@@ -63,52 +63,41 @@ class HomeController extends Controller
     }
 
     /**
-     * Homepage voice samples: every voice for the gallery (up to the admin
-     * limit per language), one per dialect or accent for the hero picker,
-     * and the two-voice dialogues.
+     * Homepage voice samples in the page language only: Arabic dialects on
+     * Arabic pages, English accents on English pages. The gallery holds up
+     * to the admin limit; the dialogues follow it.
      *
-     * @return array{showcaseVoices: array<string, array<int, array<string, mixed>>>, showcasePicker: array<string, array<int, array<string, mixed>>>, showcaseDialogues: array<int, array<string, mixed>>}
+     * @return array{showcaseVoices: array<int, array<string, mixed>>, showcaseDialogues: array<int, array<string, mixed>>}
      */
     private function homeShowcase(bool $isArabicLocale): array
     {
+        $language = $isArabicLocale ? 'ar' : 'en';
         $limit = $this->landingVoiceSampleLimit();
 
-        $samples = Cache::remember('home_showcase:'.($isArabicLocale ? 'ar' : 'en').':'.$limit, 300, function () use ($isArabicLocale, $limit): array {
-            $all = VoiceSample::query()
+        return Cache::remember('home_showcase:'.$language.':'.$limit, 300, function () use ($isArabicLocale, $language, $limit): array {
+            $samples = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
+                ->where('language', $language)
                 ->orderByDesc('is_featured')
                 ->ordered()
                 ->get()
                 ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '');
 
-            $voices = ['ar' => [], 'en' => []];
-            $picker = ['ar' => [], 'en' => []];
-            foreach ($all->where('category', 'hero') as $sample) {
-                $language = $sample->language === 'ar' ? 'ar' : 'en';
-                $card = $this->showcaseCard($sample, $isArabicLocale);
-                if ($sample->show_in_showcase && count($voices[$language]) < $limit) {
-                    $voices[$language][] = $card;
-                }
-                $dialectKey = strtolower((string) $sample->dialect);
-                if ($sample->show_in_hero && ! isset($picker[$language][$dialectKey]) && count($picker[$language]) < 24) {
-                    $picker[$language][$dialectKey] = $card;
-                }
-            }
-
             return [
-                'showcaseVoices' => $voices,
-                'showcasePicker' => ['ar' => array_values($picker['ar']), 'en' => array_values($picker['en'])],
-                // Dialogues in the page language come first.
-                'showcaseDialogues' => $all->where('category', 'dialogue')
-                    ->sortBy(fn (VoiceSample $sample): int => ($sample->language === 'ar') === $isArabicLocale ? 0 : 1)
+                'showcaseVoices' => $samples
+                    ->filter(fn (VoiceSample $sample): bool => $sample->category === 'hero' && (bool) $sample->show_in_showcase)
+                    ->take($limit)
+                    ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale))
+                    ->values()
+                    ->all(),
+                'showcaseDialogues' => $samples
+                    ->where('category', 'dialogue')
                     ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale))
                     ->values()
                     ->all(),
             ];
         });
-
-        return $samples;
     }
 
     public function pricingPage(Request $request)

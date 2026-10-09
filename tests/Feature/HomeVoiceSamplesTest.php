@@ -36,32 +36,34 @@ class HomeVoiceSamplesTest extends TestCase
         $this->sample(['title' => 'Regular A', 'title_ar' => 'AR First', 'sort_order' => 0]);
         $this->sample(['title' => 'Inactive', 'is_featured' => true, 'is_active' => false]);
         $this->sample(['title' => 'Wrong Category', 'is_featured' => true, 'category' => 'demo']);
+        $this->sample(['title' => 'Hidden', 'is_featured' => true, 'show_in_showcase' => false]);
 
         app()->setLocale('ar');
         $voices = $this->getLocalizedRoute('home')->assertOk()->viewData('showcaseVoices');
 
-        $this->assertSame(['AR Featured', 'AR First'], array_column($voices['ar'], 'title'));
-        $this->assertSame([], $voices['en']);
+        $this->assertSame(['AR Featured', 'AR First'], array_column($voices, 'title'));
     }
 
-    public function test_homepage_shows_both_languages_with_the_page_language_first(): void
+    public function test_each_page_plays_only_its_own_language(): void
     {
-        $this->sample(['title' => 'Arabic sample', 'title_ar' => 'AR Sample']);
-        $this->sample(['title' => 'English sample', 'language' => 'en', 'dialect' => 'en-GB']);
+        $this->sample(['title' => 'Arabic sample', 'title_ar' => 'AR Sample', 'sample_text' => 'نص عربي']);
+        $this->sample(['title' => 'English sample', 'language' => 'en', 'dialect' => 'en-GB', 'sample_text' => 'English words']);
+        $this->sample(['title' => 'Arabic chat', 'category' => 'dialogue']);
+        $this->sample(['title' => 'English chat', 'category' => 'dialogue', 'language' => 'en', 'dialect' => 'en-US']);
 
         app()->setLocale('en');
         $english = $this->getLocalizedRoute('home')->assertOk();
-        $this->assertSame('English sample', $english->viewData('showcasePicker')['en'][0]['title']);
-        $this->assertSame('British (Standard)', $english->viewData('showcasePicker')['en'][0]['dialect_label']);
-        $this->assertCount(1, $english->viewData('showcaseVoices')['ar']);
-        $html = $english->getContent();
-        $this->assertLessThan(strpos($html, 'data-vp-gallery="ar"'), strpos($html, 'data-vp-gallery="en"'));
+        $this->assertSame(['English sample'], array_column($english->viewData('showcaseVoices'), 'title'));
+        $this->assertSame('British (Standard)', $english->viewData('showcaseVoices')[0]['dialect_label']);
+        $this->assertSame(['English chat'], array_column($english->viewData('showcaseDialogues'), 'title'));
+        $english->assertSee('English words')->assertDontSee('نص عربي');
 
         app()->setLocale('ar');
         $arabic = $this->getLocalizedRoute('home')->assertOk();
-        $this->assertSame('سعودي (نجدي)', $arabic->viewData('showcasePicker')['ar'][0]['dialect_label']);
-        $html = $arabic->getContent();
-        $this->assertLessThan(strpos($html, 'data-vp-gallery="en"'), strpos($html, 'data-vp-gallery="ar"'));
+        $this->assertSame(['AR Sample'], array_column($arabic->viewData('showcaseVoices'), 'title'));
+        $this->assertSame('سعودي (نجدي)', $arabic->viewData('showcaseVoices')[0]['dialect_label']);
+        $this->assertSame(['Arabic chat'], array_column($arabic->viewData('showcaseDialogues'), 'title'));
+        $arabic->assertSee('نص عربي')->assertDontSee('English words');
     }
 
     public function test_guest_and_authenticated_users_get_same_homepage_voice_samples(): void
@@ -78,18 +80,19 @@ class HomeVoiceSamplesTest extends TestCase
         $this->assertSame($guestSamples, $authSamples);
     }
 
-    public function test_hero_picker_and_gallery_follow_their_own_flags(): void
+    public function test_hero_is_artwork_and_players_show_no_timer(): void
     {
-        $this->sample(['title' => 'Hero Only', 'is_featured' => true, 'show_in_showcase' => false, 'sort_order' => 0]);
-        $this->sample(['title' => 'Showcase Only', 'dialect' => 'ar-EG', 'show_in_hero' => false, 'sort_order' => 1]);
-        $this->sample(['title' => 'Second Saudi', 'sort_order' => 2]);
+        $this->sample(['title' => 'Sample One', 'duration_seconds' => 17]);
 
-        app()->setLocale('en');
-        $response = $this->getLocalizedRoute('home')->assertOk();
+        app()->setLocale('ar');
+        $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
 
-        // One hero chip per dialect, from samples marked for the hero.
-        $this->assertSame(['Hero Only'], array_column($response->viewData('showcasePicker')['ar'], 'title'));
-        $this->assertSame(['Showcase Only', 'Second Saudi'], array_column($response->viewData('showcaseVoices')['ar'], 'title'));
+        $hero = substr($html, strpos($html, 'class="hero-art'), 4000);
+        $this->assertStringContainsString('class="vs-art"', $hero);
+        $this->assertStringNotContainsString('data-vp-track', $hero);
+        $this->assertStringNotContainsString('<audio', $hero);
+        $this->assertDoesNotMatchRegularExpression('/<[^>]+\sdata-vp-time[\s>]/', $html);
+        $this->assertStringNotContainsString('0:17', $html);
     }
 
     public function test_homepage_announces_voice_cloning_under_the_hero_and_links_to_pricing(): void

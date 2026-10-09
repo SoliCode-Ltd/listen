@@ -96,20 +96,13 @@ return [
 
     // ===== LANDING PAGE =====
     'landing' => [
-        'showcase_model_badge' => 'New voice model 3.8',
-        'showcase_tab_ar' => 'Arabic',
-        'showcase_tab_en' => 'English',
-        'showcase_languages' => 'Sample language',
-        'showcase_picker' => 'Choose a dialect or accent',
-        'showcase_write' => 'Write your own text',
         'showcase_play' => 'Play',
         'showcase_pause' => 'Pause',
         'showcase_more' => 'Show all voices',
         'showcase_signature' => 'Every sample ends with the Listen audio signature.',
-        'showcase_title' => 'Voices from across the Arab world and beyond',
-        'showcase_body' => ':ar Arabic dialects and :en English accents, all made with voice model 3.8. Press play on any card.',
-        'showcase_tab_ar_long' => 'Arabic dialects',
-        'showcase_tab_en_long' => 'English accents',
+        'showcase_title' => 'Voices from across the English-speaking world',
+        'showcase_body' => ':count English accents, from London to Lagos, with natural delivery for every kind of content. Press play on any card.',
+        'hero_art_label' => 'Text turning into speech',
         'dialogue_badge' => 'Two voices, one take',
         'dialogue_title' => 'Conversations that sound real',
         'dialogue_body' => 'Podcasts, sketches, interviews and audio drama. Write who says what, and two voices perform it together, with laughs, sighs and whispers where you put them.',

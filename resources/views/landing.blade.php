@@ -632,7 +632,7 @@
         </div>
 
         <aside class="hero-art reveal">
-          @include('components.home.studio-card')
+          @include('components.home.hero-art')
         </aside>
       </div>
     </section>

@@ -63,28 +63,37 @@ class ShowcaseSamplesTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_home_shows_flags_voices_and_dialogues(): void
+    public function test_home_shows_flags_voices_and_dialogues_in_the_page_language(): void
     {
         $this->artisan('tts:showcase', ['--import' => true]);
 
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('home')->assertOk();
-        $en->assertSee('images/flags/sa.svg', false);
         $en->assertSee('images/flags/gb-sct.svg', false);
         $en->assertSee('data-vp-dialogue', false);
         $en->assertSee('These voices were created with Listen.');
-        $en->assertSee('Saudi (Najdi)');
+        $en->assertSee('css/voice-showcase.css', false);
+        $en->assertDontSee('images/flags/sa.svg', false);
+        $en->assertDontSee('هذه الأصوات من إنتاج منصة إسمع.');
         $en->assertDontSee('flagcdn.com', false);
         $en->assertDontSee('&lt;laugh&gt;', false);
-        $en->assertSee('css/voice-showcase.css', false);
-        $this->assertCount(18, $en->viewData('showcasePicker')['en']);
-        $this->assertCount(21, $en->viewData('showcasePicker')['ar']);
-        $this->assertCount(22, $en->viewData('showcaseVoices')['ar']);
+        $this->assertCount(19, $en->viewData('showcaseVoices'));
+        $this->assertCount(2, $en->viewData('showcaseDialogues'));
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('home')->assertOk();
         $ar->assertSee('سعودي (نجدي)');
-        $ar->assertSee('هذا الصوت من إنتاج منصة إسمع.');
+        $ar->assertSee('images/flags/sa.svg', false);
+        $ar->assertSee('هذه الأصوات من إنتاج منصة إسمع.');
+        $ar->assertDontSee('These voices were created with Listen.');
+        $ar->assertDontSee('images/flags/gb-sct.svg', false);
+        $this->assertCount(22, $ar->viewData('showcaseVoices'));
+        $this->assertCount(4, $ar->viewData('showcaseDialogues'));
+
+        // No model numbers on the page.
+        foreach ([$en->getContent(), $ar->getContent()] as $html) {
+            $this->assertDoesNotMatchRegularExpression('/\b3\.8\b|model 3|نموذج الصوت/u', strip_tags($html));
+        }
     }
 
     public function test_voice_flags(): void

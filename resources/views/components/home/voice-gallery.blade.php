@@ -1,58 +1,38 @@
-{{-- Every homepage voice as a card with its flag, grouped by language. --}}
+{{-- Homepage voices in the page language, each card with its flag, dialect or accent, and a waveform player. --}}
 @php
-  $vsVoices = $showcaseVoices ?? ['ar' => [], 'en' => []];
-  $vsArabicUi = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
-  $vsLangs = array_values(array_filter($vsArabicUi ? ['ar', 'en'] : ['en', 'ar'], fn ($l) => !empty($vsVoices[$l])));
-  $vsStart = $vsLangs[0] ?? null;
-  $vsCounts = [
-    'ar' => count(array_unique(array_column($vsVoices['ar'], 'dialect'))),
-    'en' => count(array_unique(array_column($vsVoices['en'], 'dialect'))),
-  ];
-  $vsDuration = fn (int $s): string => $s > 0 ? intdiv($s, 60).':'.str_pad((string) ($s % 60), 2, '0', STR_PAD_LEFT) : '';
+  $vsVoices = $showcaseVoices ?? [];
+  $vsCount = count(array_unique(array_column($vsVoices, 'dialect')));
 @endphp
-@if($vsStart)
+@if(!empty($vsVoices))
 <section class="section vs-gallery" id="voice-samples">
   <div class="vs-head">
     <div>
       <h2 class="vs-title">{{ __('ui.landing.showcase_title') }}</h2>
-      <p class="vs-lead">{{ __('ui.landing.showcase_body', ['ar' => $vsCounts['ar'], 'en' => $vsCounts['en']]) }}</p>
+      <p class="vs-lead">{{ __('ui.landing.showcase_body', ['count' => $vsCount]) }}</p>
     </div>
-    @if(count($vsLangs) > 1)
-    <div class="vs-seg" role="tablist" aria-label="{{ __('ui.landing.showcase_languages') }}">
-      @foreach($vsLangs as $lang)
-        <button type="button" class="vs-seg-btn" role="tab" aria-selected="{{ $lang === $vsStart ? 'true' : 'false' }}" data-vp-gallery="{{ $lang }}">
-          {{ __('ui.landing.showcase_tab_'.$lang.'_long') }} <span class="vs-seg-count">{{ $vsCounts[$lang] }}</span>
-        </button>
-      @endforeach
-    </div>
-    @endif
   </div>
   <div class="vs-grid">
-    @foreach($vsLangs as $lang)
-      @foreach($vsVoices[$lang] as $i => $sample)
-        <article class="vs-card{{ $i >= 9 ? ' vs-more' : '' }}" data-vp-track data-src="{{ $sample['audio_url'] }}" data-lang="{{ $lang }}" @if($lang !== $vsStart) hidden @endif>
-          <header class="vs-card-head">
-            <x-home.flag :url="$sample['flag']" size="lg" />
-            <span class="vs-card-id">
-              <span class="vs-card-dialect">{{ $sample['dialect_label'] }}</span>
-              <span class="vs-card-speaker">{{ $sample['speaker'] }}</span>
-            </span>
-          </header>
-          <h3 class="vs-card-title">{{ $sample['title'] }}</h3>
-          <p class="vs-card-text" dir="{{ $lang === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $lang }}">{{ $sample['text'] }}</p>
-          <footer class="vs-card-foot">
-            <button type="button" class="vs-play vs-play-soft" data-vp-play aria-label="{{ __('ui.landing.showcase_play') }}: {{ $sample['dialect_label'] }}, {{ $sample['title'] }}" data-label-play="{{ __('ui.landing.showcase_play') }}" data-label-pause="{{ __('ui.landing.showcase_pause') }}">
-              <svg class="vs-icon-play vs-flip" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg>
-              <svg class="vs-icon-pause" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
-            </button>
-            <span class="vs-progress" aria-hidden="true"><span></span></span>
-            <span class="vs-time" dir="ltr" data-vp-time>{{ $vsDuration((int) $sample['duration']) }}</span>
-          </footer>
-        </article>
-      @endforeach
+    @foreach($vsVoices as $i => $sample)
+      <article class="vs-card{{ $i >= 9 ? ' vs-more' : '' }}" data-vp-track data-src="{{ $sample['audio_url'] }}">
+        <header class="vs-card-head">
+          <x-home.flag :url="$sample['flag']" size="lg" />
+          <span class="vs-card-id">
+            <span class="vs-card-dialect">{{ $sample['dialect_label'] }}</span>
+            <span class="vs-card-speaker">{{ $sample['speaker'] }} · {{ $sample['title'] }}</span>
+          </span>
+        </header>
+        <p class="vs-card-text" dir="{{ $sample['language'] === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $sample['language'] }}">{{ $sample['text'] }}</p>
+        <footer class="vs-card-foot">
+          <button type="button" class="vs-play" data-vp-play aria-label="{{ __('ui.landing.showcase_play') }}: {{ $sample['dialect_label'] }}, {{ $sample['title'] }}" data-label-play="{{ __('ui.landing.showcase_play') }}" data-label-pause="{{ __('ui.landing.showcase_pause') }}">
+            <svg class="vs-icon-play vs-flip" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></svg>
+            <svg class="vs-icon-pause" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
+          </button>
+          <x-home.mini-wave :seed="$sample['id']" />
+        </footer>
+      </article>
     @endforeach
   </div>
-  @if(max(count($vsVoices['ar']), count($vsVoices['en'])) > 9)
+  @if(count($vsVoices) > 9)
     <div class="vs-more-wrap"><button type="button" class="vs-more-btn" data-vp-more>{{ __('ui.landing.showcase_more') }}</button></div>
   @endif
   <p class="vs-signature">
