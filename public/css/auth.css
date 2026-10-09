@@ -30,8 +30,8 @@ html body.auth-split-body {
   --au-danger-soft: rgba(238, 74, 119, .10);
   --au-ok: #32c58d;
   --au-ok-soft: rgba(50, 197, 141, .10);
-  --au-font: 'IBM Plex Sans', 'IBM Plex Sans Arabic', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --au-font-ar: 'IBM Plex Sans Arabic', 'IBM Plex Sans', system-ui, sans-serif;
+  --au-font: var(--site-font, sans-serif);
+  --au-font-ar: var(--site-font, sans-serif);
 
   margin: 0;
   min-height: 100vh;

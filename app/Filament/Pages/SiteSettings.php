@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
 use App\Services\MultiAccountEnforcementService;
+use App\Support\SiteFont;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -40,6 +41,7 @@ class SiteSettings extends Page implements HasForms
             'demo_sample_standard_en' => SiteSetting::get('demo_sample_standard_en', ''),
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
+            'site_font' => SiteFont::current(),
             'custom_css' => SiteSetting::get('custom_css', ''),
             'favicon_url' => SiteSetting::get('favicon_url', ''),
             'logo_url' => SiteSetting::get('logo_url', ''),
@@ -149,6 +151,13 @@ class SiteSettings extends Page implements HasForms
                                 'system' => 'System Default',
                             ])
                             ->required(),
+                        Forms\Components\Select::make('site_font')
+                            ->label('Website Font')
+                            ->options(SiteFont::options())
+                            ->default(SiteFont::DEFAULT)
+                            ->required()
+                            ->native(false)
+                            ->helperText('Used for everything on the website (text, headings, buttons and forms) in both Arabic and English.'),
                         Forms\Components\FileUpload::make('logo_url')
                             ->label('Site Logo')
                             ->acceptedFileTypes([

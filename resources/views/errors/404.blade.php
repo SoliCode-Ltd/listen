@@ -26,9 +26,7 @@
   <script>
     try { var t = localStorage.getItem('listen_theme'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
   </script>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600&display=swap" rel="stylesheet">
+  @include('components.site-fonts')
   <style>
     :root {
       --bg: #0A0A0F; --text: #F5F4F8; --muted: #A9A7B8; --line: #2A2936; --raised: #1C1B25;
@@ -39,8 +37,8 @@
       --accent: #5B36E8; --accent-hover: #4B2CC7; --accent-text: #5B36E8; --soft: rgba(91, 54, 232, .09); --wave: #D9D6E6;
     }
     html, body { margin: 0; min-height: 100%; }
-    body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
-    html[dir="rtl"] body { font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', sans-serif; }
+    body { font-family: var(--site-font, sans-serif); background: var(--bg); color: var(--text); line-height: 1.6; -webkit-font-smoothing: antialiased; }
+    html[dir="rtl"] body { font-family: var(--site-font, sans-serif); }
     .site-logo { height: 2.1rem; width: auto; display: block; }
     .site-logo.logo-light { display: none; }
     html[data-theme="light"] .site-logo.logo-dark { display: none; }
@@ -52,8 +50,8 @@
     .nf-flatline span { flex: none; width: 6px; border-radius: 3px; background: var(--accent-text); }
     .nf-flatline span.is-flat { background: var(--wave); }
     .nf-pill { align-self: flex-start; padding: 4px 10px; border-radius: 999px; background: var(--soft); color: var(--accent-text); font-size: .8125rem; font-weight: 600; }
-    .nf-title { margin: 0; font-family: 'Readex Pro', 'IBM Plex Sans', sans-serif; font-weight: 600; font-size: clamp(2rem, 4vw, 2.25rem); line-height: 1.18; letter-spacing: -0.015em; }
-    html[dir="rtl"] .nf-title { font-family: 'Readex Pro', 'IBM Plex Sans Arabic', sans-serif; letter-spacing: 0; line-height: 1.3; }
+    .nf-title { margin: 0; font-family: var(--site-font, sans-serif); font-weight: 600; font-size: clamp(2rem, 4vw, 2.25rem); line-height: 1.18; letter-spacing: -0.015em; }
+    html[dir="rtl"] .nf-title { font-family: var(--site-font, sans-serif); letter-spacing: 0; line-height: 1.3; }
     .nf-lead { margin: 0; font-size: clamp(1.05rem, 1.4vw, 1.19rem); line-height: 1.65; color: var(--muted); }
     .nf-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
     .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 1.4rem; border-radius: 12px; border: 1px solid var(--line); color: var(--text); font: inherit; font-weight: 600; text-decoration: none; transition: background-color .15s ease; }

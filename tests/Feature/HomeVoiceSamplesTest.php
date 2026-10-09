@@ -105,6 +105,9 @@ class HomeVoiceSamplesTest extends TestCase
         $this->assertStringContainsString('data-vs-play-all', $hero);
         $this->assertSame(5, substr_count($hero, 'class="vs-speaker-photo"'));
         $this->assertStringContainsString('audio/showcase/hero-ar-sultan.mp3', $hero);
+        // Each line is also in a caption card for narrow screens; no hint line under the art.
+        $this->assertSame(5, substr_count($hero, 'data-vs-caption='));
+        $this->assertStringNotContainsString('vs-cast-hint', $html);
         // No mood chip in the bubbles.
         $this->assertStringNotContainsString('vs-speech-mood', $hero);
         $this->assertStringNotContainsString('حماس', $hero);
@@ -116,7 +119,9 @@ class HomeVoiceSamplesTest extends TestCase
         foreach (['ar', 'en'] as $locale) {
             foreach (\App\Support\HeroCast::for($locale) as $person) {
                 $this->assertNotNull($person['audio'], $locale.' '.$person['name']);
-                $this->assertGreaterThan(0.5, $person['line_end'], $locale.' '.$person['name']);
+                // The speakers talk about Listen themselves; delivery tags are not shown.
+                $this->assertMatchesRegularExpression('/إسمع|Listen/u', $person['line'], $locale.' '.$person['name']);
+                $this->assertStringNotContainsString('<', $person['line']);
             }
         }
     }
