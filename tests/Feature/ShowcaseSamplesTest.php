@@ -4,7 +4,6 @@ namespace Tests\Feature;
 
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
-use App\Support\SiteDesign;
 use App\Support\VoiceFlag;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
@@ -64,20 +63,23 @@ class ShowcaseSamplesTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_new_design_home_shows_flags_voices_and_dialogues(): void
+    public function test_home_shows_flags_voices_and_dialogues(): void
     {
-        SiteSetting::set(SiteDesign::SETTING_KEY, SiteDesign::NEW);
         $this->artisan('tts:showcase', ['--import' => true]);
 
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('home')->assertOk();
         $en->assertSee('images/flags/sa.svg', false);
         $en->assertSee('images/flags/gb-sct.svg', false);
-        $en->assertSee('data-nt-dialogue', false);
+        $en->assertSee('data-vp-dialogue', false);
         $en->assertSee('These voices were created with Listen.');
         $en->assertSee('Saudi (Najdi)');
         $en->assertDontSee('flagcdn.com', false);
         $en->assertDontSee('&lt;laugh&gt;', false);
+        $en->assertSee('css/voice-showcase.css', false);
+        $this->assertCount(18, $en->viewData('showcasePicker')['en']);
+        $this->assertCount(21, $en->viewData('showcasePicker')['ar']);
+        $this->assertCount(22, $en->viewData('showcaseVoices')['ar']);
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('home')->assertOk();

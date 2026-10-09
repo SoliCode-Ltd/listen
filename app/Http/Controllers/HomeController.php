@@ -22,7 +22,6 @@ use App\Support\GeminiTtsModel;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
-use App\Support\SiteDesign;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -55,118 +54,61 @@ class HomeController extends Controller
 
     public function index()
     {
-        $countryContext = $this->localizedPricingService->resolveCountryContext(request());
-        $pricingPlans = $this->pricingPlans();
-        $highlightPlans = array_slice($pricingPlans, 0, 3);
-        $sampleLanguage = $this->sampleLanguageForLocale(app()->getLocale());
-        $isArabicLocale = $sampleLanguage === 'ar';
-        $homepageSampleLimit = $this->landingVoiceSampleLimit();
+        $isArabicLocale = $this->sampleLanguageForLocale(app()->getLocale()) === 'ar';
 
-        $heroVoiceSample = Cache::remember("landing_voice_sample_hero:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
-            $sample = VoiceSample::query()
-                ->active()
-                ->where('category', 'hero')
-                ->where('language', $sampleLanguage)
-                ->showInHero()
-                ->orderByDesc('is_featured')
-                ->ordered()
-                ->first();
-
-            return $sample ? $this->mapVoiceSample($sample, $isArabicLocale) : null;
-        });
-
-        $voiceSamples = array_slice(
-            Cache::remember("landing_voice_samples_showcase:{$sampleLanguage}", 300, function () use ($sampleLanguage, $isArabicLocale) {
-                return VoiceSample::query()
-                    ->active()
-                    ->where('category', 'hero')
-                    ->where('language', $sampleLanguage)
-                    ->showInShowcase()
-                    ->orderByDesc('is_featured')
-                    ->ordered()
-                    ->get()
-                    ->map(fn (VoiceSample $s): array => $this->mapVoiceSample($s, $isArabicLocale))
-                    ->toArray();
-            }),
-            0,
-            $homepageSampleLimit
-        );
-
-        $view = [
-            'highlightPlans' => $highlightPlans,
-            'heroVoiceSample' => $heroVoiceSample,
-            'voiceSamples' => $voiceSamples,
-            'countryContext' => $countryContext,
+        return view('landing', [
+            'countryContext' => $this->localizedPricingService->resolveCountryContext(request()),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor(request()->user()),
-        ];
-
-        if (SiteDesign::isNew()) {
-            $view += $this->newDesignHomeData($isArabicLocale, $pricingPlans);
-        }
-
-        return view('landing', $view);
+        ] + $this->homeShowcase($isArabicLocale));
     }
 
     /**
-     * Extra homepage data used only by the new site design: one real sample per Arabic
-     * dialect, the sample library in both languages, and the plans for the pricing teaser.
+     * Homepage voice samples: every voice for the gallery (up to the admin
+     * limit per language), one per dialect or accent for the hero picker,
+     * and the two-voice dialogues.
      *
-     * @param  array<int, array<string, mixed>>  $pricingPlans
-     * @return array<string, mixed>
+     * @return array{showcaseVoices: array<string, array<int, array<string, mixed>>>, showcasePicker: array<string, array<int, array<string, mixed>>>, showcaseDialogues: array<int, array<string, mixed>>}
      */
-    private function newDesignHomeData(bool $isArabicLocale, array $pricingPlans): array
+    private function homeShowcase(bool $isArabicLocale): array
     {
-        $samples = Cache::remember('nt_home_samples:'.($isArabicLocale ? 'ar' : 'en'), 300, function () use ($isArabicLocale): array {
+        $limit = $this->landingVoiceSampleLimit();
+
+        $samples = Cache::remember('home_showcase:'.($isArabicLocale ? 'ar' : 'en').':'.$limit, 300, function () use ($isArabicLocale, $limit): array {
             $all = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
-                ->orderBy('sort_order')
-                ->orderBy('id')
+                ->orderByDesc('is_featured')
+                ->ordered()
                 ->get()
                 ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '');
 
-            // Every voice for the gallery, and one per dialect or accent for the hero picker.
             $voices = ['ar' => [], 'en' => []];
             $picker = ['ar' => [], 'en' => []];
             foreach ($all->where('category', 'hero') as $sample) {
                 $language = $sample->language === 'ar' ? 'ar' : 'en';
-                if (! $sample->show_in_showcase && ! $sample->show_in_hero) {
-                    continue;
+                $card = $this->showcaseCard($sample, $isArabicLocale);
+                if ($sample->show_in_showcase && count($voices[$language]) < $limit) {
+                    $voices[$language][] = $card;
                 }
-                $card = $this->ntVoiceCard($sample, $isArabicLocale);
-                $voices[$language][] = $card;
                 $dialectKey = strtolower((string) $sample->dialect);
-                if (! isset($picker[$language][$dialectKey]) && count($picker[$language]) < 14) {
+                if ($sample->show_in_hero && ! isset($picker[$language][$dialectKey]) && count($picker[$language]) < 24) {
                     $picker[$language][$dialectKey] = $card;
                 }
             }
 
-            $dialogues = $all->where('category', 'dialogue')
-                ->map(fn (VoiceSample $sample): array => $this->ntVoiceCard($sample, $isArabicLocale))
-                ->values()
-                ->all();
-
             return [
-                'voices' => $voices,
-                'picker' => ['ar' => array_values($picker['ar']), 'en' => array_values($picker['en'])],
-                'dialogues' => $dialogues,
+                'showcaseVoices' => $voices,
+                'showcasePicker' => ['ar' => array_values($picker['ar']), 'en' => array_values($picker['en'])],
+                // Dialogues in the page language come first.
+                'showcaseDialogues' => $all->where('category', 'dialogue')
+                    ->sortBy(fn (VoiceSample $sample): int => ($sample->language === 'ar') === $isArabicLocale ? 0 : 1)
+                    ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale))
+                    ->values()
+                    ->all(),
             ];
         });
 
-        $byPrice = collect($pricingPlans)->values();
-        $teaser = collect([
-            $byPrice->first(),
-            $byPrice->firstWhere('is_popular', true),
-            $byPrice->last(),
-        ])->filter()->unique('slug')->values()->all();
-
-        return [
-            'ntVoices' => $samples['voices'],
-            'ntPicker' => $samples['picker'],
-            'ntDialogues' => $samples['dialogues'],
-            'ntTeaserPlans' => $teaser,
-            'ntFreePlan' => $byPrice->first(fn (array $plan): bool => (int) ($plan['price_monthly_cents'] ?? 1) === 0),
-        ];
+        return $samples;
     }
 
     public function pricingPage(Request $request)
@@ -1682,71 +1624,12 @@ class HomeController extends Controller
     }
 
     /**
-     * @return array{
-     *   title:string,
-     *   text:string,
-     *   audio_url:?string,
-     *   language:string,
-     *   dialect:?string,
-     *   emotion:?string,
-     *   gender:?string,
-     *   voice_name:?string,
-     *   voice_label:string,
-     *   is_featured:bool
-     * }
-     */
-    private function mapVoiceSample(VoiceSample $sample, bool $isArabicLocale): array
-    {
-        $voiceMeta = VoiceCatalog::voiceMeta($sample->voice_name);
-        $title = $this->stripDialectCodes($this->humanReadableSampleTitle($sample, $isArabicLocale));
-        $description = $isArabicLocale
-            ? ($sample->description_ar ?: $sample->description ?: '')
-            : ($sample->description ?: '');
-        $text = trim((string) ($isArabicLocale ? ($sample->sample_text_ar ?: $sample->sample_text) : $sample->sample_text));
-
-        // Use custom speaker name from metadata if available
-        $metadata = is_array($sample->metadata) ? $sample->metadata : [];
-        $speakerName = $isArabicLocale
-            ? ($metadata['speaker_name_ar'] ?? $metadata['speaker_name'] ?? '')
-            : ($metadata['speaker_name'] ?? '');
-        $speakerName = trim((string) $speakerName);
-
-        // Fall back to voice catalog label if no custom speaker name
-        if ($speakerName === '') {
-            $speakerName = trim((string) ($isArabicLocale
-                ? ($voiceMeta['label_ar'] ?? $voiceMeta['label'] ?? '')
-                : ($voiceMeta['label'] ?? '')));
-            $speakerName = $this->stripDialectCodes($speakerName);
-        }
-
-        if ($speakerName === '') {
-            $speakerName = $title !== '' ? $title : '';
-        }
-
-        return [
-            'title' => $title,
-            'description' => $description,
-            'icon' => $sample->icon ?: $this->countryFlagEmoji($sample->country),
-            'text' => $text,
-            'audio_url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
-            'language' => (string) $sample->language,
-            'dialect' => $sample->dialect,
-            'emotion' => $sample->emotion,
-            'gender' => $sample->gender,
-            'country' => $sample->country,
-            'voice_name' => $voiceMeta ? $sample->voice_name : null,
-            'voice_label' => $speakerName,
-            'is_featured' => (bool) $sample->is_featured,
-        ];
-    }
-
-    /**
-     * A sample as the new-design homepage shows it: flag, dialect or accent,
+     * A sample as the homepage shows it: flag, dialect or accent,
      * speaker, and for dialogues the turns with each speaker's name.
      *
      * @return array<string, mixed>
      */
-    private function ntVoiceCard(VoiceSample $sample, bool $isArabicLocale): array
+    private function showcaseCard(VoiceSample $sample, bool $isArabicLocale): array
     {
         $metadata = is_array($sample->metadata) ? $sample->metadata : [];
         $speakers = [];
@@ -1762,6 +1645,10 @@ class HomeController extends Controller
         $speakerName = trim((string) ($isArabicLocale
             ? ($metadata['speaker_name_ar'] ?? $metadata['speaker_name'] ?? '')
             : ($metadata['speaker_name'] ?? '')));
+        if ($speakerName === '') {
+            $voiceMeta = VoiceCatalog::voiceMeta($sample->voice_name);
+            $speakerName = trim((string) ($isArabicLocale ? ($voiceMeta['label_ar'] ?? $voiceMeta['label'] ?? '') : ($voiceMeta['label'] ?? '')));
+        }
 
         $turns = [];
         foreach ((array) ($metadata['turns'] ?? []) as $turn) {
@@ -1793,65 +1680,6 @@ class HomeController extends Controller
             'sign_off' => trim((string) ($metadata['sign_off'] ?? '')),
             'is_new_model' => ($metadata['model'] ?? '') === GeminiTtsModel::FLASH,
         ];
-    }
-
-    /**
-     * Convert a 2-letter country code to a flag emoji.
-     */
-    private function countryFlagEmoji(?string $countryCode): string
-    {
-        $code = strtoupper(trim((string) $countryCode));
-        if (strlen($code) !== 2) {
-            return '🌐';
-        }
-
-        $flagOffset = 0x1F1E6;
-        $asciiOffset = ord('A');
-
-        return mb_chr($flagOffset + ord($code[0]) - $asciiOffset)
-            . mb_chr($flagOffset + ord($code[1]) - $asciiOffset);
-    }
-
-    private function humanReadableSampleTitle(VoiceSample $sample, bool $isArabicLocale): string
-    {
-        $fallback = trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title));
-        $emotion = strtolower(trim((string) ($sample->emotion ?? 'neutral')));
-
-        $emotionLabelsAr = [
-            'neutral' => 'نمط عام',
-            'formal' => 'نمط رسمي',
-            'ad_style' => 'نمط إعلاني',
-            'news' => 'نمط إخباري',
-            'storytelling' => 'نمط قصصي',
-            'warm' => 'نمط دافئ',
-            'excited' => 'حماسي',
-            'calm' => 'نمط هادئ',
-        ];
-
-        $emotionLabelsEn = [
-            'neutral' => 'General Style',
-            'formal' => 'Formal Style',
-            'ad_style' => 'Commercial Style',
-            'news' => 'News Style',
-            'storytelling' => 'Story Style',
-            'warm' => 'Warm',
-            'excited' => 'Energetic',
-            'calm' => 'Calm Style',
-        ];
-
-        $emotionLabel = $isArabicLocale
-            ? ($emotionLabelsAr[$emotion] ?? null)
-            : ($emotionLabelsEn[$emotion] ?? null);
-
-        return $emotionLabel ?: $fallback;
-    }
-
-    private function stripDialectCodes(string $value): string
-    {
-        $cleaned = preg_replace('/\b[a-z]{2}-[A-Z]{2}\b/u', '', $value);
-        $cleaned = preg_replace('/\s{2,}/u', ' ', (string) $cleaned);
-
-        return trim((string) $cleaned, " \t\n\r\0\x0B-");
     }
 
     private function sampleLanguageForLocale(?string $locale): string

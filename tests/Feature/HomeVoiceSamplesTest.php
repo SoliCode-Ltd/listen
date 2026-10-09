@@ -12,211 +12,84 @@ class HomeVoiceSamplesTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_homepage_voice_samples_respect_admin_flags_order_and_limit(): void
+    private function sample(array $attributes): VoiceSample
+    {
+        return VoiceSample::create($attributes + [
+            'sample_text' => 'sample',
+            'audio_path' => 'audio/missing.mp3',
+            'language' => 'ar',
+            'dialect' => 'ar-SA',
+            'category' => 'hero',
+            'emotion' => 'neutral',
+            'is_active' => true,
+            'show_in_hero' => true,
+            'show_in_showcase' => true,
+        ]);
+    }
+
+    public function test_homepage_gallery_respects_admin_flags_order_and_limit(): void
     {
         SiteSetting::set('landing_voice_samples_limit', '2', 'content');
 
-        VoiceSample::create([
-            'title' => 'Featured English Title',
-            'title_ar' => 'AR Featured',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => true,
-            'is_active' => true,
-            'sort_order' => 5,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'Regular B',
-            'title_ar' => 'AR Second',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => false,
-            'is_active' => true,
-            'sort_order' => 1,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'Regular A',
-            'title_ar' => 'AR First',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => false,
-            'is_active' => true,
-            'sort_order' => 0,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'Inactive',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => true,
-            'is_active' => false,
-            'sort_order' => 0,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'Wrong Category',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'demo',
-            'emotion' => 'custom_style',
-            'is_featured' => true,
-            'is_active' => true,
-            'sort_order' => 0,
-        ]);
+        $this->sample(['title' => 'Featured', 'title_ar' => 'AR Featured', 'is_featured' => true, 'sort_order' => 5]);
+        $this->sample(['title' => 'Regular B', 'title_ar' => 'AR Second', 'sort_order' => 1]);
+        $this->sample(['title' => 'Regular A', 'title_ar' => 'AR First', 'sort_order' => 0]);
+        $this->sample(['title' => 'Inactive', 'is_featured' => true, 'is_active' => false]);
+        $this->sample(['title' => 'Wrong Category', 'is_featured' => true, 'category' => 'demo']);
 
         app()->setLocale('ar');
-        $response = $this->getLocalizedRoute('home');
-        $response->assertOk();
+        $voices = $this->getLocalizedRoute('home')->assertOk()->viewData('showcaseVoices');
 
-        $voiceSamples = $response->viewData('voiceSamples');
-        $this->assertIsArray($voiceSamples);
-        $this->assertCount(2, $voiceSamples);
-        $this->assertSame('AR Featured', $voiceSamples[0]['title']);
-        $this->assertSame('AR First', $voiceSamples[1]['title']);
-        $this->assertTrue($voiceSamples[0]['is_featured']);
-        $this->assertFalse($voiceSamples[1]['is_featured']);
+        $this->assertSame(['AR Featured', 'AR First'], array_column($voices['ar'], 'title'));
+        $this->assertSame([], $voices['en']);
     }
 
-    public function test_homepage_uses_english_samples_for_english_locale_and_arabic_for_default(): void
+    public function test_homepage_shows_both_languages_with_the_page_language_first(): void
     {
-        SiteSetting::set('landing_voice_samples_limit', '12', 'content');
-
-        VoiceSample::create([
-            'title' => 'Arabic sample',
-            'title_ar' => 'AR Sample',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_active' => true,
-            'sort_order' => 0,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'English sample',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'en',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_active' => true,
-            'sort_order' => 0,
-        ]);
+        $this->sample(['title' => 'Arabic sample', 'title_ar' => 'AR Sample']);
+        $this->sample(['title' => 'English sample', 'language' => 'en', 'dialect' => 'en-GB']);
 
         app()->setLocale('en');
-        $englishResponse = $this->getLocalizedRoute('home');
-        $englishResponse->assertOk();
-        $englishSamples = $englishResponse->viewData('voiceSamples');
-        $this->assertCount(1, $englishSamples);
-        $this->assertSame('en', $englishSamples[0]['language']);
+        $english = $this->getLocalizedRoute('home')->assertOk();
+        $this->assertSame('English sample', $english->viewData('showcasePicker')['en'][0]['title']);
+        $this->assertSame('British (Standard)', $english->viewData('showcasePicker')['en'][0]['dialect_label']);
+        $this->assertCount(1, $english->viewData('showcaseVoices')['ar']);
+        $html = $english->getContent();
+        $this->assertLessThan(strpos($html, 'data-vp-gallery="ar"'), strpos($html, 'data-vp-gallery="en"'));
 
-        app()->setLocale('fr');
-        $defaultResponse = $this->getLocalizedRoute('home');
-        $defaultResponse->assertOk();
-        $defaultSamples = $defaultResponse->viewData('voiceSamples');
-        $this->assertCount(1, $defaultSamples);
-        $this->assertSame('ar', $defaultSamples[0]['language']);
+        app()->setLocale('ar');
+        $arabic = $this->getLocalizedRoute('home')->assertOk();
+        $this->assertSame('سعودي (نجدي)', $arabic->viewData('showcasePicker')['ar'][0]['dialect_label']);
+        $html = $arabic->getContent();
+        $this->assertLessThan(strpos($html, 'data-vp-gallery="en"'), strpos($html, 'data-vp-gallery="ar"'));
     }
 
     public function test_guest_and_authenticated_users_get_same_homepage_voice_samples(): void
     {
-        SiteSetting::set('landing_voice_samples_limit', '12', 'content');
-
-        VoiceSample::create([
-            'title' => 'Sample One',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => true,
-            'is_active' => true,
-            'sort_order' => 1,
-        ]);
-
-        VoiceSample::create([
-            'title' => 'Sample Two',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => false,
-            'is_active' => true,
-            'sort_order' => 2,
-        ]);
+        $this->sample(['title' => 'Sample One', 'is_featured' => true, 'sort_order' => 1]);
+        $this->sample(['title' => 'Sample Two', 'sort_order' => 2]);
 
         app()->setLocale('ar');
-        $guestResponse = $this->getLocalizedRoute('home');
-        $guestResponse->assertOk();
-        $guestSamples = $guestResponse->viewData('voiceSamples');
+        $guestSamples = $this->getLocalizedRoute('home')->assertOk()->viewData('showcaseVoices');
 
         $user = User::factory()->create();
-        $authResponse = $this->actingAs($user)->getLocalizedRoute('home');
-        $authResponse->assertOk();
-        $authSamples = $authResponse->viewData('voiceSamples');
+        $authSamples = $this->actingAs($user)->getLocalizedRoute('home')->assertOk()->viewData('showcaseVoices');
 
         $this->assertSame($guestSamples, $authSamples);
     }
 
-    public function test_homepage_can_show_hero_audio_without_showing_same_record_in_showcase(): void
+    public function test_hero_picker_and_gallery_follow_their_own_flags(): void
     {
-        SiteSetting::set('landing_voice_samples_limit', '12', 'content');
+        $this->sample(['title' => 'Hero Only', 'is_featured' => true, 'show_in_showcase' => false, 'sort_order' => 0]);
+        $this->sample(['title' => 'Showcase Only', 'dialect' => 'ar-EG', 'show_in_hero' => false, 'sort_order' => 1]);
+        $this->sample(['title' => 'Second Saudi', 'sort_order' => 2]);
 
-        VoiceSample::create([
-            'title' => 'Hero Only',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => true,
-            'is_active' => true,
-            'show_in_hero' => true,
-            'show_in_showcase' => false,
-            'sort_order' => 0,
-        ]);
+        app()->setLocale('en');
+        $response = $this->getLocalizedRoute('home')->assertOk();
 
-        VoiceSample::create([
-            'title' => 'Showcase Only',
-            'sample_text' => 'sample',
-            'audio_path' => 'audio/missing.mp3',
-            'language' => 'ar',
-            'category' => 'hero',
-            'emotion' => 'custom_style',
-            'is_featured' => false,
-            'is_active' => true,
-            'show_in_hero' => false,
-            'show_in_showcase' => true,
-            'sort_order' => 1,
-        ]);
-
-        app()->setLocale('ar');
-        $response = $this->getLocalizedRoute('home');
-        $response->assertOk();
-
-        $heroVoiceSample = $response->viewData('heroVoiceSample');
-        $voiceSamples = $response->viewData('voiceSamples');
-
-        $this->assertSame('Hero Only', $heroVoiceSample['title']);
-        $this->assertCount(1, $voiceSamples);
-        $this->assertSame('Showcase Only', $voiceSamples[0]['title']);
+        // One hero chip per dialect, from samples marked for the hero.
+        $this->assertSame(['Hero Only'], array_column($response->viewData('showcasePicker')['ar'], 'title'));
+        $this->assertSame(['Showcase Only', 'Second Saudi'], array_column($response->viewData('showcaseVoices')['ar'], 'title'));
     }
 
     public function test_homepage_announces_voice_cloning_under_the_hero_and_links_to_pricing(): void

@@ -1,8 +1,8 @@
-{{-- Shared player for New Theme play buttons ([data-nt-track] > [data-nt-play]), voice and dialogue cards, dialect chips, language tabs and library filters. --}}
+{{-- Shared player for New Theme play buttons ([data-vp-track] > [data-vp-play]), voice and dialogue cards, dialect chips, language tabs and library filters. --}}
 <script>
 (function () {
-  if (window.__ntPlayerBooted) return;
-  window.__ntPlayerBooted = true;
+  if (window.__vpPlayerBooted) return;
+  window.__vpPlayerBooted = true;
   var root = document.body;
   var audio = new Audio();
   audio.preload = 'none';
@@ -16,7 +16,7 @@
   function setState(track, playing) {
     if (!track) return;
     track.classList.toggle('is-playing', playing);
-    var btn = track.querySelector('[data-nt-play]');
+    var btn = track.querySelector('[data-vp-play]');
     if (btn) {
       btn.setAttribute('aria-pressed', playing ? 'true' : 'false');
       var label = playing ? btn.getAttribute('data-label-pause') : btn.getAttribute('data-label-play');
@@ -25,7 +25,7 @@
   }
 
   // ---------- Audio analysis: real waveform and where the voice speaks ----------
-  // Players with a script ([data-nt-words]) decode their sample once. The bars
+  // Players with a script ([data-vp-words]) decode their sample once. The bars
   // then show the real loudness, and the script follows the moments the voice
   // is actually speaking, so pauses between sentences hold the highlight.
   var analyses = {};
@@ -93,7 +93,7 @@
 
   // ---------- Script that lights up as it is spoken ----------
   function wordify(el) {
-    if (!el || el.getAttribute('data-nt-wordified') === el.textContent) return;
+    if (!el || el.getAttribute('data-vp-wordified') === el.textContent) return;
     var text = el.textContent;
     el.textContent = '';
     var seen = 0, phrase = 0;
@@ -111,7 +111,7 @@
       if (/[.,!?;:…،؛؟]["'»”)]*$/.test(part)) phrase++;
       el.appendChild(span);
     });
-    el.setAttribute('data-nt-wordified', el.textContent);
+    el.setAttribute('data-vp-wordified', el.textContent);
     el.setAttribute('data-chars', String(seen || 1));
   }
   // Time the voice has been speaking by time t (silences skipped).
@@ -129,8 +129,8 @@
   // programming, in order), so a phrase finishes exactly when the voice stops.
   // Extra breaths in the audio are allowed; the highlight just waits there.
   function anchorsFor(el, words, info) {
-    var key = el.getAttribute('data-nt-wordified') + '|' + info.duration;
-    if (el.__ntAnchors && el.__ntAnchors.key === key) return el.__ntAnchors.list;
+    var key = el.getAttribute('data-vp-wordified') + '|' + info.duration;
+    if (el.__vpAnchors && el.__vpAnchors.key === key) return el.__vpAnchors.list;
     var total = parseFloat(el.getAttribute('data-chars')) || 1;
     var voiced = voicedAt(info, info.duration) || info.duration;
     var bounds = [];
@@ -169,7 +169,7 @@
     }
     list.push([0, 0]);
     list.reverse();
-    el.__ntAnchors = { key: key, list: list };
+    el.__vpAnchors = { key: key, list: list };
     return list;
   }
   // How far through the script (in letters) the voice is at time t.
@@ -186,14 +186,14 @@
     return total;
   }
   function paintWords(track, ratio, t) {
-    var card = track ? track.closest('[data-nt-try]') : null;
-    var el = card ? card.querySelector('[data-nt-words]') : null;
+    var card = track ? track.closest('[data-vp-try]') : null;
+    var el = card ? card.querySelector('[data-vp-words]') : null;
     if (!el) return;
     wordify(el);
     var words = el.querySelectorAll('.w');
     if (!words.length) return;
     el.classList.toggle('is-reading', ratio > 0 && ratio < 1);
-    var info = track.__ntInfo && track.__ntInfo.src === track.getAttribute('data-src') ? track.__ntInfo.data : null;
+    var info = track.__vpInfo && track.__vpInfo.src === track.getAttribute('data-src') ? track.__vpInfo.data : null;
     var pos = ratio >= 1 ? Infinity : spokenChars(el, words, t, info, ratio);
     for (var i = 0; i < words.length; i++) {
       var w = words[i];
@@ -224,7 +224,7 @@
   // Bars near the playhead lift with the voice's real loudness at that moment,
   // so the waveform moves with the speech; elsewhere they rest at their shape.
   function pulseBars(track, ratio, t) {
-    var info = track.__ntInfo && track.__ntInfo.src === track.getAttribute('data-src') ? track.__ntInfo.data : null;
+    var info = track.__vpInfo && track.__vpInfo.src === track.getAttribute('data-src') ? track.__vpInfo.data : null;
     var groups = track.querySelectorAll('.auth-wave-bars');
     if (!info || !groups.length) return;
     var playing = track.classList.contains('is-playing');
@@ -242,10 +242,10 @@
   // Dialogue cards: the line being spoken lights up. Lines share the voiced
   // time by length, and silences (the pause before the sign-off) are skipped.
   function paintTurns(track, ratio, t) {
-    if (!track || !track.hasAttribute('data-nt-dialogue')) return;
-    var turns = track.querySelectorAll('[data-nt-turn]');
+    if (!track || !track.hasAttribute('data-vp-dialogue')) return;
+    var turns = track.querySelectorAll('[data-vp-turn]');
     if (!turns.length) return;
-    var info = track.__ntInfo && track.__ntInfo.src === track.getAttribute('data-src') ? track.__ntInfo.data : null;
+    var info = track.__vpInfo && track.__vpInfo.src === track.getAttribute('data-src') ? track.__vpInfo.data : null;
     var r = ratio;
     if (info && info.segments.length && ratio > 0 && ratio < 1) {
       var voiced = voicedAt(info, info.duration);
@@ -264,44 +264,44 @@
   }
   function paintWave(track, ratio, t) {
     if (t === undefined) t = audio.currentTime;
-    if (track) track.style.setProperty('--nt-progress', String(Math.max(0, Math.min(1, ratio))));
+    if (track) track.style.setProperty('--vp-progress', String(Math.max(0, Math.min(1, ratio))));
     paintWords(track, ratio, t);
     paintTurns(track, ratio, t);
-    var wave = track ? track.querySelector('.nt-wave') : null;
+    var wave = track ? track.querySelector('.vp-wave') : null;
     // Waves with a fill layer sweep smoothly instead of lighting bar by bar.
-    if (wave) wave.style.setProperty('--nt-progress', String(Math.max(0, Math.min(1, ratio))));
+    if (wave) wave.style.setProperty('--vp-progress', String(Math.max(0, Math.min(1, ratio))));
     if (wave) pulseBars(track, ratio, t);
-    var bars = track ? track.querySelectorAll('.nt-wave > span') : [];
+    var bars = track ? track.querySelectorAll('.vp-wave > span') : [];
     var lit = Math.round(bars.length * ratio);
     for (var i = 0; i < bars.length; i++) bars[i].classList.toggle('is-lit', i < lit);
-    var time = track ? track.querySelector('[data-nt-time]') : null;
+    var time = track ? track.querySelector('[data-vp-time]') : null;
     if (time) {
-      if (time.__ntRest === undefined) time.__ntRest = time.textContent;
+      if (time.__vpRest === undefined) time.__vpRest = time.textContent;
       time.textContent = fmt(t) + (isFinite(audio.duration) ? ' / ' + fmt(audio.duration) : '');
     }
   }
   // A track that stops being the current one goes back to its resting look.
   function rest(track) {
     if (!track) return;
-    track.style.setProperty('--nt-progress', '0');
+    track.style.setProperty('--vp-progress', '0');
     paintTurns(track, 0, 0);
-    track.querySelectorAll('.nt-wave > span').forEach(function (b) { b.classList.remove('is-lit'); });
-    var time = track.querySelector('[data-nt-time]');
-    if (time && time.__ntRest !== undefined) time.textContent = time.__ntRest;
+    track.querySelectorAll('.vp-wave > span').forEach(function (b) { b.classList.remove('is-lit'); });
+    var time = track.querySelector('[data-vp-time]');
+    if (time && time.__vpRest !== undefined) time.textContent = time.__vpRest;
   }
   function prepare(track) {
     if (!track) return;
     var src = track.getAttribute('data-src');
-    if (track.hasAttribute('data-nt-dialogue')) {
-      analyse(src).then(function (info) { if (info && track.getAttribute('data-src') === src) track.__ntInfo = { src: src, data: info }; });
+    if (track.hasAttribute('data-vp-dialogue')) {
+      analyse(src).then(function (info) { if (info && track.getAttribute('data-src') === src) track.__vpInfo = { src: src, data: info }; });
       return;
     }
-    if (!track.closest('[data-nt-try]') || !track.closest('[data-nt-try]').querySelector('[data-nt-words]')) return;
+    if (!track.closest('[data-vp-try]') || !track.closest('[data-vp-try]').querySelector('[data-vp-words]')) return;
     analyse(src).then(function (info) {
       if (!info || track.getAttribute('data-src') !== src) return;
-      track.__ntInfo = { src: src, data: info };
+      track.__vpInfo = { src: src, data: info };
       paintBars(track, info);
-      var time = track.querySelector('[data-nt-time]');
+      var time = track.querySelector('[data-vp-time]');
       if (time && current !== track) time.textContent = '0:00 / ' + fmt(info.duration);
     });
   }
@@ -349,53 +349,59 @@
 
   // Analyse the first sample shortly after the page settles, so its waveform is real before play.
   function warm() {
-    document.querySelectorAll('[data-nt-try] [data-nt-track]').forEach(prepare);
+    document.querySelectorAll('[data-vp-try] [data-vp-track]').forEach(prepare);
   }
   if (document.readyState === 'complete') setTimeout(warm, 600);
   else window.addEventListener('load', function () { setTimeout(warm, 600); });
 
   root.addEventListener('click', function (event) {
-    var btn = event.target.closest('[data-nt-play]');
+    var btn = event.target.closest('[data-vp-play]');
     if (btn && root.contains(btn)) {
-      play(btn.closest('[data-nt-track]'));
+      play(btn.closest('[data-vp-track]'));
       return;
     }
     // A voice or dialogue card plays when pressed anywhere, not only on its button.
-    var pressed = event.target.closest('.nt-voice-card, .nt-dialogue');
+    var pressed = event.target.closest('.vs-card, .vs-dialogue');
     if (pressed && !event.target.closest('a, button')) {
       play(pressed);
       return;
     }
-    var langTab = event.target.closest('[data-nt-lang]');
+    var langTab = event.target.closest('[data-vp-lang]');
     if (langTab) {
-      var studio = langTab.closest('[data-nt-try]');
-      var lang = langTab.getAttribute('data-nt-lang');
-      studio.querySelectorAll('[data-nt-lang]').forEach(function (b) { b.setAttribute('aria-selected', b === langTab ? 'true' : 'false'); });
-      studio.querySelectorAll('[data-nt-rail]').forEach(function (rail) { rail.hidden = rail.getAttribute('data-nt-rail') !== lang; });
-      var firstChip = studio.querySelector('[data-nt-rail="' + lang + '"] [data-nt-chip]');
+      var studio = langTab.closest('[data-vp-try]');
+      var lang = langTab.getAttribute('data-vp-lang');
+      studio.querySelectorAll('[data-vp-lang]').forEach(function (b) { b.setAttribute('aria-selected', b === langTab ? 'true' : 'false'); });
+      studio.querySelectorAll('[data-vp-rail]').forEach(function (rail) { rail.hidden = rail.getAttribute('data-vp-rail') !== lang; });
+      var firstChip = studio.querySelector('[data-vp-rail="' + lang + '"] [data-vp-chip]');
       if (firstChip) firstChip.click();
       return;
     }
-    var galleryTab = event.target.closest('[data-nt-gallery]');
+    var more = event.target.closest('[data-vp-more]');
+    if (more) {
+      var grid = more.parentElement.previousElementSibling;
+      if (grid) grid.classList.add('is-expanded');
+      return;
+    }
+    var galleryTab = event.target.closest('[data-vp-gallery]');
     if (galleryTab) {
-      var show = galleryTab.getAttribute('data-nt-gallery');
-      galleryTab.parentElement.querySelectorAll('[data-nt-gallery]').forEach(function (b) { b.setAttribute('aria-selected', b === galleryTab ? 'true' : 'false'); });
-      root.querySelectorAll('.nt-voice-card').forEach(function (c) {
+      var show = galleryTab.getAttribute('data-vp-gallery');
+      galleryTab.parentElement.querySelectorAll('[data-vp-gallery]').forEach(function (b) { b.setAttribute('aria-selected', b === galleryTab ? 'true' : 'false'); });
+      root.querySelectorAll('.vs-card').forEach(function (c) {
         c.hidden = c.getAttribute('data-lang') !== show;
         if (c.hidden && current === c) { audio.pause(); stop(); rest(c); }
       });
       return;
     }
-    var chip = event.target.closest('[data-nt-chip]');
+    var chip = event.target.closest('[data-vp-chip]');
     if (chip) {
-      var card = chip.closest('[data-nt-try]');
-      var track = card.querySelector('[data-nt-track]');
-      card.querySelectorAll('[data-nt-chip]').forEach(function (c) { c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); });
-      var text = card.querySelector('[data-nt-try-text]');
-      var voice = card.querySelector('[data-nt-try-voice]');
-      var dialect = card.querySelector('[data-nt-try-dialect]');
-      var initial = card.querySelector('[data-nt-try-initial]');
-      var flag = card.querySelector('[data-nt-try-flag]');
+      var card = chip.closest('[data-vp-try]');
+      var track = card.querySelector('[data-vp-track]');
+      card.querySelectorAll('[data-vp-chip]').forEach(function (c) { c.setAttribute('aria-checked', c === chip ? 'true' : 'false'); });
+      var text = card.querySelector('[data-vp-try-text]');
+      var voice = card.querySelector('[data-vp-try-voice]');
+      var dialect = card.querySelector('[data-vp-try-dialect]');
+      var initial = card.querySelector('[data-vp-try-initial]');
+      var flag = card.querySelector('[data-vp-try-flag]');
       if (text) {
         text.textContent = chip.getAttribute('data-text') || '';
         text.classList.remove('is-reading');
@@ -407,8 +413,8 @@
       if (voice) voice.textContent = chip.getAttribute('data-voice') || '';
       if (dialect) dialect.textContent = chip.getAttribute('data-dialect') || '';
       if (initial) initial.textContent = chip.getAttribute('data-initial') || '';
-      var chipFlag = chip.querySelector('.nt-flag');
-      if (flag && chipFlag) { flag.innerHTML = ''; var copy = chipFlag.cloneNode(true); copy.classList.add('nt-flag-xs'); flag.appendChild(copy); }
+      var chipFlag = chip.querySelector('.vs-flag');
+      if (flag && chipFlag) { flag.innerHTML = ''; var copy = chipFlag.cloneNode(true); copy.classList.add('vs-flag-xs'); flag.appendChild(copy); }
       var wasPlaying = current === track && !audio.paused;
       if (current === track) { audio.pause(); stop(); }
       track.setAttribute('data-src', chip.getAttribute('data-src') || '');
@@ -416,14 +422,6 @@
       prepare(track);
       if (wasPlaying) play(track);
       return;
-    }
-    var filter = event.target.closest('[data-nt-filter]');
-    if (filter) {
-      var value = filter.getAttribute('data-nt-filter');
-      filter.parentElement.querySelectorAll('[data-nt-filter]').forEach(function (f) { f.setAttribute('aria-selected', f === filter ? 'true' : 'false'); });
-      root.querySelectorAll('.nt-library-row').forEach(function (row) {
-        row.hidden = value !== 'all' && row.getAttribute('data-lang') !== value;
-      });
     }
   });
 })();

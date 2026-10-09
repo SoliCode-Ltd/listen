@@ -8,10 +8,9 @@ use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 /**
- * Small data helpers for pages rendered in the new site design that are not
- * served by HomeController (sign in, register).
+ * Voice samples and plan data for the sign in and register pages.
  */
-final class NewDesignSamples
+final class AuthSamples
 {
     private const DIALECT_ORDER = ['ar-XA', 'ar-SA', 'ar-EG', 'ar-LB', 'ar-MA', 'ar-AE', 'ar-KW', 'ar-JO', 'ar-SY', 'ar-IQ'];
 
@@ -48,7 +47,7 @@ final class NewDesignSamples
     private static function samples(string $language, int $limit): array
     {
         $order = $language === 'ar' ? self::DIALECT_ORDER : self::ACCENT_ORDER;
-        $cacheKey = $language === 'ar' ? 'nt_dialect_rows:'.$limit : 'nt_sample_rows:'.$language.':'.$limit;
+        $cacheKey = 'auth_sample_rows:'.$language.':'.$limit;
 
         try {
             return Cache::remember($cacheKey, 300, function () use ($language, $order, $limit): array {
@@ -112,7 +111,7 @@ final class NewDesignSamples
         $region = strtoupper((string) substr((string) strrchr('-'.$code, '-'), 1));
         $key = $keys[$region] ?? null;
         if ($key === 'msa') {
-            return __('design.home.fusha');
+            return __('design.auth.fusha');
         }
 
         return $key ? __('ui.dialects.'.$key) : $code;

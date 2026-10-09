@@ -4,14 +4,12 @@ namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
 use App\Services\MultiAccountEnforcementService;
-use App\Support\SiteDesign;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Illuminate\Support\HtmlString;
 
 class SiteSettings extends Page implements HasForms
 {
@@ -42,7 +40,6 @@ class SiteSettings extends Page implements HasForms
             'demo_sample_standard_en' => SiteSetting::get('demo_sample_standard_en', ''),
             'site_main_language' => SiteSetting::get('site_main_language', config('app.locale', 'ar')),
             'default_theme' => SiteSetting::get('default_theme', 'system'),
-            SiteDesign::SETTING_KEY => SiteDesign::configured(),
             'custom_css' => SiteSetting::get('custom_css', ''),
             'favicon_url' => SiteSetting::get('favicon_url', ''),
             'logo_url' => SiteSetting::get('logo_url', ''),
@@ -144,22 +141,6 @@ class SiteSettings extends Page implements HasForms
                 Forms\Components\Section::make('Appearance')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Radio::make(SiteDesign::SETTING_KEY)
-                            ->label('Site Design')
-                            ->options(SiteDesign::options())
-                            ->descriptions([
-                                SiteDesign::MAIN => 'The design the site uses today.',
-                                SiteDesign::NEW => 'The redesigned look. Same pages and features, new styling. Switch back at any time.',
-                            ])
-                            ->default(SiteDesign::MAIN)
-                            ->required()
-                            ->helperText(fn (): HtmlString => new HtmlString(
-                                'Applies to every visitor once saved. To look before switching, preview just for yourself: '
-                                .'<a href="'.e(url('/').'?'.SiteDesign::PREVIEW_QUERY_KEY.'='.SiteDesign::NEW).'" target="_blank" rel="noopener" style="text-decoration: underline">preview New theme</a>'
-                                .' · <a href="'.e(url('/').'?'.SiteDesign::PREVIEW_QUERY_KEY.'='.SiteDesign::MAIN).'" target="_blank" rel="noopener" style="text-decoration: underline">preview Main theme</a>'
-                                .' · <a href="'.e(url('/').'?'.SiteDesign::PREVIEW_QUERY_KEY.'=reset').'" target="_blank" rel="noopener" style="text-decoration: underline">end preview</a>'
-                            ))
-                            ->columnSpanFull(),
                         Forms\Components\Select::make('default_theme')
                             ->label('Default Theme')
                             ->options([

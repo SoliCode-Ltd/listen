@@ -5,7 +5,7 @@ namespace Tests\Feature;
 use App\Console\Commands\SyncVoiceSampleTextCommand;
 use App\Models\VoiceSample;
 use App\Services\Tts\GeminiKeyManager;
-use App\Support\NewDesignSamples;
+use App\Support\AuthSamples;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -54,12 +54,12 @@ class VoiceSampleTextSyncTest extends TestCase
     public function test_sign_in_samples_show_the_fixed_text_straight_away(): void
     {
         $sample = $this->sample('en', 'en-US', 'Old FlowSync script.', 'wrong.mp3');
-        $this->assertSame('Old FlowSync script.', NewDesignSamples::forLocale('en', 5)[0]['text']);
+        $this->assertSame('Old FlowSync script.', AuthSamples::forLocale('en', 5)[0]['text']);
 
         $this->fakeTranscripts(['wrong.mp3' => 'Welcome. Turn your words into natural voice in seconds.']);
         $this->artisan('voice-samples:sync-text', ['--fix' => true])->assertSuccessful();
 
-        $this->assertSame('Welcome. Turn your words into natural voice in seconds.', NewDesignSamples::forLocale('en', 5)[0]['text']);
+        $this->assertSame('Welcome. Turn your words into natural voice in seconds.', AuthSamples::forLocale('en', 5)[0]['text']);
         $this->assertSame($sample->id, $sample->fresh()->id);
     }
 
@@ -90,7 +90,7 @@ class VoiceSampleTextSyncTest extends TestCase
         $this->assertSame('ar-XA', $unlabelled->fresh()->dialect, 'real Fusha gets the Fusha label');
 
         // The Fusha tab now plays the real Fusha sample.
-        $rows = NewDesignSamples::forLocale('ar', 5);
+        $rows = AuthSamples::forLocale('ar', 5);
         $this->assertSame('ar-XA', $rows[0]['dialect']);
         $this->assertStringContainsString('لا تستسلم', $rows[0]['text']);
     }
@@ -129,7 +129,7 @@ class VoiceSampleTextSyncTest extends TestCase
 
         $this->assertStringContainsString('auth-wave-fill', $html);
         $this->assertSame(2, substr_count($html, 'class="auth-wave-bars'));
-        $this->assertStringContainsString("setProperty('--nt-progress'", $html);
+        $this->assertStringContainsString("setProperty('--vp-progress'", $html);
     }
 
     public function test_sign_in_player_has_voice_tabs_and_a_word_by_word_script(): void
@@ -140,9 +140,9 @@ class VoiceSampleTextSyncTest extends TestCase
         $html = $this->getLocalizedRoute('login')->assertOk()->getContent();
 
         $this->assertSame(2, substr_count($html, 'class="auth-tab"'));
-        $this->assertStringContainsString('data-nt-words', $html);
+        $this->assertStringContainsString('data-vp-words', $html);
         $this->assertStringContainsString('Welcome. Turn your words into natural voice.', $html);
-        $this->assertStringContainsString('dir="ltr" data-nt-time', $html);
+        $this->assertStringContainsString('dir="ltr" data-vp-time', $html);
         $this->assertStringContainsString('function wordify', $html);
     }
 

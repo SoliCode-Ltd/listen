@@ -49,7 +49,6 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             \App\Http\Middleware\CaptureAdClickId::class,
             \App\Http\Middleware\SecurityHeaders::class,
-            \App\Http\Middleware\CaptureSiteDesignPreview::class,
         ]);
 
         $middleware->alias([

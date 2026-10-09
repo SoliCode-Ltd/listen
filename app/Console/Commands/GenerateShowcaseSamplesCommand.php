@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
@@ -276,6 +277,7 @@ class GenerateShowcaseSamplesCommand extends Command
         $only = array_filter((array) $this->option('only'));
         $kept = [];
         $order = ['ar' => 0, 'en' => 0, 'dialogue' => 0];
+        $pickerDialects = [];
 
         foreach ($samples as $sample) {
             $path = self::AUDIO_DIR.'/'.$sample['slug'].'.mp3';
@@ -295,6 +297,9 @@ class GenerateShowcaseSamplesCommand extends Command
             $group = $isDialogue ? 'dialogue' : $language;
             $position = $order[$group]++;
             $label = $this->dialectLabel($language, $sample['dialect']);
+            // The hero picker shows one voice per dialect or accent: the first one listed.
+            $inPicker = ! $isDialogue && ! isset($pickerDialects[$sample['dialect']]);
+            $pickerDialects[$sample['dialect']] = true;
             $text = $isDialogue
                 ? implode("\n", array_map(fn (array $t): string => $t['speaker'].': '.$t['text'], $this->turns($sample)))
                 : $sample['text'];
@@ -321,7 +326,7 @@ class GenerateShowcaseSamplesCommand extends Command
                 'sort_order' => 100 + $position,
                 'is_featured' => $position < 3,
                 'is_active' => true,
-                'show_in_hero' => $position === 0,
+                'show_in_hero' => $inPicker,
                 'show_in_showcase' => true,
                 'category' => $isDialogue ? 'dialogue' : 'hero',
                 'duration_seconds' => (int) round($this->durationOf(public_path($path))),
@@ -352,6 +357,13 @@ class GenerateShowcaseSamplesCommand extends Command
                 $old->update(['is_active' => false]);
             }
             $this->info("Deactivated {$retired->count()} older homepage sample(s). They stay in the admin and can be switched back on.");
+        }
+
+        // The gallery shows up to this many voices per language; make room for all of them.
+        $perLanguage = max($order['ar'], $order['en']);
+        if ((int) SiteSetting::get('landing_voice_samples_limit', '12') < $perLanguage) {
+            SiteSetting::set('landing_voice_samples_limit', (string) min(60, $perLanguage), 'content');
+            $this->info("Homepage sample limit raised to {$perLanguage} per language.");
         }
 
         VoiceSample::flushLandingCache();

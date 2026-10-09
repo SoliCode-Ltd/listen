@@ -2026,7 +2026,6 @@
   <main class="main-content dashboard-shell" style="max-width: 1700px; padding: 2rem clamp(1rem, 3vw, 3rem); margin: 0 auto; min-height: 80vh;">
     <div class="dashboard-layout">
       <aside class="reveal dashboard-menu">
-@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.dashboard-sidebar-head')
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
           <a class="dashboard-menu-link active" href="#commandCenterSection" data-dashboard-nav>
             <span>{{ __('ui.dashboard.command_center') }}</span>
@@ -2054,14 +2053,10 @@
           </a>
 
         </nav>
-@includeWhen(\App\Support\SiteDesign::isNew(), 'components.design-new.dashboard-sidebar-foot')
       </aside>
 
       <div class="dashboard-content">
     <section id="commandCenterSection" class="dashboard-panel active" data-dashboard-section>
-@if(\App\Support\SiteDesign::isNew())
-@include('components.design-new.dashboard-overview')
-@else
       <div class="hero-grid">
         <article class="page-card reveal command-card">
           <h1>
@@ -2118,7 +2113,6 @@
 
         </article>
       </div>
-@endif
     </section>
 
     <section id="generateVoiceSection" class="dashboard-panel" data-dashboard-section>
