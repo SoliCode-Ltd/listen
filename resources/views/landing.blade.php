@@ -82,7 +82,7 @@
     .hero-art::before {
       display: none;
     }
-    .hero-art img {
+    .hero-art > img {
       width: min(520px, 100%);
       height: auto;
       filter: drop-shadow(0 16px 28px rgba(0,0,0,.24));
@@ -403,7 +403,7 @@
         width: min(360px, 88%);
         opacity: .38;
       }
-      .hero-art img {
+      .hero-art > img {
         max-width: min(370px, 92vw);
         animation: none;
       }

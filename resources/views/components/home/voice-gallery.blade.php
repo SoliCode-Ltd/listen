@@ -2,7 +2,6 @@
      Region chips filter the cards; without a filter the first nine show until "Show all voices". --}}
 @php
   $vsVoices = $showcaseVoices ?? [];
-  $vsCount = count(array_unique(array_column($vsVoices, 'dialect')));
   $vsRegions = array_values(array_unique(array_column($vsVoices, 'region')));
   $vsOrder = ['fusha', 'gulf', 'levant', 'nile', 'iraq_yemen', 'maghreb', 'americas', 'uk_ie', 'africa', 'asia_pacific', 'other'];
   usort($vsRegions, fn ($a, $b) => array_search($a, $vsOrder, true) <=> array_search($b, $vsOrder, true));
@@ -12,7 +11,7 @@
   <div class="vs-head">
     <div>
       <h2 class="vs-title">{{ __('ui.landing.showcase_title') }}</h2>
-      <p class="vs-lead">{{ __('ui.landing.showcase_body', ['count' => $vsCount]) }}</p>
+      <p class="vs-lead">{{ __('ui.landing.showcase_body') }}</p>
     </div>
   </div>
   @if(count($vsRegions) > 1)

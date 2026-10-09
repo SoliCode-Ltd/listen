@@ -7,6 +7,7 @@ use App\Models\VoiceSample;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
+use App\Support\HeroCast;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -44,7 +45,8 @@ class GenerateShowcaseSamplesCommand extends Command
         }
 
         $data = require database_path('seeders/data/showcase_samples.php');
-        $samples = $data['samples'];
+        // The hero clips are generated with the samples but are not gallery samples.
+        $samples = array_merge($data['samples'], HeroCast::clips());
         $only = array_filter((array) $this->option('only'));
         if ($only !== []) {
             $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
@@ -94,6 +96,9 @@ class GenerateShowcaseSamplesCommand extends Command
             try {
                 $pcm = $this->requestPcm($this->payload($sample, $signOff), $key);
                 $this->encodeMp3($pcm, $target);
+                if (str_starts_with($sample['slug'], 'hero-')) {
+                    $this->saveLineEnd($sample['slug'], $target);
+                }
                 $this->info("made  {$sample['slug']} (".round($this->durationOf($target), 1).'s)');
             } catch (\Throwable $e) {
                 $failed++;
@@ -285,6 +290,29 @@ class GenerateShowcaseSamplesCommand extends Command
         unset($turn);
 
         return $turns;
+    }
+
+    /**
+     * When the spoken line ends in a hero clip: the start of the pause before the
+     * sign-off. Lets the page play the conversation line after line.
+     */
+    private function saveLineEnd(string $slug, string $file): void
+    {
+        $duration = $this->durationOf($file);
+        $ffmpeg = (string) (config('services.gemini_tts.ffmpeg_path') ?: 'ffmpeg');
+        $process = new Process([$ffmpeg, '-hide_banner', '-nostats', '-i', $file, '-af', 'silencedetect=noise=-36dB:d=0.3', '-f', 'null', '-']);
+        $process->setTimeout(60)->run();
+        preg_match_all('/silence_start: ([\d.]+)/', $process->getErrorOutput(), $m);
+        $starts = array_values(array_filter(array_map('floatval', $m[1]), fn (float $t): bool => $t > 0.4 && $t < $duration - 0.8));
+        if ($starts === []) {
+            return;
+        }
+
+        $store = database_path('seeders/data/showcase_hero_times.json');
+        $times = is_file($store) ? (array) json_decode((string) file_get_contents($store), true) : [];
+        $times[$slug] = round(end($starts), 2);
+        ksort($times);
+        file_put_contents($store, json_encode($times, JSON_PRETTY_PRINT)."\n");
     }
 
     private function durationOf(string $file): float
