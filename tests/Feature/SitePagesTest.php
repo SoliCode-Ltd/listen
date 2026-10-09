@@ -75,31 +75,19 @@ class SitePagesTest extends TestCase
             ->assertDontSee('auth-facts', false);
     }
 
-    public function test_auth_sample_player_speaks_the_page_language(): void
+    public function test_sign_in_and_register_show_the_speaker_cast_in_the_page_language(): void
     {
-        foreach ([['ar', 'ar-SA', 'مرحبا بكم في إسمع'], ['en', 'en-GB', 'Welcome to Listen, in a British voice']] as [$language, $dialect, $text]) {
-            \App\Models\VoiceSample::create([
-                'title' => 'Sample '.$dialect,
-                'sample_text' => $text,
-                'sample_text_ar' => $language === 'ar' ? $text : null,
-                'audio_path' => 'audio/'.$dialect.'.mp3',
-                'language' => $language,
-                'dialect' => $dialect,
-                'category' => 'hero',
-                'emotion' => 'neutral',
-                'is_active' => true,
-            ]);
-        }
+        app()->setLocale('en');
+        $english = $this->getLocalizedRoute('login')->assertOk();
+        $english->assertSee('class="vs-art vs-cast"', false)
+            ->assertSee('css/voice-showcase.css', false)
+            ->assertSee("Wait, that's my script, and it sounds amazing!")
+            ->assertDontSee('والله إن صوتي صار يطلع بلهجتي!', false)
+            ->assertDontSee('data-vp-track', false);
 
-        $this->getLocalizedRoute('login')
-            ->assertOk()
-            ->assertSee('Welcome to Listen, in a British voice', false)
-            ->assertSee(__('ui.dialects.british', [], 'en'), false)
-            ->assertDontSee('مرحبا بكم في إسمع', false);
-
-        $arabic = \App\Support\AuthSamples::forLocale('ar');
-        $this->assertSame(['ar-SA'], array_column($arabic, 'dialect'));
-        $this->assertSame('مرحبا بكم في إسمع', $arabic[0]['text']);
-        $this->assertSame(['en-GB'], array_column(\App\Support\AuthSamples::forLocale('en'), 'dialect'));
+        app()->setLocale('ar');
+        $this->getLocalizedRoute('register')->assertOk()
+            ->assertSee('والله إن صوتي صار يطلع بلهجتي!', false)
+            ->assertDontSee("Wait, that's my script");
     }
 }

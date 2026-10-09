@@ -260,6 +260,33 @@ class GenerateShowcaseSamplesCommand extends Command
         }
     }
 
+    /**
+     * The dialogue turns with when each is spoken (start and end in seconds), from
+     * database/seeders/data/showcase_dialogue_times.json, made by scripts/tts/dialogue_timing.py.
+     *
+     * @param  array<string, mixed>  $sample
+     * @return array<int, array{speaker: string, text: string, start?: float, end?: float}>
+     */
+    private function timedTurns(array $sample): array
+    {
+        static $times = null;
+        $file = database_path('seeders/data/showcase_dialogue_times.json');
+        $times ??= is_file($file) ? (array) json_decode((string) file_get_contents($file), true) : [];
+
+        $turns = $this->turns($sample);
+        $spans = $times[$sample['slug']] ?? [];
+        if (count($spans) !== count($turns)) {
+            return $turns;
+        }
+        foreach ($turns as $i => &$turn) {
+            $turn['start'] = (float) $spans[$i][0];
+            $turn['end'] = (float) $spans[$i][1];
+        }
+        unset($turn);
+
+        return $turns;
+    }
+
     private function durationOf(string $file): float
     {
         $process = new Process(['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', $file]);
@@ -336,7 +363,7 @@ class GenerateShowcaseSamplesCommand extends Command
                     'speakers' => array_map(fn (array $s): array => [
                         'name' => $s['name'], 'name_ar' => $s['name_ar'] ?? $s['name'], 'gender' => $s['gender'], 'dialect' => $s['dialect'] ?? $sample['dialect'],
                     ], $speakers),
-                    'turns' => $isDialogue ? $this->turns($sample) : null,
+                    'turns' => $isDialogue ? $this->timedTurns($sample) : null,
                 ],
             ]);
             $kept[] = $path;

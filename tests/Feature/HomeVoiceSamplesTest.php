@@ -88,7 +88,7 @@ class HomeVoiceSamplesTest extends TestCase
         $html = $this->getLocalizedRoute('home')->assertOk()->getContent();
 
         $hero = substr($html, strpos($html, 'class="hero-art'), 4000);
-        $this->assertStringContainsString('class="vs-art"', $hero);
+        $this->assertStringContainsString('class="vs-art vs-cast"', $hero);
         $this->assertStringNotContainsString('data-vp-track', $hero);
         $this->assertStringNotContainsString('<audio', $hero);
         $this->assertDoesNotMatchRegularExpression('/<[^>]+\sdata-vp-time[\s>]/', $html);

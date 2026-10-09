@@ -44,6 +44,27 @@ final class VoiceFlag
     }
 
     /**
+     * Region a dialect or accent belongs to, for grouping voices:
+     * fusha, gulf, levant, nile, iraq_yemen, maghreb for Arabic;
+     * americas, uk_ie, africa, asia_pacific, other for English.
+     */
+    public static function region(?string $dialect): string
+    {
+        $code = trim((string) $dialect);
+        if (isset(ArabicDialects::ALL[$code])) {
+            return (string) ArabicDialects::ALL[$code]['region'];
+        }
+
+        return match (EnglishAccents::countryOf($code)) {
+            'US', 'CA', 'JM' => 'americas',
+            'GB', 'IE' => 'uk_ie',
+            'ZA', 'NG' => 'africa',
+            'AU', 'NZ', 'IN', 'SG' => 'asia_pacific',
+            default => 'other',
+        };
+    }
+
+    /**
      * Localised name of a dialect or accent code, e.g. "Saudi (Najdi)" / "سعودي (نجدي)".
      */
     public static function label(?string $dialect, bool $arabic): string

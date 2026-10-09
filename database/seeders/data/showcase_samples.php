@@ -155,6 +155,102 @@ return [
             'style' => 'A man from Tripoli, Libya, proudly describing his city. Deep, warm, steady.',
             'text' => 'أهلين! توا بنحكيلكم على المدينة القديمة في طرابلس، الأسواق والريحة والناس الطيبين. والله حاجة باهية هلبا.'],
 
+        ['slug' => 'ar-sa-qassimi-dates', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SA-QS', 'gender' => 'male',
+            'voice' => 'Algieba', 'speaker' => 'Turki', 'speaker_ar' => 'تركي',
+            'title' => 'Date market', 'title_ar' => 'سوق التمر', 'emotion' => 'proud',
+            'style' => 'A proud man from Buraydah inviting friends to the date market. Slow, drawn Qassim intonation, generous and warm.',
+            'text' => 'هلا والله بالربع! وش علومكم؟ ترى التمر هالسنة غير، تعالوا القصيم وذوقوه بأنفسكم، أبيكم تشوفون السوق الحين قبل الزحمة.'],
+
+        ['slug' => 'ar-sa-southern-abha', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SA-SO', 'gender' => 'male',
+            'voice' => 'Orus', 'speaker' => 'Abdulaziz', 'speaker_ar' => 'عبدالعزيز',
+            'title' => 'Mountain morning', 'title_ar' => 'صباح الجبل', 'emotion' => 'calm',
+            'style' => 'A man from Abha welcoming guests on a misty morning. Calm, hospitable, southern Saudi melody.',
+            'text' => 'يا مرحبا ويا هلا! الجو في أبها اليوم بارد والضباب نازل على الجبال، تعالوا اقعدوا معنا ونشرب قهوة بالهيل.'],
+
+        ['slug' => 'ar-sa-eastern-ahsa', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SA-EA', 'gender' => 'female',
+            'voice' => 'Achernar', 'speaker' => 'Fatima', 'speaker_ar' => 'فاطمة',
+            'title' => 'Oasis trip', 'title_ar' => 'رحلة الواحة', 'emotion' => 'happy',
+            'style' => 'A cheerful woman from Al-Ahsa planning a family day out. Soft Gulf rhythm, bright and friendly.',
+            'text' => 'شلونكم؟ اليوم بنروح الأحساء نشوف النخل، المكان وايد حلو، وبعدين نتغدى رز حساوي. شنو رايكم؟'],
+
+        ['slug' => 'ar-sa-northern-hail', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SA-NO', 'gender' => 'male',
+            'voice' => 'Sadachbia', 'speaker' => 'Hamed', 'speaker_ar' => 'حامد',
+            'title' => 'Desert welcome', 'title_ar' => 'ترحيب بدوي', 'emotion' => 'warm',
+            'style' => 'A Bedouin host from Hail welcoming a guest by the fire. Deep, generous, strong Bedouin melody.',
+            'text' => 'هلا والله ومسهلا، حيّاك الله يا رجّال. هقيت إنك ما تجي، بس زين إنك جيت، القهوة جاهزة والنار شابّة.'],
+
+        ['slug' => 'ar-om-dhofari-khareef', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-OM-DH', 'gender' => 'female',
+            'voice' => 'Gacrux', 'speaker' => 'Duaa', 'speaker_ar' => 'دعاء',
+            'title' => 'Khareef season', 'title_ar' => 'موسم الخريف', 'emotion' => 'happy',
+            'style' => 'A woman from Salalah inviting visitors for the monsoon season. Gentle, proud, distinct Dhofari melody.',
+            'text' => 'مرحبا بكم في صلالة! الخريف هذي السنة واجد زين، الضباب على الجبال والمطر خفيف. تعالوا شوفوا بنفسكم.'],
+
+        ['slug' => 'ar-lb-tripoli-sweets', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-LB-TR', 'gender' => 'female',
+            'voice' => 'Vindemiatrix', 'speaker' => 'Jumana', 'speaker_ar' => 'جمانة',
+            'title' => 'Old souk sweets', 'title_ar' => 'حلويات السوق', 'emotion' => 'excited',
+            'style' => 'A woman from Tripoli, Lebanon, showing friends her favourite sweet shop. Lively, heavier Tripoli intonation.',
+            'text' => 'أهلا فيكن بطرابلس! هلّق رح نروح عالسوق القديم ناكل حلاوة الجبن، كتير طيبة، ما في متلها بكل لبنان.'],
+
+        ['slug' => 'ar-sy-aleppo-kibbeh', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SY-AL', 'gender' => 'female',
+            'voice' => 'Pulcherrima', 'speaker' => 'Abeer', 'speaker_ar' => 'عبير',
+            'title' => 'Aleppo kitchen', 'title_ar' => 'مطبخ حلبي', 'emotion' => 'warm',
+            'style' => 'A warm woman from Aleppo talking about her family recipe. Strong imala, lengthened vowels, affectionate.',
+            'text' => 'أهلين يا حبابين! هلّق بدّي احكيلكن عن الكبة الحلبية، والله شي ما بينوصف، تعالوا لعنّا عحلب وجرّبوها.'],
+
+        ['slug' => 'ar-jo-bedouin-mansaf', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-JO-BD', 'gender' => 'male',
+            'voice' => 'Sadaltager', 'speaker' => 'Tamim', 'speaker_ar' => 'تميم',
+            'title' => 'Guest of honour', 'title_ar' => 'ضيف عزيز', 'emotion' => 'warm',
+            'style' => 'A Jordanian Bedouin host greeting a friend at his tent. Hearty, firm, Bedouin rhythm.',
+            'text' => 'هلا يا رجّال، هسّاع وصلت؟ تعال اقعد، المنسف جاهز والقهوة السادة على النار. وش أخبار الأهل؟'],
+
+        ['slug' => 'ar-ps-gaza-sea', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-PS-GZ', 'gender' => 'female',
+            'voice' => 'Sulafat', 'speaker' => 'Manal', 'speaker_ar' => 'منال',
+            'title' => 'Sunset by the sea', 'title_ar' => 'غروب على البحر', 'emotion' => 'nostalgic',
+            'style' => 'A woman from Gaza describing the sea at sunset. Soft, tender, coastal Gazan accent.',
+            'text' => 'إيش أخبارك؟ هلقيت بدّي أحكيلك عن بحر غزة وقت المغرب، الشمس بتنزل على الموج، منظر بيرد الروح.'],
+
+        ['slug' => 'ar-eg-alex-corniche', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-EG-AL', 'gender' => 'male',
+            'voice' => 'Puck', 'speaker' => 'Othman', 'speaker_ar' => 'عثمان',
+            'title' => 'Seaside plans', 'title_ar' => 'مشوار البحر', 'emotion' => 'playful',
+            'style' => 'A cheerful young man from Alexandria talking to his friend. Quick, emphatic coastal intonation.',
+            'text' => 'اسمع، أنا نقولك حاجة: النهارده نروحوا الأنفوشي ناكلوا سمك ونقعدوا على الكورنيش. أهو كده الحياة يا عم!'],
+
+        ['slug' => 'ar-eg-portsaid-canal', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-EG-PO', 'gender' => 'female',
+            'voice' => 'Kore', 'speaker' => 'Lamya', 'speaker_ar' => 'لمياء',
+            'title' => 'By the canal', 'title_ar' => 'على القناة', 'emotion' => 'happy',
+            'style' => 'A woman from Port Said inviting a friend for tea by the canal. Sing-song Port Said intonation, lengthened final vowels.',
+            'text' => 'يا معلّم، بورسعيد النهارده جميلة أوي، المراكب داخلة القناة والجو حلو. تعالى بقى نشرب شاي على البحر.'],
+
+        ['slug' => 'ar-iq-basra-river', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-IQ-BS', 'gender' => 'male',
+            'voice' => 'Alnilam', 'speaker' => 'Faisal', 'speaker_ar' => 'فيصل',
+            'title' => 'Evening in Basra', 'title_ar' => 'مساء البصرة', 'emotion' => 'friendly',
+            'style' => 'A man from Basra inviting friends for an evening walk. Warm, southern Iraqi melody with a Gulf touch.',
+            'text' => 'شلونكم؟ هسّه البصرة حلوة هواية، نتمشّى على شط العرب ونشرب چاي وناكل سمچ مسگوف. تعالوا ويانه.'],
+
+        ['slug' => 'ar-ye-hadrami-tarim', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-YE-HD', 'gender' => 'male',
+            'voice' => 'Rasalgethi', 'speaker' => 'Mishary', 'speaker_ar' => 'مشاري',
+            'title' => 'Mud-brick city', 'title_ar' => 'مدينة الطين', 'emotion' => 'proud',
+            'style' => 'A man from Hadramawt describing his hometown. Calm, proud, distinct Hadrami melody.',
+            'text' => 'حيّا بكم! إيش رأيكم نروح تريم؟ بانشوف البيوت الطين العالية والنخل، والله إنها تستاهل الزيارة.'],
+
+        ['slug' => 'ar-ma-marrakech-square', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-MA-MK', 'gender' => 'female',
+            'voice' => 'Autonoe', 'speaker' => 'Ruqaya', 'speaker_ar' => 'رقية',
+            'title' => 'Night market', 'title_ar' => 'ساحة الليل', 'emotion' => 'excited',
+            'style' => 'A lively woman from Marrakech guiding visitors at night. Broad, drawn Marrakchi intonation, excited.',
+            'text' => 'مرحبا بيكم فمراكش! دابا غادي نديكم لجامع الفنا، كاين الحلايقية والعصير والطنجية، بزاف ديال الحركة!'],
+
+        ['slug' => 'ar-dz-oran-sea', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-DZ-OR', 'gender' => 'male',
+            'voice' => 'Enceladus', 'speaker' => 'Mansour', 'speaker_ar' => 'منصور',
+            'title' => 'Weekend in Oran', 'title_ar' => 'ويكند في وهران', 'emotion' => 'friendly',
+            'style' => 'A young man from Oran calling his brother. Relaxed, quick western Algerian rhythm.',
+            'text' => 'واش راك خويا؟ درك نروحو لوهران نسمعو الراي ونتمشاو فالبحر، الجو هايل بزاف، ما تخليش الفرصة.'],
+
+        ['slug' => 'ar-mr-hassaniya-tea', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-MR', 'gender' => 'male',
+            'voice' => 'Schedar', 'speaker' => 'Hazem', 'speaker_ar' => 'حازم',
+            'title' => 'Three glasses of tea', 'title_ar' => 'كيسان الأتاي', 'emotion' => 'calm',
+            'style' => 'An older man from Nouakchott sharing a tea tradition. Slow, deep, Hassaniya melody.',
+            'text' => 'أهلاً بيكم! الأتاي عندنا ثلاث كيسان، الأول مرّ كالحياة، والثاني حلو كالحب، والثالث خفيف كالموت. اشربوا وتهنّاو.'],
+
         // ── English accents ─────────────────────────────────────────
 
         ['slug' => 'en-us-brand', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-US', 'gender' => 'female',
@@ -271,6 +367,66 @@ return [
             'style' => 'A hospitable tour guide from the Gulf speaking English. Warm, generous, calm.',
             'text' => 'Hello, my friend, and welcome to Dubai. Tonight I will take you to the desert. We will drink Arabic coffee and watch the stars together.'],
 
+        ['slug' => 'en-us-southern-cobbler', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-US-SO', 'gender' => 'female',
+            'voice' => 'Erinome', 'speaker' => 'Willow',
+            'title' => 'Family recipe', 'title_ar' => 'وصفة العائلة', 'emotion' => 'warm',
+            'style' => 'A warm Southern woman sharing a family recipe. Sweet, unhurried drawl, smiling.',
+            'text' => "Y'all have got to try my mama's peach cobbler. It's sweet, it's warm, and honestly, it tastes just like summer."],
+
+        ['slug' => 'en-gb-news', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-GB', 'gender' => 'female',
+            'voice' => 'Achernar', 'speaker' => 'Alice',
+            'title' => 'Evening news', 'title_ar' => 'نشرة المساء', 'emotion' => 'news',
+            'style' => 'A poised British evening-news presenter. Clear, authoritative, measured.',
+            'text' => 'Good evening. Tonight, scientists have revealed a remarkable discovery beneath the Antarctic ice, and it could change what we know about our oceans.'],
+
+        ['slug' => 'en-au-harbour', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-AU', 'gender' => 'female',
+            'voice' => 'Pulcherrima', 'speaker' => 'Freya',
+            'title' => 'Harbour update', 'title_ar' => 'من ميناء سيدني', 'emotion' => 'happy',
+            'style' => 'A sunny Australian radio presenter. Bright, relaxed, friendly.',
+            'text' => "Righto, quick update from Sydney. The ferries are running, the sun's out, and the harbour looks absolutely stunning this morning."],
+
+        ['slug' => 'en-ie-match', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-IE', 'gender' => 'male',
+            'voice' => 'Rasalgethi', 'speaker' => 'Ryan',
+            'title' => 'Match night', 'title_ar' => 'ليلة المباراة', 'emotion' => 'friendly',
+            'style' => 'A cheerful Irishman inviting a friend over. Lilting, easy, warm.',
+            'text' => "Sure look, the match is on at eight. Grab a seat by the fire, and we'll have a grand old night of it."],
+
+        ['slug' => 'en-in-explainer', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-IN', 'gender' => 'male',
+            'voice' => 'Orus', 'speaker' => 'Nathan',
+            'title' => 'Tech explainer', 'title_ar' => 'شرح تقني', 'emotion' => 'confident',
+            'style' => 'An Indian tech educator from Bengaluru explaining a concept on his channel, with a clear, unmistakable Indian English accent and Indian intonation. Confident, encouraging.',
+            'text' => 'Namaste, friends! Let me explain this simply, yaar. Your app sends one request, the server answers in milliseconds, and your user stays happy.'],
+
+        ['slug' => 'en-za-cape-town', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-ZA', 'gender' => 'female',
+            'voice' => 'Sulafat', 'speaker' => 'Phoebe',
+            'title' => 'Mountain picnic', 'title_ar' => 'نزهة الجبل', 'emotion' => 'excited',
+            'style' => 'A cheerful South African host on a morning show. Upbeat, warm.',
+            'text' => 'Morning, everyone! Cape Town is glowing today, so pack a picnic and head up Table Mountain before the clouds roll in.'],
+
+        ['slug' => 'en-ca-hockey', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-CA', 'gender' => 'male',
+            'voice' => 'Algenib', 'speaker' => 'George',
+            'title' => 'Hockey night', 'title_ar' => 'ليلة الهوكي', 'emotion' => 'excited',
+            'style' => 'An excited Canadian sports fan. Energetic, friendly.',
+            'text' => "It's hockey night, folks! Grab some poutine, find a spot on the couch, and let's cheer the team on."],
+
+        ['slug' => 'en-ng-morning', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-NG', 'gender' => 'female',
+            'voice' => 'Vindemiatrix', 'speaker' => 'Rose',
+            'title' => 'Morning show', 'title_ar' => 'برنامج الصباح', 'emotion' => 'happy',
+            'style' => 'A bright Nigerian morning-radio host. Warm, rhythmic, uplifting.',
+            'text' => 'Good morning, Lagos! Traffic is moving on the Third Mainland Bridge, so take a deep breath and have a beautiful day.'],
+
+        ['slug' => 'en-sg-team', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-SG', 'gender' => 'male',
+            'voice' => 'Zubenelgenubi', 'speaker' => 'Philip',
+            'title' => 'Team update', 'title_ar' => 'تحديث الفريق', 'emotion' => 'playful',
+            'style' => 'A friendly Singaporean team lead reminding colleagues. Quick, cheerful.',
+            'text' => "Okay team, meeting at three, then we all go makan at the hawker centre. Don't be late, ah!"],
+
+        ['slug' => 'en-gb-scottish-shop', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-GB-SC', 'gender' => 'female',
+            'voice' => 'Autonoe', 'speaker' => 'Ivy',
+            'title' => 'Corner shop', 'title_ar' => 'دكان الحي', 'emotion' => 'playful',
+            'style' => 'A cheerful woman from Edinburgh sharing a secret. Playful, warm Scottish lilt.',
+            'text' => "Och, the wee shop round the corner sells the best tablet in Edinburgh. Trust me, you'll be back for more."],
+
         // ── Dialogues (two voices) ──────────────────────────────────
 
         ['slug' => 'dlg-en-podcast', 'kind' => 'dialogue', 'language' => 'en', 'dialect' => 'en-US',
@@ -357,6 +513,117 @@ return [
                 'Waleed: شكراً لكِ. نحن نعيش لحظة فارقة، فالآلة باتت تتكلّم بلهجاتنا وتفهم مشاعرنا.',
                 'Noura: وهل يمكن أن يميّز المستمع بين الصوت البشري والصوت المولَّد؟',
                 'Waleed: في كثير من الأحيان، لا. ولهذا يجب أن نكون واضحين دائماً بشأن مصدر الصوت.',
+            ]],
+        ['slug' => 'dlg-ar-ae-launch', 'kind' => 'dialogue', 'language' => 'ar', 'dialect' => 'ar-AE',
+            'title' => 'Startup launch', 'title_ar' => 'إطلاق مشروع', 'emotion' => 'conversational',
+            'style' => 'Two Emirati colleagues, a man and a woman, preparing an app launch. Emirati dialect, friendly teasing, quick back-and-forth.',
+            'speakers' => [
+                ['name' => 'Nawaf', 'name_ar' => 'نواف', 'voice' => 'Achird', 'gender' => 'male'],
+                ['name' => 'Khadija', 'name_ar' => 'خديجة', 'voice' => 'Aoede', 'gender' => 'female'],
+            ],
+            'lines' => [
+                'Nawaf: مرحبا خديجة! شو صار على إطلاق التطبيق؟',
+                'Khadija: كل شي جاهز تقريباً، بس نبا فيديو تعريفي بصوت إماراتي.',
+                'Nawaf: <laugh> أسجّله أنا؟ صوتي وايد حلو ترى!',
+                'Khadija: لا لا، خلنا نسويه بإسمع، أسرع وأوضح.',
+            ]],
+
+        ['slug' => 'dlg-ar-iq-market', 'kind' => 'dialogue', 'language' => 'ar', 'dialect' => 'ar-IQ',
+            'title' => 'Iraqi market run', 'title_ar' => 'مشوار السوگ', 'emotion' => 'comedy',
+            'style' => 'A Baghdadi mother and her grown son at home, gentle family comedy. Baghdadi dialect, warm and playful.',
+            'speakers' => [
+                ['name' => 'Faisal', 'name_ar' => 'فيصل', 'voice' => 'Alnilam', 'gender' => 'male'],
+                ['name' => 'Noura', 'name_ar' => 'نورة', 'voice' => 'Leda', 'gender' => 'female'],
+            ],
+            'lines' => [
+                'Faisal: يمّه، شنو نشتري اليوم من السوگ؟',
+                'Noura: هسّه نشتري طماطة وخيار، وشويّة سمچ للعشا.',
+                'Faisal: <sigh> يمّه السوگ هواية زحمة، خلّينا نطلب أونلاين.',
+                'Noura: <laugh> ماكو أحلى من السوگ يا ابني، يلّا گوم ويايه.',
+            ]],
+
+        ['slug' => 'dlg-ar-ma-couscous', 'kind' => 'dialogue', 'language' => 'ar', 'dialect' => 'ar-MA',
+            'title' => 'Friday couscous', 'title_ar' => 'كسكس الجمعة', 'emotion' => 'friendly',
+            'style' => 'A Moroccan woman and her brother deciding on lunch. Moroccan Darija, lively and affectionate.',
+            'speakers' => [
+                ['name' => 'Aisha', 'name_ar' => 'عائشة', 'voice' => 'Erinome', 'gender' => 'female'],
+                ['name' => 'Mansour', 'name_ar' => 'منصور', 'voice' => 'Enceladus', 'gender' => 'male'],
+            ],
+            'lines' => [
+                'Aisha: منصور، واش بغيتي تتغدّى طاجين ولا كسكس اليوم؟',
+                'Mansour: كسكس طبعاً! اليوم الجمعة، ما كاين حتى شي أحسن منو.',
+                'Aisha: مزيان، ولكن خاصّك تعاوني فالكوزينة.',
+                'Mansour: <laugh> واخا، غادي نجيب الخبز وصافي!',
+            ]],
+
+        ['slug' => 'dlg-ar-hj-old-jeddah', 'kind' => 'dialogue', 'language' => 'ar', 'dialect' => 'ar-SA-HJ',
+            'title' => 'Old Jeddah outing', 'title_ar' => 'مشوار جدة التاريخية', 'emotion' => 'friendly',
+            'style' => 'Two friends from Jeddah, a woman and a man, planning an evening out. Hejazi dialect, quick sing-song rhythm, playful.',
+            'speakers' => [
+                ['name' => 'Maha', 'name_ar' => 'مها', 'voice' => 'Despina', 'gender' => 'female'],
+                ['name' => 'Turki', 'name_ar' => 'تركي', 'voice' => 'Algieba', 'gender' => 'male'],
+            ],
+            'lines' => [
+                'Maha: تركي، إيش رأيك نروح جدة التاريخية دحين؟',
+                'Turki: يا سلام! أبغى آكل معصوب وأشرب سوبيا.',
+                'Maha: طيب بس لا تتأخر زي كل مرة، الزحمة كدا كدا بتبدا.',
+                'Turki: <laugh> خلاص، دقيقتين وأكون عندك.',
+            ]],
+
+        ['slug' => 'dlg-en-support', 'kind' => 'dialogue', 'language' => 'en', 'dialect' => 'en-US',
+            'title' => 'Customer support', 'title_ar' => 'خدمة العملاء', 'emotion' => 'friendly',
+            'style' => 'An American customer-support call: a kind, upbeat agent and a slightly worried customer who ends up relieved.',
+            'speakers' => [
+                ['name' => 'Ruby', 'voice' => 'Aoede', 'gender' => 'female', 'dialect' => 'en-US'],
+                ['name' => 'Nathan', 'voice' => 'Orus', 'gender' => 'male', 'dialect' => 'en-US'],
+            ],
+            'lines' => [
+                'Ruby: Hi, thanks for calling. How can I help you today?',
+                "Nathan: Hey! I ordered headphones last week, and they still haven't arrived.",
+                "Ruby: Oh no, let me check that for you. Good news, they're out for delivery right now.",
+                'Nathan: <laugh> Perfect timing. Thank you so much!',
+            ]],
+
+        ['slug' => 'dlg-en-roadtrip', 'kind' => 'dialogue', 'language' => 'en', 'dialect' => 'en-AU',
+            'title' => 'Road trip plans', 'title_ar' => 'خطة رحلة', 'emotion' => 'playful',
+            'style' => 'Two Australian friends, a woman and a man, planning a coastal road trip. Relaxed, teasing, laughing.',
+            'speakers' => [
+                ['name' => 'Freya', 'voice' => 'Pulcherrima', 'gender' => 'female', 'dialect' => 'en-AU'],
+                ['name' => 'Miles', 'voice' => 'Iapetus', 'gender' => 'male', 'dialect' => 'en-AU'],
+            ],
+            'lines' => [
+                'Freya: Okay, road trip plan. We drive up the coast and stop at every beach.',
+                "Miles: Every beach? That's about four hundred beaches.",
+                'Freya: <laugh> Fine, every good beach.',
+                "Miles: Deal. I'll bring the snacks, you bring the playlist.",
+            ]],
+
+        ['slug' => 'dlg-en-creator', 'kind' => 'dialogue', 'language' => 'en', 'dialect' => 'en-GB',
+            'title' => 'Creator interview', 'title_ar' => 'مقابلة صانعة محتوى', 'emotion' => 'conversational',
+            'style' => 'A friendly radio interview: a curious British host and a cheerful Indian content creator.',
+            'speakers' => [
+                ['name' => 'Arthur', 'voice' => 'Enceladus', 'gender' => 'male', 'dialect' => 'en-GB'],
+                ['name' => 'Luna', 'voice' => 'Despina', 'gender' => 'female', 'dialect' => 'en-IN'],
+            ],
+            'lines' => [
+                'Arthur: So, tell me, how did your channel reach a million subscribers?',
+                'Luna: Honestly? One video every single day, even when nobody was watching.',
+                'Arthur: That takes real discipline.',
+                'Luna: <laugh> And a lot of chai.',
+            ]],
+
+        ['slug' => 'dlg-en-ghost-story', 'kind' => 'dialogue', 'language' => 'en', 'dialect' => 'en-IE',
+            'title' => 'Ghost story', 'title_ar' => 'حكاية مخيفة', 'emotion' => 'suspense',
+            'style' => 'An Irish couple late at night in an old cottage. Hushed, spooky, with a comic twist.',
+            'speakers' => [
+                ['name' => 'Sienna', 'voice' => 'Leda', 'gender' => 'female', 'dialect' => 'en-IE'],
+                ['name' => 'Ryan', 'voice' => 'Rasalgethi', 'gender' => 'male', 'dialect' => 'en-IE'],
+            ],
+            'lines' => [
+                'Sienna: <whispers> Did you hear that knock at the door?',
+                "Ryan: It's only the wind, sure it is.",
+                "Sienna: The wind doesn't knock three times, Ryan.",
+                'Ryan: <gasp> Right. You open it, so.',
             ]],
     ],
 ];

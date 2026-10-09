@@ -63,37 +63,86 @@ class ShowcaseSamplesTest extends TestCase
         Http::assertNothingSent();
     }
 
-    public function test_home_shows_flags_voices_and_dialogues_in_the_page_language(): void
+    public function test_home_shows_avatars_voices_and_dialogues_in_the_page_language(): void
     {
         $this->artisan('tts:showcase', ['--import' => true]);
 
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('home')->assertOk();
         $en->assertSee('images/flags/gb-sct.svg', false);
+        $en->assertSee('images/speakers/en-daisy.webp', false);
         $en->assertSee('data-vp-dialogue', false);
-        $en->assertSee('These voices were created with Listen.');
+        $en->assertSee('data-vp-region="uk_ie"', false);
         $en->assertSee('css/voice-showcase.css', false);
         $en->assertDontSee('images/flags/sa.svg', false);
-        $en->assertDontSee('هذه الأصوات من إنتاج منصة إسمع.');
+        $en->assertDontSee('images/speakers/ar-', false);
         $en->assertDontSee('flagcdn.com', false);
         $en->assertDontSee('&lt;laugh&gt;', false);
-        $this->assertCount(19, $en->viewData('showcaseVoices'));
-        $this->assertCount(2, $en->viewData('showcaseDialogues'));
+        // The spoken sign-off stays in the audio but is not printed.
+        $en->assertDontSee('These voices were created with Listen.');
+        $this->assertCount(29, $en->viewData('showcaseVoices'));
+        $this->assertCount(6, $en->viewData('showcaseDialogues'));
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('home')->assertOk();
         $ar->assertSee('سعودي (نجدي)');
         $ar->assertSee('images/flags/sa.svg', false);
-        $ar->assertSee('هذه الأصوات من إنتاج منصة إسمع.');
-        $ar->assertDontSee('These voices were created with Listen.');
+        $ar->assertSee('images/speakers/ar-sultan.webp', false);
+        $ar->assertSee('data-vp-region="maghreb"', false);
+        $ar->assertDontSee('images/speakers/en-', false);
+        $ar->assertDontSee('هذه الأصوات من إنتاج منصة إسمع.');
         $ar->assertDontSee('images/flags/gb-sct.svg', false);
-        $this->assertCount(22, $ar->viewData('showcaseVoices'));
-        $this->assertCount(4, $ar->viewData('showcaseDialogues'));
+        $this->assertCount(38, $ar->viewData('showcaseVoices'));
+        $this->assertCount(8, $ar->viewData('showcaseDialogues'));
+
+        // Every dialogue line knows when it is spoken.
+        foreach (array_merge($en->viewData('showcaseDialogues'), $ar->viewData('showcaseDialogues')) as $dialogue) {
+            foreach ($dialogue['turns'] as $i => $turn) {
+                $this->assertNotNull($turn['start'], $dialogue['title'].' line '.$i);
+                $this->assertGreaterThan($turn['start'], $turn['end']);
+            }
+        }
+        $ar->assertSee('data-start="0.', false);
 
         // No model numbers on the page.
         foreach ([$en->getContent(), $ar->getContent()] as $html) {
             $this->assertDoesNotMatchRegularExpression('/\b3\.8\b|model 3|نموذج الصوت/u', strip_tags($html));
         }
+    }
+
+    public function test_every_active_speaker_has_an_avatar(): void
+    {
+        $this->seed(\Database\Seeders\VoiceSeeder::class);
+
+        $missing = \App\Models\Voice::query()->where('is_active', true)->get()
+            ->filter(fn ($voice) => \App\Support\SpeakerAvatar::url($voice->display_name, $voice->language) === null)
+            ->map(fn ($voice) => $voice->language.' '.$voice->display_name)->values()->all();
+        $this->assertSame([], $missing);
+    }
+
+    public function test_speaker_avatars_cover_the_hero_and_fall_back_to_an_initial(): void
+    {
+        // Every hero speaker has an avatar, in both page languages.
+        foreach (['ar', 'en'] as $locale) {
+            foreach (\App\Support\HeroCast::for($locale) as $person) {
+                $this->assertNotNull($person['avatar'], $locale.' '.$person['name']);
+            }
+        }
+
+        // The speaker catalog carries each speaker's avatar, or null when there is none yet.
+        $this->seed(\Database\Seeders\VoiceSeeder::class);
+        $catalog = \App\Support\VoiceCatalog::publicCatalog();
+        $this->assertStringContainsString('images/speakers/', (string) $catalog['ar'][0]['avatar']);
+        $this->assertNull(\App\Support\SpeakerAvatar::url('Nobody', 'en'));
+
+        // A homepage card without an avatar shows the speaker's initial instead.
+        VoiceSample::create([
+            'title' => 'No avatar yet', 'sample_text' => 'Hello there.', 'audio_path' => 'audio/x.mp3', 'language' => 'en',
+            'dialect' => 'en-US', 'category' => 'hero', 'is_active' => true, 'show_in_showcase' => true,
+            'metadata' => ['speaker_name' => 'Zed', 'speakers' => [['name' => 'Zed', 'gender' => 'male']]],
+        ]);
+        app()->setLocale('en');
+        $this->getLocalizedRoute('home')->assertOk()->assertSee('<span class="vs-avatar-initial">Z</span>', false);
     }
 
     public function test_voice_flags(): void
