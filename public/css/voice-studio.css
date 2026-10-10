@@ -595,3 +595,40 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
   /* Phones: dropdown rows stack, so a speaker's full name fits. */
   .vs-row-2:has(.vs-select) { grid-template-columns: minmax(0, 1fr); gap: 1.1rem; }
 }
+
+/* Dialogue mode: the two speakers, each a name in the script and a voice. */
+.dialogue-speakers {
+  display: grid;
+  gap: .75rem;
+  margin-top: .85rem;
+  padding-top: .85rem;
+  border-top: 1px solid var(--line);
+}
+.dialogue-speakers[hidden] { display: none; }
+.dialogue-speaker-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: .6rem;
+  align-items: end;
+}
+.dialogue-speaker-label {
+  grid-column: 1 / -1;
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--brand-accent);
+}
+.dialogue-speaker-row input[type="text"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 .8rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--surface2, transparent);
+  color: var(--text);
+  font: inherit;
+}
+.dialogue-guide { margin: 0; font-size: .82rem; color: var(--muted); line-height: 1.6; }
+.dialogue-example-btn { justify-self: start; }
+@media (max-width: 560px) {
+  .dialogue-speaker-row { grid-template-columns: minmax(0, 1fr); }
+}
