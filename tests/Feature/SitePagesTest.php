@@ -82,12 +82,12 @@ class SitePagesTest extends TestCase
         $english->assertSee('class="vs-art vs-cast"', false)
             ->assertSee('css/voice-showcase.css', false)
             ->assertSee("Wait, is that my script? I typed it into Listen and it sounds amazing!")
-            ->assertDontSee('كتبتها في إسمع وطلعت بلهجتي بالضبط!', false)
+            ->assertDontSee('كتبتها في إسمع وطلع بلهجتي بالضبط!', false)
             ->assertDontSee('data-vp-track', false);
 
         app()->setLocale('ar');
         $this->getLocalizedRoute('register')->assertOk()
-            ->assertSee('كتبتها في إسمع وطلعت بلهجتي بالضبط!', false)
+            ->assertSee('كتبتها في إسمع وطلع بلهجتي بالضبط!', false)
             ->assertDontSee("Wait, is that my script");
     }
 }

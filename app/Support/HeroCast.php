@@ -20,9 +20,9 @@ final class HeroCast
      */
     public const CAST = [
         'ar' => [
-            ['name' => 'Sultan', 'name_ar' => 'سلطان', 'voice' => 'Algenib', 'dialect' => 'ar-SA',
-                'style' => 'A young man from Riyadh hearing his own script read back for the first time. He starts with a short, sharp gasp of surprise (not a yawn), then speaks fast, genuinely amazed and delighted, smiling and breathing like a real person.',
-                'line' => '<gasp> لحظة! هذا صوتي؟ كتبتها في إسمع وطلعت بلهجتي بالضبط!'],
+            ['name' => 'Sultan', 'name_ar' => 'سلطان', 'voice' => 'Fenrir', 'dialect' => 'ar-SA',
+                'style' => 'A charismatic young man from Riyadh with a rich, warm, confident voice, like a popular Saudi podcast host. He hears his own script read back by Listen for the first time: a sharp gasp of surprise, then he bursts out in genuine amazement with a short delighted laugh in the middle, and finishes proud and thrilled. Expressive, energetic, natural Najdi delivery with real breathing; never flat or robotic.',
+                'line' => '<gasp> يا رجّال! هذا صوتي أنا؟! <laugh> كتبتها في إسمع وطلع بلهجتي بالضبط!'],
             ['name' => 'Sumaya', 'name_ar' => 'سمية', 'voice' => 'Callirrhoe', 'dialect' => 'ar-EG',
                 'style' => 'A cheerful woman from Cairo who bursts out laughing first, then talks playfully to her friends, warm and teasing, fully natural.',
                 'line' => '<laugh> وأنا كمان! إسمع بيتكلم مصري أحسن مني!'],
