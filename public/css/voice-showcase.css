@@ -306,66 +306,43 @@ html:not([data-theme="light"]) .vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px 
   transition: opacity .3s ease, scale .35s cubic-bezier(.2, .8, .2, 1);
 }
 .vs-seat-0 .vs-speech {
-  inset-inline-start: calc(100% + 14px);
+  inset-inline-start: calc(100% + 24px);
   top: 50%;
   translate: 0 -56%;
   transform-origin: left bottom;
 }
 [dir="rtl"] .vs-seat-0 .vs-speech { transform-origin: right bottom; }
-.vs-seat-1 .vs-speech { bottom: calc(100% + 12px); right: 0; transform-origin: right bottom; }
-.vs-seat-4 .vs-speech { bottom: calc(100% + 12px); left: 0; transform-origin: left bottom; }
-.vs-seat-2 .vs-speech { top: calc(100% + 12px); right: 0; transform-origin: right top; }
-.vs-seat-3 .vs-speech { top: calc(100% + 12px); left: 0; transform-origin: left top; }
-/* A small crystal arrow pointing at the speaker: a rotated square of the same
-   glass, clipped to the half that sits outside the bubble. */
+.vs-seat-1 .vs-speech { bottom: calc(100% + 22px); right: 0; transform-origin: right bottom; }
+.vs-seat-4 .vs-speech { bottom: calc(100% + 22px); left: 0; transform-origin: left bottom; }
+.vs-seat-2 .vs-speech { top: calc(100% + 22px); right: 0; transform-origin: right top; }
+.vs-seat-3 .vs-speech { top: calc(100% + 22px); left: 0; transform-origin: left top; }
+/* A smooth glass tail pointing at the speaker: a narrow point with gently
+   curved sides and a fine edge along those sides only, so it joins the bubble
+   without a seam. It is drawn pointing down and turned for the other sides.
+   The bubbles sit far enough out that its tip stops just short of the
+   speaker's glowing ring. */
 .vs-speech::after {
   content: "";
   position: absolute;
-  width: 14px;
-  height: 14px;
-  background: rgba(255, 255, 255, .62);
-  border: 0 solid rgba(118, 89, 250, .16);
+  width: 22px;
+  height: 11px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 11'%3E%3Cpath d='M0 0 C7 0 9 11 11 11 C13 11 15 0 22 0 Z' fill='rgba(255,255,255,.6)'/%3E%3Cpath d='M0 .6 C7 .6 9 10.4 11 10.4 C13 10.4 15 .6 22 .6' fill='none' stroke='rgba(118,89,250,.32)' stroke-width='1.4'/%3E%3C/svg%3E") center / 100% 100% no-repeat;
   -webkit-backdrop-filter: blur(22px) saturate(1.8);
   backdrop-filter: blur(22px) saturate(1.8);
-  rotate: 45deg;
+  clip-path: path("M0 0 C7 0 9 11 11 11 C13 11 15 0 22 0 Z");
 }
 html:not([data-theme="light"]) .vs-speech::after {
-  background: rgba(44, 41, 62, .62);
-  border-color: rgba(255, 255, 255, .14);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 22 11'%3E%3Cpath d='M0 0 C7 0 9 11 11 11 C13 11 15 0 22 0 Z' fill='rgba(255,255,255,.1)'/%3E%3Cpath d='M0 .6 C7 .6 9 10.4 11 10.4 C13 10.4 15 .6 22 .6' fill='none' stroke='rgba(255,255,255,.22)' stroke-width='1.4'/%3E%3C/svg%3E");
 }
-/* Bubbles above their speaker point down, bubbles below point up; the arrow
+/* Bubbles above their speaker point down, bubbles below point up; the tail
    sits under the middle of the avatar (an avatar is 19% of the ring wide). */
-.vs-seat-1 .vs-speech::after, .vs-seat-4 .vs-speech::after {
-  bottom: -7px;
-  border-right-width: 1px;
-  border-bottom-width: 1px;
-  clip-path: polygon(100% 0, 100% 100%, 0 100%);
-}
-.vs-seat-2 .vs-speech::after, .vs-seat-3 .vs-speech::after {
-  top: -7px;
-  border-left-width: 1px;
-  border-top-width: 1px;
-  clip-path: polygon(0 0, 100% 0, 0 100%);
-}
-.vs-seat-1 .vs-speech::after, .vs-seat-2 .vs-speech::after { right: calc(9.5cqw - 7px); }
-.vs-seat-3 .vs-speech::after, .vs-seat-4 .vs-speech::after { left: calc(9.5cqw - 7px); }
+.vs-seat-1 .vs-speech::after, .vs-seat-4 .vs-speech::after { bottom: -10px; }
+.vs-seat-2 .vs-speech::after, .vs-seat-3 .vs-speech::after { top: -10px; rotate: 180deg; }
+.vs-seat-1 .vs-speech::after, .vs-seat-2 .vs-speech::after { right: calc(9.5cqw - 11px); }
+.vs-seat-3 .vs-speech::after, .vs-seat-4 .vs-speech::after { left: calc(9.5cqw - 11px); }
 /* The top speaker's bubble opens beside them and points sideways at them. */
-.vs-seat-0 .vs-speech::after {
-  top: calc(56% - 7px);
-  left: -7px;
-  border-left-width: 1px;
-  border-bottom-width: 1px;
-  clip-path: polygon(0 0, 0 100%, 100% 100%);
-}
-[dir="rtl"] .vs-seat-0 .vs-speech::after {
-  left: auto;
-  right: -7px;
-  border-left-width: 0;
-  border-bottom-width: 0;
-  border-right-width: 1px;
-  border-top-width: 1px;
-  clip-path: polygon(0 0, 100% 0, 100% 100%);
-}
+.vs-seat-0 .vs-speech::after { top: calc(56% - 5.5px); left: -15.5px; rotate: 90deg; }
+[dir="rtl"] .vs-seat-0 .vs-speech::after { left: auto; right: -15.5px; rotate: -90deg; }
 /* Side bubbles stay clear of the top speaker; the top one stays inside the artwork. */
 .vs-seat-1 .vs-speech, .vs-seat-4 .vs-speech { max-width: 34cqw; }
 .vs-seat-0 .vs-speech { max-width: 35cqw; }
