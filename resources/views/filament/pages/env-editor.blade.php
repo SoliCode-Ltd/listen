@@ -20,7 +20,7 @@
 
             <p class="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
                 <x-filament::icon icon="heroicon-o-exclamation-triangle" class="h-4 w-4 shrink-0 text-amber-500" />
-                Changes are written to <code>.env</code> immediately. Application cache may need to be cleared.
+                Changes are written to <code>.env</code> and the settings cache is rebuilt, so they apply right away.
             </p>
         </div>
     </form>
