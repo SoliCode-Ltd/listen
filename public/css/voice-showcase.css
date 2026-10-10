@@ -306,18 +306,19 @@ html:not([data-theme="light"]) .vs-speech-meta .vs-flag { box-shadow: 0 0 0 2px 
   transition: opacity .3s ease, scale .35s cubic-bezier(.2, .8, .2, 1);
 }
 .vs-seat-0 .vs-speech {
-  inset-inline-start: calc(100% + 14px);
+  inset-inline-start: calc(100% + 24px);
   top: 50%;
   translate: 0 -56%;
   transform-origin: left bottom;
 }
 [dir="rtl"] .vs-seat-0 .vs-speech { transform-origin: right bottom; }
-.vs-seat-1 .vs-speech { bottom: calc(100% + 12px); right: 0; transform-origin: right bottom; }
-.vs-seat-4 .vs-speech { bottom: calc(100% + 12px); left: 0; transform-origin: left bottom; }
-.vs-seat-2 .vs-speech { top: calc(100% + 12px); right: 0; transform-origin: right top; }
-.vs-seat-3 .vs-speech { top: calc(100% + 12px); left: 0; transform-origin: left top; }
+.vs-seat-1 .vs-speech { bottom: calc(100% + 22px); right: 0; transform-origin: right bottom; }
+.vs-seat-4 .vs-speech { bottom: calc(100% + 22px); left: 0; transform-origin: left bottom; }
+.vs-seat-2 .vs-speech { top: calc(100% + 22px); right: 0; transform-origin: right top; }
+.vs-seat-3 .vs-speech { top: calc(100% + 22px); left: 0; transform-origin: left top; }
 /* A small crystal arrow pointing at the speaker: a rotated square of the same
-   glass, clipped to the half that sits outside the bubble. */
+   glass, clipped to the half that sits outside the bubble. The bubbles sit far
+   enough out that its tip stops just short of the speaker's glowing ring. */
 .vs-speech::after {
   content: "";
   position: absolute;
