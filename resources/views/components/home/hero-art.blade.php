@@ -21,7 +21,8 @@
 
     <svg class="vs-cast-links" viewBox="0 0 100 100" aria-hidden="true">
       <defs>
-        <linearGradient id="vsCastFlow" x1="0" y1="0" x2="1" y2="1">
+        {{-- Sized to the whole artwork, not each line: a vertical line has no width, so a per-line gradient would draw nothing. --}}
+        <linearGradient id="vsCastFlow" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="100">
           <stop offset="0" stop-color="#C46BFF"/><stop offset="1" stop-color="#7659FA"/>
         </linearGradient>
       </defs>
