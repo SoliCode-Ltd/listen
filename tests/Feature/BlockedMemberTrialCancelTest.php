@@ -31,7 +31,7 @@ class BlockedMemberTrialCancelTest extends TestCase
 
         $this->stripe = new FakeStripeTrialGateway();
         $this->app->instance(StripeTrialGateway::class, $this->stripe);
-        config(['listen.abuse.block_cancels_trial' => true]);
+        config(['listen.billing.stripe_trial_actions' => true]);
 
         Plan::query()->firstOrCreate(['slug' => 'free'], [
             'name' => 'Free', 'price_cents' => 0, 'monthly_chars' => 10000, 'monthly_minutes' => 10,
@@ -59,7 +59,7 @@ class BlockedMemberTrialCancelTest extends TestCase
 
     public function test_switched_off_by_default_so_staging_never_touches_stripe(): void
     {
-        config(['listen.abuse.block_cancels_trial' => false]);
+        config(['listen.billing.stripe_trial_actions' => false]);
         $member = User::factory()->create();
         $trial = $this->openTrial($member, 'sub_trial_2');
 
@@ -72,8 +72,8 @@ class BlockedMemberTrialCancelTest extends TestCase
 
     public function test_the_default_setting_is_off(): void
     {
-        // Without LISTEN_BLOCK_CANCELS_TRIAL in .env (staging), nothing is cancelled.
-        $this->assertFalse((require base_path('config/listen.php'))['abuse']['block_cancels_trial']);
+        // Without LISTEN_STRIPE_TRIAL_ACTIONS in .env (staging), nothing is cancelled.
+        $this->assertFalse((require base_path('config/listen.php'))['billing']['stripe_trial_actions']);
     }
 
     public function test_a_paid_subscription_is_never_touched(): void

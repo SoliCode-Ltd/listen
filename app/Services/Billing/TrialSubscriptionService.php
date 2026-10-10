@@ -439,58 +439,86 @@ class TrialSubscriptionService
     }
 
     /**
+     * Whether this server may cancel trials in Stripe. Staging runs the live
+     * Stripe keys on a copy of live members, so it is off unless switched on
+     * (LISTEN_STRIPE_TRIAL_ACTIONS=true, set on live only).
+     */
+    public static function stripeTrialActionsEnabled(): bool
+    {
+        return (bool) config('listen.billing.stripe_trial_actions', false);
+    }
+
+    /**
+     * Stops an unpaid free trial from turning into a charge: cancels it in
+     * Stripe and here. Like a member cancelling it themselves, they keep the
+     * trial plan until its end date. Returns false (and leaves the trial
+     * running, so it stays visible) when Stripe would not cancel it.
+     */
+    public function cancelTrial(BillingTrial $trial, string $reason): bool
+    {
+        if ($trial->status !== BillingTrial::STATUS_TRIALING || $trial->paid_at !== null) {
+            return false;
+        }
+
+        $subscriptionId = trim((string) $trial->stripe_subscription_id);
+
+        if ($subscriptionId !== '') {
+            try {
+                $this->gateway->cancelSubscription($subscriptionId);
+            } catch (\Throwable $exception) {
+                Log::error('Could not cancel a free trial in Stripe; it may still be charged.', [
+                    'user_id' => $trial->user_id,
+                    'billing_trial_id' => $trial->id,
+                    'stripe_subscription_id' => $subscriptionId,
+                    'reason' => $reason,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return false;
+            }
+
+            BillingSubscription::query()
+                ->where('stripe_id', $subscriptionId)
+                ->update([
+                    'stripe_status' => 'canceled',
+                    'ends_at' => now(),
+                ]);
+        }
+
+        $trial->forceFill([
+            'status' => BillingTrial::STATUS_CANCELED,
+            'canceled_at' => now(),
+            'blocked_reason' => $reason,
+        ])->save();
+
+        Log::info('Free trial cancelled.', [
+            'user_id' => $trial->user_id,
+            'billing_trial_id' => $trial->id,
+            'reason' => $reason,
+        ]);
+
+        return true;
+    }
+
+    /**
      * A blocked member must not be charged when their free trial ends for an
-     * account they can no longer use. Cancels their open (unpaid) trials in
-     * Stripe and here. A trial Stripe would not cancel is left as it is, so
-     * the admin still sees it running.
+     * account they can no longer use.
      *
      * @return int how many trials were cancelled
      */
     public function cancelOpenTrialsForBlockedUser(User $user): int
     {
+        $cancelled = 0;
         $openTrials = BillingTrial::query()
             ->where('user_id', $user->id)
             ->where('status', BillingTrial::STATUS_TRIALING)
             ->whereNull('paid_at')
             ->get();
 
-        $cancelled = 0;
         foreach ($openTrials as $trial) {
-            $subscriptionId = trim((string) $trial->stripe_subscription_id);
-
-            if ($subscriptionId !== '') {
-                try {
-                    $this->gateway->cancelSubscription($subscriptionId);
-                } catch (\Throwable $exception) {
-                    Log::error('Could not cancel the free trial of a blocked member; it may still be charged.', [
-                        'user_id' => $user->id,
-                        'billing_trial_id' => $trial->id,
-                        'stripe_subscription_id' => $subscriptionId,
-                        'error' => $exception->getMessage(),
-                    ]);
-
-                    continue;
-                }
-
-                BillingSubscription::query()
-                    ->where('stripe_id', $subscriptionId)
-                    ->update([
-                        'stripe_status' => 'canceled',
-                        'ends_at' => now(),
-                    ]);
+            if ($this->cancelTrial($trial, 'account_blocked')) {
+                $cancelled++;
             }
-
-            $trial->forceFill([
-                'status' => BillingTrial::STATUS_CANCELED,
-                'canceled_at' => now(),
-                'blocked_reason' => 'account_blocked',
-            ])->save();
-            $cancelled++;
-
-            Log::info('Free trial cancelled because the member was blocked.', [
-                'user_id' => $user->id,
-                'billing_trial_id' => $trial->id,
-            ]);
         }
 
         return $cancelled;

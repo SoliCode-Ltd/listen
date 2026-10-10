@@ -90,7 +90,7 @@ class BlockedUserService
      */
     private function cancelOpenTrial(User $user): void
     {
-        if (! config('listen.abuse.block_cancels_trial')) {
+        if (! TrialSubscriptionService::stripeTrialActionsEnabled()) {
             return;
         }
 

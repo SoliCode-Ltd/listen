@@ -38,6 +38,11 @@ return [
             7,
             1,
         ],
+        // May this server cancel free trials in Stripe (the admin "Cancel trial"
+        // button, and cancelling a blocked member's trial)? OFF unless set,
+        // because staging runs the live Stripe keys on a copy of live members:
+        // set LISTEN_STRIPE_TRIAL_ACTIONS=true on live only.
+        'stripe_trial_actions' => (bool) env('LISTEN_STRIPE_TRIAL_ACTIONS', false),
         'creator_trial' => [
             'enabled' => true,
             'days' => 7,
@@ -47,16 +52,10 @@ return [
     ],
 
     /*
-    | When a member is blocked:
-    | - block_cancels_trial: cancel their unpaid free trial in Stripe so they
-    |   are not charged for an account they cannot use. OFF unless set, because
-    |   staging runs the live Stripe keys on a copy of live members: set
-    |   LISTEN_BLOCK_CANCELS_TRIAL=true on live only.
-    | - block_evasion: an account made on the same browser after another
-    |   account there was blocked is blocked too.
+    | block_evasion: an account made on the same browser after another account
+    | there was blocked is blocked too.
     */
     'abuse' => [
-        'block_cancels_trial' => (bool) env('LISTEN_BLOCK_CANCELS_TRIAL', false),
         'block_evasion' => (bool) env('LISTEN_BLOCK_EVASION', true),
     ],
 

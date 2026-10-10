@@ -141,7 +141,7 @@ class BlockEvasionTest extends TestCase
     {
         $stripe = new FakeStripeTrialGateway();
         $this->app->instance(StripeTrialGateway::class, $stripe);
-        config(['listen.abuse.block_cancels_trial' => true]);
+        config(['listen.billing.stripe_trial_actions' => true]);
         $this->blockedMember();
         $this->travel(5)->minutes();
         $evader = User::factory()->create(['registration_device_id' => self::BROWSER]);

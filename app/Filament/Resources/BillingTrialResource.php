@@ -5,6 +5,8 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\BillingTrialResource\Pages;
 use App\Filament\Widgets\TrialOutcomeStats;
 use App\Models\BillingTrial;
+use App\Services\Billing\TrialSubscriptionService;
+use Filament\Notifications\Notification;
 use Filament\Forms;
 use Illuminate\Database\Eloquent\Model;
 use Filament\Forms\Form;
@@ -137,8 +139,49 @@ class BillingTrialResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                self::configureCancelAction(Tables\Actions\Action::make('cancelTrial')),
             ])
             ->defaultSort('id', 'desc');
+    }
+
+    /**
+     * "Cancel trial": the member is not charged when the trial ends and keeps
+     * the trial plan until then, as if they had cancelled it themselves.
+     * Shared by the list row and the trial page.
+     *
+     * @template T of \Filament\Actions\Action|\Filament\Tables\Actions\Action
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function configureCancelAction($action)
+    {
+        $enabled = TrialSubscriptionService::stripeTrialActionsEnabled();
+
+        return $action
+            ->label('Cancel trial')
+            ->icon('heroicon-o-x-circle')
+            ->color('danger')
+            ->visible(fn (BillingTrial $record): bool => $record->status === BillingTrial::STATUS_TRIALING && $record->paid_at === null)
+            ->disabled(! $enabled)
+            ->tooltip($enabled ? null : 'Turned off on this server: staging uses the live Stripe keys. Set LISTEN_STRIPE_TRIAL_ACTIONS=true on live only.')
+            ->requiresConfirmation()
+            ->modalHeading(fn (BillingTrial $record): string => 'Cancel the free trial of '.($record->user?->email ?? 'this member').'?')
+            ->modalDescription(fn (BillingTrial $record): string => 'Their card ('.($record->card_brand ?? 'card').' •'.($record->card_last4 ?? '????').')'
+                .' will not be charged when the trial ends on '.($record->trial_ends_at?->format('j M Y') ?? 'its end date').'.'
+                .' They keep the trial plan until then. This is done in Stripe and cannot be undone; they would have to start a new trial.')
+            ->modalSubmitActionLabel('Cancel the trial')
+            ->action(function (BillingTrial $record): void {
+                if (! TrialSubscriptionService::stripeTrialActionsEnabled()) {
+                    return;
+                }
+
+                $cancelled = app(TrialSubscriptionService::class)->cancelTrial($record, 'canceled_by_admin');
+
+                $cancelled
+                    ? Notification::make()->title('Trial cancelled')->body('The member will not be charged.')->success()->send()
+                    : Notification::make()->title('The trial was not cancelled')->body('Stripe did not accept the cancellation, so the trial is still running. Try again or cancel it in Stripe.')->danger()->persistent()->send();
+            });
     }
 
     public static function getPages(): array
