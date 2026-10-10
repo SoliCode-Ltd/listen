@@ -1,6 +1,6 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
-  <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v=20260423a">
+  <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
@@ -211,7 +211,7 @@
                 <input type="hidden" name="translate" id="translate" value="0">
               </div>
               {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
-              <x-voice-studio.dialogue style="margin-top: .6rem;" />
+              <x-voice-studio.dialogue />
             </x-voice-studio.panel>
             </div>
 
