@@ -1,0 +1,70 @@
+name: Dialogue dialect check
+
+# Makes one real two-dialect dialogue (Saudi + Egyptian) with this branch's
+# dialogue code, using Gemini key 1 from STAGING's .env (the owner's choice),
+# and checks each line's dialect by transcription. The recording is kept as a
+# job artifact only; nothing is committed. One speech request on a quota that
+# staging shares with live: run it only when the owner asks.
+
+on:
+  push:
+    branches: [claude/homepage-audio-model-3-8-d9nimj]
+    paths:
+      - .github/workflows/dialogue-dialect-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
+          coverage: none
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+          touch database/database.sqlite
+          php artisan migrate --force --no-interaction > /dev/null
+
+      - name: Make and check the dialogue with staging key 1
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_chk
+          chmod 600 ~/.ssh/id_chk
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
+          KEY="$(ssh -i ~/.ssh/id_chk -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          rm -f ~/.ssh/id_chk
+          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "::add-mask::$KEY"
+          echo "GEMINI_TTS_API_KEY=$KEY" >> .env
+          php artisan config:clear > /dev/null
+          php scripts/tts/dialogue_dialect_check.php
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: saudi-egyptian-dialogue
+          path: dialogue-check/
+          if-no-files-found: warn
