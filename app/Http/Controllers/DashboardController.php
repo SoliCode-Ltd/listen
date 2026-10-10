@@ -240,6 +240,10 @@ class DashboardController extends Controller
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
 
+        if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
+            $this->ensureUsableDialogue($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
+        }
+
         // Check if user selected a cloned voice (key format: cloned_{id})
         $voiceKey = $validated['voice_key'] ?? null;
         $clonedVoiceId = null;
@@ -859,5 +863,43 @@ class DashboardController extends Controller
                 'content' => $content,
             ],
         );
+    }
+
+    /**
+     * A dialogue needs premium voices, two different speakers, and a script whose
+     * lines start with the speakers' names ("Name: line"); otherwise it would come
+     * out as one voice reading the names aloud.
+     *
+     * @param  array<int, mixed>  $speakers
+     */
+    private function ensureUsableDialogue(string $tier, array $speakers, string $script): void
+    {
+        if ($tier === VoiceTier::STANDARD) {
+            throw ValidationException::withMessages(['is_dialogue' => __('ui.backend.dialogue_needs_hd')]);
+        }
+
+        $names = [];
+        $voices = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) data_get($speaker, 'name'));
+            $voice = trim((string) data_get($speaker, 'voice'));
+            if ($name !== '' && $voice !== '') {
+                $names[] = $name;
+                $voices[] = $voice;
+            }
+        }
+        if (count($names) < 2 || count(array_unique(array_map('mb_strtolower', $names))) < count($names)) {
+            throw ValidationException::withMessages(['dialogue_speakers' => __('ui.backend.dialogue_needs_two_speakers')]);
+        }
+
+        foreach (preg_split("/\r\n|\n|\r/", $script) ?: [] as $line) {
+            foreach ($names as $name) {
+                if (str_starts_with(trim($line), $name.':')) {
+                    return;
+                }
+            }
+        }
+
+        throw ValidationException::withMessages(['content' => __('ui.backend.dialogue_needs_names', ['name' => $names[0]])]);
     }
 }
