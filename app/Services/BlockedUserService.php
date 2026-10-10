@@ -3,7 +3,9 @@
 namespace App\Services;
 
 use App\Models\User;
+use App\Services\Billing\TrialSubscriptionService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
@@ -78,6 +80,28 @@ class BlockedUserService
         ])->save();
 
         $this->invalidateSessions($user);
+        $this->cancelOpenTrial($user);
+    }
+
+    /**
+     * A blocked member can no longer use the account, so their free trial must
+     * not turn into a charge. Only where switched on (live), never on staging.
+     * A failure here never stops the block itself.
+     */
+    private function cancelOpenTrial(User $user): void
+    {
+        if (! config('listen.abuse.block_cancels_trial')) {
+            return;
+        }
+
+        try {
+            app(TrialSubscriptionService::class)->cancelOpenTrialsForBlockedUser($user);
+        } catch (\Throwable $exception) {
+            Log::error('Cancelling a blocked member\'s free trial failed.', [
+                'user_id' => $user->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     public function unblock(User $user): void

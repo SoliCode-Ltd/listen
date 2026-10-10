@@ -438,6 +438,64 @@ class TrialSubscriptionService
         unset($setupIntentId);
     }
 
+    /**
+     * A blocked member must not be charged when their free trial ends for an
+     * account they can no longer use. Cancels their open (unpaid) trials in
+     * Stripe and here. A trial Stripe would not cancel is left as it is, so
+     * the admin still sees it running.
+     *
+     * @return int how many trials were cancelled
+     */
+    public function cancelOpenTrialsForBlockedUser(User $user): int
+    {
+        $openTrials = BillingTrial::query()
+            ->where('user_id', $user->id)
+            ->where('status', BillingTrial::STATUS_TRIALING)
+            ->whereNull('paid_at')
+            ->get();
+
+        $cancelled = 0;
+        foreach ($openTrials as $trial) {
+            $subscriptionId = trim((string) $trial->stripe_subscription_id);
+
+            if ($subscriptionId !== '') {
+                try {
+                    $this->gateway->cancelSubscription($subscriptionId);
+                } catch (\Throwable $exception) {
+                    Log::error('Could not cancel the free trial of a blocked member; it may still be charged.', [
+                        'user_id' => $user->id,
+                        'billing_trial_id' => $trial->id,
+                        'stripe_subscription_id' => $subscriptionId,
+                        'error' => $exception->getMessage(),
+                    ]);
+
+                    continue;
+                }
+
+                BillingSubscription::query()
+                    ->where('stripe_id', $subscriptionId)
+                    ->update([
+                        'stripe_status' => 'canceled',
+                        'ends_at' => now(),
+                    ]);
+            }
+
+            $trial->forceFill([
+                'status' => BillingTrial::STATUS_CANCELED,
+                'canceled_at' => now(),
+                'blocked_reason' => 'account_blocked',
+            ])->save();
+            $cancelled++;
+
+            Log::info('Free trial cancelled because the member was blocked.', [
+                'user_id' => $user->id,
+                'billing_trial_id' => $trial->id,
+            ]);
+        }
+
+        return $cancelled;
+    }
+
     private function retireAdminTestTrials(User $user): void
     {
         $openTests = BillingTrial::query()

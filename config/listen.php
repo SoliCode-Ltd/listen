@@ -46,6 +46,20 @@ return [
         ],
     ],
 
+    /*
+    | When a member is blocked:
+    | - block_cancels_trial: cancel their unpaid free trial in Stripe so they
+    |   are not charged for an account they cannot use. OFF unless set, because
+    |   staging runs the live Stripe keys on a copy of live members: set
+    |   LISTEN_BLOCK_CANCELS_TRIAL=true on live only.
+    | - block_evasion: an account made on the same browser after another
+    |   account there was blocked is blocked too.
+    */
+    'abuse' => [
+        'block_cancels_trial' => (bool) env('LISTEN_BLOCK_CANCELS_TRIAL', false),
+        'block_evasion' => (bool) env('LISTEN_BLOCK_EVASION', true),
+    ],
+
     'demo' => [
         'guest_char_allowance' => (int) env('DEMO_GUEST_CHAR_ALLOWANCE', 300),
         'user_char_allowance' => (int) env('DEMO_USER_CHAR_ALLOWANCE', 30000),
