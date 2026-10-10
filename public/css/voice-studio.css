@@ -597,6 +597,16 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
 }
 
 /* Dialogue mode: the two speakers, each a name in the script and a voice. */
+[data-dialogue] .compact-toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  cursor: pointer;
+}
+[data-dialogue] .t-title { font-weight: 700; color: var(--text); font-size: .9rem; margin-bottom: .2rem; }
+[data-dialogue] .t-desc { font-size: .8rem; color: var(--muted); line-height: 1.4; }
+[data-dialogue] .toggle-switch { flex-shrink: 0; }
 .dialogue-speakers {
   display: grid;
   gap: .75rem;
@@ -604,7 +614,7 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
   padding-top: .85rem;
   border-top: 1px solid var(--line);
 }
-.dialogue-speakers[hidden] { display: none; }
+.dialogue-speakers[hidden], [data-dialogue][hidden] { display: none; }
 .dialogue-speaker-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);

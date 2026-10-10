@@ -18,6 +18,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
+use App\Support\DialogueSpeakers;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -320,11 +321,14 @@ class HomeController extends Controller
                 'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
                 'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
                 'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-            ], [
+            ] + DialogueSpeakers::rules(), [
                 'performance_style.in' => __('ui.backend.performance_style_invalid'),
                 'emotion.in' => __('ui.backend.emotion_invalid'),
             ]);
             $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+            if ($validated['is_dialogue'] ?? false) {
+                DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
+            }
             $voiceName = $this->normalizeVoiceSelection(
                 $validated['target_language'],
                 $validated['voice_key'] ?? null,
@@ -426,11 +430,15 @@ class HomeController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-        ], [
+        ] + DialogueSpeakers::rules(), [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+        $isDialogue = (bool) ($validated['is_dialogue'] ?? false);
+        if ($isDialogue) {
+            DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
+        }
         $demoRoutingPlan = $this->demoRoutingPlan($demoPlan, $tier);
         $voiceName = $this->normalizeVoiceSelection(
             $validated['target_language'],
@@ -484,6 +492,14 @@ class HomeController extends Controller
                 'speed' => $studioOptions['speed'],
                 'pitch' => $studioOptions['pitch'],
             ];
+            if ($isDialogue) {
+                $voiceOptions['speakers'] = DialogueSpeakers::forSpeech(
+                    $validated['dialogue_speakers'] ?? [],
+                    $validated['target_language'],
+                    $tier,
+                    is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null,
+                );
+            }
 
             $audio = $ttsService->synthesizeAdvanced(
                 $textForSpeech,
@@ -1541,6 +1557,7 @@ class HomeController extends Controller
                     'plan_slug' => $audio['plan_slug'] ?? 'free',
                     'reward_chars_consumed' => $rewardCharsConsumed !== null ? (int) $rewardCharsConsumed : 0,
                     'total_chars' => $totalChars !== null ? (int) $totalChars : ($originalChars ?? UsageEstimator::estimate($inputText)['chars']),
+                    'dialogue_speakers' => ($validated['is_dialogue'] ?? false) ? ($validated['dialogue_speakers'] ?? []) : null,
                 ],
             ]);
         } catch (\Throwable $e) {
