@@ -15,6 +15,10 @@ class MultiAccountEnforcementService
     public const BLOCK_REASON_EN = 'Your account has been suspended because multiple accounts were created from the same network.';
 
     public const BLOCK_REASON_AR = 'تم تعليق حسابك بسبب إنشاء حسابات متعددة من نفس الشبكة.';
+    public const EVASION_REASON_EN = 'Your account has been suspended because it was created after another account on this device was suspended.';
+
+    public const EVASION_REASON_AR = 'تم تعليق حسابك لأنه أُنشئ بعد إيقاف حساب آخر على نفس الجهاز.';
+
     public const BLOCK_REASON_EN_SETTING_KEY = 'multi_account_block_reason_en';
     public const BLOCK_REASON_AR_SETTING_KEY = 'multi_account_block_reason_ar';
 
@@ -59,6 +63,10 @@ class MultiAccountEnforcementService
             return;
         }
 
+        if ($this->blockIfEvadingBlock($user)) {
+            return;
+        }
+
         $maxAccounts = $this->maxAccountsPerIp();
         $accountCount = $this->countAccountsSharingDevice($deviceIds);
 
@@ -85,6 +93,72 @@ class MultiAccountEnforcementService
         );
 
         Cache::forget('admin:suspicious_users_count');
+    }
+
+    /**
+     * The account was made on a browser where another account had already
+     * been blocked: a blocked member starting over under a new name. Accounts
+     * that were there before the block (a shared family computer) are left
+     * alone, and an admin can unblock this one (that whitelists it).
+     */
+    public function blockIfEvadingBlock(User $user): bool
+    {
+        if (! config('listen.abuse.block_evasion', true)
+            || $user->is_admin
+            || $user->isBlocked()
+            || $user->multi_account_whitelisted
+            || ! $this->hasDeviceColumns()) {
+            return false;
+        }
+
+        $source = $this->blockedAccountBefore($user);
+        if (! $source) {
+            return false;
+        }
+
+        Log::warning('Account blocked: made on the browser of an already blocked account.', [
+            'user_id' => $user->id,
+            'blocked_account_id' => $source->id,
+            'blocked_account_blocked_at' => (string) $source->blocked_at,
+        ]);
+
+        $this->blockedUserService->block(
+            $user,
+            self::EVASION_REASON_EN,
+            null,
+            ['en' => self::EVASION_REASON_EN, 'ar' => self::EVASION_REASON_AR],
+        );
+        Cache::forget('admin:suspicious_users_count');
+
+        return true;
+    }
+
+    /**
+     * A blocked account on the same browser (device cookie) whose block came
+     * before this account was created.
+     */
+    public function blockedAccountBefore(User $user): ?User
+    {
+        $deviceIds = array_values(array_unique(array_filter([
+            $user->registration_device_id,
+            $user->last_seen_device_id,
+        ])));
+
+        if ($deviceIds === [] || ! $user->created_at) {
+            return null;
+        }
+
+        return User::query()
+            ->whereKeyNot($user->id)
+            ->where('is_blocked', true)
+            ->whereNotNull('blocked_at')
+            ->where('blocked_at', '<=', $user->created_at)
+            ->where(function ($q) use ($deviceIds) {
+                $q->whereIn('registration_device_id', $deviceIds)
+                    ->orWhereIn('last_seen_device_id', $deviceIds);
+            })
+            ->orderBy('blocked_at')
+            ->first();
     }
 
     public function maxAccountsPerIp(): int
