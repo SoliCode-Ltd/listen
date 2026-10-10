@@ -76,6 +76,71 @@ class DialogueModeTest extends TestCase
         $this->assertCount(2, $generation->dialogue_metadata['speakers']);
     }
 
+    public function test_each_speaker_can_speak_their_own_dialect(): void
+    {
+        $this->actingAs($this->member(dialogue: true));
+        [$a, $b] = $this->twoPremiumVoices('ar');
+        $request = $this->dialogueRequest($a['key'], $b['key']);
+        $request['dialogue_speakers'][0]['dialect'] = 'ar-SA';
+        $request['dialogue_speakers'][1]['dialect'] = 'ar-EG';
+
+        $this->postJsonLocalizedRoute('dashboard.generate', $request)->assertSuccessful();
+
+        $parts = $this->speechParts();
+        $this->assertSame(['سلطان', 'نورة'], array_map(fn ($p) => $p['speech_metadata']['speaker'], $parts));
+        $saudi = $parts[0]['speech_metadata']['style'];
+        $egyptian = $parts[1]['speech_metadata']['style'];
+        $this->assertNotSame($saudi, $egyptian);
+        $this->assertStringContainsString('Cairene Egyptian', $egyptian);
+        $this->assertStringNotContainsString('Cairene', $saudi);
+        $this->assertStringContainsString('Voice dialect:', $saudi);
+        $this->assertSame('ar-EG', \App\Models\AudioGeneration::latest('id')->first()->dialogue_metadata['speakers'][1]['dialect']);
+
+        // The same dialogue with a different dialect is a new recording, not the saved one.
+        $this->requests = [];
+        $request['dialogue_speakers'][1]['dialect'] = 'ar-LB';
+        $this->postJsonLocalizedRoute('dashboard.generate', $request)->assertSuccessful();
+        $this->assertNotEmpty($this->speechParts(), 'a new speech request was sent');
+        $this->assertStringNotContainsString('Cairene', $this->speechParts()[1]['speech_metadata']['style']);
+    }
+
+    public function test_english_speakers_can_have_different_accents(): void
+    {
+        $this->actingAs($this->member(dialogue: true));
+        [$a, $b] = $this->twoPremiumVoices('en');
+        $request = [
+            'content' => "Daisy: Welcome back to the show!\nTheodore: Delighted to be here.",
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_tier' => 'hd',
+            'voice_key' => $a['key'],
+            'performance_style' => 'neutral',
+            'emotion' => 'neutral',
+            'is_dialogue' => true,
+            'dialogue_speakers' => [
+                ['name' => 'Daisy', 'voice' => $a['key'], 'dialect' => 'en-US'],
+                ['name' => 'Theodore', 'voice' => $b['key'], 'dialect' => 'en-GB'],
+            ],
+        ];
+
+        $this->postJsonLocalizedRoute('dashboard.generate', $request)->assertSuccessful();
+
+        $parts = $this->speechParts();
+        $this->assertStringContainsString('American English', $parts[0]['speech_metadata']['style']);
+        $this->assertStringContainsString('British English', $parts[1]['speech_metadata']['style']);
+    }
+
+    public function test_a_made_up_dialect_value_is_rejected(): void
+    {
+        $this->actingAs($this->member(dialogue: true));
+        [$a, $b] = $this->twoPremiumVoices('ar');
+        $request = $this->dialogueRequest($a['key'], $b['key']);
+        $request['dialogue_speakers'][0]['dialect'] = 'saudi; drop';
+
+        $this->postJsonLocalizedRoute('dashboard.generate', $request)
+            ->assertStatus(422)->assertJsonValidationErrors(['dialogue_speakers.0.dialect']);
+    }
+
     public function test_dialogue_needs_two_speakers_and_named_lines(): void
     {
         $this->actingAs($this->member(dialogue: true));
@@ -122,7 +187,18 @@ class DialogueModeTest extends TestCase
             ->assertSee('id="dialogueSpeakers"', false)
             ->assertSee('name="dialogue_speakers[0][name]"', false)
             ->assertSee('name="dialogue_speakers[1][voice]"', false)
+            ->assertSee('name="dialogue_speakers[1][dialect]"', false)
             ->assertSee(__('ui.dashboard.dialogue_example_btn'));
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function speechParts(): array
+    {
+        $speech = collect($this->requests)->first(fn ($r) => isset($r['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']));
+
+        return $speech['body']['contents'][0]['parts'] ?? [];
     }
 
     private function member(bool $dialogue): User

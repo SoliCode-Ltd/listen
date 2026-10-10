@@ -241,7 +241,7 @@ class TtsService
 
     /**
      * @param  array<int, mixed>  $speakers
-     * @return array<int, array{name:string,voice:string}>
+     * @return array<int, array{name:string,voice:string,dialect?:string}>
      */
     private function speakerCacheFingerprint(array $speakers): array
     {
@@ -251,10 +251,16 @@ class TtsService
                 continue;
             }
 
-            $fingerprint[] = [
+            $entry = [
                 'name' => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')),
                 'voice' => trim((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? '')),
             ];
+            // A speaker's own dialect changes the recording, so it is part of the key.
+            $dialect = trim((string) ($speaker['dialect'] ?? ''));
+            if ($dialect !== '') {
+                $entry['dialect'] = $dialect;
+            }
+            $fingerprint[] = $entry;
         }
 
         return $fingerprint;

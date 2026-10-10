@@ -627,6 +627,7 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
   color: var(--text);
   font: inherit;
 }
+.dialogue-speaker-dialect { grid-column: 1 / -1; }
 .dialogue-guide { margin: 0; font-size: .82rem; color: var(--muted); line-height: 1.6; }
 .dialogue-example-btn { justify-self: start; }
 @media (max-width: 560px) {

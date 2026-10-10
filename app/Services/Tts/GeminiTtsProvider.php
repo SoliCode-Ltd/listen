@@ -685,12 +685,29 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $pitch,
                 GeminiTtsModel::usesStructuredSpeech($model),
             );
+        $structured = GeminiTtsModel::usesStructuredSpeech($model);
+        // A speaker with their own dialect or accent gets their own direction, so two
+        // people can talk in two dialects (a Saudi host and an Egyptian guest).
+        $speakerStyles = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
+            $own = trim((string) ($speaker['dialect'] ?? ''));
+            if ($name === '' || $own === '') {
+                continue;
+            }
+            $speakerStyle = $customPrompt !== ''
+                ? trim($customPrompt.' '.$this->buildStylePrompt('neutral', 'neutral', $targetLanguage, 1.0, $own, 0.0, $structured))
+                : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch, $structured);
+            $speakerStyle = GeminiVocalTags::withCues($speakerStyle, $voiceConfig['vocal_cues'] ?? []);
+            $speakerStyles[$name] = $structured ? GeminiVocalTags::forPerformance($text, $speakerStyle)['style'] : $speakerStyle;
+        }
+
         $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
-        if (GeminiTtsModel::usesStructuredSpeech($model)) {
+        if ($structured) {
             $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
             [$text, $stylePrompt] = [$performed['text'], $performed['style']];
         }
-        $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode);
+        $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode, $speakerStyles);
 
         $audio = $this->requestAudio($endpoint, $payload);
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
@@ -767,6 +784,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         string $stylePrompt,
         array $speakers,
         string $languageCode,
+        array $speakerStyles = [],
     ): array {
         $speakerVoiceConfigs = [];
         foreach ($speakers as $speaker) {
@@ -788,9 +806,13 @@ class GeminiTtsProvider implements TtsProviderInterface
             ];
         }
 
+        $legacyDirections = '';
+        foreach ($speakerStyles as $name => $style) {
+            $legacyDirections .= "\n{$name}: {$style}";
+        }
         $parts = GeminiTtsModel::usesStructuredSpeech($model)
-            ? $this->structuredDialogueParts($text, $speakers, $stylePrompt)
-            : [['text' => trim($stylePrompt."\n\n".$text)]];
+            ? $this->structuredDialogueParts($text, $speakers, $stylePrompt, $speakerStyles)
+            : [['text' => trim($stylePrompt.$legacyDirections."\n\n".$text)]];
 
         $speechConfig = [
             'multiSpeakerVoiceConfig' => [
@@ -819,9 +841,10 @@ class GeminiTtsProvider implements TtsProviderInterface
      * Split a script into verbatim turns so Gemini 3.8 does not read speaker labels aloud.
      *
      * @param  array<int, array<string, mixed>>  $speakers
+     * @param  array<string, string>  $speakerStyles  direction per speaker name, for speakers with their own dialect
      * @return array<int, array<string, mixed>>
      */
-    private function structuredDialogueParts(string $text, array $speakers, string $stylePrompt): array
+    private function structuredDialogueParts(string $text, array $speakers, string $stylePrompt, array $speakerStyles = []): array
     {
         $names = [];
         foreach ($speakers as $speaker) {
@@ -855,8 +878,9 @@ class GeminiTtsProvider implements TtsProviderInterface
 
             $part = ['text' => $spoken];
             $metadata = ['speaker' => $currentSpeaker];
-            if (trim($stylePrompt) !== '') {
-                $metadata['style'] = $stylePrompt;
+            $lineStyle = $speakerStyles[$currentSpeaker] ?? $stylePrompt;
+            if (trim($lineStyle) !== '') {
+                $metadata['style'] = $lineStyle;
             }
             $part['speech_metadata'] = $metadata;
             $parts[] = $part;

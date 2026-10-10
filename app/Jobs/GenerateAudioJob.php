@@ -446,7 +446,7 @@ class GenerateAudioJob implements ShouldQueue
 
     /**
      * @param  mixed  $rawSpeakers
-     * @return array<int, array{name:string,voice_name:string,gender:?string}>
+     * @return array<int, array{name:string,voice_name:string,gender:?string,dialect?:string}>
      */
     private function normalizeDialogueSpeakers(mixed $rawSpeakers, string $targetLanguage, string $tier, ?string $provider): array
     {
@@ -479,11 +479,17 @@ class GenerateAudioJob implements ShouldQueue
             }
 
             $meta = VoiceCatalog::voiceMeta($voiceName);
-            $normalized[] = [
+            $entry = [
                 'name' => $name !== '' ? $name : 'Speaker',
                 'voice_name' => $voiceName,
                 'gender' => is_array($meta) ? ($meta['gender'] ?? null) : null,
             ];
+            // Each speaker may speak their own dialect or accent (ar-SA, ar-EG-AL, en-GB).
+            $dialect = trim((string) ($speaker['dialect'] ?? ''));
+            if (preg_match('/^[a-z]{2}-[A-Za-z]{2}(-[A-Za-z]{2,3})?$/', $dialect) === 1) {
+                $entry['dialect'] = $dialect;
+            }
+            $normalized[] = $entry;
         }
 
         return $normalized;

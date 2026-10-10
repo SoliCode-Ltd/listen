@@ -233,6 +233,7 @@ class DashboardController extends Controller
             'dialogue_speakers' => ['nullable', 'array', 'max:6'],
             'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
             'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
+            'dialogue_speakers.*.dialect' => ['nullable', 'string', 'max:12', 'regex:/^[a-z]{2}-[A-Za-z]{2}(-[A-Za-z]{2,3})?$/'],
         ], [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),

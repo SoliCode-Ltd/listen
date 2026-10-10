@@ -2232,8 +2232,8 @@
                       </div>
                     </label>
                     <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
-                    {{-- Two speakers, each a name used in the script and a premium voice. Shown
-                         (and sent) only while dialogue mode is on. --}}
+                    {{-- Two speakers, each a name used in the script, a premium voice and their own
+                         dialect or accent. Shown (and sent) only while dialogue mode is on. --}}
                     <div class="dialogue-speakers" id="dialogueSpeakers" @if($prefillDialogue !== '1') hidden @endif>
                       @foreach([0, 1] as $si)
                         <div class="dialogue-speaker-row">
@@ -2247,6 +2247,11 @@
                             <span class="vs-field-label">{{ __('ui.dashboard.dialogue_speaker_voice') }}</span>
                             <select name="dialogue_speakers[{{ $si }}][voice]" data-dialogue-voice="{{ $si }}" data-speaker-avatar
                               data-initial="{{ old('dialogue_speakers.'.$si.'.voice', data_get($reusePreset ?? [], 'dialogue_speakers.'.$si.'.voice')) }}" @if($prefillDialogue !== '1') disabled @endif></select>
+                          </label>
+                          <label class="vs-field dialogue-speaker-dialect">
+                            <span class="vs-field-label">{{ __('ui.dashboard.dialogue_speaker_dialect') }}</span>
+                            <select name="dialogue_speakers[{{ $si }}][dialect]" data-dialogue-dialect="{{ $si }}"
+                              data-initial="{{ old('dialogue_speakers.'.$si.'.dialect', data_get($reusePreset ?? [], 'dialogue_speakers.'.$si.'.dialect')) }}" @if($prefillDialogue !== '1') disabled @endif></select>
                           </label>
                         </div>
                       @endforeach
@@ -3861,10 +3866,33 @@
     const dialogueSelect = document.getElementById('dialogueSelect');
     const dialogueI18n = {
       guide: @json(__('ui.dashboard.dialogue_guide')),
+      sameDialect: @json(__('ui.dashboard.dialogue_dialect_same')),
       example: @json(__('ui.dashboard.dialogue_example')),
     };
     function dialogueNameInputs() { return document.querySelectorAll('[data-dialogue-name]'); }
     function dialogueVoiceSelects() { return document.querySelectorAll('[data-dialogue-voice]'); }
+    function dialogueDialectSelects() { return document.querySelectorAll('[data-dialogue-dialect]'); }
+    // Each speaker can speak their own dialect or accent; empty keeps the main setting.
+    function renderDialogueDialects() {
+      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
+      const dialects = (dialectsByLanguage[lang] || []).filter(function (d) { return d.value; });
+      dialogueDialectSelects().forEach(function (select) {
+        const previous = String(select.value || select.dataset.initial || '').trim();
+        select.innerHTML = '';
+        const same = document.createElement('option');
+        same.value = '';
+        same.textContent = dialogueI18n.sameDialect;
+        select.appendChild(same);
+        dialects.forEach(function (d) {
+          const option = document.createElement('option');
+          option.value = d.value;
+          option.textContent = d.label;
+          select.appendChild(option);
+        });
+        select.value = dialects.some(function (d) { return d.value === previous; }) ? previous : '';
+        select.dataset.initial = '';
+      });
+    }
     function dialogueNames() {
       return Array.from(dialogueNameInputs()).map(function (input, i) {
         return String(input.value || '').trim() || (i === 0 ? 'A' : 'B');
@@ -3904,6 +3932,7 @@
         }
         select.dataset.initial = '';
       });
+      renderDialogueDialects();
       syncDialogueNamesFromVoices(false);
     }
     // A name field the user has not typed in follows its voice's name.
@@ -3925,6 +3954,7 @@
       if (panel) panel.hidden = !on;
       dialogueNameInputs().forEach(function (el) { el.disabled = !on; });
       dialogueVoiceSelects().forEach(function (el) { el.disabled = !on; });
+      dialogueDialectSelects().forEach(function (el) { el.disabled = !on; });
       if (on) renderDialogueVoices();
     }
     if (dialogueToggle && dialogueSelect) {
