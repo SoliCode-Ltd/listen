@@ -3,12 +3,17 @@
 namespace App\Filament\Pages;
 
 use Filament\Forms;
+use Filament\Forms\Components\Actions\Action;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
+use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Log;
 
 class EnvEditor extends Page implements HasForms
 {
@@ -26,6 +31,9 @@ class EnvEditor extends Page implements HasForms
 
     public ?array $data = [];
 
+    /** Values as loaded, so saving only rewrites the lines that changed. */
+    public array $originalValues = [];
+
     /** Keys that are always masked and cannot be revealed. */
     protected array $sensitivePatterns = ['SECRET', 'PASSWORD', 'KEY', 'TOKEN', 'HASH'];
 
@@ -36,8 +44,18 @@ class EnvEditor extends Page implements HasForms
             abort(403, 'Only admins can access the environment editor.');
         }
 
-        $envContent = $this->parseEnv();
-        $this->form->fill(['entries' => $envContent]);
+        $this->loadEntries();
+    }
+
+    protected function loadEntries(): void
+    {
+        $entries = $this->parseEnv();
+        $this->originalValues = [];
+        foreach ($entries as $entry) {
+            $this->originalValues[$entry['key']] = $entry['value'];
+        }
+
+        $this->form->fill(['entries' => $entries]);
     }
 
     public function form(Form $form): Form
@@ -45,13 +63,20 @@ class EnvEditor extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Environment Variables')
-                    ->description('Edit .env values. Sensitive keys are masked. Changes take effect immediately.')
+                    ->description('Edit .env values, or add a new one with "Add variable" at the bottom. Sensitive keys are masked. Existing variables cannot be renamed or removed here.')
                     ->schema([
                         Forms\Components\Repeater::make('entries')
                             ->schema([
+                                Forms\Components\Hidden::make('is_new')
+                                    ->default(true),
                                 Forms\Components\TextInput::make('key')
                                     ->label('Key')
-                                    ->disabled()
+                                    ->placeholder('NEW_SETTING_NAME')
+                                    ->required()
+                                    ->maxLength(100)
+                                    ->regex('/^[A-Z][A-Z0-9_]*$/')
+                                    ->validationMessages(['regex' => 'Use capital letters, digits and underscores, starting with a letter (e.g. LISTEN_STRIPE_TRIAL_ACTIONS).'])
+                                    ->disabled(fn (Get $get): bool => ! $get('is_new'))
                                     ->dehydrated(),
                                 Forms\Components\TextInput::make('value')
                                     ->label('Value')
@@ -59,8 +84,13 @@ class EnvEditor extends Page implements HasForms
                                     ->revealable(fn ($get) => $this->isSensitive($get('key') ?? '')),
                             ])
                             ->columns(2)
-                            ->addable(false)
-                            ->deletable(false)
+                            ->addable()
+                            ->addActionLabel('Add variable')
+                            // Only rows added on this page (not saved yet) can be removed.
+                            ->deletable()
+                            ->deleteAction(fn (Action $action) => $action->visible(
+                                fn (array $arguments, Repeater $component): bool => (bool) ($component->getState()[$arguments['item']]['is_new'] ?? false)
+                            ))
                             ->reorderable(false),
                     ]),
             ])
@@ -80,37 +110,98 @@ class EnvEditor extends Page implements HasForms
         $data = $this->form->getState();
         $entries = $data['entries'] ?? [];
 
-        $envPath = base_path('.env');
-        $envContent = File::get($envPath);
+        $envPath = $this->envPath();
+        $envContent = File::exists($envPath) ? File::get($envPath) : '';
 
+        $seen = [];
         foreach ($entries as $entry) {
-            $key = $entry['key'];
-            $value = $entry['value'] ?? '';
-
-            // Wrap in quotes if the value contains spaces or special chars
-            $escapedValue = $value;
-            if (preg_match('/[\s#=]/', $value) || $value === '') {
-                $escapedValue = '"' . addcslashes($value, '"') . '"';
+            $key = trim((string) ($entry['key'] ?? ''));
+            if (! preg_match('/^[A-Z][A-Z0-9_]*$/', $key)) {
+                continue;
             }
 
-            // Replace the line in .env
-            $pattern = '/^' . preg_quote($key, '/') . '=.*/m';
+            if (isset($seen[$key])) {
+                Notification::make()
+                    ->title("{$key} is listed twice")
+                    ->body('Nothing was saved. Remove the duplicate and save again.')
+                    ->danger()
+                    ->send();
+
+                return;
+            }
+            $seen[$key] = true;
+
+            $value = (string) ($entry['value'] ?? '');
+            if (array_key_exists($key, $this->originalValues) && $this->originalValues[$key] === $value) {
+                continue; // unchanged: leave the line exactly as it is
+            }
+
+            $line = $key.'='.$this->escapeValue($value);
+
+            // Replace the line in .env, or add it at the end if it is new.
+            $pattern = '/^'.preg_quote($key, '/').'=.*/m';
             if (preg_match($pattern, $envContent)) {
-                $envContent = preg_replace($pattern, "{$key}={$escapedValue}", $envContent);
+                $envContent = preg_replace_callback($pattern, fn () => $line, $envContent);
+            } else {
+                $envContent = rtrim($envContent, "\n")."\n".$line."\n";
             }
         }
 
         File::put($envPath, $envContent);
 
+        $cacheNote = $this->refreshConfigCache();
+
+        $this->loadEntries();
+
         Notification::make()
             ->title('.env file updated successfully')
+            ->body($cacheNote)
             ->success()
             ->send();
     }
 
+    /**
+     * The app reads most settings from the cached config, so a saved .env
+     * only takes effect once that cache is rebuilt.
+     */
+    protected function refreshConfigCache(): string
+    {
+        try {
+            if (app()->configurationIsCached()) {
+                Artisan::call('config:cache');
+
+                return 'Settings cache rebuilt: the new values are in use now.';
+            }
+
+            return 'The new values are in use from the next request.';
+        } catch (\Throwable $e) {
+            Log::error('Env editor could not rebuild the config cache.', ['error' => $e->getMessage()]);
+
+            return 'Saved, but the settings cache could not be rebuilt. Run "php artisan config:cache" on the server.';
+        }
+    }
+
+    protected function escapeValue(string $value): string
+    {
+        // One line per variable: a pasted line break must not start a new one.
+        $value = str_replace(["\r", "\n"], '', $value);
+
+        // Wrap in quotes if the value contains spaces or special chars
+        if (preg_match('/[\s#=]/', $value) || $value === '') {
+            return '"'.addcslashes($value, '"').'"';
+        }
+
+        return $value;
+    }
+
+    protected function envPath(): string
+    {
+        return app()->environmentFilePath();
+    }
+
     protected function parseEnv(): array
     {
-        $envPath = base_path('.env');
+        $envPath = $this->envPath();
         if (!File::exists($envPath)) {
             return [];
         }
@@ -128,7 +219,7 @@ class EnvEditor extends Page implements HasForms
                 [$key, $value] = explode('=', $line, 2);
                 $key = trim($key);
                 $value = trim($value, " \t\n\r\0\x0B\"'");
-                $entries[] = ['key' => $key, 'value' => $value];
+                $entries[] = ['key' => $key, 'value' => $value, 'is_new' => false];
             }
         }
 
