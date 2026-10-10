@@ -210,6 +210,8 @@
                 </label>
                 <input type="hidden" name="translate" id="translate" value="0">
               </div>
+              {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
+              <x-voice-studio.dialogue style="margin-top: .6rem;" />
             </x-voice-studio.panel>
             </div>
 
@@ -293,6 +295,7 @@
       'quota_sync_failed' => __('ui.demo.quota_sync_failed'),
     ];
   @endphp
+  <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
   <script>
     const voiceCatalogByTier = @json($voiceCatalog);
     const defaultVoiceKeyByTierAndLanguage = @json($defaultVoiceKeysByTier ?? []);
@@ -1057,6 +1060,19 @@
       applyStudioTierState();
       return true;
     }
+
+    // Dialogue mode (js/dialogue-mode.js): two speakers, each with a premium voice
+    // and their own dialect or accent. Premium voices only.
+    const dialogueMode = window.ListenDialogue?.init({
+      textarea: textInput,
+      language: () => normalizeLanguage(targetLanguage?.value),
+      voices: (lang) => sortVoices(Array.isArray(voiceCatalogByTier?.hd?.[lang]) ? voiceCatalogByTier.hd[lang] : []),
+      dialects: (lang) => dialectsByLanguage[lang] || [],
+      voiceLabel: voiceDisplayLabel,
+      allowed: () => normalizeTier(voiceTier?.value || 'standard') === 'hd',
+    });
+    voiceTier?.addEventListener('change', () => dialogueMode?.refresh());
+    targetLanguage?.addEventListener('change', () => dialogueMode?.refresh());
 
     async function callEndpoint(endpoint, options = {}) {
       const includeForm = options?.includeForm !== false;

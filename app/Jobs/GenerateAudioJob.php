@@ -13,6 +13,7 @@ use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
+use App\Support\DialogueSpeakers;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceCatalog;
@@ -170,7 +171,7 @@ class GenerateAudioJob implements ShouldQueue
                     && is_array($generation->dialogue_metadata)
                 ) {
                     $provider = is_string($voiceOptions['provider']) ? $voiceOptions['provider'] : null;
-                    $voiceOptions['speakers'] = $this->normalizeDialogueSpeakers(
+                    $voiceOptions['speakers'] = DialogueSpeakers::forSpeech(
                         $generation->dialogue_metadata['speakers'] ?? [],
                         $generation->target_language,
                         $requestedTier,
@@ -442,56 +443,5 @@ class GenerateAudioJob implements ShouldQueue
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];
-    }
-
-    /**
-     * @param  mixed  $rawSpeakers
-     * @return array<int, array{name:string,voice_name:string,gender:?string,dialect?:string}>
-     */
-    private function normalizeDialogueSpeakers(mixed $rawSpeakers, string $targetLanguage, string $tier, ?string $provider): array
-    {
-        if (! is_array($rawSpeakers)) {
-            return [];
-        }
-
-        $normalized = [];
-
-        foreach ($rawSpeakers as $speaker) {
-            if (! is_array($speaker)) {
-                continue;
-            }
-
-            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? 'Speaker'));
-            $requestedVoice = trim((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''));
-            $voiceName = $requestedVoice;
-
-            if (preg_match('/^voice_\d+$/', $requestedVoice) === 1) {
-                $voiceName = VoiceCatalog::nameFromKeyForLanguageAndProvider(
-                    $targetLanguage,
-                    $requestedVoice,
-                    $tier,
-                    $provider,
-                ) ?: (VoiceCatalog::nameFromKeyForLanguage($targetLanguage, $requestedVoice, $tier) ?? '');
-            }
-
-            if ($voiceName === '') {
-                continue;
-            }
-
-            $meta = VoiceCatalog::voiceMeta($voiceName);
-            $entry = [
-                'name' => $name !== '' ? $name : 'Speaker',
-                'voice_name' => $voiceName,
-                'gender' => is_array($meta) ? ($meta['gender'] ?? null) : null,
-            ];
-            // Each speaker may speak their own dialect or accent (ar-SA, ar-EG-AL, en-GB).
-            $dialect = trim((string) ($speaker['dialect'] ?? ''));
-            if (preg_match('/^[a-z]{2}-[A-Za-z]{2}(-[A-Za-z]{2,3})?$/', $dialect) === 1) {
-                $entry['dialect'] = $dialect;
-            }
-            $normalized[] = $entry;
-        }
-
-        return $normalized;
     }
 }

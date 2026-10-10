@@ -191,6 +191,59 @@ class DialogueModeTest extends TestCase
             ->assertSee(__('ui.dashboard.dialogue_example_btn'));
     }
 
+    public function test_the_demo_speaks_a_dialogue_with_each_speakers_own_dialect(): void
+    {
+        $this->freePlan();
+        $this->actingAs(User::factory()->create());
+        [$a, $b] = $this->twoPremiumVoices('ar');
+        $request = $this->demoRequest($a['key'], $b['key']);
+        $request['dialogue_speakers'][0]['dialect'] = 'ar-SA';
+        $request['dialogue_speakers'][1]['dialect'] = 'ar-EG';
+
+        $this->postJsonLocalizedRoute('demo.preview', $request)->assertOk()->assertJson(['ok' => true]);
+
+        $parts = $this->speechParts();
+        $this->assertSame(['سلطان', 'نورة'], array_map(fn ($p) => $p['speech_metadata']['speaker'], $parts));
+        $this->assertStringContainsString('Cairene Egyptian', $parts[1]['speech_metadata']['style']);
+        $this->assertStringNotContainsString('Cairene', $parts[0]['speech_metadata']['style']);
+
+        $stored = \App\Models\DemoVoiceGeneration::latest('id')->first();
+        $this->assertSame('ar-EG', $stored->metadata['dialogue_speakers'][1]['dialect']);
+    }
+
+    public function test_the_demo_checks_a_dialogue_before_using_the_allowance(): void
+    {
+        $this->freePlan();
+        $this->actingAs(User::factory()->create());
+        [$a, $b] = $this->twoPremiumVoices('ar');
+
+        $standard = $this->demoRequest($a['key'], $b['key']);
+        $standard['voice_tier'] = 'standard';
+        unset($standard['performance_style'], $standard['emotion']);
+        $this->postJsonLocalizedRoute('demo.run', $standard)
+            ->assertStatus(422)->assertJsonPath('errors.is_dialogue.0', __('ui.backend.dialogue_needs_hd'));
+
+        $unnamed = $this->demoRequest($a['key'], $b['key']);
+        $unnamed['text'] = "مرحبا يا جماعة\nأهلاً وسهلاً";
+        $this->postJsonLocalizedRoute('demo.preview', $unnamed)
+            ->assertStatus(422)->assertJsonValidationErrors(['text']);
+
+        $this->assertSame([], $this->requests, 'nothing was sent for speech');
+        $this->assertSame(0, \App\Models\DemoVoiceGeneration::count());
+    }
+
+    public function test_the_demo_page_has_the_dialogue_panel(): void
+    {
+        $this->freePlan();
+        $this->actingAs(User::factory()->create());
+        app()->setLocale('ar');
+
+        $this->getLocalizedRoute('demo.page')->assertOk()
+            ->assertSee('id="dialogueSpeakers"', false)
+            ->assertSee('name="dialogue_speakers[1][dialect]"', false)
+            ->assertSee('js/dialogue-mode.js', false);
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -226,6 +279,29 @@ class DialogueModeTest extends TestCase
         $female = collect($voices)->firstWhere('gender', 'female');
 
         return [$male, $female];
+    }
+
+    private function freePlan(): Plan
+    {
+        return Plan::factory()->create([
+            'slug' => 'free',
+            'price_cents' => 0,
+            'voice_tier' => 'standard',
+            'tts_provider_policy' => 'auto',
+            'dialogue_enabled' => false,
+        ]);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function demoRequest(string $voiceA, string $voiceB): array
+    {
+        $request = $this->dialogueRequest($voiceA, $voiceB);
+        $request['text'] = $request['content'];
+        unset($request['content']);
+
+        return $request;
     }
 
     /**

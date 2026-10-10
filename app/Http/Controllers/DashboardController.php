@@ -14,6 +14,7 @@ use App\Services\Billing\TrialUsageRecorder;
 use App\Services\PlanAccessService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioUrl;
+use App\Support\DialogueSpeakers;
 use App\Support\PlanUsageGuard;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
@@ -228,13 +229,7 @@ class DashboardController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-            // Dialogue parameters
-            'is_dialogue' => ['nullable', 'boolean'],
-            'dialogue_speakers' => ['nullable', 'array', 'max:6'],
-            'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
-            'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
-            'dialogue_speakers.*.dialect' => ['nullable', 'string', 'max:12', 'regex:/^[a-z]{2}-[A-Za-z]{2}(-[A-Za-z]{2,3})?$/'],
-        ], [
+        ] + DialogueSpeakers::rules(), [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
@@ -242,7 +237,7 @@ class DashboardController extends Controller
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
-            $this->ensureUsableDialogue($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
+            DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         // Check if user selected a cloned voice (key format: cloned_{id})
@@ -864,43 +859,5 @@ class DashboardController extends Controller
                 'content' => $content,
             ],
         );
-    }
-
-    /**
-     * A dialogue needs premium voices, two different speakers, and a script whose
-     * lines start with the speakers' names ("Name: line"); otherwise it would come
-     * out as one voice reading the names aloud.
-     *
-     * @param  array<int, mixed>  $speakers
-     */
-    private function ensureUsableDialogue(string $tier, array $speakers, string $script): void
-    {
-        if ($tier === VoiceTier::STANDARD) {
-            throw ValidationException::withMessages(['is_dialogue' => __('ui.backend.dialogue_needs_hd')]);
-        }
-
-        $names = [];
-        $voices = [];
-        foreach ($speakers as $speaker) {
-            $name = trim((string) data_get($speaker, 'name'));
-            $voice = trim((string) data_get($speaker, 'voice'));
-            if ($name !== '' && $voice !== '') {
-                $names[] = $name;
-                $voices[] = $voice;
-            }
-        }
-        if (count($names) < 2 || count(array_unique(array_map('mb_strtolower', $names))) < count($names)) {
-            throw ValidationException::withMessages(['dialogue_speakers' => __('ui.backend.dialogue_needs_two_speakers')]);
-        }
-
-        foreach (preg_split("/\r\n|\n|\r/", $script) ?: [] as $line) {
-            foreach ($names as $name) {
-                if (str_starts_with(trim($line), $name.':')) {
-                    return;
-                }
-            }
-        }
-
-        throw ValidationException::withMessages(['content' => __('ui.backend.dialogue_needs_names', ['name' => $names[0]])]);
     }
 }

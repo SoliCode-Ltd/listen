@@ -2220,45 +2220,7 @@
                 @endif
                 </x-slot:whole-script>
                   @if($dialogueEnabled ?? false)
-                  <div class="s-card" style="margin-top: .6rem;">
-                    <label class="compact-toggle-row" for="dialogueToggle">
-                      <div class="txt">
-                        <div class="t-title">🗣️ {{ __('ui.dashboard.dialogue_mode') }}</div>
-                        <div class="t-desc" id="dialogueHint">{{ __('ui.dashboard.dialogue_hint') }}</div>
-                      </div>
-                      <div class="toggle-switch">
-                        <input type="checkbox" id="dialogueToggle" {{ $prefillDialogue === '1' ? 'checked' : '' }}>
-                        <span class="toggle-slider"></span>
-                      </div>
-                    </label>
-                    <input type="hidden" name="is_dialogue" id="dialogueSelect" value="{{ $prefillDialogue }}">
-                    {{-- Two speakers, each a name used in the script, a premium voice and their own
-                         dialect or accent. Shown (and sent) only while dialogue mode is on. --}}
-                    <div class="dialogue-speakers" id="dialogueSpeakers" @if($prefillDialogue !== '1') hidden @endif>
-                      @foreach([0, 1] as $si)
-                        <div class="dialogue-speaker-row">
-                          <div class="dialogue-speaker-label">{{ __('ui.dashboard.dialogue_speaker', ['n' => $si + 1]) }}</div>
-                          <label class="vs-field">
-                            <span class="vs-field-label">{{ __('ui.dashboard.dialogue_speaker_name') }}</span>
-                            <input type="text" name="dialogue_speakers[{{ $si }}][name]" data-dialogue-name="{{ $si }}" maxlength="50" autocomplete="off"
-                              value="{{ old('dialogue_speakers.'.$si.'.name', data_get($reusePreset ?? [], 'dialogue_speakers.'.$si.'.name')) }}" @if($prefillDialogue !== '1') disabled @endif>
-                          </label>
-                          <label class="vs-field">
-                            <span class="vs-field-label">{{ __('ui.dashboard.dialogue_speaker_voice') }}</span>
-                            <select name="dialogue_speakers[{{ $si }}][voice]" data-dialogue-voice="{{ $si }}" data-speaker-avatar
-                              data-initial="{{ old('dialogue_speakers.'.$si.'.voice', data_get($reusePreset ?? [], 'dialogue_speakers.'.$si.'.voice')) }}" @if($prefillDialogue !== '1') disabled @endif></select>
-                          </label>
-                          <label class="vs-field dialogue-speaker-dialect">
-                            <span class="vs-field-label">{{ __('ui.dashboard.dialogue_speaker_dialect') }}</span>
-                            <select name="dialogue_speakers[{{ $si }}][dialect]" data-dialogue-dialect="{{ $si }}"
-                              data-initial="{{ old('dialogue_speakers.'.$si.'.dialect', data_get($reusePreset ?? [], 'dialogue_speakers.'.$si.'.dialect')) }}" @if($prefillDialogue !== '1') disabled @endif></select>
-                          </label>
-                        </div>
-                      @endforeach
-                      <p class="dialogue-guide" id="dialogueGuide"></p>
-                      <button type="button" class="btn btn-secondary dialogue-example-btn" id="dialogueExampleBtn">{{ __('ui.dashboard.dialogue_example_btn') }}</button>
-                    </div>
-                  </div>
+                    <x-voice-studio.dialogue :on="$prefillDialogue === '1'" :preset="$reusePreset ?? []" style="margin-top: .6rem;" />
                   @endif
               @endif
               <div class="vs-divider"></div>
@@ -2854,6 +2816,7 @@
       'demo_history_locked' => app()->getLocale() === 'ar' ? 'عنصر من الديمو' : 'Demo entry',
     ];
   @endphp
+  <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
   <script>
     const voiceCatalog = @json($voiceCatalog);
     const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
@@ -3860,121 +3823,18 @@
     loadJobsFromTable();
     renderJobsPage();
 
-    // Dialogue mode: two speakers, each a name used in the script and a premium voice.
-    // The speaker fields are only sent while the mode is on.
-    const dialogueToggle = document.getElementById('dialogueToggle');
-    const dialogueSelect = document.getElementById('dialogueSelect');
-    const dialogueI18n = {
-      guide: @json(__('ui.dashboard.dialogue_guide')),
-      sameDialect: @json(__('ui.dashboard.dialogue_dialect_same')),
-      example: @json(__('ui.dashboard.dialogue_example')),
-    };
-    function dialogueNameInputs() { return document.querySelectorAll('[data-dialogue-name]'); }
-    function dialogueVoiceSelects() { return document.querySelectorAll('[data-dialogue-voice]'); }
-    function dialogueDialectSelects() { return document.querySelectorAll('[data-dialogue-dialect]'); }
-    // Each speaker can speak their own dialect or accent; empty keeps the main setting.
-    function renderDialogueDialects() {
-      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
-      const dialects = (dialectsByLanguage[lang] || []).filter(function (d) { return d.value; });
-      dialogueDialectSelects().forEach(function (select) {
-        const previous = String(select.value || select.dataset.initial || '').trim();
-        select.innerHTML = '';
-        const same = document.createElement('option');
-        same.value = '';
-        same.textContent = dialogueI18n.sameDialect;
-        select.appendChild(same);
-        dialects.forEach(function (d) {
-          const option = document.createElement('option');
-          option.value = d.value;
-          option.textContent = d.label;
-          select.appendChild(option);
-        });
-        select.value = dialects.some(function (d) { return d.value === previous; }) ? previous : '';
-        select.dataset.initial = '';
-      });
-    }
-    function dialogueNames() {
-      return Array.from(dialogueNameInputs()).map(function (input, i) {
-        return String(input.value || '').trim() || (i === 0 ? 'A' : 'B');
-      });
-    }
-    function updateDialogueGuide() {
-      const guide = document.getElementById('dialogueGuide');
-      if (!guide) return;
-      const names = dialogueNames();
-      guide.textContent = dialogueI18n.guide.replace(':example', names[0] + ': …');
-    }
-    function renderDialogueVoices() {
-      const selects = dialogueVoiceSelects();
-      if (!selects.length) return;
-      const lang = normalizeLanguage(targetLanguage?.value || 'ar');
-      const voices = sortVoices((Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : []).filter(function (v) { return String(v?.tier || '') === 'hd'; }));
-      selects.forEach(function (select, i) {
-        const previous = String(select.value || select.dataset.initial || '').trim();
-        select.innerHTML = '';
-        voices.forEach(function (voice) {
-          const option = document.createElement('option');
-          option.value = voice.key;
-          option.textContent = voiceDisplayLabel(voice);
-          option.dataset.avatar = voice.avatar || '';
-          option.dataset.name = voiceDisplayLabel(voice).split(' ')[0];
-          option.dataset.gender = voice.gender || '';
-          select.appendChild(option);
-        });
-        const keys = voices.map(function (v) { return v.key; });
-        if (keys.includes(previous)) {
-          select.value = previous;
-        } else {
-          // Speaker 1 starts with a voice of one gender, speaker 2 with the other.
-          const wanted = i === 0 ? 'male' : 'female';
-          const pick = voices.find(function (v) { return v.gender === wanted; }) || voices[i] || voices[0];
-          select.value = pick ? pick.key : '';
-        }
-        select.dataset.initial = '';
-      });
-      renderDialogueDialects();
-      syncDialogueNamesFromVoices(false);
-    }
-    // A name field the user has not typed in follows its voice's name.
-    function syncDialogueNamesFromVoices(force) {
-      const selects = dialogueVoiceSelects();
-      dialogueNameInputs().forEach(function (input, i) {
-        const option = selects[i]?.selectedOptions?.[0];
-        if (!option) return;
-        if (force || !input.dataset.touched || !String(input.value || '').trim()) {
-          input.value = option.dataset.name || option.textContent;
-        }
-      });
-      updateDialogueGuide();
-    }
-    function applyDialogueMode() {
-      const on = !!dialogueToggle?.checked;
-      if (dialogueSelect) dialogueSelect.value = on ? '1' : '0';
-      const panel = document.getElementById('dialogueSpeakers');
-      if (panel) panel.hidden = !on;
-      dialogueNameInputs().forEach(function (el) { el.disabled = !on; });
-      dialogueVoiceSelects().forEach(function (el) { el.disabled = !on; });
-      dialogueDialectSelects().forEach(function (el) { el.disabled = !on; });
-      if (on) renderDialogueVoices();
-    }
-    if (dialogueToggle && dialogueSelect) {
-      dialogueToggle.addEventListener('change', applyDialogueMode);
-      dialogueNameInputs().forEach(function (input) {
-        input.addEventListener('input', function () { input.dataset.touched = '1'; updateDialogueGuide(); });
-      });
-      dialogueVoiceSelects().forEach(function (select) {
-        select.addEventListener('change', function () { syncDialogueNamesFromVoices(false); });
-      });
-      targetLanguage?.addEventListener('change', function () { if (dialogueToggle.checked) renderDialogueVoices(); });
-      document.getElementById('dialogueExampleBtn')?.addEventListener('click', function () {
-        if (!contentInput) return;
-        const names = dialogueNames();
-        contentInput.value = dialogueI18n.example.replaceAll(':a', names[0]).replaceAll(':b', names[1]);
-        contentInput.dispatchEvent(new Event('input', { bubbles: true }));
-        contentInput.focus();
-      });
-      applyDialogueMode();
-    }
+    // Dialogue mode (js/dialogue-mode.js): two speakers, each with a premium voice
+    // and their own dialect or accent.
+    const dialogueMode = window.ListenDialogue?.init({
+      textarea: contentInput,
+      language: function () { return normalizeLanguage(targetLanguage?.value || 'ar'); },
+      voices: function (lang) {
+        return sortVoices((Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : []).filter(function (v) { return String(v?.tier || '') === 'hd'; }));
+      },
+      dialects: function (lang) { return dialectsByLanguage[lang] || []; },
+      voiceLabel: voiceDisplayLabel,
+    });
+    targetLanguage?.addEventListener('change', function () { dialogueMode?.refresh(); });
 
     // Live character counter
     function updateCharCounter() {
