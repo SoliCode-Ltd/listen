@@ -550,12 +550,12 @@ html body.auth-split-body .auth-showcase-inner > .auth-cast {
   /* Always laid out at full size (speech bubbles), then scaled to fit. */
   width: 540px;
   max-width: none;
-  margin-top: 8px;
+  margin-top: 0;
   flex: none;
   /* Scaled as a whole to the screen height by components/auth/showcase. */
   zoom: var(--cast-zoom, 1);
 }
 /* Less empty room around the ring than on the homepage, so the speakers are larger. */
 html body.auth-split-body .auth-cast .vs-cast-ring {
-  margin: 3% 0 11%;
+  margin: 14% 0 7%;
 }
