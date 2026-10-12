@@ -79,6 +79,22 @@ class PaidWelcomeEmailTest extends TestCase
         Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo('trial@example.test'));
     }
 
+    public function test_existing_paid_members_are_not_emailed_when_their_subscription_renews(): void
+    {
+        $user = User::factory()->create();
+        $subscription = Subscription::withoutEvents(fn () => Subscription::create(['user_id' => $user->id, 'plan_id' => $this->paid->id, 'status' => 'active']))->fresh();
+
+        $subscription->update(['current_period_end' => now()->addMonth(), 'billing_payment_state' => 'paid']);
+        $this->app->terminate();
+        Mail::assertNothingSent();
+
+        // Moving them to another paid plan by hand does count as starting a paid plan.
+        $other = Plan::factory()->create(['slug' => 'studio', 'price_cents' => 2900]);
+        $subscription->update(['plan_id' => $other->id]);
+        $this->app->terminate();
+        Mail::assertSent(NewsletterMail::class, 1);
+    }
+
     public function test_switching_it_off_stops_automatic_sends(): void
     {
         app(PaidWelcomeEmail::class)->save(['enabled' => false]);

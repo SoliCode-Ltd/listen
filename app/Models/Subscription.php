@@ -89,6 +89,11 @@ class Subscription extends Model
                 if ((string) $subscription->status !== 'active') {
                     return;
                 }
+                // Only the moment someone becomes paid; renewals and other saves of
+                // existing members never send it.
+                if (! $subscription->wasRecentlyCreated && ! $subscription->wasChanged(['plan_id', 'status'])) {
+                    return;
+                }
                 $plan = $subscription->plan()->first();
                 $user = $subscription->user()->first();
                 if (! $plan || (int) $plan->price_cents <= 0 || ! $user) {
