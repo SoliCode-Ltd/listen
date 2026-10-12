@@ -25,8 +25,8 @@
   </div>
 </aside>
 <script>
-  // The speakers keep their full layout and are scaled down as a whole so the
-  // headline, the lines under it and the speakers all fit the screen height.
+  // The speakers keep their full layout and are scaled as a whole, as large as
+  // the panel allows, with the headline and the lines under it always in view.
   (function () {
     var inner = document.querySelector('.auth-showcase-inner');
     var cast = inner && inner.querySelector('.auth-cast');
@@ -42,7 +42,7 @@
       });
       var width = inner.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
       var natural = cast.offsetHeight + (parseFloat(getComputedStyle(cast).marginTop) || 0);
-      var zoom = natural > 0 ? Math.max(0.45, Math.min(1, room / natural, width / cast.offsetWidth)) : 1;
+      var zoom = natural > 0 ? Math.max(0.45, Math.min(1.4, room / natural, width / cast.offsetWidth)) : 1;
       cast.style.setProperty('--cast-zoom', zoom.toFixed(3));
     }
     fit();
