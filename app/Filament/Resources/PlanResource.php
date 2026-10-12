@@ -285,6 +285,19 @@ class PlanResource extends Resource
                             ->default(0)
                             ->helperText('Higher weight = higher priority in job queue (0-1000).'),
                     ]),
+                Forms\Components\Section::make('Downloads')
+                    ->description('The audio file types members on this plan can download. With more than one, the download button opens a small menu.')
+                    ->schema([
+                        Forms\Components\CheckboxList::make('download_formats')
+                            ->label('File types')
+                            ->options(\App\Support\AudioFormats::options())
+                            ->default(\App\Support\AudioFormats::DEFAULT)
+                            ->columns(5)
+                            ->helperText(fn (): string => 'Nothing ticked keeps MP3. MP3 and WAV are made in the browser. M4A, OGG and FLAC are converted on the server'
+                                .(\App\Support\AudioFormats::serverCanConvert()
+                                    ? '. Ready on this server: '.(implode(', ', array_filter(['m4a', 'ogg', 'flac'], fn (string $f): bool => \App\Support\AudioFormats::serverSupports($f))) ?: 'none').'. A type the server cannot make stays hidden from members.'
+                                    : '; this server has no ffmpeg yet, so they stay hidden from members until it does.')),
+                    ]),
                 Forms\Components\Section::make('Voice Cloning')
                     ->description('Turn cloning on for this plan, then set how many cloned voices each subscriber can keep. 0 uses the site-wide default.')
                     ->columns(2)

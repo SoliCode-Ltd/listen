@@ -773,6 +773,8 @@ return [
     'scripts' => [
         'audio_play' => 'تشغيل',
         'audio_download' => 'تحميل الصوت',
+        'audio_download_as' => 'تحميل بصيغة',
+        'audio_download_failed' => 'تعذّر تجهيز هذه الصيغة الآن. حاول مرة أخرى أو اختر صيغة أخرى.',
     ],
 
     // ===== DASHBOARD =====

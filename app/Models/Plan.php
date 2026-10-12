@@ -54,6 +54,7 @@ class Plan extends Model
         // Voice cloning
         'voice_cloning_enabled',
         'voice_cloning_max_voices',
+        'download_formats',
     ];
 
     protected $casts = [
@@ -71,6 +72,7 @@ class Plan extends Model
         'discount_ends_at' => 'datetime',
         'voice_cloning_enabled' => 'boolean',
         'voice_cloning_max_voices' => 'integer',
+        'download_formats' => 'array',
     ];
 
     public function subscriptions(): HasMany

@@ -21,6 +21,10 @@ Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
     ->name('media.file');
 
+// A member's own audio in a file type the browser cannot make (M4A, OGG, FLAC).
+Route::middleware('auth')->get('/audio-download', \App\Http\Controllers\AudioDownloadController::class)
+    ->name('audio.download');
+
 Route::middleware('auth')->get('/manual-payment-proof/{email}/{proof_token}', AdminManualPaymentProofController::class)
     ->name('admin.manual-payments.proof');
 
