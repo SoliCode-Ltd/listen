@@ -122,6 +122,31 @@ html body.auth-split-body .auth-lang:hover {
   color: var(--au-text);
   background: var(--au-hover);
 }
+/* The theme switch (sun / moon) beside the language link. */
+html body.auth-split-body .auth-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--au-radius);
+  background: transparent;
+  color: var(--au-muted);
+  cursor: pointer;
+}
+html body.auth-split-body .auth-icon-btn:hover {
+  color: var(--au-text);
+  background: var(--au-hover);
+}
+html body.auth-split-body .auth-icon-btn .icon {
+  width: 17px;
+  height: 17px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
 
 html body.auth-split-body main.auth-page {
   flex: 1;
