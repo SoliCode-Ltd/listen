@@ -81,5 +81,34 @@ class Subscription extends Model
                 ]);
             }
         });
+
+        // The welcome email for new paid members: once, when a member is first on an
+        // active paid plan (paid online or set by an admin), never during an unpaid trial.
+        static::saved(function (Subscription $subscription): void {
+            try {
+                if ((string) $subscription->status !== 'active') {
+                    return;
+                }
+                // Only the moment someone becomes paid; renewals and other saves of
+                // existing members never send it.
+                if (! $subscription->wasRecentlyCreated && ! $subscription->wasChanged(['plan_id', 'status'])) {
+                    return;
+                }
+                $plan = $subscription->plan()->first();
+                $user = $subscription->user()->first();
+                if (! $plan || (int) $plan->price_cents <= 0 || ! $user) {
+                    return;
+                }
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $user->id)) {
+                    return;
+                }
+                app(\App\Services\Newsletter\PaidWelcomeEmail::class)->queueFirstWelcome($user);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on subscription save.', [
+                    'subscription_id' => $subscription->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
     }
 }

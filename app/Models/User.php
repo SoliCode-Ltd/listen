@@ -136,6 +136,7 @@ class User extends Authenticatable implements FilamentUser
             'is_admin' => 'boolean',
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',
+            'paid_welcome_sent_at' => 'datetime',
         ];
     }
 

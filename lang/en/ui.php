@@ -773,6 +773,8 @@ return [
     'scripts' => [
         'audio_play' => 'Play',
         'audio_download' => 'Download Audio',
+        'audio_download_as' => 'Download as',
+        'audio_download_failed' => 'This file type could not be made right now. Please try again or pick another type.',
     ],
 
     // ===== DASHBOARD =====

@@ -2,7 +2,13 @@
   $sharedI18n = [
     'audio_play' => __('ui.scripts.audio_play'),
     'audio_download' => __('ui.scripts.audio_download'),
+    'audio_download_as' => __('ui.scripts.audio_download_as'),
+    'audio_download_failed' => __('ui.scripts.audio_download_failed'),
   ];
+  // The file types this member's plan offers for download (Plans → Downloads).
+  $downloadFormats = rescue(fn () => \App\Support\AudioFormats::menuFor(
+    auth()->check() ? app(\App\Services\PlanAccessService::class)->resolveActivePlanForUserId((int) auth()->id()) : null
+  ), \App\Support\AudioFormats::menuFor(null), false);
 @endphp
 
 <script id="listen-shared-scripts">
@@ -10,6 +16,8 @@
   if (window.__listenSharedScriptsBooted) return;
   window.__listenSharedScriptsBooted = true;
   var i18n = @json($sharedI18n);
+  var downloadFormats = @json($downloadFormats);
+  var serverDownloadUrl = @json(route('audio.download', [], false));
 
   function safeGetTheme() {
     try {
@@ -237,6 +245,52 @@
     var end = encoder.flush();
     if (end && end.length) chunks.push(end);
     return new Blob(chunks, { type: 'audio/mpeg' });
+  }
+
+  function decodeToMono(buffer) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return Promise.reject(new Error('audio'));
+    var context = new Ctx();
+    return context.decodeAudioData(buffer.slice(0)).then(function(decoded) {
+      var mixed = new Float32Array(decoded.length);
+      var channels = decoded.numberOfChannels || 1;
+      for (var channel = 0; channel < channels; channel++) {
+        var data = decoded.getChannelData(channel);
+        for (var i = 0; i < decoded.length; i++) mixed[i] += data[i] / channels;
+      }
+      if (context.close) context.close();
+      return { samples: mixed, sampleRate: decoded.sampleRate || 24000 };
+    }).catch(function(error) {
+      if (context.close) context.close();
+      throw error;
+    });
+  }
+
+  // 16-bit mono WAV, made in the browser.
+  function toWavAudio(buffer) {
+    var bytes = new Uint8Array(buffer);
+    if (audioContainer(bytes) === 'wav' && bytes.length > 44) {
+      return Promise.resolve({ blob: new Blob([buffer], { type: 'audio/wav' }), extension: 'wav' });
+    }
+    return decodeToMono(buffer).then(function(audio) {
+      var pcm = floatToPcm16(audio.samples);
+      var header = new DataView(new ArrayBuffer(44));
+      var writeText = function(offset, text) { for (var i = 0; i < text.length; i++) header.setUint8(offset + i, text.charCodeAt(i)); };
+      writeText(0, 'RIFF');
+      header.setUint32(4, 36 + pcm.length * 2, true);
+      writeText(8, 'WAVE');
+      writeText(12, 'fmt ');
+      header.setUint32(16, 16, true);
+      header.setUint16(20, 1, true);
+      header.setUint16(22, 1, true);
+      header.setUint32(24, audio.sampleRate, true);
+      header.setUint32(28, audio.sampleRate * 2, true);
+      header.setUint16(32, 2, true);
+      header.setUint16(34, 16, true);
+      writeText(36, 'data');
+      header.setUint32(40, pcm.length * 2, true);
+      return { blob: new Blob([header.buffer, pcm.buffer], { type: 'audio/wav' }), extension: 'wav' };
+    });
   }
 
   window.toWhatsAppAudio = toWhatsAppAudio;
@@ -590,46 +644,121 @@
         updateProgress();
       });
       if (menuBtn) {
+        var saveBlob = function(file) {
+          var url = URL.createObjectURL(file.blob);
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = buildDownloadFilename(file.extension);
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          window.setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
+        };
+        var saveOriginal = function(src) {
+          var a = document.createElement('a');
+          a.href = src;
+          a.download = buildDownloadFilename();
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        };
+        // M4A, OGG and FLAC are converted on the server from the file being played.
+        var fetchFromServer = function(src, format) {
+          var path = '';
+          try { path = decodeURIComponent(new URL(src, window.location.href).pathname); } catch (_e) { path = src; }
+          path = path.replace(/^\/+/, '').replace(/^media\//, '');
+          var name = buildDownloadFilename(format).replace(/\.[a-z0-9]+$/i, '');
+          var url = serverDownloadUrl + '?path=' + encodeURIComponent(path) + '&format=' + encodeURIComponent(format) + '&name=' + encodeURIComponent(name);
+          return fetch(url, { credentials: 'same-origin' }).then(function(response) {
+            if (!response.ok) throw new Error('server');
+            return response.blob();
+          }).then(function(blob) { return { blob: blob, extension: format }; });
+        };
+        var downloadAs = function(format) {
+          var src = audio.getAttribute('src');
+          if (!src || menuBtn.dataset.busy === '1') return;
+          menuBtn.dataset.busy = '1';
+          menuBtn.disabled = true;
+          var work;
+          var match = downloadFormats.find(function(f) { return f.key === format; });
+          if (match && !match.browser) {
+            work = fetchFromServer(src, format).catch(function() {
+              window.alert(i18n.audio_download_failed || 'This file type is not available right now.');
+              return null;
+            });
+          } else {
+            work = fetch(src, { credentials: 'same-origin' })
+              .then(function(response) {
+                if (!response.ok) throw new Error('audio');
+                return response.arrayBuffer();
+              })
+              .then(function(buffer) { return format === 'wav' ? toWavAudio(buffer) : toWhatsAppAudio(buffer); })
+              .catch(function() { saveOriginal(src); return null; });
+          }
+          work.then(function(file) { if (file) saveBlob(file); })
+            .finally(function() {
+              menuBtn.dataset.busy = '0';
+              menuBtn.disabled = false;
+            });
+        };
+        var closeFormatMenu = function() {
+          var open = document.querySelector('.audio-format-menu');
+          if (open) open.remove();
+          document.removeEventListener('click', closeFormatMenu, true);
+          window.removeEventListener('scroll', closeFormatMenu, true);
+        };
+        var openFormatMenu = function() {
+          closeFormatMenu();
+          var menu = document.createElement('div');
+          menu.className = 'audio-format-menu';
+          menu.setAttribute('role', 'menu');
+          var title = document.createElement('div');
+          title.className = 'audio-format-title';
+          title.textContent = i18n.audio_download_as || 'Download as';
+          menu.appendChild(title);
+          downloadFormats.forEach(function(f) {
+            var item = document.createElement('button');
+            item.type = 'button';
+            item.setAttribute('role', 'menuitem');
+            item.dataset.format = f.key;
+            item.textContent = f.label;
+            item.addEventListener('click', function(ev) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              closeFormatMenu();
+              downloadAs(f.key);
+            });
+            menu.appendChild(item);
+          });
+          document.body.appendChild(menu);
+          var rect = menuBtn.getBoundingClientRect();
+          var width = menu.offsetWidth;
+          var left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
+          var top = rect.bottom + 6;
+          if (top + menu.offsetHeight > window.innerHeight - 8) top = Math.max(8, rect.top - menu.offsetHeight - 6);
+          menu.style.left = left + 'px';
+          menu.style.top = top + 'px';
+          var first = menu.querySelector('button');
+          if (first) first.focus();
+          window.setTimeout(function() {
+            document.addEventListener('click', closeFormatMenu, true);
+            window.addEventListener('scroll', closeFormatMenu, true);
+          }, 0);
+        };
         menuBtn.addEventListener('click', function(e) {
-           e.preventDefault();
-           e.stopPropagation();
-           var redirectUrl = String(audio.dataset.downloadRedirectUrl || audio.dataset.downloadRedirect || '').trim();
-           if (redirectUrl) {
-             window.location.href = redirectUrl;
-             return;
-           }
-           var src = audio.getAttribute('src');
-           if (!src || menuBtn.dataset.busy === '1') return;
-           menuBtn.dataset.busy = '1';
-           menuBtn.disabled = true;
-           fetch(src, { credentials: 'same-origin' })
-             .then(function(response) {
-               if (!response.ok) throw new Error('audio');
-               return response.arrayBuffer();
-             })
-             .then(function(buffer) { return toWhatsAppAudio(buffer); })
-             .then(function(file) {
-               var url = URL.createObjectURL(file.blob);
-               var a = document.createElement('a');
-               a.href = url;
-               a.download = buildDownloadFilename(file.extension);
-               document.body.appendChild(a);
-               a.click();
-               document.body.removeChild(a);
-               window.setTimeout(function() { URL.revokeObjectURL(url); }, 2000);
-             })
-             .catch(function() {
-               var a = document.createElement('a');
-               a.href = src;
-               a.download = buildDownloadFilename();
-               document.body.appendChild(a);
-               a.click();
-               document.body.removeChild(a);
-             })
-             .finally(function() {
-               menuBtn.dataset.busy = '0';
-               menuBtn.disabled = false;
-             });
+          e.preventDefault();
+          e.stopPropagation();
+          var redirectUrl = String(audio.dataset.downloadRedirectUrl || audio.dataset.downloadRedirect || '').trim();
+          if (redirectUrl) {
+            window.location.href = redirectUrl;
+            return;
+          }
+          if (downloadFormats.length > 1) {
+            if (document.querySelector('.audio-format-menu')) { closeFormatMenu(); return; }
+            openFormatMenu();
+            return;
+          }
+          downloadAs(downloadFormats.length ? downloadFormats[0].key : 'mp3');
         });
       }
       

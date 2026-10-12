@@ -72,6 +72,28 @@ class BillingTrial extends Model
         'charge_failed_at' => 'datetime',
     ];
 
+    protected static function booted(): void
+    {
+        // A trial that has just been paid makes a new paid member: send the welcome email.
+        static::saved(function (BillingTrial $trial): void {
+            if ($trial->status !== self::STATUS_PAID || ! $trial->wasChanged('status')) {
+                return;
+            }
+            try {
+                $user = User::query()->find($trial->user_id);
+                $welcome = app(\App\Services\Newsletter\PaidWelcomeEmail::class);
+                if ($user && $welcome->isPaidMember($user)) {
+                    $welcome->queueFirstWelcome($user);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on trial payment.', [
+                    'trial_id' => $trial->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

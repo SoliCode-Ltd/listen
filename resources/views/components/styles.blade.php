@@ -1442,6 +1442,41 @@ form:has(button.mobile-nav-link) {
   border-color: color-mix(in oklab, var(--a) 26%, var(--line));
   color: var(--text);
 }
+/* Download menu when the plan offers more than one file type. */
+.audio-format-menu {
+  position: fixed;
+  z-index: 9999;
+  min-width: 150px;
+  padding: .35rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--surface, #fff);
+  box-shadow: 0 12px 32px rgba(0,0,0,.18);
+  display: grid;
+  gap: 2px;
+}
+.audio-format-title {
+  padding: .35rem .6rem .25rem;
+  font-size: .72rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.audio-format-menu button {
+  all: unset;
+  box-sizing: border-box;
+  padding: .5rem .6rem;
+  border-radius: 8px;
+  font-size: .85rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  direction: ltr;
+  text-align: start;
+}
+.audio-format-menu button:hover,
+.audio-format-menu button:focus-visible {
+  background: color-mix(in oklab, var(--a) 12%, transparent);
+}
 .custom-audio-menu svg {
   width: 15px;
   height: 15px;

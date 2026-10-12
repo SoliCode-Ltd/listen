@@ -38,7 +38,8 @@ class SubscriptionResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('user_id')
                             ->relationship('user', 'name')
-                            ->searchable()
+                            ->getOptionLabelFromRecordUsing(fn (\App\Models\User $user): string => trim($user->name.' ('.$user->email.')'))
+                            ->searchable(['name', 'email'])
                             ->preload()
                             ->required(),
                         Forms\Components\Select::make('plan_id')
@@ -205,6 +206,12 @@ class SubscriptionResource extends Resource
                     ->label('User')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('user.email')
+                    ->label('Email')
+                    ->searchable()
+                    ->sortable()
+                    ->copyable()
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('user.country_code')
                     ->label('Country')
                     ->formatStateUsing(fn (?string $state) => Countries::label($state))
@@ -293,6 +300,26 @@ class SubscriptionResource extends Resource
                     ->modalDescription(fn (Subscription $record): string => self::giftModalDescription($record))
                     ->form(self::giftFormSchema())
                     ->action(fn (Subscription $record, array $data) => self::grantGift($record, $data)),
+                Tables\Actions\Action::make('sendWelcome')
+                    ->label('Send welcome email')
+                    ->icon('heroicon-o-envelope')
+                    ->color('gray')
+                    ->visible(fn (Subscription $record): bool => (string) $record->status === 'active' && (int) ($record->plan?->price_cents ?? 0) > 0)
+                    ->requiresConfirmation()
+                    ->modalHeading(fn (Subscription $record): string => 'Send the paid welcome email to '.($record->user?->email ?? 'this member').'?')
+                    ->modalDescription(fn (Subscription $record): string => \App\Services\Newsletter\PaidWelcomeEmail::canTrack() && $record->user?->paid_welcome_sent_at
+                        ? 'They were already welcomed on '.$record->user->paid_welcome_sent_at->format('Y-m-d').'. This sends it again. Edit the words in Newsletter → Paid welcome email.'
+                        : 'Edit the words in Newsletter → Paid welcome email.')
+                    ->action(function (Subscription $record): void {
+                        try {
+                            app(\App\Services\Newsletter\PaidWelcomeEmail::class)->send($record->user);
+                        } catch (\Throwable $e) {
+                            Notification::make()->title('The email was not sent')->body($e->getMessage())->danger()->persistent()->send();
+
+                            return;
+                        }
+                        Notification::make()->title('Welcome email sent to '.$record->user->email)->success()->send();
+                    }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
