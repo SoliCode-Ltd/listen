@@ -63,15 +63,16 @@ class SitePagesTest extends TestCase
             ->assertSee('id="email"', false)
             ->assertSee('id="password"', false)
             ->assertSee(route('legal.terms'), false)
-            ->assertSee(__('design.auth.login_headline'), false);
+            // The side panel is only the speakers, with no words around them.
+            ->assertDontSee(__('design.auth.login_headline'), false);
 
         $this->getLocalizedRoute('register')
             ->assertOk()
             ->assertSee('class="auth-split-body"', false)
             ->assertSee('action="'.route('register.submit').'"', false)
             ->assertSee('id="password_confirmation"', false)
-            ->assertSee(__('design.auth.register_headline'), false)
-            ->assertSee(__('design.auth.perk_extension'), false)
+            ->assertDontSee(__('design.auth.register_headline'), false)
+            ->assertDontSee(__('design.auth.perk_extension'), false)
             ->assertDontSee('auth-facts', false);
     }
 
