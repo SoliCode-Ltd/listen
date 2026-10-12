@@ -203,7 +203,8 @@ class NewsletterTest extends TestCase
                 && str_contains($mail->htmlBody, 'Hello Lina,')
                 && str_contains($mail->htmlBody, 'newsletter/unsubscribe');
         });
-        Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($paid->email));
+        // The paid member only gets their own welcome email, not this newsletter.
+        Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => ! $mail instanceof \App\Mail\PaidWelcomeMail && $mail->hasTo($paid->email));
 
         $newsletter->refresh();
         $this->assertSame(Newsletter::STATUS_SENT, $newsletter->status);
@@ -407,7 +408,8 @@ class NewsletterTest extends TestCase
             ->assertNotified();
 
         Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($free->email));
-        Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($paid->email));
+        // The paid member only gets their own welcome email, not this newsletter.
+        Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => ! $mail instanceof \App\Mail\PaidWelcomeMail && $mail->hasTo($paid->email));
         Mail::assertNotSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo($admin->email));
         $this->assertSame(Newsletter::STATUS_SENT, $newsletter->fresh()->status);
     }
