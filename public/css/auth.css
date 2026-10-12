@@ -455,13 +455,16 @@ html body.auth-split-body .auth-showcase-inner {
   position: relative;
   height: 100%;
   box-sizing: border-box;
-  padding: clamp(32px, 5vw, 72px);
+  padding: clamp(24px, 6vh, 72px) clamp(32px, 5vw, 72px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  /* "safe": if it ever does not fit, it starts at the top instead of losing the headline. */
+  justify-content: safe center;
   align-items: center;
-  gap: 20px;
-  overflow: hidden;
+  gap: clamp(12px, 2.2vh, 20px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
   border-inline-start: 1px solid var(--sc-card-line);
   background:
     radial-gradient(60% 50% at 85% 8%, var(--sc-glow), transparent 70%),
@@ -474,10 +477,11 @@ html body.auth-split-body .auth-showcase-inner > * {
   width: 100%;
   max-width: 520px;
 }
+html body.auth-split-body .auth-showcase-inner::-webkit-scrollbar { display: none; }
 html body.auth-split-body .auth-headline {
   margin: 0;
   font-family: inherit;
-  font-size: clamp(30px, 3.1vw, 44px);
+  font-size: clamp(26px, min(3.1vw, 4.6vh), 44px);
   font-weight: 600;
   line-height: 1.12;
   letter-spacing: -0.03em;
@@ -542,7 +546,12 @@ html body.auth-split-body .auth-perks li::before {
 }
 
 /* The Listen speakers in conversation (components/home/hero-art). */
-html body.auth-split-body .auth-cast {
-  max-width: 540px;
+html body.auth-split-body .auth-showcase-inner > .auth-cast {
+  /* Always laid out at full size (speech bubbles), then scaled to fit. */
+  width: 540px;
+  max-width: none;
   margin-top: 8px;
+  flex: none;
+  /* Scaled as a whole to the screen height by components/auth/showcase. */
+  zoom: var(--cast-zoom, 1);
 }

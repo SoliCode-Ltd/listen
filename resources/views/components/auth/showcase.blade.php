@@ -24,3 +24,30 @@
     </div>
   </div>
 </aside>
+<script>
+  // The speakers keep their full layout and are scaled down as a whole so the
+  // headline, the lines under it and the speakers all fit the screen height.
+  (function () {
+    var inner = document.querySelector('.auth-showcase-inner');
+    var cast = inner && inner.querySelector('.auth-cast');
+    if (!inner || !cast) return;
+    function fit() {
+      if (!inner.offsetParent) return;
+      cast.style.setProperty('--cast-zoom', '1');
+      var style = getComputedStyle(inner);
+      var gap = parseFloat(style.rowGap) || 0;
+      var room = inner.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+      Array.prototype.forEach.call(inner.children, function (child) {
+        if (child !== cast) room -= child.getBoundingClientRect().height + gap;
+      });
+      var width = inner.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+      var natural = cast.offsetHeight + (parseFloat(getComputedStyle(cast).marginTop) || 0);
+      var zoom = natural > 0 ? Math.max(0.45, Math.min(1, room / natural, width / cast.offsetWidth)) : 1;
+      cast.style.setProperty('--cast-zoom', zoom.toFixed(3));
+    }
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('load', fit);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(fit);
+  })();
+</script>
