@@ -219,6 +219,14 @@ class PlanResource extends Resource
                             ->required()
                             ->default(0)
                             ->helperText('0 = unlimited requests'),
+                        Forms\Components\TextInput::make('daily_requests')
+                            ->label('Generations per day')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(0)
+                            ->default(0)
+                            ->required()
+                            ->helperText('Most generations a member on this plan can make in one day, in the dashboard and the browser extension together. Failed ones do not count. 0 = no daily limit. The day restarts at midnight UTC.'),
                         Forms\Components\TextInput::make('max_chars_per_request')
                             ->label('Max Characters Per Request')
                             ->numeric()

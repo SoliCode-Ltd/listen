@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\UsageCounter;
 use Illuminate\Validation\ValidationException;
@@ -39,6 +40,34 @@ class PlanUsageGuard
     public static function hasUnlimitedRequests(?Plan $plan): bool
     {
         return self::planRequests($plan) <= 0;
+    }
+
+    /** Most generations a day on this plan; 0 means no daily limit. */
+    public static function dailyRequests(?Plan $plan): int
+    {
+        return max(0, (int) ($plan?->daily_requests ?? 0));
+    }
+
+    /**
+     * Generations the member started today (failed ones do not count: they are given back).
+     */
+    public static function requestsToday(int $userId): int
+    {
+        return AudioGeneration::query()
+            ->where('user_id', $userId)
+            ->where('created_at', '>=', now()->startOfDay())
+            ->where('status', '!=', 'failed')
+            ->count();
+    }
+
+    public static function assertWithinDailyLimit(?Plan $plan, int $userId): void
+    {
+        $limit = self::dailyRequests($plan);
+        if ($limit > 0 && self::requestsToday($userId) >= $limit) {
+            throw ValidationException::withMessages([
+                'content' => __('ui.backend.daily_requests_exceeded', ['count' => number_format($limit)]),
+            ]);
+        }
     }
 
     public static function allowsOverage(?Plan $plan): bool

@@ -22,6 +22,7 @@ final class PlanPricingLines
         'voice_quality' => ['mic', true],
         'max_chars_per_request' => ['type', true],
         'monthly_requests' => ['activity', true],
+        'daily_requests' => ['activity', true],
         'voice_controls' => ['heart', true],
         'processing_priority' => ['bolt', true],
         'commercial_use' => ['lock', true],
@@ -206,6 +207,7 @@ final class PlanPricingLines
             'monthly_requests' => $plan->isPack() ? null : ((int) $plan->monthly_requests <= 0
                 ? self::t('unlimited', $locale)
                 : number_format((int) $plan->monthly_requests)),
+            'daily_requests' => (int) ($plan->daily_requests ?? 0) > 0 ? number_format((int) $plan->daily_requests) : null,
             'voice_controls' => $premium ? self::t('full_control', $locale) : null,
             'processing_priority' => self::t(
                 in_array((string) $plan->processing_priority, ['high', 'priority', 'highest'], true) ? 'priority_high' : 'priority_standard',
@@ -252,6 +254,7 @@ final class PlanPricingLines
                 : 'Hidden: voice cloning is still a private preview, so members on this plan cannot use it yet.',
             'topup' => 'Hidden: no top-up price is set.',
             'monthly_requests' => 'Hidden: a pack has no monthly count.',
+            'daily_requests' => 'Hidden: no daily limit is set (Usage Limits → Generations per day).',
             default => 'Hidden for this plan.',
         };
     }

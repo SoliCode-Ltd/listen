@@ -661,7 +661,8 @@ class PremiumPackTest extends TestCase
         $page->assertSee(__('ui.pack.showcase_note'))
             ->assertSee('Kore')
             ->assertSee(__('ui.pack.no_chars_value'))
-            ->assertSee('class="kpis"  style="display:none"', false);
+            ->assertSee('class="kpis"  style="display:none"', false)
+            ->assertSee('class="summary-block"  style="display:none"', false);
     }
 
     public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void
@@ -765,6 +766,56 @@ class PremiumPackTest extends TestCase
             ->assertSee('min of Arabic')
             ->set('data.monthly_chars', 40000)
             ->assertSee('≈ 51 min of Arabic');
+    }
+
+    public function test_the_daily_generation_limit_counts_the_dashboard_and_the_extension_together(): void
+    {
+        $this->starter->update(['daily_requests' => 2]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $key = 'lk_live_'.str_repeat('d', 32);
+        $user->forceFill(['api_key_hash' => hash('sha256', $key)])->save();
+        $voiceKey = VoiceCatalog::keyFromId((int) $this->premiumVoice()->id);
+        $dashboard = fn () => $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => 'Hello there', 'target_language' => 'en', 'voice_key' => $voiceKey]);
+
+        $dashboard()->assertOk()->assertJsonPath('usage.daily_requests_used', 1)->assertJsonPath('usage.daily_requests_limit', 2);
+        $this->withHeaders(['X-Listen-Key' => $key])->postJson('/api/reader/queue', ['content' => 'Hello again', 'target_language' => 'en', 'voice_key' => $voiceKey, 'prefer_sync' => true])->assertOk();
+
+        $dashboard()->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.daily_requests_exceeded', ['count' => '2']));
+        $this->assertCount(2, $this->spoken, 'the refused request never reached speech');
+
+        $this->travel(1)->days();
+        $dashboard()->assertOk();
+    }
+
+    public function test_failed_generations_do_not_use_up_the_day(): void
+    {
+        $this->starter->update(['daily_requests' => 1]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $voiceKey = VoiceCatalog::keyFromId((int) $this->premiumVoice()->id);
+        $generate = fn () => $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => 'Hello there', 'target_language' => 'en', 'voice_key' => $voiceKey]);
+
+        $this->speechFails = true;
+        $generate()->assertStatus(422);
+        $this->speechFails = false;
+
+        $generate()->assertOk();
+        $generate()->assertStatus(422);
+    }
+
+    public function test_the_daily_limit_shows_on_the_pricing_card_and_in_the_admin(): void
+    {
+        $this->starter->update(['daily_requests' => 150, 'is_active' => true]);
+        $this->getLocalizedRoute('pricing')->assertSee(__('ui.pricing.lines.label_daily_requests'))->assertSee('150');
+
+        $this->actingAs($this->admin());
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->starter->getRouteKey()])
+            ->fillForm(['daily_requests' => 40])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame(40, (int) $this->starter->fresh()->daily_requests);
     }
 
     public function test_the_admin_edits_the_pack(): void
