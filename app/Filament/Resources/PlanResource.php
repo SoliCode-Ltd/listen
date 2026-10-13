@@ -10,6 +10,7 @@ use App\Support\PlanPricingLines;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use Filament\Forms\Set;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -205,14 +206,23 @@ class PlanResource extends Resource
                             ->numeric()
                             ->required()
                             ->live(debounce: 600)
+                            ->afterStateUpdated(fn (Set $set, $state) => $set('monthly_minutes', \App\Support\Credits::minutesFor((int) $state)))
                             ->helperText(fn (Get $get): string => ($get('kind') === Plan::KIND_PACK
-                                ? 'Credits each purchase adds (1 credit = 1 character read aloud). Unused credits move into the plan a member upgrades to. '
-                                : '1 credit = 1 character read aloud. ')
+                                ? 'Credits each purchase adds (1 credit = 1 character read aloud, spaces included). Unused credits move into the plan a member upgrades to. '
+                                : '1 credit = 1 character read aloud, spaces and line breaks included. ')
                                 .\App\Support\PlanCostEstimate::adminLine(
                                     (int) $get('monthly_chars'),
                                     is_numeric($get('price_dollars')) ? (float) $get('price_dollars') : null,
                                     $get('voice_tier') === 'hd',
                                 )),
+                        Forms\Components\TextInput::make('monthly_minutes')
+                            ->label('Voice minutes a month')
+                            ->suffix('min')
+                            ->disabled()
+                            ->dehydrated()
+                            ->afterStateHydrated(fn (Forms\Components\TextInput $component, Get $get) => $component->state(\App\Support\Credits::minutesFor((int) $get('monthly_chars'))))
+                            ->dehydrateStateUsing(fn (Get $get): int => \App\Support\Credits::minutesFor((int) $get('monthly_chars')))
+                            ->helperText('Set by the credits ('.number_format(\App\Support\Credits::PER_MINUTE).' credits = 1 minute of audio). Generation stops at whichever runs out first: credits or minutes.'),
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()
@@ -242,8 +252,8 @@ class PlanResource extends Resource
                     ->schema([
                         Forms\Components\Toggle::make('allow_overage')
                             ->label('Allow Overage')
-                            ->reactive()
-                            ->helperText('If enabled, users can exceed their limit at additional cost'),
+                            ->disabled()
+                            ->helperText('Off for every plan: overage is not charged, so members always stop at their credits and voice minutes.'),
                         Forms\Components\TextInput::make('overage_price_dollars')
                             ->label('Overage Price per 1M chars ($)')
                             ->numeric()

@@ -33,8 +33,8 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'Voice quality' => 'Premium',
-            // 320,000 credits at 780 a minute.
-            'Voice usage minutes' => 'Up to 410 min',
+            // 320,000 credits at 900 a minute.
+            'Voice usage minutes' => 'Up to 355 min',
             'Max text per generation' => '5,000 characters',
             'Generations per month' => 'Unlimited',
             'Emotion, style & accent' => 'Full control',
@@ -48,7 +48,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'جودة الصوت' => 'متميزة',
-            'دقائق الصوت' => 'حتى 410 دقيقة',
+            'دقائق الصوت' => 'حتى 355 دقيقة',
             'أقصى نص في المرة الواحدة' => '5,000 حرف',
             'التوليدات شهريًا' => 'غير محدود',
             'المشاعر والأسلوب واللهجة' => 'تحكم كامل',
@@ -77,7 +77,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'Voice quality' => 'Standard',
-            'Voice usage minutes' => 'Up to 160 min',
+            'Voice usage minutes' => 'Up to 138 min',
             'Max text per generation' => '1,200 characters',
             'Generations per month' => '50',
             'Processing priority' => 'Standard',
@@ -186,7 +186,7 @@ class PricingPageLinesTest extends TestCase
         // The card shows the credits with their icon, and the voice minutes they give.
         $page->assertSee('class="credit-icon"', false);
         $page->assertSee('320,000 '.__('ui.pricing.characters_per_month', [], $locale));
-        $page->assertSee(__('ui.pricing.lines.voice_minutes_value', ['count' => '410'], $locale));
+        $page->assertSee(__('ui.pricing.lines.voice_minutes_value', ['count' => '355'], $locale));
         $page->assertSee($locale === 'ar' ? 'سطر إضافي من المالك' : 'Owner extra line');
         $page->assertDontSee('Stale hand-written line');
         $page->assertDontSee('سطر قديم مكتوب يدويًا');

@@ -70,9 +70,13 @@ class PlanUsageGuard
         }
     }
 
+    /**
+     * Overage is never charged (no billing exists for it), so every plan stops
+     * at its credits and voice minutes, whatever the old switch says.
+     */
     public static function allowsOverage(?Plan $plan): bool
     {
-        return (bool) ($plan?->allow_overage ?? false);
+        return false;
     }
 
     public static function maxCharsPerRequest(?Plan $plan): int
