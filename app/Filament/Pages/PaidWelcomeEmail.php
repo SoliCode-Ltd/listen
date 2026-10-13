@@ -74,8 +74,8 @@ class PaidWelcomeEmail extends Page implements HasForms
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('subject_en')->label('Subject')->required()->maxLength(200)->columnSpan(2),
-                        Forms\Components\TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText('{name} becomes the member\'s first name.')->columnSpan(2),
-                        Forms\Components\Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. {name} works here too.')->columnSpan(2),
+                        Forms\Components\TextInput::make('headline_en')->label('Headline')->maxLength(200)->helperText('{name} becomes the member\'s first name, {plan} the name of their paid plan (in this language).')->columnSpan(2),
+                        Forms\Components\Textarea::make('body_en')->label('Message')->rows(6)->required()->helperText('A blank line starts a new paragraph. {name} and {plan} work here too, and in the subject.')->columnSpan(2),
                         Forms\Components\TextInput::make('cta_label_en')->label('Button text')->maxLength(80),
                         Forms\Components\TextInput::make('footer_en')->label('Small print at the bottom')->maxLength(300),
                     ]),

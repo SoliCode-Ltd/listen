@@ -117,7 +117,7 @@ class Plan extends Model
 
         // Try translation file (ui.pricing.plan_name_{slug})
         $transKey = "ui.pricing.plan_name_{$this->slug}";
-        $translated = __($transKey);
+        $translated = __($transKey, [], $locale);
         if ($translated !== $transKey) {
             return $translated;
         }
