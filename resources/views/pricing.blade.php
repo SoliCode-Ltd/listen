@@ -158,7 +158,21 @@
     .plan-card.popular:hover {
       box-shadow: 0 20px 40px color-mix(in oklab, var(--a) 25%, transparent);
     }
+    .popular-badge .popular-crown {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      fill: #FFD66B;
+      stroke: #FFD66B;
+      stroke-width: 1.2;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
+    }
+    .popular-badge .popular-crown path + path { fill: none; stroke-width: 1.8; stroke-linecap: round; }
     .popular-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
       position: absolute;
       top: -.8rem;
       left: 0;
@@ -249,12 +263,29 @@
       margin-bottom: 1.25rem;
       background: var(--surface);
     }
+    /* Plan credits: the credits coin, the number, then "credits/month" */
+    .plan-quota.has-credits {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-height: 3.6rem;
+      padding: .35rem 1.1rem .35rem .5rem;
+      border-radius: 999px;
+      border: 1.5px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
+      background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 5%, var(--surface)));
+      box-shadow: 0 8px 22px color-mix(in oklab, #6A45F2 10%, transparent);
+    }
+    html[dir="rtl"] .plan-quota.has-credits { padding: .35rem .5rem .35rem 1.1rem; }
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
-      gap: .35rem;
+      gap: .6rem;
+      min-width: 0;
     }
-    .plan-quota-credits .credit-icon { font-size: 1.05rem; }
+    .plan-quota-amount { display: inline-flex; align-items: baseline; flex-wrap: wrap; column-gap: .45rem; row-gap: 0; min-width: 0; }
+    .plan-quota-coin { font-size: 3rem; margin-block: -.6rem; margin-inline-start: -.85rem; margin-inline-end: -.1rem; filter: drop-shadow(0 6px 12px color-mix(in oklab, #6A45F2 26%, transparent)); }
+    .plan-quota-number { font-size: 1.4rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .plan-quota-unit { font-size: .95rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
 
     .plan-features {
       list-style: none;

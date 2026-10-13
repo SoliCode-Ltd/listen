@@ -37,7 +37,7 @@
      @endif>
 
   @if($plan['is_popular'] && !$isCurrent)
-    <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
+    <span class="popular-badge"><svg class="popular-crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.2l4.6 3.6L12 5l3.9 6.8 4.6-3.6-1.7 9.3H5.2z"/><path d="M5.4 19.6h13.2"/></svg>{{ __('ui.pricing.most_popular') }}</span>
   @endif
 
   {{-- Discount ribbon --}}
@@ -112,13 +112,22 @@
     </div>
   @endif
 
-  <div class="plan-quota">
+  @php
+    $creditsQuota = ! $isPack && empty($plan['free_try_chars']);
+  @endphp
+  <div class="plan-quota {{ $creditsQuota ? 'has-credits' : '' }}">
     @if($isPack)
       {{ __('ui.pack.headline', ['count' => number_format($plan['monthly_chars']), 'days' => (int) $plan['pack_days']]) }}
     @elseif(!empty($plan['free_try_chars']))
       {{ __('ui.pack.free_try_headline', ['count' => number_format((int) $plan['free_try_chars'])]) }}
     @else
-      <span class="plan-quota-credits" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /> {{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</span>
+      <span class="plan-quota-credits" title="{{ __('ui.pricing.credits_hint') }}">
+        <x-credit-icon class="plan-quota-coin" />
+        <span class="plan-quota-amount">
+          <strong class="plan-quota-number">{{ number_format($plan['monthly_chars']) }}</strong>
+          <span class="plan-quota-unit">{{ __('ui.pricing.characters_per_month') }}</span>
+        </span>
+      </span>
     @endif
   </div>
 

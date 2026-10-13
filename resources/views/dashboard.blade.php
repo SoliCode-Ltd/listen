@@ -1989,22 +1989,132 @@
     .plan-offer-btn { display: flex; justify-content: center; padding: .75rem 1rem; border-radius: var(--radius, 12px); background: linear-gradient(135deg, var(--a, var(--brand-accent)), var(--b, var(--brand-accent))); color: #fff; font-weight: 700; text-decoration: none; }
     .plan-offer-btn:hover { filter: brightness(1.06); }
     .meter-ends { display: block; margin-top: .3rem; color: var(--muted); }
-    .editor-counters { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
-    .credit-remaining {
+    /* ---------- Overview: credits card, month tiles, voice status ---------- */
+    .usage-hero {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 1.5rem;
+      align-items: center;
+      padding: 1.4rem 1.5rem;
+      margin-top: 1.2rem;
+      border-radius: 20px;
+      border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 22%, var(--line));
+      background:
+        radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, #3D8BFF 8%, transparent), transparent 55%),
+        linear-gradient(135deg, color-mix(in oklab, var(--a, #6A45F2) 9%, var(--surface)), var(--surface) 65%);
+    }
+    .usage-hero-head { display: flex; align-items: center; gap: .7rem; }
+    .usage-hero-coin { font-size: 2.3rem; filter: drop-shadow(0 5px 10px color-mix(in oklab, #6A45F2 25%, transparent)); }
+    .usage-hero-label { display: block; font-size: .85rem; font-weight: 700; color: var(--text); }
+    .usage-hero-plan { display: block; font-size: .78rem; color: var(--muted); }
+    .usage-hero-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: .55rem; margin: .9rem 0 .7rem; }
+    .usage-hero-value strong { font-size: clamp(2rem, 4vw, 2.7rem); line-height: 1; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-hero-value span { color: var(--muted); font-size: .92rem; }
+    .usage-hero .meter-track { height: 10px; }
+    /* Repeats the big number, so it is kept for screen readers only. */
+    .usage-hero-caption { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+    .usage-hero-chips { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: .8rem; }
+    .usage-hero-chips:empty { display: none; }
+    .usage-chip {
+      display: inline-flex; align-items: center; gap: .4rem;
+      padding: .32rem .7rem; border-radius: 999px;
+      background: color-mix(in oklab, var(--surface2) 70%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
+      font-size: .78rem; color: var(--text);
+    }
+    .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
+    .usage-ring {
+      --p: 0;
+      width: 132px; height: 132px; border-radius: 50%;
+      background: conic-gradient(var(--a, #6A45F2) calc(var(--p) * 1%), color-mix(in oklab, var(--line) 85%, transparent) 0);
+      display: grid; place-items: center;
+      transition: background .4s ease;
+    }
+    .usage-ring-inner {
+      width: 104px; height: 104px; border-radius: 50%;
+      background: var(--surface);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
+    }
+    .usage-ring-inner b { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-ring-inner span { font-size: .75rem; color: var(--muted); }
+    .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
+    .usage-tile {
+      display: flex; flex-direction: column; gap: .45rem;
+      padding: 1.05rem 1.15rem; border-radius: 16px;
+      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+      background: var(--surface);
+    }
+    .usage-tile-head { display: flex; align-items: center; gap: .55rem; }
+    .usage-tile-head small { font-size: .82rem; font-weight: 600; color: var(--muted); }
+    .usage-tile-icon {
+      display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
+      background: color-mix(in oklab, var(--a, #6A45F2) 12%, var(--surface));
+    }
+    .usage-tile-icon svg { width: 16px; height: 16px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .usage-tile-icon.gold { background: color-mix(in oklab, #8B6CFF 12%, var(--surface)); }
+    .usage-tile-icon.gold .credit-icon { font-size: 1.05rem; }
+    .usage-tile > b { font-size: 1.65rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-tile .meter-track { height: 6px; }
+    .usage-tile-foot { color: var(--muted); font-size: .76rem; line-height: 1.45; }
+    .usage-health {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem;
+      margin-top: .9rem; padding: .85rem 1.15rem; border-radius: 16px;
+      border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+      background: color-mix(in oklab, var(--surface2) 40%, var(--surface));
+    }
+    .usage-health-title { font-size: .85rem; font-weight: 700; color: var(--text); }
+    .usage-health-row { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+    .usage-health-item { display: inline-flex; align-items: center; gap: .45rem; }
+    .usage-health-item small { color: var(--muted); font-size: .8rem; }
+    .usage-health-item b { font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-health .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .usage-health .dot.processing { background: #f59e0b; box-shadow: 0 0 0 3px color-mix(in oklab, #f59e0b 22%, transparent); }
+    .usage-health .dot.done { background: #22c55e; box-shadow: 0 0 0 3px color-mix(in oklab, #22c55e 22%, transparent); }
+    .usage-health .dot.failed { background: #ef4444; box-shadow: 0 0 0 3px color-mix(in oklab, #ef4444 22%, transparent); }
+    @media (max-width: 760px) {
+      .usage-hero { grid-template-columns: 1fr; }
+      .usage-ring { justify-self: center; width: 116px; height: 116px; }
+      .usage-ring-inner { width: 92px; height: 92px; }
+      .usage-tiles { grid-template-columns: 1fr; }
+    }
+    /* Text box footer: characters, and the credits left that drop live as the text grows */
+    .editor-counters { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
+    .vs-editor-foot .char-counter {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: .35rem;
+      min-width: 8.5rem;
+      margin: 0;
+      padding: 0;
+    }
+    .char-counter-text { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .char-counter-text b { color: var(--text); font-weight: 700; font-size: .92rem; }
+    .char-counter-sep { margin: 0 .2rem; opacity: .6; }
+    .char-counter-track { height: 4px; border-radius: 999px; background: color-mix(in oklab, var(--line) 80%, transparent); overflow: hidden; }
+    .char-counter-track span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--a, #6A45F2), var(--b, #8B5CF6)); transition: width .2s ease, background .2s ease; }
+    .char-counter.warning .char-counter-track span { background: var(--warning, #f59e0b); }
+    .char-counter.danger .char-counter-track span { background: var(--danger, #ef4444); }
+    .char-counter.danger .char-counter-text b { color: var(--danger, #ef4444); }
+    .credit-live {
       display: inline-flex;
       align-items: center;
-      gap: .4rem;
-      padding: .3rem .75rem .3rem .6rem;
-      border-radius: 999px;
-      border: 1px solid color-mix(in oklab, #E0A10F 35%, var(--line));
-      background: linear-gradient(180deg, color-mix(in oklab, #FAD25A 12%, var(--surface)), var(--surface));
-      font-size: .82rem;
-      color: var(--muted);
+      gap: .6rem;
+      padding: .45rem .95rem .45rem .55rem;
+      border-radius: 14px;
+      border: 1px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
+      background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 4%, var(--surface)));
+      transition: border-color .2s ease, background .2s ease;
     }
-    .credit-remaining .credit-icon { font-size: 1.05rem; }
-    .credit-estimate { color: var(--muted); margin-inline-start: .35rem; }
-    .credit-estimate:empty { display: none; }
-    .credit-remaining strong { color: var(--text); font-variant-numeric: tabular-nums; }
+    html[dir="rtl"] .credit-live { padding: .45rem .55rem .45rem .95rem; }
+    .credit-live .credit-icon { font-size: 1.65rem; margin-block: -.15rem; filter: drop-shadow(0 4px 8px color-mix(in oklab, #6A45F2 25%, transparent)); }
+    .credit-live-text { display: flex; flex-direction: column; line-height: 1.15; }
+    .credit-live-label { font-size: .7rem; color: var(--muted); letter-spacing: .01em; }
+    .credit-live-value { font-size: 1.05rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    .credit-live.is-spending { border-color: color-mix(in oklab, var(--a, #6A45F2) 40%, var(--line)); }
+    .credit-live.is-short { border-color: color-mix(in oklab, var(--danger, #ef4444) 55%, var(--line)); background: color-mix(in oklab, var(--danger, #ef4444) 8%, var(--surface)); }
+    .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }
   </style>
 </head>
 <body>
@@ -2165,52 +2275,93 @@
               : max(0, (int) $planRequests - (int) $usage->total_requests);
           @endphp
 
-          <div class="meter" @if($freeNoChars) style="display:none" @endif>
-            <div class="meter-header">
-              <small class="meter-credits-label"><x-credit-icon /> {{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
-              <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
+          @php
+            $creditsUsedPercent = (int) ($usageSnapshot['chars_percent'] ?? $usageCharsPercent);
+            $minutesLimit = (int) ($usageSnapshot['minutes_limit'] ?? 0);
+            $minutesUsed = ((int) ($usageSnapshot['seconds_used'] ?? 0)) / 60;
+          @endphp
+
+          {{-- Credits: what is left this month (or in the pack), with the voice minutes they give. --}}
+          <div class="usage-hero" @if($freeNoChars) style="display:none" @endif>
+            <div class="usage-hero-main">
+              <div class="usage-hero-head">
+                <x-credit-icon class="usage-hero-coin" />
+                <div>
+                  <span class="usage-hero-label">{{ __('ui.dashboard.credits_left_label') }}</span>
+                  <span class="usage-hero-plan">{{ $packMode ? __('ui.pack.meter_label') : $activePlanDisplayName }}</span>
+                </div>
+              </div>
+              <div class="usage-hero-value">
+                <strong id="usageCreditsLeft">{{ number_format($remainingChars) }}</strong>
+                <span>{{ __('ui.dashboard.credits_of_total', ['total' => number_format($planChars)]) }}</span>
+              </div>
+              <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
+              <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
+              <div class="usage-hero-chips">
+                @if (! $packMode && $minutesLimit > 0)
+                  <span class="usage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="usageMinutesText">{{ __('ui.dashboard.voice_minutes_used', ['used' => number_format($minutesUsed, 1), 'total' => number_format($minutesLimit)]) }}</span></span>
+                @endif
+                @if ($packMode && $packEndsOn)
+                  <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
+                @endif
+                @if (($giftChars ?? 0) > 0)
+                  <span class="usage-chip gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</span>
+                @endif
+              </div>
             </div>
-            <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
-            @if (! $packMode && (int) ($usageSnapshot['minutes_limit'] ?? 0) > 0)
-              <small class="meter-ends" id="usageMinutesText">{{ __('ui.dashboard.voice_minutes_used', ['used' => number_format(((int) ($usageSnapshot['seconds_used'] ?? 0)) / 60, 1), 'total' => number_format((int) $usageSnapshot['minutes_limit'])]) }}</small>
-            @endif
-            @if ($packMode && $packEndsOn)
-              <small class="meter-ends">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</small>
-            @endif
-            @if (($giftChars ?? 0) > 0)
-              <small class="gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</small>
-            @endif
+            <div class="usage-ring" id="usageCreditsRing" style="--p: {{ max(0, min(100, $creditsUsedPercent)) }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => max(0, min(100, $creditsUsedPercent))]) }}">
+              <div class="usage-ring-inner">
+                <b id="usageCreditsPercent">{{ max(0, min(100, $creditsUsedPercent)) }}%</b>
+                <span>{{ __('ui.dashboard.used_short') }}</span>
+              </div>
+            </div>
           </div>
 
-          <div class="meter" @if(!empty($usageSnapshot['no_free_chars'])) style="display:none" @endif>
-            <div class="meter-header">
-              <small>{{ __('ui.dashboard.requests_usage') }}</small>
-              <small id="usageRequestsText">
+          {{-- This month at a glance --}}
+          <div class="usage-tiles" @if(!empty($usageSnapshot['no_free_chars'])) style="display:none" @endif>
+            <div class="usage-tile">
+              <div class="usage-tile-head">
+                <span class="usage-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h3l2-6 4 12 2-6h5"/></svg></span>
+                <small>{{ __('ui.dashboard.requests_usage') }}</small>
+              </div>
+              <b id="kpiRequests">{{ number_format($usage->total_requests) }}</b>
+              <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
+              <small class="usage-tile-foot" id="usageRequestsText">
                 @if ($requestsUnlimited)
                   {{ __('ui.dashboard.used_requests_of_unlimited', ['used' => number_format($usage->total_requests)]) }}
                 @else
                   {{ __('ui.dashboard.requests_remaining_of_total', ['remaining' => number_format($remainingRequests), 'total' => number_format($planRequests)]) }}
                 @endif
               </small>
+              @if((int) ($usageSnapshot['daily_requests_limit'] ?? 0) > 0)
+                <small class="usage-tile-foot" id="usageTodayText">{{ __('ui.pack.today_requests', ['used' => number_format((int) $usageSnapshot['daily_requests_used']), 'limit' => number_format((int) $usageSnapshot['daily_requests_limit'])]) }}</small>
+              @endif
             </div>
-            <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
-            @if((int) ($usageSnapshot['daily_requests_limit'] ?? 0) > 0)
-              <small class="meter-ends" id="usageTodayText">{{ __('ui.pack.today_requests', ['used' => number_format((int) $usageSnapshot['daily_requests_used']), 'limit' => number_format((int) $usageSnapshot['daily_requests_limit'])]) }}</small>
-            @endif
+            <div class="usage-tile" @if($freeNoChars) style="display:none" @endif>
+              <div class="usage-tile-head">
+                <span class="usage-tile-icon gold"><x-credit-icon /></span>
+                <small>{{ __('ui.dashboard.credits_used_month') }}</small>
+              </div>
+              <b id="kpiChars">{{ number_format((int) ($usageSnapshot['total_chars'] ?? $usage->total_chars)) }}</b>
+              <small class="usage-tile-foot">{{ __('ui.pricing.credits_hint') }}</small>
+            </div>
+            <div class="usage-tile">
+              <div class="usage-tile-head">
+                <span class="usage-tile-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+                <small>{{ __('ui.dashboard.total_jobs') }}</small>
+              </div>
+              <b id="kpiTotal">{{ number_format($stats['total']) }}</b>
+              <small class="usage-tile-foot">{{ __('ui.dashboard.total_jobs_hint') }}</small>
+            </div>
           </div>
 
-          <div class="kpis" @if($freeNoChars) style="display:none" @endif>
-            <div class="kpi"><small>{{ __('ui.dashboard.requests') }}</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
-            <div class="kpi"><small>{{ __('ui.dashboard.used_characters') }}</small><b id="kpiChars">{{ number_format((int) ($usageSnapshot['total_chars'] ?? $usage->total_chars)) }}</b></div>
-            <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
-          </div>
-
-          <div class="summary-block" @if($freeNoChars) style="display:none" @endif>
-            <h1><span class="grad-text">{{ __('ui.dashboard.system_health') }}</span></h1>
-            <div class="mini">
-              <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
-              <div class="box"><small>{{ __('ui.dashboard.done') }}</small><div><b id="statDone">{{ $stats['done'] }}</b></div></div>
-              <div class="box"><small>{{ __('ui.dashboard.failed') }}</small><div><b id="statFailed">{{ $stats['failed'] }}</b></div></div>
+          {{-- Voices being made, done and failed --}}
+          <div class="usage-health" @if($freeNoChars) style="display:none" @endif>
+            <span class="usage-health-title">{{ __('ui.dashboard.system_health') }}</span>
+            <div class="usage-health-row">
+              <div class="usage-health-item"><i class="dot processing" aria-hidden="true"></i><small>{{ __('ui.dashboard.processing') }}</small><b id="statProcessing">{{ $stats['processing'] }}</b></div>
+              <div class="usage-health-item"><i class="dot done" aria-hidden="true"></i><small>{{ __('ui.dashboard.done') }}</small><b id="statDone">{{ $stats['done'] }}</b></div>
+              <div class="usage-health-item"><i class="dot failed" aria-hidden="true"></i><small>{{ __('ui.dashboard.failed') }}</small><b id="statFailed">{{ $stats['failed'] }}</b></div>
             </div>
           </div>
 
@@ -2254,15 +2405,17 @@
               </div>
               <div class="vs-editor-foot">
             <div class="editor-counters">
-            <div class="char-counter" id="charCounter">
-              <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
-              <span class="credit-estimate" id="creditEstimate"></span>
-            </div>
-            <div class="credit-remaining" title="{{ __('ui.pricing.credits_hint') }}">
-              <x-credit-icon />
-              <span>{{ __('ui.dashboard.credits_left_label') }}</span>
-              <strong data-credit-balance>{{ number_format((int) ($usageSnapshot['remaining_chars'] ?? 0)) }}</strong>
-            </div>
+              <div class="char-counter" id="charCounter">
+                <div class="char-counter-text"><b id="charCount">0</b><span class="char-counter-sep">/</span><span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> <span class="char-counter-unit">{{ __('ui.dashboard.characters') }}</span></div>
+                <div class="char-counter-track" aria-hidden="true"><span id="charCounterFill"></span></div>
+              </div>
+              <div class="credit-live" id="creditLive" data-remaining="{{ (int) ($usageSnapshot['remaining_chars'] ?? 0) }}" title="{{ __('ui.pricing.credits_hint') }}" aria-live="polite">
+                <x-credit-icon />
+                <div class="credit-live-text">
+                  <span class="credit-live-label" id="creditLiveLabel">{{ __('ui.dashboard.credits_left_label') }}</span>
+                  <strong class="credit-live-value" id="creditLiveValue">{{ number_format((int) ($usageSnapshot['remaining_chars'] ?? 0)) }}</strong>
+                </div>
+              </div>
             </div>
                 <button class="dashboard-generate-btn" id="generateBtn" type="submit">
             <span>
@@ -3445,6 +3598,49 @@
       return `${Math.max(0, 100 - Number(percent || 0))}%`;
     }
 
+    // The credits left drop live as the text grows, by about what this voice
+    // will cost: 15 credits a second of audio, about 15 characters a second
+    // (the server's estimate; the real audio length decides the final charge).
+    let creditLiveShown = null;
+    function estimateCreditsFor(text) {
+      const value = String(text || '').trim();
+      const length = Array.from(value).length;
+      if (!length) return 0;
+      const words = (value.match(/[\p{L}\p{N}']+/gu) || []).length;
+      return Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) * 15;
+    }
+    function refreshCreditLive() {
+      const box = document.getElementById('creditLive');
+      const valueEl = document.getElementById('creditLiveValue');
+      const labelEl = document.getElementById('creditLiveLabel');
+      if (!box || !valueEl || !labelEl) return;
+      const input = document.getElementById('contentTextarea');
+      const remaining = Number(box.dataset.remaining || 0);
+      const cost = estimateCreditsFor(input ? input.value : '');
+      const after = remaining - cost;
+      box.classList.toggle('is-spending', cost > 0 && after >= 0);
+      box.classList.toggle('is-short', cost > 0 && after < 0);
+      labelEl.textContent = cost <= 0
+        ? @json(__('ui.dashboard.credits_left_label'))
+        : (after < 0 ? @json(__('ui.dashboard.credits_not_enough')) : @json(__('ui.dashboard.credits_after_this_voice')));
+      const target = Math.max(0, after);
+      const from = creditLiveShown === null ? target : creditLiveShown;
+      creditLiveShown = target;
+      if (from === target || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        valueEl.textContent = formatNumber(target);
+        return;
+      }
+      const started = performance.now();
+      const step = function (now) {
+        const t = Math.min(1, (now - started) / 260);
+        const eased = 1 - Math.pow(1 - t, 3);
+        if (creditLiveShown !== target) return;
+        valueEl.textContent = formatNumber(Math.round(from + (target - from) * eased));
+        if (t < 1) requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
+    }
+
     function updateUsagePanel(usage) {
       if (!usage || typeof usage !== 'object') return;
       const requestsUnlimited = Boolean(usage.requests_unlimited);
@@ -3465,13 +3661,22 @@
           total: formatNumber(usage.minutes_limit),
         });
       }
-      // The credit balance in the header and beside the text box.
-      if (usage.remaining_chars !== undefined) {
-        document.querySelectorAll('[data-credit-balance]').forEach(function (el) {
-          el.textContent = formatNumber(usage.remaining_chars);
-        });
+      // The credits left beside the text box.
+      const creditLive = document.getElementById('creditLive');
+      if (creditLive && usage.remaining_chars !== undefined) {
+        creditLive.dataset.remaining = String(usage.remaining_chars);
+        refreshCreditLive();
       }
       if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
+      const creditsLeftEl = document.getElementById('usageCreditsLeft');
+      if (creditsLeftEl && usage.remaining_chars !== undefined) creditsLeftEl.textContent = formatNumber(usage.remaining_chars);
+      const ring = document.getElementById('usageCreditsRing');
+      const ringPercent = document.getElementById('usageCreditsPercent');
+      if (ring && usage.chars_percent !== undefined) {
+        const p = Math.max(0, Math.min(100, Number(usage.chars_percent) || 0));
+        ring.style.setProperty('--p', p);
+        if (ringPercent) ringPercent.textContent = p + '%';
+      }
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
       if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
@@ -3991,14 +4196,9 @@
       // Every character is charged, spaces and line breaks too (as the server counts them).
       const length = Array.from(contentInput.value.trim()).length;
       charCountEl.textContent = length.toLocaleString();
-      // About the credits this text will use: 15 a second of audio, about
-      // 15 characters a second (the server's estimate). The real audio decides.
-      const estimateEl = document.getElementById('creditEstimate');
-      if (estimateEl) {
-        const words = (contentInput.value.match(/[\p{L}\p{N}']+/gu) || []).length;
-        const seconds = length > 0 ? Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) : 0;
-        estimateEl.textContent = seconds > 0 ? @json(__('ui.dashboard.credits_estimate')).replace(':count', formatNumber(seconds * 15)) : '';
-      }
+      const fill = document.getElementById('charCounterFill');
+      if (fill) fill.style.width = Math.min(100, (length / Math.max(1, maxCharsPerRequest)) * 100) + '%';
+      refreshCreditLive();
       charCounter.classList.remove('warning', 'danger');
       if (length > maxCharsPerRequest) {
         charCounter.classList.add('danger');

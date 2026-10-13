@@ -184,8 +184,9 @@ class PricingPageLinesTest extends TestCase
 
         $page->assertSee(__('ui.pricing.lines.label_max_chars_per_request', [], $locale));
         // The card shows the credits with their icon, and the voice minutes they give.
-        $page->assertSee('class="credit-icon"', false);
-        $page->assertSee('320,000 '.__('ui.pricing.characters_per_month', [], $locale));
+        $page->assertSee('class="credit-icon plan-quota-coin"', false);
+        $page->assertSee('<strong class="plan-quota-number">320,000</strong>', false);
+        $page->assertSee('<span class="plan-quota-unit">'.__('ui.pricing.characters_per_month', [], $locale).'</span>', false);
         $page->assertSee(__('ui.pricing.lines.voice_minutes_value', ['count' => '355'], $locale));
         $page->assertSee($locale === 'ar' ? 'سطر إضافي من المالك' : 'Owner extra line');
         $page->assertDontSee('Stale hand-written line');
