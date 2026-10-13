@@ -649,6 +649,21 @@ class PremiumPackTest extends TestCase
         $page->assertSee('plan-offer-card', false)->assertSee(route('billing.page', ['plan' => 'basic']), false);
     }
 
+    public function test_a_member_without_characters_sees_every_premium_option_but_is_asked_to_choose_a_plan(): void
+    {
+        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
+        $this->premiumVoice();
+        $user = $this->member();
+        UsageCounter::query()->create(['user_id' => $user->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 3998, 'total_requests' => 23]);
+
+        $page = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk();
+
+        $page->assertSee(__('ui.pack.showcase_note'))
+            ->assertSee('Kore')
+            ->assertSee(__('ui.pack.no_chars_value'))
+            ->assertSee('class="kpis"  style="display:none"', false);
+    }
+
     public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void
     {
         $basic = Plan::query()->where('slug', 'basic')->firstOrFail();
@@ -691,6 +706,45 @@ class PremiumPackTest extends TestCase
             ->assertHasNoErrors();
 
         $this->assertFalse(FreeAllowance::freePlanGivesMonthlyChars());
+    }
+
+    public function test_the_subscriptions_tab_lists_paid_members_only(): void
+    {
+        $free = $this->member();
+        $paid = $this->member();
+        app(PlanAccessService::class)->assignPlan($paid, $this->starter);
+        $this->actingAs($this->admin());
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        $freeRow = Subscription::query()->where('user_id', $free->id)->sole();
+        $paidRow = Subscription::query()->where('user_id', $paid->id)->sole();
+
+        \Livewire\Livewire::test(\App\Filament\Resources\SubscriptionResource\Pages\ListSubscriptions::class)
+            ->assertCanSeeTableRecords([$paidRow])
+            ->assertCanNotSeeTableRecords([$freeRow]);
+    }
+
+    public function test_a_free_member_can_be_gifted_characters_from_the_users_tab(): void
+    {
+        $free = $this->member();
+        $this->actingAs($this->admin());
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+
+        \Livewire\Livewire::test(\App\Filament\Resources\UserResource\Pages\ListUsers::class)
+            ->callTableAction('giftChars', $free, ['chars' => 750, 'note' => 'Welcome'])
+            ->assertHasNoTableActionErrors();
+
+        $this->assertSame(750, (int) UsageCounter::query()->where('user_id', $free->id)->value('bonus_chars'));
+    }
+
+    public function test_a_missing_free_plan_never_hands_out_a_paid_plan(): void
+    {
+        Subscription::query()->delete();
+        $this->free->delete();
+
+        $this->assertNull(app(PlanAccessService::class)->freePlan());
+        $user = $this->member();
+        $this->assertSame(0, Subscription::query()->where('user_id', $user->id)->count());
     }
 
     public function test_the_admin_edits_the_pack(): void

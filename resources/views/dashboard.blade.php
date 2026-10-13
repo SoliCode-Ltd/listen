@@ -1964,11 +1964,15 @@
     })();
   </script>
   <style>
-    .plan-offer { margin: 1rem 0 1.25rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: var(--surface); }
-    .plan-offer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
-    .plan-offer-head h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
+    .plan-offer { margin: 1rem 0 1.5rem; }
+    .plan-offer-head { margin-bottom: 1rem; }
+    .plan-offer-head h2 { margin: 0 0 .3rem; font-size: 1.25rem; }
     .plan-offer-head p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.6; }
-    .plan-offer-all { white-space: nowrap; font-size: .85rem; font-weight: 600; color: var(--brand-accent); text-decoration: none; }
+    .plan-offer-more { display: flex; justify-content: center; margin-top: 1rem; }
+    .plan-offer-all { display: inline-flex; align-items: center; gap: .45rem; padding: .7rem 1.4rem; border: 1px solid var(--brand-accent); border-radius: 999px; font-size: .95rem; font-weight: 700; color: var(--brand-accent); text-decoration: none; }
+    .plan-offer-all:hover { background: color-mix(in oklab, var(--brand-accent) 10%, transparent); }
+    .plan-showcase-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; padding: .9rem 1rem; border: 1px solid var(--brand-accent); border-radius: var(--radius, 12px); background: color-mix(in oklab, var(--brand-accent) 8%, transparent); }
+    .plan-showcase-note p { margin: 0; font-weight: 600; }
     .plan-offer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
     .plan-offer-card { display: flex; flex-direction: column; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: linear-gradient(180deg, var(--surface2), var(--surface)); }
     .plan-offer-card.is-highlighted { border-color: var(--brand-accent); box-shadow: 0 8px 28px color-mix(in oklab, var(--brand-accent) 18%, transparent); }
@@ -1984,7 +1988,6 @@
     .plan-offer-lines span { color: var(--muted); }
     .plan-offer-btn { display: flex; justify-content: center; padding: .75rem 1rem; border-radius: var(--radius, 12px); background: linear-gradient(135deg, var(--a, var(--brand-accent)), var(--b, var(--brand-accent))); color: #fff; font-weight: 700; text-decoration: none; }
     .plan-offer-btn:hover { filter: brightness(1.06); }
-    @media (max-width: 640px) { .plan-offer-head { flex-direction: column; } }
     .meter-ends { display: block; margin-top: .3rem; color: var(--muted); }
   </style>
 </head>
@@ -2108,11 +2111,8 @@
             @endphp
             <section class="plan-offer plan-offer--{{ $offer['state'] }}" id="packOffer">
               <div class="plan-offer-head">
-                <div>
-                  <h2>{{ $offer['state'] === 'has_pack' ? __('ui.pack.offer_has_pack_title') : __('ui.pack.offer_choose_title') }}</h2>
-                  <p>{{ $offerBody }}</p>
-                </div>
-                <a class="plan-offer-all" href="{{ route('pricing') }}">{{ __('ui.pack.offer_see_all') }}</a>
+                <h2>{{ $offer['state'] === 'has_pack' ? __('ui.pack.offer_has_pack_title') : __('ui.pack.offer_choose_title') }}</h2>
+                <p>{{ $offerBody }}</p>
               </div>
               <div class="plan-offer-grid">
                 @foreach($offer['options'] as $option)
@@ -2135,17 +2135,21 @@
                   </article>
                 @endforeach
               </div>
+              <div class="plan-offer-more">
+                <a class="plan-offer-all" href="{{ route('pricing') }}">{{ __('ui.pack.offer_see_all') }} <span aria-hidden="true">{{ app()->getLocale() === 'ar' ? '←' : '→' }}</span></a>
+              </div>
             </section>
           @endif
 
           @php
+            $freeNoChars = !empty($usageSnapshot['no_free_chars']) && (int) ($usageSnapshot['plan_chars'] ?? 0) <= 0;
             $remainingChars = (int) ($usageSnapshot['remaining_chars'] ?? max(0, (int) $planChars - (int) $usage->total_chars));
             $remainingRequests = $requestsUnlimited
               ? null
               : max(0, (int) $planRequests - (int) $usage->total_requests);
           @endphp
 
-          <div class="meter">
+          <div class="meter" @if($freeNoChars) style="display:none" @endif>
             <div class="meter-header">
               <small>{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
               <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
@@ -2159,7 +2163,7 @@
             @endif
           </div>
 
-          <div class="meter" @if(!empty($usageSnapshot['no_free_chars'])) hidden @endif>
+          <div class="meter" @if(!empty($usageSnapshot['no_free_chars'])) style="display:none" @endif>
             <div class="meter-header">
               <small>{{ __('ui.dashboard.requests_usage') }}</small>
               <small id="usageRequestsText">
@@ -2173,7 +2177,7 @@
             <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
           </div>
 
-          <div class="kpis">
+          <div class="kpis" @if($freeNoChars) style="display:none" @endif>
             <div class="kpi"><small>{{ __('ui.dashboard.requests') }}</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
             <div class="kpi"><small>{{ __('ui.dashboard.used_characters') }}</small><b id="kpiChars">{{ number_format((int) ($usageSnapshot['total_chars'] ?? $usage->total_chars)) }}</b></div>
             <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
@@ -2195,6 +2199,12 @@
     <section id="generateVoiceSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal queue-card" id="queueCardSection">
         <h1><span class="grad-text">{{ __('ui.dashboard.generate_new_voice') }}</span></h1>
+        @if($planShowcase ?? false)
+          <div class="plan-showcase-note">
+            <p>{{ __('ui.pack.showcase_note') }}</p>
+            <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.pack.offer_choose_title') }}</a>
+          </div>
+        @endif
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
@@ -2340,18 +2350,23 @@
       <article class="page-card reveal sidebar-info plan-card">
         <h1><span class="grad-text">{{ __('ui.dashboard.plan_and_defaults') }}</span></h1>
 
+        @php
+          $onPaidPlan = (int) ($activePlan?->price_cents ?? 0) > 0 && !$packMode;
+          $charsValue = match (true) {
+            $packMode => __('ui.pack.meter_text', ['remaining' => number_format((int) $usageSnapshot['remaining_chars']), 'total' => number_format((int) $usageSnapshot['plan_chars'])]),
+            !empty($freeNoChars) => __('ui.pack.no_chars_value'),
+            default => number_format((int) $planChars).' '.__('ui.pricing.characters_per_month'),
+          };
+        @endphp
         <div class="info-list">
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.current_plan') }}</span><span class="info-value"><span class="status done">{{ $activePlanDisplayName }}</span></span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.voice_quality') }}</span><span class="info-value">{{ $formatTierLabel($planTierLabel) }}</span></div>
-          <div class="info-row"><span class="info-label">{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.monthly_chars') }}</span><span class="info-value">{{ number_format($planChars) }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.monthly_reqs') }}</span><span class="info-value">{{ $requestsUnlimited ? __('ui.dashboard.unlimited') : $planRequests }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.max_chars_per_req') }}</span><span class="info-value">{{ $activePlan?->max_chars_per_request ?? 600 }}</span></div>
-        </div>
-
-        <div class="info-list">
-          <div class="info-row"><span class="info-label">{{ __('ui.pricing.topup_chars') }}</span><span class="info-value">{{ (($activePlan?->topup_char_price_cents ?? null) !== null || ($activePlan?->overage_price_per_million_cents ?? null) !== null) ? "\u{2066}$".number_format(((int) (($activePlan?->topup_char_price_cents ?? $activePlan?->overage_price_per_million_cents) ?? 0)) / 100, 0)."\u{2069}".__('ui.pricing.topup_per_million') : __('ui.upgrade.not_allowed') }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.commercial_use') }}</span><span class="info-value">{{ ($activePlan?->commercial_use_allowed ?? false) ? __('ui.dashboard.yes') : __('ui.dashboard.no') }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.processing') }}</span><span class="info-value">{{ $processingPriorityLabel((string) ($activePlan?->processing_priority ?? 'standard')) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ __('ui.pack.chars_label') }}</span><span class="info-value">{{ $charsValue }}</span></div>
+          @if($packMode && $packEndsOn)
+            <div class="info-row"><span class="info-label">{{ __('ui.pack.ends_label') }}</span><span class="info-value">{{ $packEndsOn }}</span></div>
+          @endif
+          @foreach($planLines as $line)
+            <div class="info-row"><span class="info-label">{{ $line['label'] }}</span><span class="info-value">{{ $line['value'] }}</span></div>
+          @endforeach
         </div>
 
         <div class="info-list">
@@ -2393,10 +2408,12 @@
 
         <div class="sidebar-actions">
           <a class="btn" href="{{ route('pricing') }}">{{ __('ui.dashboard.pricing_and_plans') }}</a>
-          <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.dashboard.upgrade_plan') }}</a>
+          <a class="btn btn-primary" href="{{ $onPaidPlan ? route('billing.page') : route('pricing') }}">{{ $onPaidPlan ? __('ui.dashboard.upgrade_plan') : __('ui.pack.offer_choose_title') }}</a>
         </div>
         <div class="sidebar-actions" style="margin-top: .6rem;">
-          <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.dashboard.manage_subscription') }}</a>
+          @if($onPaidPlan)
+            <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.dashboard.manage_subscription') }}</a>
+          @endif
           <a class="btn" href="{{ route('browsers-extension.page') }}#api-management">
             {{ __('ui.dashboard.manage_extension_key') }}
           </a>
@@ -3769,6 +3786,11 @@
     async function submitVoiceForm(event) {
       event.preventDefault();
       if (!voiceForm || !generateBtn) return;
+      // No plan and no characters: the options are shown, generating needs a plan.
+      if (@json((bool) ($planShowcase ?? false))) {
+        showFormMessage('error', @json(__('ui.pack.showcase_note')));
+        return;
+      }
       // Check if still in cooldown
       const remaining = getRemainingCooldown();
       if (remaining > 0) {

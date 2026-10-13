@@ -101,6 +101,15 @@ class DashboardController extends Controller
         $catalogByTier = VoiceCatalog::publicCatalogByTier();
         $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
         $usageSnapshot = UsageSnapshot::for($userId, $quotaPlan, $usage);
+        $packOffer = $this->packOffer($request, $usageSnapshot);
+        // A member without a plan or characters sees every premium option, so
+        // they can see what a plan gives them; generating asks them to choose one.
+        $planShowcase = $packOffer !== null && $usageSnapshot['mode'] === 'monthly' && $usageSnapshot['remaining_chars'] <= 0;
+        if ($planShowcase) {
+            $planTier = VoiceTier::HD;
+            $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
+            $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
+        }
         $planChars = $usageSnapshot['plan_chars'];
         $giftChars = $usageSnapshot['gift_chars'];
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
@@ -109,8 +118,8 @@ class DashboardController extends Controller
         $usageRequestsPercent = $usageSnapshot['requests_percent'];
 
         // Hybrid TTS: resolve dialogue availability per plan
-        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
-        $customPromptEnabled = $this->planAllowsCustomPrompt($activePlan);
+        $dialogueEnabled = $planShowcase || (bool) ($activePlan?->dialogue_enabled ?? false);
+        $customPromptEnabled = $planShowcase || $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
         $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user(), $activePlan);
         $voiceCloningUpgrade = VoiceCloningAccess::showsUpgrade(auth()->user(), $activePlan);
@@ -130,7 +139,13 @@ class DashboardController extends Controller
         return view('dashboard', [
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
-            'packOffer' => $this->packOffer($request, $usageSnapshot),
+            'packOffer' => $packOffer,
+            'planShowcase' => $planShowcase,
+            // The plan's own pricing-page lines; "credit card not needed" means nothing once signed in.
+            'planLines' => array_values(array_filter(
+                \App\Support\PlanPricingLines::forPlan($activePlan ?? new Plan, app()->getLocale()),
+                fn (array $line): bool => $line['label'] !== __('ui.pricing.lines.label_card_needed'),
+            )),
             'jobs' => $jobs,
             'stats' => $stats,
             'activePlan' => $activePlan,

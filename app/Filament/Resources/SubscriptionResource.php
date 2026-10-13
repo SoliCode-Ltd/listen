@@ -29,6 +29,16 @@ class SubscriptionResource extends Resource
 
     protected static ?int $navigationSort = 2;
 
+    /**
+     * Paid members only. Everyone on the free plan is in Users; their free-plan
+     * row still exists (it gives them the demo) but is not listed here.
+     */
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0));
+    }
+
     public static function form(Form $form): Form
     {
         return $form

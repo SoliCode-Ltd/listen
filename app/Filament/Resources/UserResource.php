@@ -394,6 +394,16 @@ HTML;
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\EditAction::make(),
+                // Free members are not in Subscriptions any more, so gifts can be given from here.
+                Tables\Actions\Action::make('giftChars')
+                    ->label('Gift characters')
+                    ->icon('heroicon-o-gift')
+                    ->color('success')
+                    ->visible(fn (User $record): bool => self::latestSubscription($record) !== null)
+                    ->modalHeading(fn (User $record): string => 'Gift characters to '.$record->email)
+                    ->modalDescription(fn (User $record): string => SubscriptionResource::giftModalDescription(self::latestSubscription($record)))
+                    ->form(SubscriptionResource::giftFormSchema())
+                    ->action(fn (User $record, array $data) => SubscriptionResource::grantGift(self::latestSubscription($record), $data)),
                 Tables\Actions\Action::make('blockUser')
                     ->label(__('ui.admin.users.block'))
                     ->icon('heroicon-o-no-symbol')
@@ -538,5 +548,10 @@ HTML;
                     $q->whereRaw('1 = 0');
                 }
             });
+    }
+
+    private static function latestSubscription(User $user): ?\App\Models\Subscription
+    {
+        return \App\Models\Subscription::query()->where('user_id', $user->id)->latest('id')->first();
     }
 }
