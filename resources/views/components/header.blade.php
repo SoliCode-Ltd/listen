@@ -67,11 +67,11 @@
         <img src="{{ $logoUrl }}" alt="{{ $brandName }}" style="max-height: 40px; width: auto;" />
       @else
         @if($isArabicUi)
-          <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
-          <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
+          <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+          <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
         @else
-          <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
-          <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
+          <img src="{{ \App\Support\VersionedAsset::url('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
+          <img src="{{ \App\Support\VersionedAsset::url('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
         @endif
       @endif
     </a>
@@ -195,11 +195,11 @@
           <img src="{{ $logoUrl }}" alt="{{ $brandName }}" />
         @else
           @if($isArabicUi)
-            <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
-            <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
+            <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+            <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
           @else
-            <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
-            <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
+            <img src="{{ \App\Support\VersionedAsset::url('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
+            <img src="{{ \App\Support\VersionedAsset::url('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
           @endif
         @endif
       </a>
