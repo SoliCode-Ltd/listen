@@ -14,6 +14,7 @@ use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
+use App\Support\AudioDuration;
 use App\Support\DialogueSpeakers;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
@@ -190,7 +191,9 @@ class GenerateAudioJob implements ShouldQueue
             }
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
-            $actualSeconds = (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
+            // The real length of the saved file; the provider's figure is only a guess from the text.
+            $actualSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null))
+                ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualMinutes = max(1, (int) ceil($actualSeconds / 60));
             $actualChars = $actualEstimate['chars'];
 
