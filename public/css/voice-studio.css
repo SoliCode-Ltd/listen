@@ -81,6 +81,10 @@
   color: transparent;
   unicode-bidi: plaintext;
   text-align: start;
+  /* Text boxes do not inherit the site's font-size-adjust; the copy behind
+     must not either, or it renders narrower and the colours drift off the tags. */
+  font-size-adjust: none;
+  font-kerning: auto;
 }
 html[lang="ar"] .tag-editor-backdrop { direction: rtl; text-align: right; }
 .tag-editor-backdrop mark {
