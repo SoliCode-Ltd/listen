@@ -38,7 +38,10 @@ class StripeTestModePackPurchaseTest extends TestCase
         $this->app->bind(StripePackGateway::class, CashierStripePackGateway::class);
 
         Plan::factory()->create(['slug' => 'free', 'price_cents' => 0, 'voice_tier' => 'standard']);
-        Plan::query()->where('slug', 'pack')->update(['is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'pack', 'name' => 'Premium Pack', 'kind' => Plan::KIND_PACK, 'pack_days' => 30,
+            'price_cents' => 200, 'monthly_chars' => 20000, 'voice_tier' => 'hd', 'is_active' => true,
+        ]);
     }
 
     protected function tearDown(): void

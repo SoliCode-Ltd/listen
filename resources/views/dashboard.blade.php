@@ -2094,22 +2094,17 @@
                 @if($offer['state'] === 'has_pack')
                   {{ __('ui.pack.offer_has_pack_body', ['count' => number_format((int) $usageSnapshot['remaining_chars']), 'date' => $packEndsOn]) }}
                 @else
-                  {{ __('ui.pack.offer_'.$offer['state'].'_body') }}
+                  {{ __('ui.pack.offer_'.$offer['state'].'_body'.($offer['has_pack_option'] ? '' : '_plans')) }}
                 @endif
               </p>
               <div class="pack-offer-options">
-                <a class="pack-offer-option is-primary" href="{{ $offer['pack_url'] }}">
-                  <span>{{ $offer['pack_name'] }}</span>
-                  <small>{{ __('ui.pack.offer_pack', ['count' => number_format($offer['pack_chars']), 'price' => $offer['pack_price'], 'days' => $offer['pack_days']]) }}</small>
-                  <b>{{ $offer['state'] === 'has_pack' ? __('ui.pack.offer_get_more') : __('ui.pack.offer_get_pack') }}</b>
-                </a>
-                @if($offer['starter_name'])
-                  <a class="pack-offer-option" href="{{ $offer['starter_url'] }}">
-                    <span>{{ $offer['starter_name'] }}</span>
-                    <small>{{ __('ui.pack.offer_plan', ['count' => number_format($offer['starter_chars']), 'price' => $offer['starter_price']]) }}</small>
-                    <b>{{ __('ui.pack.offer_choose_plan', ['name' => $offer['starter_name']]) }}</b>
+                @foreach($offer['options'] as $option)
+                  <a class="pack-offer-option {{ $option['primary'] ? 'is-primary' : '' }}" href="{{ $option['url'] }}">
+                    <span>{{ $option['name'] }}</span>
+                    <small>{{ $option['line'] }}</small>
+                    <b>{{ $option['cta'] }}</b>
                   </a>
-                @endif
+                @endforeach
               </div>
             </div>
           @endif

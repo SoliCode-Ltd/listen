@@ -527,18 +527,22 @@ class DashboardController extends Controller
     }
 
     /**
-     * The premium pack and Starter, offered to members without a paid plan.
-     * Null for members who already have a plan (or when no pack is on sale).
+     * What members without a paid plan are offered: a one-time pack when one
+     * is on sale, and the cheapest monthly plans. Null for members on a plan
+     * or in a trial.
      *
      * @param  array<string, mixed>  $usageSnapshot
-     * @return array<string, mixed>|null
+     * @return array{state:string, has_pack_option:bool, options:list<array{name:string, line:string, cta:string, url:string, primary:bool}>}|null
      */
     private function packOffer(Request $request, array $usageSnapshot): ?array
     {
         $user = $request->user();
-        $packs = app(CharPackService::class);
-        $pack = $packs->offeredPack();
-        if (! $user || ! $pack || ! $packs->canBuy($user, $pack)) {
+        if (! $user) {
+            return null;
+        }
+
+        $current = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        if ((int) ($current?->price_cents ?? 0) > 0 || $this->planAccessService->userHasUnpaidTrialWindow((int) $user->id)) {
             return null;
         }
 
@@ -553,30 +557,50 @@ class DashboardController extends Controller
             return (string) $quote['amount_formatted'];
         };
 
-        $starter = Plan::query()
-            ->subscriptionPlans()
-            ->where('is_active', true)
-            ->where('price_cents', '>', 0)
-            ->orderBy('price_cents')
-            ->first();
-
         $state = match (true) {
             $usageSnapshot['mode'] === 'pack' => 'has_pack',
             $usageSnapshot['remaining_chars'] <= 0 => 'no_chars',
             default => 'free_chars',
         };
 
+        $options = [];
+        $packs = app(CharPackService::class);
+        $pack = $packs->offeredPack();
+        if ($pack && $packs->canBuy($user, $pack)) {
+            $options[] = [
+                'name' => $pack->getLocalizedName($locale),
+                'line' => __('ui.pack.offer_pack', ['count' => number_format((int) $pack->monthly_chars), 'price' => $price($pack), 'days' => $pack->packDays()]),
+                'cta' => $state === 'has_pack' ? __('ui.pack.offer_get_more') : __('ui.pack.offer_get_pack'),
+                'url' => route('billing.pack'),
+                'primary' => true,
+            ];
+        }
+
+        $plans = Plan::query()
+            ->subscriptionPlans()
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->orderBy('price_cents')
+            ->limit($options === [] ? 2 : 1)
+            ->get();
+        foreach ($plans as $plan) {
+            $options[] = [
+                'name' => $plan->getLocalizedName($locale),
+                'line' => __('ui.pack.offer_plan', ['count' => number_format((int) $plan->monthly_chars), 'price' => $price($plan)]),
+                'cta' => __('ui.pack.offer_choose_plan', ['name' => $plan->getLocalizedName($locale)]),
+                'url' => route('billing.page', ['plan' => $plan->slug]),
+                'primary' => $options === [],
+            ];
+        }
+
+        if ($options === []) {
+            return null;
+        }
+
         return [
             'state' => $state,
-            'pack_name' => $pack->getLocalizedName($locale),
-            'pack_chars' => (int) $pack->monthly_chars,
-            'pack_days' => $pack->packDays(),
-            'pack_price' => $price($pack),
-            'pack_url' => route('billing.pack'),
-            'starter_name' => $starter?->getLocalizedName($locale),
-            'starter_chars' => (int) ($starter?->monthly_chars ?? 0),
-            'starter_price' => $starter ? $price($starter) : null,
-            'starter_url' => $starter ? route('billing.page', ['plan' => $starter->slug]) : route('pricing'),
+            'has_pack_option' => $pack !== null && $options[0]['url'] === route('billing.pack'),
+            'options' => $options,
         ];
     }
 

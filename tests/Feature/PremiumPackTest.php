@@ -71,9 +71,13 @@ class PremiumPackTest extends TestCase
             'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_chars' => 500000,
             'monthly_requests' => 0, 'max_chars_per_request' => 5000, 'voice_tier' => 'hd',
         ]);
-        // The migration creates the pack switched off; the owner turns it on.
-        $this->pack = Plan::query()->where('slug', 'pack')->firstOrFail();
-        $this->pack->update(['is_active' => true, 'max_chars_per_request' => 5000]);
+        // One-time packs are not sold today (the $2 offer is the Basic monthly
+        // plan), but the code stays ready for one: these tests run it.
+        $this->pack = Plan::factory()->create([
+            'slug' => 'pack', 'name' => 'Premium Pack', 'kind' => Plan::KIND_PACK, 'pack_days' => 30,
+            'price_cents' => 200, 'monthly_chars' => 20000, 'monthly_requests' => 0,
+            'max_chars_per_request' => 5000, 'voice_tier' => 'hd', 'is_active' => true,
+        ]);
 
         $this->stripe = new FakeStripePackGateway;
         $this->app->instance(StripePackGateway::class, $this->stripe);
@@ -84,16 +88,16 @@ class PremiumPackTest extends TestCase
     //  The pack itself
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_the_migration_creates_the_pack_switched_off(): void
+    public function test_the_migration_turns_the_unsold_pack_into_the_basic_monthly_plan(): void
     {
-        $this->pack->refresh();
+        $basic = Plan::query()->where('slug', 'basic')->firstOrFail();
 
-        $this->assertTrue($this->pack->isPack());
-        $this->assertSame(200, (int) $this->pack->price_cents);
-        $this->assertSame(20000, (int) $this->pack->monthly_chars);
-        $this->assertSame(30, $this->pack->packDays());
-        $this->assertSame('hd', $this->pack->voice_tier);
-        $this->assertNotContains('pack', Plan::query()->subscriptionPlans()->pluck('slug')->all());
+        $this->assertFalse($basic->isPack());
+        $this->assertFalse((bool) $basic->is_active, 'switched off until the owner turns it on');
+        $this->assertSame(200, (int) $basic->price_cents);
+        $this->assertSame(20000, (int) $basic->monthly_chars);
+        $this->assertSame('hd', $basic->voice_tier);
+        $this->assertContains('basic', Plan::query()->subscriptionPlans()->pluck('slug')->all());
     }
 
     public function test_buying_again_adds_characters_and_restarts_the_clock(): void
@@ -611,6 +615,56 @@ class PremiumPackTest extends TestCase
         $this->actingAs($user)->getLocalizedRoute('dashboard')
             ->assertOk()
             ->assertDontSee('id="packOffer"', false);
+    }
+
+    public function test_without_a_pack_on_sale_the_dashboard_offers_the_two_cheapest_plans(): void
+    {
+        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
+        $this->pack->update(['is_active' => false]);
+        Plan::query()->where('slug', 'basic')->update(['is_active' => true]);
+
+        $this->actingAs($this->member())->getLocalizedRoute('dashboard')
+            ->assertOk()
+            ->assertSee(__('ui.pack.offer_no_chars_body_plans'))
+            ->assertSee(route('billing.page', ['plan' => 'basic']), false)
+            ->assertSee(route('billing.page', ['plan' => 'starter']), false)
+            ->assertDontSee(route('billing.pack'), false);
+    }
+
+    public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void
+    {
+        $basic = Plan::query()->where('slug', 'basic')->firstOrFail();
+        $basic->update(['is_active' => true]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $basic);
+        $plans = app(PlanAccessService::class);
+
+        $access = $plans->resolveAccessPlanForUserId($user->id);
+        $this->assertSame('basic', $access->slug);
+        $this->assertSame('hd', $plans->resolveTierForPlan($access));
+        $this->assertFalse(CharPackService::billsToPack($plans->resolveQuotaPlanForUserId($user->id, $access)));
+
+        $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => str_repeat('a', 400),
+            'target_language' => 'en',
+            'voice_key' => VoiceCatalog::keyFromId((int) $this->premiumVoice()->id),
+        ])->assertOk()->assertJsonPath('usage.plan_chars', 20000)->assertJsonPath('usage.total_chars', 400);
+    }
+
+    public function test_the_command_ends_free_monthly_characters_for_everyone(): void
+    {
+        $existing = $this->member();
+        $admin = $this->admin();
+
+        $this->artisan('listen:end-free-monthly-chars')->assertSuccessful();
+        $this->assertTrue($existing->fresh()->free_monthly_chars, 'a dry run changes nothing');
+
+        $this->artisan('listen:end-free-monthly-chars', ['--apply' => true])->assertSuccessful();
+
+        $this->assertFalse($existing->fresh()->free_monthly_chars);
+        $this->assertTrue($admin->fresh()->free_monthly_chars, 'admin accounts are left alone');
+        $this->assertFalse(FreeAllowance::newMembersGetMonthlyChars());
+        $this->assertFalse((bool) $this->member()->fresh()->free_monthly_chars, 'new sign-ups get none either');
     }
 
     public function test_the_admin_switches_free_monthly_characters_for_new_members(): void
