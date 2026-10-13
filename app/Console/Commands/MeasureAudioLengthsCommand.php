@@ -3,19 +3,21 @@
 namespace App\Console\Commands;
 
 use App\Models\AudioGeneration;
+use App\Models\UsageCounter;
 use App\Support\AudioDuration;
 use Illuminate\Console\Command;
 
 /**
  * Older generations stored a length guessed from the text. This reads each
- * saved audio file and stores its real length. Usage counters are not changed.
+ * saved audio file, stores its real length, and then adds up each member's
+ * monthly audio seconds again from those lengths. Characters are not changed.
  */
 class MeasureAudioLengthsCommand extends Command
 {
     protected $signature = 'listen:measure-audio-lengths
         {--apply : Save the measured lengths (without it, only report what would change)}';
 
-    protected $description = 'Store the real length of every generated audio file.';
+    protected $description = 'Store the real length of every generated audio file and recount monthly audio seconds.';
 
     public function handle(): int
     {
@@ -27,6 +29,7 @@ class MeasureAudioLengthsCommand extends Command
         AudioGeneration::query()
             ->where('status', 'done')
             ->whereNotNull('audio_path')
+            ->where('duration_measured', false)
             ->orderBy('id')
             ->chunkById(200, function ($generations) use ($apply, &$checked, &$changed, &$missing): void {
                 foreach ($generations as $generation) {
@@ -37,13 +40,13 @@ class MeasureAudioLengthsCommand extends Command
 
                         continue;
                     }
-                    if ((int) $generation->duration_seconds === $seconds) {
-                        continue;
+                    if ((int) $generation->duration_seconds !== $seconds) {
+                        $changed++;
                     }
-                    $changed++;
                     if ($apply) {
                         // Keep updated_at: this is a correction, not new activity.
-                        AudioGeneration::query()->whereKey($generation->getKey())->update(['duration_seconds' => $seconds]);
+                        AudioGeneration::query()->whereKey($generation->getKey())->toBase()
+                            ->update(['duration_seconds' => $seconds, 'duration_measured' => true]);
                     }
                 }
             });
@@ -54,10 +57,48 @@ class MeasureAudioLengthsCommand extends Command
 
         if (! $apply) {
             $this->warn('Nothing changed. Run again with --apply to save the measured lengths.');
-        } else {
-            $this->info("Saved the measured length for {$changed} generations.");
+
+            return self::SUCCESS;
         }
 
+        $this->info("Saved the measured length for {$changed} generations.");
+        $this->info('Monthly usage recounted for '.$this->recountMonthlySeconds().' member-months.');
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Each member's monthly audio seconds, added up again from their finished
+     * generations (pack generations are counted in the pack, not here).
+     */
+    private function recountMonthlySeconds(): int
+    {
+        $totals = [];
+        AudioGeneration::query()
+            ->where('status', 'done')
+            ->where(fn ($q) => $q->whereNull('billed_to_pack')->orWhere('billed_to_pack', false))
+            ->whereNotNull('user_id')
+            ->select(['id', 'user_id', 'created_at', 'duration_seconds'])
+            ->chunkById(1000, function ($rows) use (&$totals): void {
+                foreach ($rows as $row) {
+                    $ym = $row->created_at?->format('Y-m');
+                    if ($ym !== null) {
+                        $totals[$row->user_id][$ym] = ($totals[$row->user_id][$ym] ?? 0) + max(0, (int) $row->duration_seconds);
+                    }
+                }
+            });
+
+        $updated = 0;
+        foreach ($totals as $userId => $months) {
+            foreach ($months as $ym => $seconds) {
+                $updated += UsageCounter::query()
+                    ->where('user_id', $userId)
+                    ->where('period_ym', $ym)
+                    ->toBase() // keep updated_at, the admin's "Last generation"
+                    ->update(['total_seconds' => $seconds, 'total_minutes' => UsageCounter::minutesFor($seconds)]);
+            }
+        }
+
+        return $updated;
     }
 }

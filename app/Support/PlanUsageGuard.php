@@ -97,9 +97,10 @@ class PlanUsageGuard
         }
 
         if ((bool) ($plan?->getAttribute('enforce_trial_minute_cap') ?? false)) {
-            $planMinutes = (int) ($plan->monthly_minutes ?? 0);
-            $incomingMinutes = (int) ($estimate['minutes'] ?? 0);
-            if ($planMinutes > 0 && (((int) $counter->total_minutes + $incomingMinutes) > $planMinutes)) {
+            // Counted in seconds: a short clip uses seconds of the trial, not a whole minute.
+            $planSeconds = (int) ($plan->monthly_minutes ?? 0) * 60;
+            $incomingSeconds = (int) ($estimate['seconds'] ?? ((int) ($estimate['minutes'] ?? 0) * 60));
+            if ($planSeconds > 0 && (((int) $counter->total_seconds + $incomingSeconds) > $planSeconds)) {
                 throw ValidationException::withMessages([
                     'content' => __('ui.backend.trial_minute_limit'),
                 ]);

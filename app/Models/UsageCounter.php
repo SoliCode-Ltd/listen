@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class UsageCounter extends Model
 {
@@ -14,6 +16,7 @@ class UsageCounter extends Model
         'user_id',
         'period_ym',
         'total_minutes',
+        'total_seconds',
         'total_chars',
         'bonus_chars',
         'total_requests',
@@ -24,7 +27,53 @@ class UsageCounter extends Model
         'total_chars' => 'integer',
         'total_requests' => 'integer',
         'total_minutes' => 'integer',
+        'total_seconds' => 'integer',
     ];
+
+    /**
+     * Whole minutes for a month's seconds: rounded up once for the month,
+     * never per generation.
+     */
+    public static function minutesFor(int $seconds): int
+    {
+        return intdiv(max(0, $seconds) + 59, 60);
+    }
+
+    /**
+     * Add (or with a negative number, give back) seconds of audio, keeping
+     * total_minutes in step.
+     */
+    public function addSeconds(int $seconds): void
+    {
+        if ($seconds === 0) {
+            return;
+        }
+
+        if ($seconds > 0) {
+            $this->increment('total_seconds', $seconds);
+        } else {
+            static::query()->whereKey($this->getKey())->update([
+                'total_seconds' => DB::raw('CASE WHEN total_seconds > '.(-$seconds).' THEN total_seconds - '.(-$seconds).' ELSE 0 END'),
+            ]);
+        }
+
+        $this->refresh();
+        $this->forceFill(['total_minutes' => self::minutesFor((int) $this->total_seconds)])->save();
+    }
+
+    /** "2 min 05 s" for the admin. */
+    public function audioLabel(): string
+    {
+        $seconds = (int) $this->total_seconds;
+        if ($seconds < 60) {
+            return $seconds.' s';
+        }
+        if ($seconds < 3600) {
+            return intdiv($seconds, 60).' min '.sprintf('%02d', $seconds % 60).' s';
+        }
+
+        return intdiv($seconds, 3600).' h '.sprintf('%02d', intdiv($seconds % 3600, 60)).' min';
+    }
 
     public function user(): BelongsTo
     {
@@ -35,7 +84,7 @@ class UsageCounter extends Model
     public function monthLabel(): string
     {
         try {
-            return \Illuminate\Support\Carbon::createFromFormat('Y-m-d', $this->period_ym.'-01')->format('F Y');
+            return Carbon::createFromFormat('Y-m-d', $this->period_ym.'-01')->format('F Y');
         } catch (\Throwable) {
             return (string) $this->period_ym;
         }

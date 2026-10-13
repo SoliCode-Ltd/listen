@@ -89,7 +89,8 @@ class BillingTrialResource extends Resource
                 ->schema([
                     Forms\Components\TextInput::make('chars_used')->disabled(),
                     Forms\Components\TextInput::make('chars_limit')->disabled(),
-                    Forms\Components\TextInput::make('minutes_used')->disabled(),
+                    Forms\Components\TextInput::make('minutes_used')->disabled()
+                        ->helperText(fn (?\App\Models\BillingTrial $record): ?string => $record ? number_format((int) $record->seconds_used).' seconds of audio' : null),
                     Forms\Components\TextInput::make('minutes_limit')->disabled(),
                     Forms\Components\TextInput::make('requests_used')->disabled(),
                     Forms\Components\TextInput::make('max_chars_per_request')->disabled(),

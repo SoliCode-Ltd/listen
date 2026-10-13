@@ -192,14 +192,14 @@ class GenerateAudioJob implements ShouldQueue
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
             // The real length of the saved file; the provider's figure is only a guess from the text.
-            $actualSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null))
-                ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
-            $actualMinutes = max(1, (int) ceil($actualSeconds / 60));
+            $measuredSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null));
+            $actualSeconds = $measuredSeconds ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualChars = $actualEstimate['chars'];
 
             $generation->update([
                 'audio_path' => $audio['audio_path'],
                 'duration_seconds' => $actualSeconds,
+                'duration_measured' => $measuredSeconds !== null,
                 'status' => 'done',
                 'error_message' => null,
                 // TTS telemetry
@@ -218,7 +218,7 @@ class GenerateAudioJob implements ShouldQueue
                 $generation,
                 0,
                 $actualChars - $reserved['chars'],
-                $actualMinutes - $reserved['minutes'],
+                $actualSeconds - $reserved['seconds'],
             );
 
             if ($generation->text_item_id) {
@@ -333,7 +333,7 @@ class GenerateAudioJob implements ShouldQueue
                 $generation,
                 -1,
                 -$reserved['chars'],
-                -$reserved['minutes'],
+                -$reserved['seconds'],
             );
         }
 
@@ -343,17 +343,18 @@ class GenerateAudioJob implements ShouldQueue
     }
 
     /**
-     * @return array{chars:int,minutes:int}
+     * What the controller reserved when the generation was queued: the
+     * estimate from the text (the real length is only known once it is done).
+     *
+     * @return array{chars:int,seconds:int}
      */
     private function reservedUsage(AudioGeneration $generation): array
     {
         $estimate = UsageEstimator::estimate((string) $generation->input_text);
 
-        $seconds = (int) ($generation->duration_seconds ?? $estimate['seconds']);
-
         return [
             'chars' => $estimate['chars'],
-            'minutes' => max(1, (int) ceil($seconds / 60)),
+            'seconds' => $estimate['seconds'],
         ];
     }
 
@@ -362,9 +363,9 @@ class GenerateAudioJob implements ShouldQueue
         return $generation->created_at?->format('Y-m') ?? now()->format('Y-m');
     }
 
-    private function applyUsageDelta(AudioGeneration $generation, int $requestsDelta, int $charsDelta, int $minutesDelta): void
+    private function applyUsageDelta(AudioGeneration $generation, int $requestsDelta, int $charsDelta, int $secondsDelta): void
     {
-        if ($requestsDelta === 0 && $charsDelta === 0 && $minutesDelta === 0) {
+        if ($requestsDelta === 0 && $charsDelta === 0 && $secondsDelta === 0) {
             return;
         }
 
@@ -378,7 +379,7 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        DB::transaction(function () use ($userId, $periodYm, $requestsDelta, $charsDelta, $minutesDelta) {
+        DB::transaction(function () use ($userId, $periodYm, $requestsDelta, $charsDelta, $secondsDelta) {
             $counter = UsageCounter::query()
                 ->where('user_id', $userId)
                 ->where('period_ym', $periodYm)
@@ -390,19 +391,19 @@ class GenerateAudioJob implements ShouldQueue
                     'user_id' => $userId,
                     'period_ym' => $periodYm,
                     'total_minutes' => 0,
+                    'total_seconds' => 0,
                     'total_chars' => 0,
                     'total_requests' => 0,
                 ]);
             }
 
-            $nextRequests = max(0, (int) $counter->total_requests + $requestsDelta);
-            $nextChars = max(0, (int) $counter->total_chars + $charsDelta);
-            $nextMinutes = max(0, (int) $counter->total_minutes + $minutesDelta);
+            $nextSeconds = max(0, (int) $counter->total_seconds + $secondsDelta);
 
             $counter->update([
-                'total_requests' => $nextRequests,
-                'total_chars' => $nextChars,
-                'total_minutes' => $nextMinutes,
+                'total_requests' => max(0, (int) $counter->total_requests + $requestsDelta),
+                'total_chars' => max(0, (int) $counter->total_chars + $charsDelta),
+                'total_seconds' => $nextSeconds,
+                'total_minutes' => UsageCounter::minutesFor($nextSeconds),
             ]);
         });
     }

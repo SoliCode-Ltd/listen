@@ -41,18 +41,21 @@ final class PlanCostEstimate
 
     /**
      * Characters spoken per second, measured from finished premium generations
-     * in the last 90 days, by language. Falls back to the estimator's speed.
+     * in the last 90 days whose audio length was read from the file, by
+     * language. Falls back to the estimator's speed.
      *
      * @return array{ar:float, en:float, measured:bool}
      */
     public static function charsPerSecond(): array
     {
-        return Cache::remember('plan_cost_estimate:chars_per_second', now()->addHours(6), function (): array {
+        return Cache::remember('plan_cost_estimate:chars_per_second:v2', now()->addHours(6), function (): array {
             $rows = AudioGeneration::query()
                 ->where('status', 'done')
                 ->where('voice_tier', VoiceTier::HD)
                 ->where('billable_chars', '>', 0)
                 ->where('duration_seconds', '>', 0)
+                // Only lengths read from the audio file: older rows hold a guess from the text.
+                ->where('duration_measured', true)
                 ->where('created_at', '>=', now()->subDays(90))
                 ->selectRaw('target_language as lang, sum(billable_chars) as chars, sum(duration_seconds) as seconds, count(*) as n')
                 ->groupBy('target_language')

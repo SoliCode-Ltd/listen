@@ -814,7 +814,7 @@ class CreatorTrialFlowTest extends TestCase
             $this->assertArrayHasKey('content', $exception->errors());
         }
 
-        $counter->forceFill(['total_chars' => 100, 'total_minutes' => 120])->save();
+        $counter->forceFill(['total_chars' => 100, 'total_seconds' => 120 * 60])->save();
         try {
             PlanUsageGuard::assertWithinLimits($quota, $counter, ['chars' => 10, 'minutes' => 1]);
             $this->fail('Starter minute cap was not enforced.');

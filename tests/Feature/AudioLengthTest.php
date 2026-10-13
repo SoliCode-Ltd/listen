@@ -7,14 +7,20 @@ use App\Filament\Resources\AudioGenerationResource\Pages\ListAudioGenerations;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
 use App\Models\Plan;
+use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioDuration;
+use App\Support\PlanCostEstimate;
+use App\Support\PlanUsageGuard;
 use App\Support\ShareableAudio;
+use App\Support\UsageEstimator;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Symfony\Component\Process\ExecutableFinder;
 use Tests\TestCase;
@@ -137,7 +143,98 @@ class AudioLengthTest extends TestCase
 
         $this->artisan('listen:measure-audio-lengths --apply')->assertSuccessful();
         $this->assertSame(12, (int) $old->fresh()->duration_seconds);
+        $this->assertTrue($old->fresh()->duration_measured);
         $this->assertSame(6, (int) $missing->fresh()->duration_seconds);
+        $this->assertFalse($missing->fresh()->duration_measured);
+    }
+
+    public function test_command_recounts_the_month_from_real_lengths(): void
+    {
+        $user = User::factory()->create();
+        // The old counting: 30 short clips counted as 30 minutes.
+        $counter = UsageCounter::create(['user_id' => $user->id, 'period_ym' => now()->format('Y-m'), 'total_requests' => 30, 'total_chars' => 1244, 'total_minutes' => 30]);
+        for ($i = 0; $i < 30; $i++) {
+            Storage::disk('public')->put("audio/clip{$i}.wav", $this->wav(6.0));
+            AudioGeneration::create($this->audioRow($user, ['audio_path' => "audio/clip{$i}.wav", 'duration_seconds' => 3]));
+        }
+        AudioGeneration::create($this->audioRow($user, ['status' => 'failed', 'duration_seconds' => 50]));
+        AudioGeneration::create($this->audioRow($user, ['billed_to_pack' => true, 'duration_seconds' => 50]));
+
+        $this->artisan('listen:measure-audio-lengths --apply')->assertSuccessful();
+
+        $counter->refresh();
+        $this->assertSame(180, (int) $counter->total_seconds);
+        $this->assertSame(3, (int) $counter->total_minutes);
+        $this->assertSame(1244, (int) $counter->total_chars, 'characters are not touched');
+        $this->assertSame('3 min 00 s', $counter->audioLabel());
+    }
+
+    public function test_short_generations_add_seconds_not_whole_minutes(): void
+    {
+        $user = User::factory()->create();
+        $counter = UsageCounter::create(['user_id' => $user->id, 'period_ym' => now()->format('Y-m'), 'total_requests' => 0, 'total_chars' => 0, 'total_minutes' => 0]);
+        Storage::disk('public')->put('audio/six.wav', $this->wav(6.0));
+        $this->fakeSpeech(['audio_path' => 'audio/six.wav', 'duration_seconds' => 3, 'provider' => 'fake']);
+
+        for ($i = 0; $i < 3; $i++) {
+            // What the dashboard reserves when it queues the generation.
+            $estimate = UsageEstimator::estimate('Hello there');
+            $counter->increment('total_requests');
+            $counter->increment('total_chars', $estimate['chars']);
+            $counter->addSeconds($estimate['seconds']);
+
+            $generation = AudioGeneration::create($this->audioRow($user, ['status' => 'queued', 'duration_seconds' => $estimate['seconds']]));
+            GenerateAudioJob::dispatchSync($generation->id);
+            $this->assertTrue($generation->fresh()->duration_measured);
+        }
+
+        $counter->refresh();
+        $this->assertSame(3, (int) $counter->total_requests);
+        $this->assertSame(18, (int) $counter->total_seconds, 'three 6-second clips');
+        $this->assertSame(1, (int) $counter->total_minutes, 'rounded up once for the month, not once per clip');
+    }
+
+    public function test_giving_back_seconds_never_goes_below_zero(): void
+    {
+        $user = User::factory()->create();
+        $counter = UsageCounter::create(['user_id' => $user->id, 'period_ym' => now()->format('Y-m'), 'total_requests' => 1, 'total_chars' => 5, 'total_minutes' => 1, 'total_seconds' => 4]);
+
+        $counter->addSeconds(-10);
+
+        $this->assertSame(0, (int) $counter->fresh()->total_seconds);
+        $this->assertSame(0, (int) $counter->fresh()->total_minutes);
+    }
+
+    public function test_trial_minute_cap_counts_seconds(): void
+    {
+        $plan = new Plan(['monthly_minutes' => 2, 'monthly_chars' => 100000, 'monthly_requests' => 0]);
+        $plan->setAttribute('enforce_trial_minute_cap', true);
+        $counter = new UsageCounter(['total_chars' => 0, 'total_requests' => 0, 'total_seconds' => 20 * 5]);
+
+        // Twenty 5-second clips are under 2 minutes, so the next short one is allowed.
+        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 50, 'seconds' => 5, 'minutes' => 1]);
+
+        $counter->total_seconds = 118;
+        $this->expectException(ValidationException::class);
+        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 50, 'seconds' => 5, 'minutes' => 1]);
+    }
+
+    public function test_speech_speed_for_the_plan_editor_uses_only_measured_lengths(): void
+    {
+        Cache::flush();
+        $user = User::factory()->create();
+        foreach ([true, false] as $measured) {
+            for ($i = 0; $i < 20; $i++) {
+                AudioGeneration::create($this->audioRow($user, [
+                    'voice_tier' => 'hd', 'target_language' => 'en', 'billable_chars' => 100,
+                    'duration_seconds' => $measured ? 10 : 50, 'duration_measured' => $measured,
+                ]));
+            }
+        }
+
+        $speed = PlanCostEstimate::charsPerSecond();
+        $this->assertTrue($speed['measured']);
+        $this->assertSame(10.0, $speed['en']);
     }
 
     private function wav(float $seconds, int $sampleRate = 24000, int $channels = 1): string

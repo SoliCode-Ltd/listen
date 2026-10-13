@@ -3,11 +3,12 @@
 namespace App\Services\Billing;
 
 use App\Models\BillingTrial;
+use App\Models\UsageCounter;
 
 class TrialUsageRecorder
 {
     /**
-     * @param  array{chars?:int,minutes?:int}  $estimate
+     * @param  array{chars?:int,seconds?:int}  $estimate
      */
     public function add(int $userId, array $estimate): void
     {
@@ -16,15 +17,17 @@ class TrialUsageRecorder
             return;
         }
 
+        $seconds = (int) $trial->seconds_used + max(0, (int) ($estimate['seconds'] ?? 0));
         $trial->forceFill([
             'chars_used' => (int) $trial->chars_used + max(0, (int) ($estimate['chars'] ?? 0)),
             'requests_used' => (int) $trial->requests_used + 1,
-            'minutes_used' => (int) $trial->minutes_used + max(0, (int) ($estimate['minutes'] ?? 0)),
+            'seconds_used' => $seconds,
+            'minutes_used' => UsageCounter::minutesFor($seconds),
         ])->save();
     }
 
     /**
-     * @param  array{chars?:int,minutes?:int}  $estimate
+     * @param  array{chars?:int,seconds?:int}  $estimate
      */
     public function release(int $userId, array $estimate): void
     {
@@ -33,10 +36,12 @@ class TrialUsageRecorder
             return;
         }
 
+        $seconds = max(0, (int) $trial->seconds_used - max(0, (int) ($estimate['seconds'] ?? 0)));
         $trial->forceFill([
             'chars_used' => max(0, (int) $trial->chars_used - max(0, (int) ($estimate['chars'] ?? 0))),
             'requests_used' => max(0, (int) $trial->requests_used - 1),
-            'minutes_used' => max(0, (int) $trial->minutes_used - max(0, (int) ($estimate['minutes'] ?? 0))),
+            'seconds_used' => $seconds,
+            'minutes_used' => UsageCounter::minutesFor($seconds),
         ])->save();
     }
 

@@ -49,6 +49,7 @@ class BillingTrial extends Model
         'chars_used',
         'requests_used',
         'minutes_used',
+        'seconds_used',
         'email_normalized',
         'phone_normalized',
         'device_id',
