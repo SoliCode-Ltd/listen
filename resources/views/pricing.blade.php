@@ -269,8 +269,8 @@
       align-items: center;
       justify-content: center;
       width: 100%;
-      min-height: 3.1rem;
-      padding: .4rem 1rem;
+      min-height: 2.35rem;
+      padding: .3rem .9rem;
       border-radius: 999px;
       border: 1px solid color-mix(in oklab, #8B6CFF 28%, var(--line));
       background: none;
@@ -279,13 +279,13 @@
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
-      gap: .6rem;
+      gap: .45rem;
       min-width: 0;
     }
-    .plan-quota-amount { display: inline-flex; align-items: baseline; justify-content: center; flex-wrap: wrap; column-gap: .45rem; row-gap: 0; min-width: 0; }
-    .plan-quota-coin { font-size: 1.9rem; margin: 0; }
-    .plan-quota-number { font-size: 1.4rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-    .plan-quota-unit { font-size: .95rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
+    .plan-quota-amount { display: inline-flex; align-items: baseline; justify-content: center; flex-wrap: wrap; column-gap: .3rem; row-gap: 0; min-width: 0; }
+    .plan-quota-coin { font-size: 1.3rem; margin: 0; }
+    .plan-quota-number { font-size: 1.02rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .plan-quota-unit { font-size: .82rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
 
     .plan-features {
       list-style: none;
