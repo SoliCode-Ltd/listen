@@ -649,6 +649,21 @@ class PremiumPackTest extends TestCase
         $page->assertSee('plan-offer-card', false)->assertSee(route('billing.page', ['plan' => 'basic']), false);
     }
 
+    public function test_a_member_without_characters_sees_every_premium_option_but_is_asked_to_choose_a_plan(): void
+    {
+        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
+        $this->premiumVoice();
+        $user = $this->member();
+        UsageCounter::query()->create(['user_id' => $user->id, 'period_ym' => now()->format('Y-m'), 'total_chars' => 3998, 'total_requests' => 23]);
+
+        $page = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk();
+
+        $page->assertSee(__('ui.pack.showcase_note'))
+            ->assertSee('Kore')
+            ->assertSee(__('ui.pack.no_chars_value'))
+            ->assertSee('class="kpis"  style="display:none"', false);
+    }
+
     public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void
     {
         $basic = Plan::query()->where('slug', 'basic')->firstOrFail();
