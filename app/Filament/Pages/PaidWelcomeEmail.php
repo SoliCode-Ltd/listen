@@ -48,7 +48,7 @@ class PaidWelcomeEmail extends Page implements HasForms
         return $form
             ->schema([
                 Forms\Components\Section::make('Sending')
-                    ->description('Goes out by itself once per member, the first time they are on an active paid plan: after paying online, after a trial is paid, or when you set a paid plan for them in Subscriptions. Members on an unpaid trial do not get it until the trial is paid. You can always send it again by hand with the buttons above.')
+                    ->description('Goes out by itself each time a member starts a paid plan: after paying online, after a trial is paid, when you set a paid plan for them in Subscriptions, or when they move to another paid plan. Renewals of the same plan do not send it. Members on an unpaid trial do not get it until the trial is paid. You can always send it again by hand with the buttons above.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\Toggle::make('enabled')
@@ -66,8 +66,8 @@ class PaidWelcomeEmail extends Page implements HasForms
                         Forms\Components\Placeholder::make('tracking')
                             ->label('Status')
                             ->content(fn (): string => WelcomeEmail::canTrack()
-                                ? 'Ready. Each member gets it automatically only once.'
-                                : 'Run the database migration on this server first; until then it is not sent automatically (sending by hand still works).')
+                                ? 'Ready.'
+                                : 'Ready. Run the database migration to keep the list of who was welcomed.')
                             ->columnSpan(2),
                     ]),
                 Forms\Components\Section::make('English')

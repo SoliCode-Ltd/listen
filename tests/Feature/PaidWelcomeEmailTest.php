@@ -32,7 +32,7 @@ class PaidWelcomeEmailTest extends TestCase
         $this->paid = Plan::factory()->create(['slug' => 'creator', 'price_cents' => 1900, 'name_en' => null, 'name_ar' => null]);
     }
 
-    public function test_a_new_paid_member_gets_the_welcome_email_once(): void
+    public function test_a_member_starting_a_paid_plan_gets_the_welcome_email(): void
     {
         $user = User::factory()->create(['name' => 'Sara Ali', 'email' => 'sara@example.test']);
 
@@ -56,6 +56,45 @@ class PaidWelcomeEmailTest extends TestCase
         // Saving the subscription again, or renewing, does not send it again.
         $subscription->update(['current_period_end' => now()->addMonth()]);
         $this->app->terminate();
+        Mail::assertSent(NewsletterMail::class, 1);
+    }
+
+    public function test_it_is_sent_again_each_time_a_paid_plan_starts(): void
+    {
+        $user = User::factory()->create(['email' => 'again@example.test']);
+        $pro = Plan::factory()->create(['slug' => 'pro', 'price_cents' => 4900, 'name_en' => null, 'name_ar' => null]);
+        $plans = app(\App\Services\PlanAccessService::class);
+
+        $plans->assignPlan($user, $this->paid);
+        $this->app->terminate();
+        // Back to free: nothing. Then a paid plan again: welcomed again.
+        $plans->assignPlan($user, $this->free);
+        $this->app->terminate();
+        Mail::assertSent(NewsletterMail::class, 1);
+
+        $plans->assignPlan($user, $pro);
+        $this->app->terminate();
+        Mail::assertSent(NewsletterMail::class, 2);
+        Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => str_contains($mail->htmlBody, 'Welcome to Pro'));
+
+        // Moving to another paid plan welcomes them to it too (a minute later).
+        $this->travel(2)->minutes();
+        $plans->assignPlan($user, $this->paid);
+        $this->app->terminate();
+        Mail::assertSent(NewsletterMail::class, 3);
+    }
+
+    public function test_one_checkout_saving_the_subscription_twice_sends_one_email(): void
+    {
+        $user = User::factory()->create();
+        $subscription = Subscription::create(['user_id' => $user->id, 'plan_id' => $this->paid->id, 'status' => 'incomplete']);
+
+        // Same request: the plan is set, then the status turns active.
+        $subscription->update(['status' => 'active']);
+        $subscription->update(['status' => 'past_due']);
+        $subscription->update(['status' => 'active']);
+        $this->app->terminate();
+
         Mail::assertSent(NewsletterMail::class, 1);
     }
 
@@ -112,6 +151,7 @@ class PaidWelcomeEmailTest extends TestCase
 
     public function test_the_admin_edits_the_words_and_sends_it_by_hand(): void
     {
+        app(PaidWelcomeEmail::class)->save(['enabled' => false]);
         $member = User::factory()->create(['email' => 'member@example.test']);
         $member->forceFill(['paid_welcome_sent_at' => now()->subWeek()])->saveQuietly();
         Subscription::create(['user_id' => $member->id, 'plan_id' => $this->paid->id, 'status' => 'active']);
@@ -122,6 +162,7 @@ class PaidWelcomeEmailTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
 
         Livewire::test(WelcomePage::class)
+            ->set('data.enabled', true)
             ->set('data.subject_en', 'Thanks for joining us')
             ->set('data.body_en', 'Your new plan is ready.')
             ->call('save')
