@@ -117,6 +117,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('price_dollars')
                             ->label('Monthly Price ($)')
                             ->numeric()
+                            ->live(onBlur: true)
                             ->prefix('$')
                             ->step('0.01')
                             ->required()
@@ -177,6 +178,7 @@ class PlanResource extends Resource
                     ->schema([
                         Forms\Components\Select::make('voice_tier')
                             ->label('Voice Quality Tier')
+                            ->live()
                             ->options([
                                 'standard' => 'Standard',
                                 'hd' => 'Premium',
@@ -202,9 +204,15 @@ class PlanResource extends Resource
                             ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Characters in the pack' : 'Monthly Characters')
                             ->numeric()
                             ->required()
-                            ->helperText(fn (Get $get): string => $get('kind') === Plan::KIND_PACK
-                                ? 'Characters each purchase adds. Unused characters move into the plan a member upgrades to.'
-                                : 'Total chars allowed per month'),
+                            ->live(debounce: 600)
+                            ->helperText(fn (Get $get): string => ($get('kind') === Plan::KIND_PACK
+                                ? 'Characters each purchase adds. Unused characters move into the plan a member upgrades to. '
+                                : 'Total chars allowed per month. ')
+                                .\App\Support\PlanCostEstimate::adminLine(
+                                    (int) $get('monthly_chars'),
+                                    is_numeric($get('price_dollars')) ? (float) $get('price_dollars') : null,
+                                    $get('voice_tier') === 'hd',
+                                )),
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()

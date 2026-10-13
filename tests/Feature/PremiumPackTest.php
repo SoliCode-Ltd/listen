@@ -747,6 +747,26 @@ class PremiumPackTest extends TestCase
         $this->assertSame(0, Subscription::query()->where('user_id', $user->id)->count());
     }
 
+    public function test_the_plan_editor_shows_minutes_and_cost_for_the_characters(): void
+    {
+        $line = \App\Support\PlanCostEstimate::adminLine(20000, 2.0, true);
+
+        // 20,000 characters at the default 13 characters a second: about 26 minutes.
+        $this->assertStringContainsString('≈ 26 min of Arabic', $line);
+        $this->assertStringContainsString('≈ 26 min of English', $line);
+        // 1,538 s x 25 tokens x $9 per million + text ≈ $0.35; at 32 tokens ≈ $0.45; 2027 prices ≈ $0.70.
+        $this->assertStringContainsString('≈ $0.35 (up to $0.45)', $line);
+        $this->assertStringContainsString('≈ $0.70 from Jan 2027', $line);
+        $this->assertStringContainsString('margin before card fees ≈ $1.55', $line);
+
+        $this->actingAs($this->admin());
+        \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
+        \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->starter->getRouteKey()])
+            ->assertSee('min of Arabic')
+            ->set('data.monthly_chars', 40000)
+            ->assertSee('≈ 51 min of Arabic');
+    }
+
     public function test_the_admin_edits_the_pack(): void
     {
         $this->actingAs($this->admin());
