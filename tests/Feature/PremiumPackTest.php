@@ -301,27 +301,24 @@ class PremiumPackTest extends TestCase
     //  New members and the free plan
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_new_members_get_no_free_monthly_characters_once_switched_off(): void
+    public function test_once_switched_off_nobody_on_the_free_plan_has_monthly_characters(): void
     {
-        $existing = $this->member();
-        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
-        $newcomer = $this->member();
-
-        $this->assertTrue($existing->fresh()->free_monthly_chars);
-        $this->assertFalse((bool) $newcomer->fresh()->free_monthly_chars);
-
+        $member = $this->member();
+        $admin = $this->admin();
         $voice = $this->standardVoice();
-        $this->actingAs($newcomer)->postJsonLocalizedRoute('dashboard.queue', [
+        $generate = fn (User $user) => $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', [
             'content' => 'Hello there',
             'target_language' => 'en',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
-        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.no_chars_yet'));
+        ]);
 
-        $this->actingAs($existing)->postJsonLocalizedRoute('dashboard.queue', [
-            'content' => 'Hello there',
-            'target_language' => 'en',
-            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
-        ])->assertOk();
+        $generate($member)->assertOk();
+
+        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
+
+        $generate($member)->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.no_chars_yet'));
+        $generate($admin)->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.no_chars_yet'));
+        $generate($this->member())->assertStatus(422);
     }
 
     public function test_a_gift_still_works_for_a_member_without_free_characters(): void
@@ -588,8 +585,8 @@ class PremiumPackTest extends TestCase
 
         $this->actingAs($this->member())->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertSee('pack-offer--no_chars', false)
-            ->assertSee(__('ui.pack.offer_no_chars_title'))
+            ->assertSee('plan-offer--no_chars', false)
+            ->assertSee(__('ui.pack.offer_choose_title'))
             ->assertSee(route('billing.pack'), false)
             ->assertSee(route('billing.page', ['plan' => 'starter']), false);
     }
@@ -602,7 +599,7 @@ class PremiumPackTest extends TestCase
 
         $this->actingAs($user)->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertSee('pack-offer--has_pack', false)
+            ->assertSee('plan-offer--has_pack', false)
             ->assertSee(__('ui.pack.meter_label'))
             ->assertSee('18,000 / 20,000', false);
     }
@@ -631,6 +628,27 @@ class PremiumPackTest extends TestCase
             ->assertDontSee(route('billing.pack'), false);
     }
 
+    public function test_the_dashboard_offer_shows_what_the_admin_wrote_for_each_plan(): void
+    {
+        SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
+        $this->pack->update(['is_active' => false]);
+        Plan::query()->where('slug', 'basic')->update([
+            'is_active' => true,
+            'name_en' => 'Lite',
+            'description_en' => 'Written by the owner for Lite.',
+            'button_text_en' => 'Start Lite',
+            'pricing_extra_lines_en' => json_encode([['label' => 'Owner line', 'value' => 'Yes', 'icon' => 'check']]),
+            'pricing_lines' => json_encode(array_fill_keys(array_keys(\App\Support\PlanPricingLines::LINES), false)),
+        ]);
+
+        $page = $this->actingAs($this->member())->getLocalizedRoute('dashboard')->assertOk();
+        $locale = app()->getLocale();
+        if ($locale === 'en') {
+            $page->assertSee('Lite')->assertSee('Written by the owner for Lite.')->assertSee('Start Lite')->assertSee('Owner line');
+        }
+        $page->assertSee('plan-offer-card', false)->assertSee(route('billing.page', ['plan' => 'basic']), false);
+    }
+
     public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void
     {
         $basic = Plan::query()->where('slug', 'basic')->firstOrFail();
@@ -653,18 +671,12 @@ class PremiumPackTest extends TestCase
 
     public function test_the_command_ends_free_monthly_characters_for_everyone(): void
     {
-        $existing = $this->member();
-        $admin = $this->admin();
-
         $this->artisan('listen:end-free-monthly-chars')->assertSuccessful();
-        $this->assertTrue($existing->fresh()->free_monthly_chars, 'a dry run changes nothing');
+        $this->assertTrue(FreeAllowance::freePlanGivesMonthlyChars(), 'a dry run changes nothing');
 
         $this->artisan('listen:end-free-monthly-chars', ['--apply' => true])->assertSuccessful();
 
-        $this->assertFalse($existing->fresh()->free_monthly_chars);
-        $this->assertTrue($admin->fresh()->free_monthly_chars, 'admin accounts are left alone');
-        $this->assertFalse(FreeAllowance::newMembersGetMonthlyChars());
-        $this->assertFalse((bool) $this->member()->fresh()->free_monthly_chars, 'new sign-ups get none either');
+        $this->assertFalse(FreeAllowance::freePlanGivesMonthlyChars());
     }
 
     public function test_the_admin_switches_free_monthly_characters_for_new_members(): void
@@ -678,7 +690,7 @@ class PremiumPackTest extends TestCase
             ->call('save')
             ->assertHasNoErrors();
 
-        $this->assertFalse(FreeAllowance::newMembersGetMonthlyChars());
+        $this->assertFalse(FreeAllowance::freePlanGivesMonthlyChars());
     }
 
     public function test_the_admin_edits_the_pack(): void

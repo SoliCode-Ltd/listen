@@ -951,7 +951,7 @@ class HomeController extends Controller
         $viewerCanBuyPack = $viewer ? $packs->canBuy($viewer) : true;
         $viewerHasPack = $viewer ? $packs->remaining((int) $viewer->id) > 0 : false;
         // New members only get the demo: the free card then shows the demo instead of a monthly allowance.
-        $freeTryChars = FreeAllowance::newMembersGetMonthlyChars() ? null : DemoAllowance::chars();
+        $freeTryChars = FreeAllowance::freePlanGivesMonthlyChars() ? null : DemoAllowance::chars();
 
         $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext, $viewerCanBuyPack, $viewerHasPack, $freeTryChars): array {
             $baseMonthlyCents = max(0, (int) $plan->price_cents);

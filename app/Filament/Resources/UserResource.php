@@ -125,9 +125,6 @@ class UserResource extends Resource
                                     ? number_format($pack['remaining']).' of '.number_format($pack['total']).' characters left, until '.$pack['expires_at']->format('j M Y')
                                     : 'None';
                             }),
-                        Forms\Components\Toggle::make('free_monthly_chars')
-                            ->label('Gets the free plan\'s monthly characters')
-                            ->helperText('On for members who joined while free monthly characters were given. Members on a paid plan are not affected.'),
                         Forms\Components\Placeholder::make('ip_linked_accounts_display')
                             ->label(__('ui.admin.users.ip_linked_accounts'))
                             ->columnSpanFull()

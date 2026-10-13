@@ -54,7 +54,7 @@ class SiteSettings extends Page implements HasForms
             'footer_social_facebook_url' => SiteSetting::get('footer_social_facebook_url', ''),
             'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
             DemoAllowance::SETTING_KEY => DemoAllowance::chars(),
-            FreeAllowance::NEW_MEMBERS_KEY => FreeAllowance::newMembersGetMonthlyChars(),
+            FreeAllowance::NEW_MEMBERS_KEY => FreeAllowance::freePlanGivesMonthlyChars(),
             'max_accounts_per_ip' => (int) SiteSetting::get('max_accounts_per_ip', 2),
             'multi_account_block_reason_en' => SiteSetting::get(
                 MultiAccountEnforcementService::BLOCK_REASON_EN_SETTING_KEY,
@@ -113,8 +113,8 @@ class SiteSettings extends Page implements HasForms
                             ->suffix('characters')
                             ->helperText('How many premium-voice characters each member can try on the demo page, in total. It is also the longest text a member can generate in one go there. Members who already used more keep what they generated; they just cannot generate more.'),
                         Forms\Components\Toggle::make(FreeAllowance::NEW_MEMBERS_KEY)
-                            ->label('New members get the free plan\'s monthly characters')
-                            ->helperText('Off: people who join from now on get only the demo above, and their dashboard offers the premium pack and Starter. Members who joined while this was on keep their monthly characters (each member\'s page in Users shows it).'),
+                            ->label('The free plan gives monthly characters')
+                            ->helperText('Off: everyone on the free plan, admins included, gets only the demo above (plus any characters you gift), and their dashboard offers your plans. On: they get the free plan\'s monthly characters set in Plans.'),
                     ]),
                 Forms\Components\Section::make('Demo Page Sample Texts')
                     ->description('The sample texts loaded when users click the English/Arabic sample chips on the demo page. HD samples can carry timings and [tags]; Standard samples must be plain text. Leave empty to use the built-in default.')

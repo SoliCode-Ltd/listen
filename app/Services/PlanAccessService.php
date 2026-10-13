@@ -51,8 +51,8 @@ class PlanAccessService
     /**
      * Feature access stays on the active plan. During an unpaid Creator trial,
      * character and minute limits come from the Starter plan and overage is off.
-     * A pack is spent from the member's pack characters, and a free member who
-     * joined after free monthly characters were switched off has none.
+     * A pack is spent from the member's pack characters, and while free monthly
+     * characters are switched off, nobody on the free plan has any.
      * The returned model is not persisted.
      */
     public function resolveQuotaPlanForUserId(int $userId, ?Plan $activePlan = null): ?Plan
@@ -69,7 +69,7 @@ class PlanAccessService
 
         if (! $this->userHasUnpaidTrialWindow($userId)) {
             if ($activePlan && (int) $activePlan->price_cents <= 0
-                && ! (bool) User::query()->whereKey($userId)->value('free_monthly_chars')) {
+                && ! \App\Support\FreeAllowance::freePlanGivesMonthlyChars()) {
                 $quota = $activePlan->replicate();
                 $quota->monthly_chars = 0;
                 $quota->allow_overage = false;

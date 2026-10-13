@@ -1964,17 +1964,27 @@
     })();
   </script>
   <style>
-    .pack-offer { margin: .9rem 0 1.1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 14px); background: var(--surface2); }
-    .pack-offer--no_chars { border-color: var(--brand-accent); }
-    .pack-offer-title { display: block; font-size: 1.05rem; margin-bottom: .25rem; }
-    .pack-offer p { margin: 0 0 .8rem; color: var(--muted); }
-    .pack-offer-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .7rem; }
-    .pack-offer-option { display: grid; gap: .25rem; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: var(--radius, 10px); text-decoration: none; color: inherit; background: var(--surface); }
-    .pack-offer-option:hover { border-color: var(--brand-accent); }
-    .pack-offer-option.is-primary { border-color: var(--brand-accent); }
-    .pack-offer-option span { font-weight: 700; }
-    .pack-offer-option small { color: var(--muted); }
-    .pack-offer-option b { color: var(--brand-accent); font-size: .92rem; }
+    .plan-offer { margin: 1rem 0 1.25rem; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: var(--surface); }
+    .plan-offer-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem; }
+    .plan-offer-head h2 { margin: 0 0 .3rem; font-size: 1.2rem; }
+    .plan-offer-head p { margin: 0; color: var(--muted); font-size: .92rem; line-height: 1.6; }
+    .plan-offer-all { white-space: nowrap; font-size: .85rem; font-weight: 600; color: var(--brand-accent); text-decoration: none; }
+    .plan-offer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+    .plan-offer-card { display: flex; flex-direction: column; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: linear-gradient(180deg, var(--surface2), var(--surface)); }
+    .plan-offer-card.is-highlighted { border-color: var(--brand-accent); box-shadow: 0 8px 28px color-mix(in oklab, var(--brand-accent) 18%, transparent); }
+    .plan-offer-card h3 { margin: 0; font-size: 1.15rem; }
+    .plan-offer-desc { margin: .3rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.5; }
+    .plan-offer-price { display: flex; align-items: baseline; gap: .35rem; margin: .9rem 0 .7rem; }
+    .plan-offer-price strong { font-size: 1.9rem; font-weight: 800; line-height: 1; unicode-bidi: isolate; }
+    .plan-offer-price span { color: var(--muted); font-size: .9rem; }
+    .plan-offer-quota { align-self: flex-start; padding: .35rem .7rem; border: 1px solid var(--line); border-radius: 999px; font-size: .8rem; font-weight: 600; margin-bottom: .8rem; }
+    .plan-offer-lines { list-style: none; margin: 0 0 1.1rem; padding: 0; flex: 1; }
+    .plan-offer-lines li { display: flex; justify-content: space-between; gap: .75rem; padding: .45rem 0; border-bottom: 1px solid color-mix(in oklab, var(--line) 55%, transparent); font-size: .88rem; }
+    .plan-offer-lines li:last-child { border-bottom: 0; }
+    .plan-offer-lines span { color: var(--muted); }
+    .plan-offer-btn { display: flex; justify-content: center; padding: .75rem 1rem; border-radius: var(--radius, 12px); background: linear-gradient(135deg, var(--a, var(--brand-accent)), var(--b, var(--brand-accent))); color: #fff; font-weight: 700; text-decoration: none; }
+    .plan-offer-btn:hover { filter: brightness(1.06); }
+    @media (max-width: 640px) { .plan-offer-head { flex-direction: column; } }
     .meter-ends { display: block; margin-top: .3rem; color: var(--muted); }
   </style>
 </head>
@@ -2087,26 +2097,45 @@
           @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
 
           @if(!empty($packOffer))
-            @php $offer = $packOffer; @endphp
-            <div class="pack-offer pack-offer--{{ $offer['state'] }}" id="packOffer">
-              <strong class="pack-offer-title">{{ __('ui.pack.offer_'.$offer['state'].'_title') }}</strong>
-              <p>
-                @if($offer['state'] === 'has_pack')
-                  {{ __('ui.pack.offer_has_pack_body', ['count' => number_format((int) $usageSnapshot['remaining_chars']), 'date' => $packEndsOn]) }}
-                @else
-                  {{ __('ui.pack.offer_'.$offer['state'].'_body'.($offer['has_pack_option'] ? '' : '_plans')) }}
-                @endif
-              </p>
-              <div class="pack-offer-options">
+            @php
+              $offer = $packOffer;
+              $offerBody = match (true) {
+                $offer['state'] === 'has_pack' => __('ui.pack.offer_has_pack_body', ['count' => number_format((int) $usageSnapshot['remaining_chars']), 'date' => $packEndsOn]),
+                $offer['state'] === 'no_chars' => __('ui.pack.offer_no_chars_body_plans'),
+                \App\Support\FreeAllowance::freePlanGivesMonthlyChars() => __('ui.pack.offer_free_chars_body_plans'),
+                default => __('ui.pack.offer_gift_left_body', ['count' => number_format((int) $usageSnapshot['remaining_chars'])]),
+              };
+            @endphp
+            <section class="plan-offer plan-offer--{{ $offer['state'] }}" id="packOffer">
+              <div class="plan-offer-head">
+                <div>
+                  <h2>{{ $offer['state'] === 'has_pack' ? __('ui.pack.offer_has_pack_title') : __('ui.pack.offer_choose_title') }}</h2>
+                  <p>{{ $offerBody }}</p>
+                </div>
+                <a class="plan-offer-all" href="{{ route('pricing') }}">{{ __('ui.pack.offer_see_all') }}</a>
+              </div>
+              <div class="plan-offer-grid">
                 @foreach($offer['options'] as $option)
-                  <a class="pack-offer-option {{ $option['primary'] ? 'is-primary' : '' }}" href="{{ $option['url'] }}">
-                    <span>{{ $option['name'] }}</span>
-                    <small>{{ $option['line'] }}</small>
-                    <b>{{ $option['cta'] }}</b>
-                  </a>
+                  <article class="plan-offer-card {{ $loop->first || $option['featured'] ? 'is-highlighted' : '' }}">
+                    <h3>{{ $option['name'] }}</h3>
+                    @if($option['description'] !== '')
+                      <p class="plan-offer-desc">{{ $option['description'] }}</p>
+                    @endif
+                    <div class="plan-offer-price">
+                      <strong dir="ltr">{{ $option['price'] }}</strong>
+                      <span>{{ $option['period'] }}</span>
+                    </div>
+                    <div class="plan-offer-quota">{{ $option['headline'] }}</div>
+                    <ul class="plan-offer-lines">
+                      @foreach($option['lines'] as $line)
+                        <li><span>{{ $line['label'] }}</span><b>{{ $line['value'] }}</b></li>
+                      @endforeach
+                    </ul>
+                    <a class="plan-offer-btn" href="{{ $option['url'] }}">{{ $option['cta'] }}</a>
+                  </article>
                 @endforeach
               </div>
-            </div>
+            </section>
           @endif
 
           @php
@@ -2130,7 +2159,7 @@
             @endif
           </div>
 
-          <div class="meter">
+          <div class="meter" @if(!empty($usageSnapshot['no_free_chars'])) hidden @endif>
             <div class="meter-header">
               <small>{{ __('ui.dashboard.requests_usage') }}</small>
               <small id="usageRequestsText">

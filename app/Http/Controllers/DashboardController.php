@@ -532,7 +532,7 @@ class DashboardController extends Controller
      * or in a trial.
      *
      * @param  array<string, mixed>  $usageSnapshot
-     * @return array{state:string, has_pack_option:bool, options:list<array{name:string, line:string, cta:string, url:string, primary:bool}>}|null
+     * @return array{state:string, options:list<array<string, mixed>>}|null
      */
     private function packOffer(Request $request, array $usageSnapshot): ?array
     {
@@ -563,17 +563,35 @@ class DashboardController extends Controller
             default => 'free_chars',
         };
 
+        $perMonth = __('ui.pricing.per_month_short');
+        $card = static function (Plan $plan, string $period, string $headline, string $url, string $cta) use ($price, $locale): array {
+            $lines = \App\Support\PlanPricingLines::forPlan($plan, $locale);
+
+            return [
+                'name' => $plan->getLocalizedName($locale),
+                'description' => $plan->getLocalizedDescription($locale),
+                'price' => $price($plan),
+                'period' => $period,
+                'headline' => $headline,
+                'lines' => array_slice($lines, 0, 5),
+                'more_lines' => max(0, count($lines) - 5),
+                'cta' => $plan->getLocalizedButtonText($locale) ?: $cta,
+                'url' => $url,
+                'featured' => (bool) $plan->is_featured,
+            ];
+        };
+
         $options = [];
         $packs = app(CharPackService::class);
         $pack = $packs->offeredPack();
         if ($pack && $packs->canBuy($user, $pack)) {
-            $options[] = [
-                'name' => $pack->getLocalizedName($locale),
-                'line' => __('ui.pack.offer_pack', ['count' => number_format((int) $pack->monthly_chars), 'price' => $price($pack), 'days' => $pack->packDays()]),
-                'cta' => $state === 'has_pack' ? __('ui.pack.offer_get_more') : __('ui.pack.offer_get_pack'),
-                'url' => route('billing.pack'),
-                'primary' => true,
-            ];
+            $options[] = $card(
+                $pack,
+                __('ui.pack.one_time'),
+                __('ui.pack.headline', ['count' => number_format((int) $pack->monthly_chars), 'days' => $pack->packDays()]),
+                route('billing.pack'),
+                $state === 'has_pack' ? __('ui.pack.offer_get_more') : __('ui.pack.offer_get_pack'),
+            );
         }
 
         $plans = Plan::query()
@@ -584,13 +602,13 @@ class DashboardController extends Controller
             ->limit($options === [] ? 2 : 1)
             ->get();
         foreach ($plans as $plan) {
-            $options[] = [
-                'name' => $plan->getLocalizedName($locale),
-                'line' => __('ui.pack.offer_plan', ['count' => number_format((int) $plan->monthly_chars), 'price' => $price($plan)]),
-                'cta' => __('ui.pack.offer_choose_plan', ['name' => $plan->getLocalizedName($locale)]),
-                'url' => route('billing.page', ['plan' => $plan->slug]),
-                'primary' => $options === [],
-            ];
+            $options[] = $card(
+                $plan,
+                $perMonth,
+                number_format((int) $plan->monthly_chars).' '.__('ui.pricing.characters_per_month'),
+                route('billing.page', ['plan' => $plan->slug]),
+                __('ui.pack.offer_choose_plan', ['name' => $plan->getLocalizedName($locale)]),
+            );
         }
 
         if ($options === []) {
@@ -599,7 +617,6 @@ class DashboardController extends Controller
 
         return [
             'state' => $state,
-            'has_pack_option' => $pack !== null && $options[0]['url'] === route('billing.pack'),
             'options' => $options,
         ];
     }
