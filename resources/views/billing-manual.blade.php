@@ -243,7 +243,7 @@
             </dl>
             <dl class="manual-detail">
               <dt>{{ __('ui.billing.billing_cycle') }}</dt>
-              <dd>{{ $billingCycle === 'yearly' ? __('ui.billing.yearly_save_20') : __('ui.billing.monthly') }}</dd>
+              <dd>{{ $billingCycle === 'one_time' ? __('ui.pack.one_time_payment') : ($billingCycle === 'yearly' ? __('ui.billing.yearly_save_20') : __('ui.billing.monthly')) }}</dd>
             </dl>
             <dl class="manual-detail">
               <dt>{{ __('ui.billing.manual_payment_method') }}</dt>
@@ -328,7 +328,7 @@
 
               <div class="manual-actions">
                 <button class="btn btn-primary" type="submit">{{ __('ui.billing.i_completed_manual_payment') }}</button>
-                <a class="btn" href="{{ route('billing.page', ['plan' => $plan->slug]) }}">{{ __('ui.billing.back_to_checkout') }}</a>
+                <a class="btn" href="{{ $plan->isPack() ? route('billing.pack') : route('billing.page', ['plan' => $plan->slug]) }}">{{ __('ui.billing.back_to_checkout') }}</a>
               </div>
             </form>
           @endif

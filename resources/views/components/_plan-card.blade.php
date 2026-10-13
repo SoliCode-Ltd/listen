@@ -1,6 +1,7 @@
 @php
+  $isPack = !empty($plan['is_pack']);
   $isCurrent = $activePlanSlug === $plan['slug'];
-  $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free';
+  $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free' && !$isPack;
   $monthlyCents = max(0, (int) ($plan['price_monthly_cents'] ?? 0));
   $yearlyCents = max(0, (int) ($plan['price_yearly_cents'] ?? 0));
   if ($yearlyCents <= 0 && $monthlyCents > 0) {
@@ -20,6 +21,7 @@
 <div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} reveal"
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
+     data-is-pack="{{ $isPack ? '1' : '0' }}"
      data-monthly-cents="{{ $monthlyCents }}"
      data-yearly-cents="{{ $yearlyCents }}"
      data-savings-cents="{{ $savingsCents }}"
@@ -60,7 +62,7 @@
       <span class="price-main" dir="ltr">
         <span class="price-amount price-value">{{ $displayMonthlyFormatted }}</span>
       </span>
-      <span class="price-period">{{ __('ui.pricing.per_month_short') }}</span>
+      <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
     </div>
     <div class="price-note price-note-text"></div>
     @php
@@ -110,7 +112,15 @@
     </div>
   @endif
 
-  <div class="plan-quota">{{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</div>
+  <div class="plan-quota">
+    @if($isPack)
+      {{ __('ui.pack.headline', ['count' => number_format($plan['monthly_chars']), 'days' => (int) $plan['pack_days']]) }}
+    @elseif(!empty($plan['free_try_chars']))
+      {{ __('ui.pack.free_try_headline', ['count' => number_format((int) $plan['free_try_chars'])]) }}
+    @else
+      {{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}
+    @endif
+  </div>
 
   <ul class="plan-features">
     @foreach($plan['features'] as $feature)
@@ -154,7 +164,15 @@
     $yearlyLabel = $trialYearly ? $trialLabel : $fallbackLabel;
   @endphp
   <div class="plan-action">
-    @if(auth()->check() && $isCurrent)
+    @if($isPack)
+      @if(!auth()->check())
+        <a class="plan-btn btn-primary" href="{{ route('pack.start') }}">{{ $plan['button_text'] ?: __('ui.pack.buy') }}</a>
+      @elseif(!empty($plan['can_buy_pack']))
+        <a class="plan-btn btn-primary" href="{{ route('billing.pack') }}">{{ !empty($plan['has_pack']) ? __('ui.pack.buy_again') : ($plan['button_text'] ?: __('ui.pack.buy')) }}</a>
+      @else
+        <span class="plan-btn btn-disabled">{{ __('ui.pack.for_free_members') }}</span>
+      @endif
+    @elseif(auth()->check() && $isCurrent)
       <span class="plan-btn btn-disabled">{{ __('ui.pricing.current_plan') }}</span>
     @elseif(auth()->check() && ($isLower || $plan['slug'] === 'free'))
       <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>

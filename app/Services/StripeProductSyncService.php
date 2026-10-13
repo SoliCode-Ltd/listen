@@ -65,6 +65,14 @@ class StripeProductSyncService
             ];
         }
 
+        // A pack is charged once per purchase, so it has no monthly price in Stripe.
+        if ($plan->isPack()) {
+            return [
+                'success' => true,
+                'message' => 'Packs are charged once and do not need Stripe prices.',
+            ];
+        }
+
         try {
             $stripe = $this->getClient();
 
@@ -364,7 +372,7 @@ class StripeProductSyncService
      */
     public function syncAllPlans(): array
     {
-        $plans = Plan::where('is_active', true)
+        $plans = Plan::query()->subscriptionPlans()->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->get();
 

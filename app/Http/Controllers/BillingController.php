@@ -54,7 +54,7 @@ class BillingController extends Controller
         $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
         $selectedPlan = trim((string) $request->query('plan', ''));
-        $validPlanSlugs = Plan::query()
+        $validPlanSlugs = Plan::query()->subscriptionPlans()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->pluck('slug')
@@ -156,7 +156,7 @@ class BillingController extends Controller
         ]);
 
         // Dynamically validate plan slug exists as an active paid plan
-        $planRecord = Plan::query()
+        $planRecord = Plan::query()->subscriptionPlans()
             ->where('slug', $validated['plan'])
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
@@ -721,7 +721,7 @@ class BillingController extends Controller
     {
         $locale = app()->getLocale();
 
-        return Plan::query()
+        return Plan::query()->subscriptionPlans()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->orderBy('price_cents')
@@ -1350,7 +1350,7 @@ class BillingController extends Controller
         }
 
         // Check admin-set prices (SiteSetting) first, then .env config
-        $plans = Plan::where('is_active', true)->where('price_cents', '>', 0)->pluck('slug');
+        $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->pluck('slug');
         foreach ($plans as $slug) {
             foreach (['monthly', 'yearly'] as $cycle) {
                 if ($priceId === $this->resolveStripePriceId((string) $slug, $cycle)) {

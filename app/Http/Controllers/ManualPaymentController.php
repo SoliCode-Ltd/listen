@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
+use App\Services\Billing\CharPackService;
 use App\Services\LocalizedPricingService;
 use App\Services\ManualPaymentService;
 use DomainException;
@@ -13,29 +14,68 @@ class ManualPaymentController extends Controller
     public function __construct(
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly ManualPaymentService $manualPaymentService,
+        private readonly CharPackService $charPacks,
     ) {}
 
-    public function instructions(Request $request)
+    /**
+     * A plan or pack on sale. A pack is always paid once ("one_time");
+     * a monthly plan never is.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function payablePlan(array $validated): Plan
     {
-        $validated = $request->validate([
-            'plan' => ['required', 'string', 'max:50'],
-            'billing_cycle' => ['required', 'in:monthly,yearly'],
-            'payment_method' => ['required', 'in:instapay,vodafone_cash'],
-        ]);
-
         $plan = Plan::query()
             ->where('slug', $validated['plan'])
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->firstOrFail();
 
-        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+        abort_if(! $plan->isPack() && $validated['billing_cycle'] === 'one_time', 404);
+
+        return $plan;
+    }
+
+    /**
+     * @param  array<string, mixed>  $validated
+     * @param  array<string, mixed>  $countryContext
+     * @return array<string, mixed>|null
+     */
+    private function quote(Plan $plan, array $validated, array $countryContext): ?array
+    {
         $quote = $this->localizedPricingService->manualQuoteForPlan(
             $plan,
-            $validated['billing_cycle'],
+            $plan->isPack() ? 'monthly' : $validated['billing_cycle'],
             $countryContext,
             $validated['payment_method'],
         );
+
+        if ($quote !== null && $plan->isPack()) {
+            $quote['cycle'] = 'one_time';
+            $quote['interval'] = null;
+        }
+
+        return $quote;
+    }
+
+    public function instructions(Request $request)
+    {
+        $validated = $request->validate([
+            'plan' => ['required', 'string', 'max:50'],
+            'billing_cycle' => ['required', 'in:monthly,yearly,one_time'],
+            'payment_method' => ['required', 'in:instapay,vodafone_cash'],
+        ]);
+
+        $plan = $this->payablePlan($validated);
+        if ($plan->isPack() && ! $this->charPacks->canBuy($request->user(), $plan)) {
+            return redirect()->route('billing.pack');
+        }
+        if ($plan->isPack()) {
+            $validated['billing_cycle'] = 'one_time';
+        }
+
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+        $quote = $this->quote($plan, $validated, $countryContext);
 
         abort_if($quote === null, 404);
 
@@ -62,24 +102,26 @@ class ManualPaymentController extends Controller
     {
         $validated = $request->validate([
             'plan' => ['required', 'string', 'max:50'],
-            'billing_cycle' => ['required', 'in:monthly,yearly'],
+            'billing_cycle' => ['required', 'in:monthly,yearly,one_time'],
             'payment_method' => ['required', 'in:instapay,vodafone_cash'],
             'proof_image' => ['nullable', 'image', 'max:5120'],
         ]);
 
-        $plan = Plan::query()
-            ->where('slug', $validated['plan'])
-            ->where('is_active', true)
-            ->where('price_cents', '>', 0)
-            ->firstOrFail();
+        $plan = $this->payablePlan($validated);
+        if ($plan->isPack() && ! $this->charPacks->canBuy($request->user(), $plan)) {
+            $message = __('ui.pack.plan_includes_premium');
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $message], 409);
+            }
+
+            return redirect()->route('billing.pack')->withErrors(['manual_payment' => $message]);
+        }
+        if ($plan->isPack()) {
+            $validated['billing_cycle'] = 'one_time';
+        }
 
         $countryContext = $this->localizedPricingService->resolveCountryContext($request);
-        $quote = $this->localizedPricingService->manualQuoteForPlan(
-            $plan,
-            $validated['billing_cycle'],
-            $countryContext,
-            $validated['payment_method'],
-        );
+        $quote = $this->quote($plan, $validated, $countryContext);
 
         if ($quote === null) {
             if ($request->expectsJson()) {
@@ -137,6 +179,10 @@ class ManualPaymentController extends Controller
                 'ok' => true,
                 'message' => __('ui.billing.manual_request_received'),
             ]);
+        }
+
+        if ($plan->isPack()) {
+            return redirect()->route('billing.pack')->with('manual_payment_success', __('ui.billing.manual_request_received'));
         }
 
         return redirect()

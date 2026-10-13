@@ -56,7 +56,7 @@ class CreatePlan extends CreateRecord
         }
 
         // Auto-sync to Stripe after create
-        if ($this->record && $this->record->price_cents > 0) {
+        if ($this->record && $this->record->price_cents > 0 && ! $this->record->isPack()) {
             try {
                 $syncService = app(StripeProductSyncService::class);
                 if ($syncService->isConfigured()) {

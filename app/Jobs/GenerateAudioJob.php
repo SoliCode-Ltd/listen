@@ -9,6 +9,7 @@ use App\Models\TtsLog;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
 use App\Services\GenerationErrorRecorder;
+use App\Services\Billing\CharPackService;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -101,7 +102,7 @@ class GenerateAudioJob implements ShouldQueue
 
             // Use advanced synthesis with plan-aware routing
             $planAccessService = app(PlanAccessService::class);
-            $plan = $generation->user_id ? $planAccessService->resolveActivePlanForUserId((int) $generation->user_id) : null;
+            $plan = $generation->user_id ? $planAccessService->resolveAccessPlanForUserId((int) $generation->user_id) : null;
 
             $requestedTier = VoiceTier::normalize((string) ($generation->voice_tier ?: VoiceTier::STANDARD));
             $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
@@ -211,8 +212,7 @@ class GenerateAudioJob implements ShouldQueue
             $this->writeTtsLog($generation, $audio, 'success');
 
             $this->applyUsageDelta(
-                (int) $generation->user_id,
-                $this->usagePeriod($generation),
+                $generation,
                 0,
                 $actualChars - $reserved['chars'],
                 $actualMinutes - $reserved['minutes'],
@@ -327,8 +327,7 @@ class GenerateAudioJob implements ShouldQueue
             $reserved = $this->reservedUsage($generation);
 
             $this->applyUsageDelta(
-                (int) $generation->user_id,
-                $this->usagePeriod($generation),
+                $generation,
                 -1,
                 -$reserved['chars'],
                 -$reserved['minutes'],
@@ -360,9 +359,19 @@ class GenerateAudioJob implements ShouldQueue
         return $generation->created_at?->format('Y-m') ?? now()->format('Y-m');
     }
 
-    private function applyUsageDelta(int $userId, string $periodYm, int $requestsDelta, int $charsDelta, int $minutesDelta): void
+    private function applyUsageDelta(AudioGeneration $generation, int $requestsDelta, int $charsDelta, int $minutesDelta): void
     {
         if ($requestsDelta === 0 && $charsDelta === 0 && $minutesDelta === 0) {
+            return;
+        }
+
+        $userId = (int) $generation->user_id;
+        $periodYm = $this->usagePeriod($generation);
+
+        // Pack characters were spent from the pack, so the correction goes there too.
+        if ($generation->billed_to_pack) {
+            app(CharPackService::class)->adjust($userId, $charsDelta);
+
             return;
         }
 

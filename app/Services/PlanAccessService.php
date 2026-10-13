@@ -6,6 +6,7 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialEligibilityService;
 use App\Support\VoiceTier;
 
@@ -32,14 +33,51 @@ class PlanAccessService
     }
 
     /**
+     * The plan whose features the member uses right now. That is their plan,
+     * except that a member on the free plan with pack characters left gets
+     * the pack's features (the premium voice). Billing code keeps using
+     * resolveActivePlanForUserId(): a pack never becomes the subscription.
+     */
+    public function resolveAccessPlanForUserId(int $userId): ?Plan
+    {
+        $plan = $this->resolveActivePlanForUserId($userId);
+        if ($plan && ($plan->isPack() || (int) $plan->price_cents > 0)) {
+            return $plan;
+        }
+
+        return app(CharPackService::class)->activePackPlan($userId) ?? $plan;
+    }
+
+    /**
      * Feature access stays on the active plan. During an unpaid Creator trial,
      * character and minute limits come from the Starter plan and overage is off.
+     * A pack is spent from the member's pack characters, and a free member who
+     * joined after free monthly characters were switched off has none.
      * The returned model is not persisted.
      */
     public function resolveQuotaPlanForUserId(int $userId, ?Plan $activePlan = null): ?Plan
     {
         $activePlan ??= $this->resolveActivePlanForUserId($userId);
+
+        if ($activePlan?->isPack()) {
+            $quota = $activePlan->replicate();
+            $quota->allow_overage = false;
+            $quota->setAttribute('billed_to_pack', true);
+
+            return $quota;
+        }
+
         if (! $this->userHasUnpaidTrialWindow($userId)) {
+            if ($activePlan && (int) $activePlan->price_cents <= 0
+                && ! (bool) User::query()->whereKey($userId)->value('free_monthly_chars')) {
+                $quota = $activePlan->replicate();
+                $quota->monthly_chars = 0;
+                $quota->allow_overage = false;
+                $quota->setAttribute('no_free_monthly_chars', true);
+
+                return $quota;
+            }
+
             return $activePlan;
         }
 
@@ -177,6 +215,6 @@ class PlanAccessService
     public function freePlan(): ?Plan
     {
         return Plan::query()->where('slug', 'free')->first()
-            ?? Plan::query()->where('is_active', true)->orderBy('price_cents')->first();
+            ?? Plan::query()->subscriptionPlans()->where('is_active', true)->orderBy('price_cents')->first();
     }
 }

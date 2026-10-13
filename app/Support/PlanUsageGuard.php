@@ -10,6 +10,10 @@ class PlanUsageGuard
 {
     public static function planChars(?Plan $plan): int
     {
+        if ($plan?->getAttribute('no_free_monthly_chars')) {
+            return 0;
+        }
+
         return max(1, (int) ($plan?->monthly_chars ?? 30000));
     }
 
@@ -56,7 +60,9 @@ class PlanUsageGuard
             $charsLimit = self::charsLimit($plan, $counter);
             if (((int) $counter->total_chars + (int) $estimate['chars']) > $charsLimit) {
                 throw ValidationException::withMessages([
-                    'content' => 'Monthly characters limit exceeded. Please upgrade your plan to continue.',
+                    'content' => $plan?->getAttribute('no_free_monthly_chars') && $charsLimit <= (int) $counter->total_chars
+                        ? __('ui.backend.no_chars_yet')
+                        : __('ui.backend.monthly_chars_exceeded'),
                 ]);
             }
         }
@@ -75,7 +81,7 @@ class PlanUsageGuard
             $planRequests = self::planRequests($plan);
             if (((int) $counter->total_requests + 1) > $planRequests) {
                 throw ValidationException::withMessages([
-                    'content' => 'Monthly requests limit exceeded. Please upgrade your plan to continue.',
+                    'content' => __('ui.backend.monthly_requests_exceeded'),
                 ]);
             }
         }

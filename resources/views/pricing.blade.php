@@ -851,13 +851,20 @@
         if ($currentPlanIndex === false) $currentPlanIndex = 0;
         $firstRow = array_slice($pricingPlans, 0, 3);
         $secondRow = array_slice($pricingPlans, 3);
+        // A full second row of three sits in the main three-column grid.
+        $secondRowFull = count($secondRow) === 3;
       @endphp
 
       @foreach($firstRow as $index => $plan)
         @include('components._plan-card', ['plan' => $plan, 'index' => $index])
       @endforeach
 
-      @if(count($secondRow) > 0)
+      @if($secondRowFull)
+        @foreach($secondRow as $sIndex => $plan)
+          @php $index = $sIndex + 3; @endphp
+          @include('components._plan-card', ['plan' => $plan, 'index' => $index])
+        @endforeach
+      @elseif(count($secondRow) > 0)
       <div class="plans-row-2">
         @foreach($secondRow as $sIndex => $plan)
           @php $index = $sIndex + 3; @endphp
@@ -949,6 +956,7 @@
   @php
     $pricingI18n = [
       'free_forever' => __('ui.pricing.free_forever'),
+      'one_time_payment' => __('ui.pack.one_time_payment'),
       'billed_yearly_save' => __('ui.pricing.billed_yearly_save'),
       'billed_monthly' => __('ui.pricing.billed_monthly'),
       'year' => __('ui.pricing.year'),
@@ -978,7 +986,12 @@
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
 
-          if (isFree) {
+          if (card.getAttribute('data-is-pack') === '1') {
+            // A pack is paid once: the monthly/yearly switch does not change it.
+            priceValue.textContent = displayMonthly;
+            priceNote.textContent = i18n.one_time_payment;
+            priceNote.className = 'price-note price-note-text';
+          } else if (isFree) {
             priceValue.textContent = displayMonthly;
             priceNote.textContent = i18n.free_forever;
             priceNote.className = 'price-note price-note-text';

@@ -10,7 +10,9 @@ use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
+use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialUsageRecorder;
+use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioUrl;
@@ -18,6 +20,7 @@ use App\Support\DialogueSpeakers;
 use App\Support\PlanUsageGuard;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
+use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceTier;
@@ -42,7 +45,7 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
 
         $baseQuery = $this->userHistoryQuery($userId);
@@ -97,14 +100,13 @@ class DashboardController extends Controller
         $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
         $catalogByTier = VoiceCatalog::publicCatalogByTier();
         $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
-        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $usage);
-        $giftChars = PlanUsageGuard::giftChars($usage);
+        $usageSnapshot = UsageSnapshot::for($userId, $quotaPlan, $usage);
+        $planChars = $usageSnapshot['plan_chars'];
+        $giftChars = $usageSnapshot['gift_chars'];
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
-        $usageCharsPercent = min(100, (int) round(($usage->total_chars / $planChars) * 100));
-        $usageRequestsPercent = $requestsUnlimited
-            ? 0
-            : min(100, (int) round(($usage->total_requests / max(1, $planRequests)) * 100));
+        $requestsUnlimited = $usageSnapshot['requests_unlimited'];
+        $usageCharsPercent = $usageSnapshot['chars_percent'];
+        $usageRequestsPercent = $usageSnapshot['requests_percent'];
 
         // Hybrid TTS: resolve dialogue availability per plan
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
@@ -127,6 +129,8 @@ class DashboardController extends Controller
 
         return view('dashboard', [
             'usage' => $usage,
+            'usageSnapshot' => $usageSnapshot,
+            'packOffer' => $this->packOffer($request, $usageSnapshot),
             'jobs' => $jobs,
             'stats' => $stats,
             'activePlan' => $activePlan,
@@ -192,8 +196,9 @@ class DashboardController extends Controller
     public function queue(Request $request)
     {
         $userId = (int) auth()->id();
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId($userId);
+        $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
+        $billToPack = CharPackService::billsToPack($quotaPlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
@@ -294,53 +299,68 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
+        if ($billToPack) {
+            // Takes the pack characters now; given back below if the generation fails.
+            app(CharPackService::class)->reserve($userId, $estimate['chars']);
+        } else {
+            PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
+        }
 
-        $recorded = $this->audioGenerationRecorder->createForUser(
-            $userId,
-            [
-                'source_type' => 'message',
-                'title' => $validated['title'] ?? null,
-                'content' => $text,
-                'language' => $sourceLanguage,
-                'status' => 'processing',
-                'received_at' => now(),
-            ],
-            [
-                'input_text' => $text,
-                'source_language' => $sourceLanguage,
-                'target_language' => $validated['target_language'],
-                'voice_tier' => $requestedTier,
-                'voice_name' => $voiceName,
-                'tts_provider' => $voiceProvider,
-                'translate' => (bool) ($validated['translate'] ?? false),
-                'duration_seconds' => $estimate['seconds'],
-                'status' => 'processing',
-                'dialect' => $studioOptions['dialect'],
-                'performance_style' => $studioOptions['performance_style'],
-                'style_prompt' => $studioOptions['style_prompt'],
-                'emotion' => $studioOptions['emotion'],
-                'speed' => $studioOptions['speed'],
-                'pitch' => $studioOptions['pitch'],
-                'is_dialogue' => $dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false),
-                'dialogue_metadata' => ($dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false)
-                    && ! empty($validated['dialogue_speakers']))
-                    ? ['speakers' => $validated['dialogue_speakers']]
-                    : null,
-            ],
-        );
+        try {
+            $recorded = $this->audioGenerationRecorder->createForUser(
+                $userId,
+                [
+                    'source_type' => 'message',
+                    'title' => $validated['title'] ?? null,
+                    'content' => $text,
+                    'language' => $sourceLanguage,
+                    'status' => 'processing',
+                    'received_at' => now(),
+                ],
+                [
+                    'input_text' => $text,
+                    'source_language' => $sourceLanguage,
+                    'target_language' => $validated['target_language'],
+                    'voice_tier' => $requestedTier,
+                    'voice_name' => $voiceName,
+                    'tts_provider' => $voiceProvider,
+                    'translate' => (bool) ($validated['translate'] ?? false),
+                    'duration_seconds' => $estimate['seconds'],
+                    'status' => 'processing',
+                    'dialect' => $studioOptions['dialect'],
+                    'performance_style' => $studioOptions['performance_style'],
+                    'style_prompt' => $studioOptions['style_prompt'],
+                    'emotion' => $studioOptions['emotion'],
+                    'speed' => $studioOptions['speed'],
+                    'pitch' => $studioOptions['pitch'],
+                    'is_dialogue' => $dialogueEnabled
+                        && $requestedTier !== VoiceTier::STANDARD
+                        && ($validated['is_dialogue'] ?? false),
+                    'dialogue_metadata' => ($dialogueEnabled
+                        && $requestedTier !== VoiceTier::STANDARD
+                        && ($validated['is_dialogue'] ?? false)
+                        && ! empty($validated['dialogue_speakers']))
+                        ? ['speakers' => $validated['dialogue_speakers']]
+                        : null,
+                    'billed_to_pack' => $billToPack,
+                ],
+            );
+        } catch (\Throwable $e) {
+            if ($billToPack) {
+                app(CharPackService::class)->release($userId, $estimate['chars']);
+            }
+            throw $e;
+        }
 
         $job = $recorded['job'];
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
-        $counter->increment('total_requests');
-        $counter->increment('total_chars', $estimate['chars']);
-        $counter->increment('total_minutes', $estimate['minutes']);
-        app(TrialUsageRecorder::class)->add($userId, $estimate);
+        if (! $billToPack) {
+            $counter->increment('total_requests');
+            $counter->increment('total_chars', $estimate['chars']);
+            $counter->increment('total_minutes', $estimate['minutes']);
+            app(TrialUsageRecorder::class)->add($userId, $estimate);
+        }
 
         try {
             // Dashboard flow is intentionally synchronous for immediate UX.
@@ -355,7 +375,11 @@ class DashboardController extends Controller
         // Always refund usage when the job actually failed,
         // regardless of whether the exception propagated.
         if ($job->status === 'failed') {
-            $this->releaseReservedUsage($counter, $estimate);
+            if ($billToPack) {
+                app(CharPackService::class)->release($userId, $estimate['chars']);
+            } else {
+                $this->releaseReservedUsage($counter, $estimate);
+            }
             $counter->refresh();
         }
 
@@ -367,13 +391,7 @@ class DashboardController extends Controller
             'total' => (clone $baseQuery)->count(),
         ];
 
-        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $counter);
-        $planRequests = PlanUsageGuard::planRequests($quotaPlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
-        $usageCharsPercent = min(100, (int) round(($counter->total_chars / $planChars) * 100));
-        $usageRequestsPercent = $requestsUnlimited
-            ? 0
-            : min(100, (int) round(($counter->total_requests / max(1, $planRequests)) * 100));
+        $usageSnapshot = UsageSnapshot::for($userId, $quotaPlan, $counter);
         $voiceNameMap = $this->voiceNameMapForUser($userId);
 
         if ($request->expectsJson()) {
@@ -386,16 +404,7 @@ class DashboardController extends Controller
                     ? __('ui.backend.dashboard_voice_generated')
                     : ($job->error_message ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
-                'usage' => [
-                    'total_chars' => (int) $counter->total_chars,
-                    'total_minutes' => (int) $counter->total_minutes,
-                    'total_requests' => (int) $counter->total_requests,
-                    'plan_chars' => $planChars,
-                    'plan_requests' => $requestsUnlimited ? null : $planRequests,
-                    'requests_unlimited' => $requestsUnlimited,
-                    'chars_percent' => $usageCharsPercent,
-                    'requests_percent' => $usageRequestsPercent,
-                ],
+                'usage' => $usageSnapshot,
                 'stats' => $stats,
             ], $statusCode);
         }
@@ -514,6 +523,60 @@ class DashboardController extends Controller
             'has_api_key' => (bool) ($user?->api_key_hash ?? false),
             'masked_key' => $last4 !== '' ? 'lk_live_****'.$last4 : null,
             'api_key_created_human' => $user?->api_key_created_at?->diffForHumans(),
+        ];
+    }
+
+    /**
+     * The premium pack and Starter, offered to members without a paid plan.
+     * Null for members who already have a plan (or when no pack is on sale).
+     *
+     * @param  array<string, mixed>  $usageSnapshot
+     * @return array<string, mixed>|null
+     */
+    private function packOffer(Request $request, array $usageSnapshot): ?array
+    {
+        $user = $request->user();
+        $packs = app(CharPackService::class);
+        $pack = $packs->offeredPack();
+        if (! $user || ! $pack || ! $packs->canBuy($user, $pack)) {
+            return null;
+        }
+
+        $pricing = app(LocalizedPricingService::class);
+        $country = $pricing->resolveCountryContext($request);
+        $locale = app()->getLocale();
+        $price = static function (Plan $plan) use ($pricing, $country, $locale): string {
+            $method = $pricing->preferredManualMethodForPlan($plan, $country);
+            $quote = ($method ? $pricing->manualQuoteForPlan($plan, 'monthly', $country, $method, $locale) : null)
+                ?? $pricing->convertedQuoteFromUsd((int) $plan->getEffectivePriceCents(), 'monthly', $country, 'stripe', $locale);
+
+            return (string) $quote['amount_formatted'];
+        };
+
+        $starter = Plan::query()
+            ->subscriptionPlans()
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->orderBy('price_cents')
+            ->first();
+
+        $state = match (true) {
+            $usageSnapshot['mode'] === 'pack' => 'has_pack',
+            $usageSnapshot['remaining_chars'] <= 0 => 'no_chars',
+            default => 'free_chars',
+        };
+
+        return [
+            'state' => $state,
+            'pack_name' => $pack->getLocalizedName($locale),
+            'pack_chars' => (int) $pack->monthly_chars,
+            'pack_days' => $pack->packDays(),
+            'pack_price' => $price($pack),
+            'pack_url' => route('billing.pack'),
+            'starter_name' => $starter?->getLocalizedName($locale),
+            'starter_chars' => (int) ($starter?->monthly_chars ?? 0),
+            'starter_price' => $starter ? $price($starter) : null,
+            'starter_url' => $starter ? route('billing.page', ['plan' => $starter->slug]) : route('pricing'),
         ];
     }
 

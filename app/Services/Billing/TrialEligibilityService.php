@@ -113,7 +113,7 @@ class TrialEligibilityService
             'minutes' => (int) ($quota->monthly_minutes ?? 0),
             'plans' => $plans->pluck('slug')->values()->all(),
             'plan_cycles' => $this->planCycles($plans),
-            'all_plans' => $plans->count() === Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->count(),
+            'all_plans' => $plans->count() === Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->count(),
         ];
     }
 
@@ -211,7 +211,7 @@ class TrialEligibilityService
 
     public function creatorPlan(): ?Plan
     {
-        return Plan::query()
+        return Plan::query()->subscriptionPlans()
             ->where('slug', $this->trialPlanSlug())
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
@@ -301,7 +301,7 @@ class TrialEligibilityService
             return null;
         }
 
-        $plan = Plan::query()
+        $plan = Plan::query()->subscriptionPlans()
             ->where('slug', $slug)
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
@@ -347,7 +347,7 @@ class TrialEligibilityService
      */
     public function trialablePlans(): Collection
     {
-        return Plan::query()
+        return Plan::query()->subscriptionPlans()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->orderBy('price_cents')

@@ -1963,6 +1963,20 @@
       document.documentElement.setAttribute('data-theme', saved || document.documentElement.getAttribute('data-theme') || 'dark');
     })();
   </script>
+  <style>
+    .pack-offer { margin: .9rem 0 1.1rem; padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 14px); background: var(--surface2); }
+    .pack-offer--no_chars { border-color: var(--brand-accent); }
+    .pack-offer-title { display: block; font-size: 1.05rem; margin-bottom: .25rem; }
+    .pack-offer p { margin: 0 0 .8rem; color: var(--muted); }
+    .pack-offer-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .7rem; }
+    .pack-offer-option { display: grid; gap: .25rem; padding: .8rem .9rem; border: 1px solid var(--line); border-radius: var(--radius, 10px); text-decoration: none; color: inherit; background: var(--surface); }
+    .pack-offer-option:hover { border-color: var(--brand-accent); }
+    .pack-offer-option.is-primary { border-color: var(--brand-accent); }
+    .pack-offer-option span { font-weight: 700; }
+    .pack-offer-option small { color: var(--muted); }
+    .pack-offer-option b { color: var(--brand-accent); font-size: .92rem; }
+    .meter-ends { display: block; margin-top: .3rem; color: var(--muted); }
+  </style>
 </head>
 <body>
   @php
@@ -2007,7 +2021,13 @@
       }
       return $text;
     };
-    $activePlanDisplayName = $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    $activePlanDisplayName = $activePlan?->isPack()
+      ? $activePlan->getLocalizedName(app()->getLocale())
+      : $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan'));
+    $packMode = ($usageSnapshot['mode'] ?? 'monthly') === 'pack';
+    $packEndsOn = !empty($usageSnapshot['pack_expires_at'])
+      ? \Illuminate\Support\Carbon::parse($usageSnapshot['pack_expires_at'])->locale(app()->getLocale())->translatedFormat('j F Y')
+      : null;
     $speakerDisplayLabel = static function (?string $voiceName) use ($voiceNameMap, $cleanSpeakerLabel): string {
       $entry = $voiceNameMap[$voiceName] ?? null;
       if (! $entry) return $cleanSpeakerLabel(__('ui.dashboard.default_speaker'));
@@ -2064,8 +2084,38 @@
             <span style="display:block; font-size:1rem; color:var(--muted); margin-top:.3rem; font-weight:500; letter-spacing:0;">{{ __('ui.dashboard.command_center_subtitle') }}</span>
           </h1>
 
+          @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
+
+          @if(!empty($packOffer))
+            @php $offer = $packOffer; @endphp
+            <div class="pack-offer pack-offer--{{ $offer['state'] }}" id="packOffer">
+              <strong class="pack-offer-title">{{ __('ui.pack.offer_'.$offer['state'].'_title') }}</strong>
+              <p>
+                @if($offer['state'] === 'has_pack')
+                  {{ __('ui.pack.offer_has_pack_body', ['count' => number_format((int) $usageSnapshot['remaining_chars']), 'date' => $packEndsOn]) }}
+                @else
+                  {{ __('ui.pack.offer_'.$offer['state'].'_body') }}
+                @endif
+              </p>
+              <div class="pack-offer-options">
+                <a class="pack-offer-option is-primary" href="{{ $offer['pack_url'] }}">
+                  <span>{{ $offer['pack_name'] }}</span>
+                  <small>{{ __('ui.pack.offer_pack', ['count' => number_format($offer['pack_chars']), 'price' => $offer['pack_price'], 'days' => $offer['pack_days']]) }}</small>
+                  <b>{{ $offer['state'] === 'has_pack' ? __('ui.pack.offer_get_more') : __('ui.pack.offer_get_pack') }}</b>
+                </a>
+                @if($offer['starter_name'])
+                  <a class="pack-offer-option" href="{{ $offer['starter_url'] }}">
+                    <span>{{ $offer['starter_name'] }}</span>
+                    <small>{{ __('ui.pack.offer_plan', ['count' => number_format($offer['starter_chars']), 'price' => $offer['starter_price']]) }}</small>
+                    <b>{{ __('ui.pack.offer_choose_plan', ['name' => $offer['starter_name']]) }}</b>
+                  </a>
+                @endif
+              </div>
+            </div>
+          @endif
+
           @php
-            $remainingChars = max(0, (int) $planChars - (int) $usage->total_chars);
+            $remainingChars = (int) ($usageSnapshot['remaining_chars'] ?? max(0, (int) $planChars - (int) $usage->total_chars));
             $remainingRequests = $requestsUnlimited
               ? null
               : max(0, (int) $planRequests - (int) $usage->total_requests);
@@ -2073,10 +2123,13 @@
 
           <div class="meter">
             <div class="meter-header">
-              <small>{{ __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
+              <small>{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
               <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
             </div>
             <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
+            @if ($packMode && $packEndsOn)
+              <small class="meter-ends">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</small>
+            @endif
             @if (($giftChars ?? 0) > 0)
               <small class="gift-chars-note" data-gift-chars="{{ (int) $giftChars }}">🎁 {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $giftChars)]) }}</small>
             @endif
@@ -2098,7 +2151,7 @@
 
           <div class="kpis">
             <div class="kpi"><small>{{ __('ui.dashboard.requests') }}</small><b id="kpiRequests">{{ $usage->total_requests }}</b></div>
-            <div class="kpi"><small>{{ __('ui.dashboard.used_characters') }}</small><b id="kpiChars">{{ number_format($usage->total_chars) }}</b></div>
+            <div class="kpi"><small>{{ __('ui.dashboard.used_characters') }}</small><b id="kpiChars">{{ number_format((int) ($usageSnapshot['total_chars'] ?? $usage->total_chars)) }}</b></div>
             <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
 
@@ -2266,7 +2319,7 @@
         <div class="info-list">
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.current_plan') }}</span><span class="info-value"><span class="status done">{{ $activePlanDisplayName }}</span></span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.voice_quality') }}</span><span class="info-value">{{ $formatTierLabel($planTierLabel) }}</span></div>
-          <div class="info-row"><span class="info-label">{{ __('ui.dashboard.monthly_chars') }}</span><span class="info-value">{{ number_format($planChars) }}</span></div>
+          <div class="info-row"><span class="info-label">{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.monthly_chars') }}</span><span class="info-value">{{ number_format($planChars) }}</span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.monthly_reqs') }}</span><span class="info-value">{{ $requestsUnlimited ? __('ui.dashboard.unlimited') : $planRequests }}</span></div>
           <div class="info-row"><span class="info-label">{{ __('ui.dashboard.max_chars_per_req') }}</span><span class="info-value">{{ $activePlan?->max_chars_per_request ?? 600 }}</span></div>
         </div>

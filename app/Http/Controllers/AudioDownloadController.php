@@ -26,7 +26,7 @@ class AudioDownloadController extends Controller
         if (! AudioFormats::isServerFormat($format) || $path === '' || str_contains($path, '..')) {
             abort(404);
         }
-        if (! in_array($format, AudioFormats::availableFor($plans->resolveActivePlanForUserId($userId)), true)) {
+        if (! in_array($format, AudioFormats::availableFor($plans->resolveAccessPlanForUserId($userId)), true)) {
             abort(403);
         }
 

@@ -10,6 +10,11 @@ class Plan extends Model
 {
     use HasFactory;
 
+    public const KIND_SUBSCRIPTION = 'subscription';
+
+    /** A one-time character pack: bought once, never renews. */
+    public const KIND_PACK = 'pack';
+
     protected $fillable = [
         'slug',
         'name',
@@ -55,6 +60,8 @@ class Plan extends Model
         'voice_cloning_enabled',
         'voice_cloning_max_voices',
         'download_formats',
+        'kind',
+        'pack_days',
         // Pricing page
         'pricing_lines',
         'pricing_extra_lines_en',
@@ -82,11 +89,41 @@ class Plan extends Model
         'pricing_extra_lines_en' => 'array',
         'pricing_extra_lines_ar' => 'array',
         'pricing_use_custom_text' => 'boolean',
+        'pack_days' => 'integer',
     ];
 
     public function subscriptions(): HasMany
     {
         return $this->hasMany(Subscription::class);
+    }
+
+    public function isPack(): bool
+    {
+        return $this->kind === self::KIND_PACK;
+    }
+
+    /**
+     * Monthly plans only: what members can subscribe to, trial, or be moved to.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Plan>  $query
+     */
+    public function scopeSubscriptionPlans($query)
+    {
+        return $query->where(fn ($q) => $q->where('kind', self::KIND_SUBSCRIPTION)->orWhereNull('kind'));
+    }
+
+    /**
+     * @param  \Illuminate\Database\Eloquent\Builder<Plan>  $query
+     */
+    public function scopePacks($query)
+    {
+        return $query->where('kind', self::KIND_PACK);
+    }
+
+    /** How many days a pack lasts once bought. */
+    public function packDays(): int
+    {
+        return max(1, (int) ($this->pack_days ?: 30));
     }
 
     /**

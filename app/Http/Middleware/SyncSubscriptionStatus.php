@@ -26,7 +26,7 @@ class SyncSubscriptionStatus
             $this->billingSyncService->syncIfStale($user);
 
             try {
-                $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+                $activePlan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
                 $this->demoHistoryImporter->syncStorageForPlan((int) $user->id, $activePlan, 200);
             } catch (\Throwable $e) {
                 Log::warning('Failed syncing demo paid-history tags by plan state.', [
