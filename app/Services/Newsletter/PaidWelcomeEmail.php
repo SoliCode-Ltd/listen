@@ -141,7 +141,7 @@ class PaidWelcomeEmail
         $newsletter = $this->asNewsletter($this->settings(), $plan);
         $renderer = app(NewsletterRenderer::class);
         // No email on the recipient: this is a welcome, not a newsletter, so no unsubscribe link.
-        $recipient = ['name' => (string) $user->name];
+        $recipient = ['name' => (string) $user->name, 'no_greeting' => true];
         $html = $renderer->html($newsletter, Newsletter::LANGUAGE_BOTH, $recipient);
         $text = $renderer->text($newsletter, Newsletter::LANGUAGE_BOTH, $recipient);
         $subject = $renderer->subject($newsletter, Newsletter::LANGUAGE_BOTH);
@@ -194,7 +194,7 @@ class PaidWelcomeEmail
         $sample = Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
         $newsletter = $this->asNewsletter($settings ?? $this->settings(), $sample);
 
-        return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true]);
+        return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true, 'no_greeting' => true]);
     }
 
     /**

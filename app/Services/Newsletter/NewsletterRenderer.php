@@ -13,7 +13,7 @@ class NewsletterRenderer
     public const FONT_AR = "'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif";
 
     /**
-     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool}  $recipient
+     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool, no_greeting?: bool}  $recipient
      */
     public function html(Newsletter $newsletter, string $locale, array $recipient = [], bool $preview = false): string
     {
@@ -36,7 +36,7 @@ class NewsletterRenderer
     }
 
     /**
-     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool}  $recipient
+     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool, no_greeting?: bool}  $recipient
      */
     public function text(Newsletter $newsletter, string $locale, array $recipient = [], bool $preview = false): string
     {
@@ -106,7 +106,7 @@ class NewsletterRenderer
     }
 
     /**
-     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool}  $recipient
+     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool, no_greeting?: bool}  $recipient
      * @return list<array<string, mixed>>
      */
     private function sections(Newsletter $newsletter, string $locale, array $recipient): array
@@ -136,7 +136,7 @@ class NewsletterRenderer
     }
 
     /**
-     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool}  $recipient
+     * @param  array{email?: string, name?: string, name_en?: string, name_ar?: string, preview?: bool, no_greeting?: bool}  $recipient
      * @return array<string, mixed>
      */
     private function section(Newsletter $newsletter, string $lang, array $recipient): array
@@ -155,9 +155,10 @@ class NewsletterRenderer
             'preheader' => $this->personalize((string) ($arabic ? $newsletter->preheader_ar : $newsletter->preheader_en), $name),
             'eyebrow' => $this->personalize((string) ($arabic ? $newsletter->eyebrow_ar : $newsletter->eyebrow_en), $name),
             'headline' => $this->personalize((string) ($arabic ? $newsletter->headline_ar : $newsletter->headline_en), $name),
-            'greeting' => $arabic
+            // The paid welcome email has no "Hello …," line; its headline greets.
+            'greeting' => ! empty($recipient['no_greeting']) ? '' : ($arabic
                 ? ('مرحباً'.($name !== '' ? ' '.$name : '').'،')
-                : ('Hello'.($name !== '' ? ' '.$name : '').','),
+                : ('Hello'.($name !== '' ? ' '.$name : '').',')),
             'paragraphs' => array_map(
                 fn (string $paragraph): string => nl2br(e($paragraph), false),
                 $paragraphsText

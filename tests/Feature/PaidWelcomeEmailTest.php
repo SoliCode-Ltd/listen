@@ -49,6 +49,10 @@ class PaidWelcomeEmailTest extends TestCase
                 && str_contains($mail->htmlBody, 'باقة مُبدع')
                 && str_contains($mail->subjectLine, 'Listen Creator')
                 && ! str_contains($mail->htmlBody, '{plan}')
+                // No "Hello Sara," line under the headline, in either language.
+                && ! str_contains($mail->htmlBody, 'Hello Sara')
+                && ! str_contains($mail->htmlBody, 'مرحباً Sara')
+                && ! str_contains($mail->textBody, 'Hello Sara')
                 && $mail->unsubscribeUrl === null;
         });
         $this->assertNotNull($user->fresh()->paid_welcome_sent_at);
