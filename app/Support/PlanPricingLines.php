@@ -145,7 +145,7 @@ final class PlanPricingLines
     {
         return ! $plan->isPack()
             && (int) $plan->price_cents <= 0
-            && ! FreeAllowance::newMembersGetMonthlyChars();
+            && ! FreeAllowance::freePlanGivesMonthlyChars();
     }
 
     /**
