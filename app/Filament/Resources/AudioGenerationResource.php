@@ -6,6 +6,7 @@ use App\Filament\Resources\AudioGenerationResource\Pages;
 use App\Models\AudioGeneration;
 use App\Models\GenerationError;
 use App\Models\TtsLog;
+use App\Support\AudioDuration;
 use App\Support\AudioUrl;
 use App\Support\GenerationChoiceLabels;
 use App\Support\VoiceTier;
@@ -54,7 +55,11 @@ class AudioGenerationResource extends Resource
                         Forms\Components\Select::make('status')
                             ->options(self::statusOptions()),
                         Forms\Components\TextInput::make('duration_seconds')
-                            ->numeric(),
+                            ->label('Length (seconds)')
+                            ->numeric()
+                            ->helperText(fn (?AudioGeneration $record): ?string => (int) $record?->duration_seconds > 0
+                                ? AudioDuration::label((int) $record->duration_seconds).' · '.number_format((int) $record->duration_seconds / 60, 1).' min'
+                                : null),
                         Forms\Components\TextInput::make('audio_path')
                             ->maxLength(255),
                         Forms\Components\TextInput::make('public_audio_url')
@@ -178,9 +183,16 @@ class AudioGenerationResource extends Resource
                     })
                     ->sortable(),
                 Tables\Columns\TextColumn::make('duration_seconds')
-                    ->label('Duration (s)')
-                    ->numeric()
-                    ->sortable(),
+                    ->label('Length')
+                    ->formatStateUsing(fn ($state): string => AudioDuration::label($state === null ? null : (int) $state))
+                    ->placeholder('—')
+                    ->tooltip(fn (AudioGeneration $record): ?string => (int) $record->duration_seconds > 0
+                        ? number_format((int) $record->duration_seconds).' seconds ('.number_format((int) $record->duration_seconds / 60, 1).' min)'
+                        : null)
+                    ->sortable()
+                    ->summarize(Tables\Columns\Summarizers\Sum::make()
+                        ->label('Total')
+                        ->formatStateUsing(fn ($state): string => self::totalLengthLabel((int) $state))),
                 Tables\Columns\IconColumn::make('translate')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('public_audio_url')
@@ -223,6 +235,21 @@ class AudioGenerationResource extends Resource
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
+    }
+
+    /**
+     * "12 min 30 s" or "3 h 05 min" for the total under the Length column.
+     */
+    public static function totalLengthLabel(int $seconds): string
+    {
+        if ($seconds <= 0) {
+            return '0 min';
+        }
+        if ($seconds < 3600) {
+            return intdiv($seconds, 60).' min '.($seconds % 60).' s';
+        }
+
+        return intdiv($seconds, 3600).' h '.sprintf('%02d', intdiv($seconds % 3600, 60)).' min';
     }
 
     /**
