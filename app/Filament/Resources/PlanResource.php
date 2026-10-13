@@ -208,8 +208,8 @@ class PlanResource extends Resource
                             ->live(debounce: 600)
                             ->afterStateUpdated(fn (Set $set, $state) => $set('monthly_minutes', \App\Support\Credits::minutesFor((int) $state)))
                             ->helperText(fn (Get $get): string => ($get('kind') === Plan::KIND_PACK
-                                ? 'Credits each purchase adds (1 credit = 1 character read aloud, spaces included). Unused credits move into the plan a member upgrades to. '
-                                : '1 credit = 1 character read aloud, spaces and line breaks included. ')
+                                ? 'Credits each purchase adds (members are charged 15 credits a second of audio they get). Unused credits move into the plan a member upgrades to. '
+                                : 'Members are charged for the audio they get: 15 credits a second (900 a minute). ')
                                 .\App\Support\PlanCostEstimate::adminLine(
                                     (int) $get('monthly_chars'),
                                     is_numeric($get('price_dollars')) ? (float) $get('price_dollars') : null,
@@ -222,7 +222,7 @@ class PlanResource extends Resource
                             ->dehydrated()
                             ->afterStateHydrated(fn (Forms\Components\TextInput $component, Get $get) => $component->state(\App\Support\Credits::minutesFor((int) $get('monthly_chars'))))
                             ->dehydrateStateUsing(fn (Get $get): int => \App\Support\Credits::minutesFor((int) $get('monthly_chars')))
-                            ->helperText('Set by the credits ('.number_format(\App\Support\Credits::PER_MINUTE).' credits = 1 minute of audio). Generation stops at whichever runs out first: credits or minutes.'),
+                            ->helperText('Set by the credits ('.number_format(\App\Support\Credits::PER_MINUTE).' credits = 1 minute of audio). Credits are charged for the real length of each audio, so members always get exactly these minutes.'),
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()

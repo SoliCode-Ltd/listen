@@ -19,7 +19,7 @@ class TrialUsageRecorder
 
         $seconds = (int) $trial->seconds_used + max(0, (int) ($estimate['seconds'] ?? 0));
         $trial->forceFill([
-            'chars_used' => (int) $trial->chars_used + max(0, (int) ($estimate['chars'] ?? 0)),
+            'chars_used' => (int) $trial->chars_used + max(0, (int) ($estimate['credits'] ?? $estimate['chars'] ?? 0)),
             'requests_used' => (int) $trial->requests_used + 1,
             'seconds_used' => $seconds,
             'minutes_used' => UsageCounter::minutesFor($seconds),
@@ -38,7 +38,7 @@ class TrialUsageRecorder
 
         $seconds = max(0, (int) $trial->seconds_used - max(0, (int) ($estimate['seconds'] ?? 0)));
         $trial->forceFill([
-            'chars_used' => max(0, (int) $trial->chars_used - max(0, (int) ($estimate['chars'] ?? 0))),
+            'chars_used' => max(0, (int) $trial->chars_used - max(0, (int) ($estimate['credits'] ?? $estimate['chars'] ?? 0))),
             'requests_used' => max(0, (int) $trial->requests_used - 1),
             'seconds_used' => $seconds,
             'minutes_used' => UsageCounter::minutesFor($seconds),

@@ -215,9 +215,10 @@ class PremiumPackTest extends TestCase
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
         ])->assertOk()
             ->assertJsonPath('usage.mode', 'pack')
-            ->assertJsonPath('usage.remaining_chars', 19600);
+            // The fake speech makes 3 seconds of audio: 45 credits.
+            ->assertJsonPath('usage.remaining_chars', 19955);
 
-        $this->assertSame(19600, app(CharPackService::class)->remaining($user->id));
+        $this->assertSame(19955, app(CharPackService::class)->remaining($user->id));
         $this->assertTrue((bool) AudioGeneration::query()->latest('id')->value('billed_to_pack'));
         $this->assertSame('hd', AudioGeneration::query()->latest('id')->value('voice_tier'));
         $this->assertSame(0, (int) UsageCounter::query()->where('user_id', $user->id)->value('total_chars'), 'the monthly allowance is untouched');
@@ -249,7 +250,7 @@ class PremiumPackTest extends TestCase
             'target_language' => 'en',
             'voice_key' => VoiceCatalog::keyFromId((int) $this->premiumVoice()->id),
         ])->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.pack_not_enough', ['remaining' => '200', 'needed' => '400']));
+            ->assertJsonPath('errors.content.0', __('ui.backend.pack_not_enough', ['remaining' => '200', 'needed' => '405']));
 
         $this->assertSame([], $this->spoken);
     }
@@ -294,7 +295,7 @@ class PremiumPackTest extends TestCase
             'prefer_sync' => true,
         ])->assertOk();
 
-        $this->assertSame(19500, app(CharPackService::class)->remaining($user->id));
+        $this->assertSame(19955, app(CharPackService::class)->remaining($user->id));
     }
 
     // ──────────────────────────────────────────────────────────────────
@@ -682,7 +683,7 @@ class PremiumPackTest extends TestCase
             'content' => str_repeat('a', 400),
             'target_language' => 'en',
             'voice_key' => VoiceCatalog::keyFromId((int) $this->premiumVoice()->id),
-        ])->assertOk()->assertJsonPath('usage.plan_chars', 20000)->assertJsonPath('usage.total_chars', 400);
+        ])->assertOk()->assertJsonPath('usage.plan_chars', 20000)->assertJsonPath('usage.total_chars', 45);
     }
 
     public function test_the_command_ends_free_monthly_characters_for_everyone(): void
@@ -753,7 +754,7 @@ class PremiumPackTest extends TestCase
         $line = \App\Support\PlanCostEstimate::adminLine(144000, 9.0, true);
 
         // 144,000 credits at 900 a minute: 160 voice minutes.
-        $this->assertStringContainsString('= up to 160 voice minutes a month', $line);
+        $this->assertStringContainsString('= 160 voice minutes a month', $line);
         // 160 min x 60 s x 32 tokens x $9 (now) / $18 (2027) per million, plus the text.
         $this->assertStringContainsString('$2.79 now, $5.58 from Jan 2027', $line);
         // $9 - 2.9% - $0.30 = $8.44 after card fees; $8.44 - $5.58 = $2.86 = 31.8%.
@@ -767,7 +768,7 @@ class PremiumPackTest extends TestCase
         \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->starter->getRouteKey()])
             ->assertSee('voice minutes a month')
             ->set('data.monthly_chars', 90000)
-            ->assertSee('= up to 100 voice minutes a month')
+            ->assertSee('= 100 voice minutes a month')
             ->assertSet('data.monthly_minutes', 100);
     }
 
@@ -791,7 +792,7 @@ class PremiumPackTest extends TestCase
         $dashboard()->assertOk();
     }
 
-    public function test_spaces_and_line_breaks_are_charged_and_the_extension_respects_custom_direction(): void
+    public function test_credits_follow_the_audio_and_the_extension_respects_custom_direction(): void
     {
         $this->starter->update(['custom_prompt_enabled' => false]);
         $user = $this->member();
@@ -800,10 +801,12 @@ class PremiumPackTest extends TestCase
         $user->forceFill(['api_key_hash' => hash('sha256', $key)])->save();
         $voiceKey = VoiceCatalog::keyFromId((int) $this->premiumVoice()->id);
 
-        // "Hi there\nfriend" is 15 characters: the space and the line break are charged too.
-        $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => "Hi there\nfriend", 'target_language' => 'en', 'voice_key' => $voiceKey])
+        // 1,500 characters reserve 100 seconds (1,500 credits), but the audio
+        // made was 3 seconds, so the member pays 45 credits: what they got.
+        $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => str_repeat("word ", 300), 'target_language' => 'en', 'voice_key' => $voiceKey])
             ->assertOk()
-            ->assertJsonPath('usage.total_chars', 15);
+            ->assertJsonPath('usage.total_chars', 45)
+            ->assertJsonPath('usage.seconds_used', 3);
 
         // The extension drops custom direction on a plan without it, as the dashboard does.
         $this->withHeaders(['X-Listen-Key' => $key])->postJson('/api/reader/queue', [

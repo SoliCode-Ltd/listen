@@ -10,8 +10,8 @@ use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
- * A plan's credits (1 per character, spaces included) also set its voice
- * minutes for the month, and generation stops at whichever runs out first.
+ * Credits are charged for the audio made (15 a second), so a plan's credits
+ * and its voice minutes always match.
  */
 class CreditsMinutesTest extends TestCase
 {
@@ -23,32 +23,29 @@ class CreditsMinutesTest extends TestCase
         $this->assertSame(600, Credits::secondsFor(9000));
     }
 
-    public function test_generation_stops_when_the_voice_minutes_run_out_before_the_credits(): void
+    public function test_credits_are_charged_for_audio_so_they_always_match_the_minutes(): void
     {
-        // 9,000 credits = 10 voice minutes.
+        // 15 credits a second: 160 minutes of audio uses exactly 144,000 credits.
+        $this->assertSame(144000, Credits::forSeconds(160 * 60));
+        $this->assertSame(Credits::minutesFor(144000) * 60, intdiv(Credits::forSeconds(160 * 60), Credits::PER_SECOND));
+
+        // A plan of 9,000 credits (10 minutes) with 580 s used (8,700 credits).
         $plan = new Plan(['monthly_chars' => 9000, 'monthly_requests' => 0]);
-        $counter = new UsageCounter(['total_chars' => 1000, 'total_requests' => 3, 'total_seconds' => 580, 'bonus_chars' => 0]);
+        $counter = new UsageCounter(['total_chars' => 8700, 'total_requests' => 3, 'total_seconds' => 580, 'bonus_chars' => 0]);
 
-        // 580 s used + 15 s = 595 s: still within 600 s.
-        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 50, 'seconds' => 15]);
-
-        // Slow speech used the minutes first: credits are left but the audio is not.
-        $counter->total_seconds = 595;
-        try {
-            PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 50, 'seconds' => 15]);
-            $this->fail('The voice minutes were not enforced.');
-        } catch (ValidationException $e) {
-            $this->assertStringContainsString('10 voice minutes', $e->errors()['content'][0]);
-        }
+        // A text reserving 20 s (300 credits) fits exactly; one more second does not.
+        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 300, 'credits' => 300, 'seconds' => 20]);
+        $this->expectException(ValidationException::class);
+        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 315, 'credits' => 315, 'seconds' => 21]);
     }
 
     public function test_gifted_credits_also_give_minutes(): void
     {
         $plan = new Plan(['monthly_chars' => 9000, 'monthly_requests' => 0]);
-        // 9,000 gifted credits double the month to 20 minutes.
-        $counter = new UsageCounter(['total_chars' => 1000, 'total_requests' => 3, 'total_seconds' => 900, 'bonus_chars' => 9000]);
+        // 9,000 gifted credits double the month to 20 minutes: 15 minutes used still leaves room.
+        $counter = new UsageCounter(['total_chars' => 13500, 'total_requests' => 3, 'total_seconds' => 900, 'bonus_chars' => 9000]);
 
-        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 50, 'seconds' => 15]);
+        PlanUsageGuard::assertWithinLimits($plan, $counter, ['chars' => 225, 'credits' => 225, 'seconds' => 15]);
         $this->assertTrue(true);
     }
 

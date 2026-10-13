@@ -51,9 +51,8 @@ class DashboardUsageMeterTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('480,000 / 500,000 credits remaining', false);
-        // The header and the text box show the credits left.
-        $response->assertSee('id="headerCreditBalance"', false);
-        $response->assertSee('<span data-credit-balance>480,000</span>', false);
+        // The text box shows the credits left; the site header does not.
+        $response->assertDontSee('id="headerCreditBalance"', false);
         $response->assertSee('<strong data-credit-balance>480,000</strong>', false);
         // 500,000 credits at 900 a minute = 555 voice minutes; none used yet.
         $response->assertSee('0.0 of 555 voice minutes used', false);

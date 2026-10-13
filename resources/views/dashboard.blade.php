@@ -2002,6 +2002,8 @@
       color: var(--muted);
     }
     .credit-remaining .credit-icon { font-size: 1.05rem; }
+    .credit-estimate { color: var(--muted); margin-inline-start: .35rem; }
+    .credit-estimate:empty { display: none; }
     .credit-remaining strong { color: var(--text); font-variant-numeric: tabular-nums; }
   </style>
 </head>
@@ -2254,6 +2256,7 @@
             <div class="editor-counters">
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
+              <span class="credit-estimate" id="creditEstimate"></span>
             </div>
             <div class="credit-remaining" title="{{ __('ui.pricing.credits_hint') }}">
               <x-credit-icon />
@@ -3988,6 +3991,14 @@
       // Every character is charged, spaces and line breaks too (as the server counts them).
       const length = Array.from(contentInput.value.trim()).length;
       charCountEl.textContent = length.toLocaleString();
+      // About the credits this text will use: 15 a second of audio, about
+      // 15 characters a second (the server's estimate). The real audio decides.
+      const estimateEl = document.getElementById('creditEstimate');
+      if (estimateEl) {
+        const words = (contentInput.value.match(/[\p{L}\p{N}']+/gu) || []).length;
+        const seconds = length > 0 ? Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) : 0;
+        estimateEl.textContent = seconds > 0 ? @json(__('ui.dashboard.credits_estimate')).replace(':count', formatNumber(seconds * 15)) : '';
+      }
       charCounter.classList.remove('warning', 'danger');
       if (length > maxCharsPerRequest) {
         charCounter.classList.add('danger');
