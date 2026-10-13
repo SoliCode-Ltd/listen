@@ -929,6 +929,14 @@ html[dir="rtl"] .perf-grid select {
   transform: translateY(0)
 }
 
+/* A transformed .reveal is its own layer, and the next one (the generate row)
+   paints over it. Lift the section whose dropdown is open so its list shows
+   above the generate button. */
+.reveal:has(.vs-select.is-open) {
+  position: relative;
+  z-index: 50
+}
+
 /* ── Responsive ── */
 @media(max-width:960px) {
   .studio-shell {
