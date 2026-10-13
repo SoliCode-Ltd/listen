@@ -55,6 +55,11 @@ class Plan extends Model
         'voice_cloning_enabled',
         'voice_cloning_max_voices',
         'download_formats',
+        // Pricing page
+        'pricing_lines',
+        'pricing_extra_lines_en',
+        'pricing_extra_lines_ar',
+        'pricing_use_custom_text',
     ];
 
     protected $casts = [
@@ -73,6 +78,10 @@ class Plan extends Model
         'voice_cloning_enabled' => 'boolean',
         'voice_cloning_max_voices' => 'integer',
         'download_formats' => 'array',
+        'pricing_lines' => 'array',
+        'pricing_extra_lines_en' => 'array',
+        'pricing_extra_lines_ar' => 'array',
+        'pricing_use_custom_text' => 'boolean',
     ];
 
     public function subscriptions(): HasMany

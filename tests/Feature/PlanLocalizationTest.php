@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Filament\Resources\PlanResource;
 use App\Models\Plan;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -131,89 +130,5 @@ class PlanLocalizationTest extends TestCase
 
         $this->assertTrue($planWithStripe->hasStripeConfig());
         $this->assertFalse($planWithoutStripe->hasStripeConfig());
-    }
-
-    public function test_default_features_en_contains_emotion_controls(): void
-    {
-        $plan = Plan::factory()->create([
-            'slug' => 'test-plan',
-            'name' => 'Test Plan',
-            'price_cents' => 999,
-            'monthly_requests' => 100,
-            'max_chars_per_request' => 5000,
-            'voice_tier' => 'standard',
-            'processing_priority' => 'standard',
-            'commercial_use_allowed' => false,
-            'recent_voices_days' => 7,
-        ]);
-
-        // Use reflection to call private method
-        $method = new \ReflectionMethod(PlanResource::class, 'buildDefaultFeaturesEn');
-        $method->setAccessible(true);
-        $features = $method->invoke(null, $plan);
-
-        // Verify emotion controls is included with heart icon
-        $emotionFeature = collect($features)->firstWhere('label', 'Emotion Controls');
-        $this->assertNotNull($emotionFeature);
-        $this->assertEquals('heart', $emotionFeature['icon']);
-        $this->assertEquals('Full Controls', $emotionFeature['value']);
-    }
-
-    public function test_default_features_ar_contains_emotion_controls(): void
-    {
-        $plan = Plan::factory()->create([
-            'slug' => 'test-plan',
-            'name' => 'Test Plan',
-            'price_cents' => 0, // Free plan
-            'monthly_requests' => 60,
-            'max_chars_per_request' => 1200,
-            'voice_tier' => 'standard',
-            'processing_priority' => 'standard',
-            'commercial_use_allowed' => false,
-            'recent_voices_days' => 7,
-        ]);
-
-        // Use reflection to call private method
-        $method = new \ReflectionMethod(PlanResource::class, 'buildDefaultFeaturesAr');
-        $method->setAccessible(true);
-        $features = $method->invoke(null, $plan);
-
-        // Verify emotion controls is included with heart icon in Arabic
-        $emotionFeature = collect($features)->firstWhere('label', 'التحكم في المشاعر');
-        $this->assertNotNull($emotionFeature);
-        $this->assertEquals('heart', $emotionFeature['icon']);
-        $this->assertEquals('أساسي', $emotionFeature['value']); // Free plan gets basic
-    }
-
-    public function test_default_features_include_all_expected_features(): void
-    {
-        $plan = Plan::factory()->create([
-            'slug' => 'test-plan',
-            'name' => 'Test Plan',
-            'price_cents' => 999,
-            'monthly_requests' => 0, // Unlimited
-            'max_chars_per_request' => 10000,
-            'voice_tier' => 'hd',
-            'processing_priority' => 'high',
-            'commercial_use_allowed' => true,
-            'recent_voices_days' => 30,
-            'dialogue_enabled' => true,
-        ]);
-
-        $method = new \ReflectionMethod(PlanResource::class, 'buildDefaultFeaturesEn');
-        $method->setAccessible(true);
-        $features = $method->invoke(null, $plan);
-
-        $labels = collect($features)->pluck('label')->toArray();
-
-        // Verify all expected features are present
-        $this->assertContains('Requests', $labels);
-        $this->assertContains('Max Input', $labels);
-        $this->assertContains('Voice Quality', $labels);
-        $this->assertContains('Emotion Controls', $labels);
-        $this->assertContains('Priority Queue', $labels);
-        $this->assertContains('Commercial Use', $labels);
-        $this->assertContains('Recent Voices', $labels);
-        $this->assertContains('Dialogue Mode', $labels); // Since dialogue_enabled = true
     }
 }

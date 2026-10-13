@@ -121,6 +121,6 @@ class CustomPromptFeatureTest extends TestCase
         $response->assertStatus(200);
 
         // The response should include the Custom Prompt feature label
-        $response->assertSee(__('ui.pricing.feature_label_custom_prompt'));
+        $response->assertSee(__('ui.pricing.lines.label_custom_prompt'));
     }
 }

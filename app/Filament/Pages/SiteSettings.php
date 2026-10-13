@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Models\SiteSetting;
 use App\Services\MultiAccountEnforcementService;
+use App\Support\DemoAllowance;
 use App\Support\SiteFont;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -51,6 +52,7 @@ class SiteSettings extends Page implements HasForms
             'footer_social_github_url' => SiteSetting::get('footer_social_github_url', ''),
             'footer_social_facebook_url' => SiteSetting::get('footer_social_facebook_url', ''),
             'footer_social_linkedin_url' => SiteSetting::get('footer_social_linkedin_url', ''),
+            DemoAllowance::SETTING_KEY => DemoAllowance::chars(),
             'max_accounts_per_ip' => (int) SiteSetting::get('max_accounts_per_ip', 2),
             'multi_account_block_reason_en' => SiteSetting::get(
                 MultiAccountEnforcementService::BLOCK_REASON_EN_SETTING_KEY,
@@ -96,6 +98,18 @@ class SiteSettings extends Page implements HasForms
                             ->label('Site Description')
                             ->rows(3)
                             ->columnSpanFull(),
+                    ]),
+                Forms\Components\Section::make('Free Demo')
+                    ->schema([
+                        Forms\Components\TextInput::make(DemoAllowance::SETTING_KEY)
+                            ->label('Demo characters per member')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->maxValue(DemoAllowance::MAX)
+                            ->required()
+                            ->suffix('characters')
+                            ->helperText('How many premium-voice characters each member can try on the demo page, in total. It is also the longest text a member can generate in one go there. Members who already used more keep what they generated; they just cannot generate more.'),
                     ]),
                 Forms\Components\Section::make('Demo Page Sample Texts')
                     ->description('The sample texts loaded when users click the English/Arabic sample chips on the demo page. HD samples can carry timings and [tags]; Standard samples must be plain text. Leave empty to use the built-in default.')
