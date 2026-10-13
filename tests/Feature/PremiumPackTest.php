@@ -662,8 +662,8 @@ class PremiumPackTest extends TestCase
         $page->assertSee(__('ui.pack.showcase_note'))
             ->assertSee('Kore')
             ->assertSee(__('ui.pack.no_chars_value'))
-            ->assertSee('class="kpis"  style="display:none"', false)
-            ->assertSee('class="summary-block"  style="display:none"', false);
+            ->assertSee('class="usage-hero"  style="display:none"', false)
+            ->assertSee('class="usage-health"  style="display:none"', false);
     }
 
     public function test_the_basic_plan_gives_the_premium_voice_with_its_own_monthly_allowance(): void

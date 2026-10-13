@@ -158,7 +158,21 @@
     .plan-card.popular:hover {
       box-shadow: 0 20px 40px color-mix(in oklab, var(--a) 25%, transparent);
     }
+    .popular-badge .popular-crown {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      fill: #FFD66B;
+      stroke: #FFD66B;
+      stroke-width: 1.2;
+      stroke-linejoin: round;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.18));
+    }
+    .popular-badge .popular-crown path + path { fill: none; stroke-width: 1.8; stroke-linecap: round; }
     .popular-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
       position: absolute;
       top: -.8rem;
       left: 0;
@@ -249,12 +263,33 @@
       margin-bottom: 1.25rem;
       background: var(--surface);
     }
+    /* Plan credits: a glowing orb beside the number */
+    .plan-quota.has-credits {
+      display: flex;
+      width: 100%;
+      padding: .55rem 1rem .55rem .6rem;
+      border-radius: 18px;
+      border-color: color-mix(in oklab, var(--a) 22%, var(--line));
+      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 7%, var(--surface)), var(--surface) 70%);
+    }
+    html[dir="rtl"] .plan-quota.has-credits { padding: .55rem .6rem .55rem 1rem; }
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
-      gap: .35rem;
+      gap: .75rem;
     }
-    .plan-quota-credits .credit-icon { font-size: 1.05rem; }
+    .plan-quota-orb {
+      display: inline-grid;
+      place-items: center;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: var(--surface);
+      box-shadow: 0 6px 18px color-mix(in oklab, var(--a) 22%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
+    }
+    .plan-quota-orb .credit-orb { font-size: 2.1rem; }
+    .plan-quota-text { font-size: .9rem; font-weight: 600; color: var(--muted); }
+    .plan-quota-text strong { font-size: 1.15rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; margin-inline-end: .2rem; }
 
     .plan-features {
       list-style: none;
