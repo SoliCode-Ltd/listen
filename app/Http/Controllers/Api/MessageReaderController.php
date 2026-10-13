@@ -174,7 +174,7 @@ class MessageReaderController extends Controller
             'style_prompt' => $validated['style_prompt'] ?? null,
             'speed' => $validated['speed'] ?? null,
             'pitch' => $validated['pitch'] ?? null,
-        ]);
+        ], $activePlan);
 
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
@@ -472,7 +472,7 @@ class MessageReaderController extends Controller
      * @param  array{dialect:mixed,emotion:mixed,performance_style:mixed,style_prompt:mixed,speed:mixed,pitch:mixed}  $options
      * @return array{dialect:?string,emotion:string,performance_style:?string,style_prompt:?string,speed:float,pitch:float}
      */
-    private function sanitizeStudioOptionsForTier(string $tier, array $options): array
+    private function sanitizeStudioOptionsForTier(string $tier, array $options, ?\App\Models\Plan $plan = null): array
     {
         $normalizedTier = VoiceTier::normalize($tier);
 
@@ -507,7 +507,10 @@ class MessageReaderController extends Controller
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'performance_style' => $performanceStyle !== '' ? $performanceStyle : null,
-            'style_prompt' => isset($options['style_prompt']) && is_string($options['style_prompt']) ? trim($options['style_prompt']) ?: null : null,
+            // Custom direction only on plans that include it, as in the dashboard.
+            'style_prompt' => (bool) ($plan?->custom_prompt_enabled ?? false) && isset($options['style_prompt']) && is_string($options['style_prompt'])
+                ? (trim($options['style_prompt']) ?: null)
+                : null,
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
         ];

@@ -750,14 +750,14 @@ class PremiumPackTest extends TestCase
 
     public function test_the_plan_editor_shows_voice_minutes_cost_and_profit_for_the_credits(): void
     {
-        $line = \App\Support\PlanCostEstimate::adminLine(125000, 9.0, true);
+        $line = \App\Support\PlanCostEstimate::adminLine(144000, 9.0, true);
 
-        // 125,000 credits at 780 a minute: 160 voice minutes.
+        // 144,000 credits at 900 a minute: 160 voice minutes.
         $this->assertStringContainsString('= up to 160 voice minutes a month', $line);
         // 160 min x 60 s x 32 tokens x $9 (now) / $18 (2027) per million, plus the text.
-        $this->assertStringContainsString('$2.79 now, $5.57 from Jan 2027', $line);
-        // $9 - 2.9% - $0.30 = $8.44 after card fees; $8.44 - $5.57 = $2.87 = 31.9%.
-        $this->assertStringContainsString('$8.44 after card fees → profit at full use $2.87 (31.9%', $line);
+        $this->assertStringContainsString('$2.79 now, $5.58 from Jan 2027', $line);
+        // $9 - 2.9% - $0.30 = $8.44 after card fees; $8.44 - $5.58 = $2.86 = 31.8%.
+        $this->assertStringContainsString('$8.44 after card fees → profit at full use $2.86 (31.8%', $line);
         $this->assertStringNotContainsString('Below 30%', $line);
 
         $this->assertStringContainsString('Below 30%', \App\Support\PlanCostEstimate::adminLine(500000, 9.0, true));
@@ -766,8 +766,9 @@ class PremiumPackTest extends TestCase
         \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
         \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->starter->getRouteKey()])
             ->assertSee('voice minutes a month')
-            ->set('data.monthly_chars', 78000)
-            ->assertSee('= up to 100 voice minutes a month');
+            ->set('data.monthly_chars', 90000)
+            ->assertSee('= up to 100 voice minutes a month')
+            ->assertSet('data.monthly_minutes', 100);
     }
 
     public function test_the_daily_generation_limit_counts_the_dashboard_and_the_extension_together(): void
@@ -788,6 +789,28 @@ class PremiumPackTest extends TestCase
 
         $this->travel(1)->days();
         $dashboard()->assertOk();
+    }
+
+    public function test_spaces_and_line_breaks_are_charged_and_the_extension_respects_custom_direction(): void
+    {
+        $this->starter->update(['custom_prompt_enabled' => false]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $key = 'lk_live_'.str_repeat('s', 32);
+        $user->forceFill(['api_key_hash' => hash('sha256', $key)])->save();
+        $voiceKey = VoiceCatalog::keyFromId((int) $this->premiumVoice()->id);
+
+        // "Hi there\nfriend" is 15 characters: the space and the line break are charged too.
+        $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => "Hi there\nfriend", 'target_language' => 'en', 'voice_key' => $voiceKey])
+            ->assertOk()
+            ->assertJsonPath('usage.total_chars', 15);
+
+        // The extension drops custom direction on a plan without it, as the dashboard does.
+        $this->withHeaders(['X-Listen-Key' => $key])->postJson('/api/reader/queue', [
+            'content' => 'Hello again', 'target_language' => 'en', 'voice_key' => $voiceKey, 'prefer_sync' => true,
+            'style_prompt' => 'Whisper dramatically',
+        ])->assertOk();
+        $this->assertNull(AudioGeneration::query()->latest('id')->value('style_prompt'));
     }
 
     public function test_failed_generations_do_not_use_up_the_day(): void

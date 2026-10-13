@@ -517,31 +517,11 @@
     const previewButtonIcon = '<svg viewBox="0 0 24 24" width="18" height="18"><polygon points="5 3 19 12 5 21 5 3" fill="currentColor"/></svg>';
     const previewButtonSpinner = '<svg viewBox="0 0 24 24" width="18" height="18" style="animation:spin .8s linear infinite;fill:currentColor"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z" opacity=".3"/><path d="M20 12h2A10 10 0 0 0 12 2v2a8 8 0 0 1 8 8z"/></svg>';
     const previewButtonCooldownIcon = '<svg viewBox="0 0 24 24" width="18" height="18" style="opacity:0.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15v-4H7l5-7v4h4l-5 7z" fill="currentColor"/></svg>';
-    const supportsUnicodeProperties = (() => {
-      try {
-        return new RegExp('[\\p{L}\\p{N}]', 'u').test('A');
-      } catch (_error) {
-        return false;
-      }
-    })();
-    const unicodeBillableCharRegex = supportsUnicodeProperties ? new RegExp('[\\p{L}\\p{N}]', 'u') : null;
-    const fallbackBillableCharRegex = /[0-9A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u052F\u0590-\u05FF\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\u0900-\u097F\u0980-\u09FF\u3040-\u30FF\u4E00-\u9FFF]/;
 
     function formatNumber(value) { return new Intl.NumberFormat('en-US').format(Number(value || 0)); }
+    // Every character is charged (spaces, line breaks and punctuation too), as on the server.
     function countBillableChars(value) {
-      const text = String(value || '');
-      if (!text) return 0;
-
-      let count = 0;
-      for (const char of text) {
-        if (unicodeBillableCharRegex) {
-          if (unicodeBillableCharRegex.test(char)) count += 1;
-          continue;
-        }
-        if (fallbackBillableCharRegex.test(char)) count += 1;
-      }
-
-      return count;
+      return Array.from(String(value || '').trim()).length;
     }
     function currentDraftBillableChars() {
       return countBillableChars(String(textInput?.value || '').trim());

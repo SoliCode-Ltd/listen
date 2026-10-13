@@ -22,8 +22,8 @@ final class PlanCostEstimate
     /** About how many characters make one text token. */
     public const CHARS_PER_TEXT_TOKEN = 3;
 
-    /** Characters spoken per second when there is no history yet (UsageEstimator's 5 chars x 2.6 words). */
-    public const DEFAULT_CHARS_PER_SECOND = 13.0;
+    /** Characters spoken per second (spaces included) when there is no history yet. */
+    public const DEFAULT_CHARS_PER_SECOND = 15.0;
 
     /**
      * Gemini 3.8 Flash TTS list prices in USD per million tokens (standard tier).

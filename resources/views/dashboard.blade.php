@@ -1989,6 +1989,20 @@
     .plan-offer-btn { display: flex; justify-content: center; padding: .75rem 1rem; border-radius: var(--radius, 12px); background: linear-gradient(135deg, var(--a, var(--brand-accent)), var(--b, var(--brand-accent))); color: #fff; font-weight: 700; text-decoration: none; }
     .plan-offer-btn:hover { filter: brightness(1.06); }
     .meter-ends { display: block; margin-top: .3rem; color: var(--muted); }
+    .editor-counters { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+    .credit-remaining {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .3rem .75rem .3rem .6rem;
+      border-radius: 999px;
+      border: 1px solid color-mix(in oklab, #E0A10F 35%, var(--line));
+      background: linear-gradient(180deg, color-mix(in oklab, #FAD25A 12%, var(--surface)), var(--surface));
+      font-size: .82rem;
+      color: var(--muted);
+    }
+    .credit-remaining .credit-icon { font-size: 1.05rem; }
+    .credit-remaining strong { color: var(--text); font-variant-numeric: tabular-nums; }
   </style>
 </head>
 <body>
@@ -2237,8 +2251,15 @@
                 <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
               </div>
               <div class="vs-editor-foot">
+            <div class="editor-counters">
             <div class="char-counter" id="charCounter">
               <span id="charCount">0</span> / <span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> {{ __('ui.dashboard.characters') }}
+            </div>
+            <div class="credit-remaining" title="{{ __('ui.pricing.credits_hint') }}">
+              <x-credit-icon />
+              <span>{{ __('ui.dashboard.credits_left_label') }}</span>
+              <strong data-credit-balance>{{ number_format((int) ($usageSnapshot['remaining_chars'] ?? 0)) }}</strong>
+            </div>
             </div>
                 <button class="dashboard-generate-btn" id="generateBtn" type="submit">
             <span>
@@ -3441,6 +3462,12 @@
           total: formatNumber(usage.minutes_limit),
         });
       }
+      // The credit balance in the header and beside the text box.
+      if (usage.remaining_chars !== undefined) {
+        document.querySelectorAll('[data-credit-balance]').forEach(function (el) {
+          el.textContent = formatNumber(usage.remaining_chars);
+        });
+      }
       if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
@@ -3958,7 +3985,8 @@
     // Live character counter
     function updateCharCounter() {
       if (!contentInput || !charCountEl || !charCounter) return;
-      const length = contentInput.value.length; // includes spaces
+      // Every character is charged, spaces and line breaks too (as the server counts them).
+      const length = Array.from(contentInput.value.trim()).length;
       charCountEl.textContent = length.toLocaleString();
       charCounter.classList.remove('warning', 'danger');
       if (length > maxCharsPerRequest) {
