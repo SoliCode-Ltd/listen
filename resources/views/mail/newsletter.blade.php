@@ -53,7 +53,9 @@
                                 @if ($section['headline'] !== '')
                                     <h1 style="display:block;margin:0 0 16px 0;font-family:{{ $section['font'] }};font-size:32px;line-height:1.2;font-weight:600;letter-spacing:-0.03em;color:#0B0B0F;text-align:{{ $section['align'] }};">{{ $section['headline'] }}</h1>
                                 @endif
-                                <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
+                                @if ($section['greeting'] !== '')
+                                    <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.5;font-weight:600;color:#16161D;text-align:{{ $section['align'] }};">{{ $section['greeting'] }}</p>
+                                @endif
                                 @foreach ($section['paragraphs'] as $paragraph)
                                     <p style="margin:0 0 14px 0;font-family:{{ $section['font'] }};font-size:16px;line-height:1.7;color:#3F3F4A;text-align:{{ $section['align'] }};">{!! $paragraph !!}</p>
                                 @endforeach
