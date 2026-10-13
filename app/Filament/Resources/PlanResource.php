@@ -50,6 +50,27 @@ class PlanResource extends Resource
                             ->label('Featured Plan')
                             ->default(false)
                             ->helperText('Highlighted as "Most Popular" on pricing pages.'),
+                        Forms\Components\Select::make('kind')
+                            ->label('Type')
+                            ->options([
+                                Plan::KIND_SUBSCRIPTION => 'Monthly plan (subscription)',
+                                Plan::KIND_PACK => 'One-time pack',
+                            ])
+                            ->default(Plan::KIND_SUBSCRIPTION)
+                            ->required()
+                            ->live()
+                            ->helperText('A pack is paid once (card, InstaPay or Vodafone Cash) and never renews. Members on the free plan who buy it get its features while its characters last.'),
+                        Forms\Components\TextInput::make('pack_days')
+                            ->label('Days the pack lasts')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(1)
+                            ->maxValue(365)
+                            ->default(30)
+                            ->suffix('days')
+                            ->required(fn (Get $get): bool => $get('kind') === Plan::KIND_PACK)
+                            ->visible(fn (Get $get): bool => $get('kind') === Plan::KIND_PACK)
+                            ->helperText('Counted from each purchase. Buying again adds the characters and starts this many days again; what is unused at the end is lost.'),
                     ]),
                 Forms\Components\Section::make('Localized Content (English)')
                     ->description('English display names and descriptions shown on pricing pages.')
@@ -178,10 +199,12 @@ class PlanResource extends Resource
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('monthly_chars')
-                            ->label('Monthly Characters')
+                            ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Characters in the pack' : 'Monthly Characters')
                             ->numeric()
                             ->required()
-                            ->helperText('Total chars allowed per month'),
+                            ->helperText(fn (Get $get): string => $get('kind') === Plan::KIND_PACK
+                                ? 'Characters each purchase adds. Unused characters move into the plan a member upgrades to.'
+                                : 'Total chars allowed per month'),
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()
@@ -611,6 +634,7 @@ class PlanResource extends Resource
                     ->label('Sync Stripe')
                     ->icon('heroicon-o-arrow-path')
                     ->color('success')
+                    ->hidden(fn (Plan $record): bool => $record->isPack())
                     ->requiresConfirmation()
                     ->modalHeading('Sync Plan to Stripe')
                     ->modalDescription('This will create or update the Stripe product and prices for this plan. Continue?')

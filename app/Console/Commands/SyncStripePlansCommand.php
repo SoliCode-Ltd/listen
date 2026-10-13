@@ -106,7 +106,7 @@ class SyncStripePlansCommand extends Command
         // Show current state
         $this->newLine();
         $this->info('📋 Plan Stripe Status:');
-        $plans = Plan::where('is_active', true)->get();
+        $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->get();
         
         $tableData = $plans->map(fn ($p) => [
             $p->slug,
@@ -126,7 +126,7 @@ class SyncStripePlansCommand extends Command
 
     private function interactiveSync(StripeProductSyncService $syncService): int
     {
-        $plans = Plan::where('is_active', true)
+        $plans = Plan::query()->subscriptionPlans()->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->get();
 

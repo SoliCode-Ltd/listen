@@ -127,10 +127,36 @@ final class PlanPricingLines
             }
         }
 
+        $automatic = self::isDemoOnlyFreePlan($plan)
+            ? self::demoLines($locale)
+            : self::automatic($plan, $locale, self::shownKeys($plan->pricing_lines));
+
         return array_merge(
-            self::automatic($plan, $locale, self::shownKeys($plan->pricing_lines)),
+            $automatic,
             self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale),
         );
+    }
+
+    /**
+     * New members get no monthly characters on the free plan, only the demo,
+     * so its card describes the demo instead of a monthly allowance.
+     */
+    public static function isDemoOnlyFreePlan(Plan $plan): bool
+    {
+        return ! $plan->isPack()
+            && (int) $plan->price_cents <= 0
+            && ! FreeAllowance::newMembersGetMonthlyChars();
+    }
+
+    /**
+     * @return array<int, array{label:string, value:string, icon:string}>
+     */
+    private static function demoLines(string $locale): array
+    {
+        return [
+            ['label' => self::t('label_demo', $locale), 'value' => self::t('chars', $locale, ['count' => number_format(DemoAllowance::chars())]), 'icon' => 'mic'],
+            ['label' => self::t('label_card_needed', $locale), 'value' => self::t('card_not_needed', $locale), 'icon' => 'lock'],
+        ];
     }
 
     /**
@@ -176,9 +202,10 @@ final class PlanPricingLines
             'max_chars_per_request' => (int) $plan->max_chars_per_request > 0
                 ? self::t('chars', $locale, ['count' => number_format((int) $plan->max_chars_per_request)])
                 : null,
-            'monthly_requests' => (int) $plan->monthly_requests <= 0
+            // A pack has no monthly count: it lasts until its characters or days run out.
+            'monthly_requests' => $plan->isPack() ? null : ((int) $plan->monthly_requests <= 0
                 ? self::t('unlimited', $locale)
-                : number_format((int) $plan->monthly_requests),
+                : number_format((int) $plan->monthly_requests)),
             'voice_controls' => $premium ? self::t('full_control', $locale) : null,
             'processing_priority' => self::t(
                 in_array((string) $plan->processing_priority, ['high', 'priority', 'highest'], true) ? 'priority_high' : 'priority_standard',
@@ -197,7 +224,7 @@ final class PlanPricingLines
                 fn (string $format): string => explode(' ', AudioFormats::ALL[$format]['label'])[0],
                 AudioFormats::availableFor($plan),
             )),
-            'topup' => self::topupCents($plan) > 0
+            'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
                 : null,
             default => null,
@@ -224,6 +251,7 @@ final class PlanPricingLines
                 ? 'Hidden: this plan does not include voice cloning (or cloning is switched off site-wide).'
                 : 'Hidden: voice cloning is still a private preview, so members on this plan cannot use it yet.',
             'topup' => 'Hidden: no top-up price is set.',
+            'monthly_requests' => 'Hidden: a pack has no monthly count.',
             default => 'Hidden for this plan.',
         };
     }

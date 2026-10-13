@@ -21,7 +21,7 @@ class UpgradeController extends Controller
         $currentPlanSlug = (string) ($activePlan?->slug ?? 'free');
         $locale = app()->getLocale();
 
-        $plans = Plan::query()
+        $plans = Plan::query()->subscriptionPlans()
             ->where('is_active', true)
             ->orderBy('price_cents')
             ->get()

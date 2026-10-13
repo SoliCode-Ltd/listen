@@ -41,7 +41,7 @@ class BillingSettings extends Page implements HasForms
             'webhook_emails_enabled' => (string) SiteSetting::get('billing_webhook_emails', config('listen.billing.webhook_email_enabled', '1')) === '1',
             'trial_enabled' => (string) SiteSetting::get('billing_trial_enabled', '1') === '1',
             'trial_plan_slugs' => $trialEligibility->allowedPlanSlugs()
-                ?? Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->pluck('slug')->all(),
+                ?? Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->pluck('slug')->all(),
             'trial_cycles' => $trialEligibility->allowedCycles(),
             'trial_quota_plan_slug' => (string) SiteSetting::get('billing_trial_quota_plan_slug', (string) config('listen.billing.creator_trial.quota_plan_slug', 'starter')),
             'trial_days' => (int) SiteSetting::get('billing_trial_days', (int) config('listen.billing.creator_trial.days', 7)),
@@ -101,7 +101,7 @@ class BillingSettings extends Page implements HasForms
                         Forms\Components\Placeholder::make('stripe_plans_status')
                             ->label('Plans Status')
                             ->content(function (): string {
-                                $plans = Plan::where('is_active', true)->where('price_cents', '>', 0)->get();
+                                $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->get();
                                 $synced = $plans->filter(fn ($p) => $p->hasStripeConfig())->count();
                                 $total = $plans->count();
                                 return "{$synced} / {$total} plans synced to Stripe";
@@ -154,7 +154,7 @@ class BillingSettings extends Page implements HasForms
                             ->columnSpanFull(),
                         Forms\Components\CheckboxList::make('trial_plan_slugs')
                             ->label('Plans that offer the trial')
-                            ->options(fn (): array => Plan::query()
+                            ->options(fn (): array => Plan::query()->subscriptionPlans()
                                 ->where('is_active', true)
                                 ->where('price_cents', '>', 0)
                                 ->orderBy('price_cents')
@@ -178,7 +178,7 @@ class BillingSettings extends Page implements HasForms
                             ->helperText('A yearly trial charges the full yearly price when it ends. A plan also needs a Stripe price for that cycle.'),
                         Forms\Components\Select::make('trial_quota_plan_slug')
                             ->label('Usage cap during the trial')
-                            ->options(fn (): array => Plan::query()
+                            ->options(fn (): array => Plan::query()->subscriptionPlans()
                                 ->where('is_active', true)
                                 ->orderBy('price_cents')
                                 ->pluck('name', 'slug')

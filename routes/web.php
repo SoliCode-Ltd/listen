@@ -126,6 +126,7 @@ Route::group([
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
     Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
+    Route::get('/premium-pack', [\App\Http\Controllers\CharPackController::class, 'start'])->name('pack.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');
     Route::get('/ai-voice-generator', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_voice_generator')->name('seo.ai-voice-generator');
     Route::get('/text-to-speech-arabic', [HomeController::class, 'seoLandingPage'])->defaults('page', 'text_to_speech_arabic')->name('seo.text-to-speech-arabic');
@@ -207,6 +208,9 @@ Route::group([
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
 
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
+        Route::get('/billing/pack', [\App\Http\Controllers\CharPackController::class, 'show'])->name('billing.pack');
+        Route::post('/billing/pack/card', [\App\Http\Controllers\CharPackController::class, 'payByCard'])->middleware('throttle:10,1')->name('billing.pack.card');
+        Route::post('/billing/pack/card/confirm', [\App\Http\Controllers\CharPackController::class, 'confirmCard'])->middleware('throttle:20,1')->name('billing.pack.card.confirm');
         Route::get('/billing/manual', [ManualPaymentController::class, 'instructions'])->name('billing.manual.instructions');
         Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');

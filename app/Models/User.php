@@ -23,6 +23,10 @@ class User extends Authenticatable implements FilamentUser
     protected static function booted(): void
     {
         static::created(static function (self $user): void {
+            if (! $user->free_monthly_chars && \App\Support\FreeAllowance::newMembersGetMonthlyChars()) {
+                $user->forceFill(['free_monthly_chars' => true])->saveQuietly();
+            }
+
             try {
                 app(PlanAccessService::class)->ensureFreePlanForUser($user);
             } catch (\Throwable $e) {
@@ -67,6 +71,7 @@ class User extends Authenticatable implements FilamentUser
         'blocked_reason_en',
         'blocked_by',
         'email_verified_at',
+        'free_monthly_chars',
     ];
 
     /**
@@ -137,6 +142,7 @@ class User extends Authenticatable implements FilamentUser
             'is_blocked' => 'boolean',
             'blocked_at' => 'datetime',
             'paid_welcome_sent_at' => 'datetime',
+            'free_monthly_chars' => 'boolean',
         ];
     }
 

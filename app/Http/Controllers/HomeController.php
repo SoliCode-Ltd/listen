@@ -8,6 +8,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
 use App\Services\GenerationErrorRecorder;
@@ -19,6 +20,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
+use App\Support\FreeAllowance;
 use App\Support\DialogueSpeakers;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
@@ -241,7 +243,7 @@ class HomeController extends Controller
             ];
         }
 
-        $upgradePlanSlug = (string) (Plan::query()
+        $upgradePlanSlug = (string) (Plan::query()->subscriptionPlans()
             ->where('is_active', true)
             ->where('price_cents', '>', 0)
             ->orderBy('price_cents')
@@ -944,7 +946,14 @@ class HomeController extends Controller
         $locale = app()->getLocale();
         $countryContext = $this->localizedPricingService->resolveCountryContext(request());
 
-        $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext): array {
+        $packs = app(CharPackService::class);
+        $viewer = auth()->user();
+        $viewerCanBuyPack = $viewer ? $packs->canBuy($viewer) : true;
+        $viewerHasPack = $viewer ? $packs->remaining((int) $viewer->id) > 0 : false;
+        // New members only get the demo: the free card then shows the demo instead of a monthly allowance.
+        $freeTryChars = FreeAllowance::newMembersGetMonthlyChars() ? null : DemoAllowance::chars();
+
+        $mapped = $plans->map(function (Plan $plan) use ($locale, $countryContext, $viewerCanBuyPack, $viewerHasPack, $freeTryChars): array {
             $baseMonthlyCents = max(0, (int) $plan->price_cents);
             $yearlyDiscountPercent = SiteSetting::yearlyDiscountPercent();
             $monthlyCents = max(0, (int) $plan->getEffectivePriceCents());
@@ -1049,6 +1058,11 @@ class HomeController extends Controller
                 'topup_minute_price_cents' => $topupMinCents,
                 'is_featured' => (bool) ($plan->is_featured ?? false),
                 'features' => $features,
+                'is_pack' => $plan->isPack(),
+                'pack_days' => $plan->isPack() ? $plan->packDays() : null,
+                'can_buy_pack' => $plan->isPack() && $viewerCanBuyPack,
+                'has_pack' => $plan->isPack() && $viewerHasPack,
+                'free_try_chars' => ! $plan->isPack() && (int) $plan->price_cents <= 0 ? $freeTryChars : null,
             ];
         })->values();
 

@@ -110,5 +110,32 @@ class Subscription extends Model
                 ]);
             }
         });
+
+        // A member with pack characters left who starts a paid plan keeps them:
+        // they are added to this month's allowance. Not during an unpaid trial;
+        // that waits until the trial is paid (BillingTrial).
+        static::saved(function (Subscription $subscription): void {
+            try {
+                if ((string) $subscription->status !== 'active') {
+                    return;
+                }
+                if (! $subscription->wasRecentlyCreated && ! $subscription->wasChanged(['plan_id', 'status'])) {
+                    return;
+                }
+                $plan = $subscription->plan()->first();
+                if (! $plan || $plan->isPack() || (int) $plan->price_cents <= 0) {
+                    return;
+                }
+                if (app(\App\Services\PlanAccessService::class)->userHasUnpaidTrialWindow((int) $subscription->user_id)) {
+                    return;
+                }
+                app(\App\Services\Billing\CharPackService::class)->moveLeftoverToPlan($subscription);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Moving pack characters to the new plan failed.', [
+                    'subscription_id' => $subscription->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
     }
 }

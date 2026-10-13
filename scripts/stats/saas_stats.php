@@ -370,6 +370,44 @@ $section('manual_payments', function () use ($has, $ym, $since, $pairs) {
     ];
 });
 
+// The one-time premium pack, side by side with Starter.
+$section('char_packs', function () use ($has, $ym, $since, $now, $pairs) {
+    if (! $has('char_pack_purchases')) {
+        return null;
+    }
+
+    $paid = fn () => DB::table('char_pack_purchases')->where('status', 'paid');
+    $buyerIds = $paid()->distinct()->pluck('user_id');
+
+    return [
+        'by_status' => $pairs(DB::table('char_pack_purchases')
+            ->selectRaw('status as k, count(*) as n')->groupBy('k')->get()),
+        'paid_by_method' => $pairs($paid()->selectRaw('method as k, count(*) as n')->groupBy('k')->get()),
+        'paid_by_month' => $pairs($paid()->whereNotNull('paid_at')->where('paid_at', '>=', $since)
+            ->selectRaw($ym('paid_at').' as k, count(*) as n')->groupBy('k')->orderBy('k')->get()),
+        'revenue_minor_by_currency' => $pairs($paid()->selectRaw('currency as k, sum(amount_minor) as n')->groupBy('k')->get()),
+        'buyers' => $buyerIds->count(),
+        'repeat_buyers' => DB::table('char_pack_purchases')->where('status', 'paid')
+            ->select('user_id')->groupBy('user_id')->havingRaw('count(*) > 1')->get()->count(),
+        // Pack buyers now on a paid monthly plan: the pack's job is to lead there.
+        'buyers_now_on_paid_plan' => $buyerIds->isEmpty() ? 0 : DB::table('subscriptions')
+            ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
+            ->whereIn('subscriptions.user_id', $buyerIds)
+            ->where('subscriptions.status', 'active')
+            ->where('plans.price_cents', '>', 0)
+            ->where('plans.kind', '!=', 'pack')
+            ->where(fn ($q) => $q->whereNull('subscriptions.current_period_end')->orWhere('subscriptions.current_period_end', '>=', $now))
+            ->distinct()->count('subscriptions.user_id'),
+        'active_packs' => $has('char_pack_wallets') ? DB::table('char_pack_wallets')
+            ->where('expires_at', '>', $now)->whereColumn('chars_total', '>', 'chars_used')->count() : null,
+        'chars_bought' => (int) $paid()->sum('chars'),
+        'chars_generated_from_packs' => $has('audio_generations', 'billed_to_pack') ? (int) DB::table('audio_generations')
+            ->where('billed_to_pack', true)->where('status', 'done')->sum('billable_chars') : null,
+        'members_without_free_monthly_chars' => $has('users', 'free_monthly_chars')
+            ? DB::table('users')->where('free_monthly_chars', false)->where('is_admin', false)->count() : null,
+    ];
+});
+
 $section('referrals', function () use ($has, $pairs) {
     if (! $has('referral_conversions')) {
         return null;

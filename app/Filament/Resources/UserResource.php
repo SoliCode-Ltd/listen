@@ -116,6 +116,18 @@ class UserResource extends Resource
                             ->content(fn (?User $record): string => $record
                                 ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format(\App\Support\DemoAllowance::chars())
                                 : '0'),
+                        Forms\Components\Placeholder::make('pack_chars_display')
+                            ->label('Premium pack')
+                            ->content(function (?User $record): string {
+                                $pack = $record ? app(\App\Services\Billing\CharPackService::class)->summary((int) $record->id) : null;
+
+                                return $pack && $pack['active']
+                                    ? number_format($pack['remaining']).' of '.number_format($pack['total']).' characters left, until '.$pack['expires_at']->format('j M Y')
+                                    : 'None';
+                            }),
+                        Forms\Components\Toggle::make('free_monthly_chars')
+                            ->label('Gets the free plan\'s monthly characters')
+                            ->helperText('On for members who joined while free monthly characters were given. Members on a paid plan are not affected.'),
                         Forms\Components\Placeholder::make('ip_linked_accounts_display')
                             ->label(__('ui.admin.users.ip_linked_accounts'))
                             ->columnSpanFull()

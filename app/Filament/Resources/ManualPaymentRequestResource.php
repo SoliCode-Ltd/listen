@@ -89,7 +89,8 @@ class ManualPaymentRequestResource extends Resource
                     ->formatStateUsing(fn (string $state): string => app(LocalizedPricingService::class)->paymentMethodMeta($state)['label']),
                 Tables\Columns\TextColumn::make('billing_cycle')
                     ->label('Cycle')
-                    ->badge(),
+                    ->badge()
+                    ->formatStateUsing(fn (string $state): string => $state === 'one_time' ? 'one-time pack' : $state),
                 Tables\Columns\TextColumn::make('expected_amount_minor')
                     ->label('Amount')
                     ->formatStateUsing(function (?string $state, ManualPaymentRequest $record): string {
@@ -204,6 +205,9 @@ class ManualPaymentRequestResource extends Resource
                     ->requiresConfirmation()
                     ->modalHeading('Delete manual payment request')
                     ->modalDescription(function (ManualPaymentRequest $record): string {
+                        if ($record->status === ManualPaymentRequest::STATUS_APPROVED && $record->plan?->isPack()) {
+                            return 'Deleting an approved pack payment takes back whatever the member has not used of that pack.';
+                        }
                         if ($record->status === ManualPaymentRequest::STATUS_APPROVED) {
                             return 'Deleting an approved request will rollback the user plan to the previous plan snapshot, or to Free if no previous snapshot is available.';
                         }
@@ -214,9 +218,11 @@ class ManualPaymentRequestResource extends Resource
                         $result = app(ManualPaymentService::class)->deleteRequest($record);
 
                         if (($result['rolled_back'] ?? false) === true) {
-                            $message = ($result['used_fallback_plan'] ?? false) === true
+                            $message = $record->plan?->isPack()
+                                ? 'Request deleted. The unused pack characters were taken back.'
+                                : (($result['used_fallback_plan'] ?? false) === true
                                 ? 'Request deleted. User plan rolled back to Free fallback.'
-                                : 'Request deleted. User plan rolled back to previous plan.';
+                                : 'Request deleted. User plan rolled back to previous plan.');
 
                             Notification::make()
                                 ->title($message)

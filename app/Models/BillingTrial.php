@@ -92,6 +92,28 @@ class BillingTrial extends Model
                 ]);
             }
         });
+
+        // The trial is paid: unused pack characters join the plan's allowance.
+        static::saved(function (BillingTrial $trial): void {
+            if ($trial->status !== self::STATUS_PAID || ! $trial->wasChanged('status')) {
+                return;
+            }
+            try {
+                $subscription = Subscription::query()
+                    ->where('user_id', $trial->user_id)
+                    ->where('status', 'active')
+                    ->latest('id')
+                    ->first();
+                if ($subscription) {
+                    app(\App\Services\Billing\CharPackService::class)->moveLeftoverToPlan($subscription);
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Moving pack characters after the trial was paid failed.', [
+                    'trial_id' => $trial->id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
     }
 
     public function user(): BelongsTo

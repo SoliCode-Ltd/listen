@@ -10,6 +10,7 @@ use App\Models\UsageCounter;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
+use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
@@ -18,6 +19,7 @@ use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
+use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
@@ -38,7 +40,7 @@ class MessageReaderController extends Controller
         $user = $this->resolveApiUser($request);
         $this->billingSyncService->syncIfStale($user);
 
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $activePlan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
 
@@ -48,9 +50,8 @@ class MessageReaderController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        $planChars = PlanUsageGuard::charsLimit($quotaPlan, $counter);
-        $planRequests = PlanUsageGuard::planRequests($quotaPlan);
-        $requestsUnlimited = PlanUsageGuard::hasUnlimitedRequests($quotaPlan);
+        $usage = UsageSnapshot::for((int) $user->id, $quotaPlan, $counter);
+        $requestsUnlimited = $usage['requests_unlimited'];
 
         // Determine the preferred provider for HD voices based on plan policy
         $preferredProvider = $this->preferredProviderForPlan($activePlan, $planTier);
@@ -86,19 +87,7 @@ class MessageReaderController extends Controller
                     'dialogue_enabled' => (bool) ($activePlan?->dialogue_enabled ?? false),
                     'tts_provider_policy' => $activePlan?->tts_provider_policy ?? 'default',
                 ],
-                'usage' => [
-                    'period' => $period,
-                    'total_chars' => (int) $counter->total_chars,
-                    'total_requests' => (int) $counter->total_requests,
-                    'total_minutes' => (int) $counter->total_minutes,
-                    'plan_chars' => $planChars,
-                    'plan_requests' => $requestsUnlimited ? null : $planRequests,
-                    'requests_unlimited' => $requestsUnlimited,
-                    'chars_percent' => min(100, (int) round(((int) $counter->total_chars / max(1, $planChars)) * 100)),
-                    'requests_percent' => $requestsUnlimited
-                        ? 0
-                        : min(100, (int) round(((int) $counter->total_requests / max(1, $planRequests)) * 100)),
-                ],
+                'usage' => ['period' => $period] + $usage,
                 'voices' => [
                     'catalog' => $catalog,
                     'defaults' => [
@@ -132,7 +121,7 @@ class MessageReaderController extends Controller
         $user = $this->resolveApiUser($request);
         $this->billingSyncService->syncIfStale($user);
 
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
+        $activePlan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
@@ -213,55 +202,71 @@ class MessageReaderController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
-        PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
+        $billToPack = CharPackService::billsToPack($quotaPlan);
+        if ($billToPack) {
+            // Takes the pack characters now; given back if the generation fails.
+            app(CharPackService::class)->reserve((int) $user->id, $estimate['chars']);
+        } else {
+            PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
+        }
 
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
-        $recorded = $this->audioGenerationRecorder->createForUser(
-            (int) $user->id,
-            [
-                'source_type' => 'message',
-                'title' => $validated['title'] ?? null,
-                'content' => $text,
-                'language' => $sourceLanguage,
-                'status' => $initialStatus,
-                'received_at' => now(),
-            ],
-            [
-                'input_text' => $text,
-                'source_language' => $sourceLanguage,
-                'target_language' => $validated['target_language'],
-                'voice_tier' => $requestedTier,
-                'voice_name' => $voiceName,
-                'tts_provider' => VoiceCatalog::providerForName($voiceName),
-                'translate' => (bool) ($validated['translate'] ?? false),
-                'duration_seconds' => $estimate['seconds'],
-                'status' => $initialStatus,
-                'dialect' => $studioOptions['dialect'],
-                'emotion' => $studioOptions['emotion'],
-                'performance_style' => $studioOptions['performance_style'],
-                'style_prompt' => $studioOptions['style_prompt'],
-                'speed' => $studioOptions['speed'],
-                'pitch' => $studioOptions['pitch'],
-                'is_dialogue' => $dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false),
-                'dialogue_metadata' => ($dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false)
-                    && ! empty($validated['dialogue_speakers']))
-                    ? ['speakers' => $validated['dialogue_speakers']]
-                    : null,
-            ],
-        );
+        try {
+            $recorded = $this->audioGenerationRecorder->createForUser(
+                (int) $user->id,
+                [
+                    'source_type' => 'message',
+                    'title' => $validated['title'] ?? null,
+                    'content' => $text,
+                    'language' => $sourceLanguage,
+                    'status' => $initialStatus,
+                    'received_at' => now(),
+                ],
+                [
+                    'input_text' => $text,
+                    'source_language' => $sourceLanguage,
+                    'target_language' => $validated['target_language'],
+                    'voice_tier' => $requestedTier,
+                    'voice_name' => $voiceName,
+                    'tts_provider' => VoiceCatalog::providerForName($voiceName),
+                    'translate' => (bool) ($validated['translate'] ?? false),
+                    'duration_seconds' => $estimate['seconds'],
+                    'status' => $initialStatus,
+                    'dialect' => $studioOptions['dialect'],
+                    'emotion' => $studioOptions['emotion'],
+                    'performance_style' => $studioOptions['performance_style'],
+                    'style_prompt' => $studioOptions['style_prompt'],
+                    'speed' => $studioOptions['speed'],
+                    'pitch' => $studioOptions['pitch'],
+                    'is_dialogue' => $dialogueEnabled
+                        && $requestedTier !== VoiceTier::STANDARD
+                        && ($validated['is_dialogue'] ?? false),
+                    'dialogue_metadata' => ($dialogueEnabled
+                        && $requestedTier !== VoiceTier::STANDARD
+                        && ($validated['is_dialogue'] ?? false)
+                        && ! empty($validated['dialogue_speakers']))
+                        ? ['speakers' => $validated['dialogue_speakers']]
+                        : null,
+                    'billed_to_pack' => $billToPack,
+                ],
+            );
+        } catch (\Throwable $e) {
+            if ($billToPack) {
+                app(CharPackService::class)->release((int) $user->id, $estimate['chars']);
+            }
+            throw $e;
+        }
 
         $item = $recorded['item'];
         $job = $recorded['job'];
 
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
-        $counter->increment('total_requests');
-        $counter->increment('total_chars', $estimate['chars']);
-        $counter->increment('total_minutes', $estimate['minutes']);
-        app(TrialUsageRecorder::class)->add((int) $user->id, $estimate);
+        if (! $billToPack) {
+            $counter->increment('total_requests');
+            $counter->increment('total_chars', $estimate['chars']);
+            $counter->increment('total_minutes', $estimate['minutes']);
+            app(TrialUsageRecorder::class)->add((int) $user->id, $estimate);
+        }
 
         if (! $runAsync) {
             try {
@@ -275,7 +280,11 @@ class MessageReaderController extends Controller
             // Always refund usage when the job actually failed,
             // regardless of whether the exception propagated.
             if ($job->status === 'failed') {
-                $this->releaseReservedUsage($counter, $estimate);
+                if ($billToPack) {
+                    app(CharPackService::class)->release((int) $user->id, $estimate['chars']);
+                } else {
+                    $this->releaseReservedUsage($counter, $estimate);
+                }
             }
         } else {
             $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'

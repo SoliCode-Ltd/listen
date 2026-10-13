@@ -42,6 +42,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Cashier::ignoreRoutes();
         $this->app->bind(StripeTrialGateway::class, CashierStripeTrialGateway::class);
+        $this->app->bind(\App\Services\Billing\StripePackGateway::class, \App\Services\Billing\CashierStripePackGateway::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([

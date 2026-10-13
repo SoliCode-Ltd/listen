@@ -191,7 +191,7 @@ class PaidWelcomeEmail
     public function previewHtml(?array $settings = null): string
     {
         // A paid plan stands in for the member's plan.
-        $sample = Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
+        $sample = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderBy('price_cents')->first();
         $newsletter = $this->asNewsletter($settings ?? $this->settings(), $sample);
 
         return app(NewsletterRenderer::class)->html($newsletter, Newsletter::LANGUAGE_BOTH, ['preview' => true, 'no_greeting' => true]);

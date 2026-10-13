@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\Billing\CharPackCardPayment;
 use App\Services\Billing\TrialOutcomeService;
 use App\Services\BillingLifecycleService;
 use App\Services\StripeWebhookEmailService;
@@ -76,6 +77,9 @@ class StripeWebhookController extends Controller
                         ? trim((string) ($event->data->object->id ?? ''))
                         : $customerId
                 ),
+                // One-time character packs.
+                'payment_intent.succeeded' => app(CharPackCardPayment::class)->handlePaymentSucceeded($event->data->object),
+                'charge.refunded' => app(CharPackCardPayment::class)->handleChargeRefunded($event->data->object),
                 default => null,
             };
 

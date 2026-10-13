@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\CharPackPurchase;
 use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\CharPackService;
 use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -78,6 +80,10 @@ class ManualPaymentService
                 throw new DomainException(__('ui.billing.admin_request_missing_relation'));
             }
 
+            if ($request->plan->isPack()) {
+                return $this->approvePack($request, $reviewer, $reviewerNotes);
+            }
+
             if ($this->hasActiveStripeSubscription($request->user)) {
                 throw new DomainException(__('ui.billing.manual_active_stripe_conflict'));
             }
@@ -139,7 +145,14 @@ class ManualPaymentService
             $rolledBack = false;
             $usedFallbackPlan = false;
 
-            if ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->user) {
+            if ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->plan?->isPack()) {
+                // Deleting an approved pack payment takes back its unused characters.
+                $purchase = CharPackPurchase::query()->where('manual_payment_request_id', $request->id)->first();
+                if ($purchase) {
+                    $this->charPacks()->refund($purchase);
+                    $rolledBack = true;
+                }
+            } elseif ($request->status === ManualPaymentRequest::STATUS_APPROVED && $request->user) {
                 [$rolledBack, $usedFallbackPlan] = $this->rollbackApprovedRequestPlan($request);
             }
 
@@ -178,6 +191,38 @@ class ManualPaymentService
 
             return $request->fresh(['user', 'plan', 'reviewer']);
         });
+    }
+
+    /**
+     * A pack paid by InstaPay / Vodafone Cash: add its characters. The member's
+     * plan is not touched; a pack never becomes the subscription.
+     */
+    private function approvePack(ManualPaymentRequest $request, User $reviewer, ?string $reviewerNotes): ManualPaymentRequest
+    {
+        $packs = $this->charPacks();
+        $purchase = $packs->startPurchase(
+            $request->user,
+            $request->plan,
+            (string) $request->payment_method,
+            (int) $request->expected_amount_minor,
+            (string) $request->currency,
+            (int) $request->id,
+        );
+        $packs->markPaid($purchase);
+
+        $request->forceFill([
+            'status' => ManualPaymentRequest::STATUS_APPROVED,
+            'reviewed_at' => now(),
+            'reviewed_by' => $reviewer->id,
+            'reviewer_notes' => $reviewerNotes,
+        ])->save();
+
+        return $request->fresh(['user', 'plan', 'reviewer']);
+    }
+
+    private function charPacks(): CharPackService
+    {
+        return app(CharPackService::class);
     }
 
     public function hasPendingRequest(User $user, Plan $plan, string $billingCycle, string $paymentMethod): bool

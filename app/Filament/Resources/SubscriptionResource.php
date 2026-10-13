@@ -43,7 +43,8 @@ class SubscriptionResource extends Resource
                             ->preload()
                             ->required(),
                         Forms\Components\Select::make('plan_id')
-                            ->relationship('plan', 'name')
+                            // A pack is not a subscription: members get packs by buying them.
+                            ->relationship('plan', 'name', fn ($query) => $query->subscriptionPlans())
                             ->searchable()
                             ->preload()
                             ->required(),
