@@ -87,6 +87,13 @@ class AppServiceProvider extends ServiceProvider
     {
         \Illuminate\Support\Facades\Event::listen(\Illuminate\Auth\Events\Login::class, \App\Services\Geo\UserCountryRecorder::class);
 
+        // No "All" in admin tables: 5,000 audio rows on one page is ~160 MB of
+        // HTML and runs PHP out of memory. A saved "All" choice is dropped by
+        // Filament because it is no longer an option.
+        \Filament\Tables\Table::configureUsing(
+            fn (\Filament\Tables\Table $table) => $table->paginationPageOptions([10, 25, 50, 100]),
+        );
+
         if (! $this->app->environment('testing')) {
             TitanMailbox::preferOverBrokenResend();
         }
