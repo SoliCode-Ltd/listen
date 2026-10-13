@@ -7,11 +7,11 @@
 <div class="auth-topbar">
   <a class="auth-logo" href="{{ route('home') }}" aria-label="{{ __('design.auth.home') }}">
     @if($authArabic)
-      <img src="{{ asset('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
-      <img src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
+      <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-dark.svg') }}" alt="منصة إسمع" class="site-logo logo-dark">
+      <img src="{{ \App\Support\VersionedAsset::url('images/logo-ar-light.svg') }}" alt="منصة إسمع" class="site-logo logo-light">
     @else
-      <img src="{{ asset('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
-      <img src="{{ asset('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
+      <img src="{{ \App\Support\VersionedAsset::url('images/logo-dark.svg') }}" alt="Listen" class="site-logo logo-dark">
+      <img src="{{ \App\Support\VersionedAsset::url('images/logo-light.svg') }}" alt="Listen" class="site-logo logo-light">
     @endif
   </a>
   <div class="auth-topbar-tools">

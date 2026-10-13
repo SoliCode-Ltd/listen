@@ -88,9 +88,9 @@
             <div class="bar"></div>
             <div class="inner">
                 @if ($arabic)
-                    <img class="logo" src="{{ asset('images/logo-ar-light.svg') }}" alt="منصة إسمع">
+                    <img class="logo" src="{{ \App\Support\VersionedAsset::url('images/logo-ar-light.svg') }}" alt="منصة إسمع">
                 @else
-                    <img class="logo" src="{{ asset('images/logo-light.svg') }}" alt="Listen">
+                    <img class="logo" src="{{ \App\Support\VersionedAsset::url('images/logo-light.svg') }}" alt="Listen">
                 @endif
                 <p class="site">listenai.studio</p>
                 <div class="rule"></div>
