@@ -9,6 +9,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\PlanAccessService;
 use App\Support\TitanMailbox;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
@@ -16,9 +17,9 @@ use InvalidArgumentException;
 use RuntimeException;
 
 /**
- * The welcome email for new paid members, in Arabic and English. It goes out once,
- * by itself, when a member starts a paid plan (paid online or set by an admin), and
- * the owner can send it again by hand. Its words are edited in
+ * The welcome email for paid members, in Arabic and English. It goes out by itself
+ * each time a member starts a paid plan (paid online or set by an admin), and the
+ * owner can send it again by hand. Its words are edited in
  * Newsletter → Paid welcome email and use the newsletter's email design.
  */
 class PaidWelcomeEmail
@@ -94,12 +95,14 @@ class PaidWelcomeEmail
     }
 
     /**
-     * Sends it by itself the first time a member is on a paid plan.
+     * Sends it by itself each time a member starts a paid plan: from free, or by
+     * moving to another paid plan. Renewals never call this, and the same plan is
+     * not welcomed twice within a minute (one checkout can save its subscription twice).
      * Runs after the page or webhook has answered, so it never slows a payment down.
      */
-    public function queueFirstWelcome(User $user): void
+    public function queueWelcome(User $user): void
     {
-        if (! self::canTrack() || $user->paid_welcome_sent_at !== null || $user->isBlocked() || ! $this->enabled()) {
+        if ($user->isBlocked() || ! $this->enabled()) {
             return;
         }
 
@@ -107,15 +110,17 @@ class PaidWelcomeEmail
         dispatch(function () use ($userId): void {
             $fresh = User::query()->find($userId);
             $welcome = app(self::class);
+            $plan = $fresh ? app(PlanAccessService::class)->resolveActivePlanForUserId($userId) : null;
             // Checked again here: a trial row can be saved after its subscription.
-            if (! $fresh || $fresh->paid_welcome_sent_at !== null || ! $welcome->enabled()
-                || ! $welcome->isPaidMember($fresh)
-                || app(PlanAccessService::class)->userHasUnpaidTrialWindow($userId)) {
+            if (! $fresh || ! $welcome->enabled() || ! $plan || (int) $plan->price_cents <= 0
+                || app(PlanAccessService::class)->userHasUnpaidTrialWindow($userId)
+                || ! Cache::add('paid_welcome:'.$userId.':'.$plan->id, 1, now()->addMinute())) {
                 return;
             }
             try {
                 $welcome->send($fresh);
             } catch (\Throwable $e) {
+                Cache::forget('paid_welcome:'.$userId.':'.$plan->id);
                 Log::warning('Paid welcome email was not sent.', ['user_id' => $userId, 'error' => $e->getMessage()]);
             }
         })->afterResponse();

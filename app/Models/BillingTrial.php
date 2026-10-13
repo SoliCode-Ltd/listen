@@ -83,7 +83,7 @@ class BillingTrial extends Model
                 $user = User::query()->find($trial->user_id);
                 $welcome = app(\App\Services\Newsletter\PaidWelcomeEmail::class);
                 if ($user && $welcome->isPaidMember($user)) {
-                    $welcome->queueFirstWelcome($user);
+                    $welcome->queueWelcome($user);
                 }
             } catch (\Throwable $e) {
                 \Illuminate\Support\Facades\Log::warning('Paid welcome email check failed on trial payment.', [
