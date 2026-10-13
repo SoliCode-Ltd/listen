@@ -112,9 +112,10 @@ class UsageCounterResource extends Resource
                     ->label('Generations')
                     ->numeric()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('total_minutes')
-                    ->label('Audio minutes')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('total_seconds')
+                    ->label('Audio length')
+                    ->formatStateUsing(fn (UsageCounter $record): string => $record->audioLabel())
+                    ->tooltip('The real length of the audio made this month, added up from every generation.')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('bonus_chars')
                     ->label('Gifted')
@@ -204,7 +205,9 @@ class UsageCounterResource extends Resource
                         ->visible(fn (UsageCounter $record): bool => self::allowance($record) !== null)
                         ->state(fn (UsageCounter $record): string => number_format(max(0, (int) self::allowance($record) - (int) $record->total_chars))),
                     Infolists\Components\TextEntry::make('total_requests')->label('Generations')->numeric(),
-                    Infolists\Components\TextEntry::make('total_minutes')->label('Audio minutes')->numeric(),
+                    Infolists\Components\TextEntry::make('total_seconds')
+                        ->label('Audio length')
+                        ->state(fn (UsageCounter $record): string => $record->audioLabel()),
                     Infolists\Components\TextEntry::make('bonus_chars')
                         ->label('Gifted characters')
                         ->state(fn (UsageCounter $record): string => number_format((int) $record->bonus_chars)),

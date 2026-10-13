@@ -20,7 +20,7 @@ class MonthlyUsageStats extends BaseWidget
         $members = (clone $month)->where('total_requests', '>', 0)->count();
         $chars = (int) (clone $month)->sum('total_chars');
         $generations = (int) (clone $month)->sum('total_requests');
-        $minutes = (int) (clone $month)->sum('total_minutes');
+        $seconds = (int) (clone $month)->sum('total_seconds');
         $gifted = (int) (clone $month)->sum('bonus_chars');
 
         return [
@@ -28,7 +28,8 @@ class MonthlyUsageStats extends BaseWidget
             Stat::make('Characters used', number_format($chars))
                 ->description('≈ $'.number_format(PlanCostEstimate::forChars($chars)['cost'], 2).' if all on the premium voice'),
             Stat::make('Generations', number_format($generations)),
-            Stat::make('Audio minutes', number_format($minutes)),
+            Stat::make('Audio length', number_format($seconds / 60, 1).' min')
+                ->description('Real length of the audio made this month'),
             Stat::make('Characters gifted', number_format($gifted)),
         ];
     }

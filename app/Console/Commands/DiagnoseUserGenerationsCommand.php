@@ -83,7 +83,7 @@ class DiagnoseUserGenerationsCommand extends Command
         $this->table(['metric', 'used', 'limit'], [
             ['characters', number_format((int) $counter?->total_chars), number_format($planChars)],
             ['requests', number_format((int) $counter?->total_requests), $planRequests > 0 ? number_format($planRequests) : 'unlimited'],
-            ['minutes', number_format((int) $counter?->total_minutes), number_format((int) ($quota?->monthly_minutes ?? 0))],
+            ['minutes', number_format((int) $counter?->total_seconds / 60, 1), number_format((int) ($quota?->monthly_minutes ?? 0))],
             ['max chars per request', '-', number_format(PlanUsageGuard::maxCharsPerRequest($quota))],
             ['overage allowed', '-', PlanUsageGuard::allowsOverage($quota) ? 'yes' : 'no'],
         ]);

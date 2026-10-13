@@ -129,7 +129,7 @@ class SubscriptionResource extends Resource
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);">' . $label . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_chars) . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . ((int) $c->bonus_chars > 0 ? '+' . number_format((int) $c->bonus_chars) : '—') . '</td>'
-                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((float) $c->total_minutes, 1) . '</td>'
+                                        . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_seconds / 60, 1) . '</td>'
                                         . '<td style="padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);text-align:right;">' . number_format((int) $c->total_requests) . '</td>'
                                         . '</tr>';
                                 })->implode('');

@@ -48,6 +48,7 @@ class AudioGeneration extends Model
         'settings_snapshot',
         // Paid from pack characters rather than the monthly allowance
         'billed_to_pack',
+        'duration_measured',
     ];
 
     protected $casts = [
@@ -60,6 +61,7 @@ class AudioGeneration extends Model
         'pitch' => 'float',
         'is_dialogue' => 'boolean',
         'billed_to_pack' => 'boolean',
+        'duration_measured' => 'boolean',
         'dialogue_metadata' => 'array',
         'billable_chars' => 'integer',
         'user_sequence_number' => 'integer',

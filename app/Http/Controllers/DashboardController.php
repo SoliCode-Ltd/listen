@@ -375,7 +375,7 @@ class DashboardController extends Controller
         if (! $billToPack) {
             $counter->increment('total_requests');
             $counter->increment('total_chars', $estimate['chars']);
-            $counter->increment('total_minutes', $estimate['minutes']);
+            $counter->addSeconds($estimate['seconds']);
             app(TrialUsageRecorder::class)->add($userId, $estimate);
         }
 
@@ -639,7 +639,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param  array{chars:int,minutes:int}  $estimate
+     * @param  array{chars:int,seconds:int}  $estimate
      */
     private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
     {
@@ -648,8 +648,8 @@ class DashboardController extends Controller
         $counter->update([
             'total_requests' => max(0, (int) $counter->total_requests - 1),
             'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
-            'total_minutes' => max(0, (int) $counter->total_minutes - (int) $estimate['minutes']),
         ]);
+        $counter->addSeconds(-(int) $estimate['seconds']);
         app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
