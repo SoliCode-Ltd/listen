@@ -748,24 +748,26 @@ class PremiumPackTest extends TestCase
         $this->assertSame(0, Subscription::query()->where('user_id', $user->id)->count());
     }
 
-    public function test_the_plan_editor_shows_minutes_and_cost_for_the_characters(): void
+    public function test_the_plan_editor_shows_voice_minutes_cost_and_profit_for_the_credits(): void
     {
-        $line = \App\Support\PlanCostEstimate::adminLine(20000, 2.0, true);
+        $line = \App\Support\PlanCostEstimate::adminLine(125000, 9.0, true);
 
-        // 20,000 characters at the default 13 characters a second: about 26 minutes.
-        $this->assertStringContainsString('≈ 26 min of Arabic', $line);
-        $this->assertStringContainsString('≈ 26 min of English', $line);
-        // 1,538 s x 25 tokens x $9 per million + text ≈ $0.35; at 32 tokens ≈ $0.45; 2027 prices ≈ $0.70.
-        $this->assertStringContainsString('≈ $0.35 (up to $0.45)', $line);
-        $this->assertStringContainsString('≈ $0.70 from Jan 2027', $line);
-        $this->assertStringContainsString('margin before card fees ≈ $1.55', $line);
+        // 125,000 credits at 780 a minute: 160 voice minutes.
+        $this->assertStringContainsString('= up to 160 voice minutes a month', $line);
+        // 160 min x 60 s x 32 tokens x $9 (now) / $18 (2027) per million, plus the text.
+        $this->assertStringContainsString('$2.79 now, $5.57 from Jan 2027', $line);
+        // $9 - 2.9% - $0.30 = $8.44 after card fees; $8.44 - $5.57 = $2.87 = 31.9%.
+        $this->assertStringContainsString('$8.44 after card fees → profit at full use $2.87 (31.9%', $line);
+        $this->assertStringNotContainsString('Below 30%', $line);
+
+        $this->assertStringContainsString('Below 30%', \App\Support\PlanCostEstimate::adminLine(500000, 9.0, true));
 
         $this->actingAs($this->admin());
         \Filament\Facades\Filament::setCurrentPanel(\Filament\Facades\Filament::getPanel('admin'));
         \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->starter->getRouteKey()])
-            ->assertSee('min of Arabic')
-            ->set('data.monthly_chars', 40000)
-            ->assertSee('≈ 51 min of Arabic');
+            ->assertSee('voice minutes a month')
+            ->set('data.monthly_chars', 78000)
+            ->assertSee('= up to 100 voice minutes a month');
     }
 
     public function test_the_daily_generation_limit_counts_the_dashboard_and_the_extension_together(): void
@@ -825,7 +827,7 @@ class PremiumPackTest extends TestCase
 
         \Livewire\Livewire::test(\App\Filament\Resources\PlanResource\Pages\EditPlan::class, ['record' => $this->pack->getRouteKey()])
             ->assertFormFieldIsVisible('pack_days')
-            ->assertSee('Characters in the pack')
+            ->assertSee('Credits in the pack')
             ->fillForm(['pack_days' => 45, 'monthly_chars' => 25000])
             ->call('save')
             ->assertHasNoFormErrors();

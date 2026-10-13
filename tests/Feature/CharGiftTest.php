@@ -160,8 +160,8 @@ class CharGiftTest extends TestCase
 
         $this->actingAs($this->member)->getLocalizedRoute('dashboard')
             ->assertOk()
-            ->assertSee('1,300 / 1,500 chars remaining', false)
-            ->assertSee('Includes 500 gift characters from Listen this month', false);
+            ->assertSee('1,300 / 1,500 credits remaining', false)
+            ->assertSee('Includes 500 gift credits from Listen this month', false);
     }
 
     public function test_dashboard_shows_no_gift_note_without_a_gift(): void

@@ -16,7 +16,7 @@ final class UsageSnapshot
      * @return array{
      *   mode:string, total_chars:int, plan_chars:int, remaining_chars:int, chars_percent:int, gift_chars:int,
      *   total_requests:int, total_minutes:int, plan_requests:?int, requests_unlimited:bool, requests_percent:int,
-     *   pack_expires_at:?string, no_free_chars:bool
+     *   pack_expires_at:?string, no_free_chars:bool, minutes_limit:?int, seconds_used:int
      * }
      */
     public static function for(int $userId, ?Plan $quotaPlan, UsageCounter $counter): array
@@ -49,6 +49,8 @@ final class UsageSnapshot
                 'requests_percent' => 0,
                 'pack_expires_at' => $pack['expires_at']?->toIso8601String(),
                 'no_free_chars' => false,
+                'minutes_limit' => null,
+                'seconds_used' => (int) $counter->total_seconds,
             ];
         }
 
@@ -73,6 +75,9 @@ final class UsageSnapshot
                 : min(100, (int) round(((int) $counter->total_requests / max(1, $planRequests)) * 100)),
             'pack_expires_at' => null,
             'no_free_chars' => (bool) $quotaPlan?->getAttribute('no_free_monthly_chars'),
+            // Voice minutes the month's credits allow, and the real seconds used.
+            'minutes_limit' => Credits::minutesFor($planChars),
+            'seconds_used' => (int) $counter->total_seconds,
         ];
     }
 }

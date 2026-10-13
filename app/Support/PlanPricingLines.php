@@ -20,6 +20,7 @@ final class PlanPricingLines
      */
     public const LINES = [
         'voice_quality' => ['mic', true],
+        'voice_minutes' => ['clock', true],
         'max_chars_per_request' => ['type', true],
         'monthly_requests' => ['activity', true],
         'daily_requests' => ['activity', true],
@@ -200,6 +201,10 @@ final class PlanPricingLines
 
         return match ($key) {
             'voice_quality' => self::t($premium ? 'premium' : 'standard', $locale),
+            // The credits also set the month's audio: one minute per Credits::PER_MINUTE.
+            'voice_minutes' => ! $plan->isPack() && Credits::minutesFor((int) $plan->monthly_chars) > 0
+                ? self::t('voice_minutes_value', $locale, ['count' => number_format(Credits::minutesFor((int) $plan->monthly_chars))])
+                : null,
             'max_chars_per_request' => (int) $plan->max_chars_per_request > 0
                 ? self::t('chars', $locale, ['count' => number_format((int) $plan->max_chars_per_request)])
                 : null,
@@ -246,6 +251,7 @@ final class PlanPricingLines
 
         return match ($key) {
             'voice_controls' => 'Hidden: only the premium voice has these controls.',
+            'voice_minutes' => 'Hidden: the plan has too few credits for a full minute.',
             'max_chars_per_request' => 'Hidden: no maximum is set.',
             'dialogue' => 'Hidden: this plan does not include dialogue.',
             'custom_prompt' => $premium ? 'Hidden: this plan does not include custom direction.' : 'Hidden: only the premium voice takes custom direction.',

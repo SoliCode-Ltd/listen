@@ -2151,10 +2151,13 @@
 
           <div class="meter" @if($freeNoChars) style="display:none" @endif>
             <div class="meter-header">
-              <small>{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
+              <small class="meter-credits-label"><x-credit-icon /> {{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.characters_usage', ['plan' => $activePlanDisplayName]) }}</small>
               <small id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
             </div>
             <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
+            @if (! $packMode && (int) ($usageSnapshot['minutes_limit'] ?? 0) > 0)
+              <small class="meter-ends" id="usageMinutesText">{{ __('ui.dashboard.voice_minutes_used', ['used' => number_format(((int) ($usageSnapshot['seconds_used'] ?? 0)) / 60, 1), 'total' => number_format((int) $usageSnapshot['minutes_limit'])]) }}</small>
+            @endif
             @if ($packMode && $packEndsOn)
               <small class="meter-ends">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</small>
             @endif
@@ -3431,6 +3434,13 @@
           remaining: formatNumber(remainingQuota(usage.plan_requests, usage.total_requests)),
           total: formatNumber(usage.plan_requests),
         });
+      const minutesText = document.getElementById('usageMinutesText');
+      if (minutesText && Number(usage.minutes_limit) > 0) {
+        minutesText.textContent = formatQuotaText(@json(__('ui.dashboard.voice_minutes_used')), {
+          used: (Number(usage.seconds_used || 0) / 60).toFixed(1),
+          total: formatNumber(usage.minutes_limit),
+        });
+      }
       if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);

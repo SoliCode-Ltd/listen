@@ -112,28 +112,73 @@ final class PlanCostEstimate
         ];
     }
 
+    /** Card fees taken from each payment (Stripe, standard cards). */
+    public const CARD_FEE_PERCENT = 2.9;
+
+    public const CARD_FEE_FIXED = 0.30;
+
+    /** The profit the plan editor asks for when every credit is used. */
+    public const TARGET_PROFIT_PERCENT = 30;
+
     /**
-     * The line under "Monthly Characters" in the plan editor.
+     * What one minute of premium audio costs at the high estimate (32 audio
+     * tokens a second) plus the text it was read from.
      */
-    public static function adminLine(int $chars, ?float $priceDollars = null, bool $premium = true): string
+    public static function costPerMinute(?Carbon $on = null): float
     {
-        if ($chars <= 0) {
-            return 'Set the characters to see minutes and cost.';
+        $price = self::geminiPrices($on);
+
+        return (60 * self::AUDIO_TOKENS_PER_SECOND_HIGH / 1_000_000) * $price['audio']
+            + ((Credits::PER_MINUTE / self::CHARS_PER_TEXT_TOKEN) / 1_000_000) * $price['text'];
+    }
+
+    /**
+     * A plan's worst month: every credit used, so every voice minute made.
+     * Costed at the Jan 2027 price so a plan stays profitable after it rises.
+     *
+     * @return array{minutes:int, cost_now:float, cost:float, net:float, profit:float, percent:float}
+     */
+    public static function fullUse(int $credits, float $priceDollars): array
+    {
+        $minutes = Credits::minutesFor($credits);
+        $net = $priceDollars > 0 ? $priceDollars * (1 - self::CARD_FEE_PERCENT / 100) - self::CARD_FEE_FIXED : 0.0;
+        $cost = $minutes * self::costPerMinute(Carbon::create(2027, 1, 1));
+        $profit = $net - $cost;
+
+        return [
+            'minutes' => $minutes,
+            'cost_now' => round($minutes * self::costPerMinute(), 2),
+            'cost' => round($cost, 2),
+            'net' => round($net, 2),
+            'profit' => round($profit, 2),
+            'percent' => $priceDollars > 0 ? round($profit / $priceDollars * 100, 1) : 0.0,
+        ];
+    }
+
+    /**
+     * The line under "Monthly credits" in the plan editor.
+     */
+    public static function adminLine(int $credits, ?float $priceDollars = null, bool $premium = true): string
+    {
+        if ($credits <= 0) {
+            return 'Set the credits to see the voice minutes and cost.';
         }
 
-        $e = self::forChars($chars);
-        $line = '≈ '.number_format($e['minutes_ar']).' min of Arabic · ≈ '.number_format($e['minutes_en']).' min of English'
-            .($e['measured'] ? ' (speed measured from your last 90 days)' : ' (estimated speed)').'.';
+        $e = self::fullUse($credits, (float) $priceDollars);
+        $line = '= up to '.number_format($e['minutes']).' voice minutes a month ('.number_format(Credits::PER_MINUTE).' credits a minute).';
 
         if (! $premium) {
             return $line.' Standard voice: speech cost is small and not estimated here.';
         }
 
-        $line .= ' Premium voice cost to us if fully used: ≈ $'.number_format($e['cost'], 2)
-            .' (up to $'.number_format($e['cost_high'], 2).'), ≈ $'.number_format($e['cost_2027'], 2).' from Jan 2027 prices.';
+        $line .= ' Most it can cost us if every credit is used: $'.number_format($e['cost_now'], 2).' now, $'.number_format($e['cost'], 2).' from Jan 2027.';
 
         if ($priceDollars !== null && $priceDollars > 0) {
-            $line .= ' Price $'.number_format($priceDollars, 2).' → margin before card fees ≈ $'.number_format($priceDollars - $e['cost_high'], 2).'.';
+            $line .= ' Price $'.number_format($priceDollars, 2).' → $'.number_format($e['net'], 2).' after card fees → profit at full use $'
+                .number_format($e['profit'], 2).' ('.number_format($e['percent'], 1).'%, Jan 2027 prices).';
+            if ($e['percent'] < self::TARGET_PROFIT_PERCENT) {
+                $line .= ' ⚠ Below '.self::TARGET_PROFIT_PERCENT.'%: lower the credits or raise the price.';
+            }
         }
 
         return $line;
