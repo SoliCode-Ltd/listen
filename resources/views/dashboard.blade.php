@@ -2004,12 +2004,12 @@
         linear-gradient(135deg, color-mix(in oklab, var(--a, #6A45F2) 9%, var(--surface)), var(--surface) 65%);
     }
     .usage-hero-head { display: flex; align-items: center; gap: .7rem; }
-    .usage-hero-coin { font-size: 2.3rem; filter: drop-shadow(0 5px 10px color-mix(in oklab, #6A45F2 25%, transparent)); }
-    .usage-hero-label { display: block; font-size: .85rem; font-weight: 700; color: var(--text); }
-    .usage-hero-plan { display: block; font-size: .78rem; color: var(--muted); }
+    .usage-hero-coin { font-size: 2.3rem; }
+    .usage-hero-label { display: block; font-size: .95rem; font-weight: 700; color: var(--text); }
+    .usage-hero-plan { display: block; font-size: .86rem; color: var(--muted); }
     .usage-hero-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: .55rem; margin: .9rem 0 .7rem; }
     .usage-hero-value strong { font-size: clamp(2rem, 4vw, 2.7rem); line-height: 1; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
-    .usage-hero-value span { color: var(--muted); font-size: .92rem; }
+    .usage-hero-value span { color: var(--muted); font-size: 1rem; }
     .usage-hero .meter-track { height: 10px; }
     /* Repeats the big number, so it is kept for screen readers only. */
     .usage-hero-caption { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
@@ -2020,7 +2020,7 @@
       padding: .32rem .7rem; border-radius: 999px;
       background: color-mix(in oklab, var(--surface2) 70%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--line) 80%, transparent);
-      font-size: .78rem; color: var(--text);
+      font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
     .usage-ring {
@@ -2037,7 +2037,7 @@
       box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
     }
     .usage-ring-inner b { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
-    .usage-ring-inner span { font-size: .75rem; color: var(--muted); }
+    .usage-ring-inner span { font-size: .82rem; color: var(--muted); }
     .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
     .usage-tile {
       display: flex; flex-direction: column; gap: .45rem;
@@ -2046,7 +2046,7 @@
       background: var(--surface);
     }
     .usage-tile-head { display: flex; align-items: center; gap: .55rem; }
-    .usage-tile-head small { font-size: .82rem; font-weight: 600; color: var(--muted); }
+    .usage-tile-head small { font-size: .92rem; font-weight: 600; color: var(--muted); }
     .usage-tile-icon {
       display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 9px;
       background: color-mix(in oklab, var(--a, #6A45F2) 12%, var(--surface));
@@ -2056,17 +2056,17 @@
     .usage-tile-icon.gold .credit-icon { font-size: 1.05rem; }
     .usage-tile > b { font-size: 1.65rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
     .usage-tile .meter-track { height: 6px; }
-    .usage-tile-foot { color: var(--muted); font-size: .76rem; line-height: 1.45; }
+    .usage-tile-foot { color: var(--muted); font-size: .87rem; line-height: 1.45; }
     .usage-health {
       display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem;
       margin-top: .9rem; padding: .85rem 1.15rem; border-radius: 16px;
       border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
       background: color-mix(in oklab, var(--surface2) 40%, var(--surface));
     }
-    .usage-health-title { font-size: .85rem; font-weight: 700; color: var(--text); }
+    .usage-health-title { font-size: .95rem; font-weight: 700; color: var(--text); }
     .usage-health-row { display: flex; flex-wrap: wrap; gap: 1.4rem; }
     .usage-health-item { display: inline-flex; align-items: center; gap: .45rem; }
-    .usage-health-item small { color: var(--muted); font-size: .8rem; }
+    .usage-health-item small { color: var(--muted); font-size: .9rem; }
     .usage-health-item b { font-variant-numeric: tabular-nums; color: var(--text); }
     .usage-health .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .usage-health .dot.processing { background: #f59e0b; box-shadow: 0 0 0 3px color-mix(in oklab, #f59e0b 22%, transparent); }
@@ -2074,9 +2074,13 @@
     .usage-health .dot.failed { background: #ef4444; box-shadow: 0 0 0 3px color-mix(in oklab, #ef4444 22%, transparent); }
     @media (max-width: 760px) {
       .usage-hero { grid-template-columns: 1fr; }
-      .usage-ring { justify-self: center; width: 116px; height: 116px; }
-      .usage-ring-inner { width: 92px; height: 92px; }
+      .usage-ring { justify-self: center; width: 104px; height: 104px; }
+      .usage-ring-inner { width: 82px; height: 82px; }
+      .usage-ring-inner b { font-size: 1.35rem; }
       .usage-tiles { grid-template-columns: 1fr; }
+      .usage-health-row { flex-wrap: nowrap; gap: .9rem; }
+      .usage-health-item { gap: .35rem; }
+      .usage-health-item small { font-size: .84rem; }
     }
     /* Text box footer: characters, and the credits left that drop live as the text grows */
     .editor-counters { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
@@ -2089,8 +2093,8 @@
       margin: 0;
       padding: 0;
     }
-    .char-counter-text { font-size: .8rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-    .char-counter-text b { color: var(--text); font-weight: 700; font-size: .92rem; }
+    .char-counter-text { font-size: .88rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .char-counter-text b { color: var(--text); font-weight: 700; font-size: 1rem; }
     .char-counter-sep { margin: 0 .2rem; opacity: .6; }
     .char-counter-track { height: 4px; border-radius: 999px; background: color-mix(in oklab, var(--line) 80%, transparent); overflow: hidden; }
     .char-counter-track span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--a, #6A45F2), var(--b, #8B5CF6)); transition: width .2s ease, background .2s ease; }
@@ -2108,10 +2112,14 @@
       transition: border-color .2s ease, background .2s ease;
     }
     html[dir="rtl"] .credit-live { padding: .45rem .55rem .45rem .95rem; }
-    .credit-live .credit-icon { font-size: 1.65rem; margin-block: -.15rem; filter: drop-shadow(0 4px 8px color-mix(in oklab, #6A45F2 25%, transparent)); }
+    .credit-live .credit-icon { font-size: 1.65rem; margin-block: -.15rem; }
     .credit-live-text { display: flex; flex-direction: column; line-height: 1.15; }
-    .credit-live-label { font-size: .7rem; color: var(--muted); letter-spacing: .01em; }
-    .credit-live-value { font-size: 1.05rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    .credit-live-label { font-size: .78rem; color: var(--muted); letter-spacing: .01em; }
+    .credit-live-value { font-size: 1.12rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    @media (max-width: 560px) {
+      .editor-counters { gap: .75rem; }
+      .vs-editor-foot .char-counter, .credit-live { flex: 1 1 100%; }
+    }
     .credit-live.is-spending { border-color: color-mix(in oklab, var(--a, #6A45F2) 40%, var(--line)); }
     .credit-live.is-short { border-color: color-mix(in oklab, var(--danger, #ef4444) 55%, var(--line)); background: color-mix(in oklab, var(--danger, #ef4444) 8%, var(--surface)); }
     .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }

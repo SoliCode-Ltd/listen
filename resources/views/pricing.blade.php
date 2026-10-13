@@ -268,14 +268,14 @@
       display: flex;
       align-items: center;
       width: 100%;
-      min-height: 3.6rem;
-      padding: .35rem 1.1rem .35rem .5rem;
+      min-height: 3.3rem;
+      padding: .4rem 1.1rem .4rem .8rem;
       border-radius: 999px;
       border: 1.5px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
       background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 5%, var(--surface)));
       box-shadow: 0 8px 22px color-mix(in oklab, #6A45F2 10%, transparent);
     }
-    html[dir="rtl"] .plan-quota.has-credits { padding: .35rem .5rem .35rem 1.1rem; }
+    html[dir="rtl"] .plan-quota.has-credits { padding: .4rem .8rem .4rem 1.1rem; }
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
@@ -283,7 +283,7 @@
       min-width: 0;
     }
     .plan-quota-amount { display: inline-flex; align-items: baseline; flex-wrap: wrap; column-gap: .45rem; row-gap: 0; min-width: 0; }
-    .plan-quota-coin { font-size: 3rem; margin-block: -.6rem; margin-inline-start: -.85rem; margin-inline-end: -.1rem; filter: drop-shadow(0 6px 12px color-mix(in oklab, #6A45F2 26%, transparent)); }
+    .plan-quota-coin { font-size: 2.15rem; margin: 0; }
     .plan-quota-number { font-size: 1.4rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
     .plan-quota-unit { font-size: .95rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
 
