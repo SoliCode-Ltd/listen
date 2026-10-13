@@ -34,7 +34,7 @@ class PricingPageLinesTest extends TestCase
         $this->assertSame([
             'Voice quality' => 'Premium',
             // 320,000 credits at 900 a minute.
-            'Voice usage minutes' => 'Up to 355 min',
+            'Voice usage minutes' => '355 min',
             'Max text per generation' => '5,000 characters',
             'Generations per month' => 'Unlimited',
             'Emotion, style & accent' => 'Full control',
@@ -48,7 +48,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'جودة الصوت' => 'متميزة',
-            'دقائق الصوت' => 'حتى 355 دقيقة',
+            'دقائق الصوت' => '355 دقيقة',
             'أقصى نص في المرة الواحدة' => '5,000 حرف',
             'التوليدات شهريًا' => 'غير محدود',
             'المشاعر والأسلوب واللهجة' => 'تحكم كامل',
@@ -77,7 +77,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'Voice quality' => 'Standard',
-            'Voice usage minutes' => 'Up to 138 min',
+            'Voice usage minutes' => '138 min',
             'Max text per generation' => '1,200 characters',
             'Generations per month' => '50',
             'Processing priority' => 'Standard',

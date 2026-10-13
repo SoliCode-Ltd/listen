@@ -85,27 +85,21 @@ class PlanUsageGuard
     }
 
     /**
-     * @param  array{chars:int, seconds?:int}  $estimate
+     * Credits are charged for audio (15 a second), so checking the credits
+     * also keeps the month within its voice minutes.
+     *
+     * @param  array{chars:int, credits?:int, seconds?:int}  $estimate
      */
     public static function assertWithinLimits(?Plan $plan, UsageCounter $counter, array $estimate): void
     {
         if (! self::allowsOverage($plan)) {
             $charsLimit = self::charsLimit($plan, $counter);
-            if (((int) $counter->total_chars + (int) $estimate['chars']) > $charsLimit) {
+            $incoming = (int) ($estimate['credits'] ?? $estimate['chars']);
+            if (((int) $counter->total_chars + $incoming) > $charsLimit) {
                 throw ValidationException::withMessages([
                     'content' => $plan?->getAttribute('no_free_monthly_chars') && $charsLimit <= (int) $counter->total_chars
                         ? __('ui.backend.no_chars_yet')
                         : __('ui.backend.monthly_chars_exceeded'),
-                ]);
-            }
-
-            // The credits also set the month's voice minutes (real seconds of
-            // audio), so slow speech cannot cost more than the plan allows.
-            $allowedSeconds = Credits::secondsFor($charsLimit);
-            $incomingSeconds = (int) ($estimate['seconds'] ?? 0);
-            if ($charsLimit > 0 && ((int) $counter->total_seconds + $incomingSeconds) > $allowedSeconds) {
-                throw ValidationException::withMessages([
-                    'content' => __('ui.backend.monthly_minutes_exceeded', ['minutes' => number_format(Credits::minutesFor($charsLimit))]),
                 ]);
             }
         }

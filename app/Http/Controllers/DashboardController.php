@@ -318,7 +318,7 @@ class DashboardController extends Controller
 
         if ($billToPack) {
             // Takes the pack characters now; given back below if the generation fails.
-            app(CharPackService::class)->reserve($userId, $estimate['chars']);
+            app(CharPackService::class)->reserve($userId, $estimate['credits']);
         } else {
             PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
         }
@@ -364,7 +364,7 @@ class DashboardController extends Controller
             );
         } catch (\Throwable $e) {
             if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['chars']);
+                app(CharPackService::class)->release($userId, $estimate['credits']);
             }
             throw $e;
         }
@@ -374,7 +374,7 @@ class DashboardController extends Controller
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         if (! $billToPack) {
             $counter->increment('total_requests');
-            $counter->increment('total_chars', $estimate['chars']);
+            $counter->increment('total_chars', $estimate['credits']);
             $counter->addSeconds($estimate['seconds']);
             app(TrialUsageRecorder::class)->add($userId, $estimate);
         }
@@ -393,7 +393,7 @@ class DashboardController extends Controller
         // regardless of whether the exception propagated.
         if ($job->status === 'failed') {
             if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['chars']);
+                app(CharPackService::class)->release($userId, $estimate['credits']);
             } else {
                 $this->releaseReservedUsage($counter, $estimate);
             }
@@ -647,7 +647,7 @@ class DashboardController extends Controller
 
         $counter->update([
             'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
+            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
         ]);
         $counter->addSeconds(-(int) $estimate['seconds']);
         app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);

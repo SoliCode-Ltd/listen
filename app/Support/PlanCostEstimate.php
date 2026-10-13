@@ -165,7 +165,7 @@ final class PlanCostEstimate
         }
 
         $e = self::fullUse($credits, (float) $priceDollars);
-        $line = '= up to '.number_format($e['minutes']).' voice minutes a month ('.number_format(Credits::PER_MINUTE).' credits a minute).';
+        $line = '= '.number_format($e['minutes']).' voice minutes a month ('.number_format(Credits::PER_MINUTE).' credits a minute).';
 
         if (! $premium) {
             return $line.' Standard voice: speech cost is small and not estimated here.';

@@ -207,7 +207,7 @@ class MessageReaderController extends Controller
 
         if ($billToPack) {
             // Takes the pack characters now; given back if the generation fails.
-            app(CharPackService::class)->reserve((int) $user->id, $estimate['chars']);
+            app(CharPackService::class)->reserve((int) $user->id, $estimate['credits']);
         } else {
             PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
         }
@@ -254,7 +254,7 @@ class MessageReaderController extends Controller
             );
         } catch (\Throwable $e) {
             if ($billToPack) {
-                app(CharPackService::class)->release((int) $user->id, $estimate['chars']);
+                app(CharPackService::class)->release((int) $user->id, $estimate['credits']);
             }
             throw $e;
         }
@@ -265,7 +265,7 @@ class MessageReaderController extends Controller
         // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
         if (! $billToPack) {
             $counter->increment('total_requests');
-            $counter->increment('total_chars', $estimate['chars']);
+            $counter->increment('total_chars', $estimate['credits']);
             $counter->addSeconds($estimate['seconds']);
             app(TrialUsageRecorder::class)->add((int) $user->id, $estimate);
         }
@@ -283,7 +283,7 @@ class MessageReaderController extends Controller
             // regardless of whether the exception propagated.
             if ($job->status === 'failed') {
                 if ($billToPack) {
-                    app(CharPackService::class)->release((int) $user->id, $estimate['chars']);
+                    app(CharPackService::class)->release((int) $user->id, $estimate['credits']);
                 } else {
                     $this->releaseReservedUsage($counter, $estimate);
                 }
@@ -312,6 +312,7 @@ class MessageReaderController extends Controller
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => $job->error_message,
             'estimated_chars' => $estimate['chars'],
+            'estimated_credits' => $estimate['credits'],
             'estimated_seconds' => $estimate['seconds'],
             'estimated_minutes' => $estimate['minutes'],
         ], $statusCode);
@@ -426,7 +427,7 @@ class MessageReaderController extends Controller
 
         $counter->update([
             'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['chars']),
+            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
         ]);
         $counter->addSeconds(-(int) $estimate['seconds']);
         app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);

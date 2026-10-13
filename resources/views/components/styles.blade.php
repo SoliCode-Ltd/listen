@@ -367,29 +367,6 @@ html[data-theme="light"] .site-logo.logo-light {
   transition: all .2s ease;
 }
 
-.credit-balance {
-  display: inline-flex;
-  align-items: center;
-  gap: .45rem;
-  height: 2.35rem;
-  padding: 0 .85rem 0 .7rem;
-  border-radius: 999px;
-  border: 1px solid color-mix(in oklab, #E0A10F 35%, var(--line));
-  background: linear-gradient(180deg, color-mix(in oklab, #FAD25A 12%, var(--surface)), var(--surface));
-  color: var(--text);
-  font-weight: 700;
-  font-size: .9rem;
-  font-variant-numeric: tabular-nums;
-  text-decoration: none;
-  white-space: nowrap;
-  transition: border-color .2s ease, box-shadow .2s ease;
-}
-.credit-balance .credit-icon { font-size: 1.2rem; }
-.credit-balance:hover {
-  border-color: color-mix(in oklab, #E0A10F 60%, var(--line));
-  box-shadow: 0 0 0 3px color-mix(in oklab, #FAD25A 18%, transparent);
-}
-
 .btn-icon:hover {
   background: color-mix(in oklab, var(--surface2) 80%, transparent);
   color: var(--text);

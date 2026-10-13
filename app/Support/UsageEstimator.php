@@ -15,7 +15,7 @@ class UsageEstimator
     }
 
     /**
-     * @return array{chars:int,words:int,seconds:int,minutes:int}
+     * @return array{chars:int,words:int,seconds:int,minutes:int,credits:int}
      */
     public static function estimate(string $text): array
     {
@@ -34,6 +34,8 @@ class UsageEstimator
             'words' => $wordCount,
             'seconds' => $seconds,
             'minutes' => $minutes,
+            // Reserved before generating; corrected to the real audio afterwards.
+            'credits' => Credits::forSeconds($seconds),
         ];
     }
 }

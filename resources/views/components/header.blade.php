@@ -102,14 +102,6 @@
         @endforeach
       </div>
 
-      @auth
-        @php($headerCredits = \App\Support\CreditBalance::remainingFor((int) auth()->id()))
-        <a href="{{ route('dashboard') }}" class="credit-balance" id="headerCreditBalance" title="{{ __('ui.header.credits_left', ['count' => number_format($headerCredits)]) }}" aria-label="{{ __('ui.header.credits_left', ['count' => number_format($headerCredits)]) }}">
-          <x-credit-icon />
-          <span data-credit-balance>{{ number_format($headerCredits) }}</span>
-        </a>
-      @endauth
-
       <button type="button" class="btn-icon theme-toggle" id="themeToggle" data-theme-toggle aria-label="{{ __('ui.header.toggle_theme') }}">
         <svg class="icon sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>
         <svg class="icon moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 1 0 9.8 9.8z"></path></svg>

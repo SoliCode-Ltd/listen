@@ -15,6 +15,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioDuration;
+use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
@@ -195,6 +196,8 @@ class GenerateAudioJob implements ShouldQueue
             $measuredSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null));
             $actualSeconds = $measuredSeconds ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualChars = $actualEstimate['chars'];
+            // Members pay for the audio they got: 15 credits a second.
+            $actualCredits = Credits::forSeconds($actualSeconds);
 
             $generation->update([
                 'audio_path' => $audio['audio_path'],
@@ -217,7 +220,7 @@ class GenerateAudioJob implements ShouldQueue
             $this->applyUsageDelta(
                 $generation,
                 0,
-                $actualChars - $reserved['chars'],
+                $actualCredits - $reserved['credits'],
                 $actualSeconds - $reserved['seconds'],
             );
 
@@ -332,7 +335,7 @@ class GenerateAudioJob implements ShouldQueue
             $this->applyUsageDelta(
                 $generation,
                 -1,
-                -$reserved['chars'],
+                -$reserved['credits'],
                 -$reserved['seconds'],
             );
         }
@@ -346,14 +349,14 @@ class GenerateAudioJob implements ShouldQueue
      * What the controller reserved when the generation was queued: the
      * estimate from the text (the real length is only known once it is done).
      *
-     * @return array{chars:int,seconds:int}
+     * @return array{credits:int,seconds:int}
      */
     private function reservedUsage(AudioGeneration $generation): array
     {
         $estimate = UsageEstimator::estimate((string) $generation->input_text);
 
         return [
-            'chars' => $estimate['chars'],
+            'credits' => $estimate['credits'],
             'seconds' => $estimate['seconds'],
         ];
     }
