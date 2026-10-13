@@ -14,6 +14,7 @@ use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 
 class AudioGenerationResource extends Resource
@@ -144,6 +145,11 @@ class AudioGenerationResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // One plain SUM over the filtered rows. (Filament's column summary
+            // copies every row, text included, into a temporary table first,
+            // which made this page very slow.)
+            ->description(fn (HasTable $livewire): string => 'Total audio length for these filters: '
+                .self::totalLengthLabel((int) $livewire->getFilteredTableQuery()->toBase()->reorder()->sum('duration_seconds')))
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->sortable(),
@@ -189,10 +195,7 @@ class AudioGenerationResource extends Resource
                     ->tooltip(fn (AudioGeneration $record): ?string => (int) $record->duration_seconds > 0
                         ? number_format((int) $record->duration_seconds).' seconds ('.number_format((int) $record->duration_seconds / 60, 1).' min)'
                         : null)
-                    ->sortable()
-                    ->summarize(Tables\Columns\Summarizers\Sum::make()
-                        ->label('Total')
-                        ->formatStateUsing(fn ($state): string => self::totalLengthLabel((int) $state))),
+                    ->sortable(),
                 Tables\Columns\IconColumn::make('translate')
                     ->boolean(),
                 Tables\Columns\TextColumn::make('public_audio_url')

@@ -126,7 +126,7 @@ class AudioLengthTest extends TestCase
             ->assertSee('Length')
             ->assertSee('1:05')
             ->assertSee('40 s')
-            ->assertSee('1 min 45 s');
+            ->assertSee('Total audio length for these filters: 1 min 45 s');
     }
 
     public function test_command_measures_older_generations(): void
