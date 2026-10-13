@@ -2000,11 +2000,11 @@
       border-radius: 20px;
       border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 22%, var(--line));
       background:
-        radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, #FAD25A 10%, transparent), transparent 55%),
+        radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, #3D8BFF 8%, transparent), transparent 55%),
         linear-gradient(135deg, color-mix(in oklab, var(--a, #6A45F2) 9%, var(--surface)), var(--surface) 65%);
     }
     .usage-hero-head { display: flex; align-items: center; gap: .7rem; }
-    .usage-hero-coin { font-size: 2.3rem; }
+    .usage-hero-coin { font-size: 2.3rem; filter: drop-shadow(0 5px 10px color-mix(in oklab, #6A45F2 25%, transparent)); }
     .usage-hero-label { display: block; font-size: .85rem; font-weight: 700; color: var(--text); }
     .usage-hero-plan { display: block; font-size: .78rem; color: var(--muted); }
     .usage-hero-value { display: flex; align-items: baseline; flex-wrap: wrap; gap: .55rem; margin: .9rem 0 .7rem; }
@@ -2052,8 +2052,8 @@
       background: color-mix(in oklab, var(--a, #6A45F2) 12%, var(--surface));
     }
     .usage-tile-icon svg { width: 16px; height: 16px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .usage-tile-icon.gold { background: color-mix(in oklab, #FAD25A 22%, var(--surface)); }
-    .usage-tile-icon.gold .credit-icon { font-size: 1.2rem; }
+    .usage-tile-icon.gold { background: color-mix(in oklab, #8B6CFF 12%, var(--surface)); }
+    .usage-tile-icon.gold .credit-icon { font-size: 1.05rem; }
     .usage-tile > b { font-size: 1.65rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; color: var(--text); }
     .usage-tile .meter-track { height: 6px; }
     .usage-tile-foot { color: var(--muted); font-size: .76rem; line-height: 1.45; }
@@ -2103,12 +2103,12 @@
       gap: .6rem;
       padding: .45rem .95rem .45rem .55rem;
       border-radius: 14px;
-      border: 1px solid color-mix(in oklab, #E0A10F 30%, var(--line));
-      background: linear-gradient(135deg, color-mix(in oklab, #FAD25A 14%, var(--surface)), var(--surface) 70%);
+      border: 1px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
+      background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 4%, var(--surface)));
       transition: border-color .2s ease, background .2s ease;
     }
     html[dir="rtl"] .credit-live { padding: .45rem .55rem .45rem .95rem; }
-    .credit-live .credit-icon { font-size: 1.7rem; }
+    .credit-live .credit-icon { font-size: 1.65rem; margin-block: -.15rem; filter: drop-shadow(0 4px 8px color-mix(in oklab, #6A45F2 25%, transparent)); }
     .credit-live-text { display: flex; flex-direction: column; line-height: 1.15; }
     .credit-live-label { font-size: .7rem; color: var(--muted); letter-spacing: .01em; }
     .credit-live-value { font-size: 1.05rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }

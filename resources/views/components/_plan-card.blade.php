@@ -122,8 +122,11 @@
       {{ __('ui.pack.free_try_headline', ['count' => number_format((int) $plan['free_try_chars'])]) }}
     @else
       <span class="plan-quota-credits" title="{{ __('ui.pricing.credits_hint') }}">
-        <span class="plan-quota-orb"><x-credit-orb /></span>
-        <span class="plan-quota-text"><strong>{{ number_format($plan['monthly_chars']) }}</strong> {{ __('ui.pricing.characters_per_month') }}</span>
+        <x-credit-icon class="plan-quota-coin" />
+        <span class="plan-quota-amount">
+          <strong class="plan-quota-number">{{ number_format($plan['monthly_chars']) }}</strong>
+          <span class="plan-quota-unit">{{ __('ui.pricing.characters_per_month') }}</span>
+        </span>
       </span>
     @endif
   </div>

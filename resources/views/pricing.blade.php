@@ -263,33 +263,29 @@
       margin-bottom: 1.25rem;
       background: var(--surface);
     }
-    /* Plan credits: a glowing orb beside the number */
+    /* Plan credits: the credits coin, the number, then "credits/month" */
     .plan-quota.has-credits {
       display: flex;
+      align-items: center;
       width: 100%;
-      padding: .55rem 1rem .55rem .6rem;
-      border-radius: 18px;
-      border-color: color-mix(in oklab, var(--a) 22%, var(--line));
-      background: linear-gradient(135deg, color-mix(in oklab, var(--a) 7%, var(--surface)), var(--surface) 70%);
+      min-height: 3.6rem;
+      padding: .35rem 1.1rem .35rem .5rem;
+      border-radius: 999px;
+      border: 1.5px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
+      background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 5%, var(--surface)));
+      box-shadow: 0 8px 22px color-mix(in oklab, #6A45F2 10%, transparent);
     }
-    html[dir="rtl"] .plan-quota.has-credits { padding: .55rem .6rem .55rem 1rem; }
+    html[dir="rtl"] .plan-quota.has-credits { padding: .35rem .5rem .35rem 1.1rem; }
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
-      gap: .75rem;
+      gap: .6rem;
+      min-width: 0;
     }
-    .plan-quota-orb {
-      display: inline-grid;
-      place-items: center;
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      background: var(--surface);
-      box-shadow: 0 6px 18px color-mix(in oklab, var(--a) 22%, transparent), inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .plan-quota-orb .credit-orb { font-size: 2.1rem; }
-    .plan-quota-text { font-size: .9rem; font-weight: 600; color: var(--muted); }
-    .plan-quota-text strong { font-size: 1.15rem; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; margin-inline-end: .2rem; }
+    .plan-quota-amount { display: inline-flex; align-items: baseline; flex-wrap: wrap; column-gap: .45rem; row-gap: 0; min-width: 0; }
+    .plan-quota-coin { font-size: 3rem; margin-block: -.6rem; margin-inline-start: -.85rem; margin-inline-end: -.1rem; filter: drop-shadow(0 6px 12px color-mix(in oklab, #6A45F2 26%, transparent)); }
+    .plan-quota-number { font-size: 1.4rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+    .plan-quota-unit { font-size: .95rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
 
     .plan-features {
       list-style: none;
