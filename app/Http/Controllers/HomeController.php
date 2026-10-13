@@ -18,7 +18,9 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\AudioUrl;
+use App\Support\DemoAllowance;
 use App\Support\DialogueSpeakers;
+use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -985,9 +987,8 @@ class HomeController extends Controller
             $localizedDescription = $plan->getLocalizedDescription($locale);
             $localizedButtonText = $plan->getLocalizedButtonText($locale);
 
-            // Use admin-configured features if available, otherwise auto-generate
-            $customFeatures = $plan->getLocalizedFeatures($locale);
-            $features = $customFeatures ?? self::resolveStructuredFeatures($plan, $tier, $locale);
+            // Lines written from the plan's settings (Admin → Plans → Pricing page)
+            $features = PlanPricingLines::forPlan($plan, $locale);
 
             // Discount data
             $hasDiscount = $plan->hasActiveDiscount();
@@ -1066,74 +1067,9 @@ class HomeController extends Controller
         })->all();
     }
 
-    /**
-     * Build structured features array for the pricing card.
-     * Auto-builds from plan attributes so labels are always locale-aware.
-     *
-     * @return array<int, array{label: string, value: string, icon: string}>
-     */
-    private static function resolveStructuredFeatures(Plan $plan, string $tier, string $locale = 'en'): array
-    {
-        $priority = (string) ($plan->processing_priority ?? 'standard');
-        $priorityLabel = match ($priority) {
-            'standard_plus' => __('ui.pricing.standard_plus'),
-            'high' => __('ui.pricing.high'),
-            'priority' => __('ui.pricing.priority'),
-            'highest' => __('ui.pricing.highest'),
-            default => __('ui.pricing.standard'),
-        };
-
-        $recentDays = (int) ($plan->recent_voices_days ?? 7);
-        $isFree = (int) $plan->price_cents <= 0;
-
-        $emotionValue = $isFree
-            ? __('ui.pricing.basic_controls')
-            : __('ui.pricing.full_controls');
-
-        $recentValue = $recentDays <= 0
-            ? __('ui.pricing.unlimited')
-            : $recentDays . ' ' . __('ui.pricing.days');
-
-        $features = [
-            ['label' => __('ui.pricing.feature_label_requests'), 'value' => (int) $plan->monthly_requests <= 0 ? __('ui.pricing.unlimited') : number_format((int) $plan->monthly_requests), 'icon' => 'activity'],
-            ['label' => __('ui.pricing.feature_label_max_input'), 'value' => number_format((int) $plan->max_chars_per_request) . ' ' . __('ui.pricing.chars'), 'icon' => 'type'],
-            ['label' => __('ui.pricing.feature_label_voice_quality'), 'value' => VoiceTier::label($tier), 'icon' => 'mic'],
-            ['label' => __('ui.pricing.feature_label_emotion_controls'), 'value' => $emotionValue, 'icon' => 'heart'],
-            ['label' => __('ui.pricing.feature_label_priority_queue'), 'value' => $priorityLabel, 'icon' => 'bolt'],
-            ['label' => __('ui.pricing.feature_label_commercial_use'), 'value' => $plan->commercial_use_allowed ? __('ui.pricing.allowed') : __('ui.pricing.personal_only'), 'icon' => 'lock'],
-            ['label' => __('ui.pricing.feature_label_recent_voices'), 'value' => $recentValue, 'icon' => 'clock'],
-        ];
-
-        $charTopupCents = $plan->topup_char_price_cents !== null
-            ? (int) $plan->topup_char_price_cents
-            : (
-                $plan->allow_overage && $plan->overage_price_per_million_cents !== null
-                    ? (int) $plan->overage_price_per_million_cents
-                    : 0
-            );
-        if ($charTopupCents > 0) {
-            $features[] = [
-                'label' => __('ui.pricing.topup_chars'),
-                'value' => '$'.number_format($charTopupCents / 100, 0).__('ui.pricing.topup_per_million'),
-                'icon' => 'download',
-            ];
-        }
-
-        if ((bool) ($plan->dialogue_enabled ?? false)) {
-            $features[] = ['label' => __('ui.pricing.feature_label_dialogue_mode'), 'value' => __('ui.pricing.included_mark'), 'icon' => 'users'];
-        }
-
-        // Custom Prompt is enabled per-plan
-        if ((bool) ($plan->custom_prompt_enabled ?? false)) {
-            $features[] = ['label' => __('ui.pricing.feature_label_custom_prompt'), 'value' => __('ui.pricing.included_mark'), 'icon' => 'star'];
-        }
-
-        return $features;
-    }
-
     private function demoCharAllowance(Request $request): int
     {
-        return max(1, (int) config('listen.demo.guest_char_allowance', 300));
+        return DemoAllowance::chars();
     }
 
     private function demoLimitExceededMessage(Request $request, int $maxChars): string

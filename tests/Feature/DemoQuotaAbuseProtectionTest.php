@@ -7,10 +7,12 @@ use App\Models\DemoGuestUsage;
 use App\Models\DemoIdentityLink;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\TranslationService;
 use App\Services\TtsService;
+use App\Support\DemoAllowance;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -184,6 +186,31 @@ class DemoQuotaAbuseProtectionTest extends TestCase
         $this->travel(11)->minutes();
 
         $this->preview('Hello')->assertOk();
+    }
+
+    public function test_the_allowance_set_in_the_admin_is_both_the_total_and_the_longest_text(): void
+    {
+        SiteSetting::set(DemoAllowance::SETTING_KEY, '50');
+        $user = User::factory()->create(['registration_ip' => '203.0.113.40']);
+        $this->actingAs($user);
+
+        $this->preview(str_repeat('a', 60))->assertStatus(422)->assertJsonValidationErrors('text');
+        $this->preview(str_repeat('a', 40))->assertOk();
+        $this->preview(str_repeat('a', 20))->assertStatus(422);
+
+        $this->assertSame([str_repeat('a', 40)], $this->spokenTexts);
+    }
+
+    public function test_without_an_admin_setting_the_server_default_applies(): void
+    {
+        config(['listen.demo.guest_char_allowance' => 120]);
+        $this->assertSame(120, DemoAllowance::chars());
+
+        SiteSetting::set(DemoAllowance::SETTING_KEY, '0');
+        $this->assertSame(120, DemoAllowance::chars(), 'an empty or zero setting falls back');
+
+        SiteSetting::set(DemoAllowance::SETTING_KEY, '900');
+        $this->assertSame(900, DemoAllowance::chars());
     }
 
     // ──────────────────────────────────────────────────────────────────

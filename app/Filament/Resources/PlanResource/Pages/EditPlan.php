@@ -25,8 +25,12 @@ class EditPlan extends EditRecord
     {
         $rawState = $this->form->getRawState();
 
-        foreach (['features_en', 'features_ar'] as $field) {
-            $data[$field] = PlanResource::normalizeRepeaterItems($data[$field] ?? []);
+        // The hand-written lists are only in the form while "Use my own text instead"
+        // is on; otherwise they are left exactly as saved.
+        foreach (['features_en', 'features_ar', 'pricing_extra_lines_en', 'pricing_extra_lines_ar'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = PlanResource::normalizeRepeaterItems($data[$field]);
+            }
         }
 
         $priceDollars = (float) ($rawState['price_dollars'] ?? 0);

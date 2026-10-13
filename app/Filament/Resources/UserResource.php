@@ -114,7 +114,7 @@ class UserResource extends Resource
                         Forms\Components\Placeholder::make('demo_chars_used_display')
                             ->label(__('ui.admin.users.demo_chars_used'))
                             ->content(fn (?User $record): string => $record
-                                ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format((int) config('listen.demo.guest_char_allowance', 300))
+                                ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format(\App\Support\DemoAllowance::chars())
                                 : '0'),
                         Forms\Components\Placeholder::make('ip_linked_accounts_display')
                             ->label(__('ui.admin.users.ip_linked_accounts'))

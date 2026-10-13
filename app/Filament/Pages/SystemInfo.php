@@ -46,7 +46,7 @@ class SystemInfo extends Page
                 'Default Voice Tier' => config('listen.voice.default_tier'),
                 'Billing Grace Days' => config('listen.billing.grace_days'),
                 'Subscription Sync TTL (min)' => config('listen.billing.subscription_sync_ttl_minutes'),
-                'Demo Guest Char Allowance' => config('listen.demo.guest_char_allowance'),
+                'Demo Characters per Member' => \App\Support\DemoAllowance::chars(),
                 'Demo User Char Allowance' => config('listen.demo.user_char_allowance'),
             ],
             'disk' => [

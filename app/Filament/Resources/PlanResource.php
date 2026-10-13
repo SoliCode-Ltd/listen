@@ -6,7 +6,7 @@ use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\StripeProductSyncService;
-use App\Services\VoiceCloningService;
+use App\Support\PlanPricingLines;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -14,6 +14,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class PlanResource extends Resource
 {
@@ -318,9 +319,38 @@ class PlanResource extends Resource
                             ->suffix('voices')
                             ->helperText('Leave this at 0 to use the site-wide default. Set 1–100 for an exact cap on this plan.'),
                     ]),
+                Forms\Components\Section::make('Pricing page')
+                    ->description('The lines under the price on this plan\'s card. They are written for you in English and Arabic from this plan\'s settings above, so changing a setting updates the card by itself. Tick the ones to show.')
+                    ->schema([
+                        Forms\Components\Toggle::make('pricing_use_custom_text')
+                            ->label('Use my own text instead')
+                            ->default(false)
+                            ->live()
+                            ->helperText('Off: the card shows the lines ticked below. On: it shows the English and Arabic lists you write yourself, which open below. Lists you wrote before are still saved.'),
+                        Forms\Components\CheckboxList::make('pricing_lines')
+                            ->label('Show on the pricing page')
+                            ->options(PlanPricingLines::adminOptions())
+                            ->descriptions(fn (Get $get, ?Plan $record): array => self::pricingLineDescriptions(self::planFromForm($get, $record)))
+                            ->formatStateUsing(fn ($state): array => PlanPricingLines::shownKeys($state))
+                            ->dehydrateStateUsing(fn ($state): array => PlanPricingLines::switchesFrom($state))
+                            ->columns(2)
+                            ->bulkToggleable()
+                            ->live()
+                            ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
+                        Forms\Components\Grid::make(2)
+                            ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
+                            ->schema([
+                                self::extraLinesRepeater('pricing_extra_lines_en', 'Extra lines (English)', 'e.g. Arabic and English voices'),
+                                self::extraLinesRepeater('pricing_extra_lines_ar', 'Extra lines (Arabic)', 'مثل: أصوات عربية وإنجليزية'),
+                            ]),
+                        Forms\Components\Placeholder::make('pricing_preview')
+                            ->label('Preview')
+                            ->content(fn (Get $get, ?Plan $record): HtmlString => self::pricingPreview(self::planFromForm($get, $record), $get))
+                            ->hidden(fn (Get $get): bool => (bool) $get('pricing_use_custom_text')),
+                    ]),
                 Forms\Components\Section::make('Plan Features (English)')
-                    ->description('Features shown on the English pricing card. Auto-populated from plan data, edit as needed.')
-                    ->collapsed()
+                    ->description('Your own lines for the English card, used while "Use my own text instead" is on. An empty list starts from the automatic lines.')
+                    ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_en')
                             ->label('Features List (EN)')
@@ -368,7 +398,7 @@ class PlanResource extends Resource
                                     return;
                                 }
 
-                                $component->state(self::normalizeRepeaterItems(self::buildDefaultFeaturesEn($record)));
+                                $component->state(self::normalizeRepeaterItems(PlanPricingLines::automatic($record, 'en')));
                             })
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
@@ -378,8 +408,8 @@ class PlanResource extends Resource
                             ->collapsible(),
                     ]),
                 Forms\Components\Section::make('خصائص الخطة (العربية)')
-                    ->description('الخصائص المعروضة على بطاقة الأسعار العربية. يتم ملؤها تلقائياً، عدّل حسب الحاجة.')
-                    ->collapsed()
+                    ->description('سطورك الخاصة لبطاقة الأسعار العربية، وتُستخدم عند تفعيل "Use my own text instead". القائمة الفارغة تبدأ من السطور التلقائية.')
+                    ->visible(fn (Get $get): bool => (bool) $get('pricing_use_custom_text'))
                     ->schema([
                         Forms\Components\Repeater::make('features_ar')
                             ->label('قائمة الخصائص (AR)')
@@ -427,7 +457,7 @@ class PlanResource extends Resource
                                     return;
                                 }
 
-                                $component->state(self::normalizeRepeaterItems(self::buildDefaultFeaturesAr($record)));
+                                $component->state(self::normalizeRepeaterItems(PlanPricingLines::automatic($record, 'ar')));
                             })
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
@@ -652,114 +682,102 @@ class PlanResource extends Resource
     }
 
     /**
-     * Build default English features from plan attributes.
-     *
-     * @return array<int, array{label: string, value: string, icon: string}>
+     * The plan as the form currently has it, so the preview follows unsaved changes.
      */
-    private static function buildDefaultFeaturesEn(Plan $record): array
+    private static function planFromForm(Get $get, ?Plan $record): Plan
     {
-        $isFree = (int) $record->price_cents <= 0;
-        $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
+        $plan = $record ? $record->replicate() : new Plan;
 
-        $priority = match ((string) ($record->processing_priority ?? 'standard')) {
-            'standard_plus' => 'Standard+',
-            'high' => 'High',
-            'priority' => 'Priority',
-            'highest' => 'Highest',
-            default => 'Standard',
-        };
-
-        $recentDays = (int) ($record->recent_voices_days ?? 7);
-        $recentValue = $recentDays <= 0 ? 'Unlimited' : "{$recentDays} days";
-
-        $emotionValue = $isFree ? 'Basic' : 'Full Controls';
-
-        $features = [
-            ['label' => 'Requests', 'value' => (int) $record->monthly_requests <= 0 ? 'Unlimited' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
-            ['label' => 'Max Input', 'value' => number_format((int) $record->max_chars_per_request) . ' chars', 'icon' => 'type'],
-            ['label' => 'Voice Quality', 'value' => \App\Support\VoiceTier::label($tier), 'icon' => 'mic'],
-            ['label' => 'Emotion Controls', 'value' => $emotionValue, 'icon' => 'heart'],
-            ['label' => 'Priority Queue', 'value' => $priority, 'icon' => 'bolt'],
-            ['label' => 'Commercial Use', 'value' => $record->commercial_use_allowed ? 'Allowed' : 'Personal only', 'icon' => 'lock'],
-            ['label' => 'Recent Voices', 'value' => $recentValue, 'icon' => 'clock'],
-        ];
-
-        if ((bool) ($record->dialogue_enabled ?? false)) {
-            $features[] = ['label' => 'Dialogue Mode', 'value' => 'Included', 'icon' => 'users'];
+        foreach (['voice_tier', 'max_chars_per_request', 'monthly_chars', 'monthly_requests', 'processing_priority', 'commercial_use_allowed',
+            'recent_voices_days', 'dialogue_enabled', 'custom_prompt_enabled', 'voice_cloning_enabled', 'voice_cloning_max_voices',
+            'download_formats', 'allow_overage'] as $field) {
+            $plan->setAttribute($field, $get($field));
         }
 
-        // Custom Prompt is enabled per-plan
-        if ((bool) ($record->custom_prompt_enabled ?? false)) {
-            $features[] = ['label' => 'Custom Prompt', 'value' => 'Included', 'icon' => 'star'];
-        }
+        $topup = (float) ($get('topup_char_price_dollars') ?? 0);
+        $plan->topup_char_price_cents = $topup > 0 ? (int) round($topup * 100) : null;
+        $overage = (float) ($get('overage_price_dollars') ?? 0);
+        $plan->overage_price_per_million_cents = $overage > 0 ? (int) round($overage * 100) : null;
 
-        // Voice Cloning
-        if ((bool) ($record->voice_cloning_enabled ?? false)) {
-            $maxVoices = VoiceCloningService::maxVoicesForPlan($record);
-            $features[] = ['label' => 'Voice Cloning', 'value' => "Up to {$maxVoices} voices", 'icon' => 'mic'];
-        }
-
-        return $features;
+        return $plan;
     }
 
     /**
-     * Build default Arabic features from plan attributes.
+     * Under each switch: what the line will say, or why this plan has no such line.
      *
-     * @return array<int, array{label: string, value: string, icon: string}>
+     * @return array<string, string>
      */
-    private static function buildDefaultFeaturesAr(Plan $record): array
+    private static function pricingLineDescriptions(Plan $plan): array
     {
-        $isFree = (int) $record->price_cents <= 0;
-        $tier = \App\Support\VoiceTier::normalize((string) ($record->voice_tier ?: 'standard'));
-
-        $priority = match ((string) ($record->processing_priority ?? 'standard')) {
-            'standard_plus' => 'عادية+',
-            'high' => 'عالية',
-            'priority' => 'أولوية',
-            'highest' => 'أعلى أولوية',
-            default => 'عادية',
-        };
-
-        $tierLabel = match ($tier) {
-            'hd' => 'متميزة',
-            default => 'عادية',
-        };
-
-        $recentDays = (int) ($record->recent_voices_days ?? 7);
-        $recentValue = $recentDays <= 0 ? 'غير محدود' : "{$recentDays} يوم";
-
-        $emotionValue = $isFree ? 'أساسي' : 'تحكم كامل';
-
-        $features = [
-            ['label' => 'الطلبات', 'value' => (int) $record->monthly_requests <= 0 ? 'غير محدود' : number_format((int) $record->monthly_requests), 'icon' => 'activity'],
-            ['label' => 'الحد الأقصى للإدخال', 'value' => number_format((int) $record->max_chars_per_request) . ' حرف', 'icon' => 'type'],
-            ['label' => 'جودة الصوت', 'value' => $tierLabel, 'icon' => 'mic'],
-            ['label' => 'التحكم في المشاعر', 'value' => $emotionValue, 'icon' => 'heart'],
-            ['label' => 'أولوية المعالجة', 'value' => $priority, 'icon' => 'bolt'],
-            ['label' => 'الاستخدام التجاري', 'value' => $record->commercial_use_allowed ? 'مسموح' : 'شخصي فقط', 'icon' => 'lock'],
-            ['label' => 'الأصوات الأخيرة', 'value' => $recentValue, 'icon' => 'clock'],
-        ];
-
-        if ((bool) ($record->dialogue_enabled ?? false)) {
-            $features[] = ['label' => 'وضع الحوار', 'value' => 'متاح', 'icon' => 'users'];
+        $descriptions = [];
+        foreach (array_keys(PlanPricingLines::LINES) as $key) {
+            $en = PlanPricingLines::value($plan, $key, 'en');
+            $ar = PlanPricingLines::value($plan, $key, 'ar');
+            $descriptions[$key] = match (true) {
+                $en === null => (string) PlanPricingLines::whyHidden($plan, $key),
+                $en === __('ui.pricing.lines.included', [], 'en') => 'Shows: included (✓)',
+                $en === $ar => 'Shows: '.$en,
+                default => 'Shows: '.$en.'  /  '.$ar,
+            };
         }
 
-        // Custom Prompt is enabled per-plan
-        if ((bool) ($record->custom_prompt_enabled ?? false)) {
-            $features[] = ['label' => 'التعليمات المخصصة', 'value' => 'متاح', 'icon' => 'star'];
+        return $descriptions;
+    }
+
+    private static function extraLinesRepeater(string $name, string $label, string $placeholder): Forms\Components\Repeater
+    {
+        return Forms\Components\Repeater::make($name)
+            ->label($label)
+            ->helperText('Shown after the automatic lines. Leave the value empty for a check mark.')
+            ->schema([
+                Forms\Components\TextInput::make('label')
+                    ->label('Text')
+                    ->required()
+                    ->maxLength(80)
+                    ->placeholder($placeholder)
+                    ->live(onBlur: true)
+                    ->columnSpan(2),
+                Forms\Components\TextInput::make('value')
+                    ->label('Value')
+                    ->maxLength(40)
+                    ->placeholder('✓')
+                    ->live(onBlur: true),
+                Forms\Components\Select::make('icon')
+                    ->label('Icon')
+                    ->options(PlanPricingLines::ICONS)
+                    ->default('check')
+                    ->required()
+                    ->live(),
+            ])
+            ->columns(4)
+            ->defaultItems(0)
+            ->addActionLabel('Add a line')
+            ->reorderableWithButtons()
+            ->reorderableWithDragAndDrop(false)
+            ->live();
+    }
+
+    private static function pricingPreview(Plan $plan, Get $get): HtmlString
+    {
+        $plan->pricing_use_custom_text = false;
+        $plan->pricing_lines = PlanPricingLines::switchesFrom($get('pricing_lines'));
+        $plan->pricing_extra_lines_en = $get('pricing_extra_lines_en');
+        $plan->pricing_extra_lines_ar = $get('pricing_extra_lines_ar');
+
+        $columns = '';
+        foreach (['en' => 'ltr', 'ar' => 'rtl'] as $locale => $dir) {
+            $rows = '';
+            foreach (PlanPricingLines::forPlan($plan, $locale) as $line) {
+                $rows .= '<li style="display:flex;justify-content:space-between;gap:1rem;padding:.35rem 0;border-bottom:1px solid rgba(127,127,127,.2)">'
+                    .'<span>'.e($line['label']).'</span><strong>'.e($line['value']).'</strong></li>';
+            }
+            $headline = number_format((int) $plan->monthly_chars).' '.e(__('ui.pricing.characters_per_month', [], $locale));
+            $columns .= '<div dir="'.$dir.'" style="flex:1;min-width:16rem">'
+                .'<div style="font-weight:600;margin-bottom:.4rem">'.$headline.'</div>'
+                .'<ul style="margin:0;padding:0;list-style:none">'.($rows !== '' ? $rows : '<li>—</li>').'</ul></div>';
         }
 
-        // Voice Cloning
-        if ((bool) ($record->voice_cloning_enabled ?? false)) {
-            $maxVoices = VoiceCloningService::maxVoicesForPlan($record);
-            $features[] = [
-                'label' => "\u{0627}\u{0633}\u{062A}\u{0646}\u{0633}\u{0627}\u{062E} \u{0627}\u{0644}\u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",
-                'value' => "\u{062D}\u{062A}\u{0649} {$maxVoices} \u{0623}\u{0635}\u{0648}\u{0627}\u{062A}",
-                'icon' => 'mic',
-            ];
-        }
-
-        return $features;
+        return new HtmlString('<div style="display:flex;flex-wrap:wrap;gap:2rem">'.$columns.'</div>');
     }
 
     /**

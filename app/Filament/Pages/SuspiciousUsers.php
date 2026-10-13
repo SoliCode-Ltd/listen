@@ -140,7 +140,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->label(__('ui.admin.suspicious.group_total_chars'))
                     ->numeric()
                     ->badge()
-                    ->color(fn ($state): string => ((int) $state) >= (int) config('listen.demo.guest_char_allowance', 300) ? 'danger' : 'success')
+                    ->color(fn ($state): string => ((int) $state) >= \App\Support\DemoAllowance::chars() ? 'danger' : 'success')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('blocked_status')
                     ->label(__('ui.admin.suspicious.status'))
@@ -188,7 +188,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->query(fn (Builder $query) => $query->having(
                         'ip_group_total_chars',
                         '>=',
-                        (int) config('listen.demo.guest_char_allowance', 300)
+                        \App\Support\DemoAllowance::chars()
                     )),
                 Tables\Filters\TernaryFilter::make('multi_account_whitelisted')
                     ->label(__('ui.admin.suspicious.whitelisted_filter'))
@@ -281,7 +281,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                         ->modalContent(fn (User $record) => view('filament.pages.partials.linked-users-modal', [
                             'users' => $this->getLinkedUsers($record),
                             'sourceUser' => $record,
-                            'charAllowance' => (int) config('listen.demo.guest_char_allowance', 300),
+                            'charAllowance' => \App\Support\DemoAllowance::chars(),
                         ]))
                         ->modalSubmitAction(false)
                         ->modalCancelActionLabel(__('ui.admin.suspicious.close')),
