@@ -66,7 +66,8 @@
           <small style="color:var(--muted);">{{ __('ui.upgrade.yearly_equivalent') }}: ${{ rtrim(rtrim(number_format($plan['price_yearly'], 2, '.', ''), '0'), '.') }} {{ __('ui.upgrade.per_month') }}</small>
 
           <div class="spec">
-            <div class="row"><span>{{ __('ui.upgrade.characters_per_month') }}</span><span>{{ number_format($plan['monthly_chars']) }}</span></div>
+            <div class="row"><span>{{ __('ui.upgrade.characters_per_month') }}</span><span><x-credit-icon /> {{ number_format($plan['monthly_chars']) }}</span></div>
+            <div class="row"><span>{{ __('ui.pricing.lines.label_voice_minutes') }}</span><span>{{ __('ui.pricing.lines.voice_minutes_value', ['count' => number_format(\App\Support\Credits::minutesFor((int) $plan['monthly_chars']))]) }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.requests') }}</span><span>{{ $plan['requests_unlimited'] ? __('ui.upgrade.unlimited') : number_format($plan['monthly_requests']).' '. __('ui.upgrade.per_month') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.commercial_use') }}</span><span>{{ $plan['commercial_use_allowed'] ? __('ui.upgrade.allowed') : __('ui.upgrade.not_allowed') }}</span></div>
             <div class="row"><span>{{ __('ui.upgrade.processing_priority') }}</span><span>{{ $priorityLabel((string) $plan['processing_priority']) }}</span></div>

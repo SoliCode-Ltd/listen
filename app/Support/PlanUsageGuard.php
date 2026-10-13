@@ -81,7 +81,7 @@ class PlanUsageGuard
     }
 
     /**
-     * @param array{chars:int} $estimate
+     * @param  array{chars:int, seconds?:int}  $estimate
      */
     public static function assertWithinLimits(?Plan $plan, UsageCounter $counter, array $estimate): void
     {
@@ -92,6 +92,16 @@ class PlanUsageGuard
                     'content' => $plan?->getAttribute('no_free_monthly_chars') && $charsLimit <= (int) $counter->total_chars
                         ? __('ui.backend.no_chars_yet')
                         : __('ui.backend.monthly_chars_exceeded'),
+                ]);
+            }
+
+            // The credits also set the month's voice minutes (real seconds of
+            // audio), so slow speech cannot cost more than the plan allows.
+            $allowedSeconds = Credits::secondsFor($charsLimit);
+            $incomingSeconds = (int) ($estimate['seconds'] ?? 0);
+            if ($charsLimit > 0 && ((int) $counter->total_seconds + $incomingSeconds) > $allowedSeconds) {
+                throw ValidationException::withMessages([
+                    'content' => __('ui.backend.monthly_minutes_exceeded', ['minutes' => number_format(Credits::minutesFor($charsLimit))]),
                 ]);
             }
         }

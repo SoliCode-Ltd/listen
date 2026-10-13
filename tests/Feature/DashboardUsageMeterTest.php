@@ -50,7 +50,9 @@ class DashboardUsageMeterTest extends TestCase
         $response = $this->actingAs($user)->getLocalizedRoute('dashboard');
 
         $response->assertOk();
-        $response->assertSee('480,000 / 500,000 chars remaining', false);
+        $response->assertSee('480,000 / 500,000 credits remaining', false);
+        // 500,000 credits at 780 a minute = 641 voice minutes; none used yet.
+        $response->assertSee('0.0 of 641 voice minutes used', false);
         $response->assertSee('72 / 100 requests remaining', false);
         $response->assertSee('id="usageCharsMeter" style="width:96%"', false);
         $response->assertSee('id="usageRequestsMeter" style="width:72%"', false);

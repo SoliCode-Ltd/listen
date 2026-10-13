@@ -84,7 +84,7 @@ class UsageCounterResource extends Resource
                     ->formatStateUsing(fn (UsageCounter $record): string => $record->monthLabel())
                     ->sortable(),
                 Tables\Columns\TextColumn::make('total_chars')
-                    ->label('Characters used')
+                    ->label('Credits used')
                     ->sortable()
                     ->formatStateUsing(function (UsageCounter $record): string {
                         $allowance = self::allowance($record);
@@ -107,15 +107,16 @@ class UsageCounterResource extends Resource
 
                         return $percent >= 90 ? 'danger' : ($percent >= 70 ? 'warning' : null);
                     })
-                    ->tooltip('This month shows the allowance (plan + gifts). Earlier months show what was used.'),
+                    ->tooltip('This month shows the credits allowed (plan + gifts). Earlier months show what was used.'),
                 Tables\Columns\TextColumn::make('total_requests')
                     ->label('Generations')
                     ->numeric()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('total_seconds')
                     ->label('Audio length')
-                    ->formatStateUsing(fn (UsageCounter $record): string => $record->audioLabel())
-                    ->tooltip('The real length of the audio made this month, added up from every generation.')
+                    ->formatStateUsing(fn (UsageCounter $record): string => $record->audioLabel()
+                        .(self::allowance($record) ? ' of '.number_format(\App\Support\Credits::minutesFor((int) self::allowance($record))).' min' : ''))
+                    ->tooltip('The real length of the audio made this month. This month also shows the voice minutes the credits allow.')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('bonus_chars')
                     ->label('Gifted')
@@ -155,7 +156,7 @@ class UsageCounterResource extends Resource
                         };
                     }),
                 Tables\Filters\Filter::make('gifted')
-                    ->label('Received gifted characters')
+                    ->label('Received gifted credits')
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('bonus_chars', '>', 0)),
                 Tables\Filters\Filter::make('active')
@@ -192,7 +193,7 @@ class UsageCounterResource extends Resource
                 ->columns(3)
                 ->schema([
                     Infolists\Components\TextEntry::make('total_chars')
-                        ->label('Characters used')
+                        ->label('Credits used')
                         ->state(function (UsageCounter $record): string {
                             $allowance = self::allowance($record);
 
@@ -209,7 +210,7 @@ class UsageCounterResource extends Resource
                         ->label('Audio length')
                         ->state(fn (UsageCounter $record): string => $record->audioLabel()),
                     Infolists\Components\TextEntry::make('bonus_chars')
-                        ->label('Gifted characters')
+                        ->label('Gifted credits')
                         ->state(fn (UsageCounter $record): string => number_format((int) $record->bonus_chars)),
                     Infolists\Components\TextEntry::make('updated_at')->label('Last generation')->dateTime()->since(),
                 ]),
@@ -296,7 +297,7 @@ class UsageCounterResource extends Resource
         }
 
         $rows = $gifts->map(fn (CharGift $gift): string => '<li>'
-            .e(number_format((int) $gift->chars)).' characters on '.e($gift->created_at?->format('j M Y'))
+            .e(number_format((int) $gift->chars)).' credits on '.e($gift->created_at?->format('j M Y'))
             .' by '.e($gift->grantedBy?->email ?? 'Listen')
             .($gift->note ? ' — '.e($gift->note) : '')
             .($gift->revoked_at ? ' <strong>(taken back)</strong>' : '')

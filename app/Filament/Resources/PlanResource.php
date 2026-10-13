@@ -201,13 +201,13 @@ class PlanResource extends Resource
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('monthly_chars')
-                            ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Characters in the pack' : 'Monthly Characters')
+                            ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Credits in the pack' : 'Monthly credits')
                             ->numeric()
                             ->required()
                             ->live(debounce: 600)
                             ->helperText(fn (Get $get): string => ($get('kind') === Plan::KIND_PACK
-                                ? 'Characters each purchase adds. Unused characters move into the plan a member upgrades to. '
-                                : 'Total chars allowed per month. ')
+                                ? 'Credits each purchase adds (1 credit = 1 character read aloud). Unused credits move into the plan a member upgrades to. '
+                                : '1 credit = 1 character read aloud. ')
                                 .\App\Support\PlanCostEstimate::adminLine(
                                     (int) $get('monthly_chars'),
                                     is_numeric($get('price_dollars')) ? (float) $get('price_dollars') : null,
@@ -536,8 +536,9 @@ class PlanResource extends Resource
                         default => 'gray',
                     }),
                 Tables\Columns\TextColumn::make('monthly_chars')
-                    ->label('Chars/mo')
+                    ->label('Credits/mo')
                     ->numeric()
+                    ->description(fn (Plan $record): string => number_format(\App\Support\Credits::minutesFor((int) $record->monthly_chars)).' voice min')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('monthly_requests')
                     ->label('Requests/mo')
@@ -811,7 +812,8 @@ class PlanResource extends Resource
                 $rows .= '<li style="display:flex;justify-content:space-between;gap:1rem;padding:.35rem 0;border-bottom:1px solid rgba(127,127,127,.2)">'
                     .'<span>'.e($line['label']).'</span><strong>'.e($line['value']).'</strong></li>';
             }
-            $headline = number_format((int) $plan->monthly_chars).' '.e(__('ui.pricing.characters_per_month', [], $locale));
+            $headline = number_format((int) $plan->monthly_chars).' '.e(__('ui.pricing.characters_per_month', [], $locale))
+                .' · '.e(__('ui.pricing.voice_minutes_short', ['count' => number_format(\App\Support\Credits::minutesFor((int) $plan->monthly_chars))], $locale));
             $columns .= '<div dir="'.$dir.'" style="flex:1;min-width:16rem">'
                 .'<div style="font-weight:600;margin-bottom:.4rem">'.$headline.'</div>'
                 .'<ul style="margin:0;padding:0;list-style:none">'.($rows !== '' ? $rows : '<li>—</li>').'</ul></div>';

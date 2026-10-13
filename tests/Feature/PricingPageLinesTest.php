@@ -33,6 +33,8 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'Voice quality' => 'Premium',
+            // 320,000 credits at 780 a minute.
+            'Voice usage minutes' => 'Up to 410 min',
             'Max text per generation' => '5,000 characters',
             'Generations per month' => 'Unlimited',
             'Emotion, style & accent' => 'Full control',
@@ -46,6 +48,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'جودة الصوت' => 'متميزة',
+            'دقائق الصوت' => 'حتى 410 دقيقة',
             'أقصى نص في المرة الواحدة' => '5,000 حرف',
             'التوليدات شهريًا' => 'غير محدود',
             'المشاعر والأسلوب واللهجة' => 'تحكم كامل',
@@ -62,6 +65,7 @@ class PricingPageLinesTest extends TestCase
     {
         $plan = Plan::factory()->create([
             'voice_tier' => 'standard',
+            'monthly_chars' => 125000,
             'max_chars_per_request' => 1200,
             'monthly_requests' => 50,
             'processing_priority' => 'standard',
@@ -73,6 +77,7 @@ class PricingPageLinesTest extends TestCase
 
         $this->assertSame([
             'Voice quality' => 'Standard',
+            'Voice usage minutes' => 'Up to 160 min',
             'Max text per generation' => '1,200 characters',
             'Generations per month' => '50',
             'Processing priority' => 'Standard',
@@ -126,11 +131,11 @@ class PricingPageLinesTest extends TestCase
     public function test_the_top_up_price_is_off_until_ticked(): void
     {
         $plan = $this->premiumPlan(['topup_char_price_cents' => 2400]);
-        $this->assertArrayNotHasKey('Character top-up', $this->lines($plan, 'en'));
+        $this->assertArrayNotHasKey('Credit top-up', $this->lines($plan, 'en'));
 
         $plan->update(['pricing_lines' => ['topup' => true]]);
-        $this->assertSame('$24 per 1M characters', $this->lines($plan->fresh(), 'en')['Character top-up']);
-        $this->assertSame('$24 لكل مليون حرف', $this->lines($plan->fresh(), 'ar')['تعبئة أحرف']);
+        $this->assertSame('$24 per 1M credits', $this->lines($plan->fresh(), 'en')['Credit top-up']);
+        $this->assertSame('$24 لكل مليون رصيد', $this->lines($plan->fresh(), 'ar')['تعبئة رصيد']);
     }
 
     public function test_extra_lines_follow_the_automatic_ones(): void
@@ -178,6 +183,10 @@ class PricingPageLinesTest extends TestCase
         $page = $this->getLocalizedRoute('pricing')->assertOk();
 
         $page->assertSee(__('ui.pricing.lines.label_max_chars_per_request', [], $locale));
+        // The card shows the credits with their icon, and the voice minutes they give.
+        $page->assertSee('class="credit-icon"', false);
+        $page->assertSee('320,000 '.__('ui.pricing.characters_per_month', [], $locale));
+        $page->assertSee(__('ui.pricing.lines.voice_minutes_value', ['count' => '410'], $locale));
         $page->assertSee($locale === 'ar' ? 'سطر إضافي من المالك' : 'Owner extra line');
         $page->assertDontSee('Stale hand-written line');
         $page->assertDontSee('سطر قديم مكتوب يدويًا');
@@ -283,6 +292,7 @@ class PricingPageLinesTest extends TestCase
         return Plan::factory()->create(array_merge([
             'slug' => 'creator',
             'price_cents' => 1900,
+            'monthly_chars' => 320000,
             'voice_tier' => 'hd',
             'max_chars_per_request' => 5000,
             'monthly_requests' => 0,

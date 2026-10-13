@@ -118,7 +118,7 @@
     @elseif(!empty($plan['free_try_chars']))
       {{ __('ui.pack.free_try_headline', ['count' => number_format((int) $plan['free_try_chars'])]) }}
     @else
-      {{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}
+      <span class="plan-quota-credits" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /> {{ number_format($plan['monthly_chars']) }} {{ __('ui.pricing.characters_per_month') }}</span>
     @endif
   </div>
 

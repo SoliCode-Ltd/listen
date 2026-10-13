@@ -249,6 +249,12 @@
       margin-bottom: 1.25rem;
       background: var(--surface);
     }
+    .plan-quota-credits {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+    }
+    .plan-quota-credits .credit-icon { font-size: 1.05rem; }
 
     .plan-features {
       list-style: none;
