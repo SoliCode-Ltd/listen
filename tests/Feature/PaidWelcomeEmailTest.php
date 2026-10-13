@@ -29,7 +29,7 @@ class PaidWelcomeEmailTest extends TestCase
         parent::setUp();
         Mail::fake();
         $this->free = Plan::factory()->create(['slug' => 'free', 'price_cents' => 0]);
-        $this->paid = Plan::factory()->create(['slug' => 'creator', 'price_cents' => 1900]);
+        $this->paid = Plan::factory()->create(['slug' => 'creator', 'price_cents' => 1900, 'name_en' => null, 'name_ar' => null]);
     }
 
     public function test_a_new_paid_member_gets_the_welcome_email_once(): void
@@ -44,7 +44,11 @@ class PaidWelcomeEmailTest extends TestCase
                 && str_contains($mail->htmlBody, PaidWelcomeEmail::REVIEW_URL)
                 && str_contains($mail->htmlBody, 'Sara')
                 && str_contains($mail->htmlBody, 'أهلاً بك')
-                && str_contains($mail->htmlBody, 'Welcome aboard')
+                // The member's own plan, named in each language.
+                && str_contains($mail->htmlBody, 'Welcome to Creator, Sara!')
+                && str_contains($mail->htmlBody, 'باقة مُبدع')
+                && str_contains($mail->subjectLine, 'Listen Creator')
+                && ! str_contains($mail->htmlBody, '{plan}')
                 && $mail->unsubscribeUrl === null;
         });
         $this->assertNotNull($user->fresh()->paid_welcome_sent_at);
@@ -139,6 +143,14 @@ class PaidWelcomeEmailTest extends TestCase
             ->callTableAction('sendWelcome', $subscription);
         Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo('member@example.test'));
         Mail::assertSent(NewsletterMail::class, 3);
+    }
+
+    public function test_a_plan_name_set_in_the_admin_is_used_and_a_missing_one_leaves_no_gap(): void
+    {
+        $plan = new Plan(['slug' => 'gold', 'name' => 'Gold', 'name_en' => 'Gold Plus', 'name_ar' => 'الذهبية']);
+        $this->assertSame('Welcome to Gold Plus!', PaidWelcomeEmail::withPlan('Welcome to {plan}!', $plan, 'en'));
+        $this->assertSame('أهلاً بك في باقة الذهبية', PaidWelcomeEmail::withPlan('أهلاً بك في باقة {plan}', $plan, 'ar'));
+        $this->assertSame('Thanks for choosing the plan.', PaidWelcomeEmail::withPlan('Thanks for choosing the {plan} plan.', null, 'en'));
     }
 
     public function test_the_page_sits_under_newsletter(): void
