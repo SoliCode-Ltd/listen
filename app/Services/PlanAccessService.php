@@ -214,7 +214,8 @@ class PlanAccessService
 
     public function freePlan(): ?Plan
     {
+        // Never falls back to a paid plan: a missing free plan must not give a paid one away.
         return Plan::query()->where('slug', 'free')->first()
-            ?? Plan::query()->subscriptionPlans()->where('is_active', true)->orderBy('price_cents')->first();
+            ?? Plan::query()->subscriptionPlans()->where('price_cents', '<=', 0)->orderBy('id')->first();
     }
 }
