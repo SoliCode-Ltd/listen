@@ -129,6 +129,19 @@ class AudioLengthTest extends TestCase
             ->assertSee('Total audio length for these filters: 1 min 45 s');
     }
 
+    public function test_admin_tables_never_show_every_row_at_once(): void
+    {
+        $this->actingAs(User::factory()->create(['is_admin' => true]));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        // A choice of "All" saved before the option was removed.
+        session()->put('tables.'.md5(ListAudioGenerations::class).'_per_page', 'all');
+
+        $page = Livewire::test(ListAudioGenerations::class);
+
+        $this->assertSame(10, $page->instance()->getTableRecordsPerPage());
+        $this->assertNotContains('all', $page->instance()->getTable()->getPaginationPageOptions());
+    }
+
     public function test_command_measures_older_generations(): void
     {
         Storage::disk('public')->put('audio/old.wav', $this->wav(12.0));
