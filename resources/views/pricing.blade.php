@@ -283,7 +283,7 @@
       min-width: 0;
     }
     .plan-quota-amount { display: inline-flex; align-items: baseline; flex-wrap: wrap; column-gap: .45rem; row-gap: 0; min-width: 0; }
-    .plan-quota-coin { font-size: 2.15rem; margin: 0; filter: drop-shadow(0 6px 12px color-mix(in oklab, #6A45F2 26%, transparent)); }
+    .plan-quota-coin { font-size: 2.15rem; margin: 0; }
     .plan-quota-number { font-size: 1.4rem; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
     .plan-quota-unit { font-size: .95rem; font-weight: 600; color: color-mix(in oklab, var(--muted) 85%, var(--text)); white-space: nowrap; }
 
