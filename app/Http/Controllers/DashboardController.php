@@ -314,6 +314,8 @@ class DashboardController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
 
+        PlanUsageGuard::assertWithinDailyLimit($quotaPlan, $userId);
+
         if ($billToPack) {
             // Takes the pack characters now; given back below if the generation fails.
             app(CharPackService::class)->reserve($userId, $estimate['chars']);

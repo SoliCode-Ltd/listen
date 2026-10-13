@@ -2175,6 +2175,9 @@
               </small>
             </div>
             <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
+            @if((int) ($usageSnapshot['daily_requests_limit'] ?? 0) > 0)
+              <small class="meter-ends" id="usageTodayText">{{ __('ui.pack.today_requests', ['used' => number_format((int) $usageSnapshot['daily_requests_used']), 'limit' => number_format((int) $usageSnapshot['daily_requests_limit'])]) }}</small>
+            @endif
           </div>
 
           <div class="kpis" @if($freeNoChars) style="display:none" @endif>
@@ -2183,7 +2186,7 @@
             <div class="kpi"><small>{{ __('ui.dashboard.total_jobs') }}</small><b id="kpiTotal">{{ $stats['total'] }}</b></div>
           </div>
 
-          <div class="summary-block">
+          <div class="summary-block" @if($freeNoChars) style="display:none" @endif>
             <h1><span class="grad-text">{{ __('ui.dashboard.system_health') }}</span></h1>
             <div class="mini">
               <div class="box"><small>{{ __('ui.dashboard.processing') }}</small><div><b id="statProcessing">{{ $stats['processing'] }}</b></div></div>
@@ -3432,6 +3435,13 @@
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
       if (kpiRequests) kpiRequests.textContent = formatNumber(usage.total_requests);
       if (kpiChars) kpiChars.textContent = formatNumber(usage.total_chars);
+      const todayText = document.getElementById('usageTodayText');
+      if (todayText && Number(usage.daily_requests_limit) > 0) {
+        todayText.textContent = formatQuotaText(@json(__('ui.pack.today_requests')), {
+          used: formatNumber(usage.daily_requests_used),
+          limit: formatNumber(usage.daily_requests_limit),
+        });
+      }
     }
 
     function updateStats(stats) {

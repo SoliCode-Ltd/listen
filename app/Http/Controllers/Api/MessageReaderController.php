@@ -203,6 +203,8 @@ class MessageReaderController extends Controller
         );
 
         $billToPack = CharPackService::billsToPack($quotaPlan);
+        PlanUsageGuard::assertWithinDailyLimit($quotaPlan, (int) $user->id);
+
         if ($billToPack) {
             // Takes the pack characters now; given back if the generation fails.
             app(CharPackService::class)->reserve((int) $user->id, $estimate['chars']);

@@ -29,6 +29,7 @@ class Plan extends Model
         'monthly_chars',
         'premium_voice_minutes',
         'monthly_requests',
+        'daily_requests',
         'max_chars_per_request',
         'allow_overage',
         'overage_price_per_million_cents',
@@ -90,6 +91,7 @@ class Plan extends Model
         'pricing_extra_lines_ar' => 'array',
         'pricing_use_custom_text' => 'boolean',
         'pack_days' => 'integer',
+        'daily_requests' => 'integer',
     ];
 
     public function subscriptions(): HasMany

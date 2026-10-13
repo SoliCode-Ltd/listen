@@ -21,6 +21,17 @@ final class UsageSnapshot
      */
     public static function for(int $userId, ?Plan $quotaPlan, UsageCounter $counter): array
     {
+        return self::base($userId, $quotaPlan, $counter) + [
+            'daily_requests_limit' => PlanUsageGuard::dailyRequests($quotaPlan),
+            'daily_requests_used' => PlanUsageGuard::dailyRequests($quotaPlan) > 0 ? PlanUsageGuard::requestsToday($userId) : null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private static function base(int $userId, ?Plan $quotaPlan, UsageCounter $counter): array
+    {
         if (CharPackService::billsToPack($quotaPlan)) {
             $pack = app(CharPackService::class)->summary($userId);
 
