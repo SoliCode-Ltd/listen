@@ -175,6 +175,8 @@ class AudioFormats
             return $configured;
         }
 
-        return (new ExecutableFinder())->find('ffmpeg');
+        // storage/app/bin is where the "Server deploy" workflow's ffmpeg mode
+        // puts a copy on hosts that have none.
+        return (new ExecutableFinder())->find('ffmpeg', null, [storage_path('app/bin')]);
     }
 }
