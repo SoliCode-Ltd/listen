@@ -609,6 +609,7 @@
       'resuming' => __('ui.manage_subscription.resuming'),
       'resume_failed' => __('ui.manage_subscription.resume_failed'),
       'subscription_resumed' => __('ui.manage_subscription.subscription_resumed'),
+      'card_not_approved' => __('ui.backend.billing_card_not_approved'),
     ];
   @endphp
   <script>
@@ -751,22 +752,31 @@
       });
     }
 
-    async function collectCardPaymentMethod() {
+    // The bank approves the new card first (3D Secure when it asks); only then
+    // does it replace the card that renews the subscription.
+    async function confirmCardWithBank() {
       if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
-      const result = await stripe.createPaymentMethod({
-        type: 'card',
-        card,
-        billing_details: {
-          name: userName || undefined,
-          email: userEmail || undefined,
+      const intent = await post('{{ route('billing.payment-method.intent') }}');
+      if (!intent.ok || intent.data?.ok === false || !intent.data?.client_secret) {
+        throw new Error(intent.data?.message || i18n.card_update_failed);
+      }
+
+      const result = await stripe.confirmCardSetup(String(intent.data.client_secret), {
+        payment_method: {
+          card,
+          billing_details: {
+            name: userName || undefined,
+            email: userEmail || undefined,
+          },
         },
       });
 
       if (result.error) {
-        throw new Error(normalizeStripeMessage(result.error.message, i18n.invalid_card_details));
+        // Nothing changed: the current card keeps renewing the subscription.
+        throw new Error(i18n.card_not_approved);
       }
 
-      return String(result.paymentMethod?.id || '');
+      return String(result.setupIntent?.id || '');
     }
 
     updateCardBtn?.addEventListener('click', async () => {
@@ -778,15 +788,15 @@
           throw new Error(i18n.enter_new_card_first);
         }
 
-        const paymentMethod = await collectCardPaymentMethod();
-        const response = await post('{{ route('billing.payment-method') }}', { payment_method: paymentMethod });
+        const setupIntent = await confirmCardWithBank();
+        const response = await post('{{ route('billing.payment-method') }}', { setup_intent: setupIntent });
 
         if (!response.ok || response.data?.ok === false) {
           throw new Error(response.data?.message || i18n.card_update_failed);
         }
 
         setMessage(paymentMessageBox, 'ok', response.data?.message || i18n.card_updated_successfully);
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 2200);
       } catch (error) {
         setMessage(paymentMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.card_update_failed));
       } finally {
