@@ -816,6 +816,27 @@ class PremiumPackTest extends TestCase
         $this->assertNull(AudioGeneration::query()->latest('id')->value('style_prompt'));
     }
 
+    public function test_the_daily_limit_follows_the_cairo_day_not_the_utc_day(): void
+    {
+        config(['listen.billing.daily_limit_timezone' => 'Africa/Cairo']);
+        $this->starter->update(['daily_requests' => 1]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $voiceKey = VoiceCatalog::keyFromId((int) $this->premiumVoice()->id);
+        $generate = fn () => $this->actingAs($user)->postJsonLocalizedRoute('dashboard.queue', ['content' => 'Hello there', 'target_language' => 'en', 'voice_key' => $voiceKey]);
+
+        // 23:50 and 00:10 UTC are 02:50 and 03:10 in Cairo: the same day there,
+        // so UTC midnight must not hand out a second day's generations.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-13 23:50:00', 'UTC'));
+        $generate()->assertOk();
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 00:10:00', 'UTC'));
+        $generate()->assertStatus(422);
+
+        // Cairo midnight (21:00 UTC) starts the next day.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 21:05:00', 'UTC'));
+        $generate()->assertOk();
+    }
+
     public function test_failed_generations_do_not_use_up_the_day(): void
     {
         $this->starter->update(['daily_requests' => 1]);
