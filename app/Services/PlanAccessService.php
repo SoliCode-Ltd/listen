@@ -148,9 +148,10 @@ class PlanAccessService
         $this->assignPlan($user, $free);
     }
 
-    public function assignPlan(User $user, Plan $plan, string $status = 'active', ?\DateTimeInterface $periodEnd = null): Subscription
+    public function assignPlan(User $user, Plan $plan, string $status = 'active', ?\DateTimeInterface $periodEnd = null, ?\DateTimeInterface $periodStart = null): Subscription
     {
-        $periodStart = now();
+        $explicitStart = $periodStart !== null;
+        $periodStart = $periodStart ?: now();
         $periodEnd = $periodEnd ?: now()->addMonth();
 
         // Capture the transition signal BEFORE the subscription row is mutated
@@ -183,10 +184,17 @@ class PlanAccessService
                 'current_period_end' => $periodEnd,
             ]);
         } else {
+            // The same plan and period seen again (a billing refresh): keep when it started.
+            $samePeriod = ! $explicitStart
+                && (int) $subscription->plan_id === (int) $plan->id
+                && (string) $subscription->status === $status
+                && $subscription->current_period_start !== null
+                && $subscription->current_period_end?->getTimestamp() === \Illuminate\Support\Carbon::instance($periodEnd)->getTimestamp();
+
             $subscription->update([
                 'plan_id' => $plan->id,
                 'status' => $status,
-                'current_period_start' => $periodStart,
+                'current_period_start' => $samePeriod ? $subscription->current_period_start : $periodStart,
                 'current_period_end' => $periodEnd,
             ]);
         }
