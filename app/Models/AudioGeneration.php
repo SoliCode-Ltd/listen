@@ -116,6 +116,7 @@ class AudioGeneration extends Model
             'pitch' => $snapshot['pitch'] ?? $this->pitch,
             'is_dialogue' => (bool) ($snapshot['is_dialogue'] ?? $this->is_dialogue),
             'dialogue_speakers' => $snapshot['dialogue_speakers'] ?? ($dialogueMetadata['speakers'] ?? null),
+            'audio_effect' => $snapshot['audio_effect'] ?? null,
         ];
 
         return array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);

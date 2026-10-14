@@ -228,6 +228,8 @@ final class StudioChoices
             'performance_style' => $pack(self::STYLES),
             'performance_styleGroups' => $labels(self::STYLE_GROUPS),
             'tags' => self::TAG_ICONS,
+            'audio_effect' => AudioEffects::forPicker($arabic),
+            'audio_effectGroups' => $labels(AudioEffects::GROUPS),
         ];
     }
 }

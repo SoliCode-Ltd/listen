@@ -156,6 +156,14 @@ class AudioFormats
         }
     }
 
+    /**
+     * The server's ffmpeg, or null when there is none (or it may not be run).
+     */
+    public static function ffmpegPath(): ?string
+    {
+        return self::ffmpeg();
+    }
+
     private static function ffmpeg(): ?string
     {
         if (! function_exists('proc_open') || in_array('proc_open', array_map('trim', explode(',', (string) ini_get('disable_functions'))), true)) {
