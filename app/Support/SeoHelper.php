@@ -161,9 +161,9 @@ class SeoHelper
             ],
             'text_to_speech' => [
                 'label' => 'Text to Speech Online',
-                'title' => 'Free Text to Speech Online in Arabic and English',
+                'title' => 'Text to Speech Online in Arabic, English and 22 More Languages',
                 'title_key' => 'ui.seo.text_to_speech_title',
-                'description' => 'Free online text to speech with natural Arabic and English AI voices. Paste text, pick a voice or dialect, and download MP3.',
+                'description' => 'Turn writing into natural speech online: paste your text, pick a voice, a language and a dialect or accent, and download MP3.',
                 'description_key' => 'ui.seo.text_to_speech_description',
                 'robots' => self::DEFAULT_META_ROBOTS,
                 'path' => '/text-to-speech',
@@ -250,7 +250,8 @@ class SeoHelper
                 'indexable' => false,
             ],
         ] + SeoDialectPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
-          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS);
+          + SeoEnglishPages::pageDefinitions(self::DEFAULT_META_ROBOTS)
+          + SeoLanguagePages::pageDefinitions(self::DEFAULT_META_ROBOTS);
     }
 
     /**
@@ -298,13 +299,13 @@ class SeoHelper
                     'faq_title' => 'Frequently asked questions',
                     'faqs' => [
                         ['question' => 'What is AI text to speech used for?', 'answer' => 'Teams use AI text to speech to convert written content into spoken audio for products, marketing, support, and training.'],
-                        ['question' => 'Does Listen support Arabic and English?', 'answer' => 'Yes. Listen is built for premium Arabic and English voice generation in one unified workflow.'],
-                        ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. You can start with the demo flow and free path, then upgrade when your production volume grows.'],
+                        ['question' => 'Which languages does Listen speak?', 'answer' => 'Arabic, in Fusha and more than 100 regional accents, English in more than 30 accents, and 22 more languages on the premium voices, including Spanish, French, German, Turkish, Hindi and Japanese.'],
+                        ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo before choosing a plan.'],
                         ['question' => 'Who is this page for?', 'answer' => 'It is ideal for creators, startups, product teams, agencies, and organizations that publish multilingual audio content.'],
                     ],
                     'cta_title' => 'Start generating production-ready audio',
                     'cta_body' => 'Launch your next voice workflow with Listen and move from text to publishable audio in minutes.',
-                    'cta_primary' => 'Create your free account',
+                    'cta_primary' => 'Create your account',
                 ],
                 'ar' => [
                     'eyebrow' => 'تحويل النص إلى صوت',
@@ -328,13 +329,13 @@ class SeoHelper
                     'faq_title' => 'الأسئلة الشائعة',
                     'faqs' => [
                         ['question' => 'في ماذا يُستخدم تحويل النص إلى صوت بالذكاء الاصطناعي؟', 'answer' => 'يُستخدم لتحويل المحتوى المكتوب إلى صوت في المنتجات، والتسويق، والدعم، والتدريب، وتجارب الوصول الرقمي.'],
-                        ['question' => 'هل تدعم منصة إسمع العربية والإنجليزية؟', 'answer' => 'نعم، منصة إسمع مصممة لتقديم مخرجات عربية وإنجليزية عالية الجودة ضمن سير عمل واحد.'],
-                        ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يمكنك البدء عبر الديمو أو المسار المجاني ثم الترقية عند زيادة الاحتياج الإنتاجي.'],
+                        ['question' => 'ما اللغات التي تتحدث بها منصة إسمع؟', 'answer' => 'العربية بالفصحى وبأكثر من 100 لكنة محلية، والإنجليزية بأكثر من 30 لكنة، و22 لغة أخرى بالأصوات المميزة منها الإسبانية والفرنسية والألمانية والتركية والهندية واليابانية.'],
+                        ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي قبل اختيار الباقة.'],
                         ['question' => 'لمن تناسب هذه الصفحة؟', 'answer' => 'تناسب صناع المحتوى، والشركات الناشئة، وفرق المنتجات، والجهات التعليمية، والفرق التي تعمل بلغتين.'],
                     ],
                     'cta_title' => 'ابدأ إنتاج صوت جاهز للنشر',
                     'cta_body' => 'ابدأ مع منصة إسمع وحوّل النص إلى صوت احترافي خلال دقائق.',
-                    'cta_primary' => 'أنشئ حسابك المجاني',
+                    'cta_primary' => 'أنشئ حسابك',
                 ],
             ],
             'ai_voice_generator' => [
@@ -433,7 +434,7 @@ class SeoHelper
                 'ar' => [
                     'eyebrow' => 'تحويل النص العربي إلى صوت',
                     'h1' => 'تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات',
-                    'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى وأكثر من خمسين لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
+                    'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى وأكثر من 100 لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
                     'highlights_title' => 'لماذا منصة إسمع للنص العربي؟',
                     'highlights_intro' => 'لأن العربية ليست لغة إضافية عندنا، بل اللغة الأساسية.',
                     'highlights' => [
@@ -451,26 +452,26 @@ class SeoHelper
                     ],
                     'faq_title' => 'الأسئلة الشائعة',
                     'faqs' => [
-                        ['question' => 'كيف أحول نص عربي إلى صوت؟', 'answer' => 'أنشئ حساباً مجانياً، الصق النص، اختر الصوت واللهجة، ثم اضغط توليد وحمّل الملف بصيغة MP3.'],
+                        ['question' => 'كيف أحول نص عربي إلى صوت؟', 'answer' => 'أنشئ حساباً، الصق النص، اختر الصوت واللهجة، ثم اضغط توليد وحمّل الملف بصيغة MP3.'],
                         ['question' => 'هل يدعم التشكيل والنص غير المشكول؟', 'answer' => 'نعم، يقرأ النص المشكول وغير المشكول. إضافة التشكيل على الكلمات الملتبسة تساعد على نطق أدق.'],
                         ['question' => 'هل يمكن تحويل النص إلى صوت باللهجة السعودية أو المصرية أو المغربية؟', 'answer' => 'نعم، اختر اللهجة من الاستوديو: لهجات الخليج (السعودية بلكناتها، الإماراتية، الكويتية، القطرية، البحرينية، العُمانية)، والشام، ومصر والسودان، والعراق واليمن، والمغرب العربي.'],
-                        ['question' => 'هل الخدمة مجانية؟', 'answer' => 'يمكنك البدء مجاناً بحساب مجاني، ثم الترقية إلى خطة مدفوعة عند الحاجة إلى عدد أحرف أكبر.'],
+                        ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي، ثم تختار الباقة التي تناسب عدد الأحرف الذي تحتاجه.'],
                     ],
                     'cta_title' => 'حوّل نصك العربي إلى صوت الآن',
-                    'cta_body' => 'أنشئ حسابك المجاني واسمع نصك بصوت عربي طبيعي خلال ثوانٍ.',
-                    'cta_primary' => 'أنشئ حسابك المجاني',
+                    'cta_body' => 'أنشئ حسابك واسمع نصك بصوت عربي طبيعي خلال ثوانٍ.',
+                    'cta_primary' => 'أنشئ حسابك',
                 ],
             ],
             'text_to_speech' => [
                 'en' => [
                     'eyebrow' => 'Text to Speech Online',
-                    'h1' => 'Free Text to Speech Online with Natural Arabic and English Voices',
-                    'intro' => 'Paste any text, choose a voice, and get natural-sounding speech in seconds. Listen reads English and Arabic, including Fusha and more than fifty Arabic accents, and gives you an MP3 you can download and use.',
+                    'h1' => 'Text to Speech Online with Natural Voices in Arabic, English and 22 More Languages',
+                    'intro' => 'Paste any text, choose a voice, and get natural-sounding speech in seconds. Listen reads English and Arabic, including Fusha and more than 100 Arabic accents, plus 22 more languages, and gives you an MP3 you can download and use.',
                     'highlights_title' => 'Why use Listen for text to speech',
                     'highlights_intro' => 'Human-sounding voices without the robotic tone.',
                     'highlights' => [
                         ['title' => 'Natural HD voices', 'body' => 'Choose Standard voices for everyday reading or HD voices with emotion and performance styles for professional voiceovers.'],
-                        ['title' => 'English and Arabic, every dialect', 'body' => '18 English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
+                        ['title' => 'English and Arabic, every dialect', 'body' => 'More than 30 English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
                         ['title' => 'Translate, then speak', 'body' => 'Write in one language and get audio in the other with built-in translation.'],
                     ],
                     'use_cases_title' => 'What people use it for',
@@ -483,24 +484,24 @@ class SeoHelper
                     ],
                     'faq_title' => 'Frequently asked questions',
                     'faqs' => [
-                        ['question' => 'Is Listen text to speech free?', 'answer' => 'Yes, you can start with a free account. Paid plans add more characters per month, HD voices and higher limits.'],
+                        ['question' => 'Can I try Listen before I pay?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo. Plans add monthly characters, premium voices, emotions and more languages.'],
                         ['question' => 'How do I convert text to speech?', 'answer' => 'Sign up, paste your text, pick a language, voice and dialect, then generate and download the MP3.'],
-                        ['question' => 'Which languages are supported?', 'answer' => 'English and Arabic, including Modern Standard Arabic and dialects from Egypt, the Gulf, the Levant, Iraq, Yemen, Sudan and the Maghreb.'],
+                        ['question' => 'Which languages are supported?', 'answer' => 'Arabic, including Modern Standard Arabic and dialects from Egypt, the Gulf, the Levant, Iraq, Yemen, Sudan and the Maghreb; English in more than 30 accents; and 22 more languages on the premium voices, such as Spanish, French, German, Portuguese, Turkish, Hindi, Japanese and Korean.'],
                         ['question' => 'Can I read web pages aloud?', 'answer' => 'Yes. The Listen Reader Chrome extension reads selected text on any page.'],
                     ],
                     'cta_title' => 'Turn your text into speech now',
-                    'cta_body' => 'Create a free account and hear your first audio in seconds.',
-                    'cta_primary' => 'Create your free account',
+                    'cta_body' => 'Create your account and hear your first audio in seconds.',
+                    'cta_primary' => 'Create your account',
                 ],
                 'ar' => [
                     'eyebrow' => 'تحويل النص إلى كلام',
-                    'h1' => 'تحويل النص إلى كلام مجاناً أونلاين بصوت عربي وإنجليزي طبيعي',
-                    'intro' => 'الصق أي نص، اختر الصوت، واحصل على كلام طبيعي خلال ثوانٍ. منصة إسمع تقرأ العربية والإنجليزية، بالفصحى وبأكثر من خمسين لكنة عربية، وتعطيك ملف MP3 جاهزاً للتحميل والاستخدام.',
+                    'h1' => 'تحويل النص إلى كلام أونلاين بصوت طبيعي بالعربية والإنجليزية و22 لغة أخرى',
+                    'intro' => 'الصق أي نص، اختر الصوت، واحصل على كلام طبيعي خلال ثوانٍ. منصة إسمع تقرأ العربية والإنجليزية، بالفصحى وبأكثر من 100 لكنة عربية، إضافة إلى 22 لغة أخرى، وتعطيك ملف MP3 جاهزاً للتحميل والاستخدام.',
                     'highlights_title' => 'لماذا منصة إسمع لتحويل الكتابة إلى صوت',
                     'highlights_intro' => 'أصوات تشبه البشر، بلا نبرة آلية.',
                     'highlights' => [
                         ['title' => 'أصوات طبيعية عالية الدقة', 'body' => 'أصوات قياسية للقراءة اليومية، وأصوات عالية الدقة بالمشاعر وأساليب الأداء للتعليق الصوتي الاحترافي.'],
-                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، و18 لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
+                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، وأكثر من 30 لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
                         ['title' => 'ترجم ثم حوّل إلى صوت', 'body' => 'اكتب بلغة واحصل على الصوت باللغة الأخرى عبر الترجمة المدمجة.'],
                     ],
                     'use_cases_title' => 'فيم يُستخدم',
@@ -513,14 +514,14 @@ class SeoHelper
                     ],
                     'faq_title' => 'الأسئلة الشائعة',
                     'faqs' => [
-                        ['question' => 'هل تحويل النص إلى صوت في منصة إسمع مجاني؟', 'answer' => 'نعم، يمكنك البدء بحساب مجاني. الخطط المدفوعة تضيف أحرفاً أكثر شهرياً وأصواتاً عالية الدقة وحدوداً أعلى.'],
+                        ['question' => 'هل يمكن تجربة منصة إسمع قبل الدفع؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي. الباقات تضيف أحرفاً شهرية وأصواتاً مميزة ومشاعر ولغات أكثر.'],
                         ['question' => 'كيف أحول الكتابة إلى صوت؟', 'answer' => 'سجّل حساباً، الصق النص، اختر اللغة والصوت واللهجة، ثم اضغط توليد وحمّل ملف MP3.'],
-                        ['question' => 'ما اللغات المدعومة؟', 'answer' => 'العربية والإنجليزية، بما في ذلك الفصحى ولهجات مصر والخليج والشام والعراق واليمن والسودان والمغرب العربي.'],
+                        ['question' => 'ما اللغات المدعومة؟', 'answer' => 'العربية بالفصحى ولهجات مصر والخليج والشام والعراق واليمن والسودان والمغرب العربي، والإنجليزية بأكثر من 30 لكنة، و22 لغة أخرى بالأصوات المميزة مثل الإسبانية والفرنسية والألمانية والبرتغالية والتركية والهندية واليابانية والكورية.'],
                         ['question' => 'هل يمكن قراءة صفحات الويب بصوت عالٍ؟', 'answer' => 'نعم، إضافة إسمع لمتصفح كروم تقرأ أي نص تحدده على أي صفحة.'],
                     ],
                     'cta_title' => 'حوّل نصك إلى كلام الآن',
-                    'cta_body' => 'أنشئ حسابك المجاني واسمع أول مقطع صوتي خلال ثوانٍ.',
-                    'cta_primary' => 'أنشئ حسابك المجاني',
+                    'cta_body' => 'أنشئ حسابك واسمع أول مقطع صوتي خلال ثوانٍ.',
+                    'cta_primary' => 'أنشئ حسابك',
                 ],
             ],
         ];
@@ -728,16 +729,16 @@ class SeoHelper
             "# {$siteName}",
             '',
             '> Listen (Arabic: منصة إسمع) is an AI text to speech platform for Arabic and English at ' . $base . '. It speaks Modern Standard Arabic (Fusha), '
-                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with HD voices, emotion and performance styles, translation, voice cloning and a Chrome extension.',
+                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, and '.(count(SpeechLanguages::ALL) - 2).' more languages on its premium voices, with emotion and performance styles, sound environments, translation and a Chrome extension.',
             '',
             '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
             "- [Home (Arabic)]({$base}/ar)",
-            "- [Text to speech online]({$base}/en/text-to-speech): free online text to speech in Arabic and English",
+            "- [Text to speech online]({$base}/en/text-to-speech): online text to speech in Arabic, English and 22 more languages",
             "- [Arabic text to speech]({$base}/en/text-to-speech-arabic) · [Arabic version]({$base}/ar/text-to-speech-arabic)",
             "- [AI text to speech]({$base}/en/ai-text-to-speech)",
             "- [AI voice generator]({$base}/en/ai-voice-generator)",
-            "- [Pricing]({$base}/en/pricing): free plan and paid plans",
+            "- [Pricing]({$base}/en/pricing): monthly plans; new accounts can try the voices in the demo first",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             "- [Contact]({$base}/en/contact-us)",
             '',
@@ -754,6 +755,13 @@ class SeoHelper
         $lines[] = "- [All English accents]({$base}/en/english-accents) · [Arabic version]({$base}/ar/english-accents)";
         foreach (SeoEnglishPages::PAGES as $slug => $row) {
             $lines[] = '- [' . SeoEnglishPages::title($slug, 'en') . "]({$base}/en/english-accents/{$slug})";
+        }
+
+        $lines[] = '';
+        $lines[] = '## Other languages';
+        $lines[] = "- [All languages]({$base}/en/languages) · [Arabic version]({$base}/ar/languages)";
+        foreach (SeoLanguagePages::PAGES as $slug => $row) {
+            $lines[] = '- [' . SeoLanguagePages::title($slug, 'en') . "]({$base}/en/languages/{$slug})";
         }
 
         return implode("\n", array_merge($lines, [
@@ -854,6 +862,13 @@ class SeoHelper
             return $field === 'title'
                 ? SeoEnglishPages::title($accentSlug, $locale)
                 : SeoEnglishPages::description($accentSlug, $locale);
+        }
+
+        $languageSlug = SeoLanguagePages::slugForPageKey($page);
+        if ($languageSlug !== null && in_array($field, ['title', 'description'], true)) {
+            return $field === 'title'
+                ? SeoLanguagePages::title($languageSlug, $locale)
+                : SeoLanguagePages::description($languageSlug, $locale);
         }
 
         $translationKey = (string) ($definition["{$field}_key"] ?? '');
@@ -1232,6 +1247,13 @@ class SeoHelper
             ];
         }
 
+        if (SeoLanguagePages::slugForPageKey($page) !== null) {
+            $trail[] = [
+                'name' => $locale === 'ar' ? 'اللغات' : 'Languages',
+                'url' => self::pageUrl(SeoLanguagePages::HUB_PAGE, $locale),
+            ];
+        }
+
         $name = self::localizedOverride("seo_{$page}_title", $locale, $locale === 'ar') ?: self::localizedDefault('title', $page, $locale);
         $trail[] = ['name' => $name, 'url' => self::pageUrl($page, $locale)];
 
@@ -1254,8 +1276,8 @@ class SeoHelper
             'description' => self::siteDescription($locale),
             'inLanguage' => ['ar', 'en'],
             'featureList' => $locale === 'ar'
-                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى وأكثر من خمسين لكنة عربية', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'ترجمة قبل التحويل إلى صوت', 'استنساخ الصوت', 'إضافة لمتصفح كروم']
-                : ['Arabic and English text to speech', 'Modern Standard Arabic and 50+ Arabic accents', 'HD voices with emotion and performance control', 'Translate before speech', 'Voice cloning', 'Chrome extension'],
+                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى وأكثر من 100 لكنة عربية', 'أكثر من 30 لكنة إنجليزية و22 لغة أخرى', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'بيئات صوتية مثل القاعة والهاتف والراديو', 'ترجمة قبل التحويل إلى صوت', 'إضافة لمتصفح كروم']
+                : ['Arabic and English text to speech', 'Modern Standard Arabic and 100+ Arabic accents', '30+ English accents and 22 more languages', 'HD voices with emotion and performance control', 'Sound environments such as hall, phone and radio', 'Translate before speech', 'Chrome extension'],
             'publisher' => ['@id' => $organizationId],
         ];
 
@@ -1278,7 +1300,8 @@ class SeoHelper
     private static function planOffers(): ?array
     {
         try {
-            $prices = \App\Models\Plan::query()->where('is_active', true)->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
+            // Paid plans only: a $0 plan is the demo account, not an offer.
+            $prices = \App\Models\Plan::query()->where('is_active', true)->where('price_cents', '>', 0)->pluck('price_cents')->map(fn ($cents) => (int) $cents)->all();
         } catch (\Throwable) {
             return null;
         }
@@ -1572,8 +1595,8 @@ HTML;
         }
 
         return $locale === 'ar'
-            ? 'منصة متقدمة لتحويل النص إلى صوت بأصوات عربية وإنجليزية طبيعية تناسب المنتجات والمحتوى وسير العمل الحديث.'
-            : 'A premium AI text to speech platform with natural Arabic and English voices for product, content, and workflow automation.';
+            ? 'منصة لتحويل النص إلى صوت بأصوات طبيعية بالفصحى واللهجات العربية واللكنات الإنجليزية و22 لغة أخرى، للمحتوى والإعلانات والتعليم والمنتجات.'
+            : 'AI text to speech with natural voices in Fusha and Arabic dialects, English accents and 22 more languages, for content, ads, learning and products.';
     }
 
     public static function currentLocale(): string
@@ -1936,6 +1959,7 @@ HTML;
             default => match (true) {
                 SeoDialectPages::slugForPageKey($page) !== null, $page === SeoDialectPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoDialectPages.php', 'app/Support/ArabicDialects.php'],
                 SeoEnglishPages::slugForPageKey($page) !== null, $page === SeoEnglishPages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoEnglishPages.php', 'app/Support/EnglishAccents.php'],
+                SeoLanguagePages::slugForPageKey($page) !== null, $page === SeoLanguagePages::HUB_PAGE => ['resources/views/seo/landing-page.blade.php', 'app/Support/SeoLanguagePages.php', 'app/Support/SpeechLanguages.php'],
                 default => [],
             },
         };

@@ -121,6 +121,12 @@
                   <select id="target_language" name="target_language">
                     <option value="ar">{{ __('ui.demo.arabic') }}</option>
                     <option value="en">{{ __('ui.demo.english') }}</option>
+                    <optgroup label="{{ __('ui.dashboard.more_languages_premium') }}">
+                      @foreach(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar') as $vsLang)
+                        @continue(! $vsLang['premium'])
+                        <option value="{{ $vsLang['value'] }}" data-premium-language>{{ $vsLang['label'] }} · {{ $vsLang['native'] }}</option>
+                      @endforeach
+                    </optgroup>
                   </select>
                 </div>
               </x-voice-studio.setbar>
@@ -325,7 +331,9 @@
     function renderDialectOptions() {
       if (!dialectSelect || !targetLanguage) return;
       const lang = normalizeLanguage(targetLanguage.value);
-      const dialects = dialectsByLanguage[lang] || dialectsByLanguage['ar'];
+      const dialects = dialectsByLanguage[lang] || [{ value: '', label: autoDialectLabel }];
+      const dialectField = dialectSelect.closest('[data-vs-dialect-field]');
+      if (dialectField) dialectField.hidden = !dialectsByLanguage[lang];
       dialectSelect.innerHTML = '';
       for (const d of dialects) {
         const opt = document.createElement('option');
@@ -460,7 +468,7 @@
       used_chars: 0,
       is_exhausted: false,
     });
-    let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
+    let preferredTranslateLanguage = ['ar', 'en'].includes(targetLanguage?.value) ? targetLanguage.value : 'ar';
     const preferredVoiceKeyByLanguageAndTier = {};
     let quotaRefreshPromise = null;
     let isQuotaRefreshing = false;
@@ -499,9 +507,27 @@
 
       return !(draftText === lastGeneratedText && liveBillableChars === lastGeneratedChars);
     }
-    function normalizeLanguage(value) { return value === 'en' ? 'en' : 'ar'; }
-    function oppositeLanguage(value) { return normalizeLanguage(value) === 'en' ? 'ar' : 'en'; }
-    function detectSourceLanguage(value) { return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en'; }
+    const speechLanguageCodes = @json(\App\Support\SpeechLanguages::codes());
+    function normalizeLanguage(value) { const code = String(value || '').toLowerCase(); return speechLanguageCodes.includes(code) ? code : 'ar'; }
+    // Arabic and English have their own speakers; the other languages are read by the English premium speakers.
+    function voiceLanguageOf(value) { const code = normalizeLanguage(value); return code === 'ar' || code === 'en' ? code : 'en'; }
+    function oppositeLanguage(value) { return normalizeLanguage(value) === 'ar' ? 'en' : 'ar'; }
+    const latinLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'tr', 'nl', 'pl', 'id', 'vi'];
+    const scriptLanguages = [
+      ['ar', /[\u0600-\u06FF\u0750-\u077F]/u], ['ru', /[\u0400-\u04FF]/u], ['hi', /[\u0900-\u097F]/u],
+      ['bn', /[\u0980-\u09FF]/u], ['ja', /[\u3040-\u30FF]/u], ['ko', /[\uAC00-\uD7AF\u1100-\u11FF]/u],
+      ['th', /[\u0E00-\u0E7F]/u], ['ta', /[\u0B80-\u0BFF]/u], ['te', /[\u0C00-\u0C7F]/u],
+      ['gu', /[\u0A80-\u0AFF]/u], ['kn', /[\u0C80-\u0CFF]/u], ['ml', /[\u0D00-\u0D7F]/u],
+    ];
+    function detectSourceLanguage(value) { const text = String(value || ''); for (const [code, pattern] of scriptLanguages) { if (pattern.test(text)) return code; } return 'en'; }
+    function textFitsLanguage(source, lang) { return source === lang || (source === 'en' && latinLanguages.includes(lang)); }
+    // The other languages need the premium voices.
+    function syncPremiumLanguages() {
+      if (!targetLanguage) return;
+      const hd = normalizeTier(voiceTier?.value || 'standard') === 'hd';
+      targetLanguage.querySelectorAll('[data-premium-language]').forEach((opt) => { opt.disabled = !hd; });
+      if (!hd && !['ar', 'en'].includes(targetLanguage.value)) targetLanguage.value = 'en';
+    }
     function isTranslateEnabled() { return String(translateSelect?.value || '1') === '1'; }
     function voicePreferenceBucket(language = normalizeLanguage(targetLanguage?.value), tier = normalizeTier(voiceTier?.value || 'standard')) {
       return `${normalizeLanguage(language)}:${normalizeTier(tier)}`;
@@ -918,7 +944,7 @@
 
     function getFilteredVoices() {
       const tier = voiceTier?.value || 'standard';
-      const lang = targetLanguage.value;
+      const lang = voiceLanguageOf(targetLanguage.value);
       const gender = voiceGender.value;
       const byTier = voiceCatalogByTier?.[tier] || {};
       const list = Array.isArray(byTier?.[lang]) ? byTier[lang] : [];
@@ -961,8 +987,8 @@
       const preferenceBucket = voicePreferenceBucket(lang, tier);
       const remembered = String(preferredVoiceKeyByLanguageAndTier[preferenceBucket]||'').trim();
       const defaultVoiceKey = String(
-        defaultVoiceKeyByTierAndLanguage?.[tier]?.[lang]
-        || fallbackDefaultVoiceKeyByLanguage?.[lang]
+        defaultVoiceKeyByTierAndLanguage?.[tier]?.[voiceLanguageOf(lang)]
+        || fallbackDefaultVoiceKeyByLanguage?.[voiceLanguageOf(lang)]
         || ''
       ).trim();
       const preferredArabicGeminiVoiceKey = findPreferredArabicGeminiVoiceKey(voices, lang, tier);
@@ -978,10 +1004,12 @@
     function syncLanguageToCurrentTextWhenTranslationOff(fallbackLanguage = null) {
       if (!targetLanguage || !textInput || isTranslateEnabled()) return false;
       const text = String(textInput.value||'').trim();
-      if (!text) { const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null; if (!fallback) return false; const currentLanguage = normalizeLanguage(targetLanguage.value); if (currentLanguage === fallback) return false; rememberCurrentVoiceSelection(currentLanguage); targetLanguage.value = fallback; renderVoiceOptions(); renderDialectOptions(); applyStudioTierState(); return true; }
+      if (!text) { const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null; if (!fallback || !['ar', 'en'].includes(normalizeLanguage(targetLanguage.value))) return false; const currentLanguage = normalizeLanguage(targetLanguage.value); if (currentLanguage === fallback) return false; rememberCurrentVoiceSelection(currentLanguage); targetLanguage.value = fallback; renderVoiceOptions(); renderDialectOptions(); applyStudioTierState(); return true; }
       const sourceLanguage = detectSourceLanguage(text);
       const currentLanguage = normalizeLanguage(targetLanguage.value);
-      if (sourceLanguage === currentLanguage) return false;
+      if (textFitsLanguage(sourceLanguage, currentLanguage)) return false;
+      const sourceOption = Array.from(targetLanguage.options || []).find((opt) => opt.value === sourceLanguage);
+      if (!sourceOption || sourceOption.disabled) return false;
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = sourceLanguage;
       renderVoiceOptions();
@@ -1215,6 +1243,7 @@
     form?.addEventListener('submit', (event) => { event.preventDefault(); previewBtn?.click(); });
 
     voiceTier?.addEventListener('change', () => {
+      syncPremiumLanguages();
       // A loaded sample follows the quality: plain sentences for Standard,
       // the directed script for HD. Text the visitor typed is left alone.
       const current = String(textInput?.value || '').trim();
@@ -1276,6 +1305,7 @@
     }
     if (translateToggle && translateSelect) translateToggle.checked = translateSelect.value === '1';
     if (!isTranslateEnabled()) preferredTranslateLanguage = oppositeLanguage(normalizeLanguage(targetLanguage?.value));
+    syncPremiumLanguages();
     renderVoiceOptions();
     renderDialectOptions();
     applyStudioTierState();

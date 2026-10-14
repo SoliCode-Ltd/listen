@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Exceptions\TranslationFailedException;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\Plan;
@@ -267,6 +268,9 @@ class GenerateAudioJob implements ShouldQueue
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
+        if ($e instanceof TranslationFailedException) {
+            return $e->getMessage();
+        }
         if (str_starts_with((string) $generation->voice_name, 'cloned_')
             && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
             return __('ui.backend.cloned_voice_daily_limit');

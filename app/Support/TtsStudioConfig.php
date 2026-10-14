@@ -469,7 +469,13 @@ class TtsStudioConfig
 
     private static function normalizeLanguage(string $language): string
     {
-        return strtolower(trim($language)) === 'en' ? 'en' : 'ar';
+        $language = strtolower(trim($language));
+        if ($language === 'en') {
+            return 'en';
+        }
+
+        // Languages other than Arabic and English have no dialect list and neutral defaults.
+        return SpeechLanguages::premiumOnly($language) ? $language : 'ar';
     }
 
     private static function normalizeSlug(string $value): string

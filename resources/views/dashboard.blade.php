@@ -2136,7 +2136,7 @@
       return match ((string) $code) {
         'ar' => __('ui.dashboard.arabic'),
         'en' => __('ui.dashboard.english'),
-        default => (string) ($code ?: '-'),
+        default => \App\Support\SpeechLanguages::isValid($code) ? \App\Support\SpeechLanguages::name($code, app()->getLocale() === 'ar') : (string) ($code ?: '-'),
       };
     };
     $processingPriorityLabel = static function (?string $value): string {
@@ -2396,9 +2396,18 @@
               <x-voice-studio.setbar :studio="($planTier ?? 'standard') === 'hd'" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
                 <div>
                   <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
+                  @php
+                    $vsHd = ($planTier ?? 'standard') === 'hd';
+                  @endphp
                   <select name="target_language" id="target_language">
                     <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
                     <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
+                    <optgroup label="{{ $vsHd ? __('ui.dashboard.more_languages') : __('ui.dashboard.more_languages_premium') }}">
+                      @foreach(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar') as $vsLang)
+                        @continue(! $vsLang['premium'])
+                        <option value="{{ $vsLang['value'] }}"{{ $prefillValue('target_language', 'ar') === $vsLang['value'] ? ' selected' : '' }}{{ $vsHd ? '' : ' disabled' }}>{{ $vsLang['label'] }} · {{ $vsLang['native'] }}</option>
+                      @endforeach
+                    </optgroup>
                   </select>
                 </div>
               </x-voice-studio.setbar>
@@ -3069,6 +3078,7 @@
     const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
     const clonedVoiceBadge = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_label') : '');
     const oldVoice = @json($prefillValue('voice_key'));
+    const speechLanguageNames = @json(collect(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar'))->mapWithKeys(fn ($row) => [$row['value'] => $row['label']]));
     const defaultVoiceKeyByLanguage = {
       ar: String(@json((string) ($voiceNameMap[$defaultVoiceAr]['key'] ?? '')) || '').trim(),
       en: String(@json((string) ($voiceNameMap[$defaultVoiceEn]['key'] ?? '')) || '').trim(),
@@ -3124,7 +3134,7 @@
     const i18n = @json($dashboardI18n);
     const pageLocale = document.documentElement.lang || 'en';
 
-    let preferredTranslateLanguage = targetLanguage?.value === 'en' ? 'en' : 'ar';
+    let preferredTranslateLanguage = normalizeLanguage(targetLanguage?.value);
     const preferredVoiceKeyByLanguage = { ar: '', en: '' };
     const dialectSelect = document.getElementById('dialect');
     const performanceStyleSelect = document.getElementById('performance_style');
@@ -3196,7 +3206,10 @@
     function renderDialectOptions() {
       if (!dialectSelect || !targetLanguage) return;
       const lang = normalizeLanguage(targetLanguage.value);
-      const dialects = dialectsByLanguage[lang] || dialectsByLanguage['ar'];
+      const dialects = dialectsByLanguage[lang] || [{ value: '', label: autoDialectLabel }];
+      // Only Arabic and English have dialects and accents to choose.
+      const dialectField = dialectSelect.closest('[data-vs-dialect-field]');
+      if (dialectField) dialectField.hidden = !dialectsByLanguage[lang];
       dialectSelect.innerHTML = '';
       for (const d of dialects) {
         const opt = document.createElement('option');
@@ -3242,22 +3255,48 @@
     }
 
     function normalizeLanguage(value) {
-      return value === 'en' ? 'en' : 'ar';
+      const code = String(value || '').toLowerCase();
+      return Object.prototype.hasOwnProperty.call(speechLanguageNames, code) ? code : 'ar';
     }
 
+    // Arabic and English have their own speakers; the other languages are
+    // read by the English premium speakers.
+    function voiceLanguageOf(value) {
+      const code = normalizeLanguage(value);
+      return code === 'ar' || code === 'en' ? code : 'en';
+    }
+
+    // Languages written in Latin letters cannot be told apart by their letters.
+    const latinLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'tr', 'nl', 'pl', 'id', 'vi'];
+    const scriptLanguages = [
+      ['ar', /[\u0600-\u06FF\u0750-\u077F]/u], ['ru', /[\u0400-\u04FF]/u], ['hi', /[\u0900-\u097F]/u],
+      ['bn', /[\u0980-\u09FF]/u], ['ja', /[\u3040-\u30FF]/u], ['ko', /[\uAC00-\uD7AF\u1100-\u11FF]/u],
+      ['th', /[\u0E00-\u0E7F]/u], ['ta', /[\u0B80-\u0BFF]/u], ['te', /[\u0C00-\u0C7F]/u],
+      ['gu', /[\u0A80-\u0AFF]/u], ['kn', /[\u0C80-\u0CFF]/u], ['ml', /[\u0D00-\u0D7F]/u],
+    ];
+
     function oppositeLanguage(value) {
-      return normalizeLanguage(value) === 'en' ? 'ar' : 'en';
+      return normalizeLanguage(value) === 'ar' ? 'en' : 'ar';
     }
 
     function detectSourceLanguage(value) {
-      return /[\u0600-\u06FF]/u.test(String(value || '')) ? 'ar' : 'en';
+      const text = String(value || '');
+      for (const [code, pattern] of scriptLanguages) {
+        if (pattern.test(text)) return code;
+      }
+      return 'en';
+    }
+
+    // True when the text is (or may be) written in this language.
+    function textFitsLanguage(source, lang) {
+      return source === lang || (source === 'en' && latinLanguages.includes(lang));
     }
 
     function languageLabel(code) {
       const normalized = String(code || '').toLowerCase();
       if (normalized === 'ar') return i18n.language_ar;
       if (normalized === 'en') return i18n.language_en;
-      return code || '-';
+      return speechLanguageNames[normalized] || code || '-';
     }
 
     function statusLabel(status) {
@@ -3453,10 +3492,11 @@
 
     function renderVoiceOptions() {
       const lang = normalizeLanguage(targetLanguage?.value || 'ar');
-      const raw = Array.isArray(voiceCatalog?.[lang]) ? voiceCatalog[lang] : [];
+      const voiceLang = voiceLanguageOf(lang);
+      const raw = Array.isArray(voiceCatalog?.[voiceLang]) ? voiceCatalog[voiceLang] : [];
       const voices = sortVoices(raw);
       const remembered = String(preferredVoiceKeyByLanguage[lang] || '').trim();
-      const defaultVoiceKey = String(defaultVoiceKeyByLanguage?.[lang] || '').trim();
+      const defaultVoiceKey = String(defaultVoiceKeyByLanguage?.[voiceLang] || '').trim();
       const current = String(remembered || defaultVoiceKey || '').trim();
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
@@ -3485,7 +3525,7 @@
       // Built-in voices
       if (voices.length) {
         const builtInGroup = document.createElement('optgroup');
-        builtInGroup.label = lang === 'ar' ? 'الأصوات المتاحة' : 'Available Voices';
+        builtInGroup.label = pageLocale === 'ar' ? 'الأصوات المتاحة' : 'Available Voices';
         for (const voice of voices) {
           const option = document.createElement('option');
           option.value = voice.key;
@@ -3508,7 +3548,7 @@
       const text = String(contentInput.value || '').trim();
       if (!text) {
         const fallback = fallbackLanguage ? normalizeLanguage(fallbackLanguage) : null;
-        if (!fallback) return false;
+        if (!fallback || !['ar', 'en'].includes(normalizeLanguage(targetLanguage.value))) return false;
         const currentLanguage = normalizeLanguage(targetLanguage.value);
         if (currentLanguage === fallback) return false;
         rememberCurrentVoiceSelection(currentLanguage);
@@ -3520,7 +3560,11 @@
       }
       const sourceLanguage = detectSourceLanguage(text);
       const currentLanguage = normalizeLanguage(targetLanguage.value);
-      if (sourceLanguage === currentLanguage) return false;
+      if (textFitsLanguage(sourceLanguage, currentLanguage)) return false;
+      // Without translation the voice reads the text as written: follow its language
+      // when the plan can speak it.
+      const sourceOption = Array.from(targetLanguage.options || []).find((opt) => opt.value === sourceLanguage);
+      if (!sourceOption || sourceOption.disabled) return false;
       rememberCurrentVoiceSelection(currentLanguage);
       targetLanguage.value = sourceLanguage;
       renderVoiceOptions();

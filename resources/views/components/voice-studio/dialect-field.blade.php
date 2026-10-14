@@ -3,7 +3,7 @@
   (search, regions, then each country's dialects). The select stays the form
   field; the page fills it per language and js/voice-studio.js draws the rest.
 --}}
-<div class="vs-field">
+<div class="vs-field" data-vs-dialect-field>
   <div class="vs-field-label">
     <span id="dialectPickLabel">{{ __('ui.dashboard.dialect') }}</span>
   </div>

@@ -237,7 +237,7 @@ class VoiceCatalog
      */
     public static function forLanguage(string $language, ?string $tier = null): array
     {
-        return self::byLanguage($tier)[$language] ?? [];
+        return self::byLanguage($tier)[SpeechLanguages::voiceLanguage($language)] ?? [];
     }
 
     /**
@@ -256,7 +256,7 @@ class VoiceCatalog
     public static function namesForLanguage(string $language, ?string $tier = null): array
     {
         return self::activeQuery($tier)
-            ->where('language', $language)
+            ->where('language', SpeechLanguages::voiceLanguage($language))
             ->pluck('internal_voice_id')
             ->all();
     }
@@ -465,7 +465,7 @@ class VoiceCatalog
         }
 
         return self::activeQuery($tier)
-            ->where('language', $language)
+            ->where('language', SpeechLanguages::voiceLanguage($language))
             ->where('internal_voice_id', $voiceName)
             ->exists();
     }
@@ -477,7 +477,7 @@ class VoiceCatalog
 
     public static function defaultForLanguageAndProvider(string $language, ?string $tier = null, ?string $provider = null): string
     {
-        $language = strtolower(trim($language));
+        $language = SpeechLanguages::voiceLanguage(strtolower(trim($language)));
         $normalizedTier = $tier !== null && $tier !== ''
             ? VoiceTier::normalize($tier)
             : null;
@@ -595,7 +595,7 @@ class VoiceCatalog
         ?string $tier = null,
         ?string $gender = null,
     ): string {
-        $language = strtolower(trim($language));
+        $language = SpeechLanguages::voiceLanguage(strtolower(trim($language)));
         $provider = strtolower(trim($provider));
         $normalizedTier = $tier !== null && $tier !== ''
             ? VoiceTier::normalize($tier)
@@ -639,7 +639,7 @@ class VoiceCatalog
         ?string $provider = null,
         ?string $gender = null,
     ): ?Voice {
-        $language = strtolower(trim($language));
+        $language = SpeechLanguages::voiceLanguage(strtolower(trim($language)));
         $provider = strtolower(trim((string) $provider));
         $gender = strtolower(trim((string) $gender));
 
@@ -732,7 +732,7 @@ class VoiceCatalog
             return null;
         }
 
-        $query = self::activeQuery($tier, $provider)->where('id', $id)->where('language', $language);
+        $query = self::activeQuery($tier, $provider)->where('id', $id)->where('language', SpeechLanguages::voiceLanguage($language));
 
         return $query->first();
     }

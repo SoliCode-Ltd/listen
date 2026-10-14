@@ -1,7 +1,7 @@
 <?php
 
 /*
- * Updates SEO site settings that hold back search visibility.
+ * Updates (or, with a null value, deletes) SEO site settings on the live site.
  *
  * Dry run by default: prints each setting's current and new value.
  * With APPLY=1 in the environment it writes the new values and first saves
@@ -27,49 +27,49 @@ require $root.'/vendor/autoload.php';
 $app = require $root.'/bootstrap/app.php';
 $app->make(Kernel::class)->bootstrap();
 
-$noindex = 'noindex,nofollow,noarchive,nosnippet';
-
+/*
+ * October 2026: the product no longer has a free plan, speaks 24 languages,
+ * and has more than 100 Arabic and 30 English accents. The page titles and
+ * descriptions saved here earlier still said "Free Plan", "Start free",
+ * "50 dialects" and "18 accents", and a saved value always wins over the
+ * site's own text. A null value deletes the saved override, so the page
+ * shows the up-to-date text that ships with the site (the lang files).
+ */
 $changes = [
-    // Home: the old title had no search keyword ("Turn any text into human voice instantly.").
-    'seo_home_title_en' => 'Arabic & English AI Text to Speech, 50+ Dialects',
-    'seo_home_title_ar' => 'تحويل النص إلى صوت وكلام بالذكاء الاصطناعي',
-    'seo_home_description_en' => 'AI text to speech in Arabic and English: Fusha and 50 Arabic dialects from the Gulf, Levant, Egypt and Maghreb, plus 18 English accents. Free to try, MP3 download.',
-    'seo_home_description_ar' => 'تحويل النص إلى صوت بالذكاء الاصطناعي بالعربية والإنجليزية: الفصحى و50 لهجة من الخليج والشام ومصر والمغرب العربي، و18 لكنة إنجليزية. جرّبها مجاناً وحمّل MP3.',
+    'seo_home_title' => null,
+    'seo_home_description' => null,
+    'seo_home_title_en' => null,
+    'seo_home_title_ar' => null,
+    'seo_home_description_en' => null,
+    'seo_home_description_ar' => null,
 
-    // Pricing had no Arabic description, so it showed the site-wide one.
-    'seo_pricing_title_en' => 'Text to Speech Pricing and Free Plan',
-    'seo_pricing_title_ar' => 'أسعار تحويل النص إلى صوت والخطة المجانية',
-    'seo_pricing_description_en' => 'Compare Listen plans for Arabic and English AI text to speech. Start free, then upgrade for more characters, HD voices and dialects.',
-    'seo_pricing_description_ar' => 'قارن خطط منصة إسمع لتحويل النص إلى صوت بالعربية والإنجليزية. ابدأ مجاناً ثم رقِّ خطتك لأحرف أكثر وأصوات عالية الدقة ولهجات.',
+    'seo_pricing_title' => null,
+    'seo_pricing_description' => null,
+    'seo_pricing_title_en' => null,
+    'seo_pricing_title_ar' => null,
+    'seo_pricing_description_en' => null,
+    'seo_pricing_description_ar' => null,
 
-    // Extension: target "text to speech chrome extension" / "قراءة النص بصوت".
-    'seo_extension_title_en' => 'Text to Speech Chrome Extension',
-    'seo_extension_title_ar' => 'إضافة كروم لقراءة النصوص بصوت عالٍ',
-    'seo_extension_description_en' => 'Read any web page aloud in natural Arabic or English with the Listen Reader Chrome extension. Select text, press play.',
-    'seo_extension_description_ar' => 'اقرأ أي صفحة ويب بصوت عربي أو إنجليزي طبيعي مع إضافة إسمع لمتصفح كروم. حدد النص واضغط تشغيل.',
+    'seo_ai_text_to_speech_description' => null,
+    'seo_ai_text_to_speech_description_en' => null,
+    'seo_ai_text_to_speech_description_ar' => null,
+    'seo_ai_voice_generator_description' => null,
+    'seo_ai_voice_generator_description_en' => null,
+    'seo_ai_voice_generator_description_ar' => null,
+    'seo_text_to_speech_arabic_title_ar' => null,
+    'seo_text_to_speech_arabic_description' => null,
+    'seo_text_to_speech_arabic_description_en' => null,
+    'seo_text_to_speech_arabic_description_ar' => null,
+    'seo_text_to_speech_title_en' => null,
+    'seo_text_to_speech_title_ar' => null,
+    'seo_text_to_speech_description_en' => null,
+    'seo_text_to_speech_description_ar' => null,
+    'seo_register_description_en' => null,
+    'seo_register_description_ar' => null,
 
-    // Arabic text to speech page now also has an Arabic version.
-    'seo_text_to_speech_arabic_title_ar' => 'تحويل النص العربي إلى كلام بالفصحى واللهجات',
-    'seo_text_to_speech_arabic_description_ar' => 'حوّل النص العربي، فصحى أو عامية، إلى كلام بصوت بشري طبيعي بنطق صحيح وأكثر من 50 لهجة عربية. جرّبه مجاناً مع منصة إسمع.',
-
-    // Sign-in and account pages were set to "index"; they belong out of search.
-    'seo_login_robots' => $noindex,
-    'seo_register_robots' => $noindex,
-    'seo_demo_robots' => $noindex,
-    'seo_dashboard_robots' => $noindex,
-    'seo_billing_robots' => $noindex,
-    'seo_manage_subscription_robots' => $noindex,
-    'seo_upgrade_robots' => $noindex,
-
-    // Sitemap: list only indexable pages, and drop the hand-written list
-    // (it duplicated the automatic entries and pointed at /demo, a redirect).
-    'sitemap_include_non_indexable' => '0',
-    'sitemap_paths' => '',
-
-    'robots_txt' => "User-agent: *\nAllow: /\nDisallow: /admin\nDisallow: /livewire/\n\nSitemap: https://listenai.studio/sitemap.xml",
-
-    // Empty = the app's built-in llms.txt, which lists every landing and dialect page.
-    'llms_txt' => '',
+    // The site-wide fallback description, used by pages without their own.
+    'meta_description_en' => 'Natural AI voices in Fusha, 100+ Arabic dialect accents, 30+ English accents and 22 more languages, with emotions and sound environments. Download MP3.',
+    'meta_description_ar' => 'أصوات طبيعية بالذكاء الاصطناعي بالفصحى وأكثر من 100 لكنة عربية وأكثر من 30 لكنة إنجليزية و22 لغة أخرى، مع المشاعر وبيئات الصوت. حمّل الصوت بصيغة MP3.',
 ];
 
 if (($restore = getenv('RESTORE')) !== false && $restore !== '') {
@@ -99,7 +99,7 @@ foreach ($changes as $key => $value) {
     $row = SiteSetting::query()->where('key', $key)->first(['value', 'group']);
     $backup[$key] = $row ? ['value' => $row->value, 'group' => $row->group] : null;
     $current = $row?->value;
-    $report[$key] = ['from' => $current, 'to' => $value, 'changed' => (string) $current !== $value];
+    $report[$key] = ['from' => $current, 'to' => $value, 'changed' => $value === null ? $row !== null : (string) $current !== $value];
 }
 
 if ($apply) {
@@ -114,7 +114,12 @@ if ($apply) {
         if (! $report[$key]['changed']) {
             continue;
         }
-        SiteSetting::set($key, $value, 'seo');
+        if ($value === null) {
+            SiteSetting::query()->where('key', $key)->delete();
+        } else {
+            SiteSetting::set($key, $value, 'seo');
+        }
+        Cache::forget("site_setting.{$key}");
     }
     foreach (['site_settings_group.seo', 'site_settings_group.general'] as $cacheKey) {
         Cache::forget($cacheKey);

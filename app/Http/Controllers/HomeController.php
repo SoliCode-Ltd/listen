@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\TranslationFailedException;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
@@ -25,6 +26,7 @@ use App\Support\DialogueSpeakers;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
+use App\Support\SeoLanguagePages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
 use App\Support\TtsStudioConfig;
@@ -204,6 +206,34 @@ class HomeController extends Controller
         ]);
     }
 
+    public function languageHubPage(Request $request)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoLanguagePages::hubContent($locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoLanguagePages::HUB_PAGE,
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'dialectGroups' => SeoLanguagePages::hubGroups($locale),
+        ]);
+    }
+
+    public function languagePage(Request $request, string $language)
+    {
+        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
+        $content = SeoLanguagePages::content($language, $locale);
+
+        return view('seo.landing-page', [
+            'page' => SeoLanguagePages::pageKey($language),
+            'pageContent' => $content,
+            'faqItems' => $content['faqs'],
+            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
+            'currentLanguage' => $language,
+        ]);
+    }
+
     public function dialectPage(Request $request, string $dialect)
     {
         $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
@@ -314,7 +344,7 @@ class HomeController extends Controller
 
             $validated = $request->validate([
                 'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-                'target_language' => ['required', 'in:ar,en'],
+                'target_language' => ['required', 'in:'.implode(',', \App\Support\SpeechLanguages::codes())],
                 'translate' => ['nullable', 'boolean'],
                 'voice_key' => ['nullable', 'string', 'max:60'],
                 'voice_tier' => ['nullable', 'in:standard,hd'],
@@ -330,6 +360,9 @@ class HomeController extends Controller
                 'emotion.in' => __('ui.backend.emotion_invalid'),
             ]);
             $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+            if (\App\Support\SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
+                throw ValidationException::withMessages(['target_language' => __('ui.backend.dashboard_language_not_available_for_tier')]);
+            }
             if ($validated['is_dialogue'] ?? false) {
                 DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
             }
@@ -340,7 +373,7 @@ class HomeController extends Controller
             );
 
             $text = trim($validated['text']);
-            $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
+            $sourceLanguage = \App\Support\SpeechLanguages::detect($text);
             $estimate = UsageEstimator::estimate($text);
             if ($estimate['chars'] > $maxChars) {
                 throw ValidationException::withMessages([
@@ -423,7 +456,7 @@ class HomeController extends Controller
 
         $validated = $request->validate([
             'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'target_language' => ['required', 'in:ar,en'],
+            'target_language' => ['required', 'in:'.implode(',', \App\Support\SpeechLanguages::codes())],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_tier' => ['nullable', 'in:standard,hd'],
@@ -439,6 +472,9 @@ class HomeController extends Controller
             'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
+        if (\App\Support\SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
+            throw ValidationException::withMessages(['target_language' => __('ui.backend.dashboard_language_not_available_for_tier')]);
+        }
         $isDialogue = (bool) ($validated['is_dialogue'] ?? false);
         if ($isDialogue) {
             DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
@@ -451,7 +487,7 @@ class HomeController extends Controller
         );
 
         $text = trim($validated['text']);
-        $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
+        $sourceLanguage = \App\Support\SpeechLanguages::detect($text);
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
@@ -474,7 +510,7 @@ class HomeController extends Controller
             );
 
             $studioOptions = $this->sanitizeStudioOptionsForTier($tier, [
-                'dialect' => $validated['dialect'] ?? null,
+                'dialect' => \App\Support\SpeechLanguages::premiumOnly($validated['target_language']) ? null : ($validated['dialect'] ?? null),
                 'performance_style' => $validated['performance_style'] ?? null,
                 'style_prompt' => $validated['style_prompt'] ?? null,
                 'emotion' => $validated['emotion'] ?? 'neutral',
@@ -643,7 +679,7 @@ class HomeController extends Controller
 
             return response()->json([
                 'ok' => false,
-                'message' => __('ui.backend.demo_voice_generation_failed'),
+                'message' => $e instanceof TranslationFailedException ? $e->getMessage() : __('ui.backend.demo_voice_generation_failed'),
                 'quota' => $quota ?: $this->demoQuotaForClient($request),
             ], 422);
         }

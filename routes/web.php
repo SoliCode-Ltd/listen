@@ -139,6 +139,10 @@ Route::group([
     Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
         ->whereIn('accent', \App\Support\SeoEnglishPages::slugs())
         ->name('seo.accent');
+    Route::get('/languages', [HomeController::class, 'languageHubPage'])->name('seo.languages');
+    Route::get('/languages/{language}', [HomeController::class, 'languagePage'])
+        ->whereIn('language', \App\Support\SeoLanguagePages::slugs())
+        ->name('seo.language');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
