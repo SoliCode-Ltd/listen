@@ -327,6 +327,10 @@ class PlanResource extends Resource
                             ->label('Custom Prompt')
                             ->helperText('Allow users to provide custom voice styling instructions (Gemini voices).')
                             ->default(false),
+                        Forms\Components\Toggle::make('sound_effects_enabled')
+                            ->label('Sound environments')
+                            ->helperText('Echo, hall, phone call, radio and the other effects on the whole recording. Needs ffmpeg on the server. Plans without it see the option locked, with an upgrade button.')
+                            ->default(false),
                         Forms\Components\TextInput::make('queue_priority_weight')
                             ->label('Queue Priority Weight')
                             ->numeric()
@@ -591,6 +595,10 @@ class PlanResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('custom_prompt_enabled')
                     ->label('Custom Prompt')
+                    ->boolean()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\IconColumn::make('sound_effects_enabled')
+                    ->label('Sound environments')
                     ->boolean()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\IconColumn::make('commercial_use_allowed')

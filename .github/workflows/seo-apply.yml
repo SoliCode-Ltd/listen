@@ -1,13 +1,20 @@
 name: SEO settings apply
 
 # Updates the live SEO site settings with scripts/seo/apply_seo_settings.php.
-# The mode comes from scripts/seo/apply_mode.txt: "dry-run" (default) only
+# The mode is chosen when the workflow is run by hand (dry-run or apply); a
+# run started by a push reads scripts/seo/apply_mode.txt: "dry-run" (default) only
 # prints current and new values; "apply" writes them after saving a backup on
 # the server; "restore <backup file>" puts a backup back.
 # Uses the same LIVE_SSH_* secrets as the "Site security check" workflow.
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'dry-run lists the changes; apply saves a backup on the server, then writes them'
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
   push:
     branches: [claude/seo-arabic-english-tts]
     paths:
@@ -34,7 +41,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/report
-          mode="$(head -n1 scripts/seo/apply_mode.txt 2>/dev/null | tr -d '\r' || true)"
+          mode="${{ inputs.mode }}"
+          # A run started by a push follows scripts/seo/apply_mode.txt.
+          [ -n "$mode" ] || mode="$(head -n1 scripts/seo/apply_mode.txt 2>/dev/null | tr -d '\r' || true)"
           case "$mode" in
             apply) envs="APPLY=1" ;;
             restore\ *) envs="RESTORE=$(printf '%s' "${mode#restore }" | tr -cd 'A-Za-z0-9._-')" ;;

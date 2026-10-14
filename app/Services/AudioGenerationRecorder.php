@@ -75,7 +75,10 @@ class AudioGenerationRecorder
         $voiceName = trim((string) ($attributes['voice_name'] ?? ''));
 
         if ($voiceTier !== VoiceTier::HD || $voiceName === '') {
-            return null;
+            // Standard voices keep no studio settings, only a sound environment when the plan has them.
+            $effect = $attributes['audio_effect'] ?? null;
+
+            return \App\Support\AudioEffects::isValid($effect) ? ['audio_effect' => $effect] : null;
         }
 
         $voiceMeta = VoiceCatalog::voiceMeta($voiceName);

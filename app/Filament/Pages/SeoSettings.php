@@ -73,6 +73,7 @@ class SeoSettings extends Page implements HasForms
             'bing_site_verification' => SiteSetting::get('bing_site_verification', ''),
             'yandex_site_verification' => SiteSetting::get('yandex_site_verification', ''),
             'baidu_site_verification' => SiteSetting::get('baidu_site_verification', ''),
+            'naver_site_verification' => SiteSetting::get('naver_site_verification', ''),
 
             'robots_txt' => SiteSetting::get('robots_txt', SeoHelper::defaultRobotsTxt()),
             'sitemap_paths' => SiteSetting::get('sitemap_paths', SeoHelper::defaultSitemapEntriesText()),
@@ -245,6 +246,9 @@ class SeoSettings extends Page implements HasForms
                             ->maxLength(255),
                         Forms\Components\TextInput::make('baidu_site_verification')
                             ->label('Baidu Verification Token')
+                            ->maxLength(255),
+                        Forms\Components\TextInput::make('naver_site_verification')
+                            ->label('Naver Verification Token (Korea)')
                             ->maxLength(255),
                     ]),
 

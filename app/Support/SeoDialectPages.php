@@ -191,22 +191,22 @@ final class SeoDialectPages
         $accents = self::accents($slug);
 
         if ($locale === 'ar') {
-            $names = implode('، ', array_map(fn (array $a): string => self::accentShortName($a['ar']), array_slice($accents, 0, 4)));
+            $names = implode('، ', array_map(fn (array $a): string => self::accentShortName($a['ar']), array_slice($accents, 0, 3)));
             $subject = self::isFusha($slug) ? 'بالعربية الفصحى' : 'باللهجة '.$row['ar'];
 
             return 'حوّل النص إلى صوت طبيعي '.$subject.' بالذكاء الاصطناعي'
                 .(count($accents) > 1 ? ' بلكنات: '.$names : '')
                 .(self::isFusha($slug) ? '. نطق فصيح سليم' : '. نطق حقيقي للهجة')
-                .'، مع المشاعر وأساليب الأداء وتحميل MP3 من منصة إسمع.';
+                .'، مع المشاعر وتحميل MP3.';
         }
 
-        $names = implode(', ', array_map(fn (array $a): string => self::accentShortName($a['en']), array_slice($accents, 0, 4)));
+        $names = implode(', ', array_map(fn (array $a): string => self::accentShortName($a['en']), array_slice($accents, 0, 3)));
         $subject = self::isFusha($slug) ? 'Modern Standard Arabic' : $row['en'].' Arabic';
 
         return 'Turn text into natural '.$subject.' speech with AI'
             .(count($accents) > 1 ? ', in '.$names.' accents' : '')
             .(self::isFusha($slug) ? '. Correct, clear pronunciation' : '. Real dialect pronunciation')
-            .', with emotions, performance styles and MP3 download on Listen.';
+            .', with emotions and MP3 download.';
     }
 
     /**

@@ -1,4 +1,4 @@
-@include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing'])
+@include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing', 'faqItems' => array_map(fn ($n) => ['question' => __('ui.pricing.faq'.$n.'_q'), 'answer' => __('ui.pricing.faq'.$n.'_a')], [1, 2, 3, 4])])
   <style>
     .bg-orb {
       position: fixed;

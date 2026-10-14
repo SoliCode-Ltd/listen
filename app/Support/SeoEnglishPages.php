@@ -159,14 +159,14 @@ final class SeoEnglishPages
         $accents = self::accents($slug);
 
         if ($locale === 'ar') {
-            $names = implode('، ', array_map(fn (array $a): string => self::shortName($a['ar']), $accents));
+            $names = implode('، ', array_map(fn (array $a): string => self::shortName($a['ar']), array_slice($accents, 0, 3)));
 
             return 'حوّل النص إلى صوت إنجليزي طبيعي بلكنة '.$row['ar'].' بالذكاء الاصطناعي'
                 .(count($accents) > 1 ? ' ('.$names.')' : '')
                 .'. اكتب بالعربية أو الإنجليزية وحمّل MP3 من منصة إسمع.';
         }
 
-        $names = implode(', ', array_map(fn (array $a): string => self::shortName($a['en']), $accents));
+        $names = implode(', ', array_map(fn (array $a): string => self::shortName($a['en']), array_slice($accents, 0, 3)));
         $subject = self::isForeignAccent($slug) ? 'English with a natural '.$row['en'].' accent' : $row['en'].' English';
 
         return 'Turn text into natural '.$subject.' speech with AI'

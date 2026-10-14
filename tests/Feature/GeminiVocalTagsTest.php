@@ -221,7 +221,7 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertCount(count(GeminiVocalTags::all()) + count(GeminiVocalTags::deliveries()) - count(GeminiVocalTags::DELIVERY_GROUPS['style']), $tags);
     }
 
-    public function test_standard_dashboard_has_no_tag_picker(): void
+    public function test_standard_dashboard_has_no_tag_picker_when_no_plan_sells_the_premium_voices(): void
     {
         $this->actingAs($this->memberOn(VoiceTier::STANDARD));
 
@@ -234,6 +234,18 @@ class GeminiVocalTagsTest extends TestCase
             ->getContent();
 
         $this->assertSame([], $this->studioMeta($html)['tagMenus']);
+    }
+
+    public function test_standard_dashboard_shows_the_tags_locked_when_a_premium_plan_is_on_sale(): void
+    {
+        \App\Models\Plan::factory()->create(['slug' => 'creator', 'name' => 'Creator', 'voice_tier' => VoiceTier::HD, 'is_active' => true, 'price_cents' => 2200]);
+        $this->actingAs($this->memberOn(VoiceTier::STANDARD));
+
+        $meta = $this->studioMeta($this->getLocalizedRoute('dashboard')->assertOk()->getContent());
+
+        $this->assertNotSame([], $meta['tagMenus']);
+        $this->assertSame('Creator', $meta['tagsLock']['plan']);
+        $this->assertStringContainsString('billing?plan=creator', $meta['tagsLock']['url']);
     }
 
     public function test_tag_texts_exist_in_english_and_arabic(): void

@@ -2393,7 +2393,7 @@
           </div>
 
             <div class="vs-editor-card">
-              <x-voice-studio.setbar :studio="($planTier ?? 'standard') === 'hd'" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
+              <x-voice-studio.setbar :lock="$featureLocks['studio'] ?? null" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
                 <div>
                   <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
                   @php
@@ -2409,6 +2409,12 @@
                       @endforeach
                     </optgroup>
                   </select>
+                  @if(($vsLangLock = $featureLocks['studio'] ?? null) && ! ($vsLangLock['none'] ?? false))
+                    <a class="vs-upgrade vs-upgrade-inline" href="{{ $vsLangLock['url'] }}">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></svg>
+                      <span>{{ $vsLangLock['plan'] ? __('ui.dashboard.more_languages_on_plan', ['plan' => $vsLangLock['plan']]) : __('ui.dashboard.more_languages_premium') }}</span>
+                    </a>
+                  @endif
                 </div>
               </x-voice-studio.setbar>
               <div class="tag-editor" id="tagEditor" data-vs-editor>
@@ -2441,13 +2447,15 @@
           </div>
 
           <aside class="vs-side">
-            <x-voice-studio.panel :show-tags="($planTier ?? 'standard') === 'hd'">
-              @if(($planTier ?? 'standard') === 'hd')
-                @if(\App\Support\AudioEffects::available())
+            <x-voice-studio.panel :tags-lock="$featureLocks['studio'] ?? null">
+              @if(\App\Support\AudioEffects::available())
+                <x-voice-studio.locked :lock="$featureLocks['effects'] ?? null">
                   <div class="vs-field vs-effect-field">
                     <x-voice-studio.choice-field name="audio_effect" :label="__('ui.dashboard.audio_effect')" :options="\App\Support\AudioEffects::options()" :default-label="__('ui.dashboard.audio_effect_none')" :selected="$prefillValue('audio_effect')" />
                   </div>
-                @endif
+                </x-voice-studio.locked>
+              @endif
+              <x-voice-studio.locked :lock="$featureLocks['studio'] ?? null">
                 <div class="vs-row-2 vs-field">
                   <div>
                     <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">{{ number_format((float) $prefillValue('speed', '1.0'), 1) }}</span></span></div>
@@ -2462,16 +2470,16 @@
                     </div>
                   </div>
                 </div>
-                @if($customPromptEnabled ?? false)
-                  <div class="vs-field">
-                    <label class="vs-field-label" for="style_prompt">{{ __('ui.dashboard.style_prompt') }}</label>
-                    <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}">{{ $prefillValue('style_prompt') }}</textarea>
-                  </div>
-                @endif
-                @if($dialogueEnabled ?? false)
-                  <x-voice-studio.dialogue :on="$prefillDialogue === '1'" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
-                @endif
-              @endif
+              </x-voice-studio.locked>
+              <x-voice-studio.locked :lock="$featureLocks['prompt'] ?? null">
+                <div class="vs-field">
+                  <label class="vs-field-label" for="style_prompt">{{ __('ui.dashboard.style_prompt') }}</label>
+                  <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}">{{ $prefillValue('style_prompt') }}</textarea>
+                </div>
+              </x-voice-studio.locked>
+              <x-voice-studio.locked :lock="$featureLocks['dialogue'] ?? null">
+                <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
+              </x-voice-studio.locked>
               <div class="s-card vs-field">
                 <label class="compact-toggle-row" for="translateToggle">
                   <div class="txt">

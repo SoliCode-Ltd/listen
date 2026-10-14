@@ -5,9 +5,12 @@
   style and emotion sit on the text box (voice-studio.setbar), and the tags
   in the toolbar above the text. Behaviour in js/voice-studio.js.
 --}}
-@props(['showTags' => true])
+@props(['showTags' => true, 'tagsLock' => null])
 @php
   $vsAr = app()->getLocale() === 'ar';
+  // Locked tags still show (dimmed, with an upgrade button) unless no plan on sale has them.
+  $showTags = $showTags && ! ($tagsLock['none'] ?? false);
+  $tagsLock = $showTags ? $tagsLock : null;
   $vsTagMenus = [];
   if ($showTags) {
       foreach (\App\Support\GeminiVocalTags::GROUPS as $vsGroup => $vsTags) {
@@ -28,7 +31,12 @@
       'favorites' => \App\Http\Controllers\FavoriteVoicesController::forUser(auth()->user()),
       'favoritesUrl' => auth()->check() ? route('dashboard.favorite-voices') : null,
       'tagMenus' => $vsTagMenus,
-      'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library'),
+      // The tags need the premium voices: without them the toolbar shows, locked.
+      'tagsLock' => $tagsLock,
+      'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library') + [
+          'upgrade_to_plan' => __('ui.dashboard.upgrade_to_plan'),
+          'upgrade_to_unlock' => __('ui.dashboard.upgrade_to_unlock'),
+      ],
   ];
 @endphp
 <section class="vs-panel" data-vs-panel aria-label="{{ __('ui.dashboard.voice_studio') }}">
@@ -67,7 +75,7 @@
     {{ $slot }}
   </div>
 
-  @if($showTags)
+  @if($showTags && ! $tagsLock)
     <details class="vs-guide">
       <summary>{{ __('ui.dashboard.vocal_tags_tips') }}</summary>
       <ul>

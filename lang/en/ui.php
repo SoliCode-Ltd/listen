@@ -3,7 +3,7 @@
 return [
     // ===== SEO =====
     'seo' => [
-        'home_title' => 'AI Text to Speech: Arabic Dialects, English Accents & 24 Languages',
+        'home_title' => 'AI Text to Speech in Arabic Dialects & 24 Languages',
         'home_description' => 'Natural AI voices in Fusha, 100+ Arabic dialect accents, 30+ English accents and 22 more languages, with emotions and sound environments. Download MP3.',
         'demo_title' => 'Listen Demo',
         'demo_description' => 'Try Listen\'s AI text to speech and hear natural voices in Arabic dialects, English accents and more languages.',
@@ -37,7 +37,7 @@ return [
         'ai_voice_generator_description' => 'Generate AI voiceovers for ads, explainers, courses and social video with emotions, performance styles and sound environments, in 24 languages.',
         'text_to_speech_arabic_title' => 'Arabic Text to Speech',
         'text_to_speech_arabic_description' => 'Turn Arabic text into natural speech in Fusha or more than 100 regional accents from the Gulf, the Levant, Egypt and the Maghreb, with real dialect words.',
-        'text_to_speech_title' => 'Text to Speech Online in Arabic, English and 22 More Languages',
+        'text_to_speech_title' => 'Text to Speech Online: Arabic, English & 22 More Languages',
         'text_to_speech_description' => 'Turn writing into natural speech online: paste your text, pick a voice, a language and a dialect or accent, and download MP3. Arabic, English and 22 more languages.',
         'arabic_dialects_title' => 'Arabic Dialects Text to Speech',
         'arabic_dialects_description' => 'AI text to speech in Fusha and more than 100 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
@@ -879,6 +879,9 @@ return [
         'english' => 'English',
         'more_languages' => 'More languages',
         'more_languages_premium' => 'More languages (Premium plans)',
+        'upgrade_to_plan' => 'Upgrade to :plan',
+        'more_languages_on_plan' => '22 more languages with :plan',
+        'upgrade_to_unlock' => 'Upgrade to unlock',
         'speaker' => 'Speaker',
         'translate_before_speaking' => 'Translate before speaking',
         'translate_enabled_hint' => 'Text will be auto-translated to the selected voice language.',

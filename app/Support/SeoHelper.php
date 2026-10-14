@@ -161,7 +161,7 @@ class SeoHelper
             ],
             'text_to_speech' => [
                 'label' => 'Text to Speech Online',
-                'title' => 'Text to Speech Online in Arabic, English and 22 More Languages',
+                'title' => 'Text to Speech Online: Arabic, English & 22 More Languages',
                 'title_key' => 'ui.seo.text_to_speech_title',
                 'description' => 'Turn writing into natural speech online: paste your text, pick a voice, a language and a dialect or accent, and download MP3.',
                 'description_key' => 'ui.seo.text_to_speech_description',
@@ -1363,6 +1363,7 @@ class SeoHelper
             'bing_site_verification' => 'msvalidate.01',
             'yandex_site_verification' => 'yandex-verification',
             'baidu_site_verification' => 'baidu-site-verification',
+            'naver_site_verification' => 'naver-site-verification',
         ];
 
         $tags = [];
