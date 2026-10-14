@@ -42,6 +42,16 @@ class TtsStudioConfig
         ['value' => 'tour_guide', 'label' => 'Tour Guide', 'translation_key' => 'ui.dashboard.style_tour_guide'],
         ['value' => 'true_crime', 'label' => 'True Crime', 'translation_key' => 'ui.dashboard.style_true_crime'],
         ['value' => 'luxury_brand', 'label' => 'Luxury Brand', 'translation_key' => 'ui.dashboard.style_luxury_brand'],
+        ['value' => 'social_media', 'label' => 'Social Media Creator', 'translation_key' => 'ui.dashboard.style_social_media'],
+        ['value' => 'tutorial', 'label' => 'Tutorial', 'translation_key' => 'ui.dashboard.style_tutorial'],
+        ['value' => 'stand_up', 'label' => 'Stand-up Comedy', 'translation_key' => 'ui.dashboard.style_stand_up'],
+        ['value' => 'horror', 'label' => 'Horror Story', 'translation_key' => 'ui.dashboard.style_horror'],
+        ['value' => 'dubbing', 'label' => 'Drama Dubbing', 'translation_key' => 'ui.dashboard.style_dubbing'],
+        ['value' => 'oratory', 'label' => 'Oratory', 'translation_key' => 'ui.dashboard.style_oratory'],
+        ['value' => 'reverent', 'label' => 'Reverent Reading', 'translation_key' => 'ui.dashboard.style_reverent'],
+        ['value' => 'cartoon', 'label' => 'Cartoon Character', 'translation_key' => 'ui.dashboard.style_cartoon'],
+        ['value' => 'announcer', 'label' => 'Public Announcer', 'translation_key' => 'ui.dashboard.style_announcer'],
+        ['value' => 'interview', 'label' => 'Interview', 'translation_key' => 'ui.dashboard.style_interview'],
     ];
 
     /**
@@ -73,6 +83,22 @@ class TtsStudioConfig
         ['value' => 'surprised', 'label' => 'Surprised', 'translation_key' => 'ui.dashboard.emotion_surprised'],
         ['value' => 'sarcastic', 'label' => 'Sarcastic', 'translation_key' => 'ui.dashboard.emotion_sarcastic'],
         ['value' => 'suspenseful', 'label' => 'Suspenseful', 'translation_key' => 'ui.dashboard.emotion_suspenseful'],
+        ['value' => 'curious', 'label' => 'Curious', 'translation_key' => 'ui.dashboard.emotion_curious'],
+        ['value' => 'relieved', 'label' => 'Relieved', 'translation_key' => 'ui.dashboard.emotion_relieved'],
+        ['value' => 'disappointed', 'label' => 'Disappointed', 'translation_key' => 'ui.dashboard.emotion_disappointed'],
+        ['value' => 'embarrassed', 'label' => 'Embarrassed', 'translation_key' => 'ui.dashboard.emotion_embarrassed'],
+        ['value' => 'shy', 'label' => 'Shy', 'translation_key' => 'ui.dashboard.emotion_shy'],
+        ['value' => 'bored', 'label' => 'Bored', 'translation_key' => 'ui.dashboard.emotion_bored'],
+        ['value' => 'frustrated', 'label' => 'Frustrated', 'translation_key' => 'ui.dashboard.emotion_frustrated'],
+        ['value' => 'disgusted', 'label' => 'Disgusted', 'translation_key' => 'ui.dashboard.emotion_disgusted'],
+        ['value' => 'heartbroken', 'label' => 'Heartbroken', 'translation_key' => 'ui.dashboard.emotion_heartbroken'],
+        ['value' => 'panicked', 'label' => 'Panicked', 'translation_key' => 'ui.dashboard.emotion_panicked'],
+        ['value' => 'amazed', 'label' => 'Amazed', 'translation_key' => 'ui.dashboard.emotion_amazed'],
+        ['value' => 'reassuring', 'label' => 'Reassuring', 'translation_key' => 'ui.dashboard.emotion_reassuring'],
+        ['value' => 'apologetic', 'label' => 'Apologetic', 'translation_key' => 'ui.dashboard.emotion_apologetic'],
+        ['value' => 'menacing', 'label' => 'Menacing', 'translation_key' => 'ui.dashboard.emotion_menacing'],
+        ['value' => 'dreamy', 'label' => 'Dreamy', 'translation_key' => 'ui.dashboard.emotion_dreamy'],
+        ['value' => 'sleepy', 'label' => 'Sleepy', 'translation_key' => 'ui.dashboard.emotion_sleepy'],
     ];
 
     /**

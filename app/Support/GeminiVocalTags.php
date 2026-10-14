@@ -88,8 +88,9 @@ class GeminiVocalTags
      * @var array<string, array<int, string>>
      */
     public const DELIVERY_GROUPS = [
-        'mood' => ['happy', 'excited', 'warm', 'calm', 'serious', 'sad', 'angry', 'nervous', 'scared', 'surprised', 'curious', 'sarcastic', 'playful', 'confident', 'tired'],
-        'pace' => ['slowly', 'quickly', 'softly', 'loudly', 'whispering'],
+        'mood' => ['happy', 'excited', 'warm', 'calm', 'serious', 'sad', 'angry', 'nervous', 'scared', 'surprised', 'curious', 'sarcastic', 'playful', 'confident', 'tired',
+            'shy', 'proud', 'disappointed', 'relieved', 'disgusted', 'bored', 'worried', 'loving', 'mocking', 'amazed', 'panicked', 'tearful', 'laughing'],
+        'pace' => ['slowly', 'quickly', 'softly', 'loudly', 'whispering', 'emphatic', 'singing', 'breathless', 'monotone'],
         'style' => ['storytelling', 'newsreader', 'advertising', 'conversational', 'dramatic', 'motivational', 'documentary'],
     ];
 
@@ -98,7 +99,11 @@ class GeminiVocalTags
         'happy' => 'سعيد', 'excited' => 'متحمس', 'warm' => 'دافئ', 'calm' => 'هادئ', 'serious' => 'جاد', 'sad' => 'حزين',
         'angry' => 'غاضب', 'nervous' => 'متوتر', 'scared' => 'خائف', 'surprised' => 'متفاجئ', 'curious' => 'فضولي',
         'sarcastic' => 'ساخر', 'playful' => 'مرح', 'confident' => 'واثق', 'tired' => 'متعب',
+        'shy' => 'بخجل', 'proud' => 'بفخر', 'disappointed' => 'بخيبة أمل', 'relieved' => 'بارتياح', 'disgusted' => 'باشمئزاز',
+        'bored' => 'بملل', 'worried' => 'بقلق', 'loving' => 'بحب', 'mocking' => 'باستهزاء', 'amazed' => 'بانبهار', 'panicked' => 'بذعر',
+        'tearful' => 'باكيًا', 'laughing' => 'ضاحكًا',
         'slowly' => 'ببطء', 'quickly' => 'بسرعة', 'softly' => 'بنعومة', 'loudly' => 'بصوت عالٍ', 'whispering' => 'هامس',
+        'emphatic' => 'بتأكيد', 'singing' => 'غناءً', 'breathless' => 'لاهثًا', 'monotone' => 'برتابة',
         'storytelling' => 'راوي قصص', 'newsreader' => 'مذيع أخبار', 'advertising' => 'إعلاني', 'conversational' => 'حواري',
         'dramatic' => 'درامي', 'motivational' => 'تحفيزي', 'documentary' => 'وثائقي',
     ];
@@ -116,6 +121,23 @@ class GeminiVocalTags
         'advertising' => 'like an advert voiceover, upbeat and persuasive', 'conversational' => 'conversationally, natural and casual',
         'dramatic' => 'dramatically, with tension', 'motivational' => 'like a motivational speaker, uplifting and strong',
         'documentary' => 'like a documentary narrator, deep and steady',
+        'shy' => 'shy and hesitant',
+        'proud' => 'proud and dignified',
+        'disappointed' => 'disappointed and deflated',
+        'relieved' => 'relieved, letting the tension go',
+        'disgusted' => 'disgusted, with clear distaste',
+        'bored' => 'bored and flat',
+        'worried' => 'worried and uneasy',
+        'loving' => 'loving and tender',
+        'mocking' => 'mocking and teasing',
+        'amazed' => 'amazed and full of wonder',
+        'panicked' => 'panicked and urgent',
+        'tearful' => 'tearful, the voice breaking as if about to cry',
+        'laughing' => 'while laughing, the words bubbling with laughter',
+        'emphatic' => 'with strong emphasis, stressing every key word',
+        'singing' => 'sung, with a gentle melody instead of speaking',
+        'breathless' => 'breathless, as if after running',
+        'monotone' => 'in a flat monotone, no pitch changes',
     ];
 
     /**
