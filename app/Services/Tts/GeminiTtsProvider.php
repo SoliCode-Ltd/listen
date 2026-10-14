@@ -251,6 +251,40 @@ class GeminiTtsProvider implements TtsProviderInterface
         'ar-MA-MK' => 'Marrakchi Moroccan Arabic (Marrakech)',
         'ar-DZ-CO' => 'Constantinois Algerian Arabic (Constantine, eastern Algeria)',
         'ar-TN-SF' => 'Sfaxi Tunisian Arabic (Sfax)',
+        'ar-XA-NW' => 'Modern Standard Arabic in the style of a TV news bulletin',
+        'ar-XA-CL' => 'Classical Arabic (heritage literary Fusha with full case endings)',
+        'ar-XA-WH' => 'Educated pan-Arab spoken Arabic ("White Arabic"), between Fusha and colloquial',
+        'ar-SA-TH' => 'Tihami Saudi Arabic (Red Sea coast, Al-Qunfudhah and Jazan lowlands)',
+        'ar-AE-NO' => 'Northern Emirati Arabic (Ras Al Khaimah and Fujairah)',
+        'ar-AE-BD' => 'Emirati Bedouin Arabic (Al Ain and the desert tribes)',
+        'ar-KW-BD' => 'Kuwaiti Bedouin Arabic (Najdi-influenced)',
+        'ar-BH-BA' => 'Baharna Bahraini Arabic (the villages of Bahrain)',
+        'ar-OM-IN' => 'Interior Omani Arabic (Nizwa and Al Batinah)',
+        'ar-LB-SO' => 'Southern Lebanese Arabic (Tyre, Nabatieh and the South)',
+        'ar-LB-BK' => 'Bekaa Lebanese Arabic (Zahle and Baalbek)',
+        'ar-LB-MT' => 'Mount Lebanon Arabic (Chouf and Metn, with a full ق)',
+        'ar-SY-HM' => 'Homsi and Hamwi Syrian Arabic (Homs and Hama)',
+        'ar-SY-CO' => 'Coastal Syrian Arabic (Latakia and Tartus, with a full ق)',
+        'ar-SY-SW' => 'Suwayda Syrian Arabic (Jabal al-Arab, with a full ق)',
+        'ar-JO-SO' => 'Southern Jordanian Arabic (Karak, Tafilah and Ma\'an)',
+        'ar-PS-FL' => 'Rural Palestinian Arabic (Fallahi, the villages)',
+        'ar-PS-NB' => 'Nablusi Palestinian Arabic (Nablus)',
+        'ar-EG-SH' => 'Modern Cairo street Arabic (youth slang, sha\'bi neighbourhoods)',
+        'ar-EG-NU' => 'Aswan Egyptian Arabic (Nubian-influenced, Upper Egypt)',
+        'ar-SD-WE' => 'Western Sudanese Arabic (Darfur and Kordofan, Baggara)',
+        'ar-SD-EA' => 'Eastern Sudanese Arabic (Kassala and Port Sudan)',
+        'ar-IQ-NJ' => 'Najafi Iraqi Arabic (Najaf and Karbala, Middle Euphrates)',
+        'ar-IQ-SO' => 'Southern rural Iraqi Arabic (Nasiriyah, Amarah and the marshes)',
+        'ar-YE-TH' => 'Tihami Yemeni Arabic (Hodeidah and the Red Sea coast)',
+        'ar-MA-FS' => 'Fassi Moroccan Arabic (Fes, old city speech)',
+        'ar-MA-OR' => 'Eastern Moroccan Arabic (Oujda)',
+        'ar-MA-SA' => 'Saharan Hassaniya Arabic (Laayoune and the Moroccan south)',
+        'ar-DZ-AL' => 'Algiers Algerian Arabic (Dziri, the capital)',
+        'ar-DZ-TL' => 'Tlemcen Algerian Arabic (soft urban Andalusian-rooted speech)',
+        'ar-DZ-SA' => 'Saharan Algerian Arabic (Ouargla, Djelfa and the south)',
+        'ar-TN-SA' => 'Sahel Tunisian Arabic (Sousse and Monastir)',
+        'ar-TN-SO' => 'Southern Tunisian Arabic (Gabes and Medenine, Bedouin-influenced)',
+        'ar-LY-FZ' => 'Fezzani Libyan Arabic (Sabha and the south)',
     ];
 
     /** @var array<int, string> */
@@ -329,6 +363,16 @@ class GeminiTtsProvider implements TtsProviderInterface
         'tour_guide' => 'Speak this Arabic text like an enthusiastic tour guide: friendly, informative, and vivid, pointing out details with curiosity.',
         'true_crime' => 'Narrate this Arabic text like a true-crime podcast host: low, measured, and suspenseful, revealing each detail carefully.',
         'luxury_brand' => 'Speak this Arabic text like a luxury-brand advertisement: smooth, slow, elegant, and refined, with understated confidence.',
+        'social_media' => 'Speak this Arabic text like a popular social-media creator talking to camera: fast, punchy, upbeat and personal, hooking the listener in the first seconds.',
+        'tutorial' => 'Speak this Arabic text like a friendly tutorial presenter: clear, step by step and patient, emphasising each action and number so it is easy to follow.',
+        'stand_up' => 'Perform this Arabic text like a stand-up comedian on stage: conversational and confident, with build-ups and punchlines landing after a short beat.',
+        'horror' => 'Narrate this Arabic text like a horror storyteller: low, slow and chilling, with long tense pauses and a hushed voice before each scare.',
+        'dubbing' => 'Perform this Arabic text like a drama dubbing artist: expressive and theatrical, with rich articulation and every line acted with clear emotion.',
+        'oratory' => 'Deliver this Arabic text like a powerful orator giving a speech: resonant, rhythmic and rousing, with strong emphasis and deliberate pauses for effect.',
+        'reverent' => 'Read this Arabic text in a calm, reverent and spiritual tone, with careful, precise articulation of every letter and gentle pauses, suited to supplications and devotional texts.',
+        'cartoon' => 'Perform this Arabic text like an animated cartoon character: bright, bouncy and exaggerated, with playful pitch jumps and lots of energy.',
+        'announcer' => 'Speak this Arabic text like a public announcement at an airport or station: clear, calm, evenly paced and polite, with every name and number distinct.',
+        'interview' => 'Speak this Arabic text like someone being interviewed: natural, thoughtful and articulate, answering with conversational pauses.',
     ];
 
     public function name(): string
@@ -1297,7 +1341,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         $dialectCode = strtoupper(trim((string) $dialect));
-        if ($isArabic && $dialectCode !== '' && $dialectCode !== 'AR-XA') {
+        // Fusha and its registers (news, classical, White Arabic) are not colloquial.
+        if ($isArabic && $dialectCode !== '' && ! str_starts_with($dialectCode, 'AR-XA')) {
             $prompt .= $dialectCode === 'AR-EG'
                 ? ' Stay in Cairene Egyptian colloquial Arabic, not Modern Standard Arabic. Pronounce ج like the English g, and use Cairo rhythm, the way someone from Cairo talks to a friend. Do not switch to formal Fusha or news-anchor pronunciation.'
                 : ' Stay in this regional colloquial variety. Do not switch to Modern Standard Arabic or news-anchor Fusha.';
@@ -1354,6 +1399,11 @@ class GeminiTtsProvider implements TtsProviderInterface
             'calm' => 'serene, peaceful, and deeply relaxing',
             'angry' => 'intense, passionate, with controlled fury',
             'joyful' => 'bright, joyful, and full of delight',
+            'hopeful' => 'hopeful and optimistic, lifting toward a brighter future',
+            'serious' => 'serious and weighty, every word measured',
+            'playful' => 'playful and lighthearted, with a mischievous twinkle',
+            'mysterious' => 'mysterious and hushed, hinting at secrets',
+            'confident' => 'confident and assured, commanding attention',
             'tender' => 'soft, tender, and caring, like speaking to someone you love',
             'empathetic' => 'understanding, gentle, and compassionate',
             'romantic' => 'intimate, soft, and romantic',
@@ -1366,6 +1416,22 @@ class GeminiTtsProvider implements TtsProviderInterface
             'surprised' => 'genuinely surprised and amazed',
             'sarcastic' => 'dry and sarcastic, with ironic emphasis',
             'suspenseful' => 'tense and suspenseful, keeping the listener on edge',
+            'curious' => 'curious and intrigued, asking with genuine interest',
+            'relieved' => 'relieved, the tension finally released, letting out the worry',
+            'disappointed' => 'disappointed and let down, with a sinking, deflated tone',
+            'embarrassed' => 'embarrassed and awkward, a little flustered and hesitant',
+            'shy' => 'shy and soft-spoken, a little hesitant and gentle',
+            'bored' => 'bored and unenthusiastic, flat and slightly drawn out',
+            'frustrated' => 'frustrated and exasperated, holding back irritation',
+            'disgusted' => 'disgusted and repulsed, with clear distaste in the voice',
+            'heartbroken' => 'heartbroken, quietly devastated, the voice close to breaking',
+            'panicked' => 'panicked and urgent, breathless and fast, close to losing control',
+            'amazed' => 'amazed and in awe, full of wonder',
+            'reassuring' => 'reassuring and steady, calming the listener that all will be well',
+            'apologetic' => 'apologetic and sincere, softly regretful',
+            'menacing' => 'menacing and threatening, low, slow and controlled',
+            'dreamy' => 'dreamy and far away, soft and floating',
+            'sleepy' => 'sleepy and drowsy, slow, low energy, with soft yawning pauses',
             default => '',
         };
     }
@@ -1433,6 +1499,16 @@ class GeminiTtsProvider implements TtsProviderInterface
             'tour_guide' => 'Speak like an enthusiastic tour guide: friendly, informative, and vivid, pointing out details with curiosity.',
             'true_crime' => 'Narrate like a true-crime podcast host: low, measured, and suspenseful, revealing each detail carefully.',
             'luxury_brand' => 'Speak like a luxury-brand advertisement: smooth, slow, elegant, and refined, with understated confidence.',
+            'social_media' => 'Speak like a popular social-media creator talking to camera: fast, punchy, upbeat and personal, hooking the viewer in the first seconds.',
+            'tutorial' => 'Speak like a friendly tutorial presenter: clear, step by step, patient, emphasising each action and number so it is easy to follow.',
+            'stand_up' => 'Perform like a stand-up comedian on stage: conversational, confident, with timing, build-ups and punchlines landing after a short beat.',
+            'horror' => 'Narrate like a horror storyteller: low, slow and chilling, with long tense pauses and a hushed voice before each scare.',
+            'dubbing' => 'Perform like a drama dubbing artist: expressive and theatrical, rich articulation, every line acted with clear emotion.',
+            'oratory' => 'Deliver like a powerful orator giving a speech: resonant, rhythmic and rousing, with strong emphasis and deliberate pauses for effect.',
+            'reverent' => 'Read in a calm, reverent and spiritual tone, with careful, precise articulation and gentle pauses, suited to supplications and devotional texts.',
+            'cartoon' => 'Perform like an animated cartoon character: bright, bouncy and exaggerated, with playful pitch jumps and lots of energy.',
+            'announcer' => 'Speak like a public announcement at an airport or station: clear, calm, evenly paced and polite, with every name and number distinct.',
+            'interview' => 'Speak like someone being interviewed: natural, thoughtful and articulate, answering with conversational pauses.',
             default          => 'Performance style: '.str_replace(['_', '-'], ' ', $style).'. Keep this style clear and consistent throughout.',
         };
     }

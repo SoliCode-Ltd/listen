@@ -70,7 +70,7 @@
                     $tagLabel = $tabKey === 'sounds' ? \App\Support\GeminiVocalTags::label($vocalTag) : \App\Support\GeminiVocalTags::deliveryLabel($vocalTag);
                     $tagOther = $tabKey === 'sounds' ? (\App\Support\GeminiVocalTags::ARABIC_NAMES[$vocalTag] ?? '') : (\App\Support\GeminiVocalTags::DELIVERY_ARABIC[$vocalTag] ?? '');
                   @endphp
-                  <button type="button" class="vs-chip vs-chip-{{ $tabKey }}" data-vocal-tag="{{ $tagLabel }}" data-tag-kind="{{ $tabKey }}" data-search="{{ $tagLabel }} {{ $vocalTag }} {{ $tagOther }}" title="{{ $tabKey === 'sounds' ? '<'.$tagLabel.'>' : '['.$tagLabel.']' }}">{{ $tagLabel }}</button>
+                  <button type="button" class="vs-chip vs-chip-{{ $tabKey }}" data-vocal-tag="{{ $tagLabel }}" data-tag-key="{{ $vocalTag }}" data-tag-kind="{{ $tabKey }}" data-search="{{ $tagLabel }} {{ $vocalTag }} {{ $tagOther }}" title="{{ $tabKey === 'sounds' ? '<'.$tagLabel.'>' : '['.$tagLabel.']' }}">{{ $tagLabel }}</button>
                 @endforeach
               </div>
             </div>
@@ -88,4 +88,6 @@
       </ul>
     </details>
   @endif
+  {{-- Icons, categories and one-line descriptions for the pickers and tag menus. --}}
+  <script type="application/json" data-vs-meta>@json(\App\Support\StudioChoices::forPicker(app()->getLocale() === 'ar') + ['i18n' => __('ui.dashboard.picker')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
 </section>

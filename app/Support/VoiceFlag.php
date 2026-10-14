@@ -12,6 +12,7 @@ final class VoiceFlag
     private const SUBDIVISIONS = [
         'EN-GB-SC' => 'gb-sct',
         'EN-GB-WL' => 'gb-wls',
+        'EN-GB-NI' => 'gb-nir',
     ];
 
     private const NO_COUNTRY = ['AR-XA', 'EN-AR'];
@@ -58,8 +59,8 @@ final class VoiceFlag
         return match (EnglishAccents::countryOf($code)) {
             'US', 'CA', 'JM' => 'americas',
             'GB', 'IE' => 'uk_ie',
-            'ZA', 'NG' => 'africa',
-            'AU', 'NZ', 'IN', 'SG' => 'asia_pacific',
+            'ZA', 'NG', 'GH', 'KE' => 'africa',
+            'AU', 'NZ', 'IN', 'SG', 'PK', 'PH' => 'asia_pacific',
             default => 'other',
         };
     }

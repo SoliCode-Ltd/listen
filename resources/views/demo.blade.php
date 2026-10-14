@@ -163,24 +163,8 @@
 
               <x-slot:whole-script>
                   <div class="vs-row-2 vs-field">
-                    <div>
-                      <label class="vs-field-label" for="performance_style">{{ __('ui.dashboard.performance_style') }}</label>
-                      <select name="performance_style" id="performance_style">
-                        <option value="">{{ __('ui.dashboard.vocal_default') }}</option>
-                        @foreach(($studioPerformanceStyles ?? []) as $styleOption)
-                          <option value="{{ $styleOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($styleOption['label_ar'] ?? $styleOption['label'] ?? '') : ($styleOption['label'] ?? ($styleOption['value'] ?? '')) }}</option>
-                        @endforeach
-                      </select>
-                    </div>
-                    <div>
-                      <label class="vs-field-label" for="emotion">{{ __('ui.dashboard.emotion_tone') }}</label>
-                      <select name="emotion" id="emotion">
-                        <option value="">{{ __('ui.dashboard.vocal_default') }}</option>
-                        @foreach(($studioEmotions ?? []) as $emotionOption)
-                          <option value="{{ $emotionOption['value'] ?? '' }}">{{ app()->getLocale() === 'ar' ? ($emotionOption['label_ar'] ?? $emotionOption['label'] ?? '') : ($emotionOption['label'] ?? ($emotionOption['value'] ?? '')) }}</option>
-                        @endforeach
-                      </select>
-                    </div>
+                    <x-voice-studio.choice-field name="performance_style" :label="__('ui.dashboard.performance_style')" :options="$studioPerformanceStyles ?? []" />
+                    <x-voice-studio.choice-field name="emotion" :label="__('ui.dashboard.emotion_tone')" :options="$studioEmotions ?? []" />
                   </div>
                 <div class="vs-row-2 vs-field">
                   <div>
@@ -1334,6 +1318,7 @@
   @auth
     @include('referral.popup')
   @endauth
+  <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>
 </html>

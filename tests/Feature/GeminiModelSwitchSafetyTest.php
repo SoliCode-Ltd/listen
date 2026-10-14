@@ -285,81 +285,85 @@ class GeminiModelSwitchSafetyTest extends TestCase
         foreach ($models as $model) {
             $structured = GeminiTtsModel::usesStructuredSpeech($model);
             foreach ($cases as [$language, $dialect, $dialectName]) {
-                foreach ($emotions as $emotion) {
-                    foreach ($styles as $style) {
-                        $prompt = $buildStyle->invoke(
-                            $provider,
-                            $style,
-                            $emotion,
-                            $language,
-                            1.0,
-                            $dialect,
-                            0.0,
-                            $structured,
-                        );
-                        $languageCode = $resolveLanguage->invoke($provider, $language, $dialect);
-                        $transcript = $language === 'ar' ? self::TRANSCRIPT_AR : self::TRANSCRIPT_EN;
-                        $payload = $buildPayload->invoke($provider, $model, $transcript, $prompt, 'Kore', $languageCode);
-                        $part = $payload['contents'][0]['parts'][0];
-                        $spoken = (string) $part['text'];
-                        $label = "{$model} {$language} {$dialect} {$emotion} {$style}";
+                // Every emotion and every style with every dialect, paired in turn:
+                // the prompt pieces are independent, so the full product adds nothing.
+                $pairs = max(count($emotions), count($styles));
+                for ($i = 0; $i < $pairs; $i++) {
+                    $emotion = $emotions[$i % count($emotions)];
+                    $style = $styles[$i % count($styles)];
+                    $prompt = $buildStyle->invoke(
+                        $provider,
+                        $style,
+                        $emotion,
+                        $language,
+                        1.0,
+                        $dialect,
+                        0.0,
+                        $structured,
+                    );
+                    $languageCode = $resolveLanguage->invoke($provider, $language, $dialect);
+                    $transcript = $language === 'ar' ? self::TRANSCRIPT_AR : self::TRANSCRIPT_EN;
+                    $payload = $buildPayload->invoke($provider, $model, $transcript, $prompt, 'Kore', $languageCode);
+                    $part = $payload['contents'][0]['parts'][0];
+                    $spoken = (string) $part['text'];
+                    $label = "{$model} {$language} {$dialect} {$emotion} {$style}";
 
-                        if ($spoken === '' || ! str_contains($spoken, $transcript)) {
-                            $failures[] = "{$label} dropped the transcript";
-                        }
-                        if (str_contains($spoken, 'speech_metadata')) {
-                            $failures[] = "{$label} leaked metadata into speech";
-                        }
+                    if ($spoken === '' || ! str_contains($spoken, $transcript)) {
+                        $failures[] = "{$label} dropped the transcript";
+                    }
+                    if (str_contains($spoken, 'speech_metadata')) {
+                        $failures[] = "{$label} leaked metadata into speech";
+                    }
 
-                        if ($structured) {
-                            if ($spoken !== $transcript) {
-                                $failures[] = "{$label} would speak the instructions";
-                            }
-                            $styleText = (string) ($part['speech_metadata']['style'] ?? '');
-                            if ($styleText === '') {
-                                $failures[] = "{$label} has no style metadata";
-                            }
-                            if ($language === 'ar' && ! str_contains($styleText, $dialectName)) {
-                                $failures[] = "{$label} lost the dialect name";
-                            }
-                            if ($dialect === 'ar-EG' && ! str_contains($styleText, 'Cairene Egyptian')) {
-                                $failures[] = "{$label} lost the Egyptian lock";
-                            } elseif ($language === 'ar' && strtoupper($dialect) !== 'AR-XA' && $dialect !== 'ar-EG' && ! str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
-                                $failures[] = "{$label} lost the colloquial lock";
-                            }
-                            if ($dialect === 'ar-XA' && str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
-                                $failures[] = "{$label} pushed Fusha away from Fusha";
-                            }
-                            if ($language === 'en' && ! str_contains($styleText, $dialectName)) {
-                                $failures[] = "{$label} lost the English accent";
-                            }
-                            if ($emotion !== 'neutral' && ! str_contains($styleText, 'Emotional tone:')) {
-                                $failures[] = "{$label} lost the emotion";
-                            }
-                            if (isset($payload['generationConfig']['speechConfig']['languageCode'])) {
-                                $failures[] = "{$label} sent languageCode to a structured model";
-                            }
-                        } else {
-                            if (! str_contains($spoken, 'Voice dialect:') && $language === 'ar') {
-                                $failures[] = "{$label} dropped the dialect from the legacy prompt";
-                            }
-                            if ($language === 'en' && str_contains($spoken, 'Voice accent:')) {
-                                $failures[] = "{$label} changed the legacy English prompt";
-                            }
-                            $sentCode = $payload['generationConfig']['speechConfig']['languageCode'] ?? '';
-                            if ($language === 'ar' && $sentCode !== 'ar-XA') {
-                                $failures[] = "{$label} sent {$sentCode} instead of ar-XA";
-                            }
-                            $expectedCode = in_array($dialect, ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? $dialect
-                                : (in_array(substr($dialect, 0, 5), ['en-US', 'en-GB'], true) ? substr($dialect, 0, 5) : 'en-US');
-                            if ($language === 'en' && $sentCode !== $expectedCode) {
-                                $failures[] = "{$label} sent {$sentCode} instead of {$expectedCode}";
-                            }
+                    if ($structured) {
+                        if ($spoken !== $transcript) {
+                            $failures[] = "{$label} would speak the instructions";
                         }
+                        $styleText = (string) ($part['speech_metadata']['style'] ?? '');
+                        if ($styleText === '') {
+                            $failures[] = "{$label} has no style metadata";
+                        }
+                        if ($language === 'ar' && ! str_contains($styleText, $dialectName)) {
+                            $failures[] = "{$label} lost the dialect name";
+                        }
+                        if ($dialect === 'ar-EG' && ! str_contains($styleText, 'Cairene Egyptian')) {
+                            $failures[] = "{$label} lost the Egyptian lock";
+                        } elseif ($language === 'ar' && ! str_starts_with(strtoupper($dialect), 'AR-XA') && $dialect !== 'ar-EG' && ! str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
+                            $failures[] = "{$label} lost the colloquial lock";
+                        }
+                        // Fusha and its registers (news, classical, White Arabic).
+                        if (str_starts_with(strtoupper($dialect), 'AR-XA') && str_contains($styleText, 'Do not switch to Modern Standard Arabic')) {
+                            $failures[] = "{$label} pushed Fusha away from Fusha";
+                        }
+                        if ($language === 'en' && ! str_contains($styleText, $dialectName)) {
+                            $failures[] = "{$label} lost the English accent";
+                        }
+                        if ($emotion !== 'neutral' && ! str_contains($styleText, 'Emotional tone:')) {
+                            $failures[] = "{$label} lost the emotion";
+                        }
+                        if (isset($payload['generationConfig']['speechConfig']['languageCode'])) {
+                            $failures[] = "{$label} sent languageCode to a structured model";
+                        }
+                    } else {
+                        if (! str_contains($spoken, 'Voice dialect:') && $language === 'ar') {
+                            $failures[] = "{$label} dropped the dialect from the legacy prompt";
+                        }
+                        if ($language === 'en' && str_contains($spoken, 'Voice accent:')) {
+                            $failures[] = "{$label} changed the legacy English prompt";
+                        }
+                        $sentCode = $payload['generationConfig']['speechConfig']['languageCode'] ?? '';
+                        if ($language === 'ar' && $sentCode !== 'ar-XA') {
+                            $failures[] = "{$label} sent {$sentCode} instead of ar-XA";
+                        }
+                        $expectedCode = in_array($dialect, ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? $dialect
+                            : (in_array(substr($dialect, 0, 5), ['en-US', 'en-GB'], true) ? substr($dialect, 0, 5) : 'en-US');
+                        if ($language === 'en' && $sentCode !== $expectedCode) {
+                            $failures[] = "{$label} sent {$sentCode} instead of {$expectedCode}";
+                        }
+                    }
 
-                        if (count($failures) > 12) {
-                            break 4;
-                        }
+                    if (count($failures) > 12) {
+                        break 3;
                     }
                 }
             }

@@ -35,7 +35,8 @@
   border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
   border-radius: 16px;
   background: var(--surface);
-  overflow: hidden;
+  /* Visible, so the tag menus above the text are never cut off. */
+  overflow: visible;
 }
 .tag-editor {
   position: relative;
@@ -103,6 +104,7 @@ html[lang="ar"] .tag-editor-backdrop { direction: rtl; text-align: right; }
   gap: .75rem;
   padding: .7rem .9rem .7rem 1.2rem;
   border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  border-radius: 0 0 16px 16px;
   background: color-mix(in oklab, var(--surface2) 45%, var(--surface));
 }
 html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
@@ -337,8 +339,6 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
 }
 .vs-chip-sounds { --chip-dot: var(--vs-sound, #6A45F2); }
 .vs-chip-delivery { --chip-dot: var(--vs-delivery, #E8A33D); }
-.vs-chip-dialect { --chip-dot: var(--a, #6A45F2); }
-.vs-chip-dialect::before { display: none; }
 .vs-chip:hover {
   border-color: var(--chip-dot);
   background: color-mix(in oklab, var(--chip-dot) 8%, var(--surface));
@@ -353,19 +353,7 @@ html[lang="ar"] .vs-group-label { letter-spacing: 0; font-size: .86rem; }
   border-color: var(--chip-dot);
   background: color-mix(in oklab, var(--chip-dot) 16%, var(--surface));
 }
-.vs-chip-choice { --chip-dot: var(--a, #6A45F2); }
-.vs-chip-choice::before { display: none; }
 .vs-chip:disabled { opacity: .45; cursor: not-allowed; }
-.vs-chip-choice[aria-checked="true"],
-.vs-chip-dialect[aria-checked="true"],
-.vs-chip-choice[aria-checked="true"]:hover,
-.vs-chip-dialect[aria-checked="true"]:hover {
-  border-color: var(--a, #6A45F2);
-  background: var(--a, #6A45F2);
-  color: #fff;
-}
-.vs-dialects { display: grid; gap: .8rem; margin-top: 1.1rem; }
-.vs-dialects[hidden], .vs-country[hidden] { display: none; }
 .vs-sub-label {
   display: block;
   margin-bottom: .35rem;
@@ -646,4 +634,459 @@ html[lang="ar"] .vs-select-group { letter-spacing: 0; font-size: .84rem; }
 .dialogue-example-btn { justify-self: start; }
 @media (max-width: 560px) {
   .dialogue-speaker-row { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------- Listen icons (js/voice-studio-icons.js) ---------- */
+.vs-ico {
+  --vs-ico-ink: #A99CFF;
+  display: block;
+  flex: none;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+html[data-theme="light"] .vs-ico { --vs-ico-ink: #7659FA; }
+.vs-chip.has-ico { padding-inline-start: .35rem; }
+.vs-chip.has-ico::before { display: none; }
+.vs-chip-ico { width: 22px; height: 22px; }
+
+/* Round flags, with the brand ring; the Arabic letter where there is no single country. */
+.vs-flag {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface2);
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px color-mix(in oklab, var(--a, #7659FA) 35%, transparent);
+}
+.vs-flag img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vs-flag-letter {
+  background: linear-gradient(135deg, #A48FFF, #7659FA 55%, #5B3DF5);
+  color: #FFFFFF;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.vs-flag-sm { width: 20px; height: 20px; font-size: .62rem; box-shadow: 0 0 0 1.5px var(--surface), 0 0 0 2.5px color-mix(in oklab, var(--a, #7659FA) 30%, transparent); }
+
+/* ---------- Choice cards (dialect, style, emotion) ---------- */
+.vs-pick {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  width: 100%;
+  min-height: 66px;
+  padding: .6rem .85rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 14px;
+  background: linear-gradient(135deg, color-mix(in oklab, var(--a, #7659FA) 7%, var(--surface)), var(--surface) 70%);
+  color: var(--text);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s ease, box-shadow .15s ease, transform .1s ease;
+}
+.vs-pick:hover { border-color: color-mix(in oklab, var(--a, #7659FA) 55%, var(--line)); box-shadow: 0 6px 18px -10px var(--brand-accent-glow, rgba(118, 89, 250, .4)); }
+.vs-pick:active { transform: scale(.99); }
+.vs-pick:focus-visible { outline: none; border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 22%, transparent); }
+.vs-pick:disabled { opacity: .55; cursor: not-allowed; }
+.vs-pick-ico { display: grid; place-items: center; flex: none; width: 42px; height: 42px; }
+.vs-pick-text { display: grid; gap: .1rem; min-width: 0; flex: 1; }
+.vs-pick-value,
+.vs-pick-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vs-pick-value { font-size: .98rem; font-weight: 700; color: var(--text); }
+.vs-pick-desc { font-size: .8rem; color: var(--muted); }
+.vs-pick-desc[hidden] { display: none; }
+.vs-pick-chevron { flex: none; width: 20px; height: 20px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.vs-pick:hover .vs-pick-chevron { stroke: var(--a, #7659FA); }
+
+/* ---------- Picker dialog ---------- */
+html.vs-modal-open { overflow: hidden; }
+.vs-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.vs-modal[hidden] { display: none; }
+.vs-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(12, 8, 32, .55);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  animation: vs-fade .16s ease-out;
+}
+.vs-modal-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(940px, 100%);
+  max-height: min(88vh, 880px);
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 40px 90px -30px rgba(20, 10, 60, .55), 0 0 0 1px color-mix(in oklab, var(--a, #7659FA) 10%, transparent);
+  overflow: hidden;
+  animation: vs-pop .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+.vs-modal-dialog::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 120px;
+  background: radial-gradient(120% 100% at 0% 0%, color-mix(in oklab, var(--a, #7659FA) 16%, transparent), transparent 70%);
+  pointer-events: none;
+}
+html[dir="rtl"] .vs-modal-dialog::before { background: radial-gradient(120% 100% at 100% 0%, color-mix(in oklab, var(--a, #7659FA) 16%, transparent), transparent 70%); }
+@keyframes vs-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes vs-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes vs-sheet { from { transform: translateY(40px); opacity: .6; } to { transform: none; opacity: 1; } }
+.vs-modal-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .9rem;
+  padding: 1.25rem 1.5rem .9rem;
+}
+.vs-modal-ico { display: grid; place-items: center; flex: none; width: 46px; height: 46px; }
+.vs-modal-titles { min-width: 0; flex: 1; }
+.vs-modal-head h2 { margin: 0; font-size: 1.22rem; font-weight: 800; line-height: 1.3; color: var(--text); }
+.vs-modal-head p { margin: .15rem 0 0; font-size: .88rem; line-height: 1.5; color: var(--muted); }
+.vs-modal-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.vs-modal-close svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.vs-modal-close:hover { color: var(--text); border-color: color-mix(in oklab, var(--text) 25%, var(--line)); }
+.vs-modal-close:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 2px; }
+.vs-modal-tools { position: relative; padding: 0 1.5rem .85rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 75%, transparent); }
+.vs-modal-search,
+.vs-tb-search { position: relative; display: flex; align-items: center; color: var(--muted); }
+.vs-modal-search svg,
+.vs-tb-search svg {
+  position: absolute;
+  inset-inline-start: .85rem;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+.vs-modal-search input,
+.vs-tb-search input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  margin: 0;
+  padding: 0 1rem;
+  padding-inline-start: 2.6rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 13px;
+  background: color-mix(in oklab, var(--surface2) 65%, var(--surface));
+  color: var(--text);
+  font-family: inherit;
+  font-size: .98rem;
+  box-shadow: none;
+}
+.vs-modal-search input:focus,
+.vs-tb-search input:focus { outline: none; border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 18%, transparent); }
+.vs-filters {
+  display: flex;
+  gap: .5rem;
+  margin-top: .8rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 2px;
+}
+.vs-filters::-webkit-scrollbar { display: none; }
+.vs-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  flex: none;
+  min-height: 34px;
+  padding: 0 .8rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .86rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease, color .15s ease;
+}
+.vs-filter small {
+  min-width: 1.5rem;
+  padding: .05rem .4rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--a, #7659FA) 12%, transparent);
+  color: color-mix(in oklab, var(--a, #7659FA) 80%, var(--text));
+  font-size: .74rem;
+  font-weight: 700;
+  text-align: center;
+}
+.vs-filter:hover { border-color: color-mix(in oklab, var(--a, #7659FA) 50%, var(--line)); }
+.vs-filter[aria-pressed="true"] {
+  border-color: transparent;
+  background: linear-gradient(135deg, #8E76FF, #7659FA 55%, #5B3DF5);
+  color: #FFFFFF;
+  box-shadow: 0 6px 16px -8px var(--brand-accent-glow, rgba(118, 89, 250, .5));
+}
+.vs-filter[aria-pressed="true"] small { background: rgba(255, 255, 255, .22); color: #FFFFFF; }
+.vs-filter:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 2px; }
+.vs-modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: .9rem 1.5rem 1.5rem;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+}
+.vs-modal-body:focus { outline: none; }
+.vs-modal-section { margin-top: .6rem; }
+.vs-modal-section h3 {
+  position: sticky;
+  top: -.9rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  margin: 0 0 .55rem;
+  padding: .7rem 0 .45rem;
+  background: var(--surface);
+  font-size: .86rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.vs-modal-section h3 small {
+  padding: .05rem .45rem;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface2) 80%, var(--line));
+  color: var(--muted);
+  font-size: .72rem;
+}
+.vs-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(236px, 1fr));
+  gap: .65rem;
+}
+.vs-cards-top { margin-bottom: .4rem; }
+.vs-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  min-height: 74px;
+  padding: .7rem .9rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.vs-card:hover {
+  border-color: color-mix(in oklab, var(--a, #7659FA) 50%, var(--line));
+  background: color-mix(in oklab, var(--a, #7659FA) 5%, var(--surface));
+  box-shadow: 0 10px 24px -16px var(--brand-accent-glow, rgba(118, 89, 250, .5));
+  transform: translateY(-1px);
+}
+.vs-card:focus-visible { outline: none; border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 24%, transparent); }
+.vs-card:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.vs-card[aria-pressed="true"] {
+  border-color: var(--a, #7659FA);
+  background: color-mix(in oklab, var(--a, #7659FA) 10%, var(--surface));
+}
+.vs-card-ico { display: grid; place-items: center; flex: none; width: 44px; height: 44px; }
+.vs-card-ico .vs-ico { width: 44px; height: 44px; }
+.vs-card-text { display: grid; gap: .15rem; min-width: 0; flex: 1; }
+.vs-card-name,
+.vs-card-desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.vs-card-name { font-size: .93rem; font-weight: 700; line-height: 1.35; }
+.vs-card-desc { font-size: .78rem; line-height: 1.45; color: var(--muted); }
+.vs-card-check {
+  position: absolute;
+  top: 8px;
+  inset-inline-end: 8px;
+  width: 20px;
+  height: 20px;
+  padding: 3px;
+  border-radius: 50%;
+  background: var(--a, #7659FA);
+  fill: none;
+  stroke: #FFFFFF;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  transform: scale(.6);
+  transition: opacity .15s ease, transform .15s ease;
+}
+.vs-card[aria-pressed="true"] .vs-card-check { opacity: 1; transform: none; }
+.vs-card-auto { border-style: dashed; }
+.vs-card-auto[aria-pressed="true"] { border-style: solid; }
+.vs-modal-empty { margin: 0; padding: 2.5rem 1.5rem 3rem; text-align: center; color: var(--muted); font-size: .95rem; }
+.vs-modal-empty[hidden] { display: none; }
+@media (max-width: 640px) {
+  .vs-modal { padding: 0; place-items: end stretch; }
+  .vs-modal-dialog {
+    width: 100%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    height: 92vh;
+    height: 92dvh;
+    border-radius: 22px 22px 0 0;
+    animation: vs-sheet .22s ease-out;
+  }
+  .vs-modal-head { padding: 1rem 1rem .75rem; }
+  .vs-modal-tools { padding: 0 1rem .75rem; }
+  .vs-modal-body { padding: .75rem 1rem 1.25rem; }
+  .vs-cards { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
+  .vs-card { min-height: 64px; }
+}
+
+/* ---------- Tag toolbar above the text ---------- */
+.vs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  padding: .65rem .8rem;
+  border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+  border-radius: 16px 16px 0 0;
+  background: color-mix(in oklab, var(--surface2) 45%, var(--surface));
+}
+/* Demo page: the toolbar sits on its own above the demo's text box. */
+.vs-toolbar:has(+ .demo-tag-editor) {
+  margin-bottom: .6rem;
+  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+  border-radius: 14px;
+}
+.vs-toolbar[hidden] { display: none; }
+.vs-tb-item { position: relative; }
+.vs-tb-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 40px;
+  padding: 0 .65rem 0 .4rem;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: .88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+html[dir="rtl"] .vs-tb-btn { padding: 0 .4rem 0 .65rem; }
+.vs-tb-btn .vs-ico { width: 28px; height: 28px; }
+.vs-tb-chev { width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+.vs-tb-btn:hover,
+.vs-tb-item.is-open .vs-tb-btn { border-color: color-mix(in oklab, var(--a, #7659FA) 55%, var(--line)); background: color-mix(in oklab, var(--a, #7659FA) 7%, var(--surface)); }
+.vs-tb-item.is-open .vs-tb-chev { transform: rotate(180deg); }
+.vs-tb-btn:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 2px; }
+.vs-tb-pop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  inset-inline-start: 0;
+  display: flex;
+  flex-direction: column;
+  width: min(340px, calc(100vw - 32px));
+  max-height: 400px;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 48px -18px rgba(20, 10, 60, .4), 0 2px 6px rgba(15, 15, 30, .06);
+  overflow: hidden;
+  animation: vs-select-in .14s ease-out;
+}
+.vs-tb-pop[hidden] { display: none; }
+.vs-tb-hint {
+  margin: 0;
+  padding: .8rem .95rem .2rem;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.5;
+  color: color-mix(in oklab, var(--a, #7659FA) 75%, var(--text));
+}
+.vs-tb-search { margin: .45rem .7rem .35rem; }
+.vs-tb-search input { min-height: 40px; font-size: .9rem; border-radius: 11px; }
+.vs-tb-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 .4rem .5rem; scrollbar-width: thin; }
+.vs-tb-group {
+  padding: .6rem .55rem .25rem;
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
+.vs-tb-group[hidden], .vs-tb-row[hidden], .vs-tb-empty[hidden] { display: none; }
+.vs-tb-row {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  width: 100%;
+  min-height: 42px;
+  padding: .3rem .55rem;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+.vs-tb-row .vs-ico { width: 28px; height: 28px; }
+.vs-tb-name { flex: 1; min-width: 0; font-size: .92rem; font-weight: 600; }
+.vs-tb-row code {
+  flex: none;
+  padding: .12rem .45rem;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--a, #7659FA) 9%, var(--surface2));
+  color: color-mix(in oklab, var(--a, #7659FA) 70%, var(--text));
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: .74rem;
+}
+.vs-tb-row:hover,
+.vs-tb-row:focus-visible { outline: none; background: color-mix(in oklab, var(--a, #7659FA) 9%, var(--surface)); }
+.vs-tb-empty { margin: 0; padding: 1rem; text-align: center; font-size: .88rem; color: var(--muted); }
+@media (max-width: 480px) {
+  .vs-toolbar { gap: .4rem; padding: .55rem; }
+  .vs-tb-btn { font-size: .82rem; min-height: 38px; }
+  .vs-tb-btn .vs-ico { width: 24px; height: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-modal-dialog, .vs-modal-backdrop, .vs-tb-pop { animation: none; }
+  .vs-card, .vs-pick, .vs-card-check { transition: none; }
+  .vs-card:hover { transform: none; }
 }
