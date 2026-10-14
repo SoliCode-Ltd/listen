@@ -1429,7 +1429,8 @@ class BillingController extends Controller
     {
         return Carbon::parse($date)
             ->clone()
-            ->setTimezone((string) config('listen.billing.daily_limit_timezone', 'Africa/Cairo'))
+            // UTC, the time Stripe bills in, so dates match the member's receipts and charges.
+            ->setTimezone('UTC')
             ->locale((string) app()->getLocale())
             ->translatedFormat('j M Y');
     }

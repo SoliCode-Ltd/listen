@@ -128,6 +128,17 @@ class ManageSubscriptionPageTest extends TestCase
             ->assertSee(__('ui.billing.monthly'));
     }
 
+    public function test_dates_are_the_days_stripe_bills_on_in_utc(): void
+    {
+        // 23:30 UTC is already the next day in Cairo; receipts and charges use UTC.
+        $user = $this->manualMember(\Illuminate\Support\Carbon::parse('2026-12-25 23:30:00', 'UTC'));
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee('25 Dec 2026')
+            ->assertDontSee('26 Dec 2026');
+    }
+
     public function test_a_free_member_sees_no_renewal_and_no_usage(): void
     {
         $user = User::factory()->create();

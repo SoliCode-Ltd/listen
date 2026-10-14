@@ -49,6 +49,7 @@ class BillingSyncService
         $currentPlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
         $targetPlan = $currentPlan ?: $freePlan;
         $periodEnd = now()->addMonth();
+        $periodStart = null;
 
         if ($user->stripe_id) {
             try {
@@ -80,6 +81,11 @@ class BillingSyncService
                             $periodEnd = $periodEndTs > 0
                                 ? Carbon::createFromTimestamp($periodEndTs)
                                 : now()->addMonth();
+                            // Stripe's own period start, so a refresh never moves it to "now".
+                            $periodStartTs = (int) ($stripeSubscription->current_period_start
+                                ?? $stripeSubscription->items->data[0]->current_period_start
+                                ?? 0);
+                            $periodStart = $periodStartTs > 0 ? Carbon::createFromTimestamp($periodStartTs) : null;
                         }
 
                         $this->persistBillingSubscription($user, $stripeSubscription);
@@ -137,7 +143,7 @@ class BillingSyncService
             }
         }
 
-        $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd);
+        $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
 
         $user->forceFill([
             'subscription_status_checked_at' => now(),
