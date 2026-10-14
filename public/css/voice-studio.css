@@ -736,8 +736,8 @@ html.vs-modal-open { overflow: hidden; }
   -webkit-line-clamp: 2;
   overflow: hidden;
 }
-.vs-card-name { font-size: .84rem; font-weight: 700; line-height: 1.4; }
-.vs-card-desc { font-size: .74rem; line-height: 1.45; color: var(--muted); }
+.vs-card-name { font-size: .84rem; font-weight: 700; line-height: 1.6; }
+.vs-card-desc { font-size: .74rem; line-height: 1.6; color: var(--muted); }
 .vs-card-check {
   position: absolute;
   top: 8px;
@@ -1318,7 +1318,14 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
   #generateVoiceSection > .page-card { padding: 1rem .85rem; border-radius: 14px; }
 }
 
-/* Arabic letters such as a final ي reach past their box: room so they are never clipped. */
+/* Arabic letters such as a final ي reach past their box (its dots sit below the
+   line in the site font): room on every side so they are never clipped, taken
+   back with negative margins so the layout does not move. */
+.vs-select-label,
+.vs-pick-value,
+.vs-pick-desc,
+.vs-voice-name,
+.vs-voice-dialect { padding-block: .12em .3em; margin-block: -.12em -.3em; line-height: 1.45; }
 .vs-select-label,
 .vs-pick-value,
 .vs-pick-desc { padding-inline-end: .3em; }
@@ -1417,3 +1424,17 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 /* A locked card: the button sits on its own line above the card, never on its border. */
 .vs-locked.vs-locked-card { padding-top: 2.3rem; }
 .vs-locked.vs-locked-card > .vs-upgrade { top: 0; }
+
+/* Speaker cards: a bigger face; gender is the filter's job, not a label on each card. */
+.vs-lib .vs-voice-avatar { width: 78px; height: 78px; }
+.vs-lib .vs-voice-avatar > img,
+.vs-lib .vs-voice-initial { width: 78px; height: 78px; font-size: 1.7rem; }
+.vs-lib .vs-voice-flag { width: 24px; height: 24px; }
+.vs-lib .vs-voice-name { margin-top: .45rem; font-size: .95rem; }
+@media (max-width: 480px) {
+  .vs-lib .vs-voice-avatar,
+  .vs-lib .vs-voice-avatar > img,
+  .vs-lib .vs-voice-initial { width: 68px; height: 68px; }
+}
+/* The site's label style adds a bottom margin: the search box then sits higher than the gender buttons. */
+.vs-lib .vs-lib-tools > .vs-lib-search { margin: 0; }

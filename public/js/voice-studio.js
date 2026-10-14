@@ -712,7 +712,6 @@
         };
       });
     }
-    function genderText(g) { return g === 'female' || g === 'male' ? t(meta, g) : ''; }
     function heart(on) {
       return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10-7.5 10z"' + (on ? ' fill="currentColor"' : '') + '/></svg>';
     }
@@ -769,12 +768,12 @@
         : '<span class="vs-voice-initial">' + initial + '</span>';
       var metaLine = [];
       if (item.mine) metaLine.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
-      if (genderText(item.gender)) metaLine.push('<span class="vs-voice-gender vs-g-' + escAttr(item.gender) + '">' + escAttr(genderText(item.gender)) + '</span>');
+      // The gender filter above the cards already sorts by gender: no label on each card.
       el.innerHTML = '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
           + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
         + '<span class="vs-voice-avatar">' + avatar + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
         + '<span class="vs-voice-name">' + escAttr(item.label) + '</span>'
-        + '<span class="vs-voice-meta">' + metaLine.join('') + '</span>'
+        + (metaLine.length ? '<span class="vs-voice-meta">' + metaLine.join('') + '</span>' : '')
         + (item.dialect ? '<span class="vs-voice-dialect">' + escAttr(item.dialect) + '</span>' : '')
         + (item.preview
           ? '<button type="button" class="vs-voice-play" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
