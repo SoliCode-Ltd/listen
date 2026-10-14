@@ -106,6 +106,28 @@ class ManageSubscriptionPageTest extends TestCase
             ->assertSee(__('ui.manage_subscription.manual_payment_label'));
     }
 
+    public function test_the_details_show_the_last_payment_its_discount_and_the_billing_cycle(): void
+    {
+        $user = $this->manualMember(now()->addDays(20));
+        ManualPaymentRequest::create([
+            'user_id' => $user->id, 'plan_id' => $this->starter->id, 'billing_cycle' => 'monthly',
+            'payment_method' => 'instapay', 'expected_amount_minor' => 47400, 'currency' => 'EGP',
+            'status' => ManualPaymentRequest::STATUS_APPROVED, 'submitted_at' => now(), 'reviewed_at' => now(),
+            'price_snapshot' => ['amount_minor' => 47400, 'full_amount_minor' => 59300, 'discount_percent' => 20],
+        ]);
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.last_payment'))
+            ->assertSee('474 EGP')
+            ->assertSee(__('ui.billing.payment_method_instapay'))
+            ->assertSee(__('ui.manage_subscription.discount_value', ['percent' => 20, 'amount' => "\u{2066}−119 EGP\u{2069}"]))
+            ->assertSee(__('ui.manage_subscription.member_since'))
+            // Renewing is not automatic: what it costs and by when.
+            ->assertSee(__('ui.manage_subscription.renew_payment'))
+            ->assertSee(__('ui.billing.monthly'));
+    }
+
     public function test_a_free_member_sees_no_renewal_and_no_usage(): void
     {
         $user = User::factory()->create();

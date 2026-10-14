@@ -126,6 +126,9 @@ class BillingController extends Controller
             && (bool) ($subscription?->id)
             && trim((string) ($subscription?->stripe_id ?? '')) !== '';
 
+        $stripeInvoices = $this->loadInvoices($user, $stripeReady, $countryContext, $locale);
+        $upcomingCharge = $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null;
+
         return view('manage-subscription', [
             'activePlan' => $accessPlan,
             'activePlanName' => $accessPlan
@@ -135,20 +138,124 @@ class BillingController extends Controller
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
             'defaultPaymentMethod' => $this->loadDefaultPaymentMethod($user, $stripeReady, $stripeValid ? $subscription : null),
-            'invoices' => array_merge(
-                $this->loadInvoices($user, $stripeReady, $countryContext, $locale),
-                $this->manualPaymentReceipts($user, $locale),
-            ),
+            'invoices' => array_merge($stripeInvoices['rows'], $this->manualPaymentReceipts($user, $locale)),
+            'billing' => $this->billingSummary($user, $subscription, $stripeValid, $manual, $stripeInvoices['last_paid'], $upcomingCharge, $locale),
             'hasCancelableSubscription' => $stripeValid && ! $onGracePeriod,
             'isCancellationScheduled' => $onGracePeriod,
             'billingProfileRemoved' => $billingProfileRemoved,
             'subscriptionStatus' => $manual['status'] ?? $this->subscriptionStatusLabel($subscription, $hasStripeCustomer),
             'subscriptionEndsAt' => $onGracePeriod && $subscription?->ends_at ? $this->formatCarbonDate($subscription->ends_at) : null,
             'subscriptionRenewsAt' => $periodEnd ? $this->formatCarbonDate($periodEnd) : null,
-            'upcomingCharge' => $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null,
+            'upcomingCharge' => $upcomingCharge,
             'trialNotice' => $this->trialNotice($user, $locale),
             'manual' => $manual,
         ]);
+    }
+
+    /**
+     * "20% off (−$1.80)" for an invoice with a discount, or null.
+     */
+    private function discountLabel(mixed $stripeInvoice, string $currency): ?string
+    {
+        $discount = 0;
+        foreach ((array) ($stripeInvoice->total_discount_amounts ?? []) as $row) {
+            $discount += (int) (is_object($row) ? ($row->amount ?? 0) : ($row['amount'] ?? 0));
+        }
+        $subtotal = (int) ($stripeInvoice->subtotal ?? 0);
+        if ($discount <= 0 || $subtotal <= 0) {
+            return null;
+        }
+
+        return __('ui.manage_subscription.discount_value', [
+            'percent' => (int) round($discount / $subtotal * 100),
+            'amount' => $this->savedAmount($this->formatInvoiceTotalLabel($discount, $currency)),
+        ]);
+    }
+
+    /** "−119 EGP" kept left-to-right inside Arabic text. */
+    private function savedAmount(string $formatted): string
+    {
+        return "\u{2066}−".$formatted."\u{2069}";
+    }
+
+    /**
+     * What the member paid last, what they pay next and how often, for card and manual plans.
+     *
+     * @return array<string, mixed>
+     */
+    private function billingSummary(User $user, ?BillingSubscription $subscription, bool $stripeValid, ?array $manual, ?array $lastCard, ?array $upcoming, string $locale): array
+    {
+        $cycle = null;
+        $since = null;
+        $last = $lastCard;
+        $next = null;
+
+        if ($stripeValid && $subscription) {
+            $plan = $this->resolvePlanFromBillingSubscription($subscription);
+            if ($plan) {
+                $cycle = (string) $subscription->stripe_price === $this->resolveStripePriceId((string) $plan->slug, 'yearly') ? 'yearly' : 'monthly';
+            }
+            $since = $subscription->created_at ? $this->formatCarbonDate($subscription->created_at) : null;
+            if ($upcoming) {
+                $next = ['amount' => $upcoming['charged'] ?? $upcoming['total'], 'date' => $upcoming['date'] ?? null, 'discount' => $upcoming['discount'] ?? null, 'manual' => false];
+            }
+        } elseif ($manual && ! empty($manual['plan_slug'])) {
+            $payments = \App\Models\ManualPaymentRequest::query()
+                ->where('user_id', $user->id)
+                ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
+                ->orderBy('id')
+                ->get();
+            $first = $payments->first();
+            $latest = $payments->last();
+            if ($latest) {
+                $snapshot = is_array($latest->price_snapshot) ? $latest->price_snapshot : [];
+                $currency = strtoupper((string) ($latest->currency ?: 'EGP'));
+                $amount = (int) $latest->expected_amount_minor;
+                $full = (int) ($snapshot['full_amount_minor'] ?? 0);
+                $cycle = in_array((string) $latest->billing_cycle, ['monthly', 'yearly'], true) ? (string) $latest->billing_cycle : null;
+                $last = [
+                    'amount' => $this->formatMinor($amount, $currency),
+                    'date' => $this->formatCarbonDate($latest->reviewed_at ?? $latest->created_at),
+                    'method' => $this->localizedPricingService->paymentMethodMeta((string) $latest->payment_method)['label'],
+                    'discount' => $full > $amount ? __('ui.manage_subscription.discount_value', [
+                        'percent' => (int) ($snapshot['discount_percent'] ?? round((1 - $amount / $full) * 100)),
+                        'amount' => $this->savedAmount($this->formatMinor($full - $amount, $currency)),
+                    ]) : null,
+                ];
+                $since = $this->formatCarbonDate($first->reviewed_at ?? $first->created_at);
+
+                // Not renewed automatically: what renewing costs today, and by when.
+                $plan = Plan::query()->where('slug', $manual['plan_slug'])->first();
+                $quote = $plan ? $this->localizedPricingService->egpPriceQuote($plan, $cycle ?? 'monthly', (string) $latest->payment_method, $locale) : null;
+                if ($quote) {
+                    $next = [
+                        'amount' => $this->formatMinor((int) $quote['amount_minor'], (string) $quote['currency']),
+                        'date' => $manual['ends_at'] ?? null,
+                        'discount' => (int) ($quote['discount_percent'] ?? 0) > 0 ? __('ui.manage_subscription.discount_value', [
+                            'percent' => (int) $quote['discount_percent'],
+                            'amount' => $this->savedAmount($this->formatMinor((int) $quote['full_amount_minor'] - (int) $quote['amount_minor'], (string) $quote['currency'])),
+                        ]) : null,
+                        'manual' => true,
+                    ];
+                }
+            }
+        }
+
+        return [
+            'cycle' => $cycle ? __('ui.billing.'.$cycle) : null,
+            'since' => $since,
+            'last' => $last,
+            'next' => $next,
+        ];
+    }
+
+    private function formatMinor(int $amountMinor, string $currency): string
+    {
+        $currency = strtoupper($currency);
+
+        return $currency === 'USD'
+            ? $this->formatInvoiceTotalLabel($amountMinor, 'USD')
+            : number_format($amountMinor / 100, $amountMinor % 100 === 0 ? 0 : 2).' '.$currency;
     }
 
     /**
@@ -1121,17 +1228,20 @@ class BillingController extends Controller
     }
 
     /**
-     * @return array<int, array<string, string>>
+     * The card invoices, and a summary of the last one paid.
+     *
+     * @return array{rows: array<int, array<string, string>>, last_paid: ?array<string, string>}
      */
     private function loadInvoices(User $user, bool $stripeReady, array $countryContext = [], string $locale = 'en'): array
     {
         if (! $stripeReady || ! $user->hasStripeId()) {
-            return [];
+            return ['rows' => [], 'last_paid' => null];
         }
 
         try {
+            $lastPaid = null;
             // Paid and unpaid ones: an open invoice is what a past-due member has to pay.
-            return collect($user->invoices(true))->map(function ($invoice) use ($countryContext, $locale) {
+            $rows = collect($user->invoices(true))->map(function ($invoice) use ($countryContext, $locale, &$lastPaid) {
                 $stripeInvoice = $invoice->asStripeInvoice();
                 $status = strtolower((string) ($stripeInvoice->status ?? 'paid'));
                 if ($status === 'draft') {
@@ -1140,6 +1250,17 @@ class BillingController extends Controller
                 $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
                 $totalCents = (int) ($stripeInvoice->total ?? 0);
                 $invoiceDate = $invoice->date();
+
+                // Invoices come newest first: the first paid one is the last payment.
+                if ($lastPaid === null && $status === 'paid' && (int) ($stripeInvoice->amount_paid ?? 0) > 0) {
+                    $paidAt = (int) ($stripeInvoice->status_transitions->paid_at ?? 0);
+                    $lastPaid = [
+                        'amount' => $this->formatChargedAmount((int) $stripeInvoice->amount_paid, $currency, $countryContext, $locale),
+                        'date' => $paidAt > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($paidAt)) : ($invoiceDate ? $this->formatCarbonDate($invoiceDate) : ''),
+                        'method' => __('ui.manage_subscription.paid_by_card'),
+                        'discount' => $this->discountLabel($stripeInvoice, $currency),
+                    ];
+                }
 
                 return [
                     'id' => (string) $invoice->id,
@@ -1150,6 +1271,8 @@ class BillingController extends Controller
                     'pay_url' => $status === 'open' ? (string) ($stripeInvoice->hosted_invoice_url ?? '') : '',
                 ];
             })->filter()->values()->all();
+
+            return ['rows' => $rows, 'last_paid' => $lastPaid];
         } catch (\Throwable $exception) {
             Log::warning('Unable to load Stripe invoices for manage subscription page.', [
                 'user_id' => $user->id,
@@ -1157,7 +1280,7 @@ class BillingController extends Controller
                 'error' => $exception->getMessage(),
             ]);
 
-            return [];
+            return ['rows' => [], 'last_paid' => null];
         }
     }
 
@@ -1211,6 +1334,8 @@ class BillingController extends Controller
 
             return [
                 'total' => $this->formatLocalizedInvoiceAmount($totalCents, $currency, $countryContext, $locale),
+                'charged' => $this->formatChargedAmount($totalCents, $currency, $countryContext, $locale),
+                'discount' => $this->discountLabel($stripeInvoice, $currency),
                 'currency' => $currency,
                 'date' => $periodEndTs > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($periodEndTs)) : null,
             ];

@@ -125,6 +125,8 @@
       margin: 0;
       text-align: end;
     }
+    .detail-sub { display: block; margin-top: .15rem; font-size: .8rem; font-weight: 500; color: var(--muted); }
+    .detail-saving { color: var(--ok, #16a34a); }
     .actions .btn:not(.btn-primary):not(.btn-danger) {
       background: transparent;
       border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 45%, var(--line));
@@ -437,9 +439,45 @@
 
         <div class="detail-list">
           <div class="detail-row">
-            <dt>{{ __('ui.manage_subscription.voice_tier') }}</dt>
-            <dd>{{ $normalizeTierLabel($activeTierLabel) }}</dd>
+            <dt>{{ __('ui.manage_subscription.current_plan') }}</dt>
+            <dd>{{ $activePlanName }}{{ !empty($billing['cycle']) ? ' · '.$billing['cycle'] : '' }}</dd>
           </div>
+          @if(!empty($billing['since']))
+            <div class="detail-row">
+              <dt>{{ __('ui.manage_subscription.member_since') }}</dt>
+              <dd>{{ $billing['since'] }}</dd>
+            </div>
+          @endif
+          @if(!empty($billing['last']))
+            <div class="detail-row">
+              <dt>{{ __('ui.manage_subscription.last_payment') }}</dt>
+              <dd>
+                <bdi>{{ $billing['last']['amount'] }}</bdi>
+                @if(!empty($billing['last']['date'])) · {{ $billing['last']['date'] }} @endif
+                <small class="detail-sub">{{ $billing['last']['method'] }}</small>
+              </dd>
+            </div>
+            @if(!empty($billing['last']['discount']))
+              <div class="detail-row">
+                <dt>{{ __('ui.manage_subscription.discount_label') }}</dt>
+                <dd class="detail-saving"><bdi>{{ $billing['last']['discount'] }}</bdi></dd>
+              </div>
+            @endif
+          @endif
+          @if(!empty($billing['next']))
+            <div class="detail-row">
+              <dt>{{ $billing['next']['manual'] ? __('ui.manage_subscription.renew_payment') : __('ui.manage_subscription.next_payment') }}</dt>
+              <dd>
+                <bdi>{{ $billing['next']['amount'] }}</bdi>
+                @if(!empty($billing['next']['date']))
+                  {{ $billing['next']['manual'] ? __('ui.manage_subscription.renew_before', ['date' => $billing['next']['date']]) : __('ui.manage_subscription.on_date', ['date' => $billing['next']['date']]) }}
+                @endif
+                @if(!empty($billing['next']['discount']))
+                  <small class="detail-sub detail-saving"><bdi>{{ $billing['next']['discount'] }}</bdi></small>
+                @endif
+              </dd>
+            </div>
+          @endif
           @if($subscriptionRenewsAt && ! $isCancellationScheduled)
             <div class="detail-row" id="renewsOnRow">
               <dt>{{ __('ui.manage_subscription.renews_on') }}</dt>
@@ -456,12 +494,6 @@
             <div class="detail-row">
               <dt>{{ $manual['expired'] ? __('ui.manage_subscription.access_ends_on') : __('ui.manage_subscription.paid_until') }}</dt>
               <dd>{{ $manual['ends_at'] }}</dd>
-            </div>
-          @endif
-          @if(!empty($upcomingCharge['total']))
-            <div class="detail-row">
-              <dt>{{ __('ui.manage_subscription.upcoming_invoice') }}</dt>
-              <dd><bdi>{{ $upcomingCharge['total'] }}</bdi></dd>
             </div>
           @endif
         </div>

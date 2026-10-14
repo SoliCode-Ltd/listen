@@ -254,12 +254,29 @@ class LocalizedPricingService
             return null;
         }
 
+        return $this->egpPriceQuote($plan, $cycle, $method, $locale);
+    }
+
+    /**
+     * The plan's price in Egyptian pounds for a cycle, whatever payment methods are
+     * switched on (what renewing costs), with the price before any discount.
+     */
+    public function egpPriceQuote(Plan $plan, string $cycle, string $method = 'instapay', ?string $locale = null): ?array
+    {
+        $cycle = $this->normalizeCycle($cycle);
         $amountMinor = $this->manualPriceMinor($plan, $cycle);
         if ($amountMinor <= 0) {
             return null;
         }
 
-        return $this->buildQuote($amountMinor, self::CURRENCY_EGP, $cycle, $method, $locale);
+        // The price before any discount, kept with the payment so the member can see what they saved.
+        $fullUsdMinor = max(0, (int) $plan->price_cents) * ($cycle === 'yearly' ? 12 : 1);
+        $fullMinor = max($amountMinor, $this->convertUsdMinorToCurrency($fullUsdMinor, self::CURRENCY_EGP));
+
+        return $this->buildQuote($amountMinor, self::CURRENCY_EGP, $cycle, $method, $locale) + [
+            'full_amount_minor' => $fullMinor,
+            'discount_percent' => $fullMinor > 0 ? (int) round((1 - $amountMinor / $fullMinor) * 100) : 0,
+        ];
     }
 
     /**
