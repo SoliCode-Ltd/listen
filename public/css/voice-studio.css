@@ -1250,67 +1250,70 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
   .vs-setbar .vs-pick { min-height: 52px; }
 }
 
-/* ---------- Workspace: sections divided by lines, not boxed ---------- */
+/* ---------- Workspace: neat, flat boxes (a border, no shadow or gradient) ---------- */
 #generateVoiceSection > .page-card {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
+  padding: clamp(1.25rem, 2.6vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 #generateVoiceSection > .page-card::before { display: none; }
-#generateVoiceSection > .page-card:hover { box-shadow: none; }
-#generateVoiceSection > .page-card > h1 { margin: 0 0 1.6rem; font-size: 1.55rem; line-height: 1.3; }
+#generateVoiceSection > .page-card:hover { border-color: var(--line); box-shadow: none; }
+#generateVoiceSection > .page-card > h1 { margin: 0 0 1.5rem; font-size: 1.55rem; line-height: 1.3; }
 #generateVoiceSection > .page-card > h1 .grad-text {
   background: none;
   -webkit-text-fill-color: currentColor;
   color: var(--text);
 }
-.vs-layout { gap: 0; }
-.vs-main { padding-inline-end: 2rem; }
-.vs-side { padding-inline-start: 2rem; border-inline-start: 1px solid var(--line); }
-.vs-panel { border: 0; border-radius: 0; background: none; }
-.vs-panel-head { padding: 0 0 1rem; }
-.vs-lib { padding: 0; }
-.vs-pane { padding: 0; }
-.vs-guide { padding: 1.1rem 0; }
-@media (max-width: 1180px) {
-  .vs-main { padding-inline-end: 0; }
-  .vs-side { margin-top: 2rem; padding: 2rem 0 0; border-inline-start: 0; border-top: 1px solid var(--line); }
+.vs-layout { gap: 1.5rem; }
+.vs-panel {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
+.vs-panel-head { padding: 1.4rem 1.5rem .9rem; }
+.vs-lib { padding: 0 1.5rem; }
+.vs-pane { padding: 0 1.5rem 1.5rem; }
+.vs-guide { padding: 1.1rem 1.5rem; }
 @media (max-width: 480px) {
-  .vs-panel-head { padding: 0 0 .8rem; }
-  .vs-lib { padding: 0; }
-  .vs-pane { padding: 0; }
+  .vs-panel-head { padding: 1.1rem 1rem .7rem; }
+  .vs-lib { padding: 0 1rem; }
+  .vs-pane { padding: 0 1rem 1.2rem; }
+  .vs-guide { padding: 1rem; }
 }
 
-/* Fine-tuning and its switches: rows divided by lines. */
-.vs-lib + .vs-pane { margin-top: 1.6rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+/* Fine-tuning: its switches sit in small boxes of their own. */
+.vs-lib + .vs-pane { margin-top: 1.5rem; padding-top: 1.4rem; border-top: 1px solid var(--line); }
 .vs-panel .s-card,
 #generateVoiceSection .vs-panel .s-card {
   margin: 0;
   padding: 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
 }
 .vs-pane > .vs-field.s-card,
+#generateVoiceSection .vs-pane > .vs-field.s-card,
 .vs-pane [data-dialogue] { margin-top: 1.5rem; }
+.vs-pane .vs-field > .s-card + .s-card,
+.vs-pane .translate-row + [data-dialogue] { margin-top: .75rem; }
 .vs-panel .compact-toggle-row,
-.vs-panel .translate-row { padding: 1rem 0; border: 0; border-radius: 0; background: none; }
+.vs-panel .translate-row { padding: 1rem 1.1rem; border: 0; border-radius: 0; background: none; }
 .vs-panel .vs-guide { border-top: 1px solid var(--line); }
 .vs-effect-field { margin-top: 0; margin-bottom: 1.5rem; }
 .vs-effect-field .vs-field-label { margin-bottom: .55rem; }
 
-/* The preview area under the workspace: a quiet strip, not another card. */
+/* The preview under the workspace: its own box. */
 #generateVoiceSection .output-panel {
-  margin-top: 2rem;
-  padding: 1.5rem 0 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
+  margin-top: 1.5rem;
+  padding: 1.4rem 1.5rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+@media (max-width: 600px) {
+  #generateVoiceSection > .page-card { padding: 1rem .85rem; border-radius: 14px; }
 }

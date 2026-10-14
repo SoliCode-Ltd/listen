@@ -840,7 +840,6 @@ return [
         'command_center' => 'مركز التحكم',
         'command_center_subtitle' => 'راقب استخدامك وأنشئ أصواتاً جديدة.',
         'menu_panel' => 'قائمة اللوحة',
-        'menu_workspace' => 'مساحة العمل',
         'characters_usage' => ':plan – الرصيد',
         'chars' => 'رصيد',
         'credits_after_this_voice' => 'رصيدك بعد هذا الصوت',

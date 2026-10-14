@@ -6,6 +6,8 @@ name: Server deploy
 # config (public/extensions/*/config.js).
 #   inspect: lists the files that differ from main (nothing changes).
 #   deploy:  copies main over the app, then clears and rebuilds caches.
+#   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
+#            environments and download formats) when the host has none.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -17,7 +19,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy]
+        options: [inspect, deploy, ffmpeg]
         default: inspect
 
 permissions:
@@ -69,6 +71,30 @@ jobs:
           echo "== $(wc -l < diff.txt) file(s) =="
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
           echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
+          echo "ffmpeg (sound environments, download formats):"
+          $S "$FIND; bash -s" <<'REMOTE' || true
+          f="$(command -v ffmpeg || true)"; [ -x storage/app/bin/ffmpeg ] && f="$f storage/app/bin/ffmpeg"
+          e="$(grep -E '^FFMPEG_PATH=' .env 2>/dev/null || true)"
+          echo "  found: ${f:-NONE (run this workflow with mode ffmpeg)} ${e}"
+          php -r 'echo "  PHP proc_open (command line): ", function_exists("proc_open") && stripos((string) ini_get("disable_functions"), "proc_open") === false ? "allowed" : "DISABLED", PHP_EOL;'
+          REMOTE
+          if [ "$MODE" = ffmpeg ]; then
+            case "$($S 'uname -m')" in
+              x86_64) A=amd64 ;; aarch64|arm64) A=arm64 ;; *) echo "Unknown CPU type"; exit 1 ;;
+            esac
+            B="https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-$A-static.tar.xz"
+            curl -fsSL --retry 3 -o ff.tar.xz "$B"
+            curl -fsSL --retry 3 "$B.md5" | awk '{print $1"  ff.tar.xz"}' | md5sum -c -
+            tar -xJf ff.tar.xz --wildcards --strip-components=1 '*/ffmpeg'
+            ./ffmpeg -hide_banner -encoders | grep -q libmp3lame
+            $S "$FIND; mkdir -p storage/app/bin && cat > storage/app/bin/ffmpeg.new" < ffmpeg
+            $S "$FIND; set -e; chmod 755 storage/app/bin/ffmpeg.new; storage/app/bin/ffmpeg.new -hide_banner -version | head -1; \
+              mv storage/app/bin/ffmpeg.new storage/app/bin/ffmpeg; \
+              php artisan cache:forget audio_formats.encoders >/dev/null 2>&1 || true; \
+              php artisan queue:restart | tail -1 || true; echo 'INSTALLED: storage/app/bin/ffmpeg'"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
           $S "$FIND; set -e; tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \

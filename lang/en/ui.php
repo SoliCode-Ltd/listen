@@ -840,7 +840,6 @@ return [
         'command_center' => 'Command Center',
         'command_center_subtitle' => 'Monitor your usage and generate new voices.',
         'menu_panel' => 'Dashboard Menu',
-        'menu_workspace' => 'Workspace',
         'characters_usage' => ':plan – Credits',
         'chars' => 'credits',
         'credits_after_this_voice' => 'Credits after this voice',

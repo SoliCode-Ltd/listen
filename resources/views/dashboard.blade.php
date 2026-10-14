@@ -656,16 +656,6 @@
       padding-inline-end: 1rem;
       border-inline-end: 1px solid var(--line);
     }
-    .dashboard-menu-title {
-      margin: .25rem 0 .6rem;
-      padding-inline-start: .75rem;
-      font-size: .72rem;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    html[dir="rtl"] .dashboard-menu-title { letter-spacing: 0; font-size: .8rem; }
     .dashboard-menu-list {
       display: grid;
       gap: 2px;
@@ -1889,7 +1879,6 @@
         border: 0;
         background: transparent;
       }
-      .dashboard-menu-title { display: none; }
       .dashboard-menu-link {
         flex: 0 0 auto;
         min-height: 38px;
@@ -2190,7 +2179,6 @@
   <main class="main-content dashboard-shell" style="max-width: 1700px; padding: 2rem clamp(1rem, 3vw, 3rem); margin: 0 auto; min-height: 80vh;">
     <div class="dashboard-layout">
       <aside class="reveal dashboard-menu">
-        <p class="dashboard-menu-title">{{ __('ui.dashboard.menu_workspace') }}</p>
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
           <a class="dashboard-menu-link active" href="#commandCenterSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
