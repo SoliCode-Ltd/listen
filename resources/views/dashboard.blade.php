@@ -3461,9 +3461,9 @@
       if (!voiceSelect) return;
       voiceSelect.innerHTML = '';
 
-      // Inject cloned voices at the top as an optgroup (if any match this language)
-      const langPrefix = lang === 'ar' ? 'ar' : 'en';
-      const matchingCloned = (clonedVoices || []).filter(v => v.language_code && v.language_code.startsWith(langPrefix));
+      // The member's cloned voices come first, whatever the language: a cloned
+      // voice speaks the script it is given.
+      const matchingCloned = clonedVoices || [];
       if (matchingCloned.length > 0) {
         const group = document.createElement('optgroup');
         group.label = clonedVoiceGroupLabel;

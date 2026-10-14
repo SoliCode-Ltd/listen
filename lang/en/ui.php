@@ -1101,7 +1101,7 @@ return [
             'any' => 'All',
             'female' => 'Female',
             'male' => 'Male',
-            'fine_tune' => 'Fine-tuning',
+            'fine_tune' => 'Sound engineering',
             'play' => 'Play a preview of',
             'favorite_add' => 'Add to favourites',
             'favorite_remove' => 'Remove from favourites',

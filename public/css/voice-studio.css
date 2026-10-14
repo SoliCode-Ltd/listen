@@ -1317,3 +1317,10 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 @media (max-width: 600px) {
   #generateVoiceSection > .page-card { padding: 1rem .85rem; border-radius: 14px; }
 }
+
+/* Arabic letters such as a final ي reach past their box: room so they are never clipped. */
+.vs-select-label,
+.vs-pick-value,
+.vs-pick-desc { padding-inline-end: .3em; }
+.vs-voice-name,
+.vs-voice-dialect { padding-inline: .3em; }
