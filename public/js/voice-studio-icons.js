@@ -43,6 +43,7 @@
     wavy: '<path d="M10.5 22.2q1.4-1.8 2.75 0t2.75 0 2.75 0 2.75 0" stroke="' + W + '" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
     smirk: '<path d="M12.2 22.2q5 1.2 8.8-2.8" stroke="' + W + '" stroke-width="2" fill="none" stroke-linecap="round"/>',
     tongue: '<path d="M10.5 19.5q5.5 5.5 11 0" stroke="' + W + '" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M15.2 22.3h4v1.6a2 2 0 0 1-4 0z" fill="' + W + '"/>',
+    kiss: '<path d="M14.6 19.4q2.8-.6 2.2 1.6-.4 1 .6 1.2-1.2.4.4 1.4.6 1.6-2.6 1.6" stroke="' + W + '" stroke-width="1.9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>',
     teeth: '<rect x="10" y="19.2" width="12" height="5.4" rx="2.7" fill="' + W + '"/><path d="M10.4 21.9h11.2M14 19.4v5M18 19.4v5" stroke="' + DEEP + '" stroke-width=".9" opacity=".45"/>'
   };
   var BROWS = {
@@ -87,6 +88,13 @@
     sad: ['dot', 'frown', 'worried'], heartbroken: ['closed', 'frown', 'worried', 'broken'], disappointed: ['closed', 'frown'],
     angry: ['dot', 'frown', 'angry'], frustrated: ['squint', 'teeth', null, 'steam'], anxious: ['dot', 'wavy', 'worried', 'sweat'],
     worried: ['dot', 'wavy', 'worried'], fear: ['wide', 'teeth', 'worried'], panic: ['wide', 'O', 'worried', 'sweat'],
+    cheerful: ['happy', 'grin', null, 'blush'], triumph: ['happy', 'laugh', 'up', 'sparkle'], innocent: ['wide', 'smallsmile', 'up', 'blush'],
+    sincere: ['dot', 'smallsmile', 'up', 'heart'], lonely: ['closed', 'flat', 'worried', 'tear'], guilty: ['side', 'wavy', 'worried', 'sweat'],
+    jealous: ['side', 'frown', 'angry'], furious: ['squint', 'teeth', 'angry', 'steam'], defiant: ['dot', 'smirk', 'angry'],
+    resigned: ['half', 'flat', 'worried', 'puff'], whistle: ['closed', 'o', 'up', 'note'], sniff: ['closed', 'flat', null, 'puff'],
+    hiccup: ['wide', 'o', null, 'excl'], gulp: ['wide', 'wavy', 'worried', 'sweat'], snore: ['closed', 'O', null, 'zzz'],
+    burp: ['squint', 'O', null, 'puff'], kiss: ['closed', 'kiss', null, 'heart'], thinking: ['side', 'flat', 'raised', 'question'],
+    agree: ['happy', 'smallsmile'], hesitant: ['up', 'wavy', 'worried'], elder: ['half', 'smallsmile', 'straight', 'sparkle'],
     surprised: ['wide', 'o', 'up', 'excl'], embarrassed: ['squint', 'teeth', null, 'blush'], disgusted: ['half', 'wavy', 'angry'],
     sigh: ['closed', 'o', null, 'puff'], gasp: ['wide', 'O', 'up'], pant: ['closed', 'O', null, 'sweat'], shh: ['dot', 'flat', null, 'shh'],
     shout: ['squint', 'O', null, 'waves'], scream: ['wide', 'O', 'worried', 'waves'], shriek: ['wide', 'O', 'up', 'excl'],
@@ -160,6 +168,9 @@
     fast: 'M4 17.5a8 8 0 1 1 16 0M12 17.5l4.8-4.8M4 17.5h2M18 17.5h2',
     emphasis: '<path d="M12 3.6v11" stroke-width="2.6"/><path d="M12 19.6h.01" stroke-width="3.4"/><path d="M5.4 7.4 3.6 6M18.6 7.4 20.4 6M5 12H3M19 12h2"/>',
     note: '<path d="M9 18V5.2l11-2.2v13"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+    clap: '<path d="M7.5 13.5 12 9a1.4 1.4 0 0 1 2 2l-3 3M10 12l4.6-4.6a1.4 1.4 0 0 1 2 2L12 14M12.6 13.4l3.4-3.4a1.4 1.4 0 0 1 2 2l-4.6 4.6a5 5 0 0 1-7 0l-.6-.6a4 4 0 0 1 0-5.6L8 8.2a1.4 1.4 0 0 1 2 2"/><path d="M15 3.5l.6 1.8M19 5.6l-1.4 1.2M20.6 9.6h-1.8"/>',
+    low: '<path d="M4 9.5v5h3.5l5 4v-13l-5 4z"/><path d="M17 8v8M14.6 13.6 17 16l2.4-2.4"/>',
+    high: '<path d="M4 9.5v5h3.5l5 4v-13l-5 4z"/><path d="M17 16V8M14.6 10.4 17 8l2.4 2.4"/>',
     monotone: 'M3 12h18M3 8h2.5M3 16h2.5M18.5 8H21M18.5 16H21'
   };
 

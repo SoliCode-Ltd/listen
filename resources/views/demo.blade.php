@@ -107,6 +107,23 @@
                 {{ __('ui.demo.text_input') }}
                 <span class="char-count" id="charCounter" dir="ltr"></span>
               </div>
+              <x-voice-studio.setbar studio-id="studioPanel" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
+                <div>
+                  <label class="vs-field-label" for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
+                  <select id="voice_tier" name="voice_tier">
+                    @foreach($demoTiers as $tier)
+                      <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>{{ $tier['label'] }}</option>
+                    @endforeach
+                  </select>
+                </div>
+                <div>
+                  <label class="vs-field-label" for="target_language">{{ __('ui.demo.voice_language') }}</label>
+                  <select id="target_language" name="target_language">
+                    <option value="ar">{{ __('ui.demo.arabic') }}</option>
+                    <option value="en">{{ __('ui.demo.english') }}</option>
+                  </select>
+                </div>
+              </x-voice-studio.setbar>
               <div class="tag-editor demo-tag-editor" data-vs-editor>
                 <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
                 <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
@@ -117,72 +134,32 @@
               </div>
               <div class="sample-human-note" role="note">
                 <strong>{{ $isArabicLocale ? 'ملاحظة احترافية' : 'Pro Tip' }}</strong>
-                <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة. ثم أضف المؤثرات وطريقة الأداء من استوديو الصوت بالأسفل ليبدو الصوت بشريًا أكثر.' : 'Click the sample chips above (Arabic / English) to load ready scripts, then add sound effects and delivery from the voice studio below for a more human voice.' }}</span>
+                <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة. ثم أضف الأصوات والمشاعر من شريط الوسوم فوق النص ليبدو الصوت بشريًا أكثر.' : 'Click the sample chips above (Arabic / English) to load ready scripts, then add sounds and feelings from the tag bar above the text for a more human voice.' }}</span>
               </div>
             </div>
 
             {{-- Voice studio: voice, sound effects and delivery (shared with the dashboard) --}}
             <div class="reveal">
             <x-voice-studio.panel :show-tags="true">
-              <div class="vs-row-2">
-                <div class="ctrl-group vs-field-compact">
-                  <label for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
-                  <select id="voice_tier" name="voice_tier">
-                    @foreach($demoTiers as $tier)
-                      <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>{{ $tier['label'] }}</option>
-                    @endforeach
-                  </select>
-                </div>
-                <div class="ctrl-group vs-field-compact">
-                  <label for="target_language">{{ __('ui.demo.voice_language') }}</label>
-                  <select id="target_language" name="target_language">
-                    <option value="ar">{{ __('ui.demo.arabic') }}</option>
-                    <option value="en">{{ __('ui.demo.english') }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="vs-row-2 vs-field">
-                <div class="ctrl-group vs-field-compact">
-                  <label for="voice_gender">{{ __('ui.demo.gender') }}</label>
-                  <select id="voice_gender">
-                    <option value="all">{{ __('ui.demo.any') }}</option>
-                    <option value="female">{{ __('ui.demo.female') }}</option>
-                    <option value="male">{{ __('ui.demo.male') }}</option>
-                  </select>
-                </div>
-                <div class="ctrl-group vs-field-compact">
-                  <label for="voice_key">{{ __('ui.demo.speaker') }}</label>
-                  <select id="voice_key" name="voice_key" data-speaker-avatar></select>
-                </div>
-              </div>
-
-              {{-- Premium-only settings; the page script shows them for the Premium tier. --}}
-              <div id="studioPanel" style="display:none;">
-                @include('components.voice-studio.dialect-field')
-              </div>
-
-              <x-slot:whole-script>
-                  <div class="vs-row-2 vs-field">
-                    <x-voice-studio.choice-field name="performance_style" :label="__('ui.dashboard.performance_style')" :options="$studioPerformanceStyles ?? []" />
-                    <x-voice-studio.choice-field name="emotion" :label="__('ui.dashboard.emotion_tone')" :options="$studioEmotions ?? []" />
-                  </div>
-                <div class="vs-row-2 vs-field">
-                  <div>
-                    <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
-                    <div class="slider-wrap">
-                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
-                    <div class="slider-wrap">
-                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
-                    </div>
+              {{-- The library filters speakers by gender itself; the page script still reads this field. --}}
+              <select id="voice_gender" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
+                <option value="all">{{ __('ui.demo.any') }}</option>
+              </select>
+              <div class="vs-row-2 vs-field" data-vs-hd-only>
+                <div>
+                  <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
+                  <div class="slider-wrap">
+                    <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
                   </div>
                 </div>
-              </x-slot:whole-script>
-
-              <div class="vs-divider"></div>
+                <div>
+                  <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
+                  <div class="slider-wrap">
+                    <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
+                  </div>
+                </div>
+              </div>
+              <div class="vs-field">
               <div class="translate-row">
                 <div class="translate-info">
                   <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
@@ -196,6 +173,7 @@
               </div>
               {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
               <x-voice-studio.dialogue />
+              </div>
             </x-voice-studio.panel>
             </div>
 

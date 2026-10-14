@@ -139,6 +139,7 @@ class User extends Authenticatable implements FilamentUser
             'blocked_at' => 'datetime',
             'paid_welcome_sent_at' => 'datetime',
             'free_monthly_chars' => 'boolean',
+            'favorite_voices' => 'array',
         ];
     }
 

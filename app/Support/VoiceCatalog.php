@@ -351,6 +351,62 @@ class VoiceCatalog
         return false;
     }
 
+    /**
+     * Every active voice for the studio's voice library, by key: who it is,
+     * where it is from and a recording to preview it, when there is one
+     * (the voice's own preview, else a single-speaker sample of it).
+     *
+     * @return array<string, array{g: string, a: ?string, l: string, c: ?string, f: ?string, d: string, p: ?string, s: bool}>
+     */
+    public static function libraryEntries(bool $arabic): array
+    {
+        $voices = self::activeQuery()->get();
+        $samples = \App\Models\VoiceSample::query()
+            ->where('is_active', true)
+            ->whereIn('voice_name', $voices->pluck('internal_voice_id')->all())
+            ->orderByDesc('is_featured')
+            ->orderBy('sort_order')
+            ->get(['voice_name', 'audio_path', 'metadata']);
+        $sampleByVoice = [];
+        foreach ($samples as $sample) {
+            $turns = (array) (($sample->metadata ?? [])['turns'] ?? []);
+            if ($turns === [] && ! isset($sampleByVoice[$sample->voice_name])) {
+                $sampleByVoice[$sample->voice_name] = (string) $sample->audio_path;
+            }
+        }
+
+        $entries = [];
+        foreach ($voices as $voice) {
+            $dialect = trim((string) $voice->dialect);
+            $preview = self::existingAudio((string) $voice->preview_audio_path)
+                ?? self::existingAudio($sampleByVoice[$voice->internal_voice_id] ?? '');
+            $entries[self::keyFromId((int) $voice->id)] = [
+                'g' => strtolower((string) $voice->gender),
+                'a' => SpeakerAvatar::url((string) $voice->display_name, (string) $voice->language),
+                'l' => (string) $voice->language,
+                'c' => $dialect !== '' ? (ArabicDialects::countryOf($dialect) ?? EnglishAccents::countryOf($dialect)) : null,
+                'f' => $dialect !== '' ? VoiceFlag::url($dialect, $voice->country) : null,
+                'd' => $dialect !== '' ? VoiceFlag::label($dialect, $arabic) : '',
+                'p' => $preview,
+                's' => (bool) $voice->is_featured,
+            ];
+        }
+
+        return $entries;
+    }
+
+    private static function existingAudio(string $path): ?string
+    {
+        $path = ltrim(trim($path), '/');
+        if ($path === '') {
+            return null;
+        }
+
+        return \Illuminate\Support\Facades\Storage::disk('public')->exists($path) || is_file(public_path($path))
+            ? AudioUrl::fromPath($path)
+            : null;
+    }
+
     public static function voiceMeta(?string $voiceName): ?array
     {
         $voiceName = trim((string) $voiceName);

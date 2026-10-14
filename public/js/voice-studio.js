@@ -1,14 +1,13 @@
 /*
  * Voice studio panel (components/voice-studio/panel.blade.php), shared by the
  * dashboard generator and the demo page:
- *  - tabs (language / sound effects / delivery), hidden for standard voices;
- *  - search across both tag tabs, forgiving Arabic spelling;
- *  - tags inserted at the cursor and highlighted inside the text box, from
- *    the panel or the toolbar above the text (reactions, emotions, voice);
+ *  - the voice library: every speaker as a card with avatar, gender, accent,
+ *    a preview and favourites (kept on the account and in the browser);
+ *  - tags inserted at the cursor from the toolbar above the text (sounds,
+ *    emotions, voice and pace) and highlighted inside the text box;
  *  - pickers for dialect, performance style and emotion: a card showing the
  *    choice and a dialog with search, categories, recent picks and icons,
  *    kept in step with each select, which stays the form field;
- *  - tag tabs: a category list, then that category's tags;
  *  - every visible dropdown drawn as a styled list over its select.
  */
 (function () {
@@ -533,28 +532,25 @@
 
   // ---------- Toolbar above the text: tags by what they do ----------
   // Built from the panel's tag chips, so the two always offer the same tags.
-  function buildToolbar(panel, form, meta, insertTag) {
+  function buildToolbar(form, meta, insertTag) {
     var editor = form.querySelector('[data-vs-editor]');
-    var chips = panel.querySelectorAll('[data-vocal-tag]');
-    if (!editor || !chips.length || !editor.parentNode) return null;
+    var tags = meta.tagMenus || [];
+    if (!editor || !tags.length || !editor.parentNode) return null;
     var menus = [
       { key: 'reactions', icon: 'f-laugh', rows: [] },
       { key: 'emotions', icon: 'f-starstruck', rows: [] },
       { key: 'voice', icon: 'g-volume', rows: [] }
     ];
-    Array.prototype.forEach.call(chips, function (chip) {
-      var group = chip.closest('[data-vs-group]');
-      var groupKey = group ? group.dataset.vsGroup : '';
-      var groupLabelNode = group && group.querySelector('.vs-group-label');
+    tags.forEach(function (tag) {
       var row = {
-        kind: chip.dataset.tagKind,
-        label: chip.dataset.vocalTag,
-        key: chip.dataset.tagKey,
-        group: groupKey,
-        groupLabel: groupLabelNode ? groupLabelNode.textContent.trim() : '',
-        search: fold(chip.dataset.search || chip.dataset.vocalTag)
+        kind: tag.k,
+        label: tag.l,
+        key: tag.t,
+        group: tag.g,
+        groupLabel: tag.gl || '',
+        search: fold(tag.l + ' ' + tag.t + ' ' + (tag.o || ''))
       };
-      var menu = row.kind === 'delivery' ? (groupKey === 'mood' ? menus[1] : menus[2]) : (groupKey === 'pauses' ? menus[2] : menus[0]);
+      var menu = row.kind === 'delivery' ? (row.group === 'mood' ? menus[1] : menus[2]) : (row.group === 'pauses' ? menus[2] : menus[0]);
       menu.rows.push(row);
     });
 
@@ -667,102 +663,214 @@
     return bar;
   }
 
+  // ---------- Voice library: every speaker as a card ----------
+  // The voice select stays the form field; the page fills it per language
+  // and tier, and the library draws one card per option.
+  function initLibrary(library, meta) {
+    var select = library.querySelector('select[name="voice_key"]');
+    var grid = library.querySelector('[data-vs-lib-grid]');
+    var empty = library.querySelector('[data-vs-lib-empty]');
+    var search = library.querySelector('[data-vs-lib-search]');
+    var tabs = library.querySelectorAll('[data-vs-lib-tab]');
+    var genders = library.querySelectorAll('[data-vs-lib-gender]');
+    if (!select || !grid) return;
+    var voices = meta.voices || {};
+    var state = { tab: 'all', gender: '', query: '' };
+    var STORE = 'listen.studio.favorites';
+    var favorites = {};
+    (meta.favorites || []).forEach(function (k) { favorites[k] = true; });
+    try { (JSON.parse(window.localStorage.getItem(STORE) || '[]') || []).forEach(function (k) { favorites[k] = true; }); } catch (e) { /* no storage */ }
+    var audio = null;
+    var playing = '';
+
+    function items() {
+      return Array.prototype.filter.call(select.options, function (o) { return o.value && !o.hidden; }).map(function (o) {
+        var v = voices[o.value] || {};
+        var mine = o.value.indexOf('cloned_') === 0;
+        var label = String(o.textContent || '').trim();
+        // "Name (Cloned voice)": the card says it with its own badge.
+        if (mine) label = label.replace(/\s*\([^()]*\)\s*$/, '');
+        return {
+          value: o.value, label: label, mine: mine, gender: v.g || '', avatar: v.a || o.dataset.avatar || '',
+          flag: v.f || '', dialect: v.d || '', preview: v.p || '', featured: !!v.s, disabled: o.disabled,
+          key: fold(label + ' ' + (v.d || '') + ' ' + (v.g ? t(meta, v.g) : '') + ' ' + o.value)
+        };
+      });
+    }
+    function genderText(g) { return g === 'female' || g === 'male' ? t(meta, g) : ''; }
+    function heart(on) {
+      return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10-7.5 10z"' + (on ? ' fill="currentColor"' : '') + '/></svg>';
+    }
+    function saveFavorites() {
+      var list = Object.keys(favorites).filter(function (k) { return favorites[k]; }).slice(0, 100);
+      try { window.localStorage.setItem(STORE, JSON.stringify(list)); } catch (e) { /* no storage */ }
+      if (!meta.favoritesUrl || !window.fetch) return;
+      var tokenNode = document.querySelector('meta[name="csrf-token"]') || document.querySelector('input[name="_token"]');
+      var token = tokenNode ? (tokenNode.content || tokenNode.value || '') : '';
+      fetch(meta.favoritesUrl, {
+        method: 'PUT',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': token, 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({ voices: list })
+      }).catch(function () { /* kept in this browser */ });
+    }
+    function stopPreview() {
+      if (audio) { audio.pause(); audio.currentTime = 0; }
+      playing = '';
+      grid.querySelectorAll('.vs-voice.is-playing').forEach(function (c) { c.classList.remove('is-playing'); });
+    }
+    function togglePreview(item, card) {
+      if (playing === item.value) { stopPreview(); return; }
+      stopPreview();
+      if (!audio) {
+        audio = new Audio();
+        audio.preload = 'none';
+        audio.addEventListener('ended', stopPreview);
+        audio.addEventListener('error', stopPreview);
+      }
+      audio.src = item.preview;
+      playing = item.value;
+      card.classList.add('is-playing');
+      var started = audio.play();
+      if (started && started.catch) started.catch(stopPreview);
+    }
+    function choose(value) {
+      if (select.value === value) return;
+      select.value = value;
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      render();
+    }
+    function card(item) {
+      var el = document.createElement('div');
+      el.className = 'vs-voice' + (item.value === select.value ? ' is-selected' : '') + (playing === item.value ? ' is-playing' : '');
+      el.setAttribute('role', 'option');
+      el.setAttribute('aria-selected', item.value === select.value ? 'true' : 'false');
+      el.tabIndex = item.value === select.value ? 0 : -1;
+      el.dataset.value = item.value;
+      if (item.disabled) el.setAttribute('aria-disabled', 'true');
+      var initial = escAttr(item.label.charAt(0).toUpperCase());
+      var avatar = item.avatar
+        ? '<img src="' + escAttr(item.avatar) + '" alt="" width="64" height="64" loading="lazy" decoding="async">'
+        : '<span class="vs-voice-initial">' + initial + '</span>';
+      var metaLine = [];
+      if (item.mine) metaLine.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
+      if (genderText(item.gender)) metaLine.push('<span class="vs-voice-gender vs-g-' + escAttr(item.gender) + '">' + escAttr(genderText(item.gender)) + '</span>');
+      el.innerHTML = '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
+          + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
+        + '<span class="vs-voice-avatar">' + avatar + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
+        + '<span class="vs-voice-name">' + escAttr(item.label) + '</span>'
+        + '<span class="vs-voice-meta">' + metaLine.join('') + '</span>'
+        + (item.dialect ? '<span class="vs-voice-dialect">' + escAttr(item.dialect) + '</span>' : '')
+        + (item.preview
+          ? '<button type="button" class="vs-voice-play" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
+            + '<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>'
+            + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>'
+            + '<span class="vs-voice-bars" aria-hidden="true"><i></i><i></i><i></i></span></button>'
+          : '')
+        + '<svg class="vs-voice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+      el.querySelector('.vs-voice-fav').addEventListener('click', function (e) {
+        e.stopPropagation();
+        favorites[item.value] = !favorites[item.value];
+        if (!favorites[item.value]) delete favorites[item.value];
+        saveFavorites();
+        render();
+      });
+      var play = el.querySelector('.vs-voice-play');
+      if (play) play.addEventListener('click', function (e) { e.stopPropagation(); togglePreview(item, el); });
+      el.addEventListener('click', function () { if (!item.disabled) choose(item.value); });
+      el.addEventListener('keydown', function (e) {
+        if (e.target !== el) return;
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!item.disabled) choose(item.value); return; }
+        var cards = Array.prototype.slice.call(grid.querySelectorAll('.vs-voice'));
+        var at = cards.indexOf(el);
+        var rtl = getComputedStyle(grid).direction === 'rtl';
+        var cols = Math.max(1, Math.round(grid.clientWidth / Math.max(1, el.offsetWidth)));
+        var next = { ArrowRight: rtl ? at - 1 : at + 1, ArrowLeft: rtl ? at + 1 : at - 1, ArrowDown: at + cols, ArrowUp: at - cols, Home: 0, End: cards.length - 1 }[e.key];
+        if (next === undefined) return;
+        e.preventDefault();
+        var target = cards[Math.max(0, Math.min(cards.length - 1, next))];
+        if (target) { target.tabIndex = 0; el.tabIndex = -1; target.focus(); }
+      });
+      return el;
+    }
+    var lastKey = '';
+    function render() {
+      var all = items();
+      var counts = {
+        all: all.filter(function (i) { return !i.mine; }).length,
+        favorites: all.filter(function (i) { return favorites[i.value]; }).length,
+        mine: all.filter(function (i) { return i.mine; }).length
+      };
+      tabs.forEach(function (tab) {
+        var key = tab.dataset.vsLibTab;
+        if (key === 'mine') tab.hidden = counts.mine === 0;
+        var n = tab.querySelector('[data-vs-lib-count]');
+        if (n) n.textContent = counts[key] ? String(counts[key]) : '';
+      });
+      if (state.tab === 'mine' && counts.mine === 0) state.tab = 'all';
+      tabs.forEach(function (tab) { tab.setAttribute('aria-selected', tab.dataset.vsLibTab === state.tab ? 'true' : 'false'); });
+      var q = fold(state.query);
+      var shown = all.filter(function (i) {
+        if (state.tab === 'all' && i.mine) return false;
+        if (state.tab === 'mine' && !i.mine) return false;
+        if (state.tab === 'favorites' && !favorites[i.value]) return false;
+        if (state.gender && i.gender && i.gender !== state.gender) return false;
+        if (state.gender && !i.gender && !i.mine) return false;
+        return !q || i.key.indexOf(q) !== -1;
+      });
+      var key = JSON.stringify([state, select.value, playing, shown.map(function (i) { return i.value + (favorites[i.value] ? '*' : ''); })]);
+      if (key === lastKey) return;
+      var focusedValue = grid.contains(document.activeElement) && document.activeElement.closest('.vs-voice') ? document.activeElement.closest('.vs-voice').dataset.value : null;
+      lastKey = key;
+      grid.innerHTML = '';
+      shown.forEach(function (i) { grid.appendChild(card(i)); });
+      if (!grid.querySelector('.vs-voice[tabindex="0"]') && grid.firstChild) grid.firstChild.tabIndex = 0;
+      if (focusedValue) {
+        var again = grid.querySelector('.vs-voice[data-value="' + focusedValue.replace(/"/g, '') + '"]');
+        if (again) again.focus({ preventScroll: true });
+      }
+      empty.hidden = shown.length > 0;
+      empty.textContent = state.tab === 'favorites' && !q && !state.gender ? t(meta, 'no_favorites') : (all.length ? t(meta, 'no_results') : t(meta, 'no_voices'));
+    }
+    tabs.forEach(function (tab) {
+      tab.addEventListener('click', function () { state.tab = tab.dataset.vsLibTab; render(); });
+    });
+    genders.forEach(function (b) {
+      b.addEventListener('click', function () {
+        state.gender = b.dataset.vsLibGender;
+        genders.forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+        render();
+      });
+    });
+    if (search) {
+      search.addEventListener('input', function () { state.query = search.value; render(); });
+      search.addEventListener('keydown', function (e) { if (e.key === 'Escape') { search.value = ''; state.query = ''; render(); } });
+    }
+    select.addEventListener('change', render);
+    // The page focuses the speaker field (a speaker chosen on the home page): show that card.
+    select.addEventListener('focus', function () {
+      var picked = grid.querySelector('.vs-voice.is-selected') || grid.querySelector('.vs-voice');
+      if (picked) { picked.focus({ preventScroll: true }); picked.scrollIntoView({ block: 'nearest' }); }
+    });
+    if (window.MutationObserver) {
+      new MutationObserver(function () { stopPreview(); render(); }).observe(select, { childList: true, subtree: true });
+    }
+    // Pages also set the speaker from code (language switch, reuse a generation).
+    var lastValue = select.value;
+    setInterval(function () { if (select.value !== lastValue) { lastValue = select.value; render(); } }, 300);
+    render();
+  }
+
   function initPanel(panel) {
     if (panel.__vs) return;
     panel.__vs = true;
     var form = panel.closest('form') || document;
     var textarea = form.querySelector('[data-vs-editor] textarea');
-    var tabs = panel.querySelectorAll('[data-vs-tab]');
-    var panes = panel.querySelectorAll('[data-vs-pane]');
     var meta = readMeta(panel);
-    var search = panel.querySelector('[data-vs-search]');
-    var searchInput = search ? search.querySelector('input') : null;
-    var active = 'settings';
-
-    function showTab(name) {
-      active = name;
-      tabs.forEach(function (t) { t.setAttribute('aria-selected', t.dataset.vsTab === name ? 'true' : 'false'); });
-      if (searchInput && searchInput.value.trim()) { applySearch(); return; }
-      panes.forEach(function (p) { p.hidden = p.dataset.vsPane !== name; });
-      if (search) search.hidden = name === 'settings';
-      panel.querySelectorAll('[data-vs-results-title]').forEach(function (h) { h.hidden = true; });
-    }
-
-    // ---------- Categories: one group of tags at a time ----------
-    function showCategory(pane) {
-      var picker = pane.querySelector('[data-vs-category]');
-      if (!picker) return;
-      pane.querySelectorAll('.vs-groups [data-vs-group]').forEach(function (g) { g.hidden = g.dataset.vsGroup !== picker.value; });
-    }
-    panel.querySelectorAll('[data-vs-category]').forEach(function (picker) {
-      var pane = picker.closest('[data-vs-pane]');
-      picker.addEventListener('change', function () { showCategory(pane); });
-      showCategory(pane);
-    });
-
-    // ---------- Search: one query, results from both tag tabs ----------
-    function applySearch() {
-      var q = fold(searchInput ? searchInput.value : '');
-      var tagPanes = panel.querySelectorAll('[data-vs-pane="sounds"], [data-vs-pane="delivery"]');
-      tagPanes.forEach(function (pane) {
-        pane.classList.toggle('is-searching', !!q);
-        pane.querySelectorAll('[data-vs-whole], [data-vs-category-wrap], [data-vs-tag-hint]').forEach(function (el) { el.hidden = !!q; });
-      });
-      if (!q) {
-        tagPanes.forEach(function (pane) {
-          pane.querySelectorAll('.vs-chip').forEach(function (c) { c.hidden = false; });
-          showCategory(pane);
-          var empty = pane.querySelector('.vs-empty');
-          if (empty) empty.hidden = true;
-        });
-        panes.forEach(function (p) { p.hidden = p.dataset.vsPane !== active; });
-        panel.querySelectorAll('[data-vs-results-title]').forEach(function (h) { h.hidden = true; });
-        return;
-      }
-      var total = 0;
-      tagPanes.forEach(function (pane) {
-        var inPane = 0;
-        pane.querySelectorAll('.vs-groups [data-vs-group]').forEach(function (group) {
-          var inGroup = 0;
-          group.querySelectorAll('.vs-chip').forEach(function (chip) {
-            var match = (chip.__vsKey || (chip.__vsKey = fold(chip.dataset.search || chip.textContent))).indexOf(q) !== -1;
-            chip.hidden = !match;
-            if (match) inGroup++;
-          });
-          group.hidden = inGroup === 0;
-          inPane += inGroup;
-        });
-        pane.hidden = inPane === 0;
-        var title = pane.querySelector('[data-vs-results-title]');
-        if (title) title.hidden = inPane === 0;
-        var empty = pane.querySelector('.vs-empty');
-        if (empty) empty.hidden = true;
-        total += inPane;
-      });
-      panel.querySelectorAll('[data-vs-pane="settings"]').forEach(function (p) { p.hidden = true; });
-      if (total === 0) {
-        var target = panel.querySelector('[data-vs-pane="' + (active === 'settings' ? 'sounds' : active) + '"]');
-        if (target) {
-          target.hidden = false;
-          var empty = target.querySelector('.vs-empty');
-          if (empty) empty.hidden = false;
-          var title = target.querySelector('[data-vs-results-title]');
-          if (title) title.hidden = true;
-        }
-      }
-    }
-    if (searchInput) {
-      searchInput.addEventListener('input', applySearch);
-      searchInput.addEventListener('search', applySearch);
-      searchInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { searchInput.value = ''; applySearch(); }
-      });
-    }
-    tabs.forEach(function (t) { t.addEventListener('click', function () { showTab(t.dataset.vsTab); }); });
 
     // ---------- Insert tags at the cursor ----------
-    // The cursor is remembered when the text box loses focus, so a menu or
-    // panel click still inserts where the member was writing.
+    // The cursor is remembered when the text box loses focus, so a menu
+    // click still inserts where the member was writing.
     var caretAt = null;
     if (textarea) {
       textarea.addEventListener('blur', function () { caretAt = [textarea.selectionStart, textarea.selectionEnd]; });
@@ -787,19 +895,7 @@
       textarea.dispatchEvent(new Event('input', { bubbles: true }));
       return true;
     }
-    panel.querySelectorAll('[data-vocal-tag]').forEach(function (chip) {
-      var icon = meta.tags && meta.tags[chip.dataset.tagKey];
-      if (icon && window.VoiceStudioIcons) {
-        chip.insertAdjacentHTML('afterbegin', window.VoiceStudioIcons.svg(icon, 'vs-chip-ico'));
-        chip.classList.add('has-ico');
-      }
-      chip.addEventListener('click', function () {
-        if (!insertTag(chip.dataset.tagKind, chip.dataset.vocalTag)) return;
-        chip.classList.add('is-added');
-        setTimeout(function () { chip.classList.remove('is-added'); }, 450);
-      });
-    });
-    var toolbar = buildToolbar(panel, form, meta, insertTag);
+    var toolbar = buildToolbar(form, meta, insertTag);
 
     // ---------- Colour the tags inside the text box ----------
     var backdrop = form.querySelector('[data-vs-editor] [data-vs-backdrop]');
@@ -819,32 +915,25 @@
       paint();
     }
 
-    // ---------- Standard voices: only the voice tab ----------
+    // ---------- Standard voices: no tags, dialect, style or emotion ----------
     var tier = form.querySelector('select[name="voice_tier"]');
     function applyTier() {
       var hd = !tier || tier.value === 'hd';
-      panel.querySelectorAll('[data-vs-tab="sounds"], [data-vs-tab="delivery"]').forEach(function (t) { t.hidden = !hd; });
       if (toolbar) toolbar.hidden = !hd;
-      if (!hd && active !== 'settings') showTab('settings');
+      form.querySelectorAll('[data-vs-hd-only]').forEach(function (el) { el.classList.toggle('vs-off', !hd); });
     }
-    if (tier) { tier.addEventListener('change', applyTier); applyTier(); }
+    if (tier) tier.addEventListener('change', applyTier);
+    applyTier();
 
     // ---------- Pickers: dialect, performance style and emotion ----------
-    panel.querySelectorAll('[data-vs-pick]').forEach(function (button) {
+    form.querySelectorAll('[data-vs-pick]').forEach(function (button) {
       var select = form.querySelector('select[name="' + button.dataset.vsPick + '"]');
       if (select) initPickButton(button, select, meta);
     });
 
-    // A required setting left empty in a hidden tab: open it so the browser can point at it.
-    if (form.addEventListener) {
-      form.addEventListener('invalid', function (event) {
-        var pane = event.target.closest && event.target.closest('[data-vs-pane]');
-        if (pane && pane.hidden) {
-          if (searchInput) searchInput.value = '';
-          showTab(pane.dataset.vsPane);
-        }
-      }, true);
-    }
+    // ---------- Voice library ----------
+    var library = panel.querySelector('[data-vs-library]');
+    if (library) initLibrary(library, meta);
 
     // ---------- Sliders: the value badge follows the slider ----------
     panel.querySelectorAll('input[type="range"]').forEach(function (range) {
@@ -864,13 +953,13 @@
       show();
     });
 
-    // Every visible dropdown in the panel (hidden form fields stay as they are).
-    panel.querySelectorAll('select').forEach(function (select) {
-      if (select.closest('.vs-hidden-field') || select.classList.contains('vs-hidden-field') || select.getAttribute('aria-hidden') === 'true') return;
+    // Every visible dropdown in the panel and on the text box (hidden form fields stay as they are).
+    var selects = Array.prototype.slice.call(panel.querySelectorAll('select'))
+      .concat(Array.prototype.slice.call(form.querySelectorAll('[data-vs-setbar] select')));
+    selects.forEach(function (select) {
+      if (select.classList.contains('vs-hidden-field') || select.getAttribute('aria-hidden') === 'true') return;
       enhanceSelect(select);
     });
-
-    showTab('settings');
   }
 
   function boot() {

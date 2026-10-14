@@ -2407,6 +2407,15 @@
           </div>
 
             <div class="vs-editor-card">
+              <x-voice-studio.setbar :studio="($planTier ?? 'standard') === 'hd'" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
+                <div>
+                  <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
+                  <select name="target_language" id="target_language">
+                    <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
+                    <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
+                  </select>
+                </div>
+              </x-voice-studio.setbar>
               <div class="tag-editor" id="tagEditor" data-vs-editor>
                 <div class="tag-editor-backdrop" id="tagEditorBackdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
                 <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
@@ -2438,28 +2447,7 @@
 
           <aside class="vs-side">
             <x-voice-studio.panel :show-tags="($planTier ?? 'standard') === 'hd'">
-          <div class="vs-row-2">
-            <div>
-              <label class="vs-field-label">{{ __('ui.dashboard.voice_language') }}</label>
-              <select name="target_language" id="target_language">
-                <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
-                <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
-              </select>
-            </div>
-            <div>
-              <label class="vs-field-label">{{ __('ui.dashboard.speaker') }}</label>
-              <select name="voice_key" id="voice_key" data-speaker-avatar></select>
-            </div>
-          </div>
-
-
               @if(($planTier ?? 'standard') === 'hd')
-                @include('components.voice-studio.dialect-field')
-                <x-slot:whole-script>
-                  <div class="vs-row-2 vs-field">
-                    <x-voice-studio.choice-field name="performance_style" :label="__('ui.dashboard.performance_style')" :options="$studioPerformanceStyles ?? []" />
-                    <x-voice-studio.choice-field name="emotion" :label="__('ui.dashboard.emotion_tone')" :options="$studioEmotions ?? []" />
-                  </div>
                 <div class="vs-row-2 vs-field">
                   <div>
                     <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">{{ number_format((float) $prefillValue('speed', '1.0'), 1) }}</span></span></div>
@@ -2480,25 +2468,23 @@
                     <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}">{{ $prefillValue('style_prompt') }}</textarea>
                   </div>
                 @endif
-                </x-slot:whole-script>
-                  @if($dialogueEnabled ?? false)
-                    <x-voice-studio.dialogue :on="$prefillDialogue === '1'" :preset="$reusePreset ?? []" style="margin-top: .6rem;" />
-                  @endif
+                @if($dialogueEnabled ?? false)
+                  <x-voice-studio.dialogue :on="$prefillDialogue === '1'" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
+                @endif
               @endif
-              <div class="vs-divider"></div>
-          <div class="s-card">
-            <label class="compact-toggle-row" for="translateToggle">
-              <div class="txt">
-                <div class="t-title">🌐 {{ __('ui.dashboard.translate_before_speaking') }}</div>
-                <div class="t-desc" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
+              <div class="s-card vs-field">
+                <label class="compact-toggle-row" for="translateToggle">
+                  <div class="txt">
+                    <div class="t-title">🌐 {{ __('ui.dashboard.translate_before_speaking') }}</div>
+                    <div class="t-desc" id="translateHint">{{ __('ui.dashboard.translate_enabled_hint') }}</div>
+                  </div>
+                  <div class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
+                    <input type="checkbox" id="translateToggle" {{ $prefillTranslate === '1' ? 'checked' : '' }}>
+                    <span class="toggle-slider"></span>
+                  </div>
+                </label>
+                <input type="hidden" name="translate" id="translateSelect" value="{{ $prefillTranslate }}">
               </div>
-              <div class="toggle-switch" aria-label="{{ __('ui.dashboard.translate_before_speaking') }}">
-                <input type="checkbox" id="translateToggle" {{ $prefillTranslate === '1' ? 'checked' : '' }}>
-                <span class="toggle-slider"></span>
-              </div>
-            </label>
-            <input type="hidden" name="translate" id="translateSelect" value="{{ $prefillTranslate }}">
-          </div>
             </x-voice-studio.panel>
           </aside>
         </form>

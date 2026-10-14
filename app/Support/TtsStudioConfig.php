@@ -99,6 +99,16 @@ class TtsStudioConfig
         ['value' => 'menacing', 'label' => 'Menacing', 'translation_key' => 'ui.dashboard.emotion_menacing'],
         ['value' => 'dreamy', 'label' => 'Dreamy', 'translation_key' => 'ui.dashboard.emotion_dreamy'],
         ['value' => 'sleepy', 'label' => 'Sleepy', 'translation_key' => 'ui.dashboard.emotion_sleepy'],
+        ['value' => 'cheerful', 'label' => 'Cheerful', 'translation_key' => 'ui.dashboard.emotion_cheerful'],
+        ['value' => 'triumphant', 'label' => 'Triumphant', 'translation_key' => 'ui.dashboard.emotion_triumphant'],
+        ['value' => 'innocent', 'label' => 'Innocent', 'translation_key' => 'ui.dashboard.emotion_innocent'],
+        ['value' => 'sincere', 'label' => 'Sincere', 'translation_key' => 'ui.dashboard.emotion_sincere'],
+        ['value' => 'lonely', 'label' => 'Lonely', 'translation_key' => 'ui.dashboard.emotion_lonely'],
+        ['value' => 'guilty', 'label' => 'Guilty', 'translation_key' => 'ui.dashboard.emotion_guilty'],
+        ['value' => 'jealous', 'label' => 'Jealous', 'translation_key' => 'ui.dashboard.emotion_jealous'],
+        ['value' => 'furious', 'label' => 'Furious', 'translation_key' => 'ui.dashboard.emotion_furious'],
+        ['value' => 'defiant', 'label' => 'Defiant', 'translation_key' => 'ui.dashboard.emotion_defiant'],
+        ['value' => 'resigned', 'label' => 'Resigned', 'translation_key' => 'ui.dashboard.emotion_resigned'],
     ];
 
     /**

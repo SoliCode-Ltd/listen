@@ -26,9 +26,11 @@ class GeminiVocalTags
         'laughter' => ['laugh', 'chuckle', 'giggle', 'cackle', 'snicker'],
         'breath' => ['sigh', 'gasp', 'breath', 'heavy breath', 'exhales', 'pant', 'phew'],
         'pauses' => ['short pause', 'long pause'],
-        'voice' => ['whispers', 'shout', 'scream', 'shriek', 'cheer'],
-        'body' => ['cough', 'sneeze', 'throat-clearing', 'yawn', 'snort', 'tsk', 'pff'],
+        'voice' => ['whispers', 'shout', 'scream', 'shriek', 'cheer', 'hum', 'whistle'],
+        'body' => ['cough', 'sneeze', 'throat-clearing', 'yawn', 'snort', 'tsk', 'pff', 'sniff', 'hiccup', 'gulp', 'snore', 'burp'],
         'emotion' => ['cry', 'sob', 'whimper', 'groan', 'moan', 'growl', 'grunt', 'grr', 'hiss', 'argh'],
+        'gestures' => ['clap', 'kiss'],
+        'fillers' => ['hmm', 'uh-huh', 'um'],
     ];
 
     /**
@@ -59,6 +61,9 @@ class GeminiVocalTags
         'cries' => 'cry', 'crying' => 'cry',
         'sobs' => 'sob', 'sobbing' => 'sob',
         'whimpers' => 'whimper', 'groans' => 'groan', 'growls' => 'growl', 'grunts' => 'grunt',
+        'humming' => 'hum', 'hums' => 'hum', 'whistles' => 'whistle', 'whistling' => 'whistle', 'sniffs' => 'sniff', 'sniffle' => 'sniff',
+        'hiccups' => 'hiccup', 'gulps' => 'gulp', 'snores' => 'snore', 'snoring' => 'snore', 'burps' => 'burp', 'claps' => 'clap',
+        'clapping' => 'clap', 'applause' => 'clap', 'kisses' => 'kiss', 'hmmm' => 'hmm', 'uh huh' => 'uh-huh', 'mm-hmm' => 'uh-huh', 'umm' => 'um', 'uh' => 'um',
     ];
 
     /**
@@ -69,14 +74,13 @@ class GeminiVocalTags
      */
     public const ARABIC_NAMES = [
         'laugh' => 'ضحكة', 'chuckle' => 'ضحكة خفيفة', 'giggle' => 'قهقهة', 'cackle' => 'قهقهة عالية', 'snicker' => 'ضحكة ساخرة',
-        'sigh' => 'تنهيدة', 'gasp' => 'شهقة', 'breath' => 'نفس', 'heavy breath' => 'نفس ثقيل', 'exhales' => 'زفير',
-        'pant' => 'لهاث', 'phew' => 'تنفس ارتياح',
+        'sigh' => 'تنهيدة', 'gasp' => 'شهقة', 'breath' => 'نفس', 'heavy breath' => 'نفس ثقيل', 'exhales' => 'زفير', 'pant' => 'لهاث', 'phew' => 'تنفس ارتياح',
         'short pause' => 'وقفة قصيرة', 'long pause' => 'وقفة طويلة',
-        'whispers' => 'همس', 'shout' => 'صياح', 'scream' => 'صرخة', 'shriek' => 'صرخة حادة', 'cheer' => 'هتاف',
-        'cough' => 'سعال', 'sneeze' => 'عطسة', 'throat-clearing' => 'تنحنح', 'yawn' => 'تثاؤب', 'snort' => 'نخرة',
-        'tsk' => 'طقطقة لسان', 'pff' => 'تأفف',
-        'cry' => 'بكاء', 'sob' => 'نحيب', 'whimper' => 'أنين', 'groan' => 'تأوه', 'moan' => 'آهة',
-        'growl' => 'زمجرة', 'grunt' => 'همهمة', 'grr' => 'زمجرة خفيفة', 'hiss' => 'فحيح', 'argh' => 'تذمر',
+        'whispers' => 'همس', 'shout' => 'صياح', 'scream' => 'صرخة', 'shriek' => 'صرخة حادة', 'cheer' => 'هتاف', 'hum' => 'دندنة', 'whistle' => 'صفير',
+        'cough' => 'سعال', 'sneeze' => 'عطسة', 'throat-clearing' => 'تنحنح', 'yawn' => 'تثاؤب', 'snort' => 'نخرة', 'tsk' => 'طقطقة لسان', 'pff' => 'تأفف', 'sniff' => 'استنشاق', 'hiccup' => 'حازوقة', 'gulp' => 'بلع ريق', 'snore' => 'شخير', 'burp' => 'تجشؤ',
+        'cry' => 'بكاء', 'sob' => 'نحيب', 'whimper' => 'أنين', 'groan' => 'تأوه', 'moan' => 'آهة', 'growl' => 'زمجرة', 'grunt' => 'همهمة', 'grr' => 'زمجرة خفيفة', 'hiss' => 'فحيح', 'argh' => 'تذمر',
+        'clap' => 'تصفيق', 'kiss' => 'قبلة',
+        'hmm' => 'تفكير', 'uh-huh' => 'موافقة', 'um' => 'تردد',
     ];
 
     /**
@@ -89,8 +93,10 @@ class GeminiVocalTags
      */
     public const DELIVERY_GROUPS = [
         'mood' => ['happy', 'excited', 'warm', 'calm', 'serious', 'sad', 'angry', 'nervous', 'scared', 'surprised', 'curious', 'sarcastic', 'playful', 'confident', 'tired',
-            'shy', 'proud', 'disappointed', 'relieved', 'disgusted', 'bored', 'worried', 'loving', 'mocking', 'amazed', 'panicked', 'tearful', 'laughing'],
-        'pace' => ['slowly', 'quickly', 'softly', 'loudly', 'whispering', 'emphatic', 'singing', 'breathless', 'monotone'],
+            'shy', 'proud', 'disappointed', 'relieved', 'disgusted', 'bored', 'worried', 'loving', 'mocking', 'amazed', 'panicked', 'tearful', 'laughing',
+            'cheerful', 'triumphant', 'innocent', 'lonely', 'guilty', 'defiant', 'furious'],
+        'pace' => ['slowly', 'quickly', 'softly', 'loudly', 'whispering', 'emphatic', 'singing', 'breathless', 'monotone',
+            'stuttering', 'trembling', 'robotic', 'deep voice', 'high voice', 'child voice', 'elderly voice'],
         'style' => ['storytelling', 'newsreader', 'advertising', 'conversational', 'dramatic', 'motivational', 'documentary'],
     ];
 
@@ -102,8 +108,10 @@ class GeminiVocalTags
         'shy' => 'بخجل', 'proud' => 'بفخر', 'disappointed' => 'بخيبة أمل', 'relieved' => 'بارتياح', 'disgusted' => 'باشمئزاز',
         'bored' => 'بملل', 'worried' => 'بقلق', 'loving' => 'بحب', 'mocking' => 'باستهزاء', 'amazed' => 'بانبهار', 'panicked' => 'بذعر',
         'tearful' => 'باكيًا', 'laughing' => 'ضاحكًا',
+        'cheerful' => 'ببهجة', 'triumphant' => 'بانتصار', 'innocent' => 'ببراءة', 'lonely' => 'بوحدة', 'guilty' => 'بذنب', 'defiant' => 'بتحدٍّ', 'furious' => 'بغضب شديد',
         'slowly' => 'ببطء', 'quickly' => 'بسرعة', 'softly' => 'بنعومة', 'loudly' => 'بصوت عالٍ', 'whispering' => 'هامس',
         'emphatic' => 'بتأكيد', 'singing' => 'غناءً', 'breathless' => 'لاهثًا', 'monotone' => 'برتابة',
+        'stuttering' => 'بتلعثم', 'trembling' => 'بارتجاف', 'robotic' => 'بصوت آلي', 'deep voice' => 'بصوت عميق', 'high voice' => 'بصوت حاد', 'child voice' => 'بصوت طفل', 'elderly voice' => 'بصوت مسن',
         'storytelling' => 'راوي قصص', 'newsreader' => 'مذيع أخبار', 'advertising' => 'إعلاني', 'conversational' => 'حواري',
         'dramatic' => 'درامي', 'motivational' => 'تحفيزي', 'documentary' => 'وثائقي',
     ];
@@ -138,6 +146,20 @@ class GeminiVocalTags
         'singing' => 'sung, with a gentle melody instead of speaking',
         'breathless' => 'breathless, as if after running',
         'monotone' => 'in a flat monotone, no pitch changes',
+        'cheerful' => 'cheerful and sunny',
+        'triumphant' => 'triumphant and victorious',
+        'innocent' => 'innocent and soft',
+        'lonely' => 'lonely and quiet',
+        'guilty' => 'guilty and hesitant',
+        'defiant' => 'defiant and firm',
+        'furious' => 'furious, barely holding back',
+        'stuttering' => 'stuttering, repeating the first sounds of some words',
+        'trembling' => 'with a trembling, shaky voice',
+        'robotic' => 'in a flat robotic voice, evenly spaced syllables',
+        'deep voice' => 'in a deep, low voice',
+        'high voice' => 'in a high, bright voice',
+        'child voice' => 'in the voice of a young child',
+        'elderly voice' => 'in the voice of an elderly person, slower and slightly shaky',
     ];
 
     /**
@@ -163,7 +185,9 @@ class GeminiVocalTags
         'يتثاءب' => 'yawn', 'تتثاءب' => 'yawn',
         'بكى' => 'cry', 'يبكي' => 'cry', 'تبكي' => 'cry', 'عياط' => 'cry', 'يعيط' => 'cry', 'تعيط' => 'cry',
         'ينتحب' => 'sob', 'أنين' => 'whimper', 'يئن' => 'whimper', 'آه' => 'groan', 'يتأوه' => 'groan',
-        'هتاف' => 'cheer', 'يهتف' => 'cheer', 'تصفيق' => 'cheer',
+        'هتاف' => 'cheer', 'يهتف' => 'cheer', 'يصفق' => 'clap', 'تصفق' => 'clap',
+        'يدندن' => 'hum', 'تدندن' => 'hum', 'يصفر' => 'whistle', 'فواق' => 'hiccup', 'زغطة' => 'hiccup',
+        'يشخر' => 'snore', 'بوسة' => 'kiss', 'امم' => 'um', 'اممم' => 'hmm', 'اها' => 'uh-huh',
     ];
 
     /** Longest text a mood tag may hold, so ordinary bracketed text is left alone. */
@@ -493,6 +517,18 @@ class GeminiVocalTags
         'grr' => 'an angry "grr"',
         'hiss' => 'a sharp hiss',
         'argh' => 'a frustrated "argh"',
+        'hum' => 'a short hummed melody, lips closed',
+        'whistle' => 'a short whistle',
+        'sniff' => 'a quick, audible sniff through the nose',
+        'hiccup' => 'a single real hiccup',
+        'gulp' => 'a nervous, audible gulp',
+        'snore' => 'a few seconds of real snoring',
+        'burp' => 'a short, comic burp',
+        'clap' => 'a few hand claps',
+        'kiss' => 'a light kiss sound',
+        'hmm' => 'a thoughtful "hmm"',
+        'uh-huh' => 'an agreeing "uh-huh"',
+        'um' => 'a hesitant "um"',
     ];
 
     /**
