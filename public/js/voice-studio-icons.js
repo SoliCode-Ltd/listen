@@ -2,7 +2,7 @@
  * Listen's own icons for the voice studio, in the brand colours instead of
  * system emoji: round faces for feelings and sounds ("f-…") and rounded
  * tiles with a line drawing for styles and pacing ("g-…"). Both are drawn
- * on the brand gradient with white features, so they look the same on every
+ * in the flat brand purple with white features, so they look the same on every
  * device, in light and dark themes.
  *
  *   VoiceStudioIcons.svg('f-laugh')  → '<svg class="vs-ico" …>'
@@ -15,8 +15,9 @@
   var W = '#FFFFFF';
   var INK = 'var(--vs-ico-ink, #7659FA)';
   var DEEP = '#3A1FB8';
+  var BRAND = '#7659FA';
 
-  // ---------- Faces: eyes, mouth, brows and extras on a gradient circle ----------
+  // ---------- Faces: eyes, mouth, brows and extras on a brand circle ----------
   var EYES = {
     dot: '<circle cx="11" cy="13" r="2" fill="' + W + '"/><circle cx="21" cy="13" r="2" fill="' + W + '"/>',
     happy: '<path d="M8.5 14q2.5-3.6 5 0M18.5 14q2.5-3.6 5 0" stroke="' + W + '" stroke-width="2" fill="none" stroke-linecap="round"/>',
@@ -107,15 +108,14 @@
 
   function face(id) {
     var spec = FACES[id] || FACES.neutral;
-    var out = '<circle cx="16" cy="16" r="14" fill="url(#vsIcoFace)"/>'
-      + '<path d="M7.4 9.2a11 11 0 0 1 7.2-5" stroke="' + W + '" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".28"/>';
+    var out = '<circle cx="16" cy="16" r="14" fill="' + BRAND + '"/>';
     if (spec[2]) out += BROWS[spec[2]] || '';
     out += (EYES[spec[0]] || EYES.dot) + (MOUTHS[spec[1]] || MOUTHS.flat);
     for (var i = 3; i < spec.length; i++) out += EXTRAS[spec[i]] || '';
     return out;
   }
 
-  // ---------- Glyphs: a line drawing on a gradient tile (24px grid) ----------
+  // ---------- Glyphs: a line drawing on a brand tile (24px grid) ----------
   var GLYPHS = {
     auto: 'M12 3l1.8 4.6L18.5 9l-4.7 1.6L12 15l-1.8-4.4L5.5 9l4.7-1.4zM18.5 14.6l.9 2.2 2.1.8-2.1.8-.9 2.2-.9-2.2-2.1-.8 2.1-.8zM5.5 15.6l.7 1.6 1.6.6-1.6.6-.7 1.6-.7-1.6-1.6-.6 1.6-.6z',
     wave: 'M2 12h2.5l2-5 3 10 3-14 3 14 2.5-8 1.5 3H22',
@@ -177,25 +177,11 @@
   function glyph(name) {
     var g = GLYPHS[name] || GLYPHS.wave;
     var body = g.charAt(0) === '<' ? g : '<path d="' + g + '"/>';
-    return '<rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="url(#vsIcoTile)"/>'
-      + '<path d="M6 7.6a8 8 0 0 1 5.4-3.6" stroke="' + W + '" stroke-width="1.6" fill="none" stroke-linecap="round" opacity=".25"/>'
+    return '<rect x="1.5" y="1.5" width="29" height="29" rx="9" fill="' + BRAND + '"/>'
       + '<g transform="translate(5 5) scale(.917)" fill="none" stroke="' + W + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + body + '</g>';
   }
 
-  // The brand gradients, once per page (url(#…) works across inline SVGs).
-  function ensureDefs() {
-    if (document.getElementById('vsIcoDefs')) return;
-    var holder = document.createElement('div');
-    holder.innerHTML = '<svg id="vsIcoDefs" width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden">'
-      + '<defs>'
-      + '<linearGradient id="vsIcoFace" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#A48FFF"/><stop offset=".55" stop-color="#7659FA"/><stop offset="1" stop-color="#5B3DF5"/></linearGradient>'
-      + '<linearGradient id="vsIcoTile" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8E76FF"/><stop offset=".6" stop-color="#7659FA"/><stop offset="1" stop-color="#4C6BF5"/></linearGradient>'
-      + '</defs></svg>';
-    (document.body || document.documentElement).appendChild(holder.firstChild);
-  }
-
   function svg(id, extraClass) {
-    ensureDefs();
     var name = String(id || '');
     var inner = name.indexOf('g-') === 0 ? glyph(name.slice(2)) : face(name.indexOf('f-') === 0 ? name.slice(2) : 'neutral');
     return '<svg class="vs-ico' + (extraClass ? ' ' + extraClass : '') + '" viewBox="0 0 32 32" aria-hidden="true" focusable="false">' + inner + '</svg>';

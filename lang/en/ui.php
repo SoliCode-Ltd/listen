@@ -1096,7 +1096,7 @@ return [
             'favorites' => 'Favourites',
             'mine' => 'My voices',
             'mine_badge' => 'My voice',
-            'search' => 'Search by name or accent…',
+            'search' => 'Search speakers…',
             'gender' => 'Gender',
             'any' => 'All',
             'female' => 'Female',

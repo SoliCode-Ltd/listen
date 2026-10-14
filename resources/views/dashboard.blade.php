@@ -627,7 +627,7 @@
     }
     .dashboard-layout {
       display: grid;
-      grid-template-columns: 200px minmax(0, 1fr);
+      grid-template-columns: 220px minmax(0, 1fr);
       gap: 1.75rem;
       align-items: start;
     }
@@ -648,84 +648,67 @@
       grid-template-columns: minmax(0, 1fr);
       gap: 1rem;
     }
+    /* Section menu: a plain card, an icon per section, a solid mark on the open one. */
     .dashboard-menu {
       position: sticky;
       top: 5.5rem;
-      padding: 0 1rem 0 0;
-    }
-    html[dir="rtl"] .dashboard-menu {
-      padding: 0 0 0 1rem;
-    }
-    .dashboard-menu-title {
-      margin: 0 0 1.5rem;
-      font-size: .8rem;
-      text-transform: uppercase;
-      letter-spacing: .1em;
-      font-weight: 800;
-      color: color-mix(in oklab, var(--text) 50%, var(--muted));
-      padding-inline-start: 1rem;
+      padding: .5rem;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: var(--surface);
     }
     .dashboard-menu-list {
       display: grid;
-      gap: .25rem;
+      gap: 2px;
     }
     .dashboard-menu-link {
+      position: relative;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: .8rem;
-      padding: .85rem 1rem;
-      border-radius: .75rem;
-      border: 1px solid transparent;
-      background: transparent;
-      color: color-mix(in oklab, var(--text) 70%, var(--muted));
+      gap: .7rem;
+      min-height: 42px;
+      padding: .55rem .75rem;
+      border-radius: 10px;
+      color: var(--muted);
       text-decoration: none;
-      font-size: .95rem;
+      font-size: .92rem;
       font-weight: 600;
-      transition: all .25s cubic-bezier(.4, 0, .2, 1);
-      position: relative;
+      line-height: 1.3;
+      transition: background-color .15s ease, color .15s ease;
     }
-    .dashboard-menu-link::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 50%;
-      bottom: 50%;
-      width: 4px;
-      background: linear-gradient(180deg, var(--a), var(--b));
-      border-radius: 0 4px 4px 0;
-      opacity: 0;
-      transition: all .25s cubic-bezier(.4, 0, .2, 1);
-    }
-    html[dir="rtl"] .dashboard-menu-link::before {
-      left: auto;
-      right: 0;
-      border-radius: 4px 0 0 4px;
+    .dashboard-menu-link svg {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .dashboard-menu-link:hover {
       color: var(--text);
-      background: color-mix(in oklab, var(--line) 20%, transparent);
-      transform: translateX(4px);
-    }
-    html[dir="rtl"] .dashboard-menu-link:hover {
-      transform: translateX(-4px);
+      background: var(--surface2);
     }
     .dashboard-menu-link.active {
-      color: var(--text);
-      background: color-mix(in oklab, var(--line) 25%, transparent);
+      color: var(--a);
+      background: color-mix(in oklab, var(--a) 9%, var(--surface));
       font-weight: 700;
     }
     .dashboard-menu-link.active::before {
-      opacity: 1;
-      top: 15%;
-      bottom: 15%;
+      content: '';
+      position: absolute;
+      inset-inline-start: 0;
+      top: 10px;
+      bottom: 10px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--a);
     }
-    .dashboard-menu-link span:last-child {
-      font-size: .75rem;
-      font-weight: 800;
-      font-family: var(--font-mono);
-      color: color-mix(in oklab, var(--a) 60%, var(--muted));
-      opacity: .8;
+    html[dir="rtl"] .dashboard-menu-link.active::before { border-radius: 3px 0 0 3px; }
+    .dashboard-menu-link:focus-visible {
+      outline: 2px solid var(--a);
+      outline-offset: 1px;
     }
     .hero-grid {
       display: grid;
@@ -1841,17 +1824,13 @@
         position: static;
         padding: 0;
       }
-      .dashboard-menu-link:hover,
-      html[dir="rtl"] .dashboard-menu-link:hover {
-        transform: none;
-      }
       .dashboard-menu-list {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .dashboard-menu-link {
         min-width: 0;
       }
-      .dashboard-menu-link span:first-child {
+      .dashboard-menu-link span {
         min-width: 0;
         overflow-wrap: anywhere;
       }
@@ -1883,37 +1862,41 @@
       .reveal.dashboard-menu {
         margin-top: 0;
       }
+      /* Phones: the sections wrap onto a second line rather than run off the screen. */
       .dashboard-menu-list {
         display: flex;
+        flex-wrap: wrap;
         gap: .45rem;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x proximity;
-        scrollbar-width: none;
-        padding-bottom: .2rem;
       }
       .dashboard-menu-list::-webkit-scrollbar {
         display: none;
       }
+      .dashboard-menu {
+        padding: 0;
+        border: 0;
+        background: transparent;
+      }
       .dashboard-menu-link {
         flex: 0 0 auto;
-        padding: .55rem .95rem;
+        min-height: 38px;
+        padding: .45rem .85rem;
         border: 1px solid var(--line);
         border-radius: var(--radius-full, 999px);
-        font-size: .88rem;
+        background: var(--surface);
+        font-size: .86rem;
         white-space: nowrap;
         scroll-snap-align: start;
       }
-      .dashboard-menu-link::before,
-      .dashboard-menu-link span:last-child {
+      .dashboard-menu-link svg { width: 16px; height: 16px; }
+      .dashboard-menu-link.active::before {
         display: none;
       }
-      .dashboard-menu-link span:first-child {
+      .dashboard-menu-link span {
         overflow-wrap: normal;
       }
       .dashboard-menu-link.active {
-        border-color: color-mix(in oklab, var(--a) 55%, var(--line));
-        background: color-mix(in oklab, var(--a) 18%, transparent);
+        border-color: var(--a);
+        background: color-mix(in oklab, var(--a) 9%, var(--surface));
       }
       .perf-panel {
         padding: 1rem .75rem;
@@ -2195,28 +2178,28 @@
       <aside class="reveal dashboard-menu">
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
           <a class="dashboard-menu-link active" href="#commandCenterSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
             <span>{{ __('ui.dashboard.command_center') }}</span>
-            <span></span>
           </a>
           <a class="dashboard-menu-link" href="#generateVoiceSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
             <span>{{ __('ui.dashboard.generate_new_voice') }}</span>
-            <span></span>
           </a>
 
           @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
-          <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav >
+          <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M17.5 9.5a3 3 0 0 1 0 5M20 7a6.5 6.5 0 0 1 0 10"/></svg>
             <span>{{ __('ui.nav.voice_cloning') }}</span>
-            <span></span>
           </a>
           @endif
 
           <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg>
             <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
-            <span></span>
           </a>
           <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M12 7.8V12l3 2"/></svg>
             <span>{{ __('ui.dashboard.recent_voices') }}</span>
-            <span></span>
           </a>
 
         </nav>
