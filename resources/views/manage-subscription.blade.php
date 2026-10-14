@@ -126,21 +126,11 @@
       text-align: end;
     }
     .actions .btn:not(.btn-primary):not(.btn-danger) {
-      background: var(--surface);
-      border: 1px solid var(--line);
+      background: transparent;
+      border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 45%, var(--line));
       color: var(--text);
+      box-shadow: none;
     }
-    .usage-card { margin-bottom: 1.25rem; animation-delay: .06s; }
-    .usage-credits { display: flex; align-items: center; gap: .8rem; }
-    .usage-coin { font-size: 2.1rem; }
-    .usage-credits-text { display: flex; flex-direction: column; line-height: 1.2; }
-    .usage-credits-text small { color: var(--muted); font-size: .85rem; }
-    .usage-credits-text b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
-    .usage-meter { height: 8px; margin: .85rem 0 .6rem; border-radius: 999px; background: color-mix(in oklab, var(--line) 80%, transparent); overflow: hidden; }
-    .usage-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--a, #6A45F2), var(--b, #8B5CF6)); }
-    .usage-note { margin: 0 0 1rem; color: var(--muted); font-size: .88rem; line-height: 1.6; }
-    .usage-empty { margin: 0 0 1rem; color: var(--muted); }
-    .usage-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .5rem; margin: 0; }
     .stripe-container {
       margin-top: .5rem;
       padding: 1rem;
@@ -374,13 +364,6 @@
       'cancellation scheduled', 'past due', 'past_due', 'unpaid', 'incomplete payment', 'incomplete' => 'pending',
       default => 'canceled',
     };
-    $usage = $usage ?? [];
-    $creditsTotal = (int) ($usage['plan_chars'] ?? 0);
-    $creditsLeft = (int) ($usage['remaining_chars'] ?? 0);
-    $minutesTotal = (int) ($usage['minutes_limit'] ?? 0);
-    $minutesUsed = round(((int) ($usage['seconds_used'] ?? 0)) / 60, 1);
-    $dailyLimit = (int) ($usage['daily_requests_limit'] ?? 0);
-    $packMode = ($usage['mode'] ?? 'monthly') === 'pack';
   @endphp
   @include('components.header')
 
@@ -443,66 +426,6 @@
           @endif
         </b>
       </div>
-    </div>
-
-    <div class="card usage-card">
-      <div class="card-header">
-        <h2>{{ __('ui.manage_subscription.usage_title') }}</h2>
-        <p>{{ __('ui.manage_subscription.usage_hint') }}</p>
-      </div>
-      @if($creditsTotal <= 0 && ! $packMode)
-        <p class="usage-empty">{{ __('ui.manage_subscription.no_credits') }}</p>
-      @else
-        <div class="usage-credits">
-          <x-credit-icon class="usage-coin" />
-          <div class="usage-credits-text">
-            <small>{{ __('ui.manage_subscription.credits_left') }}</small>
-            <b><bdi>{{ __('ui.manage_subscription.credits_value', ['left' => number_format($creditsLeft), 'total' => number_format($creditsTotal)]) }}</bdi></b>
-          </div>
-        </div>
-        <div class="usage-meter" role="presentation"><span style="width: {{ $creditsTotal > 0 ? max(0, min(100, round($creditsLeft / $creditsTotal * 100))) : 0 }}%"></span></div>
-        <p class="usage-note">
-          {{ __('ui.manage_subscription.credits_hint') }}
-          @if((int) ($usage['gift_chars'] ?? 0) > 0)
-            {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $usage['gift_chars'])]) }}.
-          @endif
-          @if($packMode && !empty($usage['pack_expires_at']))
-            {{ __('ui.manage_subscription.pack_ends', ['date' => \Illuminate\Support\Carbon::parse($usage['pack_expires_at'])->setTimezone(config('listen.billing.daily_limit_timezone', 'Africa/Cairo'))->locale(app()->getLocale())->translatedFormat('j M Y')]) }}
-          @elseif(! $packMode)
-            {{ __('ui.manage_subscription.credits_reset', ['date' => $creditsResetAt]) }}
-          @endif
-        </p>
-      @endif
-      <dl class="detail-list usage-list">
-        @if($minutesTotal > 0)
-          <div class="detail-row">
-            <dt>{{ __('ui.manage_subscription.voice_minutes') }}</dt>
-            <dd><bdi>{{ __('ui.manage_subscription.minutes_value', ['used' => number_format($minutesUsed, 1), 'total' => number_format($minutesTotal)]) }}</bdi></dd>
-          </div>
-        @endif
-        <div class="detail-row">
-          <dt>{{ __('ui.manage_subscription.generations_today') }}</dt>
-          <dd><bdi>{{ $dailyLimit > 0
-              ? __('ui.manage_subscription.count_of_limit', ['used' => number_format((int) ($usage['daily_requests_used'] ?? 0)), 'limit' => number_format($dailyLimit)])
-              : __('ui.manage_subscription.unlimited') }}</bdi></dd>
-        </div>
-        <div class="detail-row">
-          <dt>{{ __('ui.manage_subscription.generations_month') }}</dt>
-          <dd><bdi>{{ !empty($usage['requests_unlimited'])
-              ? __('ui.manage_subscription.unlimited')
-              : __('ui.manage_subscription.count_of_limit', ['used' => number_format((int) ($usage['total_requests'] ?? 0)), 'limit' => number_format((int) ($usage['plan_requests'] ?? 0))]) }}</bdi></dd>
-        </div>
-        <div class="detail-row">
-          <dt>{{ __('ui.manage_subscription.max_text') }}</dt>
-          <dd><bdi>{{ __('ui.manage_subscription.chars_value', ['count' => number_format(\App\Support\PlanUsageGuard::maxCharsPerRequest($quotaPlan ?? null))]) }}</bdi></dd>
-        </div>
-        @if(!empty($downloadFormats))
-          <div class="detail-row">
-            <dt>{{ __('ui.manage_subscription.downloads') }}</dt>
-            <dd><bdi dir="ltr">{{ $downloadFormats }}</bdi></dd>
-          </div>
-        @endif
-      </dl>
     </div>
 
     <div class="grid-layout">
@@ -686,6 +609,7 @@
       'resuming' => __('ui.manage_subscription.resuming'),
       'resume_failed' => __('ui.manage_subscription.resume_failed'),
       'subscription_resumed' => __('ui.manage_subscription.subscription_resumed'),
+      'card_not_approved' => __('ui.backend.billing_card_not_approved'),
     ];
   @endphp
   <script>
@@ -828,22 +752,31 @@
       });
     }
 
-    async function collectCardPaymentMethod() {
+    // The bank approves the new card first (3D Secure when it asks); only then
+    // does it replace the card that renews the subscription.
+    async function confirmCardWithBank() {
       if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
-      const result = await stripe.createPaymentMethod({
-        type: 'card',
-        card,
-        billing_details: {
-          name: userName || undefined,
-          email: userEmail || undefined,
+      const intent = await post('{{ route('billing.payment-method.intent') }}');
+      if (!intent.ok || intent.data?.ok === false || !intent.data?.client_secret) {
+        throw new Error(intent.data?.message || i18n.card_update_failed);
+      }
+
+      const result = await stripe.confirmCardSetup(String(intent.data.client_secret), {
+        payment_method: {
+          card,
+          billing_details: {
+            name: userName || undefined,
+            email: userEmail || undefined,
+          },
         },
       });
 
       if (result.error) {
-        throw new Error(normalizeStripeMessage(result.error.message, i18n.invalid_card_details));
+        // Nothing changed: the current card keeps renewing the subscription.
+        throw new Error(i18n.card_not_approved);
       }
 
-      return String(result.paymentMethod?.id || '');
+      return String(result.setupIntent?.id || '');
     }
 
     updateCardBtn?.addEventListener('click', async () => {
@@ -855,15 +788,15 @@
           throw new Error(i18n.enter_new_card_first);
         }
 
-        const paymentMethod = await collectCardPaymentMethod();
-        const response = await post('{{ route('billing.payment-method') }}', { payment_method: paymentMethod });
+        const setupIntent = await confirmCardWithBank();
+        const response = await post('{{ route('billing.payment-method') }}', { setup_intent: setupIntent });
 
         if (!response.ok || response.data?.ok === false) {
           throw new Error(response.data?.message || i18n.card_update_failed);
         }
 
         setMessage(paymentMessageBox, 'ok', response.data?.message || i18n.card_updated_successfully);
-        setTimeout(() => window.location.reload(), 1500);
+        setTimeout(() => window.location.reload(), 2200);
       } catch (error) {
         setMessage(paymentMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.card_update_failed));
       } finally {

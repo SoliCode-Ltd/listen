@@ -7,7 +7,6 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
-use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\TrialEligibilityService;
@@ -96,7 +95,6 @@ class BillingController extends Controller
         // Show the plan the member actually gets (the one every limit uses),
         // and log it if Stripe says otherwise so a broken sync gets noticed.
         $accessPlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
-        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $accessPlan);
         $stripePlan = $this->resolveConsistentActivePlan($accessPlan, $subscription);
         if ($stripePlan && $accessPlan && (string) $stripePlan->slug !== (string) $accessPlan->slug && ! $accessPlan->isPack()) {
             Log::warning('Manage subscription: Stripe plan and enforced plan differ.', [
@@ -128,11 +126,6 @@ class BillingController extends Controller
             && (bool) ($subscription?->id)
             && trim((string) ($subscription?->stripe_id ?? '')) !== '';
 
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => now()->format('Y-m')],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
-
         return view('manage-subscription', [
             'activePlan' => $accessPlan,
             'activePlanName' => $accessPlan
@@ -155,11 +148,6 @@ class BillingController extends Controller
             'upcomingCharge' => $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null,
             'trialNotice' => $this->trialNotice($user, $locale),
             'manual' => $manual,
-            'usage' => \App\Support\UsageSnapshot::for($userId, $quotaPlan, $counter),
-            'quotaPlan' => $quotaPlan,
-            'downloadFormats' => collect(\App\Support\AudioFormats::chosenFor($accessPlan))
-                ->map(fn (string $format): string => strtoupper($format))->implode(', '),
-            'creditsResetAt' => $this->formatCarbonDate(now()->addMonthNoOverflow()->startOfMonth()),
         ]);
     }
 
@@ -426,7 +414,34 @@ class BillingController extends Controller
         ]);
     }
 
-    public function updatePaymentMethod(Request $request)
+    /**
+     * Step 1 of replacing the card: a SetupIntent the page confirms with the
+     * bank (3D Secure when asked). Nothing changes until the bank approves.
+     */
+    public function paymentMethodIntent(Request $request, \App\Services\Billing\StripeCardUpdateGateway $stripe)
+    {
+        if (! $this->isStripeReady()) {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_not_configured')], 422);
+        }
+
+        $user = $request->user();
+        try {
+            $intent = $stripe->createSetupIntent($stripe->ensureCustomer($user), (int) $user->id);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to start a card update.', ['user_id' => $user->id, 'error' => $exception->getMessage()]);
+
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_update_card_failed')], 422);
+        }
+
+        return response()->json(['ok' => true, 'client_secret' => $intent['client_secret']]);
+    }
+
+    /**
+     * Step 2: the bank approved the new card, so it now renews the subscription.
+     * A card the bank refused never gets here, and the old card keeps renewing.
+     * A member behind on payment is charged right away with the new card.
+     */
+    public function updatePaymentMethod(Request $request, \App\Services\Billing\StripeCardUpdateGateway $stripe)
     {
         if (! $this->isStripeReady()) {
             return response()->json([
@@ -437,39 +452,60 @@ class BillingController extends Controller
 
         $user = $request->user();
         $validated = $request->validate([
-            'payment_method' => ['required', 'string', 'max:255'],
+            'setup_intent' => ['required', 'string', 'max:255'],
         ]);
 
         try {
-            $this->ensureStripeCustomer($user);
-            $this->assertCardPaymentMethod((string) $validated['payment_method']);
-            $user->updateDefaultPaymentMethod((string) $validated['payment_method']);
-            // A card set on the subscription itself (trials, plan changes) wins over the
-            // customer's default, so renewals would keep using the old card without this.
-            $subscription = $this->currentDefaultSubscription($user);
-            if ($subscription && ! $subscription->ended() && trim((string) $subscription->stripe_id) !== '') {
-                Cashier::stripe()->subscriptions->update((string) $subscription->stripe_id, [
-                    'default_payment_method' => (string) $validated['payment_method'],
-                ]);
-            }
-            $this->savedCards->rememberQuietly($user, (string) $validated['payment_method'], 'update');
-            $this->billingSyncService->syncIfStale($user, true);
+            $customerId = $stripe->ensureCustomer($user);
+            $intent = $stripe->retrieveSetupIntent((string) $validated['setup_intent']);
         } catch (\Throwable $exception) {
-            Log::warning('Unable to update Stripe payment method.', [
-                'user_id' => $user->id,
-                'error' => $exception->getMessage(),
-            ]);
+            Log::warning('Unable to read the card update from Stripe.', ['user_id' => $user->id, 'error' => $exception->getMessage()]);
 
-            return response()->json([
-                'ok' => false,
-                'message' => __('ui.backend.billing_update_card_failed'),
-            ], 422);
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_update_card_failed')], 422);
         }
 
-        return response()->json([
-            'ok' => true,
-            'message' => __('ui.backend.billing_payment_method_updated'),
-        ]);
+        // Only this member's own, bank-approved card update.
+        if ($intent['customer'] !== $customerId || $intent['purpose'] !== 'card_update' || $intent['payment_method'] === '') {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_update_card_failed')], 422);
+        }
+        if ($intent['status'] !== 'succeeded') {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_card_not_approved')], 422);
+        }
+
+        $paymentMethod = $intent['payment_method'];
+        $subscription = $this->currentDefaultSubscription($user);
+        $subscriptionId = $subscription && ! $subscription->ended() ? trim((string) $subscription->stripe_id) : '';
+
+        try {
+            $stripe->useForRenewals($customerId, $subscriptionId !== '' ? $subscriptionId : null, $paymentMethod);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to set the approved card for renewals.', ['user_id' => $user->id, 'error' => $exception->getMessage()]);
+
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_update_card_failed')], 422);
+        }
+
+        $this->savedCards->rememberQuietly($user, $paymentMethod, 'update');
+        $message = __('ui.backend.billing_payment_method_updated');
+
+        // Behind on payment: pay now with the new card instead of waiting for a retry.
+        $behind = $subscriptionId !== '' && in_array(strtolower((string) $subscription->stripe_status), ['past_due', 'unpaid', 'incomplete'], true);
+        if ($behind) {
+            try {
+                $result = $stripe->payOpenInvoices($customerId, $subscriptionId, $paymentMethod);
+                if ($result['attempted'] > 0) {
+                    $message = $result['paid'] === $result['attempted']
+                        ? __('ui.backend.billing_card_updated_and_paid')
+                        : __('ui.backend.billing_card_updated_payment_failed');
+                }
+            } catch (\Throwable $exception) {
+                Log::warning('Unable to pay open invoices with the updated card.', ['user_id' => $user->id, 'error' => $exception->getMessage()]);
+                $message = __('ui.backend.billing_card_updated_payment_failed');
+            }
+        }
+
+        $this->billingSyncService->syncIfStale($user, true);
+
+        return response()->json(['ok' => true, 'message' => $message]);
     }
 
     public function cancel(Request $request)

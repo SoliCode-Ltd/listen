@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
-use App\Models\UsageCounter;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -50,13 +49,9 @@ class ManageSubscriptionPageTest extends TestCase
         return $user;
     }
 
-    public function test_a_member_who_paid_manually_sees_their_plan_credits_and_end_date(): void
+    public function test_a_member_who_paid_manually_sees_their_plan_and_end_date(): void
     {
         $user = $this->manualMember(now()->addDays(20));
-        UsageCounter::create([
-            'user_id' => $user->id, 'period_ym' => now()->format('Y-m'),
-            'total_chars' => 25000, 'total_seconds' => 1500, 'total_requests' => 12, 'total_minutes' => 25,
-        ]);
 
         $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
             ->assertOk()
@@ -64,12 +59,8 @@ class ManageSubscriptionPageTest extends TestCase
             ->assertDontSee(__('ui.manage_subscription.status_no_subscription'))
             ->assertSee(__('ui.manage_subscription.paid_until'))
             ->assertSee(__('ui.manage_subscription.renew_plan'))
-            // Credits left of the plan's credits, and the minutes they make.
-            ->assertSee(__('ui.manage_subscription.credits_value', ['left' => '200,000', 'total' => '225,000']))
-            ->assertSee(__('ui.manage_subscription.minutes_value', ['used' => '25.0', 'total' => '250']))
-            ->assertSee(__('ui.manage_subscription.count_of_limit', ['used' => '12', 'limit' => '3,000']))
-            ->assertSee(__('ui.manage_subscription.chars_value', ['count' => '3,000']))
-            ->assertSee('MP3, WAV')
+            // Usage lives on the dashboard; this page is about paying and renewing.
+            ->assertDontSee('225,000')
             ->assertDontSee('characters/month');
     }
 
@@ -115,16 +106,14 @@ class ManageSubscriptionPageTest extends TestCase
             ->assertSee(__('ui.manage_subscription.manual_payment_label'));
     }
 
-    public function test_a_free_member_without_credits_is_told_to_choose_a_plan(): void
+    public function test_a_free_member_sees_no_renewal_and_no_usage(): void
     {
-        $this->free->update(['monthly_chars' => 0]);
-        \App\Models\SiteSetting::set(\App\Support\FreeAllowance::NEW_MEMBERS_KEY, '0', 'billing');
         $user = User::factory()->create();
 
         $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
             ->assertOk()
-            ->assertSee(__('ui.manage_subscription.no_credits'))
             ->assertDontSee(__('ui.manage_subscription.renew_plan'))
-            ->assertDontSee(__('ui.manage_subscription.renews_on'));
+            ->assertDontSee(__('ui.manage_subscription.renews_on'))
+            ->assertDontSee('usage-card');
     }
 }
