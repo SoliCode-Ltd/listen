@@ -649,14 +649,25 @@
       gap: 1rem;
     }
     /* Section menu: a plain card, an icon per section, a solid mark on the open one. */
+    /* The menu column runs the full height of the page, its divider from the header to the footer. */
     .dashboard-menu {
-      position: sticky;
-      top: 5.5rem;
-      min-height: calc(100vh - 8rem);
+      position: relative;
+      align-self: stretch;
       padding-inline-end: 1rem;
-      border-inline-end: 1px solid var(--line);
+    }
+    .dashboard-menu::after {
+      content: '';
+      position: absolute;
+      /* The page's top padding and the menu's own top margin: up to the header. */
+      top: -3.5rem;
+      bottom: -2rem;
+      inset-inline-end: 0;
+      width: 1px;
+      background: var(--line);
     }
     .dashboard-menu-list {
+      position: sticky;
+      top: 5.5rem;
       display: grid;
       gap: 2px;
     }
@@ -1826,7 +1837,9 @@
         border-inline-end: 0;
         border-bottom: 1px solid var(--line);
       }
+      .dashboard-menu::after { display: none; }
       .dashboard-menu-list {
+        position: static;
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .dashboard-menu-link {
@@ -2396,25 +2409,10 @@
               <x-voice-studio.setbar :lock="$featureLocks['studio'] ?? null" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
                 <div>
                   <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
-                  @php
-                    $vsHd = ($planTier ?? 'standard') === 'hd';
-                  @endphp
                   <select name="target_language" id="target_language">
                     <option value="ar" {{ $prefillValue('target_language', 'ar') === 'ar' ? 'selected' : '' }}>{{ __('ui.dashboard.arabic') }}</option>
                     <option value="en" {{ $prefillValue('target_language', 'ar') === 'en' ? 'selected' : '' }}>{{ __('ui.dashboard.english') }}</option>
-                    <optgroup label="{{ $vsHd ? __('ui.dashboard.more_languages') : __('ui.dashboard.more_languages_premium') }}">
-                      @foreach(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar') as $vsLang)
-                        @continue(! $vsLang['premium'])
-                        <option value="{{ $vsLang['value'] }}"{{ $prefillValue('target_language', 'ar') === $vsLang['value'] ? ' selected' : '' }}{{ $vsHd ? '' : ' disabled' }}>{{ $vsLang['label'] }} · {{ $vsLang['native'] }}</option>
-                      @endforeach
-                    </optgroup>
                   </select>
-                  @if(($vsLangLock = $featureLocks['studio'] ?? null) && ! ($vsLangLock['none'] ?? false))
-                    <a class="vs-upgrade vs-upgrade-inline" href="{{ $vsLangLock['url'] }}">
-                      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></svg>
-                      <span>{{ $vsLangLock['plan'] ? __('ui.dashboard.more_languages_on_plan', ['plan' => $vsLangLock['plan']]) : __('ui.dashboard.more_languages_premium') }}</span>
-                    </a>
-                  @endif
                 </div>
               </x-voice-studio.setbar>
               <div class="tag-editor" id="tagEditor" data-vs-editor>
@@ -2455,6 +2453,9 @@
                   </div>
                 </x-voice-studio.locked>
               @endif
+              <x-voice-studio.locked :lock="$featureLocks['dialogue'] ?? null">
+                <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
+              </x-voice-studio.locked>
               <x-voice-studio.locked :lock="$featureLocks['studio'] ?? null">
                 <div class="vs-row-2 vs-field">
                   <div>
@@ -2470,15 +2471,6 @@
                     </div>
                   </div>
                 </div>
-              </x-voice-studio.locked>
-              <x-voice-studio.locked :lock="$featureLocks['prompt'] ?? null">
-                <div class="vs-field">
-                  <label class="vs-field-label" for="style_prompt">{{ __('ui.dashboard.style_prompt') }}</label>
-                  <textarea name="style_prompt" id="style_prompt" rows="2" maxlength="2000" placeholder="{{ __('ui.dashboard.style_prompt_placeholder') }}">{{ $prefillValue('style_prompt') }}</textarea>
-                </div>
-              </x-voice-studio.locked>
-              <x-voice-studio.locked :lock="$featureLocks['dialogue'] ?? null">
-                <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
               </x-voice-studio.locked>
               <div class="s-card vs-field">
                 <label class="compact-toggle-row" for="translateToggle">

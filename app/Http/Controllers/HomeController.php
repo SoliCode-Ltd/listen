@@ -26,7 +26,6 @@ use App\Support\DialogueSpeakers;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
-use App\Support\SeoLanguagePages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
 use App\Support\TtsStudioConfig;
@@ -203,34 +202,6 @@ class HomeController extends Controller
             'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
             'sample' => SeoEnglishPages::sample($accent),
             'currentAccent' => $accent,
-        ]);
-    }
-
-    public function languageHubPage(Request $request)
-    {
-        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
-        $content = SeoLanguagePages::hubContent($locale);
-
-        return view('seo.landing-page', [
-            'page' => SeoLanguagePages::HUB_PAGE,
-            'pageContent' => $content,
-            'faqItems' => $content['faqs'],
-            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'dialectGroups' => SeoLanguagePages::hubGroups($locale),
-        ]);
-    }
-
-    public function languagePage(Request $request, string $language)
-    {
-        $locale = str_starts_with(strtolower((string) app()->getLocale()), 'ar') ? 'ar' : 'en';
-        $content = SeoLanguagePages::content($language, $locale);
-
-        return view('seo.landing-page', [
-            'page' => SeoLanguagePages::pageKey($language),
-            'pageContent' => $content,
-            'faqItems' => $content['faqs'],
-            'ctaPrimaryUrl' => $request->user() ? route('dashboard') : route('register'),
-            'currentLanguage' => $language,
         ]);
     }
 

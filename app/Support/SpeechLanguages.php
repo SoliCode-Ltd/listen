@@ -3,11 +3,9 @@
 namespace App\Support;
 
 /**
- * The languages a recording can be made in.
- *
- * Arabic and English have their own speakers, dialects and accents, on every
- * plan. The others are spoken by the premium speakers (each premium speaker
- * can talk in any of them), so they need a premium plan.
+ * The languages a recording can be made in: Arabic and English, each with its
+ * own speakers, dialects and accents. A language added here beyond those two
+ * is read by the English premium speakers and needs a premium plan.
  */
 final class SpeechLanguages
 {
@@ -19,28 +17,6 @@ final class SpeechLanguages
     public const ALL = [
         'ar' => ['Arabic', 'العربية', 'العربية', 'ar-XA', 'sa'],
         'en' => ['English', 'الإنجليزية', 'English', 'en-US', 'us'],
-        'es' => ['Spanish', 'الإسبانية', 'Español', 'es-US', 'es'],
-        'fr' => ['French', 'الفرنسية', 'Français', 'fr-FR', 'fr'],
-        'de' => ['German', 'الألمانية', 'Deutsch', 'de-DE', 'de'],
-        'it' => ['Italian', 'الإيطالية', 'Italiano', 'it-IT', 'it'],
-        'pt' => ['Portuguese', 'البرتغالية', 'Português', 'pt-BR', 'br'],
-        'tr' => ['Turkish', 'التركية', 'Türkçe', 'tr-TR', 'tr'],
-        'ru' => ['Russian', 'الروسية', 'Русский', 'ru-RU', 'ru'],
-        'nl' => ['Dutch', 'الهولندية', 'Nederlands', 'nl-NL', 'nl'],
-        'pl' => ['Polish', 'البولندية', 'Polski', 'pl-PL', 'pl'],
-        'hi' => ['Hindi', 'الهندية', 'हिन्दी', 'hi-IN', 'in'],
-        'bn' => ['Bengali', 'البنغالية', 'বাংলা', 'bn-BD', 'bd'],
-        'id' => ['Indonesian', 'الإندونيسية', 'Bahasa Indonesia', 'id-ID', 'id'],
-        'ja' => ['Japanese', 'اليابانية', '日本語', 'ja-JP', 'jp'],
-        'ko' => ['Korean', 'الكورية', '한국어', 'ko-KR', 'kr'],
-        'th' => ['Thai', 'التايلاندية', 'ไทย', 'th-TH', 'th'],
-        'vi' => ['Vietnamese', 'الفيتنامية', 'Tiếng Việt', 'vi-VN', 'vn'],
-        'mr' => ['Marathi', 'الماراثية', 'मराठी', 'mr-IN', 'in'],
-        'ta' => ['Tamil', 'التاميلية', 'தமிழ்', 'ta-IN', 'in'],
-        'te' => ['Telugu', 'التيلوغوية', 'తెలుగు', 'te-IN', 'in'],
-        'gu' => ['Gujarati', 'الغوجاراتية', 'ગુજરાતી', 'gu-IN', 'in'],
-        'kn' => ['Kannada', 'الكانادية', 'ಕನ್ನಡ', 'kn-IN', 'in'],
-        'ml' => ['Malayalam', 'المالايالامية', 'മലയാളം', 'ml-IN', 'in'],
     ];
 
     /**

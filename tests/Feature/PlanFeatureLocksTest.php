@@ -27,13 +27,14 @@ class PlanFeatureLocksTest extends TestCase
         // Dialect, style and emotion, speed and pitch: on the premium voices.
         $this->assertStringContainsString('name="emotion"', $html);
         $this->assertStringContainsString('name="speed"', $html);
-        $this->assertStringContainsString('Upgrade to Creator', $html);
+        $this->assertStringContainsString('Available on Creator', $html);
         $this->assertStringContainsString('billing?plan=creator', $html);
-        // Dialogue and the custom prompt: only Pro has them.
-        $this->assertStringContainsString('Upgrade to Pro', $html);
+        // Dialogue: only Pro has it.
+        $this->assertStringContainsString('Available on Pro', $html);
         $this->assertStringContainsString('billing?plan=pro', $html);
-        $this->assertStringContainsString('name="style_prompt"', $html);
-        $this->assertGreaterThanOrEqual(4, substr_count($html, 'data-vs-locked'));
+        // The custom prompt is not offered in the dashboard.
+        $this->assertStringNotContainsString('name="style_prompt"', $html);
+        $this->assertGreaterThanOrEqual(3, substr_count($html, 'data-vs-locked'));
         if (AudioFormats::serverCanConvert()) {
             $this->assertStringContainsString('data-vs-pick="audio_effect"', $html);
         }
@@ -60,8 +61,7 @@ class PlanFeatureLocksTest extends TestCase
 
         $html = $this->actingAs($this->memberOf($starter))->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
-        $this->assertStringContainsString('رقِّ إلى المبدع', $html);
-        $this->assertStringContainsString('22 لغة أخرى مع باقة المبدع', $html);
+        $this->assertStringContainsString('متاح في المبدع', $html);
     }
 
     private function memberOf(Plan $plan): User

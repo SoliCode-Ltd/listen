@@ -1392,3 +1392,14 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 @media (max-width: 480px) {
   .vs-upgrade { font-size: .7rem; padding: .28rem .6rem; }
 }
+
+/* Library tools: search and gender on one line, the same height. */
+.vs-lib .vs-lib-tools { flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: .6rem; }
+.vs-lib .vs-lib-search { flex: 0 1 62%; min-width: 0; }
+.vs-lib .vs-lib-search input { height: 42px; min-height: 42px; padding-top: 0; padding-bottom: 0; line-height: 42px; }
+.vs-lib .vs-lib-gender { height: 42px; align-items: center; box-sizing: border-box; }
+.vs-lib .vs-lib-gender button { height: 34px; min-height: 34px; }
+@media (max-width: 380px) {
+  .vs-lib .vs-lib-tools { flex-wrap: wrap; }
+  .vs-lib .vs-lib-search { flex: 1 1 100%; }
+}

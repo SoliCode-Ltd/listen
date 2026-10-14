@@ -121,12 +121,6 @@
                   <select id="target_language" name="target_language">
                     <option value="ar">{{ __('ui.demo.arabic') }}</option>
                     <option value="en">{{ __('ui.demo.english') }}</option>
-                    <optgroup label="{{ __('ui.dashboard.more_languages_premium') }}">
-                      @foreach(\App\Support\SpeechLanguages::options(app()->getLocale() === 'ar') as $vsLang)
-                        @continue(! $vsLang['premium'])
-                        <option value="{{ $vsLang['value'] }}" data-premium-language>{{ $vsLang['label'] }} · {{ $vsLang['native'] }}</option>
-                      @endforeach
-                    </optgroup>
                   </select>
                 </div>
               </x-voice-studio.setbar>

@@ -180,7 +180,7 @@ class DashboardController extends Controller
                 ],
             ],
             // Options the plan lacks stay visible, dimmed, with an upgrade button.
-            'featureLocks' => $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled, $customPromptEnabled),
+            'featureLocks' => $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled),
             // Hybrid TTS studio data
             'dialogueEnabled' => $dialogueEnabled,
             'customPromptEnabled' => $customPromptEnabled,
@@ -853,7 +853,7 @@ class DashboardController extends Controller
     /**
      * @return array<string, array{url: string, plan: ?string}|null>
      */
-    private function featureLocks(?Plan $plan, string $planTier, bool $showcase, bool $dialogueEnabled, bool $customPromptEnabled): array
+    private function featureLocks(?Plan $plan, string $planTier, bool $showcase, bool $dialogueEnabled): array
     {
         $arabic = app()->getLocale() === 'ar';
         $premium = $planTier === VoiceTier::HD;
@@ -862,7 +862,6 @@ class DashboardController extends Controller
             PlanFeatures::STUDIO => PlanFeatures::lock(PlanFeatures::STUDIO, $premium, $arabic),
             PlanFeatures::EFFECTS => PlanFeatures::lock(PlanFeatures::EFFECTS, $showcase || PlanFeatures::planOffers($plan, PlanFeatures::EFFECTS), $arabic),
             PlanFeatures::DIALOGUE => PlanFeatures::lock(PlanFeatures::DIALOGUE, $premium && $dialogueEnabled, $arabic),
-            PlanFeatures::PROMPT => PlanFeatures::lock(PlanFeatures::PROMPT, $premium && $customPromptEnabled, $arabic),
         ];
     }
 
