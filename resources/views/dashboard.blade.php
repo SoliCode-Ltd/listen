@@ -2189,7 +2189,7 @@
   <div class="bg-orb a"></div>
   <div class="bg-orb b"></div>
 
-  <main class="main-content dashboard-shell" style="max-width: 1700px; padding: 2rem clamp(1rem, 3vw, 3rem); margin: 0 auto; min-height: 80vh;">
+  <main class="main-content dashboard-shell" style="max-width: 1880px; padding: 2rem clamp(.75rem, 1.8vw, 1.75rem); margin: 0 auto; min-height: 80vh;">
     <div class="dashboard-layout">
       <aside class="reveal dashboard-menu">
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
@@ -2453,8 +2453,8 @@
                   </div>
                 </x-voice-studio.locked>
               @endif
-              <x-voice-studio.locked :lock="$featureLocks['dialogue'] ?? null">
-                <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" style="margin-top: 1rem;" />
+              <x-voice-studio.locked :lock="$featureLocks['dialogue'] ?? null" class="vs-locked-card">
+                <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" />
               </x-voice-studio.locked>
               <x-voice-studio.locked :lock="$featureLocks['studio'] ?? null">
                 <div class="vs-row-2 vs-field">
