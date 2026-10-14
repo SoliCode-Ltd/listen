@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Models\Voice;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
@@ -136,5 +137,55 @@ class StudioPickerTest extends TestCase
         $this->assertStringContainsString('<select name="emotion" id="emotion" class="vs-hidden-field"', $html);
         $this->assertStringContainsString('<option value="panicked">مذعور</option>', $html);
         $this->assertStringContainsString('<option value="horror">قصة رعب</option>', $html);
+    }
+
+    public function test_members_keep_their_favourite_voices_on_their_account(): void
+    {
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->putJson(route('dashboard.favorite-voices', [], false), ['voices' => ['voice_3', 'cloned_7', 'voice_3']])
+            ->assertOk()
+            ->assertJson(['saved' => true, 'voices' => ['voice_3', 'cloned_7']]);
+        $this->assertSame(['voice_3', 'cloned_7'], $user->fresh()->favorite_voices);
+
+        $this->actingAs($user)->putJson(route('dashboard.favorite-voices', [], false), ['voices' => ['<script>']])->assertStatus(422);
+        $this->actingAs($user)->putJson(route('dashboard.favorite-voices', [], false), ['voices' => array_map(fn ($i) => 'voice_'.$i, range(1, 101))])->assertStatus(422);
+        $this->assertSame(['voice_3', 'cloned_7'], $user->fresh()->favorite_voices, 'a refused list changes nothing');
+
+        $this->actingAs($user)->putJson(route('dashboard.favorite-voices', [], false), ['voices' => []])->assertOk();
+        $this->assertSame([], $user->fresh()->favorite_voices);
+    }
+
+    public function test_guests_cannot_save_favourites(): void
+    {
+        $this->putJson(route('dashboard.favorite-voices', [], false), ['voices' => ['voice_1']])->assertUnauthorized();
+    }
+
+    public function test_the_library_knows_each_speaker_and_the_members_favourites(): void
+    {
+        $plan = Plan::factory()->create(['voice_tier' => VoiceTier::HD, 'is_active' => true]);
+        $user = User::factory()->create(['favorite_voices' => ['voice_999']]);
+        Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);
+        $voice = Voice::query()->create([
+            'language' => 'ar', 'gender' => 'female', 'tier' => VoiceTier::HD, 'display_name' => 'Rawaa',
+            'internal_voice_id' => 'gemini-ar-rawaa-test', 'is_active' => true, 'provider' => 'gemini',
+            'provider_voice_id' => 'Kore', 'dialect' => 'ar-SA-HJ', 'preview_audio_path' => 'missing/preview.mp3',
+        ]);
+        app()->setLocale('ar');
+
+        $html = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
+        $this->assertSame(1, preg_match('/<script type="application\/json" data-vs-meta>(.*?)<\/script>/s', $html, $m));
+        $meta = json_decode($m[1], true);
+
+        $entry = $meta['voices']['voice_'.$voice->id];
+        $this->assertSame('female', $entry['g']);
+        $this->assertSame('ar', $entry['l']);
+        $this->assertSame('SA', $entry['c']);
+        $this->assertStringEndsWith('/images/flags/sa.svg', $entry['f']);
+        $this->assertSame('سعودي (حجازي)', $entry['d']);
+        $this->assertNull($entry['p'], 'no preview when the file is missing');
+        $this->assertSame(['voice_999'], $meta['favorites']);
+        $this->assertStringEndsWith('/dashboard/favorite-voices', $meta['favoritesUrl']);
+        $this->assertSame('أنثى', $meta['i18n']['female']);
     }
 }

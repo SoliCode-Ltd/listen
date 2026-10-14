@@ -69,6 +69,16 @@ final class StudioChoices
         'surprised' => ['f-surprised', 'strong', 'Genuinely surprised', 'متفاجئ حقًا'],
         'embarrassed' => ['f-embarrassed', 'strong', 'Awkward and flustered', 'محرج ومرتبك'],
         'disgusted' => ['f-disgusted', 'strong', 'Clear distaste', 'اشمئزاز واضح'],
+        'cheerful' => ['f-cheerful', 'bright', 'Sunny, smiling delivery', 'مشرق بابتسامة في كل كلمة'],
+        'triumphant' => ['f-triumph', 'bright', 'Celebrating a hard-won win', 'احتفال بنصر مستحق'],
+        'innocent' => ['f-innocent', 'gentle', 'Soft, pure and wide-eyed', 'بريء وصافٍ ورقيق'],
+        'sincere' => ['f-sincere', 'gentle', 'Heartfelt, every word meant', 'من القلب، كل كلمة صادقة'],
+        'lonely' => ['f-lonely', 'strong', 'Quiet, withdrawn and alone', 'هادئ ومنعزل ووحيد'],
+        'guilty' => ['f-guilty', 'strong', 'Uneasy, hesitant and low', 'قلق ومتردد بصوت منخفض'],
+        'jealous' => ['f-jealous', 'strong', 'Resentful, with a bitter edge', 'حاقد بنبرة مُرّة'],
+        'furious' => ['f-furious', 'strong', 'Explosive, barely contained rage', 'غضب عارم بالكاد يُكبح'],
+        'defiant' => ['f-defiant', 'dramatic', 'Unyielding, standing firm', 'صامد لا يتراجع'],
+        'resigned' => ['f-resigned', 'dramatic', 'Weary acceptance', 'قبول متعب لما لا يتغير'],
     ];
 
     /**
@@ -147,6 +157,8 @@ final class StudioChoices
         'tsk' => 'f-tsk', 'pff' => 'f-pff',
         'cry' => 'f-cry', 'sob' => 'f-sob', 'whimper' => 'f-whimper', 'groan' => 'f-groan', 'moan' => 'f-moan',
         'growl' => 'f-growl', 'grunt' => 'f-grunt', 'grr' => 'f-angry', 'hiss' => 'f-hiss', 'argh' => 'f-frustrated',
+        'hum' => 'g-note', 'whistle' => 'f-whistle', 'sniff' => 'f-sniff', 'hiccup' => 'f-hiccup', 'gulp' => 'f-gulp', 'snore' => 'f-snore',
+        'burp' => 'f-burp', 'clap' => 'g-clap', 'kiss' => 'f-kiss', 'hmm' => 'f-thinking', 'uh-huh' => 'f-agree', 'um' => 'f-hesitant',
 
         'happy' => 'f-grin', 'excited' => 'f-starstruck', 'warm' => 'f-smile', 'calm' => 'f-calm', 'serious' => 'f-serious',
         'sad' => 'f-sad', 'angry' => 'f-angry', 'nervous' => 'f-anxious', 'scared' => 'f-fear', 'surprised' => 'f-surprised',
@@ -156,6 +168,9 @@ final class StudioChoices
         'panicked' => 'f-panic', 'tearful' => 'f-cry', 'laughing' => 'f-laugh',
         'slowly' => 'g-slow', 'quickly' => 'g-fast', 'softly' => 'g-feather', 'loudly' => 'g-volume', 'whispering' => 'f-shh',
         'emphatic' => 'g-emphasis', 'singing' => 'g-note', 'breathless' => 'g-breath-heavy', 'monotone' => 'g-monotone',
+        'cheerful' => 'f-cheerful', 'triumphant' => 'f-triumph', 'innocent' => 'f-innocent', 'lonely' => 'f-lonely', 'guilty' => 'f-guilty',
+        'defiant' => 'f-defiant', 'furious' => 'f-furious', 'stuttering' => 'f-hesitant', 'trembling' => 'f-fear', 'robotic' => 'g-bot',
+        'deep voice' => 'g-low', 'high voice' => 'g-high', 'child voice' => 'f-innocent', 'elderly voice' => 'f-elder',
         'storytelling' => 'g-feather', 'newsreader' => 'g-news', 'advertising' => 'g-tv', 'conversational' => 'g-chat',
         'dramatic' => 'g-masks', 'motivational' => 'g-flame', 'documentary' => 'g-globe',
     ];

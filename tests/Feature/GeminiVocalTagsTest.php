@@ -34,7 +34,7 @@ class GeminiVocalTagsTest extends TestCase
             $this->assertSame("Well. <{$tag}> Go on.", $prepared['text'], $tag);
             $this->assertSame([], $prepared['cues'], $tag);
         }
-        $this->assertCount(36, GeminiVocalTags::all());
+        $this->assertCount(48, GeminiVocalTags::all());
         $this->assertSame(GeminiVocalTags::all(), array_values(array_unique(GeminiVocalTags::all())));
     }
 
@@ -200,32 +200,40 @@ class GeminiVocalTagsTest extends TestCase
     {
         $this->actingAs($this->memberOn(VoiceTier::HD));
 
-        $this->getLocalizedRoute('dashboard')
+        $html = $this->getLocalizedRoute('dashboard')
             ->assertOk()
             ->assertSee('data-vs-panel', false)
-            ->assertSee('data-vs-tab="sounds"', false)
-            ->assertSee('data-vs-tab="delivery"', false)
-            ->assertSee('data-vocal-tag="laugh"', false)
-            ->assertSee('data-vocal-tag="short pause"', false)
-            ->assertSee('data-vocal-tag="excited"', false)
-            ->assertSee('data-tag-kind="delivery"', false)
             ->assertSee('data-vs-backdrop', false)
             ->assertSee('js/voice-studio.js', false)
             ->assertSee('css/voice-studio.css', false)
-            ->assertDontSee('&lt;laugh&gt;</button>', false)
-            ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0]);
+            ->assertDontSee('data-vs-tab="sounds"', false)
+            ->assertSee(__('ui.dashboard.vocal_tags_tip_items')[0])
+            ->getContent();
+
+        // The toolbar above the text is built from the tag list in the page.
+        $tags = collect($this->studioMeta($html)['tagMenus']);
+        $this->assertSame('laugh', $tags->firstWhere('t', 'laugh')['l']);
+        $this->assertSame('sounds', $tags->firstWhere('t', 'short pause')['k']);
+        $this->assertSame('delivery', $tags->firstWhere('t', 'excited')['k']);
+        $this->assertSame('mood', $tags->firstWhere('t', 'excited')['g']);
+        $this->assertSame('pace', $tags->firstWhere('t', 'child voice')['g']);
+        $this->assertNull($tags->firstWhere('t', 'storytelling'), 'style tags stay out of the menus');
+        $this->assertCount(count(GeminiVocalTags::all()) + count(GeminiVocalTags::deliveries()) - count(GeminiVocalTags::DELIVERY_GROUPS['style']), $tags);
     }
 
     public function test_standard_dashboard_has_no_tag_picker(): void
     {
         $this->actingAs($this->memberOn(VoiceTier::STANDARD));
 
-        $this->getLocalizedRoute('dashboard')
+        $html = $this->getLocalizedRoute('dashboard')
             ->assertOk()
             ->assertSee('data-vs-panel', false)
+            ->assertSee('data-vs-library', false)
             ->assertSee('name="voice_key"', false)
-            ->assertDontSee('data-vs-tab="sounds"', false)
-            ->assertDontSee('data-vocal-tag=', false);
+            ->assertDontSee('data-vs-pick="dialect"', false)
+            ->getContent();
+
+        $this->assertSame([], $this->studioMeta($html)['tagMenus']);
     }
 
     public function test_tag_texts_exist_in_english_and_arabic(): void
@@ -247,7 +255,7 @@ class GeminiVocalTagsTest extends TestCase
 
     public function test_arabic_tag_names_work_like_the_english_ones(): void
     {
-        $this->assertCount(36, array_unique(GeminiVocalTags::ARABIC_NAMES));
+        $this->assertCount(48, array_unique(GeminiVocalTags::ARABIC_NAMES));
         $this->assertSame(GeminiVocalTags::all(), array_keys(GeminiVocalTags::ARABIC_NAMES), 'every tag has an Arabic name, in order');
 
         foreach (GeminiVocalTags::ARABIC_NAMES as $tag => $name) {
@@ -277,19 +285,17 @@ class GeminiVocalTagsTest extends TestCase
     public function test_arabic_dashboard_picker_is_in_arabic(): void
     {
         $this->actingAs($this->memberOn(VoiceTier::HD));
+        app()->setLocale('ar');
 
-        $html = $this->withSession(['locale' => 'ar'])->withHeader('Accept-Language', 'ar')
-            ->get('/ar'.$this->localizedRoute('dashboard'))->getContent();
-        if (! str_contains($html, 'vocalTags')) {
-            app()->setLocale('ar');
-            $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
+        $meta = $this->studioMeta($this->getLocalizedRoute('dashboard')->assertOk()->getContent());
+
+        $labels = array_column($meta['tagMenus'], 'l');
+        foreach (['ضحكة', 'وقفة قصيرة', 'متحمس', 'تصفيق', 'بصوت طفل'] as $label) {
+            $this->assertContains($label, $labels);
         }
-
-        $this->assertStringContainsString('data-vocal-tag="ضحكة"', $html);
-        $this->assertStringContainsString('data-vocal-tag="وقفة قصيرة"', $html);
-        $this->assertStringContainsString('data-vocal-tag="متحمس"', $html);
-        $this->assertStringNotContainsString('data-vocal-tag="laugh"', $html);
-        $this->assertStringContainsString('المؤثرات الصوتية', $html);
+        $this->assertNotContains('laugh', $labels);
+        $this->assertSame('أصوات حيّة', $meta['i18n']['toolbar_reactions']);
+        $this->assertSame('مكتبة الأصوات', $meta['i18n']['title']);
     }
 
     public function test_delivery_tags_split_the_script_into_directed_parts(): void
@@ -314,7 +320,7 @@ class GeminiVocalTagsTest extends TestCase
 
     public function test_every_delivery_tag_has_arabic_and_reads_back(): void
     {
-        $this->assertCount(44, GeminiVocalTags::deliveries());
+        $this->assertCount(58, GeminiVocalTags::deliveries());
         $this->assertSame(GeminiVocalTags::deliveries(), array_keys(GeminiVocalTags::DELIVERY_ARABIC));
         foreach (GeminiVocalTags::DELIVERY_ARABIC as $tag => $name) {
             $this->assertSame($tag, GeminiVocalTags::delivery($name), $name);
@@ -345,25 +351,27 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertSame("Clear.\nDelivery cues from the script: sad and subdued.", $styles['I lost it.']);
     }
 
-    public function test_voice_settings_live_in_the_first_tab_of_the_studio(): void
+    public function test_language_and_choices_sit_on_the_text_box_and_speakers_in_the_library(): void
     {
         $this->actingAs($this->memberOn(VoiceTier::HD));
 
         $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
         $this->assertStringNotContainsString('class="perf-panel"', $html, 'the separate panel is gone');
-        $settings = substr($html, strpos($html, 'data-vs-pane="settings"'));
-        $settings = substr($settings, 0, strpos($settings, 'data-vs-pane="sounds"'));
-        foreach (['name="target_language"', 'name="voice_key"', 'name="dialect"', 'data-vs-pick="dialect"', 'id="translateToggle"'] as $field) {
-            $this->assertStringContainsString($field, $settings, $field.' is in the language tab');
+        $this->assertStringNotContainsString('data-vs-tab=', $html, 'no tabs in the panel any more');
+        // On the text box: language, dialect, style and emotion.
+        $editor = substr($html, strpos($html, 'class="vs-editor-card"'));
+        $editor = substr($editor, 0, strpos($editor, 'id="contentTextarea"'));
+        foreach (['data-vs-setbar', 'name="target_language"', 'name="dialect"', 'data-vs-pick="dialect"', 'name="performance_style"', 'data-vs-pick="performance_style"', 'name="emotion"', 'data-vs-pick="emotion"'] as $field) {
+            $this->assertStringContainsString($field, $editor, $field.' is on the text box');
         }
-        // Style, emotion, speed and pitch shape the reading: they open the delivery tab.
-        $delivery = substr($html, strpos($html, 'data-vs-pane="delivery"'));
-        $whole = substr($delivery, strpos($delivery, 'data-vs-whole'), 9000);
-        foreach (['name="performance_style"', 'name="emotion"', 'name="speed"', 'name="pitch"'] as $field) {
-            $this->assertStringNotContainsString($field, $settings, $field.' is not in the language tab');
-            $this->assertStringContainsString($field, $whole, $field.' is in the delivery tab');
+        // In the panel: the voice library, then the fine-tuning.
+        $panel = substr($html, strpos($html, 'data-vs-panel'));
+        $panel = substr($panel, 0, strpos($panel, 'data-vs-meta'));
+        foreach (['data-vs-library', 'name="voice_key"', 'data-vs-lib-tab="favorites"', 'data-vs-lib-gender="female"', 'name="speed"', 'name="pitch"', 'id="translateToggle"'] as $field) {
+            $this->assertStringContainsString($field, $panel, $field.' is in the panel');
         }
+        $this->assertStringNotContainsString('name="target_language"', $panel);
         $this->assertStringNotContainsString('name="performance_style" id="performance_style" required', $html);
         // Sliders: the badge carries the unit and is kept up to date by the studio script;
         // the page's text-field style no longer turns the slider into a thick box.
@@ -371,30 +379,24 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringNotContainsString("oninput=\"document.getElementById('speedVal')", $html);
         $this->assertStringContainsString('.editor-panel input:not([type="range"])', $html);
         // The editor and the generate button sit together in the main column.
-        $main = substr($html, strpos($html, 'class="vs-main"'), 4000);
+        $main = substr($html, strpos($html, 'class="vs-main"'), 20000);
         $this->assertStringContainsString('id="contentTextarea"', $main);
         $this->assertStringContainsString('id="generateBtn"', $main);
     }
 
-    public function test_language_tab_has_a_dialect_picker_and_delivery_tab_the_whole_script_choices(): void
+    public function test_arabic_studio_has_the_library_and_every_dialect_has_a_country(): void
     {
         $this->actingAs($this->memberOn(VoiceTier::HD));
 
         app()->setLocale('ar');
         $html = $this->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
-        $this->assertStringContainsString('إعدادات اللغة', $html);
-        $this->assertStringNotContainsString('إعدادات الأداء', $html);
+        $this->assertStringContainsString('مكتبة الأصوات', $html);
+        $this->assertStringContainsString('المفضلة', $html);
         $this->assertStringContainsString('data-vs-pick="dialect"', $html);
         $this->assertStringContainsString('data-vs-pick="performance_style"', $html);
         $this->assertStringContainsString('data-vs-pick="emotion"', $html);
-        // Each tag tab: a category list, then that category's tags.
-        $sounds = substr($html, strpos($html, 'data-vs-pane="sounds"'));
-        $this->assertMatchesRegularExpression('/<select id="vsCategory-sounds" data-vs-category>\s*<option value="laughter">ضحك \(5\)<\/option>/u', $sounds);
-        $this->assertStringContainsString('data-vs-group="laughter"', $sounds);
-        $delivery = substr($html, strpos($html, 'data-vs-pane="delivery"'));
-        $this->assertStringContainsString('id="vsCategory-delivery" data-vs-category', $delivery);
-        $this->assertStringContainsString('<option value="">افتراضي</option>', $delivery);
+        $this->assertStringContainsString('<option value="">افتراضي</option>', $html);
         // The choices show the Arabic names of the styles.
         $this->assertMatchesRegularExpression('/<option value="cinematic">[^<]*[\x{0600}-\x{06FF}]/u', $html);
 
@@ -408,6 +410,7 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertSame(array_keys(ArabicDialects::COUNTRIES), array_values(array_intersect(array_keys(ArabicDialects::COUNTRIES), array_keys($countries))));
         $this->assertCount(count(ArabicDialects::COUNTRIES), $countries);
         $this->assertSame('EG', ArabicDialects::countryOf('ar-EG-AL'));
+        $this->assertSame('TR', ArabicDialects::countryOf('ar-TR-HT'));
         $this->assertNull(ArabicDialects::countryOf('en-US'));
     }
 
@@ -417,7 +420,7 @@ class GeminiVocalTagsTest extends TestCase
 
         $html = $this->getLocalizedRoute('demo.page')->assertOk()->getContent();
 
-        foreach (['data-vs-panel', 'data-vs-editor', 'data-vs-backdrop', 'data-vocal-tag="laugh"', 'data-tag-key="laugh"', 'data-tag-kind="delivery"', 'data-vs-pick="dialect"', 'data-vs-pick="emotion"', 'data-vs-meta', 'id="voice_tier"', 'id="voice_key"', 'id="studioPanel"', 'js/voice-studio-icons.js', 'js/voice-studio.js'] as $needle) {
+        foreach (['data-vs-panel', 'data-vs-editor', 'data-vs-backdrop', 'data-vs-setbar', 'data-vs-library', 'data-vs-hd-only', 'data-vs-pick="dialect"', 'data-vs-pick="emotion"', 'data-vs-meta', 'id="voice_tier"', 'id="voice_key"', 'id="studioPanel"', 'js/voice-studio-icons.js', 'js/voice-studio.js'] as $needle) {
             $this->assertStringContainsString($needle, $html, $needle);
         }
         $this->assertStringContainsString('[calm] How long have you been telling yourself', $html, 'the Premium sample uses the tags');
@@ -436,8 +439,8 @@ class GeminiVocalTagsTest extends TestCase
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(85, $codes);
-        foreach (['ar-XA-NW', 'ar-XA-CL', 'ar-XA-WH', 'ar-SA-TH', 'ar-AE-BD', 'ar-BH-BA', 'ar-LB-MT', 'ar-SY-CO', 'ar-PS-FL', 'ar-EG-SH', 'ar-SD-WE', 'ar-IQ-NJ', 'ar-YE-TH', 'ar-MA-FS', 'ar-DZ-TL', 'ar-TN-SA', 'ar-LY-FZ', 'ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-QA-BD', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+        $this->assertCount(122, $codes);
+        foreach (['ar-XA-KH', 'ar-XA-ED', 'ar-XA-DR', 'ar-TD', 'ar-SS', 'ar-IR', 'ar-TR-MR', 'ar-TR-HT', 'ar-DZ-JJ', 'ar-EG-WH', 'ar-IQ-OB', 'ar-QA-OL', 'ar-XA-NW', 'ar-XA-CL', 'ar-XA-WH', 'ar-SA-TH', 'ar-AE-BD', 'ar-BH-BA', 'ar-LB-MT', 'ar-SY-CO', 'ar-PS-FL', 'ar-EG-SH', 'ar-SD-WE', 'ar-IQ-NJ', 'ar-YE-TH', 'ar-MA-FS', 'ar-DZ-TL', 'ar-TN-SA', 'ar-LY-FZ', 'ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-QA-BD', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
             $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
@@ -464,7 +467,7 @@ class GeminiVocalTagsTest extends TestCase
         // Style tags repeat the whole-script style: gone from the panel, still read when typed.
         $this->assertArrayNotHasKey('style', GeminiVocalTags::panelDeliveryGroups());
         $this->assertSame('storytelling', GeminiVocalTags::delivery('storytelling'));
-        $this->assertCount(44, GeminiVocalTags::deliveries());
+        $this->assertCount(58, GeminiVocalTags::deliveries());
     }
 
     public function test_stock_voice_script_is_rewritten_into_the_chosen_dialect(): void
@@ -495,6 +498,18 @@ class GeminiVocalTagsTest extends TestCase
         $part = $speech['body']['contents'][0]['parts'][0];
         $this->assertSame('أنا عاوز أروح دلوك. <laugh> إكده', $part['text']);
         $this->assertStringContainsString('Dialect markers to make clearly audible: Saidi', $part['speech_metadata']['style']);
+    }
+
+    /**
+     * The studio data the page hands its script (components/voice-studio/panel).
+     *
+     * @return array<string, mixed>
+     */
+    private function studioMeta(string $html): array
+    {
+        $this->assertSame(1, preg_match('/<script type="application\/json" data-vs-meta>(.*?)<\/script>/s', $html, $m));
+
+        return json_decode($m[1], true);
     }
 
     private function memberOn(string $tier): User

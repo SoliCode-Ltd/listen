@@ -1,84 +1,73 @@
 {{--
-  Voice studio side panel: language settings, sound effects and delivery.
-  Used by the dashboard generator and the demo page; behaviour in js/voice-studio.js.
-  The slot is the language tab; the optional wholeScript slot (style, emotion,
-  speed, pitch) opens the delivery tab. Each tag tab picks a category, then its tags.
+  Voice studio side panel, shared by the dashboard generator and the demo page:
+  the voice library (every speaker with avatar, gender, accent, a preview and
+  favourites) above the fine-tuning settings in the slot. Language, dialect,
+  style and emotion sit on the text box (voice-studio.setbar), and the tags
+  in the toolbar above the text. Behaviour in js/voice-studio.js.
 --}}
 @props(['showTags' => true])
 @php
-  $vsTagTabs = [
-    'sounds' => ['groups' => \App\Support\GeminiVocalTags::GROUPS, 'groupKey' => 'vocal_tag_groups'],
-    'delivery' => ['groups' => \App\Support\GeminiVocalTags::panelDeliveryGroups(), 'groupKey' => 'vocal_delivery_groups'],
+  $vsAr = app()->getLocale() === 'ar';
+  $vsTagMenus = [];
+  if ($showTags) {
+      foreach (\App\Support\GeminiVocalTags::GROUPS as $vsGroup => $vsTags) {
+          foreach ($vsTags as $vsTag) {
+              $vsTagMenus[] = ['k' => 'sounds', 't' => $vsTag, 'l' => \App\Support\GeminiVocalTags::label($vsTag), 'g' => $vsGroup,
+                  'gl' => __('ui.dashboard.vocal_tag_groups.'.$vsGroup), 'o' => \App\Support\GeminiVocalTags::ARABIC_NAMES[$vsTag] ?? ''];
+          }
+      }
+      foreach (\App\Support\GeminiVocalTags::panelDeliveryGroups() as $vsGroup => $vsTags) {
+          foreach ($vsTags as $vsTag) {
+              $vsTagMenus[] = ['k' => 'delivery', 't' => $vsTag, 'l' => \App\Support\GeminiVocalTags::deliveryLabel($vsTag), 'g' => $vsGroup,
+                  'gl' => __('ui.dashboard.vocal_delivery_groups.'.$vsGroup), 'o' => \App\Support\GeminiVocalTags::DELIVERY_ARABIC[$vsTag] ?? ''];
+          }
+      }
+  }
+  $vsMeta = \App\Support\StudioChoices::forPicker($vsAr) + [
+      'voices' => \App\Support\VoiceCatalog::libraryEntries($vsAr),
+      'favorites' => \App\Http\Controllers\FavoriteVoicesController::forUser(auth()->user()),
+      'favoritesUrl' => auth()->check() ? route('dashboard.favorite-voices') : null,
+      'tagMenus' => $vsTagMenus,
+      'i18n' => __('ui.dashboard.picker') + __('ui.dashboard.library'),
   ];
 @endphp
 <section class="vs-panel" data-vs-panel aria-label="{{ __('ui.dashboard.voice_studio') }}">
   <header class="vs-panel-head">
     <span class="vs-panel-icon" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 10v4M7.5 7v10M12 4v16M16.5 7v10M21 10v4"/></svg></span>
     <div>
-      <strong>{{ __('ui.dashboard.voice_studio') }}</strong>
-      <small>{{ __('ui.dashboard.vocal_tags_hint') }}</small>
+      <strong>{{ __('ui.dashboard.library.title') }}</strong>
+      <small>{{ __('ui.dashboard.library.hint') }}</small>
     </div>
   </header>
-  <div class="vs-tabs" role="tablist">
-    <button type="button" class="vs-tab" role="tab" data-vs-tab="settings" aria-selected="true"><span class="vs-kind vs-kind-settings" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_settings') }}</button>
-    @if($showTags)
-      @foreach($vsTagTabs as $tabKey => $tab)
-        <button type="button" class="vs-tab" role="tab" data-vs-tab="{{ $tabKey }}" aria-selected="false"><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_tab_'.$tabKey) }}</button>
-      @endforeach
-    @endif
-  </div>
-  @if($showTags)
-    <label class="vs-search" data-vs-search hidden>
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input type="search" placeholder="{{ __('ui.dashboard.vocal_search') }}" autocomplete="off" aria-label="{{ __('ui.dashboard.vocal_search') }}">
-    </label>
-  @endif
 
-  <div class="vs-pane" role="tabpanel" data-vs-pane="settings">
+  <div class="vs-lib" data-vs-library>
+    <select name="voice_key" id="voice_key" class="vs-hidden-field" tabindex="-1" aria-hidden="true" data-speaker-avatar></select>
+    <div class="vs-lib-tabs" role="tablist" aria-label="{{ __('ui.dashboard.library.title') }}">
+      <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="all" aria-selected="true">{{ __('ui.dashboard.library.all') }} <small data-vs-lib-count="all"></small></button>
+      <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="favorites" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10-7.5 10z"/></svg>{{ __('ui.dashboard.library.favorites') }} <small data-vs-lib-count="favorites"></small></button>
+      <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="mine" aria-selected="false" hidden>{{ __('ui.dashboard.library.mine') }} <small data-vs-lib-count="mine"></small></button>
+    </div>
+    <div class="vs-lib-tools">
+      <label class="vs-lib-search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input type="search" autocomplete="off" placeholder="{{ __('ui.dashboard.library.search') }}" aria-label="{{ __('ui.dashboard.library.search') }}" data-vs-lib-search>
+      </label>
+      <div class="vs-lib-gender" role="group" aria-label="{{ __('ui.dashboard.library.gender') }}">
+        <button type="button" data-vs-lib-gender="" aria-pressed="true">{{ __('ui.dashboard.library.any') }}</button>
+        <button type="button" data-vs-lib-gender="female" aria-pressed="false">{{ __('ui.dashboard.library.female') }}</button>
+        <button type="button" data-vs-lib-gender="male" aria-pressed="false">{{ __('ui.dashboard.library.male') }}</button>
+      </div>
+    </div>
+    <div class="vs-lib-grid" data-vs-lib-grid role="listbox" aria-label="{{ __('ui.dashboard.speaker') }}"></div>
+    <p class="vs-lib-empty" data-vs-lib-empty hidden></p>
+  </div>
+
+  <div class="vs-pane">
+    <div class="vs-section-title">{{ __('ui.dashboard.library.fine_tune') }}</div>
     {{ $slot }}
   </div>
 
   @if($showTags)
-    @foreach($vsTagTabs as $tabKey => $tab)
-      <div class="vs-pane" role="tabpanel" data-vs-pane="{{ $tabKey }}" hidden>
-        <div class="vs-results-title" data-vs-results-title hidden><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span> {{ __('ui.dashboard.vocal_tab_'.$tabKey) }}</div>
-        @if($tabKey === 'delivery' && isset($wholeScript))
-          <div class="vs-whole" data-vs-whole>
-            <div class="vs-section-title">{{ __('ui.dashboard.vocal_whole_script') }}</div>
-            <p class="vs-pane-hint">{{ __('ui.dashboard.vocal_whole_script_hint') }}</p>
-            {{ $wholeScript }}
-            <div class="vs-divider"></div>
-            <div class="vs-section-title">{{ __('ui.dashboard.vocal_inline_tags') }}</div>
-          </div>
-        @endif
-        <p class="vs-pane-hint" data-vs-tag-hint><span class="vs-kind vs-kind-{{ $tabKey }}" aria-hidden="true"></span>{{ __('ui.dashboard.vocal_'.$tabKey.'_hint') }}</p>
-        <div class="vs-field vs-category" data-vs-category-wrap>
-          <label class="vs-sub-label" for="vsCategory-{{ $tabKey }}">{{ __('ui.dashboard.vocal_category') }}</label>
-          <select id="vsCategory-{{ $tabKey }}" data-vs-category>
-            @foreach($tab['groups'] as $group => $groupTags)
-              <option value="{{ $group }}">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }} ({{ count($groupTags) }})</option>
-            @endforeach
-          </select>
-        </div>
-        <div class="vs-groups">
-          @foreach($tab['groups'] as $group => $groupTags)
-            <div class="vs-group" data-vs-group="{{ $group }}">
-              <div class="vs-group-label">{{ __('ui.dashboard.'.$tab['groupKey'].'.'.$group) }}</div>
-              <div class="vs-chips">
-                @foreach($groupTags as $vocalTag)
-                  @php
-                    $tagLabel = $tabKey === 'sounds' ? \App\Support\GeminiVocalTags::label($vocalTag) : \App\Support\GeminiVocalTags::deliveryLabel($vocalTag);
-                    $tagOther = $tabKey === 'sounds' ? (\App\Support\GeminiVocalTags::ARABIC_NAMES[$vocalTag] ?? '') : (\App\Support\GeminiVocalTags::DELIVERY_ARABIC[$vocalTag] ?? '');
-                  @endphp
-                  <button type="button" class="vs-chip vs-chip-{{ $tabKey }}" data-vocal-tag="{{ $tagLabel }}" data-tag-key="{{ $vocalTag }}" data-tag-kind="{{ $tabKey }}" data-search="{{ $tagLabel }} {{ $vocalTag }} {{ $tagOther }}" title="{{ $tabKey === 'sounds' ? '<'.$tagLabel.'>' : '['.$tagLabel.']' }}">{{ $tagLabel }}</button>
-                @endforeach
-              </div>
-            </div>
-          @endforeach
-        </div>
-        <p class="vs-empty" hidden>{{ __('ui.dashboard.vocal_no_results') }}</p>
-      </div>
-    @endforeach
     <details class="vs-guide">
       <summary>{{ __('ui.dashboard.vocal_tags_tips') }}</summary>
       <ul>
@@ -88,6 +77,6 @@
       </ul>
     </details>
   @endif
-  {{-- Icons, categories and one-line descriptions for the pickers and tag menus. --}}
-  <script type="application/json" data-vs-meta>@json(\App\Support\StudioChoices::forPicker(app()->getLocale() === 'ar') + ['i18n' => __('ui.dashboard.picker')], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
+  {{-- Icons, categories, voices and tag menus for the pickers, the library and the toolbar. --}}
+  <script type="application/json" data-vs-meta>@json($vsMeta, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
 </section>

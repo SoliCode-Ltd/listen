@@ -206,6 +206,7 @@ Route::group([
         Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
+        Route::put('/dashboard/favorite-voices', [\App\Http\Controllers\FavoriteVoicesController::class, 'update'])->name('dashboard.favorite-voices');
 
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.page');
         Route::get('/billing/pack', [\App\Http\Controllers\CharPackController::class, 'show'])->name('billing.pack');
