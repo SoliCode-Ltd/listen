@@ -155,9 +155,17 @@ class ExtensionController extends Controller
         if (File::exists($manifestPath)) {
             $manifest = json_decode(File::get($manifestPath), true);
             if (is_array($manifest)) {
-                $manifest['name'] = SiteSetting::get('extension_chrome_name', $manifest['name'] ?? 'Listen Reader');
-                $manifest['description'] = SiteSetting::get('extension_chrome_description', $manifest['description'] ?? '');
-                $manifest['version'] = SiteSetting::get('extension_chrome_version', $manifest['version'] ?? '1.0.0');
+                // Keep the translated name and description (English and Arabic) unless the
+                // admin wrote their own; never ship an older version than the source.
+                $name = trim((string) SiteSetting::get('extension_chrome_name', ''));
+                if ($name !== '' && ! in_array($name, ['Listen Reader', 'Listen Studio Chrome'], true)) {
+                    $manifest['name'] = $name;
+                }
+                $description = trim((string) SiteSetting::get('extension_chrome_description', ''));
+                if ($description !== '' && $description !== 'Listen to selected text on any page using your Listen account.') {
+                    $manifest['description'] = $description;
+                }
+                $manifest['version'] = \App\Support\ExtensionVersion::current();
                 File::put($manifestPath, json_encode($manifest, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
             }
         }

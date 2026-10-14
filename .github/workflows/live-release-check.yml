@@ -1,0 +1,72 @@
+name: Live release check
+
+# Read-only: is LIVE running main, and do credits, daily limits and plans work?
+# 1. From the outside: the public pages load and show the credits pricing.
+# 2. Over SSH: compares every file main ships with the server's copy (sha1),
+#    lists pending migrations, plans, paying members' usage, daily-limit
+#    breaches, recent generations and logged errors. READ ONLY database
+#    session; emails are masked; nothing is written.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-133b8b13-pcl57v]
+    paths:
+      - .github/workflows/live-release-check.yml
+      - scripts/support/live_release_check.php
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Probe public pages
+        run: |
+          set -uo pipefail
+          for path in /en /ar /en/pricing /ar/pricing /en/login /en/dashboard; do
+            code=$(curl -s -o page.html -w '%{http_code}' -L --max-time 30 "https://listenai.studio$path")
+            extra=""
+            case "$path" in
+              */pricing) grep -q 'credit-coin' page.html && extra="credits coin shown" || extra="NO credits coin on the page" ;;
+            esac
+            echo "$path -> HTTP $code $extra"
+          done
+
+      - name: Checksums of the files main ships
+        run: |
+          set -euo pipefail
+          git fetch -q --depth=1 origin main
+          git worktree add -q ../main-copy FETCH_HEAD
+          (cd ../main-copy && git ls-files | grep -v -E '^(\.github/|tests/|\.env|storage/|vendor/|node_modules/|public/storage)' \
+            | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' \
+            | tr '\n' '\0' | xargs -0 sha1sum) > manifest.txt
+          echo "main is $(git rev-parse --short FETCH_HEAD), $(wc -l < manifest.txt) files"
+          { printf '<?php\n$MANIFEST = <<<'"'"'EOM'"'"'\n'; cat manifest.txt; printf 'EOM;\n'; tail -n +2 scripts/support/live_release_check.php; } > combined.php
+
+      - name: Check live over SSH
+        env:
+          SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
+          SSH_USER: ${{ secrets.LIVE_SSH_USER }}
+          SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}
+          APP_PATH: ${{ secrets.LIVE_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_inspect
+          chmod 600 ~/.ssh/id_inspect
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; \$(command -v php8.4 || command -v php)"
+          ssh -i ~/.ssh/id_inspect -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" < combined.php
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_inspect

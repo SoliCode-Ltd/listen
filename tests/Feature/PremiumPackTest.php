@@ -816,6 +816,53 @@ class PremiumPackTest extends TestCase
         $this->assertNull(AudioGeneration::query()->latest('id')->value('style_prompt'));
     }
 
+    public function test_the_extension_profile_speaks_credits_and_the_members_language(): void
+    {
+        $this->starter->update(['daily_requests' => 40, 'max_chars_per_request' => 120000]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $key = 'lk_live_'.str_repeat('p', 32);
+        $user->forceFill(['api_key_hash' => hash('sha256', $key)])->save();
+
+        $profile = $this->withHeaders(['X-Listen-Key' => $key, 'X-Listen-Locale' => 'ar'])->getJson('/api/reader/profile')
+            ->assertOk()
+            ->assertJsonPath('profile.plan.credits_per_minute', 900)
+            ->assertJsonPath('profile.plan.daily_requests', 40)
+            // Never more than the request validation accepts.
+            ->assertJsonPath('profile.plan.max_chars_per_request', 50000)
+            ->assertJsonPath('profile.usage.daily_requests_limit', 40)
+            ->assertJsonPath('profile.usage.minutes_limit', \App\Support\Credits::minutesFor(500000))
+            ->assertJsonMissingPath('profile.plan.allow_overage')
+            ->assertJsonMissingPath('profile.plan.overage_price_per_million_cents')
+            ->json('profile');
+
+        $this->assertStringContainsString('/ar/', $profile['links']['pricing']);
+        $this->assertStringContainsString('/ar/', $profile['links']['manage']);
+        $this->assertSame($this->starter->getLocalizedName('ar') ?: 'Starter', $profile['plan']['name']);
+    }
+
+    public function test_the_extension_gets_the_daily_limit_message_in_arabic_and_the_dashboard_defaults(): void
+    {
+        $this->starter->update(['daily_requests' => 1]);
+        $user = $this->member();
+        app(PlanAccessService::class)->assignPlan($user, $this->starter);
+        $key = 'lk_live_'.str_repeat('q', 32);
+        $user->forceFill(['api_key_hash' => hash('sha256', $key)])->save();
+        $send = fn () => $this->withHeaders(['X-Listen-Key' => $key, 'X-Listen-Locale' => 'ar'])->postJson('/api/reader/queue', [
+            'content' => 'Hello there', 'target_language' => 'en',
+            'voice_key' => VoiceCatalog::keyFromId((int) $this->premiumVoice()->id), 'prefer_sync' => true,
+        ]);
+
+        // Style and emotion left empty get the site's defaults, as in the dashboard; the usage comes back.
+        $send()->assertOk()->assertJsonPath('usage.daily_requests_used', 1);
+        $job = AudioGeneration::query()->latest('id')->first();
+        $this->assertSame(\App\Support\TtsStudioConfig::defaultPerformanceStyle('en') ?: 'neutral', $job->performance_style);
+
+        app()->setLocale('ar');
+        $send()->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.daily_requests_exceeded', ['count' => '1']));
+        app()->setLocale('en');
+    }
+
     public function test_the_daily_limit_follows_the_cairo_day_not_the_utc_day(): void
     {
         config(['listen.billing.daily_limit_timezone' => 'Africa/Cairo']);

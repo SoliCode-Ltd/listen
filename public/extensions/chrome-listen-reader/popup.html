@@ -9,7 +9,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Studio Chrome</title>
+  <title>Listen Reader</title>
   <link rel="stylesheet" href="popup.css" />
 </head>
 
@@ -17,7 +17,7 @@
   <main class="app">
     <header class="head">
       <div class="head-row">
-        <h1 data-i18n="extName">Listen Studio Chrome</h1>
+        <h1 data-i18n="extName">Listen Reader</h1>
         <button id="langSwitcher" class="lang-btn" type="button" title="Switch Language">عربي</button>
       </div>
       <p data-i18n="headerSubtitle">Select text anywhere and listen instantly.</p>
@@ -33,15 +33,23 @@
           <div class="small" id="userPlan">Plan: -</div>
         </div>
       </div>
-      <div class="usage-grid">
+      <div class="credits-row">
+        <img class="coin" src="credit-coin.webp" alt="" width="40" height="30" />
         <div>
-          <div class="small" id="charsText">Characters: 0 / 0</div>
-          <div class="bar"><span id="charsBar"></span></div>
+          <div class="small" data-i18n="charactersLabel">Credits left</div>
+          <div class="credits-value" id="creditsValue">-</div>
         </div>
-        <div>
-          <div class="small" id="requestsText">Requests: 0 / 0</div>
-          <div class="bar"><span id="requestsBar"></span></div>
-        </div>
+      </div>
+      <div class="bar"><span id="charsBar"></span></div>
+      <div class="usage-lines">
+        <div class="small" id="minutesText"></div>
+        <div class="small" id="todayText"></div>
+        <div class="small" id="requestsText"></div>
+      </div>
+      <div class="credits-note" id="creditsNote"></div>
+      <div class="plan-links">
+        <a id="planLink" href="#" target="_blank" rel="noopener" hidden data-i18n="managePlan">Manage plan</a>
+        <a id="dashboardLink" href="#" target="_blank" rel="noopener" hidden data-i18n="openDashboard">Dashboard</a>
       </div>
     </section>
 
@@ -62,53 +70,16 @@
       </label>
 
       <div id="studioPanel" class="studio-panel" style="display:none;">
-        <div class="studio-label">🎛️ <span data-i18n="studioLabel">Voice Studio (HD)</span></div>
+        <div class="studio-label">🎛️ <span data-i18n="studioLabel">Voice Studio (Premium)</span></div>
         <label class="studio-full-width"><span data-i18n="dialect">Dialect</span>
           <select id="dialect"></select>
         </label>
         <div class="studio-grid">
           <label><span data-i18n="performanceStyle">Performance Style</span>
-            <select id="performanceStyle">
-              <option value="" data-i18n="chooseStyle">-- Choose Style --</option>
-              <option value="neutral" data-i18n="styleNeutral">Neutral</option>
-              <option value="educational" data-i18n="styleEducational">Educational</option>
-              <option value="commercial" data-i18n="styleCommercial">Commercial</option>
-              <option value="promo" data-i18n="stylePromo">Promotional</option>
-              <option value="podcast" data-i18n="stylePodcast">Podcast</option>
-              <option value="assistant" data-i18n="styleAssistant">Virtual Assistant</option>
-              <option value="narrative" data-i18n="styleNarrative">Narrative</option>
-              <option value="comedic" data-i18n="styleComedic">Comedic</option>
-              <option value="corporate" data-i18n="styleCorporate">Corporate</option>
-              <option value="conversational" data-i18n="styleConversational">Conversational</option>
-              <option value="inspirational" data-i18n="styleInspirational">Inspirational</option>
-              <option value="cinematic" data-i18n="styleCinematic">Cinematic</option>
-              <option value="documentary" data-i18n="styleDocumentary">Documentary</option>
-              <option value="storytelling" data-i18n="styleStorytelling">Storytelling</option>
-              <option value="ad_style" data-i18n="styleAdStyle">Ad Style</option>
-              <option value="news" data-i18n="styleNews">News</option>
-              <option value="sports_commentator" data-i18n="styleSportsCommentator">Sports Commentator</option>
-              <option value="meditation" data-i18n="styleMeditation">Meditation</option>
-              <option value="audiobook" data-i18n="styleAudiobook">Audiobook</option>
-              <option value="children_story" data-i18n="styleChildrenStory">Children Story</option>
-              <option value="radio_host" data-i18n="styleRadioHost">Radio Host</option>
-            </select>
+            <select id="performanceStyle"></select>
           </label>
           <label><span data-i18n="emotion">Emotion</span>
-            <select id="emotion">
-              <option value="" data-i18n="chooseEmotion">-- Choose Emotion --</option>
-              <option value="neutral" data-i18n="emotionNeutral">Neutral</option>
-              <option value="warm" data-i18n="emotionWarm">Warm</option>
-              <option value="sad" data-i18n="emotionSad">Sad</option>
-              <option value="excited" data-i18n="emotionExcited">Excited</option>
-              <option value="formal" data-i18n="emotionFormal">Formal</option>
-              <option value="calm" data-i18n="emotionCalm">Calm</option>
-              <option value="angry" data-i18n="emotionAngry">Angry</option>
-              <option value="hopeful" data-i18n="emotionHopeful">Hopeful</option>
-              <option value="serious" data-i18n="emotionSerious">Serious</option>
-              <option value="playful" data-i18n="emotionPlayful">Playful</option>
-              <option value="mysterious" data-i18n="emotionMysterious">Mysterious</option>
-              <option value="confident" data-i18n="emotionConfident">Confident</option>
-            </select>
+            <select id="emotion"></select>
           </label>
         </div>
       </div>
@@ -143,6 +114,7 @@
         <div class="char-counter" id="charCounter">
           <span id="charCount">0</span> / <span id="charLimit">-</span> <span data-i18n="characters">characters</span>
         </div>
+        <div class="credit-estimate" id="creditEstimate"></div>
       </label>
       <button id="quickBtn" class="btn" data-i18n="readQuickBtn">Read quick text</button>
     </section>

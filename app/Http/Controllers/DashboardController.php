@@ -833,17 +833,7 @@ class DashboardController extends Controller
 
     private function planAllowsCustomPrompt(?Plan $plan): bool
     {
-        if (! $plan) {
-            return false;
-        }
-
-        $rawSlug = (string) ($plan->slug ?? '');
-        $slug = strtolower(trim((string) (preg_replace('/[\x{FEFF}\x{200B}\x{200C}\x{200D}\x{2060}]/u', '', $rawSlug) ?? $rawSlug)));
-        if ($slug === 'starter') {
-            return false;
-        }
-
-        return (bool) ($plan->custom_prompt_enabled ?? false);
+        return (bool) $plan?->allowsCustomPrompt();
     }
 
     /**

@@ -39,7 +39,9 @@ class TtsStudioConfigTest extends TestCase
 
         $this->assertIsArray($row);
         $this->assertSame('Sports Commentator', $row['label'] ?? null);
-        $this->assertSame('Sports Commentator', $row['label_ar'] ?? null);
+        $this->assertSame('Sports Commentator', $row['label_en'] ?? null);
+        // The Arabic label comes from the Arabic file whatever the page's language.
+        $this->assertMatchesRegularExpression('/\p{Arabic}/u', (string) ($row['label_ar'] ?? ''));
     }
 
     public function test_style_and_emotion_left_on_default_get_the_site_defaults(): void
