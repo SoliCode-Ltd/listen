@@ -1,0 +1,130 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\ManualPaymentRequest;
+use App\Models\Plan;
+use App\Models\Subscription;
+use App\Models\UsageCounter;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ManageSubscriptionPageTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private Plan $free;
+
+    private Plan $starter;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        config(['services.stripe.key' => '', 'services.stripe.secret' => '']);
+
+        $this->free = Plan::create([
+            'slug' => 'free', 'name' => 'FREE', 'price_cents' => 0, 'monthly_minutes' => 5,
+            'monthly_chars' => 4500, 'monthly_requests' => 50, 'max_chars_per_request' => 600, 'is_active' => true,
+        ]);
+        $this->starter = Plan::create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_minutes' => 250,
+            'monthly_chars' => 225000, 'monthly_requests' => 3000, 'daily_requests' => 100,
+            'max_chars_per_request' => 3000, 'download_formats' => ['mp3', 'wav'], 'is_active' => true,
+        ]);
+    }
+
+    private function manualMember(\DateTimeInterface $periodEnd): User
+    {
+        $user = User::factory()->create();
+        Subscription::query()->where('user_id', $user->id)->delete();
+        Subscription::create([
+            'user_id' => $user->id,
+            'plan_id' => $this->starter->id,
+            'status' => 'active',
+            'billing_payment_state' => 'manual_override',
+            'current_period_start' => now()->subMonth(),
+            'current_period_end' => $periodEnd,
+        ]);
+
+        return $user;
+    }
+
+    public function test_a_member_who_paid_manually_sees_their_plan_credits_and_end_date(): void
+    {
+        $user = $this->manualMember(now()->addDays(20));
+        UsageCounter::create([
+            'user_id' => $user->id, 'period_ym' => now()->format('Y-m'),
+            'total_chars' => 25000, 'total_seconds' => 1500, 'total_requests' => 12, 'total_minutes' => 25,
+        ]);
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.status_manual_active'))
+            ->assertDontSee(__('ui.manage_subscription.status_no_subscription'))
+            ->assertSee(__('ui.manage_subscription.paid_until'))
+            ->assertSee(__('ui.manage_subscription.renew_plan'))
+            // Credits left of the plan's credits, and the minutes they make.
+            ->assertSee(__('ui.manage_subscription.credits_value', ['left' => '200,000', 'total' => '225,000']))
+            ->assertSee(__('ui.manage_subscription.minutes_value', ['used' => '25.0', 'total' => '250']))
+            ->assertSee(__('ui.manage_subscription.count_of_limit', ['used' => '12', 'limit' => '3,000']))
+            ->assertSee(__('ui.manage_subscription.chars_value', ['count' => '3,000']))
+            ->assertSee('MP3, WAV')
+            ->assertDontSee('characters/month');
+    }
+
+    public function test_an_expired_manual_payment_says_so_and_offers_renewal(): void
+    {
+        $user = $this->manualMember(now()->subDays(2));
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.status_expired'))
+            ->assertSee(__('ui.manage_subscription.renew_plan'))
+            // Back on the free plan, which gives no credits here.
+            ->assertSee($this->free->getLocalizedName('en') ?: 'FREE');
+    }
+
+    public function test_a_pending_manual_payment_is_shown(): void
+    {
+        $user = User::factory()->create();
+        ManualPaymentRequest::create([
+            'user_id' => $user->id, 'plan_id' => $this->starter->id, 'billing_cycle' => 'monthly',
+            'payment_method' => 'instapay', 'expected_amount_minor' => 47400, 'currency' => 'EGP',
+            'status' => ManualPaymentRequest::STATUS_PENDING, 'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.manual_pending_notice', ['plan' => $this->starter->getLocalizedName('en') ?: 'Starter']));
+    }
+
+    public function test_approved_manual_payments_are_listed_with_the_invoices(): void
+    {
+        $user = $this->manualMember(now()->addDays(20));
+        ManualPaymentRequest::create([
+            'user_id' => $user->id, 'plan_id' => $this->starter->id, 'billing_cycle' => 'monthly',
+            'payment_method' => 'vodafone_cash', 'expected_amount_minor' => 47400, 'currency' => 'EGP',
+            'status' => ManualPaymentRequest::STATUS_APPROVED, 'submitted_at' => now(), 'reviewed_at' => now(),
+        ]);
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertDontSee(__('ui.manage_subscription.no_invoices_yet'))
+            ->assertSee('474 EGP')
+            ->assertSee(__('ui.manage_subscription.manual_payment_label'));
+    }
+
+    public function test_a_free_member_without_credits_is_told_to_choose_a_plan(): void
+    {
+        $this->free->update(['monthly_chars' => 0]);
+        \App\Models\SiteSetting::set(\App\Support\FreeAllowance::NEW_MEMBERS_KEY, '0', 'billing');
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.no_credits'))
+            ->assertDontSee(__('ui.manage_subscription.renew_plan'))
+            ->assertDontSee(__('ui.manage_subscription.renews_on'));
+    }
+}

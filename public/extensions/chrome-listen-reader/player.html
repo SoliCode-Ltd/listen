@@ -9,7 +9,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Listen Player</title>
+  <title>Listen Reader</title>
   <style>
     :root {
       --bg: #0B0B0F;
@@ -68,10 +68,10 @@
 
 <body>
   <div class="card">
-    <h1>Listen Player</h1>
+    <h1 id="playerTitle">Listen Reader</h1>
     <p id="textPreview">Preparing audio...</p>
     <audio id="audio" controls autoplay preload="auto"></audio>
-    <div class="hint">Keep this tab open while listening.</div>
+    <div class="hint" id="playerHint">Keep this tab open while listening.</div>
   </div>
 
   <script src="player.js"></script>

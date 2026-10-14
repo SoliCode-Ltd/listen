@@ -35,7 +35,7 @@ class ExtensionSettings extends Page implements HasForms
             'extension_safari_enabled' => SiteSetting::get('extension_safari_enabled', '0'),
 
             // Chrome metadata
-            'extension_chrome_version' => SiteSetting::get('extension_chrome_version', '1.0.0'),
+            'extension_chrome_version' => SiteSetting::get('extension_chrome_version', \App\Support\ExtensionVersion::source()),
             'extension_chrome_name' => SiteSetting::get('extension_chrome_name', 'Listen Reader'),
             'extension_chrome_description' => SiteSetting::get('extension_chrome_description', 'Listen to selected text on any page using your Listen account.'),
 
@@ -54,11 +54,11 @@ class ExtensionSettings extends Page implements HasForms
             'extension_chrome_card_subtitle' => SiteSetting::get('extension_chrome_card_subtitle', 'Full support with context menu integration'),
 
             // Firefox card
-            'extension_firefox_card_title' => SiteSetting::get('extension_firefox_card_title', 'Mozilla Firefox'),
+            'extension_firefox_card_title' => SiteSetting::get('extension_firefox_card_title', 'Firefox'),
             'extension_firefox_card_subtitle' => SiteSetting::get('extension_firefox_card_subtitle', 'WebExtension API support'),
 
             // Safari card
-            'extension_safari_card_title' => SiteSetting::get('extension_safari_card_title', 'Apple Safari'),
+            'extension_safari_card_title' => SiteSetting::get('extension_safari_card_title', 'Safari'),
             'extension_safari_card_subtitle' => SiteSetting::get('extension_safari_card_subtitle', 'Native Safari Web Extension'),
 
             // Feature cards
@@ -267,7 +267,7 @@ class ExtensionSettings extends Page implements HasForms
                                             ->schema([
                                                 Forms\Components\Placeholder::make('limits_info')
                                                     ->label('Rate Limits & Quotas')
-                                                    ->content('Per-request character limits and monthly usage quotas are enforced per-user based on their active Plan. To edit these limits, go to the Plans resource.'),
+                                                    ->content('The extension uses the member\'s plan exactly like the dashboard: monthly credits (900 = 1 minute of audio), the daily and monthly generation limits, and the longest text per voice. To change them, edit the plan in Plans.'),
                                             ]),
                                     ]),
                                 Forms\Components\Section::make('API Key Configuration')

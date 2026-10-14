@@ -110,6 +110,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: .9rem;
       padding: .65rem .75rem;
       background: var(--surface);
       border: 1px solid var(--line);
@@ -121,7 +122,25 @@
     }
     .detail-row dd {
       font-weight: 600;
+      margin: 0;
+      text-align: end;
     }
+    .actions .btn:not(.btn-primary):not(.btn-danger) {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+    .usage-card { margin-bottom: 1.25rem; animation-delay: .06s; }
+    .usage-credits { display: flex; align-items: center; gap: .8rem; }
+    .usage-coin { font-size: 2.1rem; }
+    .usage-credits-text { display: flex; flex-direction: column; line-height: 1.2; }
+    .usage-credits-text small { color: var(--muted); font-size: .85rem; }
+    .usage-credits-text b { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
+    .usage-meter { height: 8px; margin: .85rem 0 .6rem; border-radius: 999px; background: color-mix(in oklab, var(--line) 80%, transparent); overflow: hidden; }
+    .usage-meter span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--a, #6A45F2), var(--b, #8B5CF6)); }
+    .usage-note { margin: 0 0 1rem; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+    .usage-empty { margin: 0 0 1rem; color: var(--muted); }
+    .usage-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .5rem; margin: 0; }
     .stripe-container {
       margin-top: .5rem;
       padding: 1rem;
@@ -325,16 +344,6 @@
 </head>
 <body>
   @php
-    $planNameBySlug = static function (?string $slug, ?string $fallback = null): string {
-      $knownSlugs = [
-        'free' => __('ui.pricing.plan_name_free'),
-        'starter' => __('ui.pricing.plan_name_starter', ['default' => 'Starter']),
-        'creator' => __('ui.pricing.plan_name_creator'),
-        'pro' => __('ui.pricing.plan_name_pro'),
-        'studio_max' => __('ui.pricing.plan_name_studio_max', ['default' => 'Studio Max']),
-      ];
-      return $knownSlugs[(string) $slug] ?? (string) ($fallback ?: ucfirst((string) $slug) ?: '-');
-    };
     $normalizeTierLabel = static function (?string $label): string {
       $raw = trim((string) $label);
       $value = strtolower($raw);
@@ -355,8 +364,23 @@
       'canceled', 'cancelled' => __('ui.manage_subscription.status_canceled'),
       'unpaid' => __('ui.manage_subscription.status_unpaid'),
       'cancellation scheduled' => __('ui.manage_subscription.cancellation_scheduled'),
+      'active manual' => __('ui.manage_subscription.status_manual_active'),
+      'expired' => __('ui.manage_subscription.status_expired'),
       default => __('ui.manage_subscription.status_unknown'),
     };
+    $statusClass = match ($subscriptionStatusLower) {
+      'active', 'trialing', 'active manual' => 'active',
+      'expired' => 'canceled',
+      'cancellation scheduled', 'past due', 'past_due', 'unpaid', 'incomplete payment', 'incomplete' => 'pending',
+      default => 'canceled',
+    };
+    $usage = $usage ?? [];
+    $creditsTotal = (int) ($usage['plan_chars'] ?? 0);
+    $creditsLeft = (int) ($usage['remaining_chars'] ?? 0);
+    $minutesTotal = (int) ($usage['minutes_limit'] ?? 0);
+    $minutesUsed = round(((int) ($usage['seconds_used'] ?? 0)) / 60, 1);
+    $dailyLimit = (int) ($usage['daily_requests_limit'] ?? 0);
+    $packMode = ($usage['mode'] ?? 'monthly') === 'pack';
   @endphp
   @include('components.header')
 
@@ -370,6 +394,18 @@
         {{ $trialNotice }}
       </div>
     @endif
+    @if(!empty($manual['pending_plan']))
+      <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
+        {{ __('ui.manage_subscription.manual_pending_notice', ['plan' => $manual['pending_plan']]) }}
+      </div>
+    @endif
+    @if(!empty($manual['status']) && !empty($manual['ends_at']) && ($manual['expired'] || !empty($manual['paid_manually'])))
+      <div class="message {{ $manual['expired'] ? 'error' : 'info' }}" style="margin-top:-.4rem;margin-bottom:1rem;">
+        {{ $manual['expired']
+            ? __('ui.manage_subscription.manual_expired_notice', ['date' => $manual['ends_at']])
+            : __('ui.manage_subscription.manual_active_notice', ['date' => $manual['ends_at']]) }}
+      </div>
+    @endif
     @if($billingProfileRemoved)
       <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
         {{ __('ui.manage_subscription.billing_profile_removed') }}
@@ -379,22 +415,19 @@
     <div class="status-grid">
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.current_plan') }}</small>
-        <b>{{ $activePlanName ?? $planNameBySlug($activePlan?->slug ?? 'free', $activePlan?->name ?? __('ui.dashboard.free_plan')) }}</b>
+        <b>{{ $activePlanName }}</b>
       </div>
       <div class="status-item">
         <small>{{ __('ui.manage_subscription.status') }}</small>
-        @php
-          $statusClass = 'active';
-          if (str_contains($subscriptionStatusLower, 'cancel')) $statusClass = 'canceled';
-          elseif (str_contains($subscriptionStatusLower, 'pending') || str_contains($subscriptionStatusLower, 'past due') || str_contains($subscriptionStatusLower, 'past_due') || str_contains($subscriptionStatusLower, 'no subscription') || str_contains($subscriptionStatusLower, 'unpaid') || str_contains($subscriptionStatusLower, 'incomplete')) $statusClass = 'pending';
-        @endphp
         <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatusLabel }}</span>
       </div>
       <div class="status-item">
-        <small>{{ __('ui.manage_subscription.next_billing') }}</small>
+        <small>{{ !empty($manual['ends_at']) && empty($manual['expired']) ? __('ui.manage_subscription.paid_until') : __('ui.manage_subscription.next_billing') }}</small>
         <b>
           @if(!empty($upcomingCharge['total']))
-            {{ $upcomingCharge['total'] }}{{ !empty($upcomingCharge['date']) ? ' ' . __('ui.manage_subscription.on_date', ['date' => $upcomingCharge['date']]) : '' }}
+            <bdi>{{ $upcomingCharge['total'] }}</bdi>{{ !empty($upcomingCharge['date']) ? ' ' . __('ui.manage_subscription.on_date', ['date' => $upcomingCharge['date']]) : '' }}
+          @elseif(!empty($manual['ends_at']) && empty($manual['expired']))
+            {{ $manual['ends_at'] }}
           @else
             {{ __('ui.manage_subscription.not_scheduled') }}
           @endif
@@ -404,12 +437,72 @@
         <small>{{ __('ui.manage_subscription.saved_card') }}</small>
         <b>
           @if($defaultPaymentMethod)
-            {{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? 'card')) }} **** {{ $defaultPaymentMethod->card->last4 ?? '' }}
+            <bdi dir="ltr">{{ strtoupper((string) ($defaultPaymentMethod->card->brand ?? '')) }} •••• {{ $defaultPaymentMethod->card->last4 ?? '' }}</bdi>
           @else
             <span style="color: var(--muted);">{{ __('ui.manage_subscription.not_saved') }}</span>
           @endif
         </b>
       </div>
+    </div>
+
+    <div class="card usage-card">
+      <div class="card-header">
+        <h2>{{ __('ui.manage_subscription.usage_title') }}</h2>
+        <p>{{ __('ui.manage_subscription.usage_hint') }}</p>
+      </div>
+      @if($creditsTotal <= 0 && ! $packMode)
+        <p class="usage-empty">{{ __('ui.manage_subscription.no_credits') }}</p>
+      @else
+        <div class="usage-credits">
+          <x-credit-icon class="usage-coin" />
+          <div class="usage-credits-text">
+            <small>{{ __('ui.manage_subscription.credits_left') }}</small>
+            <b><bdi>{{ __('ui.manage_subscription.credits_value', ['left' => number_format($creditsLeft), 'total' => number_format($creditsTotal)]) }}</bdi></b>
+          </div>
+        </div>
+        <div class="usage-meter" role="presentation"><span style="width: {{ $creditsTotal > 0 ? max(0, min(100, round($creditsLeft / $creditsTotal * 100))) : 0 }}%"></span></div>
+        <p class="usage-note">
+          {{ __('ui.manage_subscription.credits_hint') }}
+          @if((int) ($usage['gift_chars'] ?? 0) > 0)
+            {{ __('ui.dashboard.gift_chars_note', ['count' => number_format((int) $usage['gift_chars'])]) }}.
+          @endif
+          @if($packMode && !empty($usage['pack_expires_at']))
+            {{ __('ui.manage_subscription.pack_ends', ['date' => \Illuminate\Support\Carbon::parse($usage['pack_expires_at'])->setTimezone(config('listen.billing.daily_limit_timezone', 'Africa/Cairo'))->locale(app()->getLocale())->translatedFormat('j M Y')]) }}
+          @elseif(! $packMode)
+            {{ __('ui.manage_subscription.credits_reset', ['date' => $creditsResetAt]) }}
+          @endif
+        </p>
+      @endif
+      <dl class="detail-list usage-list">
+        @if($minutesTotal > 0)
+          <div class="detail-row">
+            <dt>{{ __('ui.manage_subscription.voice_minutes') }}</dt>
+            <dd><bdi>{{ __('ui.manage_subscription.minutes_value', ['used' => number_format($minutesUsed, 1), 'total' => number_format($minutesTotal)]) }}</bdi></dd>
+          </div>
+        @endif
+        <div class="detail-row">
+          <dt>{{ __('ui.manage_subscription.generations_today') }}</dt>
+          <dd><bdi>{{ $dailyLimit > 0
+              ? __('ui.manage_subscription.count_of_limit', ['used' => number_format((int) ($usage['daily_requests_used'] ?? 0)), 'limit' => number_format($dailyLimit)])
+              : __('ui.manage_subscription.unlimited') }}</bdi></dd>
+        </div>
+        <div class="detail-row">
+          <dt>{{ __('ui.manage_subscription.generations_month') }}</dt>
+          <dd><bdi>{{ !empty($usage['requests_unlimited'])
+              ? __('ui.manage_subscription.unlimited')
+              : __('ui.manage_subscription.count_of_limit', ['used' => number_format((int) ($usage['total_requests'] ?? 0)), 'limit' => number_format((int) ($usage['plan_requests'] ?? 0))]) }}</bdi></dd>
+        </div>
+        <div class="detail-row">
+          <dt>{{ __('ui.manage_subscription.max_text') }}</dt>
+          <dd><bdi>{{ __('ui.manage_subscription.chars_value', ['count' => number_format(\App\Support\PlanUsageGuard::maxCharsPerRequest($quotaPlan ?? null))]) }}</bdi></dd>
+        </div>
+        @if(!empty($downloadFormats))
+          <div class="detail-row">
+            <dt>{{ __('ui.manage_subscription.downloads') }}</dt>
+            <dd><bdi dir="ltr">{{ $downloadFormats }}</bdi></dd>
+          </div>
+        @endif
+      </dl>
     </div>
 
     <div class="grid-layout">
@@ -436,18 +529,27 @@
               <dd>{{ $subscriptionEndsAt }}</dd>
             </div>
           @endif
+          @if(!empty($manual['ends_at']))
+            <div class="detail-row">
+              <dt>{{ $manual['expired'] ? __('ui.manage_subscription.access_ends_on') : __('ui.manage_subscription.paid_until') }}</dt>
+              <dd>{{ $manual['ends_at'] }}</dd>
+            </div>
+          @endif
           @if(!empty($upcomingCharge['total']))
             <div class="detail-row">
               <dt>{{ __('ui.manage_subscription.upcoming_invoice') }}</dt>
-              <dd>{{ $upcomingCharge['total'] }}</dd>
+              <dd><bdi>{{ $upcomingCharge['total'] }}</bdi></dd>
             </div>
           @endif
         </div>
 
         <div class="actions">
-          <a class="btn btn-primary" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
+          @if(!empty($manual['plan_slug']))
+            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $manual['plan_slug']]) }}">{{ __('ui.manage_subscription.renew_plan') }}</a>
+          @endif
+          <a class="btn {{ empty($manual['plan_slug']) ? 'btn-primary' : '' }}" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
           @if($isCancellationScheduled)
-            <button class="btn btn-primary" id="resumeBtn" type="button">{{ __('ui.manage_subscription.resume_subscription', ['default' => 'Resume Subscription']) }}</button>
+            <button class="btn btn-primary" id="resumeBtn" type="button">{{ __('ui.manage_subscription.resume_subscription') }}</button>
           @endif
           @if($hasCancelableSubscription)
             <button class="btn btn-danger" id="cancelBtn" type="button">{{ __('ui.manage_subscription.cancel_subscription') }}</button>
@@ -521,9 +623,11 @@
               @foreach($invoices as $invoice)
                 @php
                   $invStatus = strtolower((string) $invoice['status']);
-                  $statusBadgeClass = 'paid';
-                  if ($invStatus === 'open') $statusBadgeClass = 'open';
-                  elseif (in_array($invStatus, ['void', 'uncollectible'])) $statusBadgeClass = 'void';
+                  $statusBadgeClass = match ($invStatus) {
+                    'paid' => 'paid',
+                    'open' => 'open',
+                    default => 'void',
+                  };
                   $invStatusLabel = match ($invStatus) {
                     'paid' => __('ui.manage_subscription.invoice_status_paid'),
                     'open' => __('ui.manage_subscription.invoice_status_open'),
@@ -536,10 +640,17 @@
                   <td>{{ $invoice['date'] }}</td>
                   <td><span class="invoice-status {{ $statusBadgeClass }}">{{ $invStatusLabel }}</span></td>
                   <td>{{ $invoice['purpose'] ?? __('ui.manage_subscription.subscription') }}</td>
-                  <td>{{ $invoice['total'] }}</td>
+                  <td><bdi>{{ $invoice['total'] }}</bdi></td>
                   <td>
                     <div class="invoice-actions">
-                      <a class="btn" target="_blank" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">{{ __('ui.manage_subscription.view') }}</a>
+                      @if(!empty($invoice['pay_url']))
+                        <a class="btn btn-primary" target="_blank" rel="noopener" href="{{ $invoice['pay_url'] }}">{{ __('ui.manage_subscription.pay_now') }}</a>
+                      @endif
+                      @if(!empty($invoice['id']))
+                        <a class="btn" target="_blank" href="{{ route('billing.invoice.view', ['invoiceId' => $invoice['id']]) }}">{{ __('ui.manage_subscription.view') }}</a>
+                      @else
+                        <span style="color: var(--muted);">—</span>
+                      @endif
                     </div>
                   </td>
                 </tr>
@@ -572,6 +683,9 @@
       'cancellation_failed' => __('ui.manage_subscription.cancellation_failed'),
       'subscription_canceled_success' => __('ui.manage_subscription.subscription_canceled_success'),
       'cancellation_scheduled' => __('ui.manage_subscription.cancellation_scheduled'),
+      'resuming' => __('ui.manage_subscription.resuming'),
+      'resume_failed' => __('ui.manage_subscription.resume_failed'),
+      'subscription_resumed' => __('ui.manage_subscription.subscription_resumed'),
     ];
   @endphp
   <script>
@@ -682,7 +796,7 @@
       return { ok: res.ok, status: res.status, data };
     }
 
-    const stripe = stripeKey ? Stripe(stripeKey) : null;
+    const stripe = stripeKey && typeof Stripe === 'function' ? Stripe(stripeKey, { locale: isArabicLocale ? 'ar' : 'en' }) : null;
     const elements = stripe ? stripe.elements() : null;
     const card = elements
       ? elements.create('card', {
@@ -758,13 +872,11 @@
     });
 
     cancelBtn?.addEventListener('click', async () => {
+      if (!window.confirm(i18n.confirm_cancel_prompt)) return;
       setButtonBusy(cancelBtn, true, i18n.canceling, cancelBtnDefaultText);
       setMessage(subscriptionMessageBox, '', '');
 
       try {
-        const proceed = window.confirm(i18n.confirm_cancel_prompt);
-        if (!proceed) return;
-
         const response = await post('{{ route('billing.cancel') }}');
         if (!response.ok || response.data?.ok === false) {
           throw new Error(response.data?.message || i18n.cancellation_failed);
@@ -780,6 +892,8 @@
 
         renewsOnRow?.remove();
         cancelBtn?.remove();
+        // Reload so "Access ends on" and the Resume button appear.
+        setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
         setMessage(subscriptionMessageBox, 'error', normalizeStripeMessage(error?.message, i18n.cancellation_failed));
       } finally {
@@ -789,19 +903,19 @@
 
     resumeBtn?.addEventListener('click', async () => {
       const resumeBtnDefaultText = resumeBtn.textContent.trim();
-      setButtonBusy(resumeBtn, true, '{{ __("ui.manage_subscription.resuming", ["default" => "Resuming..."]) }}', resumeBtnDefaultText);
+      setButtonBusy(resumeBtn, true, i18n.resuming, resumeBtnDefaultText);
       setMessage(subscriptionMessageBox, '', '');
 
       try {
         const response = await post('{{ route('billing.resume') }}');
         if (!response.ok || response.data?.ok === false) {
-          throw new Error(response.data?.message || '{{ __("ui.manage_subscription.resume_failed", ["default" => "Unable to resume subscription."]) }}');
+          throw new Error(response.data?.message || i18n.resume_failed);
         }
 
-        setMessage(subscriptionMessageBox, 'ok', response.data?.message || '{{ __("ui.manage_subscription.subscription_resumed", ["default" => "Subscription resumed successfully."]) }}');
+        setMessage(subscriptionMessageBox, 'ok', response.data?.message || i18n.subscription_resumed);
         setTimeout(() => window.location.reload(), 1500);
       } catch (error) {
-        setMessage(subscriptionMessageBox, 'error', error?.message || '{{ __("ui.manage_subscription.resume_failed", ["default" => "Unable to resume subscription."]) }}');
+        setMessage(subscriptionMessageBox, 'error', error?.message || i18n.resume_failed);
       } finally {
         setButtonBusy(resumeBtn, false, '', resumeBtnDefaultText);
       }

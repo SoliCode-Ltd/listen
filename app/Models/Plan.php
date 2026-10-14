@@ -104,6 +104,15 @@ class Plan extends Model
         return $this->kind === self::KIND_PACK;
     }
 
+    /** Whether members may write their own voice direction (the dashboard and the extension). */
+    public function allowsCustomPrompt(): bool
+    {
+        $rawSlug = (string) ($this->slug ?? '');
+        $slug = strtolower(trim((string) (preg_replace('/[\x{FEFF}\x{200B}\x{200C}\x{200D}\x{2060}]/u', '', $rawSlug) ?? $rawSlug)));
+
+        return $slug !== 'starter' && (bool) ($this->custom_prompt_enabled ?? false);
+    }
+
     /**
      * Monthly plans only: what members can subscribe to, trial, or be moved to.
      *

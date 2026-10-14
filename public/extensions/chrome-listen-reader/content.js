@@ -54,7 +54,7 @@
   // Side panel translations
   const panelTranslations = {
     en: {
-      brandName: 'Listen Studio',
+      brandName: 'Listen Reader',
       close: 'Close',
       speakerLabel: 'Speaker:',
       play: 'Play',
@@ -64,7 +64,7 @@
       auto: 'Auto',
     },
     ar: {
-      brandName: 'ستوديو إسمع',
+      brandName: 'قارئ إسمع',
       close: 'إغلاق',
       speakerLabel: 'المتحدث:',
       play: 'تشغيل',

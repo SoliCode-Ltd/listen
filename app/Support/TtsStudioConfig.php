@@ -375,10 +375,21 @@ class TtsStudioConfig
                 $translated = $fallback !== '' ? $fallback : self::humanizeValue($value);
             }
 
+            // Both languages, whatever the page's language (the extension switches on its own).
+            $inLocale = function (string $locale) use ($translationKey, $translated): string {
+                if ($translationKey === '') {
+                    return $translated;
+                }
+                $text = trim((string) __($translationKey, [], $locale));
+
+                return $text !== '' && $text !== $translationKey ? $text : $translated;
+            };
+
             $mergedByValue[$value] = [
                 'value' => $value,
                 'label' => $translated,
-                'label_ar' => trim((string) ($row['label_ar'] ?? '')) ?: $translated,
+                'label_en' => trim((string) ($row['label_en'] ?? '')) ?: $inLocale('en'),
+                'label_ar' => trim((string) ($row['label_ar'] ?? '')) ?: $inLocale('ar'),
                 'instruction_en' => '',
                 'instruction_ar' => '',
                 'region' => (string) ($row['region'] ?? ''),
@@ -394,6 +405,7 @@ class TtsStudioConfig
             $mergedByValue[$value] = [
                 'value' => $value,
                 'label' => trim((string) ($row['label'] ?? self::humanizeValue($value))),
+                'label_en' => trim((string) ($row['label'] ?? self::humanizeValue($value))),
                 'label_ar' => trim((string) ($row['label_ar'] ?? $row['label'] ?? self::humanizeValue($value))),
                 'instruction_en' => trim((string) ($row['instruction_en'] ?? '')),
                 'instruction_ar' => trim((string) ($row['instruction_ar'] ?? $row['instruction_en'] ?? '')),

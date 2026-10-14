@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "Listen Studio Chrome",
+    "message": "Listen Reader",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "Listen to selected text on any page using your Listen account. Select text, right-click, and hear it read aloud with premium AI voices.",
+    "message": "Select text on any page and hear it in a natural voice. Uses your Listen plan credits.",
     "description": "Extension description"
   },
   "headerSubtitle": {
@@ -12,7 +12,7 @@
     "description": "Header subtitle"
   },
   "contextMenuTitle": {
-    "message": "Listen Selected Text",
+    "message": "Listen to the selected text",
     "description": "Context menu item"
   },
   "profileSection": {
@@ -28,11 +28,11 @@
     "description": "Plan label prefix"
   },
   "charactersLabel": {
-    "message": "Characters:",
+    "message": "Credits left",
     "description": "Characters usage label"
   },
   "requestsLabel": {
-    "message": "Requests:",
+    "message": "Generations this month:",
     "description": "Requests usage label"
   },
   "unlimited": {
@@ -76,7 +76,7 @@
     "description": "Auto voice option"
   },
   "studioLabel": {
-    "message": "Voice Studio (HD)",
+    "message": "Voice Studio (Premium)",
     "description": "Studio panel label"
   },
   "dialect": {
@@ -396,7 +396,7 @@
     "description": "Switch to other language"
   },
   "playerBrand": {
-    "message": "Listen Voice",
+    "message": "Listen Reader",
     "description": "Side panel brand"
   },
   "playerSpeaker": {
@@ -414,5 +414,168 @@
   "playerDownload": {
     "message": "Download",
     "description": "Download button"
+  },
+  "creditsOf": {
+    "message": "$LEFT$ of $TOTAL$",
+    "placeholders": {
+      "left": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "minutesUsed": {
+    "message": "$USED$ of $TOTAL$ voice minutes used",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "todayUsed": {
+    "message": "Today: $USED$ of $LIMIT$ generations",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "giftNote": {
+    "message": "Includes $COUNT$ gift credits this month",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "packEnds": {
+    "message": "Your credits last until $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "noCredits": {
+    "message": "Your plan has no credits yet."
+  },
+  "dailyReached": {
+    "message": "You reached today’s limit. You can generate again tomorrow."
+  },
+  "choosePlan": {
+    "message": "Choose a plan"
+  },
+  "managePlan": {
+    "message": "Manage plan"
+  },
+  "openDashboard": {
+    "message": "Dashboard"
+  },
+  "creditsHint": {
+    "message": "900 credits = 1 minute of audio. You are charged for the audio you get."
+  },
+  "estimateCost": {
+    "message": "About $CREDITS$ credits for this text",
+    "placeholders": {
+      "credits": {
+        "content": "$1"
+      }
+    }
+  },
+  "estimateAfter": {
+    "message": "Credits after: $LEFT$",
+    "placeholders": {
+      "left": {
+        "content": "$1"
+      }
+    }
+  },
+  "estimateShort": {
+    "message": "Not enough credits for this text"
+  },
+  "defaultChoice": {
+    "message": "Default ($NAME$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "yourVoices": {
+    "message": "Your cloned voices"
+  },
+  "errNoActiveTab": {
+    "message": "No active tab found."
+  },
+  "errAudioDownload": {
+    "message": "Could not download the generated audio."
+  },
+  "errStatusCheck": {
+    "message": "Unable to check the generation status."
+  },
+  "errGenerationFailed": {
+    "message": "Voice generation failed."
+  },
+  "errTooLong": {
+    "message": "Voice generation is taking too long. Please try again."
+  },
+  "errSidePlayer": {
+    "message": "Could not open the side player on this page. Try a regular website tab."
+  },
+  "errNoEndpoint": {
+    "message": "The service address is not set."
+  },
+  "errSetApiKey": {
+    "message": "Add your API key to connect your account."
+  },
+  "errProfileTimeout": {
+    "message": "The request timed out. The server may be slow or unreachable."
+  },
+  "errNetwork": {
+    "message": "Network error. Check your connection and try again."
+  },
+  "errProfileLoad": {
+    "message": "Could not load your account."
+  },
+  "errNoTextSelected": {
+    "message": "No text selected. Highlight some text first."
+  },
+  "errQueueTimeout": {
+    "message": "The request timed out. The voice may still be generating; check your dashboard."
+  },
+  "errUnexpected": {
+    "message": "Unexpected response from the server."
+  },
+  "errUnsupportedPage": {
+    "message": "This page cannot be read. Open a regular website tab and try again."
+  },
+  "errNoSelection": {
+    "message": "No selected text found. Highlight text first, then try again."
+  },
+  "msgGenerated": {
+    "message": "Voice generated successfully."
+  },
+  "errInvalidRequest": {
+    "message": "Invalid request."
+  },
+  "errUnsupportedAction": {
+    "message": "Unsupported action."
+  },
+  "playerNowPlaying": {
+    "message": "Now playing the selected text."
+  },
+  "playerKeepOpen": {
+    "message": "Keep this tab open while listening."
+  },
+  "playerMissing": {
+    "message": "The audio address is missing."
   }
 }

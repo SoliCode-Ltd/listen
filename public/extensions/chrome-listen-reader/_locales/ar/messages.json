@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "ستوديو إسمع لكروم",
+    "message": "قارئ إسمع",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "استمع إلى النص المحدد في أي صفحة باستخدام حسابك في ليسن. حدد النص، انقر بزر الماوس الأيمن، واستمع إليه بأصوات ذكاء اصطناعي متميزة.",
+    "message": "حدّد أي نص في أي صفحة واستمع إليه بصوت طبيعي. يستخدم رصيد خطتك في إسمع.",
     "description": "Extension description"
   },
   "headerSubtitle": {
@@ -12,7 +12,7 @@
     "description": "Header subtitle"
   },
   "contextMenuTitle": {
-    "message": "استمع للنص المحدد",
+    "message": "استمع إلى النص المحدد",
     "description": "Context menu item"
   },
   "profileSection": {
@@ -28,11 +28,11 @@
     "description": "Plan label prefix"
   },
   "charactersLabel": {
-    "message": "الأحرف:",
+    "message": "الرصيد المتبقي",
     "description": "Characters usage label"
   },
   "requestsLabel": {
-    "message": "الطلبات:",
+    "message": "عمليات التوليد هذا الشهر:",
     "description": "Requests usage label"
   },
   "unlimited": {
@@ -76,7 +76,7 @@
     "description": "Auto voice option"
   },
   "studioLabel": {
-    "message": "استوديو الصوت (HD)",
+    "message": "استوديو الصوت (متميز)",
     "description": "Studio panel label"
   },
   "dialect": {
@@ -396,7 +396,7 @@
     "description": "Switch to other language"
   },
   "playerBrand": {
-    "message": "ليسن فويس",
+    "message": "قارئ إسمع",
     "description": "Side panel brand"
   },
   "playerSpeaker": {
@@ -414,5 +414,168 @@
   "playerDownload": {
     "message": "تحميل",
     "description": "Download button"
+  },
+  "creditsOf": {
+    "message": "$LEFT$ من $TOTAL$",
+    "placeholders": {
+      "left": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "minutesUsed": {
+    "message": "استُخدمت $USED$ من $TOTAL$ دقيقة صوت",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "todayUsed": {
+    "message": "اليوم: $USED$ من $LIMIT$ عملية توليد",
+    "placeholders": {
+      "used": {
+        "content": "$1"
+      },
+      "limit": {
+        "content": "$2"
+      }
+    }
+  },
+  "giftNote": {
+    "message": "يشمل $COUNT$ رصيد هدية هذا الشهر",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "packEnds": {
+    "message": "رصيدك صالح حتى $DATE$",
+    "placeholders": {
+      "date": {
+        "content": "$1"
+      }
+    }
+  },
+  "noCredits": {
+    "message": "لا يوجد رصيد في خطتك بعد."
+  },
+  "dailyReached": {
+    "message": "وصلت إلى حد اليوم. يمكنك التوليد مرة أخرى غداً."
+  },
+  "choosePlan": {
+    "message": "اختر خطة"
+  },
+  "managePlan": {
+    "message": "إدارة الخطة"
+  },
+  "openDashboard": {
+    "message": "لوحة التحكم"
+  },
+  "creditsHint": {
+    "message": "900 رصيد = دقيقة واحدة من الصوت. تُحاسب على الصوت الذي تحصل عليه."
+  },
+  "estimateCost": {
+    "message": "حوالي $CREDITS$ رصيد لهذا النص",
+    "placeholders": {
+      "credits": {
+        "content": "$1"
+      }
+    }
+  },
+  "estimateAfter": {
+    "message": "الرصيد بعدها: $LEFT$",
+    "placeholders": {
+      "left": {
+        "content": "$1"
+      }
+    }
+  },
+  "estimateShort": {
+    "message": "رصيدك لا يكفي لهذا النص"
+  },
+  "defaultChoice": {
+    "message": "افتراضي ($NAME$)",
+    "placeholders": {
+      "name": {
+        "content": "$1"
+      }
+    }
+  },
+  "yourVoices": {
+    "message": "أصواتك المستنسخة"
+  },
+  "errNoActiveTab": {
+    "message": "لم يتم العثور على تبويب نشط."
+  },
+  "errAudioDownload": {
+    "message": "تعذر تحميل الصوت الذي تم توليده."
+  },
+  "errStatusCheck": {
+    "message": "تعذر التحقق من حالة التوليد."
+  },
+  "errGenerationFailed": {
+    "message": "فشل توليد الصوت."
+  },
+  "errTooLong": {
+    "message": "توليد الصوت يستغرق وقتاً طويلاً. حاول مرة أخرى."
+  },
+  "errSidePlayer": {
+    "message": "تعذر فتح المشغل الجانبي في هذه الصفحة. جرّب تبويب موقع عادي."
+  },
+  "errNoEndpoint": {
+    "message": "عنوان الخدمة غير مضبوط."
+  },
+  "errSetApiKey": {
+    "message": "أضف مفتاح API لربط حسابك."
+  },
+  "errProfileTimeout": {
+    "message": "انتهت مهلة الطلب. قد يكون الخادم بطيئاً أو غير متاح."
+  },
+  "errNetwork": {
+    "message": "خطأ في الشبكة. تحقق من اتصالك وحاول مرة أخرى."
+  },
+  "errProfileLoad": {
+    "message": "تعذر تحميل حسابك."
+  },
+  "errNoTextSelected": {
+    "message": "لم يتم تحديد نص. حدّد نصاً أولاً."
+  },
+  "errQueueTimeout": {
+    "message": "انتهت مهلة الطلب. قد يكون الصوت ما زال قيد التوليد، تحقق من لوحة التحكم."
+  },
+  "errUnexpected": {
+    "message": "استجابة غير متوقعة من الخادم."
+  },
+  "errUnsupportedPage": {
+    "message": "لا يمكن قراءة هذه الصفحة. افتح تبويب موقع عادي وحاول مرة أخرى."
+  },
+  "errNoSelection": {
+    "message": "لم يتم العثور على نص محدد. حدّد نصاً أولاً ثم حاول مرة أخرى."
+  },
+  "msgGenerated": {
+    "message": "تم توليد الصوت بنجاح."
+  },
+  "errInvalidRequest": {
+    "message": "طلب غير صالح."
+  },
+  "errUnsupportedAction": {
+    "message": "إجراء غير مدعوم."
+  },
+  "playerNowPlaying": {
+    "message": "يتم تشغيل النص المحدد الآن."
+  },
+  "playerKeepOpen": {
+    "message": "أبقِ هذا التبويب مفتوحاً أثناء الاستماع."
+  },
+  "playerMissing": {
+    "message": "عنوان الصوت غير موجود."
   }
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
-use App\Models\SiteSetting;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
@@ -15,8 +14,13 @@ use App\Services\Billing\TrialUsageRecorder;
 use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
+use App\Models\ClonedVoice;
+use App\Support\AudioFormats;
 use App\Support\AudioUrl;
+use App\Support\Credits;
+use App\Support\DialogueSpeakers;
 use App\Support\PlanUsageGuard;
+use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
@@ -25,6 +29,7 @@ use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
+use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
 class MessageReaderController extends Controller
 {
@@ -53,9 +58,10 @@ class MessageReaderController extends Controller
         $usage = UsageSnapshot::for((int) $user->id, $quotaPlan, $counter);
         $requestsUnlimited = $usage['requests_unlimited'];
 
-        // Determine the preferred provider for HD voices based on plan policy
-        $preferredProvider = $this->preferredProviderForPlan($activePlan, $planTier);
-        $catalog = VoiceCatalog::publicCatalog($planTier, $preferredProvider);
+        // The same voices and defaults as the dashboard.
+        $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
+        $catalog = VoiceCatalog::publicCatalogByTier()[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
+        $locale = (string) app()->getLocale();
 
         $defaultAr = VoiceCatalog::voiceMeta(
             VoiceCatalog::defaultForLanguageAndProvider('ar', $planTier, $preferredProvider)
@@ -72,28 +78,36 @@ class MessageReaderController extends Controller
                     'email' => (string) $user->email,
                 ],
                 'plan' => [
-                    'name' => (string) ($activePlan?->name ?? 'FREE'),
+                    'name' => $activePlan ? ($activePlan->getLocalizedName($locale) ?: (string) $activePlan->name) : __('ui.dashboard.free_plan'),
                     'slug' => (string) ($activePlan?->slug ?? 'free'),
                     'voice_tier' => $planTier,
                     'voice_tier_label' => VoiceTier::label($planTier),
-                    'max_chars_per_request' => PlanUsageGuard::maxCharsPerRequest($quotaPlan),
-                    'allow_overage' => PlanUsageGuard::allowsOverage($quotaPlan),
-                    'overage_price_per_million_cents' => $activePlan?->overage_price_per_million_cents !== null
-                        ? (int) $activePlan->overage_price_per_million_cents
-                        : null,
+                    'max_chars_per_request' => self::maxCharsPerRequest($quotaPlan),
+                    'credits_per_second' => Credits::PER_SECOND,
+                    'credits_per_minute' => Credits::PER_MINUTE,
+                    'daily_requests' => PlanUsageGuard::dailyRequests($quotaPlan),
+                    'custom_prompt_enabled' => (bool) $activePlan?->allowsCustomPrompt(),
+                    'download_formats' => AudioFormats::chosenFor($activePlan),
                     'commercial_use_allowed' => (bool) ($activePlan?->commercial_use_allowed ?? false),
                     'processing_priority' => (string) ($activePlan?->processing_priority ?: 'standard'),
                     'requests_unlimited' => $requestsUnlimited,
                     'dialogue_enabled' => (bool) ($activePlan?->dialogue_enabled ?? false),
-                    'tts_provider_policy' => $activePlan?->tts_provider_policy ?? 'default',
+                    'voice_cloning_enabled' => VoiceCloningAccess::allows($user, $activePlan),
                 ],
                 'usage' => ['period' => $period] + $usage,
+                'links' => [
+                    'dashboard' => $this->localizedUrl('dashboard', $locale),
+                    'pricing' => $this->localizedUrl('pricing', $locale),
+                    'billing' => $this->localizedUrl('billing.page', $locale),
+                    'manage' => $this->localizedUrl('manage-subscription.page', $locale),
+                ],
                 'voices' => [
                     'catalog' => $catalog,
                     'defaults' => [
                         'ar' => $defaultAr['key'] ?? null,
                         'en' => $defaultEn['key'] ?? null,
                     ],
+                    'cloned' => $this->clonedVoicesFor($user, $activePlan),
                     'studio' => [
                         'performance_styles' => TtsStudioConfig::performanceStyleCatalog(),
                         'emotions' => TtsStudioConfig::emotionCatalog(),
@@ -124,8 +138,13 @@ class MessageReaderController extends Controller
         $activePlan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
-        $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
+        $maxChars = self::maxCharsPerRequest($quotaPlan);
         $processingMode = strtolower((string) config('listen.audio.processing', 'sync'));
+        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+        // Style and emotion left on "Default" get the site's defaults, as in the dashboard.
+        if (VoiceTier::normalize((string) ($request->input('voice_tier') ?? $planTier)) === VoiceTier::HD) {
+            $request->merge(TtsStudioConfig::withDefaultChoices($request->only(['performance_style', 'emotion']), $request->input('target_language')));
+        }
         $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
         $emotionValues = TtsStudioConfig::emotionValues();
 
@@ -146,11 +165,9 @@ class MessageReaderController extends Controller
             'style_prompt' => ['nullable', 'string', 'max:2000'],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-            // Dialogue parameters
-            'is_dialogue' => ['nullable', 'boolean'],
-            'dialogue_speakers' => ['nullable', 'array', 'max:6'],
-            'dialogue_speakers.*.name' => ['required_with:dialogue_speakers', 'string', 'max:50'],
-            'dialogue_speakers.*.voice' => ['required_with:dialogue_speakers', 'string', 'max:100'],
+        ] + DialogueSpeakers::rules(), [
+            'performance_style.in' => __('ui.backend.performance_style_invalid'),
+            'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
@@ -161,14 +178,27 @@ class MessageReaderController extends Controller
             ], 403);
         }
 
-        $voiceName = $this->normalizeVoiceSelection(
-            $validated['target_language'],
-            $validated['voice_key'] ?? null,
-            $validated['voice_name'] ?? null,
-            $requestedTier,
-        );
+        if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
+            DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
+        }
+
+        $voiceKey = trim((string) ($validated['voice_key'] ?? ''));
+        if (str_starts_with($voiceKey, 'cloned_')) {
+            $voiceName = $this->clonedVoiceName($user, $activePlan, $voiceKey);
+            $voiceProvider = 'gemini';
+        } else {
+            $voiceName = $this->normalizeVoiceSelection(
+                $validated['target_language'],
+                $voiceKey,
+                $validated['voice_name'] ?? null,
+                $requestedTier,
+            );
+            $voiceProvider = VoiceCatalog::providerForName($voiceName);
+        }
+        // No dialect chosen: the site's default for the language, as the dashboard preselects it.
+        $dialect = trim((string) ($validated['dialect'] ?? '')) ?: TtsStudioConfig::defaultDialect((string) $validated['target_language']);
         $studioOptions = $this->sanitizeStudioOptionsForTier($requestedTier, [
-            'dialect' => $validated['dialect'] ?? null,
+            'dialect' => $dialect,
             'emotion' => $validated['emotion'] ?? 'neutral',
             'performance_style' => $validated['performance_style'] ?? null,
             'style_prompt' => $validated['style_prompt'] ?? null,
@@ -212,7 +242,6 @@ class MessageReaderController extends Controller
             PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
         }
 
-        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
         try {
             $recorded = $this->audioGenerationRecorder->createForUser(
                 (int) $user->id,
@@ -230,7 +259,7 @@ class MessageReaderController extends Controller
                     'target_language' => $validated['target_language'],
                     'voice_tier' => $requestedTier,
                     'voice_name' => $voiceName,
-                    'tts_provider' => VoiceCatalog::providerForName($voiceName),
+                    'tts_provider' => $voiceProvider,
                     'translate' => (bool) ($validated['translate'] ?? false),
                     'duration_seconds' => $estimate['seconds'],
                     'status' => $initialStatus,
@@ -297,6 +326,7 @@ class MessageReaderController extends Controller
         }
 
         $isFailed = $job->status === 'failed';
+        $counter->refresh();
         $statusCode = in_array($job->status, ['queued', 'processing'], true)
             ? 202
             : ($isFailed ? 422 : 200);
@@ -315,6 +345,7 @@ class MessageReaderController extends Controller
             'estimated_credits' => $estimate['credits'],
             'estimated_seconds' => $estimate['seconds'],
             'estimated_minutes' => $estimate['minutes'],
+            'usage' => UsageSnapshot::for((int) $user->id, $quotaPlan, $counter),
         ], $statusCode);
     }
 
@@ -368,6 +399,12 @@ class MessageReaderController extends Controller
 
     private function resolveApiUser(Request $request): User
     {
+        // Messages and labels in the extension's language (it sends X-Listen-Locale).
+        $locale = strtolower(substr(trim((string) ($request->header('X-Listen-Locale') ?: $request->getPreferredLanguage(['en', 'ar']) ?: '')), 0, 2));
+        if (in_array($locale, ['ar', 'en'], true)) {
+            app()->setLocale($locale);
+        }
+
         if (Auth::check()) {
             $user = $request->user();
             if ($this->blockedUserService->isBlocked($user)) {
@@ -438,8 +475,10 @@ class MessageReaderController extends Controller
         $voiceKey = trim((string) $voiceKey);
         $voiceName = trim((string) $voiceName);
 
+        $preferredProvider = VoiceCatalog::preferredProviderForTier($tier);
+
         if ($voiceKey !== '') {
-            $mapped = VoiceCatalog::nameFromKeyForLanguage($language, $voiceKey, $tier);
+            $mapped = VoiceCatalog::nameFromKeyForLanguageAndProvider($language, $voiceKey, $tier, $preferredProvider);
             if (! $mapped) {
                 throw ValidationException::withMessages([
                     'voice_key' => __('ui.backend.dashboard_speaker_not_available'),
@@ -459,7 +498,7 @@ class MessageReaderController extends Controller
             return $voiceName;
         }
 
-        $defaultVoice = VoiceCatalog::defaultForLanguage($language, $tier);
+        $defaultVoice = VoiceCatalog::defaultForLanguageAndProvider($language, $tier, $preferredProvider);
         if ($defaultVoice === '') {
             throw ValidationException::withMessages([
                 'target_language' => __('ui.backend.dashboard_language_not_available_for_tier'),
@@ -481,7 +520,7 @@ class MessageReaderController extends Controller
             return [
                 'dialect' => null,
                 'emotion' => 'neutral',
-                'performance_style' => null,
+                'performance_style' => 'neutral',
                 'style_prompt' => null,
                 'speed' => 1.0,
                 'pitch' => 0.0,
@@ -507,9 +546,9 @@ class MessageReaderController extends Controller
         return [
             'dialect' => isset($options['dialect']) && is_string($options['dialect']) ? trim($options['dialect']) ?: null : null,
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
-            'performance_style' => $performanceStyle !== '' ? $performanceStyle : null,
+            'performance_style' => $performanceStyle !== '' ? $performanceStyle : 'neutral',
             // Custom direction only on plans that include it, as in the dashboard.
-            'style_prompt' => (bool) ($plan?->custom_prompt_enabled ?? false) && isset($options['style_prompt']) && is_string($options['style_prompt'])
+            'style_prompt' => (bool) $plan?->allowsCustomPrompt() && isset($options['style_prompt']) && is_string($options['style_prompt'])
                 ? (trim($options['style_prompt']) ?: null)
                 : null,
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
@@ -517,36 +556,48 @@ class MessageReaderController extends Controller
         ];
     }
 
-    private function preferredProviderForPlan(?\App\Models\Plan $plan, string $planTier): ?string
+    /** The plan's text limit per voice, never above what the request validation accepts. */
+    private static function maxCharsPerRequest(?\App\Models\Plan $plan): int
     {
-        if ($planTier !== VoiceTier::HD) {
-            return null;
-        }
-
-        $siteOverride = $plan
-            ? $this->normalizeProviderPolicyValue(SiteSetting::get("tts_plan_provider_{$plan->slug}", null))
-            : null;
-
-        if ($siteOverride !== null) {
-            return $siteOverride;
-        }
-
-        $planOverride = $this->normalizeProviderPolicyValue($plan?->tts_provider_policy);
-        if ($planOverride !== null) {
-            return $planOverride;
-        }
-
-        return VoiceCatalog::preferredProviderForTier($planTier);
+        return min(PlanUsageGuard::maxCharsPerRequest($plan), 50000);
     }
 
-    private function normalizeProviderPolicyValue(mixed $value): ?string
+    private function localizedUrl(string $route, string $locale): string
     {
-        $value = strtolower(trim((string) $value));
+        try {
+            return (string) LaravelLocalization::getLocalizedURL($locale, route($route), [], true);
+        } catch (\Throwable) {
+            return route($route);
+        }
+    }
 
-        return match ($value) {
-            'google_cloud', 'google_only' => 'google_cloud',
-            'gemini', 'gemini_only', 'gemini_preferred' => 'gemini',
-            default => null,
-        };
+    /**
+     * The member's own ready cloned voices, when their plan includes cloning.
+     *
+     * @return array<int, array{key:string, label:string}>
+     */
+    private function clonedVoicesFor(User $user, ?\App\Models\Plan $plan): array
+    {
+        if (! VoiceCloningAccess::allows($user, $plan)) {
+            return [];
+        }
+
+        return ClonedVoice::query()->where('user_id', $user->id)->ready()->orderBy('name')->get(['id', 'name'])
+            ->map(fn (ClonedVoice $voice): array => ['key' => 'cloned_'.$voice->id, 'label' => (string) $voice->name])
+            ->values()->all();
+    }
+
+    private function clonedVoiceName(User $user, ?\App\Models\Plan $plan, string $voiceKey): string
+    {
+        if (! VoiceCloningAccess::allows($user, $plan)) {
+            throw ValidationException::withMessages(['voice_key' => __('ui.backend.dashboard_speaker_not_available')]);
+        }
+        $id = (int) str_replace('cloned_', '', $voiceKey);
+        $exists = ClonedVoice::query()->where('id', $id)->where('user_id', $user->id)->ready()->exists();
+        if (! $exists) {
+            throw ValidationException::withMessages(['voice_key' => __('ui.voice_cloning.processing_failed_generic')]);
+        }
+
+        return 'cloned_'.$id;
     }
 }

@@ -36,7 +36,13 @@ const elements = {
   userAvatar: document.getElementById('userAvatar'),
   userName: document.getElementById('userName'),
   userPlan: document.getElementById('userPlan'),
-  charsText: document.getElementById('charsText'),
+  creditsValue: document.getElementById('creditsValue'),
+  minutesText: document.getElementById('minutesText'),
+  todayText: document.getElementById('todayText'),
+  creditsNote: document.getElementById('creditsNote'),
+  planLink: document.getElementById('planLink'),
+  dashboardLink: document.getElementById('dashboardLink'),
+  creditEstimate: document.getElementById('creditEstimate'),
   requestsText: document.getElementById('requestsText'),
   charsBar: document.getElementById('charsBar'),
   requestsBar: document.getElementById('requestsBar'),
@@ -65,6 +71,23 @@ async function loadTranslations(lang) {
 
 function t(key, fallback = '') {
   return translations[key] || fallback || key;
+}
+
+// A message with $NAME$ placeholders filled in.
+function tf(key, fallback, values = {}) {
+  let text = t(key, fallback);
+  for (const [name, value] of Object.entries(values)) {
+    text = text.split(`$${name.toUpperCase()}$`).join(String(value));
+  }
+  return text;
+}
+
+function formatNumber(value, digits = 0) {
+  // Western digits in both languages, as on the website.
+  return Number(value || 0).toLocaleString('en-US', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  });
 }
 
 function applyTranslations() {
@@ -128,60 +151,24 @@ async function switchLanguage() {
   const currentDialect = elements.dialect?.value || '';
   const currentVoice = elements.voiceKey?.value || '';
   renderDialectOptions(currentDialect);
+  renderStudioOptions(elements.performanceStyle?.value || '', elements.emotion?.value || '');
   // Re-render voice options with translated labels
   renderVoiceOptions(currentVoice);
   // Update translate direction label
   updateTranslateLabel();
-  // Re-apply profile card with new translations
+  // Re-apply profile card with new translations, then reload it so the plan name follows.
   setProfileCard(profileData);
+  updateCharCounter();
+  if (String(elements.apiKey.value || '').trim()) {
+    refreshProfile().catch(() => { });
+  }
 }
-
-const fallbackCatalog = {
-  ar: [
-    { key: 'voice_ar_f_1', label: 'Sara', label_ar: 'سارة', gender: 'female' },
-    { key: 'voice_ar_f_2', label: 'Mariam', label_ar: 'مريم', gender: 'female' },
-    { key: 'voice_ar_m_1', label: 'Omar', label_ar: 'عمر', gender: 'male' },
-    { key: 'voice_ar_m_2', label: 'Ahmed', label_ar: 'أحمد', gender: 'male' },
-  ],
-  en: [
-    { key: 'voice_en_f_1', label: 'Emma', label_ar: 'إيما', gender: 'female' },
-    { key: 'voice_en_f_2', label: 'Olivia', label_ar: 'أوليفيا', gender: 'female' },
-    { key: 'voice_en_m_1', label: 'Liam', label_ar: 'ليام', gender: 'male' },
-    { key: 'voice_en_m_2', label: 'Noah', label_ar: 'نوح', gender: 'male' },
-  ],
-};
 
 let profileData = null;
 let apiKeyVerifyTimer = null;
 let lastVerifiedApiKey = '';
 let preferredTranslateLanguage = 'ar';
 const preferredVoiceKeyByLanguage = { ar: '', en: '' };
-
-const dialectsByLanguage = {
-  ar: [
-    { value: '', labelKey: 'autoDetect', label: 'Auto-detect' },
-    { value: 'ar-XA', labelKey: 'dialectMsa', label: 'Modern Standard Arabic' },
-    { value: 'ar-SA', labelKey: 'dialectSaudi', label: 'Saudi' },
-    { value: 'ar-AE', labelKey: 'dialectEmirati', label: 'Emirati' },
-    { value: 'ar-EG', labelKey: 'dialectEgyptian', label: 'Egyptian' },
-    { value: 'ar-LB', labelKey: 'dialectLebanese', label: 'Lebanese' },
-    { value: 'ar-SY', labelKey: 'dialectSyrian', label: 'Syrian' },
-    { value: 'ar-JO', labelKey: 'dialectJordanian', label: 'Jordanian' },
-    { value: 'ar-IQ', labelKey: 'dialectIraqi', label: 'Iraqi' },
-    { value: 'ar-MA', labelKey: 'dialectMoroccan', label: 'Moroccan' },
-    { value: 'ar-KW', labelKey: 'dialectKuwaiti', label: 'Kuwaiti' },
-    { value: 'ar-TN', labelKey: 'dialectTunisian', label: 'Tunisian' },
-    { value: 'ar-OM', labelKey: 'dialectOmani', label: 'Omani' },
-  ],
-  en: [
-    { value: '', labelKey: 'autoDetect', label: 'Auto-detect' },
-    { value: 'en-US', labelKey: 'dialectAmerican', label: 'American' },
-    { value: 'en-GB', labelKey: 'dialectBritish', label: 'British' },
-    { value: 'en-AU', labelKey: 'dialectAustralian', label: 'Australian' },
-    { value: 'en-IN', labelKey: 'dialectIndian', label: 'Indian' },
-    { value: 'en-ZA', labelKey: 'dialectSouthAfrican', label: 'South African' },
-  ],
-};
 
 function setStatus(message, type = '') {
   elements.status.textContent = message || '';
@@ -297,24 +284,52 @@ function updateTranslateLabel() {
   elements.translateLabel.textContent = translateDirectionLabel(language);
 }
 
-function renderDialectOptions(preferredDialect = '') {
-  if (!elements.dialect) return;
-  const language = normalizeLanguage(elements.targetLanguage.value);
-  const dialects = dialectsByLanguage[language] || [];
-  
-  elements.dialect.innerHTML = '';
-  for (const dialect of dialects) {
+function studio() {
+  return profileData?.voices?.studio || {};
+}
+
+function studioLabel(row) {
+  if (!row) return '';
+  if (currentUiLang === 'ar') return row.label_ar || row.label || row.value;
+  return row.label_en || row.label || row.value;
+}
+
+// A select filled from the account's catalog; "Default (…)" keeps the site's default.
+function fillStudioSelect(select, rows, defaultValue, preferred) {
+  if (!select) return;
+  const list = Array.isArray(rows) ? rows : [];
+  const defaultRow = list.find((row) => row?.value === defaultValue);
+  select.innerHTML = '';
+  const first = document.createElement('option');
+  first.value = '';
+  first.textContent = defaultRow
+    ? tf('defaultChoice', 'Default ($NAME$)', { name: studioLabel(defaultRow) })
+    : t('autoDefault', 'Default');
+  select.appendChild(first);
+  for (const row of list) {
     const option = document.createElement('option');
-    option.value = dialect.value;
-    option.textContent = dialect.labelKey ? t(dialect.labelKey, dialect.label) : dialect.label;
-    elements.dialect.appendChild(option);
+    option.value = String(row?.value || '');
+    option.textContent = studioLabel(row);
+    select.appendChild(option);
   }
-  
-  if (dialects.some(d => d.value === preferredDialect)) {
-    elements.dialect.value = preferredDialect;
-  } else {
-    elements.dialect.value = '';
-  }
+  select.value = list.some((row) => row?.value === preferred) ? preferred : '';
+}
+
+function renderDialectOptions(preferredDialect = '') {
+  const language = normalizeLanguage(elements.targetLanguage.value);
+  fillStudioSelect(
+    elements.dialect,
+    studio().dialects?.[language],
+    studio().defaults?.[language]?.dialect,
+    preferredDialect,
+  );
+}
+
+function renderStudioOptions(preferredStyle = '', preferredEmotion = '') {
+  const language = normalizeLanguage(elements.targetLanguage.value);
+  const defaults = studio().defaults?.[language] || {};
+  fillStudioSelect(elements.performanceStyle, studio().performance_styles, defaults.performance_style, preferredStyle);
+  fillStudioSelect(elements.emotion, studio().emotions, defaults.emotion, preferredEmotion);
 }
 
 function updateStudioPanel() {
@@ -322,28 +337,52 @@ function updateStudioPanel() {
   // Only show studio panel if:
   // 1. Profile is loaded (API key valid)
   // 2. Plan is HD tier (not free/standard)
-  const hasValidProfile = profileData && profileData.plan;
-  const voiceTier = profileData?.plan?.voice_tier || 'standard';
-  const planSlug = String(profileData?.plan?.slug || 'free').toLowerCase();
-  const isHdPlan = voiceTier === 'hd' && planSlug !== 'free';
-  
-  elements.studioPanel.style.display = hasValidProfile && isHdPlan ? 'block' : 'none';
+  // Premium voices only, as in the dashboard.
+  const isPremium = String(profileData?.plan?.voice_tier || 'standard') === 'hd';
+  elements.studioPanel.style.display = profileData?.plan && isPremium ? 'block' : 'none';
+}
+
+// About what a text costs, the same estimate as the dashboard (15 credits a second of audio).
+function estimateCreditsFor(text) {
+  const value = String(text || '').trim();
+  const length = Array.from(value).length;
+  if (!length) return 0;
+  const words = (value.match(/[\p{L}\p{N}']+/gu) || []).length;
+  return Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) * 15;
 }
 
 function updateCharCounter() {
   if (!elements.quickText || !elements.charCount || !elements.charCounter) return;
-  const length = elements.quickText.value.length;
-  const maxChars = profileData?.plan?.max_chars_per_request || 5000;
-  
-  elements.charCount.textContent = length.toLocaleString();
-  elements.charLimit.textContent = maxChars.toLocaleString();
-  
+  // Counted like the server: trimmed, one per character.
+  const value = String(elements.quickText.value || '').trim();
+  const length = Array.from(value).length;
+  const maxChars = Number(profileData?.plan?.max_chars_per_request || 0);
+
+  elements.charCount.textContent = formatNumber(length);
+  elements.charLimit.textContent = maxChars > 0 ? formatNumber(maxChars) : '-';
+
   elements.charCounter.classList.remove('warning', 'danger');
-  if (length > maxChars) {
+  if (maxChars > 0 && length > maxChars) {
     elements.charCounter.classList.add('danger');
-  } else if (length > maxChars * 0.9) {
+  } else if (maxChars > 0 && length > maxChars * 0.9) {
     elements.charCounter.classList.add('warning');
   }
+
+  if (!elements.creditEstimate) return;
+  const cost = estimateCreditsFor(value);
+  const usage = profileData?.usage;
+  elements.creditEstimate.classList.remove('short');
+  if (!cost || !usage) {
+    elements.creditEstimate.textContent = '';
+    return;
+  }
+  const left = Number(usage.remaining_chars || 0) - cost;
+  if (left < 0) {
+    elements.creditEstimate.classList.add('short');
+    elements.creditEstimate.textContent = t('estimateShort', 'Not enough credits for this text');
+    return;
+  }
+  elements.creditEstimate.textContent = `${tf('estimateCost', 'About $CREDITS$ credits for this text', { credits: formatNumber(cost) })} · ${tf('estimateAfter', 'Credits after: $LEFT$', { left: formatNumber(left) })}`;
 }
 
 function writeSettingsToForm(settings = {}) {
@@ -358,8 +397,7 @@ function writeSettingsToForm(settings = {}) {
   elements.targetLanguage.value = translateEnabled ? preferredTranslateLanguage : targetLanguage;
   elements.translate.checked = translateEnabled;
   elements.autoPlay.checked = settings.autoPlay !== false;
-  if (elements.performanceStyle) elements.performanceStyle.value = settings.performanceStyle || '';
-  if (elements.emotion) elements.emotion.value = settings.emotion || '';
+  renderStudioOptions(settings.performanceStyle || '', settings.emotion || '');
   updateTranslateLabel();
   renderVoiceOptions(voiceKeys[normalizeLanguage(elements.targetLanguage.value)] || settings.voiceKey || '');
   renderDialectOptions(settings.dialect || '');
@@ -369,11 +407,7 @@ function writeSettingsToForm(settings = {}) {
 
 function voiceCatalog() {
   const fromApi = profileData?.voices?.catalog;
-  if (fromApi && typeof fromApi === 'object') {
-    return fromApi;
-  }
-
-  return fallbackCatalog;
+  return fromApi && typeof fromApi === 'object' ? fromApi : {};
 }
 
 function defaults() {
@@ -447,7 +481,21 @@ function renderVoiceOptions(preferredKey = '') {
     elements.voiceKey.appendChild(option);
   }
 
-  if (list.some((voice) => voice?.key === current) || current === '') {
+  // The member's own cloned voices, when their plan includes cloning.
+  const cloned = Array.isArray(profileData?.voices?.cloned) ? profileData.voices.cloned : [];
+  if (cloned.length) {
+    const group = document.createElement('optgroup');
+    group.label = t('yourVoices', 'Your cloned voices');
+    for (const voice of cloned) {
+      const option = document.createElement('option');
+      option.value = String(voice?.key || '');
+      option.textContent = String(voice?.label || voice?.key || '');
+      group.appendChild(option);
+    }
+    elements.voiceKey.appendChild(group);
+  }
+
+  if (list.some((voice) => voice?.key === current) || cloned.some((voice) => voice?.key === current) || current === '') {
     elements.voiceKey.value = current;
   } else {
     elements.voiceKey.value = '';
@@ -461,29 +509,88 @@ function renderVoiceOptions(preferredKey = '') {
   }
 }
 
+function setLink(link, url) {
+  if (!link) return;
+  if (url) {
+    link.href = url;
+    link.hidden = false;
+  } else {
+    link.hidden = true;
+  }
+}
+
 function setProfileCard(profile = null) {
   const defaultName = t('connectAccount', 'Connect your account');
   const name = String(profile?.user?.name || defaultName);
   const plan = String(profile?.plan?.name || '-');
   const voiceTierLabel = String(profile?.plan?.voice_tier_label || '').trim();
   const usage = profile?.usage || {};
-  const requestsUnlimited = Boolean(usage?.requests_unlimited);
-
-  const planLabel = t('planLabel', 'Plan:');
-  const charsLabel = t('charactersLabel', 'Characters:');
-  const reqLabel = t('requestsLabel', 'Requests:');
-  const unlimitedText = t('unlimited', 'Unlimited');
+  const planCredits = Number(usage.plan_chars || 0);
+  const left = Math.max(0, Number(usage.remaining_chars || 0));
+  const hasCredits = planCredits > 0 || usage.mode === 'pack';
 
   const initial = name.trim().charAt(0).toUpperCase() || 'L';
   elements.userAvatar.textContent = initial;
   elements.userName.textContent = name;
-  elements.userPlan.textContent = voiceTierLabel ? `${planLabel} ${plan} (${voiceTierLabel})` : `${planLabel} ${plan}`;
-  elements.charsText.textContent = `${charsLabel} ${Number(usage.total_chars || 0).toLocaleString()} / ${Number(usage.plan_chars || 0).toLocaleString()}`;
-  elements.requestsText.textContent = requestsUnlimited
-    ? `${reqLabel} ${Number(usage.total_requests || 0).toLocaleString()} / ${unlimitedText}`
-    : `${reqLabel} ${Number(usage.total_requests || 0).toLocaleString()} / ${Number(usage.plan_requests || 0).toLocaleString()}`;
-  elements.charsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.chars_percent || 0)))}%`;
-  elements.requestsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.requests_percent || 0)))}%`;
+  elements.userPlan.textContent = voiceTierLabel
+    ? `${t('planLabel', 'Plan:')} ${plan} (${voiceTierLabel})`
+    : `${t('planLabel', 'Plan:')} ${plan}`;
+
+  // Credits left of the month's credits, like the dashboard; the bar shows what is left.
+  elements.creditsValue.textContent = profile
+    ? tf('creditsOf', '$LEFT$ of $TOTAL$', { left: formatNumber(left), total: formatNumber(planCredits) })
+    : '-';
+  elements.charsBar.style.width = planCredits > 0 ? `${Math.max(0, Math.min(100, (left / planCredits) * 100))}%` : '0%';
+
+  const minutesTotal = Number(usage.minutes_limit || 0);
+  elements.minutesText.textContent = profile && minutesTotal > 0
+    ? tf('minutesUsed', '$USED$ of $TOTAL$ voice minutes used', {
+      used: formatNumber(Number(usage.seconds_used || 0) / 60, 1),
+      total: formatNumber(minutesTotal),
+    })
+    : '';
+
+  const dailyLimit = Number(usage.daily_requests_limit || 0);
+  const dailyUsed = Number(usage.daily_requests_used || 0);
+  elements.todayText.textContent = profile && dailyLimit > 0
+    ? tf('todayUsed', 'Today: $USED$ of $LIMIT$ generations', { used: formatNumber(dailyUsed), limit: formatNumber(dailyLimit) })
+    : '';
+
+  elements.requestsText.textContent = profile
+    ? `${t('requestsLabel', 'Generations this month:')} ${formatNumber(usage.total_requests)} / ${usage.requests_unlimited ? t('unlimited', 'Unlimited') : formatNumber(usage.plan_requests)}`
+    : '';
+  elements.requestsBar && (elements.requestsBar.style.width = `${Math.max(0, Math.min(100, Number(usage.requests_percent || 0)))}%`);
+
+  // The one thing the member should know right now.
+  let note = '';
+  let warn = false;
+  if (profile && !hasCredits) {
+    note = t('noCredits', 'Your plan has no credits yet.');
+    warn = true;
+  } else if (profile && dailyLimit > 0 && dailyUsed >= dailyLimit) {
+    note = t('dailyReached', 'You reached today\u2019s limit. You can generate again tomorrow.');
+    warn = true;
+  } else if (profile && usage.mode === 'pack' && usage.pack_expires_at) {
+    const date = new Date(usage.pack_expires_at);
+    note = tf('packEnds', 'Your credits last until $DATE$', {
+      date: date.toLocaleDateString(currentUiLang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' }),
+    });
+  } else if (profile && Number(usage.gift_chars || 0) > 0) {
+    note = tf('giftNote', 'Includes $COUNT$ gift credits this month', { count: formatNumber(usage.gift_chars) });
+  } else if (profile) {
+    note = t('creditsHint', '900 credits = 1 minute of audio. You are charged for the audio you get.');
+  }
+  elements.creditsNote.textContent = note;
+  elements.creditsNote.classList.toggle('warn', warn);
+
+  const links = profile?.links || {};
+  const needsPlan = profile && (!hasCredits || left <= 0);
+  setLink(elements.planLink, needsPlan ? (links.pricing || links.billing) : links.manage);
+  if (elements.planLink) {
+    elements.planLink.textContent = needsPlan ? t('choosePlan', 'Choose a plan') : t('managePlan', 'Manage plan');
+    elements.planLink.classList.toggle('primary', Boolean(needsPlan));
+  }
+  setLink(elements.dashboardLink, links.dashboard);
 }
 
 async function refreshProfile() {
@@ -493,12 +600,14 @@ async function refreshProfile() {
   });
 
   if (!response?.ok) {
-    throw new Error(response?.message || 'Could not load profile.');
+    throw new Error(response?.message || t('errProfileLoad', 'Could not load profile.'));
   }
 
   profileData = response.profile || null;
   setProfileCard(profileData);
   renderVoiceOptions(elements.voiceKey.value);
+  renderDialectOptions(elements.dialect?.value || '');
+  renderStudioOptions(elements.performanceStyle?.value || '', elements.emotion?.value || '');
   updateStudioPanel();
   updateCharCounter();
 }
@@ -510,7 +619,7 @@ async function persistSettingsSilently() {
   });
 
   if (!response?.ok) {
-    throw new Error(response?.message || 'Could not save settings.');
+    throw new Error(response?.message || t('errInvalidRequest', 'Could not save settings.'));
   }
 }
 
@@ -579,7 +688,7 @@ async function bootstrap() {
   try {
     const response = await requestBackground({ type: 'GET_SETTINGS' });
     if (!response?.ok) {
-      throw new Error(response?.message || 'Unable to load settings.');
+      throw new Error(response?.message || t('errProfileLoad', 'Unable to load settings.'));
     }
 
     const settings = response.settings || {};
@@ -598,7 +707,7 @@ async function bootstrap() {
     setStatus('');
     await loadLastStatus().catch(() => { });
   } catch (error) {
-    setStatus(error.message || 'Unable to load settings.', 'error');
+    setStatus(error.message || t('errProfileLoad', 'Unable to load settings.'), 'error');
     await loadLastStatus().catch(() => { });
   }
 }
@@ -612,7 +721,7 @@ async function saveSettings() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.message || 'Save failed.');
+      throw new Error(response?.message || t('errInvalidRequest', 'Save failed.'));
     }
 
     writeSettingsToForm(response.settings || {});
@@ -620,7 +729,7 @@ async function saveSettings() {
     lastVerifiedApiKey = String((response.settings || {}).apiKey || '').trim();
     setStatus(t('statusSaved', 'Settings saved.'), 'ok');
   } catch (error) {
-    setStatus(error.message || 'Save failed.', 'error');
+    setStatus(error.message || t('errInvalidRequest', 'Save failed.'), 'error');
   }
 }
 
@@ -634,7 +743,7 @@ async function readSelection() {
       overrides: readSettingsFromForm(),
     });
     if (!response?.ok) {
-      throw new Error(response?.message || 'Unable to read selected text.');
+      throw new Error(response?.message || t('errNoSelection', 'Unable to read selected text.'));
     }
 
     await refreshProfile().catch(() => { });
@@ -649,7 +758,7 @@ async function readSelection() {
     } else if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network error')) {
       setStatus(t('statusNetworkError', 'Network error. If usage changed, check dashboard for the generated audio.'), 'error');
     } else {
-      setStatus(error.message || 'Unable to read selected text.', 'error');
+      setStatus(error.message || t('errNoSelection', 'Unable to read selected text.'), 'error');
     }
   }
 }
@@ -670,7 +779,7 @@ async function readQuickText() {
     });
 
     if (!response?.ok) {
-      throw new Error(response?.message || 'Voice generation failed.');
+      throw new Error(response?.message || t('errGenerationFailed', 'Voice generation failed.'));
     }
 
     await refreshProfile().catch(() => { });
@@ -685,7 +794,7 @@ async function readQuickText() {
     } else if (msg.includes('failed to fetch') || msg.includes('networkerror') || msg.includes('network error')) {
       setStatus(t('statusNetworkError', 'Network error. If usage changed, check dashboard for the generated audio.'), 'error');
     } else {
-      setStatus(error.message || 'Voice generation failed.', 'error');
+      setStatus(error.message || t('errGenerationFailed', 'Voice generation failed.'), 'error');
     }
   }
 }
@@ -818,7 +927,7 @@ elements.apiKey.addEventListener('change', async () => {
     lastVerifiedApiKey = apiKey;
     setStatus(t('statusApiKeyVerified', 'API key verified.'), 'ok');
   } catch (error) {
-    setStatus(error.message || 'Invalid API key.', 'error');
+    setStatus(error.message || t('errSetApiKey', 'Invalid API key.'), 'error');
   }
 });
 

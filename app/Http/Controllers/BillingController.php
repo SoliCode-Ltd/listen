@@ -7,6 +7,7 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
+use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\TrialEligibilityService;
@@ -79,61 +80,154 @@ class BillingController extends Controller
     public function manage(Request $request)
     {
         $user = $request->user();
+        $userId = (int) $user->id;
         $this->billingSyncService->syncIfStale($user, true);
 
-        $activePlan = $this->planAccessService->resolveActivePlanForUserId((int) $user->id);
-        $subscription = $this->currentDefaultSubscription($user);
-        $activePlan = $this->resolveConsistentActivePlan($activePlan, $subscription);
         $stripeKey = (string) config('services.stripe.key', '');
         $stripeSecret = (string) config('services.stripe.secret', '');
         $stripeReady = trim($stripeKey) !== '' && trim($stripeSecret) !== '';
-
-        $defaultPaymentMethod = $this->loadDefaultPaymentMethod($user, $stripeReady);
-
-        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
         $locale = (string) app()->getLocale();
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
 
-        $invoices = $this->loadInvoices($user, $stripeReady, $countryContext, $locale);
+        $subscription = $this->currentDefaultSubscription($user);
+        $stripeValid = (bool) ($subscription?->valid() ?? false);
+        $onGracePeriod = (bool) ($subscription?->onGracePeriod() ?? false);
+
+        // Show the plan the member actually gets (the one every limit uses),
+        // and log it if Stripe says otherwise so a broken sync gets noticed.
+        $accessPlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
+        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $accessPlan);
+        $stripePlan = $this->resolveConsistentActivePlan($accessPlan, $subscription);
+        if ($stripePlan && $accessPlan && (string) $stripePlan->slug !== (string) $accessPlan->slug && ! $accessPlan->isPack()) {
+            Log::warning('Manage subscription: Stripe plan and enforced plan differ.', [
+                'user_id' => $userId,
+                'stripe_plan' => $stripePlan->slug,
+                'enforced_plan' => $accessPlan->slug,
+            ]);
+        }
+
+        $manual = $stripeValid ? null : $this->manualSubscriptionState($user);
+        $hasStripeCustomer = $user->hasStripeId();
 
         $periodEnd = null;
-        if ($subscription && $stripeReady && $user->hasStripeId()) {
+        $renews = $stripeValid && ! $onGracePeriod
+            && in_array(strtolower((string) $subscription?->stripe_status), ['active', 'trialing'], true);
+        if ($renews && $stripeReady && $hasStripeCustomer) {
             try {
-                $periodEnd = $subscription->currentPeriodEnd()?->toDateString();
+                $periodEnd = $subscription->currentPeriodEnd();
             } catch (\Throwable $exception) {
                 Log::warning('Unable to resolve Stripe current period end for manage subscription page.', [
-                    'user_id' => $user->id,
-                    'stripe_id' => $user->stripe_id,
+                    'user_id' => $userId,
                     'subscription_id' => $subscription->id,
                     'error' => $exception->getMessage(),
                 ]);
             }
         }
 
-        $hasStripeCustomer = $user->hasStripeId();
         $billingProfileRemoved = ! $hasStripeCustomer
             && (bool) ($subscription?->id)
             && trim((string) ($subscription?->stripe_id ?? '')) !== '';
 
+        $counter = UsageCounter::firstOrCreate(
+            ['user_id' => $userId, 'period_ym' => now()->format('Y-m')],
+            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
+        );
+
         return view('manage-subscription', [
-            'activePlan' => $activePlan,
-            'activePlanName' => $activePlan
-                ? ($activePlan->getLocalizedName($locale) ?: $activePlan->name)
+            'activePlan' => $accessPlan,
+            'activePlanName' => $accessPlan
+                ? ($accessPlan->getLocalizedName($locale) ?: $accessPlan->name)
                 : __('ui.dashboard.free_plan'),
-            'activeTierLabel' => VoiceTier::label((string) ($activePlan?->voice_tier ?: 'standard')),
+            'activeTierLabel' => VoiceTier::label($this->planAccessService->resolveTierForPlan($accessPlan)),
             'stripeReady' => $stripeReady,
             'stripeKey' => $stripeKey,
-            'defaultPaymentMethod' => $defaultPaymentMethod,
-            'invoices' => $invoices,
-            'hasActiveSubscription' => (bool) ($subscription?->valid() ?? false),
-            'hasCancelableSubscription' => (bool) ($subscription?->valid() ?? false) && ! ($subscription?->onGracePeriod() ?? false),
-            'isCancellationScheduled' => (bool) ($subscription?->onGracePeriod() ?? false),
+            'defaultPaymentMethod' => $this->loadDefaultPaymentMethod($user, $stripeReady, $stripeValid ? $subscription : null),
+            'invoices' => array_merge(
+                $this->loadInvoices($user, $stripeReady, $countryContext, $locale),
+                $this->manualPaymentReceipts($user, $locale),
+            ),
+            'hasCancelableSubscription' => $stripeValid && ! $onGracePeriod,
+            'isCancellationScheduled' => $onGracePeriod,
             'billingProfileRemoved' => $billingProfileRemoved,
-            'subscriptionStatus' => $this->subscriptionStatusLabel($subscription, $hasStripeCustomer),
-            'subscriptionEndsAt' => $this->formatDateLabel(($subscription?->onGracePeriod() ?? false) ? $subscription?->ends_at?->toDateString() : null),
-            'subscriptionRenewsAt' => $this->formatDateLabel($periodEnd),
-            'upcomingCharge' => $this->resolveUpcomingCharge($subscription, $countryContext, $locale),
-            'trialNotice' => $this->trialNotice($user),
+            'subscriptionStatus' => $manual['status'] ?? $this->subscriptionStatusLabel($subscription, $hasStripeCustomer),
+            'subscriptionEndsAt' => $onGracePeriod && $subscription?->ends_at ? $this->formatCarbonDate($subscription->ends_at) : null,
+            'subscriptionRenewsAt' => $periodEnd ? $this->formatCarbonDate($periodEnd) : null,
+            'upcomingCharge' => $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null,
+            'trialNotice' => $this->trialNotice($user, $locale),
+            'manual' => $manual,
+            'usage' => \App\Support\UsageSnapshot::for($userId, $quotaPlan, $counter),
+            'quotaPlan' => $quotaPlan,
+            'downloadFormats' => collect(\App\Support\AudioFormats::chosenFor($accessPlan))
+                ->map(fn (string $format): string => strtoupper($format))->implode(', '),
+            'creditsResetAt' => $this->formatCarbonDate(now()->addMonthNoOverflow()->startOfMonth()),
         ]);
+    }
+
+    /**
+     * A plan paid by InstaPay / Vodafone Cash: no Stripe subscription, an end
+     * date set when the payment was approved, and no automatic renewal.
+     *
+     * @return array{status:?string, ends_at:?string, expired:bool, plan_slug:?string, pending_plan:?string, paid_manually:bool}|null
+     */
+    private function manualSubscriptionState(User $user): ?array
+    {
+        $local = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
+        $pending = \App\Models\ManualPaymentRequest::query()
+            ->where('user_id', $user->id)
+            ->where('status', \App\Models\ManualPaymentRequest::STATUS_PENDING)
+            ->whereNotNull('submitted_at')
+            ->latest('id')
+            ->with('plan')
+            ->first();
+        $pendingPlan = $pending?->plan ? ($pending->plan->getLocalizedName((string) app()->getLocale()) ?: $pending->plan->name) : null;
+
+        if (! $local || (int) ($local->plan?->price_cents ?? 0) <= 0) {
+            return $pendingPlan ? ['status' => null, 'ends_at' => null, 'expired' => false, 'plan_slug' => null, 'pending_plan' => $pendingPlan, 'paid_manually' => false] : null;
+        }
+
+        // A paid plan without a card subscription: paid by InstaPay / Vodafone Cash, or set by an admin.
+        $paidManually = (string) $local->billing_payment_state === 'manual_override';
+        $end = $local->current_period_end;
+        $expired = (string) $local->status !== 'active' || ($end !== null && $end->isPast());
+
+        return [
+            'status' => $expired ? 'Expired' : ($paidManually ? 'Active manual' : 'Active'),
+            'ends_at' => $end ? $this->formatCarbonDate($end) : null,
+            'expired' => $expired,
+            'plan_slug' => (string) $local->plan?->slug,
+            'pending_plan' => $pendingPlan,
+            'paid_manually' => $paidManually,
+        ];
+    }
+
+    /**
+     * Approved InstaPay / Vodafone Cash payments, listed with the card invoices.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function manualPaymentReceipts(User $user, string $locale): array
+    {
+        return \App\Models\ManualPaymentRequest::query()
+            ->where('user_id', $user->id)
+            ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
+            ->latest('id')
+            ->limit(24)
+            ->with('plan')
+            ->get()
+            ->map(function ($payment) use ($locale): array {
+                $currency = strtoupper((string) ($payment->currency ?: 'EGP'));
+                $amount = (int) $payment->expected_amount_minor;
+
+                return [
+                    'id' => '',
+                    'date' => $this->formatCarbonDate($payment->reviewed_at ?? $payment->created_at),
+                    'status' => 'PAID',
+                    'total' => number_format($amount / 100, $amount % 100 === 0 ? 0 : 2).' '.$currency,
+                    'purpose' => trim(($payment->plan ? ($payment->plan->getLocalizedName($locale) ?: $payment->plan->name).' · ' : '').__('ui.manage_subscription.manual_payment_label')),
+                    'pay_url' => '',
+                ];
+            })
+            ->all();
     }
 
     public function subscribe(Request $request)
@@ -350,6 +444,14 @@ class BillingController extends Controller
             $this->ensureStripeCustomer($user);
             $this->assertCardPaymentMethod((string) $validated['payment_method']);
             $user->updateDefaultPaymentMethod((string) $validated['payment_method']);
+            // A card set on the subscription itself (trials, plan changes) wins over the
+            // customer's default, so renewals would keep using the old card without this.
+            $subscription = $this->currentDefaultSubscription($user);
+            if ($subscription && ! $subscription->ended() && trim((string) $subscription->stripe_id) !== '') {
+                Cashier::stripe()->subscriptions->update((string) $subscription->stripe_id, [
+                    'default_payment_method' => (string) $validated['payment_method'],
+                ]);
+            }
             $this->savedCards->rememberQuietly($user, (string) $validated['payment_method'], 'update');
             $this->billingSyncService->syncIfStale($user, true);
         } catch (\Throwable $exception) {
@@ -992,8 +1094,13 @@ class BillingController extends Controller
         }
 
         try {
-            return collect($user->invoices())->map(function ($invoice) use ($countryContext, $locale) {
+            // Paid and unpaid ones: an open invoice is what a past-due member has to pay.
+            return collect($user->invoices(true))->map(function ($invoice) use ($countryContext, $locale) {
                 $stripeInvoice = $invoice->asStripeInvoice();
+                $status = strtolower((string) ($stripeInvoice->status ?? 'paid'));
+                if ($status === 'draft') {
+                    return null;
+                }
                 $currency = strtoupper((string) ($stripeInvoice->currency ?? 'USD'));
                 $totalCents = (int) ($stripeInvoice->total ?? 0);
                 $invoiceDate = $invoice->date();
@@ -1001,11 +1108,12 @@ class BillingController extends Controller
                 return [
                     'id' => (string) $invoice->id,
                     'date' => $invoiceDate ? $this->formatCarbonDate($invoiceDate) : '-',
-                    'status' => strtoupper((string) ($stripeInvoice->status ?? 'paid')),
-                    'total' => $this->formatLocalizedInvoiceAmount($totalCents, $currency, $countryContext, $locale),
+                    'status' => strtoupper($status),
+                    'total' => $this->formatChargedAmount($totalCents, $currency, $countryContext, $locale),
                     'purpose' => $this->resolveInvoicePurposeLabel($stripeInvoice, $locale),
+                    'pay_url' => $status === 'open' ? (string) ($stripeInvoice->hosted_invoice_url ?? '') : '',
                 ];
-            })->values()->all();
+            })->filter()->values()->all();
         } catch (\Throwable $exception) {
             Log::warning('Unable to load Stripe invoices for manage subscription page.', [
                 'user_id' => $user->id,
@@ -1017,13 +1125,22 @@ class BillingController extends Controller
         }
     }
 
-    private function loadDefaultPaymentMethod(User $user, bool $stripeReady): mixed
+    private function loadDefaultPaymentMethod(User $user, bool $stripeReady, ?BillingSubscription $subscription = null): mixed
     {
         if (! $stripeReady || ! $user->hasStripeId()) {
             return null;
         }
 
         try {
+            // The card renewals use: the subscription's own card wins over the customer's.
+            if ($subscription && trim((string) $subscription->stripe_id) !== '') {
+                $stripeSubscription = Cashier::stripe()->subscriptions->retrieve((string) $subscription->stripe_id, ['expand' => ['default_payment_method']]);
+                $own = $stripeSubscription->default_payment_method ?? null;
+                if (is_object($own) && isset($own->card)) {
+                    return $own;
+                }
+            }
+
             return $user->defaultPaymentMethod();
         } catch (\Throwable $exception) {
             Log::warning('Unable to load default Stripe payment method.', [
@@ -1113,7 +1230,7 @@ class BillingController extends Controller
         try {
             return $request->user()->downloadInvoice($invoiceId, [
                 'vendor' => config('app.name', 'Listen'),
-                'product' => 'Subscription Invoice',
+                'product' => __('ui.manage_subscription.invoice_product'),
             ]);
         } catch (\Throwable $exception) {
             Log::warning('Unable to render PDF invoice locally, redirecting to Stripe hosted invoice when possible.', [
@@ -1129,7 +1246,7 @@ class BillingController extends Controller
                 return redirect()->away($hostedUrl);
             }
 
-            abort(422, 'Unable to download invoice PDF right now.');
+            abort(422, __('ui.manage_subscription.invoice_download_failed'));
         }
     }
 
@@ -1151,6 +1268,7 @@ class BillingController extends Controller
     {
         return Carbon::parse($date)
             ->clone()
+            ->setTimezone((string) config('listen.billing.daily_limit_timezone', 'Africa/Cairo'))
             ->locale((string) app()->getLocale())
             ->translatedFormat('j M Y');
     }
@@ -1199,6 +1317,18 @@ class BillingController extends Controller
 
         // Fallback to Stripe's native formatting
         return $this->formatInvoiceTotalLabel($amountCents, $stripeCurrency);
+    }
+
+    /**
+     * What the card was actually charged (Stripe charges USD), with today's
+     * local-currency estimate beside it, so past amounts never change.
+     */
+    private function formatChargedAmount(int $amountCents, string $stripeCurrency, array $countryContext, string $locale): string
+    {
+        $charged = $this->formatInvoiceTotalLabel($amountCents, $stripeCurrency);
+        $local = $this->formatLocalizedInvoiceAmount($amountCents, $stripeCurrency, $countryContext, $locale);
+
+        return $local !== $charged ? $charged.' (≈ '.$local.')' : $charged;
     }
 
     private function resolveInvoicePurposeLabel(mixed $stripeInvoice, string $locale = 'en'): string
@@ -1386,7 +1516,7 @@ class BillingController extends Controller
         return trim((string) config("services.stripe.prices.{$planSlug}.{$cycle}", ''));
     }
 
-    private function trialNotice(User $user): ?string
+    private function trialNotice(User $user, string $locale = 'en'): ?string
     {
         if (! $this->planAccessService->userHasUnpaidTrialWindow((int) $user->id)) {
             return null;
@@ -1395,19 +1525,34 @@ class BillingController extends Controller
         $trial = BillingTrial::query()
             ->where('user_id', $user->id)
             ->whereNull('paid_at')
-            ->where('trial_ends_at', '>', now())
             ->whereIn('status', [BillingTrial::STATUS_TRIALING, BillingTrial::STATUS_CANCELED])
             ->latest('id')
             ->first();
-        $quota = $trial?->quotaPlan ?: $this->trialEligibility->starterPlan();
-        $planName = (string) ($trial?->plan?->name ?: $this->trialEligibility->creatorPlan()?->name ?: '');
+        // The limits that are really applied during the trial.
+        $quota = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id);
+        $plan = $trial?->plan ?: $this->trialEligibility->creatorPlan();
+        $planName = $plan ? ($plan->getLocalizedName($locale) ?: (string) $plan->name) : '';
+
+        if ($trial && $trial->status === BillingTrial::STATUS_CANCELED) {
+            return __('ui.billing.trial_canceled_notice', [
+                'plan' => $planName,
+                'date' => $trial->trial_ends_at ? $this->formatCarbonDate($trial->trial_ends_at) : '—',
+            ]);
+        }
+
+        $credits = \App\Support\PlanUsageGuard::planChars($quota);
+        $minutes = \App\Support\Credits::minutesFor($credits);
+        $minuteCap = (int) ($quota?->monthly_minutes ?? 0);
+        if ((bool) ($quota?->getAttribute('enforce_trial_minute_cap') ?? false) && $minuteCap > 0) {
+            $minutes = min($minutes, $minuteCap);
+        }
 
         return __('ui.billing.trial_active_notice', [
             'plan' => $planName,
-            'quota' => (string) ($quota->name ?? ''),
-            'chars' => number_format((int) ($quota->monthly_chars ?? 0)),
-            'per_request' => number_format((int) ($quota->max_chars_per_request ?? 0)),
-            'minutes' => number_format((int) ($quota->monthly_minutes ?? 0)),
+            'quota' => $quota ? ($quota->getLocalizedName($locale) ?: (string) $quota->name) : '',
+            'credits' => number_format($credits),
+            'per_request' => number_format(\App\Support\PlanUsageGuard::maxCharsPerRequest($quota)),
+            'minutes' => number_format($minutes),
         ]);
     }
 

@@ -66,6 +66,34 @@ function getVoiceLabel(voiceData, uiLang) {
   return voiceData.label || '';
 }
 
+// Messages in the extension's language (the popup can switch it), cached once per language.
+let currentBgLang = 'en';
+const BG_MESSAGES = {};
+
+async function warmBgMessages(lang) {
+  const language = lang === 'ar' ? 'ar' : 'en';
+  currentBgLang = language;
+  if (BG_MESSAGES[language]) return;
+  try {
+    const response = await fetch(chrome.runtime.getURL(`_locales/${language}/messages.json`));
+    const json = await response.json();
+    BG_MESSAGES[language] = Object.fromEntries(Object.entries(json).map(([key, value]) => [key, value?.message || '']));
+  } catch (_error) {
+    BG_MESSAGES[language] = {};
+  }
+}
+
+function bgText(key, fallback) {
+  return BG_MESSAGES[currentBgLang]?.[key] || fallback;
+}
+
+getUiLanguage().then(warmBgMessages).catch(() => { });
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === 'local' && changes.uiLanguage) {
+    warmBgMessages(changes.uiLanguage.newValue).catch(() => { });
+  }
+});
+
 const PACKAGED_API_BASE = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.apiBase || '');
 const PACKAGED_CONFIG_URL = normalizeApiBase(self.LISTEN_EXTENSION_CONFIG?.configUrl || '');
 const REMOTE_CONFIG_ALARM = 'listen_remote_config_refresh';
@@ -244,7 +272,7 @@ function sleep(ms) {
 function sendTabMessage(tabId, message) {
   return new Promise((resolve, reject) => {
     if (typeof tabId !== 'number') {
-      reject(new Error('No active tab found.'));
+      reject(new Error(bgText('errNoActiveTab', 'No active tab found.')));
       return;
     }
 
@@ -276,7 +304,7 @@ function isUnsupportedTabUrl(url) {
 async function getActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab || typeof tab.id !== 'number') {
-    throw new Error('No active tab found.');
+    throw new Error(bgText('errNoActiveTab', 'No active tab found.'));
   }
 
   return tab;
@@ -622,7 +650,7 @@ async function fetchAudioPacket(audioUrl) {
   });
 
   if (!response.ok) {
-    throw new Error('Could not download generated audio.');
+    throw new Error(bgText('errAudioDownload', 'Could not download generated audio.'));
   }
 
   const buffer = await response.arrayBuffer();
@@ -645,6 +673,7 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
         headers: {
           Accept: 'application/json',
           'X-Listen-Key': apiKey,
+        'X-Listen-Locale': currentBgLang,
         },
       });
     } catch (networkError) {
@@ -654,7 +683,7 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data?.ok === false) {
-      throw new Error(extractApiErrorMessage(data, 'Unable to check generation status.'));
+      throw new Error(extractApiErrorMessage(data, bgText('errStatusCheck', 'Unable to check generation status.')));
     }
 
     const jobs = Array.isArray(data?.jobs) ? data.jobs : [];
@@ -666,11 +695,11 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
     }
 
     if (match.status === 'failed') {
-      throw new Error(extractApiErrorMessage(match, 'Voice generation failed.'));
+      throw new Error(extractApiErrorMessage(match, bgText('errGenerationFailed', 'Voice generation failed.')));
     }
   }
 
-  throw new Error('Voice generation is taking too long. Please try again.');
+  throw new Error(bgText('errTooLong', 'Voice generation is taking too long. Please try again.'));
 }
 
 async function openSidePlayer(tabId, audioUrl, textPreview, voiceLabel = '', requestToken = 0) {
@@ -700,29 +729,30 @@ async function openSidePlayer(tabId, audioUrl, textPreview, voiceLabel = '', req
   if (!response?.ok) {
     const ready = await ensureContentScriptReady(tabId);
     if (!ready) {
-      throw new Error('Could not open side player in this page. Try in a regular website tab.');
+      throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
     }
 
     response = await sendTabMessage(tabId, message).catch(() => null);
   }
 
   if (!response?.ok) {
-    throw new Error('Could not open side player in this page. Try in a regular website tab.');
+    throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
   }
 
   return { skipped: false };
 }
 
 async function fetchProfile(overrides = {}) {
+  await warmBgMessages(await getUiLanguage());
   const settings = { ...(await getSettings()), ...overrides };
   const apiBase = normalizeApiBase(settings.apiBase);
   const apiKey = String(settings.apiKey || '').trim();
 
   if (!apiBase) {
-    throw new Error('Service endpoint is not configured.');
+    throw new Error(bgText('errNoEndpoint', 'Service endpoint is not configured.'));
   }
   if (!apiKey) {
-    throw new Error('Set API Key to connect your account.');
+    throw new Error(bgText('errSetApiKey', 'Set API Key to connect your account.'));
   }
 
   let response;
@@ -735,6 +765,7 @@ async function fetchProfile(overrides = {}) {
       headers: {
         Accept: 'application/json',
         'X-Listen-Key': apiKey,
+        'X-Listen-Locale': currentBgLang,
       },
       signal: controller.signal,
     });
@@ -742,14 +773,14 @@ async function fetchProfile(overrides = {}) {
     clearTimeout(timeoutId);
   } catch (networkError) {
     if (networkError.name === 'AbortError') {
-      throw new Error('Request timed out. Server may be slow or unreachable.');
+      throw new Error(bgText('errProfileTimeout', 'Request timed out. Server may be slow or unreachable.'));
     }
-    throw new Error('Network error. Check your connection and ensure the server is running.');
+    throw new Error(bgText('errNetwork', 'Network error. Check your connection and ensure the server is running.'));
   }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(extractApiErrorMessage(data, 'Could not load profile.'));
+    throw new Error(extractApiErrorMessage(data, bgText('errProfileLoad', 'Could not load profile.')));
   }
 
   return data?.profile || null;
@@ -758,19 +789,20 @@ async function fetchProfile(overrides = {}) {
 async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   const selectedText = normalizeSelectedText(text);
   if (!selectedText) {
-    throw new Error('No text selected. Highlight text first.');
+    throw new Error(bgText('errNoTextSelected', 'No text selected. Highlight text first.'));
   }
 
   const settings = { ...(await getSettings()), ...overrides };
   const apiBase = normalizeApiBase(settings.apiBase);
   const apiKey = String(settings.apiKey || '').trim();
   const uiLang = await getUiLanguage();
+  await warmBgMessages(uiLang);
 
   if (!apiBase) {
-    throw new Error('Service endpoint is not configured.');
+    throw new Error(bgText('errNoEndpoint', 'Service endpoint is not configured.'));
   }
   if (!apiKey) {
-    throw new Error('Set API Key in extension settings.');
+    throw new Error(bgText('errSetApiKey', 'Set API Key in extension settings.'));
   }
 
   const selectedTargetLanguage = settings.translate !== false
@@ -830,6 +862,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         'X-Listen-Key': apiKey,
+        'X-Listen-Locale': currentBgLang,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -838,14 +871,14 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     clearTimeout(timeoutId);
   } catch (networkError) {
     if (networkError.name === 'AbortError') {
-      throw new Error('Request timed out. The voice may still be generating - check your history.');
+      throw new Error(bgText('errQueueTimeout', 'Request timed out. The voice may still be generating - check your history.'));
     }
-    throw new Error('Network error. Check your connection and ensure the server is running.');
+    throw new Error(bgText('errNetwork', 'Network error. Check your connection and ensure the server is running.'));
   }
 
   const data = await response.json().catch(() => ({}));
   if (!response.ok || data?.ok === false) {
-    throw new Error(extractApiErrorMessage(data, 'Voice generation failed.'));
+    throw new Error(extractApiErrorMessage(data, bgText('errGenerationFailed', 'Voice generation failed.')));
   }
 
   if (data.audio_url) {
@@ -867,7 +900,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
       status: data.status || 'done',
       audio_url: absoluteAudioUrl,
       voice_label: getVoiceLabel(data?.voice, uiLang),
-      message: 'Voice generated successfully.',
+      message: bgText('msgGenerated', 'Voice generated successfully.'),
     };
   }
 
@@ -892,23 +925,23 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
       status: readyJob.status,
       audio_url: absoluteJobAudioUrl,
       voice_label: getVoiceLabel(readyJob?.voice, uiLang),
-      message: 'Voice generated successfully.',
+      message: bgText('msgGenerated', 'Voice generated successfully.'),
     };
   }
 
-  throw new Error('Unexpected response from API.');
+  throw new Error(bgText('errUnexpected', 'Unexpected response from API.'));
 }
 
 async function readCurrentTabSelection(overrides = {}) {
   const tab = await getActiveTab();
   if (isUnsupportedTabUrl(tab.url)) {
-    throw new Error('Cannot read selection from chrome:// or extension pages. Open a regular website tab and try again.');
+    throw new Error(bgText('errUnsupportedPage', 'Cannot read selection from chrome:// or extension pages. Open a regular website tab and try again.'));
   }
 
   const selectedText = await readSelectionFromTab(tab.id);
 
   if (!selectedText) {
-    throw new Error('No selected text found. Highlight text first, then try again.');
+    throw new Error(bgText('errNoSelection', 'No selected text found. Highlight text first, then try again.'));
   }
 
   const requestToken = nextPlaybackToken(tab.id);
@@ -953,7 +986,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     await queueTextForPlayback(selected, {}, { tabId: tabId ?? undefined, requestToken });
     flashBadge('OK', '#2bb673');
   } catch (error) {
-    const message = String(error?.message || 'Voice generation failed.');
+    const message = String(error?.message || bgText('errGenerationFailed', 'Voice generation failed.'));
     await setLastStatus(message, 'error');
     flashBadge('ERR', '#d9534f', 3000);
   }
@@ -962,7 +995,7 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   const respond = async () => {
     if (!message || typeof message !== 'object') {
-      return { ok: false, message: 'Invalid request.' };
+      return { ok: false, message: bgText('errInvalidRequest', 'Invalid request.') };
     }
 
     if (message.type === 'GET_SETTINGS') {
@@ -1013,7 +1046,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return { ok: true, detection };
     }
 
-    return { ok: false, message: 'Unsupported action.' };
+    return { ok: false, message: bgText('errUnsupportedAction', 'Unsupported action.') };
   };
 
   respond()
