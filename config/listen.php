@@ -31,6 +31,8 @@ return [
     ],
 
     'billing' => [
+        // A plan's daily generation limit resets at midnight in this time zone (most members are in Egypt).
+        'daily_limit_timezone' => (string) env('LISTEN_DAILY_LIMIT_TIMEZONE', 'Africa/Cairo'),
         'subscription_sync_ttl_minutes' => (int) env('LISTEN_SUBSCRIPTION_SYNC_TTL_MINUTES', 10),
         'grace_days' => (int) env('LISTEN_BILLING_GRACE_DAYS', 7),
         'webhook_email_enabled' => (bool) env('LISTEN_BILLING_WEBHOOK_EMAILS', true),

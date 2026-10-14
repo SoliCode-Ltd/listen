@@ -50,14 +50,27 @@ class PlanUsageGuard
 
     /**
      * Generations the member started today (failed ones do not count: they are given back).
+     * "Today" is the members' day (Cairo by default), not the server's UTC day, so the
+     * limit does not reset in the middle of their night.
      */
     public static function requestsToday(int $userId): int
     {
         return AudioGeneration::query()
             ->where('user_id', $userId)
-            ->where('created_at', '>=', now()->startOfDay())
+            ->where('created_at', '>=', self::startOfMemberDay())
             ->where('status', '!=', 'failed')
             ->count();
+    }
+
+    /** Midnight of the members' current day, in the app's time zone (as stored). */
+    public static function startOfMemberDay(): \Illuminate\Support\Carbon
+    {
+        $zone = (string) config('listen.billing.daily_limit_timezone', 'Africa/Cairo');
+        try {
+            return now($zone)->startOfDay()->setTimezone(config('app.timezone'));
+        } catch (\Throwable) {
+            return now()->startOfDay();
+        }
     }
 
     public static function assertWithinDailyLimit(?Plan $plan, int $userId): void
