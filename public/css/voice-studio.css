@@ -1020,104 +1020,88 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-lib-gender button:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
 .vs-lib-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
-  gap: .6rem;
-  max-height: 470px;
-  margin-top: .8rem;
-  padding: .2rem .15rem .4rem;
+  gap: 2px;
+  max-height: 440px;
+  margin: .9rem -.5rem 0;
+  padding: 0 .1rem;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
 }
+/* One speaker per row: avatar, name and details, then preview and favourite. */
 .vs-voice {
-  position: relative;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: .3rem;
+  gap: .8rem;
   min-width: 0;
-  padding: .85rem .5rem .7rem;
-  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
-  border-radius: 16px;
-  background: var(--surface);
-  text-align: center;
+  min-height: 60px;
+  padding: .5rem .6rem;
+  border-radius: 10px;
   cursor: pointer;
-  transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+  transition: background-color .12s ease;
 }
-.vs-voice:hover { border-color: color-mix(in oklab, var(--a, #7659FA) 50%, var(--line)); }
-.vs-voice:focus-visible { outline: none; border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 24%, transparent); }
-.vs-voice.is-selected {
-  border-color: var(--a, #7659FA);
-  background: color-mix(in oklab, var(--a, #7659FA) 6%, var(--surface));
-}
+.vs-voice:hover { background: var(--surface2); }
+.vs-voice:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: -2px; }
+.vs-voice.is-selected { background: color-mix(in oklab, var(--a, #7659FA) 9%, var(--surface)); }
 .vs-voice[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
-.vs-voice-avatar { position: relative; display: block; width: 62px; height: 62px; }
+.vs-voice-avatar { position: relative; flex: none; width: 42px; height: 42px; }
 .vs-voice-avatar > img,
 .vs-voice-initial {
   display: grid;
   place-items: center;
-  width: 62px;
-  height: 62px;
+  box-sizing: border-box;
+  width: 42px;
+  height: 42px;
+  border: 2px solid transparent;
   border-radius: 50%;
   object-fit: cover;
   background: #7659FA;
   color: #FFFFFF;
-  font-size: 1.4rem;
-  font-weight: 800;
-  border: 2px solid var(--surface2);
-  box-sizing: border-box;
+  font-size: 1rem;
+  font-weight: 700;
 }
 .vs-voice.is-selected .vs-voice-avatar > img,
 .vs-voice.is-selected .vs-voice-initial { border-color: var(--a, #7659FA); }
 .vs-voice-flag {
   position: absolute;
   bottom: -2px;
-  inset-inline-end: -2px;
-  width: 22px;
-  height: 22px;
+  inset-inline-end: -3px;
+  width: 17px;
+  height: 17px;
+  border: 2px solid var(--surface);
   border-radius: 50%;
   overflow: hidden;
-  border: 2px solid var(--surface);
 }
 .vs-voice-flag img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.vs-voice-info { display: grid; gap: .1rem; flex: 1; min-width: 0; }
 .vs-voice-name {
-  max-width: 100%;
-  margin-top: .25rem;
   overflow: hidden;
-  font-size: .9rem;
-  font-weight: 800;
+  font-size: .92rem;
+  font-weight: 700;
   color: var(--text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.vs-voice-meta { display: flex; flex-wrap: wrap; justify-content: center; gap: .25rem; min-height: 1.2rem; }
-.vs-voice-gender,
-.vs-voice-badge {
-  padding: .05rem .45rem;
-  border-radius: 999px;
-  font-size: .68rem;
-  font-weight: 700;
-  line-height: 1.5;
-}
-.vs-voice-gender.vs-g-female { background: color-mix(in oklab, #A48FFF 22%, transparent); color: color-mix(in oklab, #7659FA 85%, var(--text)); }
-.vs-voice-gender.vs-g-male { background: color-mix(in oklab, #4C6BF5 14%, transparent); color: color-mix(in oklab, #4C6BF5 85%, var(--text)); }
-.vs-voice-badge { background: color-mix(in oklab, var(--a, #7659FA) 14%, transparent); color: color-mix(in oklab, var(--a, #7659FA) 85%, var(--text)); }
-.vs-voice-dialect {
-  max-width: 100%;
+.vs-voice.is-selected .vs-voice-name { color: var(--a, #7659FA); }
+.vs-voice-sub {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  min-width: 0;
   overflow: hidden;
-  font-size: .7rem;
+  font-size: .78rem;
   color: var(--muted);
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
+.vs-voice-sub i { font-style: normal; opacity: .6; }
+.vs-voice-badge { color: var(--a, #7659FA); font-weight: 600; }
+.vs-voice-actions { display: flex; align-items: center; gap: .2rem; flex: none; }
+.vs-voice-play,
 .vs-voice-fav {
-  position: absolute;
-  top: 6px;
-  inset-inline-end: 6px;
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -1125,50 +1109,28 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
   color: var(--muted);
   cursor: pointer;
 }
+.vs-voice-play svg { width: 16px; height: 16px; fill: currentColor; }
 .vs-voice-fav svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 2; }
+.vs-voice-play:hover,
 .vs-voice-fav:hover { color: var(--a, #7659FA); background: color-mix(in oklab, var(--a, #7659FA) 10%, transparent); }
 .vs-voice-fav[aria-pressed="true"] { color: var(--a, #7659FA); }
 .vs-voice-fav:focus-visible,
 .vs-voice-play:focus-visible { outline: 2px solid var(--a, #7659FA); outline-offset: 1px; }
-.vs-voice-check {
-  position: absolute;
-  top: 8px;
-  inset-inline-start: 8px;
-  width: 18px;
-  height: 18px;
-  padding: 3px;
-  border-radius: 50%;
-  background: var(--a, #7659FA);
-  fill: none;
-  stroke: #FFFFFF;
-  stroke-width: 3;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0;
+/* Hover shows the actions; a favourite or a playing preview keeps its own visible. */
+@media (hover: hover) {
+  .vs-voice .vs-voice-play,
+  .vs-voice .vs-voice-fav[aria-pressed="false"] { opacity: 0; }
+  .vs-voice:hover .vs-voice-play,
+  .vs-voice:hover .vs-voice-fav,
+  .vs-voice:focus-within .vs-voice-play,
+  .vs-voice:focus-within .vs-voice-fav,
+  .vs-voice.is-selected .vs-voice-play,
+  .vs-voice.is-playing .vs-voice-play { opacity: 1; }
 }
-.vs-voice.is-selected .vs-voice-check { opacity: 1; }
-.vs-voice-play {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: .3rem;
-  width: 100%;
-  min-height: 30px;
-  margin-top: .2rem;
-  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
-  border-radius: 9px;
-  background: color-mix(in oklab, var(--surface2) 60%, var(--surface));
-  color: var(--a, #7659FA);
-  cursor: pointer;
-}
-.vs-voice-play svg { width: 15px; height: 15px; fill: currentColor; }
-.vs-voice-play .i-stop,
-.vs-voice-play .vs-voice-bars { display: none; }
-.vs-voice.is-playing .vs-voice-play { background: var(--a, #7659FA); border-color: transparent; color: #FFFFFF; }
+.vs-voice-bars { display: none; align-items: flex-end; gap: 2px; height: 12px; }
+.vs-voice.is-playing .vs-voice-play { color: #FFFFFF; background: var(--a, #7659FA); }
 .vs-voice.is-playing .vs-voice-play .i-play { display: none; }
-.vs-voice.is-playing .vs-voice-play .i-stop,
-.vs-voice.is-playing .vs-voice-play .vs-voice-bars { display: inline-flex; }
-.vs-voice-bars { align-items: flex-end; gap: 2px; height: 12px; }
+.vs-voice.is-playing .vs-voice-bars { display: inline-flex; }
 .vs-voice-bars i { display: block; width: 3px; height: 100%; border-radius: 2px; background: currentColor; animation: vs-bars .9s ease-in-out infinite; }
 .vs-voice-bars i:nth-child(2) { animation-delay: .15s; }
 .vs-voice-bars i:nth-child(3) { animation-delay: .3s; }
@@ -1177,7 +1139,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-lib-empty[hidden] { display: none; }
 .vs-lib + .vs-pane { margin-top: 1.1rem; border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent); }
 @media (max-width: 480px) {
-  .vs-lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 420px; }
+  .vs-lib-grid { max-height: 380px; }
   .vs-lib-tab { font-size: .8rem; padding: 0 .35rem; }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1249,4 +1211,95 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
   .vs-setbar { gap: .75rem; padding: .9rem; }
   .vs-setbar .vs-select-button,
   .vs-setbar .vs-pick { min-height: 52px; }
+}
+
+/* ---------- Workspace: sections divided by lines, not boxed ---------- */
+#generateVoiceSection > .page-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+#generateVoiceSection > .page-card::before { display: none; }
+#generateVoiceSection > .page-card:hover { box-shadow: none; }
+#generateVoiceSection > .page-card > h1 { margin: 0 0 1.6rem; font-size: 1.55rem; line-height: 1.3; }
+#generateVoiceSection > .page-card > h1 .grad-text {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--text);
+}
+.vs-layout { gap: 0; }
+.vs-main { padding-inline-end: 2rem; }
+.vs-side { padding-inline-start: 2rem; border-inline-start: 1px solid var(--line); }
+.vs-panel { border: 0; border-radius: 0; background: none; }
+.vs-panel-head { padding: 0 0 1rem; }
+.vs-lib { padding: 0; }
+.vs-pane { padding: 0; }
+.vs-guide { padding: 1.1rem 0; }
+@media (max-width: 1180px) {
+  .vs-main { padding-inline-end: 0; }
+  .vs-side { margin-top: 2rem; padding: 2rem 0 0; border-inline-start: 0; border-top: 1px solid var(--line); }
+}
+@media (max-width: 480px) {
+  .vs-panel-head { padding: 0 0 .8rem; }
+  .vs-lib { padding: 0; }
+  .vs-pane { padding: 0; }
+}
+
+/* Library tabs: an underline, like page tabs. */
+.vs-lib-tabs {
+  gap: 1.4rem;
+  padding: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+.vs-lib-tab {
+  position: relative;
+  flex: none;
+  min-height: 0;
+  padding: .2rem 0 .75rem;
+  border-radius: 0;
+}
+.vs-lib-tab[aria-selected="true"] { background: none; outline: 0; color: var(--text); }
+.vs-lib-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--a, #7659FA);
+}
+
+/* Fine-tuning and its switches: rows divided by lines. */
+.vs-lib + .vs-pane { margin-top: 1.6rem; padding-top: 1.5rem; border-top: 1px solid var(--line); }
+.vs-panel .s-card,
+#generateVoiceSection .vs-panel .s-card {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+.vs-pane > .vs-field.s-card,
+.vs-pane [data-dialogue] { margin-top: 1.5rem; }
+.vs-panel .compact-toggle-row,
+.vs-panel .translate-row { padding: 1rem 0; border: 0; border-radius: 0; background: none; }
+.vs-panel .vs-guide { border-top: 1px solid var(--line); }
+.vs-effect-field { margin-top: 0; margin-bottom: 1.5rem; }
+.vs-effect-field .vs-field-label { margin-bottom: .55rem; }
+
+/* The preview area under the workspace: a quiet strip, not another card. */
+#generateVoiceSection .output-panel {
+  margin-top: 2rem;
+  padding: 1.5rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
 }

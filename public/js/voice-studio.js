@@ -253,7 +253,7 @@
       var row = info[opt.value] || {};
       var item = { value: opt.value, label: String(opt.textContent || '').trim(), desc: row.d || '', disabled: opt.disabled };
       if (!opt.value) {
-        item.desc = t(meta, isDialect ? 'auto_desc' : 'default_desc');
+        item.desc = t(meta, isDialect ? 'auto_desc' : kind + '_default_desc') || t(meta, 'default_desc');
         item.icon = icon('g-auto');
         item.group = '';
         return item;
@@ -349,7 +349,7 @@
     modal.dataset.kind = kind;
     modal.querySelector('h2').textContent = t(meta, titleKey);
     modal.querySelector('#vsModalHint').textContent = t(meta, hintKey, { count: choices.length, countries: Object.keys(countries).length });
-    modal.querySelector('.vs-modal-ico').innerHTML = icon(isDialect ? 'g-globe' : kind === 'emotion' ? 'f-smile' : 'g-mic');
+    modal.querySelector('.vs-modal-ico').innerHTML = icon(isDialect ? 'g-globe' : kind === 'emotion' ? 'f-smile' : kind === 'audio_effect' ? 'g-hall' : 'g-mic');
     modal.querySelector('.vs-modal-close').setAttribute('aria-label', t(meta, 'close'));
     input.placeholder = t(meta, isDialect ? (english ? 'search_accent' : 'search_dialect') : 'search');
     input.setAttribute('aria-label', input.placeholder);
@@ -752,22 +752,22 @@
       var avatar = item.avatar
         ? '<img src="' + escAttr(item.avatar) + '" alt="" width="64" height="64" loading="lazy" decoding="async">'
         : '<span class="vs-voice-initial">' + initial + '</span>';
-      var metaLine = [];
-      if (item.mine) metaLine.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
-      if (genderText(item.gender)) metaLine.push('<span class="vs-voice-gender vs-g-' + escAttr(item.gender) + '">' + escAttr(genderText(item.gender)) + '</span>');
-      el.innerHTML = '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
-          + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
-        + '<span class="vs-voice-avatar">' + avatar + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="18" height="18" loading="lazy"></span>' : '') + '</span>'
-        + '<span class="vs-voice-name">' + escAttr(item.label) + '</span>'
-        + '<span class="vs-voice-meta">' + metaLine.join('') + '</span>'
-        + (item.dialect ? '<span class="vs-voice-dialect">' + escAttr(item.dialect) + '</span>' : '')
+      var sub = [];
+      if (item.mine) sub.push('<span class="vs-voice-badge">' + escAttr(t(meta, 'mine_badge')) + '</span>');
+      if (genderText(item.gender)) sub.push('<span>' + escAttr(genderText(item.gender)) + '</span>');
+      if (item.dialect) sub.push('<span>' + escAttr(item.dialect) + '</span>');
+      el.innerHTML = '<span class="vs-voice-avatar">' + avatar + (item.flag ? '<span class="vs-voice-flag"><img src="' + escAttr(item.flag) + '" alt="" width="16" height="16" loading="lazy"></span>' : '') + '</span>'
+        + '<span class="vs-voice-info"><span class="vs-voice-name">' + escAttr(item.label) + '</span>'
+        + (sub.length ? '<span class="vs-voice-sub">' + sub.join('<i aria-hidden="true">·</i>') + '</span>' : '') + '</span>'
+        + '<span class="vs-voice-actions">'
         + (item.preview
           ? '<button type="button" class="vs-voice-play" aria-label="' + escAttr(t(meta, 'play')) + ' ' + escAttr(item.label) + '">'
             + '<svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z"/></svg>'
-            + '<svg class="i-stop" viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/></svg>'
             + '<span class="vs-voice-bars" aria-hidden="true"><i></i><i></i><i></i></span></button>'
           : '')
-        + '<svg class="vs-voice-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+        + '<button type="button" class="vs-voice-fav" aria-pressed="' + (favorites[item.value] ? 'true' : 'false') + '" aria-label="'
+          + escAttr(t(meta, favorites[item.value] ? 'favorite_remove' : 'favorite_add')) + '">' + heart(favorites[item.value]) + '</button>'
+        + '</span>';
       el.querySelector('.vs-voice-fav').addEventListener('click', function (e) {
         e.stopPropagation();
         favorites[item.value] = !favorites[item.value];

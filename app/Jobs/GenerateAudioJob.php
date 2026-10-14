@@ -15,6 +15,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioDuration;
+use App\Support\AudioEffects;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\UsageEstimator;
@@ -193,7 +194,14 @@ class GenerateAudioJob implements ShouldQueue
 
             $actualEstimate = UsageEstimator::estimate($textForSpeech);
             // The real length of the saved file; the provider's figure is only a guess from the text.
+            // Measured before any effect, so an echo's tail is never charged.
             $measuredSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null));
+
+            // A sound environment for the whole recording, added to a copy of the clean voice.
+            $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
+            if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
+                $audio['audio_path'] = $effected;
+            }
             $actualSeconds = $measuredSeconds ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualChars = $actualEstimate['chars'];
             // Members pay for the audio they got: 15 credits a second.

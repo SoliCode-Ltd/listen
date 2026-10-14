@@ -53,6 +53,8 @@ class AudioGenerationRecorder
             ]);
 
             $attributes['settings_snapshot'] = $this->buildSettingsSnapshot($attributes);
+            // Kept in the settings only: the effect is added after the speech (GenerateAudioJob).
+            unset($attributes['audio_effect']);
 
             $job = AudioGeneration::create($attributes);
 
@@ -97,6 +99,7 @@ class AudioGenerationRecorder
             'pitch' => array_key_exists('pitch', $attributes) ? (float) $attributes['pitch'] : null,
             'is_dialogue' => (bool) ($attributes['is_dialogue'] ?? false),
             'dialogue_speakers' => $dialogueSpeakers,
+            'audio_effect' => \App\Support\AudioEffects::isValid($attributes['audio_effect'] ?? null) ? $attributes['audio_effect'] : null,
         ], static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
 
         return $snapshot === [] ? null : $snapshot;

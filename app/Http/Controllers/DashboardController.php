@@ -249,6 +249,7 @@ class DashboardController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            'audio_effect' => ['nullable', 'string', 'in:'.implode(',', \App\Support\AudioEffects::keys())],
         ] + DialogueSpeakers::rules(), [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),
@@ -350,6 +351,10 @@ class DashboardController extends Controller
                     'emotion' => $studioOptions['emotion'],
                     'speed' => $studioOptions['speed'],
                     'pitch' => $studioOptions['pitch'],
+                    // Premium only, and only when this server can add it.
+                    'audio_effect' => $requestedTier !== VoiceTier::STANDARD && \App\Support\AudioEffects::available()
+                        ? ($validated['audio_effect'] ?? null)
+                        : null,
                     'is_dialogue' => $dialogueEnabled
                         && $requestedTier !== VoiceTier::STANDARD
                         && ($validated['is_dialogue'] ?? false),
