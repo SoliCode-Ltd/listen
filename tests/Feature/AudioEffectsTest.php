@@ -82,7 +82,7 @@ class AudioEffectsTest extends TestCase
         $this->assertSame('hall', $generation->reusableSettings()['audio_effect']);
     }
 
-    public function test_an_unknown_effect_is_refused_and_standard_voices_get_none(): void
+    public function test_an_unknown_effect_is_refused_and_plans_without_sound_environments_get_none(): void
     {
         Storage::fake('public');
         Storage::disk('public')->put('audio/voice.mp3', 'audio');
@@ -95,15 +95,32 @@ class AudioEffectsTest extends TestCase
             'audio_effect' => 'nightclub',
         ])->assertStatus(422)->assertJsonValidationErrors('audio_effect');
 
-        $this->actingAs($this->memberOn(VoiceTier::STANDARD))->postJsonLocalizedRoute('dashboard.queue', [
+        $this->actingAs($this->memberOn(VoiceTier::HD, effects: false))->postJsonLocalizedRoute('dashboard.queue', [
             'content' => 'Hello there.',
             'target_language' => 'en',
-            'voice_key' => VoiceCatalog::keyFromId((int) $this->voice('standard')->id),
+            'voice_key' => VoiceCatalog::keyFromId((int) $this->voice('hd')->id),
             'audio_effect' => 'echo',
         ])->assertOk();
         $generation = AudioGeneration::query()->latest('id')->firstOrFail();
         $this->assertNull(($generation->settings_snapshot ?? [])['audio_effect'] ?? null);
         $this->assertSame('audio/voice.mp3', $generation->audio_path);
+    }
+
+    public function test_a_standard_plan_with_sound_environments_switched_on_gets_them(): void
+    {
+        $this->requireFfmpeg();
+        Storage::fake('public');
+        $this->tone('audio/voice.mp3', 2);
+        $this->fakeSpeech('audio/voice.mp3');
+
+        $this->actingAs($this->memberOn(VoiceTier::STANDARD))->postJsonLocalizedRoute('dashboard.queue', [
+            'content' => 'Hello there.',
+            'target_language' => 'en',
+            'voice_key' => VoiceCatalog::keyFromId((int) $this->voice('standard')->id),
+            'audio_effect' => 'phone',
+        ])->assertOk();
+
+        $this->assertStringStartsWith('audio/effects/voice-phone-', AudioGeneration::query()->latest('id')->firstOrFail()->audio_path);
     }
 
     public function test_the_premium_dashboard_offers_the_effects_when_the_server_can_add_them(): void
@@ -159,9 +176,9 @@ class AudioEffectsTest extends TestCase
         $this->app->instance(TtsService::class, $tts);
     }
 
-    private function memberOn(string $tier): User
+    private function memberOn(string $tier, bool $effects = true): User
     {
-        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true, 'monthly_chars' => 100000, 'max_chars_per_request' => 5000, 'monthly_requests' => 0]);
+        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true, 'monthly_chars' => 100000, 'max_chars_per_request' => 5000, 'monthly_requests' => 0, 'sound_effects_enabled' => $effects]);
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
         Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);
 

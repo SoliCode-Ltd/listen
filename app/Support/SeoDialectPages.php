@@ -82,6 +82,18 @@ final class SeoDialectPages
         'mauritanian' => ['country' => 'MR', 'en' => 'Mauritanian Hassaniya', 'ar' => 'الحسانية الموريتانية',
             'about_en' => 'Mauritanian Hassaniya is a distinct Arabic variety that keeps classical sounds lost in many other dialects.',
             'about_ar' => 'الحسانية الموريتانية لهجة عربية مميزة تحافظ على أصوات فصيحة اختفت من لهجات أخرى.'],
+        'chadian' => ['country' => 'TD', 'en' => 'Chadian', 'ar' => 'التشادية',
+            'about_en' => 'Chadian Arabic (Shuwa) is the everyday Arabic of N\'Djamena and much of Chad, with its own simple grammar and Sahelian melody.',
+            'about_ar' => 'العربية التشادية (الشوا) هي عربية الحياة اليومية في أنجمينا وأغلب تشاد، بقواعدها المبسطة ونغمتها الساحلية.'],
+        'south-sudanese' => ['country' => 'SS', 'en' => 'South Sudanese', 'ar' => 'الجنوب سودانية',
+            'about_en' => 'Juba Arabic is the shared language of South Sudan\'s markets and streets, simple and relaxed, with many local and English words.',
+            'about_ar' => 'عربي جوبا هو اللغة المشتركة في أسواق جنوب السودان وشوارعه، بسيطة وهادئة وفيها كلمات محلية وإنجليزية كثيرة.'],
+        'ahwazi' => ['country' => 'IR', 'en' => 'Ahwazi', 'ar' => 'الأهوازية',
+            'about_en' => 'Ahwazi Arabic, spoken in Khuzestan, is close to southern Iraqi speech with its own local words and melody.',
+            'about_ar' => 'اللهجة الأهوازية في خوزستان قريبة من لهجة جنوب العراق، ولها مفرداتها ونغمتها المحلية.'],
+        'anatolian' => ['country' => 'TR', 'en' => 'Anatolian', 'ar' => 'الأناضولية',
+            'about_en' => 'Anatolian Arabic is the old Arabic of south-east Türkiye, from Mardin and Urfa to Hatay, with Turkish loanwords.',
+            'about_ar' => 'العربية الأناضولية هي العربية القديمة في جنوب شرق تركيا، من ماردين وأورفا إلى هاتاي، مع كلمات تركية.'],
         'fusha' => ['country' => 'XA', 'en' => 'Modern Standard Arabic (Fusha)', 'ar' => 'العربية الفصحى',
             'about_en' => 'Modern Standard Arabic (Fusha) is the formal Arabic of news, education, audiobooks and official content in every Arab country.',
             'about_ar' => 'العربية الفصحى هي لغة الأخبار والتعليم والكتب الصوتية والمحتوى الرسمي في كل الدول العربية.'],
@@ -128,7 +140,7 @@ final class SeoDialectPages
                 'label' => 'Arabic Dialects',
                 'title' => 'Arabic Dialects Text to Speech',
                 'title_key' => 'ui.seo.arabic_dialects_title',
-                'description' => 'AI text to speech in Fusha and 50 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
+                'description' => 'AI text to speech in Fusha and more than 100 Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
                 'description_key' => 'ui.seo.arabic_dialects_description',
                 'robots' => $robots,
                 'path' => '/arabic-dialects',
@@ -179,22 +191,22 @@ final class SeoDialectPages
         $accents = self::accents($slug);
 
         if ($locale === 'ar') {
-            $names = implode('، ', array_map(fn (array $a): string => self::accentShortName($a['ar']), array_slice($accents, 0, 4)));
+            $names = implode('، ', array_map(fn (array $a): string => self::accentShortName($a['ar']), array_slice($accents, 0, 3)));
             $subject = self::isFusha($slug) ? 'بالعربية الفصحى' : 'باللهجة '.$row['ar'];
 
             return 'حوّل النص إلى صوت طبيعي '.$subject.' بالذكاء الاصطناعي'
                 .(count($accents) > 1 ? ' بلكنات: '.$names : '')
                 .(self::isFusha($slug) ? '. نطق فصيح سليم' : '. نطق حقيقي للهجة')
-                .'، تحميل MP3، وجرّبه مجاناً مع منصة إسمع.';
+                .'، مع المشاعر وتحميل MP3.';
         }
 
-        $names = implode(', ', array_map(fn (array $a): string => self::accentShortName($a['en']), array_slice($accents, 0, 4)));
+        $names = implode(', ', array_map(fn (array $a): string => self::accentShortName($a['en']), array_slice($accents, 0, 3)));
         $subject = self::isFusha($slug) ? 'Modern Standard Arabic' : $row['en'].' Arabic';
 
         return 'Turn text into natural '.$subject.' speech with AI'
             .(count($accents) > 1 ? ', in '.$names.' accents' : '')
             .(self::isFusha($slug) ? '. Correct, clear pronunciation' : '. Real dialect pronunciation')
-            .', MP3 download, free to try on Listen.';
+            .', with emotions and MP3 download.';
     }
 
     /**
@@ -314,12 +326,12 @@ final class SeoDialectPages
                         ? 'تُنطق الفصحى نطقاً كاملاً بمخارج الحروف الصحيحة ودون مفردات عامية.'
                         : 'عند اختيار '.$dialect.' في الاستوديو تُوجَّه الأصوات عالية الدقة لنطق الحروف وإيقاع الكلام كما يتكلم أهل البلد. للحصول على أفضل نتيجة اكتب النص نفسه بالعامية.'],
                     ['question' => 'ما اللكنات المتاحة '.$with.'؟', 'answer' => $accentNames.'.'],
-                    ['question' => 'هل يمكن التجربة مجاناً؟', 'answer' => 'نعم، أنشئ حساباً مجانياً وجرّب الأصوات من صفحة التجربة، ثم اختر الخطة المناسبة عند زيادة الاستخدام.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.'],
                     ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
                 ],
                 'cta_title' => 'ابدأ التعليق الصوتي '.$with,
-                'cta_body' => 'أنشئ حسابك المجاني واسمع نصك '.$with.' خلال ثوانٍ.',
-                'cta_primary' => 'أنشئ حسابك المجاني',
+                'cta_body' => 'أنشئ حسابك واسمع نصك '.$with.' خلال ثوانٍ.',
+                'cta_primary' => 'أنشئ حسابك',
             ];
         }
 
@@ -367,12 +379,12 @@ final class SeoDialectPages
                     ? 'Yes. Fusha is spoken with full, correct articulation and no colloquial words.'
                     : 'When you choose '.$dialect.' in the studio, HD voices are directed to use local pronunciation and rhythm. For the most natural result, write the script itself in the dialect.'],
                 ['question' => 'Which '.$dialect.' accents are available?', 'answer' => $accentNames.'.'],
-                ['question' => 'Can I try it for free?', 'answer' => 'Yes. Create a free account and try the voices in the demo, then pick a plan when you need more.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo, then you pick the plan that fits your use.'],
                 ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'Every clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
             ],
             'cta_title' => 'Start your '.$dialect.' voiceover',
-            'cta_body' => 'Create a free account and hear your script in '.$dialect.' in seconds.',
-            'cta_primary' => 'Create your free account',
+            'cta_body' => 'Create your account and hear your script in '.$dialect.' in seconds.',
+            'cta_primary' => 'Create your account',
         ];
     }
 
@@ -392,11 +404,11 @@ final class SeoDialectPages
                 'faqs' => [
                     ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => count(ArabicDialects::ALL).' لكنة من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة عربية، بالإضافة إلى العربية الفصحى.'],
                     ['question' => 'هل أكتب النص بالعامية أم بالفصحى؟', 'answer' => 'للحصول على أكثر نتيجة طبيعية اكتب النص باللهجة نفسها. ويمكنك أيضاً كتابة نص فصيح واختيار اللهجة.'],
-                    ['question' => 'هل يمكن التجربة مجاناً؟', 'answer' => 'نعم، أنشئ حساباً مجانياً وجرّب الأصوات واللهجات من صفحة التجربة.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللهجات في العرض التجريبي.'],
                 ],
                 'cta_title' => 'اسمع نصك بلهجة جمهورك',
-                'cta_body' => 'أنشئ حسابك المجاني واختر من أكثر من '.count(ArabicDialects::ALL).' لكنة عربية.',
-                'cta_primary' => 'أنشئ حسابك المجاني',
+                'cta_body' => 'أنشئ حسابك واختر من أكثر من '.count(ArabicDialects::ALL).' لكنة عربية.',
+                'cta_primary' => 'أنشئ حسابك',
             ];
         }
 
@@ -408,11 +420,11 @@ final class SeoDialectPages
             'faqs' => [
                 ['question' => 'How many Arabic dialects does Listen support?', 'answer' => count(ArabicDialects::ALL).' accents from '.(count(ArabicDialects::COUNTRIES) - 1).' Arab countries, plus Modern Standard Arabic (Fusha).'],
                 ['question' => 'Should I write the script in dialect or in Fusha?', 'answer' => 'For the most natural result, write the script in the dialect itself. You can also write in Fusha and choose a dialect.'],
-                ['question' => 'Can I try it for free?', 'answer' => 'Yes. Create a free account and try the voices and dialects in the demo.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and dialects in the demo.'],
             ],
             'cta_title' => 'Speak your audience\'s dialect',
-            'cta_body' => 'Create a free account and choose from '.count(ArabicDialects::ALL).' Arabic accents.',
-            'cta_primary' => 'Create your free account',
+            'cta_body' => 'Create your account and choose from '.count(ArabicDialects::ALL).' Arabic accents.',
+            'cta_primary' => 'Create your account',
         ];
     }
 

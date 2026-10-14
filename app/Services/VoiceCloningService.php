@@ -692,6 +692,37 @@ class VoiceCloningService
             ."Transcript:\n".$text;
     }
 
+    /**
+     * One plain text answer from the transcript models, or null.
+     */
+    public function generateText(string $prompt, int $timeout = 20): ?string
+    {
+        foreach (self::TRANSCRIPT_MODELS as $model) {
+            try {
+                $response = $this->request('POST', '/models/'.$model.':generateContent', [
+                    'contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]],
+                    'generationConfig' => ['temperature' => 0.2],
+                ], $timeout);
+            } catch (\Throwable $e) {
+                Log::warning('Text request failed.', ['model' => $model, 'error' => $e->getMessage()]);
+
+                return null;
+            }
+            if ($response->successful()) {
+                $raw = data_get($response->json(), 'candidates.0.content.parts.0.text');
+
+                return is_string($raw) && trim($raw) !== '' ? trim($raw) : null;
+            }
+            if (! $this->transcriptModelMissing($response)) {
+                Log::warning('Text request was rejected.', ['model' => $model, 'status' => $response->status()]);
+
+                return null;
+            }
+        }
+
+        return null;
+    }
+
     private function rewriteTranscript(string $text, string $instruction): ?string
     {
         $prompt = $this->rewritePrompt($text, $instruction);

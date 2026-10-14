@@ -23,6 +23,8 @@ use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
+use App\Support\PlanFeatures;
+use App\Support\SpeechLanguages;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -177,6 +179,8 @@ class DashboardController extends Controller
                     'dialect' => TtsStudioConfig::defaultDialect('en'),
                 ],
             ],
+            // Options the plan lacks stay visible, dimmed, with an upgrade button.
+            'featureLocks' => $this->featureLocks($activePlan, $planTier, $planShowcase, $dialogueEnabled, $customPromptEnabled),
             // Hybrid TTS studio data
             'dialogueEnabled' => $dialogueEnabled,
             'customPromptEnabled' => $customPromptEnabled,
@@ -238,7 +242,7 @@ class DashboardController extends Controller
             'title' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
             'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'target_language' => ['required', 'in:ar,en'],
+            'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_tier' => ['nullable', 'in:standard,hd'],
@@ -256,6 +260,11 @@ class DashboardController extends Controller
         ]);
 
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
+        if (SpeechLanguages::premiumOnly($validated['target_language']) && $requestedTier !== VoiceTier::HD) {
+            throw ValidationException::withMessages([
+                'target_language' => __('ui.backend.dashboard_language_not_available_for_tier'),
+            ]);
+        }
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
@@ -300,8 +309,13 @@ class DashboardController extends Controller
             'pitch' => $validated['pitch'] ?? null,
         ], $activePlan);
 
+        if (SpeechLanguages::premiumOnly($validated['target_language'])) {
+            // These languages have no dialect or accent list.
+            $studioOptions['dialect'] = null;
+        }
+
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
-        $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
+        $sourceLanguage = SpeechLanguages::detect($text);
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
@@ -351,8 +365,8 @@ class DashboardController extends Controller
                     'emotion' => $studioOptions['emotion'],
                     'speed' => $studioOptions['speed'],
                     'pitch' => $studioOptions['pitch'],
-                    // Premium only, and only when this server can add it.
-                    'audio_effect' => $requestedTier !== VoiceTier::STANDARD && \App\Support\AudioEffects::available()
+                    // Only on plans with sound environments, and only when this server can add them.
+                    'audio_effect' => PlanFeatures::planOffers($activePlan, PlanFeatures::EFFECTS) && \App\Support\AudioEffects::available()
                         ? ($validated['audio_effect'] ?? null)
                         : null,
                     'is_dialogue' => $dialogueEnabled
@@ -834,6 +848,22 @@ class DashboardController extends Controller
         $priceCents = (int) ($plan->price_cents ?? 0);
 
         return $priceCents > 0 || ($slug !== '' && $slug !== 'free');
+    }
+
+    /**
+     * @return array<string, array{url: string, plan: ?string}|null>
+     */
+    private function featureLocks(?Plan $plan, string $planTier, bool $showcase, bool $dialogueEnabled, bool $customPromptEnabled): array
+    {
+        $arabic = app()->getLocale() === 'ar';
+        $premium = $planTier === VoiceTier::HD;
+
+        return [
+            PlanFeatures::STUDIO => PlanFeatures::lock(PlanFeatures::STUDIO, $premium, $arabic),
+            PlanFeatures::EFFECTS => PlanFeatures::lock(PlanFeatures::EFFECTS, $showcase || PlanFeatures::planOffers($plan, PlanFeatures::EFFECTS), $arabic),
+            PlanFeatures::DIALOGUE => PlanFeatures::lock(PlanFeatures::DIALOGUE, $premium && $dialogueEnabled, $arabic),
+            PlanFeatures::PROMPT => PlanFeatures::lock(PlanFeatures::PROMPT, $premium && $customPromptEnabled, $arabic),
+        ];
     }
 
     private function planAllowsCustomPrompt(?Plan $plan): bool

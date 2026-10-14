@@ -89,6 +89,14 @@ Route::get('/robots.txt', function () {
     return response($content, 200)->header('Content-Type', 'text/plain');
 })->name('robots');
 
+// SEO: IndexNow key file (Bing, Yandex, Naver, Seznam). The key is made by `php artisan seo:indexnow`.
+Route::get('/indexnow-key.txt', function () {
+    $key = trim((string) SiteSetting::get('indexnow_key', ''));
+    abort_if($key === '', 404);
+
+    return response($key, 200)->header('Content-Type', 'text/plain; charset=UTF-8');
+})->name('indexnow.key');
+
 // SEO: llms.txt
 Route::get('/llms.txt', function () {
     if (!SeoHelper::llmsTxtEnabled()) {
@@ -139,6 +147,10 @@ Route::group([
     Route::get('/english-accents/{accent}', [HomeController::class, 'accentPage'])
         ->whereIn('accent', \App\Support\SeoEnglishPages::slugs())
         ->name('seo.accent');
+    Route::get('/languages', [HomeController::class, 'languageHubPage'])->name('seo.languages');
+    Route::get('/languages/{language}', [HomeController::class, 'languagePage'])
+        ->whereIn('language', \App\Support\SeoLanguagePages::slugs())
+        ->name('seo.language');
     Route::view('/privacy-policy', 'legal.privacy')->name('legal.privacy');
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');

@@ -1317,3 +1317,78 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 @media (max-width: 600px) {
   #generateVoiceSection > .page-card { padding: 1rem .85rem; border-radius: 14px; }
 }
+
+/* Arabic letters such as a final ي reach past their box: room so they are never clipped. */
+.vs-select-label,
+.vs-pick-value,
+.vs-pick-desc { padding-inline-end: .3em; }
+.vs-voice-name,
+.vs-voice-dialect { padding-inline: .3em; }
+
+/* ---------- Options outside the member's plan: dimmed, with an upgrade button ---------- */
+.vs-locked { position: relative; }
+.vs-locked-body {
+  opacity: .42;
+  filter: grayscale(.35);
+  pointer-events: none;
+  user-select: none;
+}
+.vs-upgrade {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  padding: .32rem .7rem;
+  border: 1px solid color-mix(in oklab, var(--a, #7659FA) 45%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--a, #7659FA) 12%, var(--surface));
+  color: color-mix(in oklab, var(--a, #7659FA) 80%, var(--text));
+  font-size: .74rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.vs-upgrade svg {
+  flex: none;
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.vs-upgrade:hover,
+.vs-upgrade:focus-visible {
+  background: var(--a, #7659FA);
+  border-color: var(--a, #7659FA);
+  color: #fff;
+  outline: none;
+}
+.vs-locked > .vs-upgrade {
+  position: absolute;
+  top: -.15rem;
+  inset-inline-end: 0;
+  z-index: 3;
+}
+.vs-pane > .vs-locked + .vs-locked,
+.vs-pane > .vs-field + .vs-locked,
+.vs-pane > .vs-locked + .vs-field { margin-top: 1.5rem; }
+/* On the text box the locked fields keep their places in the settings grid. */
+.vs-setbar { position: relative; }
+.vs-locked.vs-setbar-lock,
+.vs-setbar-lock > .vs-locked-body { display: contents; }
+.vs-setbar-lock .vs-setbar-studio > * { opacity: .42; filter: grayscale(.35); pointer-events: none; user-select: none; }
+.vs-setbar-lock > .vs-upgrade { top: .85rem; inset-inline-end: 1.3rem; }
+@media (max-width: 600px) {
+  /* Narrow screens: the button sits under the locked fields, not over a label. */
+  .vs-setbar-lock > .vs-upgrade { position: static; grid-column: 1 / -1; justify-self: start; order: 99; }
+}
+.vs-upgrade-inline { margin-top: .5rem; }
+.vs-toolbar.is-locked .vs-tb-item { opacity: .42; filter: grayscale(.35); }
+.vs-toolbar.is-locked { flex-wrap: wrap; align-items: center; }
+.vs-toolbar.is-locked .vs-tb-upgrade { margin: 0; margin-inline-start: auto; align-self: center; }
+@media (max-width: 480px) {
+  .vs-upgrade { font-size: .7rem; padding: .28rem .6rem; }
+}

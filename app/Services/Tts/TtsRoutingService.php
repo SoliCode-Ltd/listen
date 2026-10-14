@@ -62,7 +62,9 @@ class TtsRoutingService
             $result = $provider->synthesize($text, $targetLanguage, $voiceConfig);
         } catch (\Throwable $primaryError) {
             // If the primary provider fails and it's not Google Cloud, try fallback 
-            if ($provider->name() !== $this->googleProvider->name() && $this->shouldFallback($mode)) {
+            // The standard voices only speak Arabic and English: other languages have no fallback.
+            if ($provider->name() !== $this->googleProvider->name() && $this->shouldFallback($mode)
+                && ! \App\Support\SpeechLanguages::premiumOnly(strtolower($targetLanguage))) {
                 Log::warning('TTS primary provider failed, falling back to Google Cloud.', [
                     'primary_provider' => $provider->name(),
                     'error' => $primaryError->getMessage(),

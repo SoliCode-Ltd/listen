@@ -663,6 +663,21 @@
     return bar;
   }
 
+  // The tags need the premium voices: the menus show, dimmed, beside an upgrade button.
+  function lockToolbar(bar, lock, meta) {
+    bar.classList.add('is-locked');
+    bar.querySelectorAll('.vs-tb-item').forEach(function (item) {
+      item.setAttribute('inert', '');
+      item.setAttribute('aria-hidden', 'true');
+    });
+    var link = document.createElement('a');
+    link.className = 'vs-upgrade vs-upgrade-inline vs-tb-upgrade';
+    link.href = lock.url;
+    link.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.2"/><path d="M8.5 10.5V7.8a3.5 3.5 0 0 1 7 0v2.7"/></svg><span>'
+      + escAttr(lock.plan ? t(meta, 'upgrade_to_plan').replace(':plan', lock.plan) : t(meta, 'upgrade_to_unlock')) + '</span>';
+    bar.appendChild(link);
+  }
+
   // ---------- Voice library: every speaker as a card ----------
   // The voice select stays the form field; the page fills it per language
   // and tier, and the library draws one card per option.
@@ -896,6 +911,11 @@
       return true;
     }
     var toolbar = buildToolbar(form, meta, insertTag);
+    if (toolbar && meta.tagsLock) lockToolbar(toolbar, meta.tagsLock, meta);
+
+    // Options the plan does not include stay visible but are never sent.
+    form.querySelectorAll('[data-vs-locked] input, [data-vs-locked] select, [data-vs-locked] textarea, [data-vs-locked] button')
+      .forEach(function (el) { el.disabled = true; });
 
     // ---------- Colour the tags inside the text box ----------
     var backdrop = form.querySelector('[data-vs-editor] [data-vs-backdrop]');

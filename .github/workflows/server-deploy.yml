@@ -8,6 +8,8 @@ name: Server deploy
 #   deploy:  copies main over the app, then clears and rebuilds caches.
 #   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
 #            environments and download formats) when the host has none.
+#   indexnow: tells Bing, Yandex, Naver and Seznam about every public page
+#            (php artisan seo:indexnow). Run on live after a deploy that adds pages.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -19,7 +21,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg]
+        options: [inspect, deploy, ffmpeg, indexnow]
         default: inspect
 
 permissions:
@@ -78,6 +80,11 @@ jobs:
           echo "  found: ${f:-NONE (run this workflow with mode ffmpeg)} ${e}"
           php -r 'echo "  PHP proc_open (command line): ", function_exists("proc_open") && stripos((string) ini_get("disable_functions"), "proc_open") === false ? "allowed" : "DISABLED", PHP_EOL;'
           REMOTE
+          if [ "$MODE" = indexnow ]; then
+            $S "$FIND; php artisan seo:indexnow"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
           if [ "$MODE" = ffmpeg ]; then
             case "$($S 'uname -m')" in
               x86_64) A=amd64 ;; aarch64|arm64) A=arm64 ;; *) echo "Unknown CPU type"; exit 1 ;;

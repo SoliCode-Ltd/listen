@@ -5,6 +5,7 @@ namespace App\Services\Tts;
 use App\Contracts\TtsProviderInterface;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
+use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
@@ -1388,7 +1389,11 @@ class GeminiTtsProvider implements TtsProviderInterface
         // Gemini 3.8 does not accept languageCode on a single-speaker request.
         // The English accent has to travel in the style text, or American,
         // British, and Australian selections all sound the same.
-        if ($structuredSpeech && ! $isArabic) {
+        if (SpeechLanguages::premiumOnly(strtolower(trim($targetLanguage)))) {
+            // The language travels in the style text as well (the newer model takes no language code).
+            $name = SpeechLanguages::englishName($targetLanguage);
+            $prompt .= " Speak in {$name} (".SpeechLanguages::nativeName($targetLanguage)."), with natural native pronunciation and rhythm. Read the transcript exactly as written; do not translate it or switch to another language.";
+        } elseif ($structuredSpeech && ! $isArabic) {
             $accentName = match ($dialectCode) {
                 'EN-US' => 'American English',
                 'EN-GB' => 'British English',
@@ -1663,7 +1668,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             return 'ar-XA';
         }
 
-        return 'en-US';
+        return SpeechLanguages::speechCode($normalized) ?? 'en-US';
     }
 
     private function normalizeGender(mixed $gender): string
