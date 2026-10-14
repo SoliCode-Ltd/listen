@@ -71,7 +71,6 @@
   </div>
 
   <div class="vs-pane">
-    <div class="vs-section-title">{{ __('ui.dashboard.library.fine_tune') }}</div>
     {{ $slot }}
   </div>
 

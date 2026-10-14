@@ -6,7 +6,6 @@ use App\Models\Plan;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
-use App\Support\SeoLanguagePages;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -36,8 +35,7 @@ class SeoProductClaimsTest extends TestCase
             ['en', 'seo.ai-text-to-speech', []], ['ar', 'seo.ai-text-to-speech', []],
             ['en', 'seo.dialect', ['dialect' => 'egyptian']], ['ar', 'seo.dialect', ['dialect' => 'chadian']],
             ['en', 'seo.accent', ['accent' => 'british']], ['ar', 'seo.accent', ['accent' => 'kenyan']],
-            ['en', 'seo.language', ['language' => 'spanish']], ['ar', 'seo.language', ['language' => 'japanese']],
-            ['en', 'seo.languages', []], ['ar', 'seo.languages', []],
+            ['en', 'seo.accent', ['accent' => 'spanish-accent']], ['ar', 'seo.accent', ['accent' => 'japanese-accent']],
         ];
 
         foreach ($pages as [$locale, $route, $params]) {
@@ -46,32 +44,26 @@ class SeoProductClaimsTest extends TestCase
         }
     }
 
-    public function test_language_pages_render_with_breadcrumbs_and_alternates(): void
+    public function test_accent_pages_for_other_languages_render_with_breadcrumbs(): void
     {
-        $html = $this->page('en', 'seo.language', ['language' => 'spanish'])->assertOk()->getContent();
-        $this->assertStringContainsString('<title>Spanish Text to Speech with Natural AI Voices', $html);
-        $this->assertStringContainsString('hreflang="ar" href="'.url('/ar/languages/spanish').'"', $html);
-        $this->assertStringContainsString('"name":"Languages"', $html);
-        $this->assertStringContainsString('Which plan do I need for Spanish?', $html);
+        $html = $this->page('en', 'seo.accent', ['accent' => 'spanish-accent'])->assertOk()->getContent();
+        $this->assertStringContainsString('<title>English Text to Speech with a Spanish Accent', $html);
+        $this->assertStringContainsString('"name":"English accents"', $html);
 
-        $ar = $this->page('ar', 'seo.languages')->assertOk()->getContent();
-        $this->assertStringContainsString('تحويل النص إلى صوت بـ24 لغة', $ar);
-        $this->assertStringContainsString('/languages/hindi"', $ar);
-
+        $ar = $this->page('ar', 'seo.accent', ['accent' => 'german-accent'])->assertOk()->getContent();
+        $this->assertStringContainsString('تحويل النص إلى صوت إنجليزي بلكنة ألمانية', $ar);
     }
 
     public function test_the_sitemap_lists_the_new_language_dialect_and_accent_pages(): void
     {
         $xml = $this->get('/sitemap.xml')->assertOk()->getContent();
 
-        foreach (SeoLanguagePages::slugs() as $slug) {
-            $this->assertStringContainsString('/en/languages/'.$slug.'<', $xml);
-        }
+        $this->assertStringNotContainsString('/languages/', $xml);
         foreach (['chadian', 'south-sudanese', 'ahwazi', 'anatolian'] as $slug) {
             $this->assertContains($slug, SeoDialectPages::slugs());
             $this->assertStringContainsString('/ar/arabic-dialects/'.$slug.'<', $xml);
         }
-        foreach (['pakistani', 'filipino', 'ghanaian', 'kenyan', 'french-accent'] as $slug) {
+        foreach (['pakistani', 'filipino', 'ghanaian', 'kenyan', 'french-accent', 'spanish-accent', 'german-accent', 'japanese-accent', 'chinese-accent'] as $slug) {
             $this->assertNotSame([], SeoEnglishPages::accents($slug), $slug);
             $this->assertStringContainsString('/en/english-accents/'.$slug.'<', $xml);
         }

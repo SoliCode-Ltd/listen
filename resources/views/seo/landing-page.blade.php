@@ -261,7 +261,6 @@
       ['label' => __('ui.nav.text_to_speech_arabic'), 'url' => route('seo.text-to-speech-arabic'), 'page' => 'text_to_speech_arabic'],
       ['label' => __('ui.nav.arabic_dialects'), 'url' => route('seo.arabic-dialects'), 'page' => 'arabic_dialects'],
       ['label' => __('ui.nav.english_accents'), 'url' => route('seo.english-accents'), 'page' => 'english_accents'],
-      ['label' => __('ui.nav.languages'), 'url' => route('seo.languages'), 'page' => 'languages'],
       ['label' => __('ui.nav.ai_voice_generator'), 'url' => route('seo.ai-voice-generator'), 'page' => 'ai_voice_generator'],
       ['label' => __('ui.nav.pricing'), 'url' => route('pricing'), 'page' => 'pricing'],
       ['label' => __('ui.nav.extension'), 'url' => route('browsers-extension.page'), 'page' => 'extension'],
@@ -291,20 +290,6 @@
     ];
     if (isset($currentAccent) || $page === 'english_accents') {
       $voiceSections = array_reverse($voiceSections);
-    }
-    $languageSection = [
-      'title' => isset($currentLanguage) ? ($isArabic ? 'لغات أخرى' : 'Other languages') : ($isArabic ? 'تحويل النص إلى صوت بلغات أخرى' : 'Text to speech in more languages'),
-      'links' => array_map(fn ($l) => ['url' => route('seo.language', ['language' => $l['slug']]), 'label' => $l['label']], array_values(array_filter(
-        \App\Support\SeoLanguagePages::popular($voiceLocale, 10),
-        fn ($link) => $link['slug'] !== ($currentLanguage ?? null)
-      ))),
-      'all' => ['url' => route('seo.languages'), 'label' => $isArabic ? 'كل اللغات' : 'All languages'],
-    ];
-    // Language pages lead with other languages; the hub already lists them all.
-    if (isset($currentLanguage)) {
-      array_unshift($voiceSections, $languageSection);
-    } elseif ($page !== 'languages') {
-      $voiceSections[] = $languageSection;
     }
   @endphp
   @include('components.header')
@@ -360,7 +345,7 @@
 
     @if(! empty($dialectGroups))
       <section class="seo-section">
-        <h2>{{ match ($page) { 'english_accents' => $isArabic ? 'اختر اللكنة' : 'Choose an accent', 'languages' => $isArabic ? 'اختر اللغة' : 'Choose a language', default => $isArabic ? 'اختر اللهجة' : 'Choose a dialect' } }}</h2>
+        <h2>{{ match ($page) { 'english_accents' => $isArabic ? 'اختر اللكنة' : 'Choose an accent', default => $isArabic ? 'اختر اللهجة' : 'Choose a dialect' } }}</h2>
         @foreach($dialectGroups as $group)
           <div class="seo-region">
             <h3>{{ $group['region'] }}</h3>
