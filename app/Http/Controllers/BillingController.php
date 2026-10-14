@@ -7,7 +7,6 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
-use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\TrialEligibilityService;
@@ -96,7 +95,6 @@ class BillingController extends Controller
         // Show the plan the member actually gets (the one every limit uses),
         // and log it if Stripe says otherwise so a broken sync gets noticed.
         $accessPlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
-        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $accessPlan);
         $stripePlan = $this->resolveConsistentActivePlan($accessPlan, $subscription);
         if ($stripePlan && $accessPlan && (string) $stripePlan->slug !== (string) $accessPlan->slug && ! $accessPlan->isPack()) {
             Log::warning('Manage subscription: Stripe plan and enforced plan differ.', [
@@ -128,11 +126,6 @@ class BillingController extends Controller
             && (bool) ($subscription?->id)
             && trim((string) ($subscription?->stripe_id ?? '')) !== '';
 
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => now()->format('Y-m')],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
-
         return view('manage-subscription', [
             'activePlan' => $accessPlan,
             'activePlanName' => $accessPlan
@@ -155,11 +148,6 @@ class BillingController extends Controller
             'upcomingCharge' => $stripeReady && $renews ? $this->resolveUpcomingCharge($subscription, $countryContext, $locale) : null,
             'trialNotice' => $this->trialNotice($user, $locale),
             'manual' => $manual,
-            'usage' => \App\Support\UsageSnapshot::for($userId, $quotaPlan, $counter),
-            'quotaPlan' => $quotaPlan,
-            'downloadFormats' => collect(\App\Support\AudioFormats::chosenFor($accessPlan))
-                ->map(fn (string $format): string => strtoupper($format))->implode(', '),
-            'creditsResetAt' => $this->formatCarbonDate(now()->addMonthNoOverflow()->startOfMonth()),
         ]);
     }
 
