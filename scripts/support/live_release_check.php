@@ -346,8 +346,7 @@ $section('Arabic dialect path (last 15 premium Arabic generations with a dialect
 });
 
 $section('PROBE (temporary): dialogues and the rewrite request', function () use ($line) {
-    $line('Queue connection', config('queue.default'));
-    $line('Queue retry_after', config('queue.connections.'.config('queue.default').'.retry_after'));
+    $line('Queue connection', config('queue.default'));    $line('Queue retry_after', config('queue.connections.'.config('queue.default').'.retry_after'));
     $line('Voice proxy set', trim((string) config('services.gemini_tts.voice_proxy', '')) !== '');
     $eg = '/(?<!\p{L})(عايز|عايزة|دلوقتي|إزاي|ازاي|إزيك|ازيك|كده|أوي|اوي|مش|ليه|فين|بتاع|خالص|ده|دي|إيه|ايه)(?!\p{L})/u';
     $fu = '/(?<!\p{L})(لماذا|ماذا|الآن|سوف|لكن|لكنني|ليس|هذا|هذه|أريد|كيف|جدًا|جدا)(?!\p{L})/u';
@@ -380,8 +379,9 @@ $section('PROBE (temporary): dialogues and the rewrite request', function () use
     $protected = \App\Support\GeminiVocalTags::protect(trim(\App\Support\GeminiVocalTags::normalizeMarkup($block)));
     $prompt = $call('rewritePrompt', $protected['text'], $call('rewriteInstruction', 'ar-EG'));
     $prompt = str_replace("- Do not add a title", "- Keep the line breaks: one output line for each input line, in the same order.\n- Do not add a title", $prompt);
-    foreach ([['gemini-3.5-flash', true], ['gemini-3.5-flash', false], ['gemini-3.6-flash', true]] as [$model, $minimal]) {
-        $config = ['temperature' => 0.2] + ($minimal ? ['thinkingConfig' => ['thinkingLevel' => 'minimal']] : []);
+    foreach ([['gemini-3.5-flash', 'minimal'], ['gemini-3.5-flash', 'low'], ['gemini-3.6-flash', 'minimal'], ['gemini-3.6-flash', 'low'], ['gemini-3.5-flash', 'minimal']] as [$model, $level]) {
+        $minimal = $level;
+        $config = ['temperature' => 0.2, 'thinkingConfig' => ['thinkingLevel' => $level]];
         $t = microtime(true);
         try {
             $r = $call('request', 'POST', '/models/'.$model.':generateContent', ['contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]], 'generationConfig' => $config], 25);
@@ -389,7 +389,7 @@ $section('PROBE (temporary): dialogues and the rewrite request', function () use
             $raw = (string) data_get($r->json(), 'candidates.0.content.parts.0.text', '');
             $clean = $raw !== '' ? $call('cleanSpokenTranscript', $raw, $protected['text']) : '';
             $out = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $clean) ?: [])));
-            echo sprintf("  %s minimal=%s: HTTP %d in %d ms, lines %d/5, tag kept=%s, thoughts=%s\n", $model, $minimal ? 'yes' : 'no', $r->status(), $ms, count($out),
+            echo sprintf("  %s thinking=%s: HTTP %d in %d ms, lines %d/5, tag kept=%s, thoughts=%s\n", $model, $minimal, $r->status(), $ms, count($out),
                 \App\Support\GeminiVocalTags::placeholdersIntact($clean, count($protected['tags'])) ? 'yes' : 'NO', data_get($r->json(), 'usageMetadata.thoughtsTokenCount', 0));
             if ($r->status() !== 200) {
                 echo '     '.mb_substr((string) $r->body(), 0, 300)."\n";
@@ -398,7 +398,7 @@ $section('PROBE (temporary): dialogues and the rewrite request', function () use
                 echo "     | {$o}\n";
             }
         } catch (\Throwable $e) {
-            echo sprintf("  %s minimal=%s: FAILED after %d ms: %s\n", $model, $minimal ? 'yes' : 'no', (int) round((microtime(true) - $t) * 1000), mb_substr($e->getMessage(), 0, 160));
+            echo sprintf("  %s thinking=%s: FAILED after %d ms: %s\n", $model, $minimal, (int) round((microtime(true) - $t) * 1000), mb_substr($e->getMessage(), 0, 160));
         }
     }
 });
