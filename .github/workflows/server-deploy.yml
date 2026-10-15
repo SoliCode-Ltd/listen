@@ -12,6 +12,11 @@ name: Server deploy
 #            migrate --force). Only when the owner asks; deploy first.
 #   indexnow: tells Bing, Yandex, Naver and Seznam about every public page
 #            (php artisan seo:indexnow). Run on live after a deploy that adds pages.
+#   queue:   shows how the queue workers run, then makes sure a job is never
+#            handed to a second worker while the first is still on it: sets
+#            DB_QUEUE_RETRY_AFTER=180 in .env (above the 150 s job limit; the
+#            old .env is kept in storage/app/listen-deploy), rebuilds the config
+#            cache and restarts the workers.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -23,7 +28,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue]
         default: inspect
 
 permissions:
@@ -85,6 +90,27 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = queue ]; then
+            $S "$FIND; bash -s" <<'REMOTE'
+          set -e
+          echo "== Queue workers running now =="
+          ps -eo pid,etime,args | grep -E 'artisan (queue:(work|listen)|horizon)' | grep -v grep || echo "  none right now"
+          echo "== Cron lines that start Laravel =="
+          crontab -l 2>/dev/null | grep -E 'artisan|queue' || echo "  none in this user's crontab"
+          echo "== Queue settings in .env (before) =="
+          grep -E '^(QUEUE_CONNECTION|DB_QUEUE[A-Z_]*|REDIS_QUEUE[A-Z_]*)=' .env || echo "  none (defaults)"
+          b="storage/app/listen-deploy/env.backup-$(date -u +%Y%m%d%H%M%S)"
+          cp .env "$b" && chmod 600 "$b" && echo "  old .env kept as $b"
+          if grep -q '^DB_QUEUE_RETRY_AFTER=' .env; then sed -i 's/^DB_QUEUE_RETRY_AFTER=.*/DB_QUEUE_RETRY_AFTER=180/' .env; else printf '\nDB_QUEUE_RETRY_AFTER=180\n' >> .env; fi
+          echo "== After =="
+          grep -E '^DB_QUEUE_RETRY_AFTER=' .env
+          [ -f bootstrap/cache/config.php ] && php artisan config:cache | tail -1
+          php artisan queue:restart | tail -1
+          php artisan tinker --execute="echo '  retry_after in use: '.config('queue.connections.'.config('queue.default').'.retry_after').' s ('.config('queue.default').')'.PHP_EOL;"
+          REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
