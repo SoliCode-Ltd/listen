@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 
 /**
@@ -35,33 +36,116 @@ final class GenerationChoiceLabels
     }
 
     /**
-     * The accent a generation was spoken in, and a note under it. A dialogue speaker
-     * given their own dialect speaks it on their lines; when every speaker has one,
-     * the main setting is not used at all, so theirs are shown and the main one is
-     * marked unused.
-     *
-     * @return array{0: string, 1: ?string}
+     * The accent the audio was spoken in. A dialogue speaker given their own dialect
+     * speaks it on their lines: one accent when everyone spoke the same, else one per speaker.
      */
-    public static function spokenAccent(?string $code, bool $isDialogue, mixed $dialogue, ?string $language = null, ?string $tier = null): array
+    public static function spokenAccent(AudioGeneration $generation): string
     {
-        $main = trim((string) $code) !== '' ? self::accent($code, $language, $tier) : '—';
-        $speakers = $isDialogue && is_array($dialogue) ? array_values(array_filter((array) ($dialogue['speakers'] ?? []), 'is_array')) : [];
-        $own = [];
-        foreach ($speakers as $speaker) {
-            $dialect = trim((string) ($speaker['dialect'] ?? ''));
-            if ($dialect !== '') {
-                $own[] = trim((string) ($speaker['name'] ?? '?')).': '.self::accent($dialect, $language, $tier);
+        $speakers = self::speakers($generation);
+        if ($speakers === []) {
+            return trim((string) $generation->dialect) !== ''
+                ? self::accent($generation->dialect, $generation->target_language, $generation->voice_tier)
+                : '—';
+        }
+
+        $accents = array_values(array_unique(array_column($speakers, 'accent')));
+
+        return count($accents) === 1
+            ? $accents[0]
+            : implode('; ', array_map(fn (array $s): string => $s['name'].': '.$s['accent'], $speakers));
+    }
+
+    /**
+     * Who spoke a dialogue: each speaker's name, the voice that read their lines
+     * (resolved the way the speech request resolves it) and the accent they spoke.
+     *
+     * @return list<array{name: string, voice: string, accent: string}>
+     */
+    public static function speakers(AudioGeneration $generation): array
+    {
+        if (! $generation->is_dialogue || ! is_array($generation->dialogue_metadata)) {
+            return [];
+        }
+
+        $language = (string) $generation->target_language;
+        $tier = VoiceTier::normalize((string) $generation->voice_tier);
+        $provider = VoiceCatalog::providerForName((string) $generation->voice_name);
+        $speakers = [];
+        foreach ((array) ($generation->dialogue_metadata['speakers'] ?? []) as $speaker) {
+            if (! is_array($speaker)) {
+                continue;
             }
+            $resolved = DialogueSpeakers::forSpeech([$speaker], $language, $tier, $provider)[0] ?? [];
+            $dialect = trim((string) ($speaker['dialect'] ?? '')) ?: trim((string) $generation->dialect);
+            $speakers[] = [
+                'name' => trim((string) ($speaker['name'] ?? $speaker['speaker'] ?? '')) ?: 'Speaker',
+                'voice' => self::voice((string) ($resolved['voice_name'] ?? $speaker['voice_name'] ?? $speaker['voice'] ?? '')),
+                'accent' => $dialect !== '' ? self::accent($dialect, $language, $generation->voice_tier) : '—',
+            ];
         }
 
-        if ($own === []) {
-            return [$main, null];
-        }
-        if (count($own) === count($speakers)) {
-            return [implode('; ', $own), 'Main setting not used: '.$main];
+        return $speakers;
+    }
+
+    /**
+     * The voice that spoke: a dialogue's speakers' voices, else the chosen voice.
+     *
+     * @return list<string>
+     */
+    public static function spokenVoices(AudioGeneration $generation): array
+    {
+        $speakers = self::speakers($generation);
+
+        return $speakers === []
+            ? [self::voice($generation->voice_name)]
+            : array_map(fn (array $s): string => $s['name'].': '.$s['voice'], $speakers);
+    }
+
+    /**
+     * The sound environment the audio was placed in, e.g. "ملعب · Stadium — stadium".
+     */
+    public static function environment(?string $effect): string
+    {
+        $effect = trim((string) $effect);
+        if ($effect === '' || ! AudioEffects::isValid($effect)) {
+            return $effect === '' ? 'None' : "Unknown environment — {$effect}";
         }
 
-        return [$main, 'Except — '.implode('; ', $own)];
+        return self::bilingual(AudioEffects::label($effect, true), AudioEffects::label($effect, false))." — {$effect}";
+    }
+
+    /**
+     * Every studio setting the audio was made with that differs from the default,
+     * one per line, for the generations list. Standard voices have none.
+     *
+     * @return list<string>
+     */
+    public static function settings(AudioGeneration $generation): array
+    {
+        $lines = [];
+        $style = strtolower(trim((string) $generation->performance_style));
+        if ($style !== '' && $style !== 'neutral') {
+            $lines[] = 'Style: '.self::performanceStyle($style);
+        }
+        $emotion = strtolower(trim((string) $generation->emotion));
+        if ($emotion !== '' && $emotion !== 'neutral') {
+            $lines[] = 'Emotion: '.self::emotion($emotion);
+        }
+        if ($generation->speed !== null && abs((float) $generation->speed - 1.0) > 0.001) {
+            $lines[] = 'Speed: '.(float) $generation->speed.'x';
+        }
+        if ($generation->pitch !== null && abs((float) $generation->pitch) > 0.001) {
+            $lines[] = 'Pitch: '.(float) $generation->pitch;
+        }
+        if (filled($generation->style_prompt)) {
+            $lines[] = 'Direction: '.\Illuminate\Support\Str::limit(trim((string) $generation->style_prompt), 80);
+        }
+        $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
+        if ($effect !== '') {
+            $lines[] = 'Environment: '.self::environment($effect);
+        }
+
+        return $lines;
     }
 
     /**
