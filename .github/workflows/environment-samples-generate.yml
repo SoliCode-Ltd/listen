@@ -1,0 +1,81 @@
+name: Environment samples generate
+
+# Makes the homepage sound environment clips (database/seeders/data/
+# environment_samples.php) with Gemini key 1 from STAGING's .env, places each
+# one in its environment with the studio's engine, and commits the MP3s back
+# to this branch (only the missing ones). Owner-approved (homepage section request, 2026-10-15). The key is read over SSH, masked in the log and never stored.
+# Speech requests count against that key's quota, which staging shares with
+# live: run it only when the owner asks.
+
+on:
+  push:
+    branches: [claude/beautiful-sagan-df90b3]
+    paths:
+      - .github/workflows/environment-samples-generate.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: environment-samples-generate
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
+          coverage: none
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Install dependencies
+        run: |
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          php artisan key:generate --no-interaction
+
+      - name: Generate with staging key 1
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
+          chmod 600 ~/.ssh/id_gen
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
+          KEY="$(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          rm -f ~/.ssh/id_gen
+          if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "::add-mask::$KEY"
+          echo "Using staging key 1: ${KEY:0:6}...${KEY: -4}"
+          php artisan tts:showcase --set=environments --generate --render --pause=20 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-160 || echo "Some clips failed (see above); the ones made are still committed, and the next run makes only the missing ones."
+
+      - name: Commit the clips
+        if: always()
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/audio/environments
+          if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
+          git diff --cached --stat
+          git commit -m "Homepage sound environments: clips made with staging key 1"
+          git pull --rebase origin "${GITHUB_REF#refs/heads/}"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}

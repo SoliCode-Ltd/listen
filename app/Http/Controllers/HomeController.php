@@ -15,19 +15,23 @@ use App\Services\DemoFraudService;
 use App\Services\GenerationErrorRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
+use App\Services\ProfanityFilter;
 use App\Services\Referral\DemoRewardLedgerService;
-use App\Services\Tts\TtsRoutingService;
+use App\Services\Referral\ReferralQualificationService;
 use App\Services\TranslationService;
+use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
+use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
-use App\Support\FreeAllowance;
 use App\Support\DialogueSpeakers;
+use App\Support\FreeAllowance;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
 use App\Support\SpeakerAvatar;
+use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -35,6 +39,7 @@ use App\Support\VoiceFlag;
 use App\Support\VoiceTier;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -55,8 +60,7 @@ class HomeController extends Controller
         private readonly PlanAccessService $planAccessService,
         private readonly LocalizedPricingService $localizedPricingService,
         private readonly TtsRoutingService $ttsRoutingService,
-    ) {
-    }
+    ) {}
 
     public function index()
     {
@@ -65,7 +69,42 @@ class HomeController extends Controller
         return view('landing', [
             'countryContext' => $this->localizedPricingService->resolveCountryContext(request()),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor(request()->user()),
+            'environmentSamples' => $this->environmentSamples($isArabicLocale ? 'ar' : 'en'),
         ] + $this->homeShowcase($isArabicLocale));
+    }
+
+    /**
+     * The homepage sound environments: the same voice clean and placed in its
+     * environment, in the page language, only for clips that are on disk.
+     *
+     * @return array<int, array<string, string>>
+     */
+    private function environmentSamples(string $language): array
+    {
+        $samples = (require database_path('seeders/data/environment_samples.php'))['samples'];
+        $arabic = $language === 'ar';
+        $out = [];
+        foreach ($samples as $sample) {
+            $place = 'audio/environments/'.$sample['slug'].'.mp3';
+            $clean = 'audio/environments/clean/'.$sample['slug'].'.mp3';
+            if ($sample['language'] !== $language || ! is_file(public_path($place)) || ! is_file(public_path($clean))) {
+                continue;
+            }
+            $out[] = [
+                'id' => $sample['slug'],
+                'effect' => $sample['effect'],
+                'place' => AudioEffects::label($sample['effect'], $arabic),
+                'about' => (string) (AudioEffects::forPicker($arabic)[$sample['effect']]['d'] ?? ''),
+                'scene' => $sample['scene'],
+                'speaker' => $sample['speaker'],
+                'text' => $sample['text'],
+                'language' => $sample['language'],
+                'place_url' => asset($place).'?v='.filemtime(public_path($place)),
+                'clean_url' => asset($clean).'?v='.filemtime(public_path($clean)),
+            ];
+        }
+
+        return $out;
     }
 
     /**
@@ -314,8 +353,8 @@ class HomeController extends Controller
             $emotionValues = TtsStudioConfig::emotionValues();
 
             $validated = $request->validate([
-                'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-                'target_language' => ['required', 'in:'.implode(',', \App\Support\SpeechLanguages::codes())],
+                'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+                'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
                 'translate' => ['nullable', 'boolean'],
                 'voice_key' => ['nullable', 'string', 'max:60'],
                 'voice_tier' => ['nullable', 'in:standard,hd'],
@@ -331,7 +370,7 @@ class HomeController extends Controller
                 'emotion.in' => __('ui.backend.emotion_invalid'),
             ]);
             $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
-            if (\App\Support\SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
+            if (SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
                 throw ValidationException::withMessages(['target_language' => __('ui.backend.dashboard_language_not_available_for_tier')]);
             }
             if ($validated['is_dialogue'] ?? false) {
@@ -344,7 +383,7 @@ class HomeController extends Controller
             );
 
             $text = trim($validated['text']);
-            $sourceLanguage = \App\Support\SpeechLanguages::detect($text);
+            $sourceLanguage = SpeechLanguages::detect($text);
             $estimate = UsageEstimator::estimate($text);
             if ($estimate['chars'] > $maxChars) {
                 throw ValidationException::withMessages([
@@ -426,8 +465,8 @@ class HomeController extends Controller
         $emotionValues = TtsStudioConfig::emotionValues();
 
         $validated = $request->validate([
-            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'target_language' => ['required', 'in:'.implode(',', \App\Support\SpeechLanguages::codes())],
+            'text' => ['required', 'string', 'max:50000', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+            'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
             'voice_tier' => ['nullable', 'in:standard,hd'],
@@ -443,7 +482,7 @@ class HomeController extends Controller
             'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
         $tier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $defaultTier));
-        if (\App\Support\SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
+        if (SpeechLanguages::premiumOnly($validated['target_language']) && $tier !== VoiceTier::HD) {
             throw ValidationException::withMessages(['target_language' => __('ui.backend.dashboard_language_not_available_for_tier')]);
         }
         $isDialogue = (bool) ($validated['is_dialogue'] ?? false);
@@ -458,7 +497,7 @@ class HomeController extends Controller
         );
 
         $text = trim($validated['text']);
-        $sourceLanguage = \App\Support\SpeechLanguages::detect($text);
+        $sourceLanguage = SpeechLanguages::detect($text);
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
@@ -481,7 +520,7 @@ class HomeController extends Controller
             );
 
             $studioOptions = $this->sanitizeStudioOptionsForTier($tier, [
-                'dialect' => \App\Support\SpeechLanguages::premiumOnly($validated['target_language']) ? null : ($validated['dialect'] ?? null),
+                'dialect' => SpeechLanguages::premiumOnly($validated['target_language']) ? null : ($validated['dialect'] ?? null),
                 'performance_style' => $validated['performance_style'] ?? null,
                 'style_prompt' => $validated['style_prompt'] ?? null,
                 'emotion' => $validated['emotion'] ?? 'neutral',
@@ -570,7 +609,7 @@ class HomeController extends Controller
             // Trigger first-demo-generation qualification check for referrals.
             // Safe to call on every generation — idempotent via conversion status.
             try {
-                app(\App\Services\Referral\ReferralQualificationService::class)
+                app(ReferralQualificationService::class)
                     ->evaluate($request->user(), 'first_demo_generation');
             } catch (\Throwable $e) {
                 Log::warning('Referral qualification (first demo) evaluation failed.', [
@@ -1084,6 +1123,7 @@ class HomeController extends Controller
 
         return $mapped->map(function (array $plan) use ($popularSlug): array {
             $plan['is_popular'] = $popularSlug !== '' && $plan['slug'] === $popularSlug;
+
             return $plan;
         })->all();
     }
@@ -1288,7 +1328,7 @@ class HomeController extends Controller
         $linkedIds = User::query()
             ->where(function ($q) use ($ips) {
                 $q->whereIn('registration_ip', $ips)
-                  ->orWhereIn('last_login_ip', $ips);
+                    ->orWhereIn('last_login_ip', $ips);
             })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -1315,7 +1355,7 @@ class HomeController extends Controller
         $linkedIds = User::query()
             ->where(function ($q) use ($requestIp) {
                 $q->where('registration_ip', $requestIp)
-                  ->orWhere('last_login_ip', $requestIp);
+                    ->orWhere('last_login_ip', $requestIp);
             })
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
@@ -1394,7 +1434,7 @@ class HomeController extends Controller
         return null;
     }
 
-    private function attachDemoDeviceCookie(Request $request, \Illuminate\Http\Response $response): \Illuminate\Http\Response
+    private function attachDemoDeviceCookie(Request $request, Response $response): Response
     {
         if ($this->demoDeviceIdFromRequest($request) !== null) {
             return $response;
@@ -1677,12 +1717,12 @@ class HomeController extends Controller
         // Standard tier: no performance controls - use defaults only.
         if ($normalizedTier === VoiceTier::STANDARD) {
             return [
-                'dialect'  => null,
+                'dialect' => null,
                 'performance_style' => 'neutral',
                 'style_prompt' => null,
-                'emotion'  => 'neutral',
-                'speed'    => 1.0,
-                'pitch'    => 0.0,
+                'emotion' => 'neutral',
+                'speed' => 1.0,
+                'pitch' => 0.0,
             ];
         }
 
@@ -1723,7 +1763,7 @@ class HomeController extends Controller
     }
 
     /**
-     * @param array{performance_style:mixed,emotion:mixed} $input
+     * @param  array{performance_style:mixed,emotion:mixed}  $input
      */
     private function ensureRequiredStudioSelections(string $tier, array $input): void
     {

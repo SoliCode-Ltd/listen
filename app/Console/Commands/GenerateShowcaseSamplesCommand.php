@@ -5,12 +5,14 @@ namespace App\Console\Commands;
 use App\Models\SiteSetting;
 use App\Models\VoiceSample;
 use App\Support\ArabicDialects;
+use App\Support\AudioEffects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\HeroCast;
 use Illuminate\Console\Command;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
 /**
@@ -28,6 +30,8 @@ class GenerateShowcaseSamplesCommand extends Command
         {--import : Create or update the voice_samples rows for the MP3s on disk}
         {--key= : Gemini API key for --generate (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these sample slugs}
+        {--set=showcase : Which samples: showcase (dialects, accents, dialogues) or environments (the sound environments section)}
+        {--render : environments set only: place each clean clip in its sound environment}
         {--force : Regenerate MP3s that already exist}
         {--keep-old : On import, leave the older homepage samples active}
         {--pause=7 : Seconds between Gemini requests}';
@@ -36,8 +40,16 @@ class GenerateShowcaseSamplesCommand extends Command
 
     private const AUDIO_DIR = 'audio/showcase';
 
+    private const ENVIRONMENT_DIR = 'audio/environments';
+
+    private string $dir = self::AUDIO_DIR;
+
     public function handle(): int
     {
+        if ($this->option('set') === 'environments') {
+            return $this->environments();
+        }
+
         if (! $this->option('generate') && ! $this->option('import')) {
             $this->error('Pass --generate, --import, or both.');
 
@@ -76,13 +88,13 @@ class GenerateShowcaseSamplesCommand extends Command
             return false;
         }
 
-        @mkdir(public_path(self::AUDIO_DIR), 0775, true);
+        @mkdir(public_path($this->dir), 0775, true);
         $pause = max(0, (int) $this->option('pause'));
         $failed = 0;
         $requested = false;
 
         foreach ($samples as $sample) {
-            $target = public_path(self::AUDIO_DIR.'/'.$sample['slug'].'.mp3');
+            $target = public_path($this->dir.'/'.$sample['slug'].'.mp3');
             if (is_file($target) && ! $this->option('force')) {
                 $this->line("skip  {$sample['slug']} (exists)");
 
@@ -111,6 +123,62 @@ class GenerateShowcaseSamplesCommand extends Command
     }
 
     /**
+     * The homepage sound environments: --generate makes the clean clips (one
+     * Gemini request each, no sign-off), --render places each one in its
+     * environment with the studio's own engine (no Gemini).
+     */
+    private function environments(): int
+    {
+        $samples = (require database_path('seeders/data/environment_samples.php'))['samples'];
+        $only = array_filter((array) $this->option('only'));
+        if ($only !== []) {
+            $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
+        }
+        $samples = array_map(fn (array $s): array => $s + ['kind' => 'single', 'sign_off' => false], $samples);
+
+        if ($this->option('generate')) {
+            $this->dir = self::ENVIRONMENT_DIR.'/clean';
+            if (! $this->generate($samples, ['en' => '', 'ar' => ''])) {
+                return self::FAILURE;
+            }
+        }
+        if (! $this->option('render')) {
+            return self::SUCCESS;
+        }
+
+        if (! AudioEffects::available()) {
+            $this->error('No ffmpeg here: the environments cannot be rendered.');
+
+            return self::FAILURE;
+        }
+        $disk = Storage::disk('public');
+        $failed = 0;
+        foreach ($samples as $sample) {
+            $clean = public_path(self::ENVIRONMENT_DIR.'/clean/'.$sample['slug'].'.mp3');
+            if (! is_file($clean)) {
+                $this->warn("no clean clip for {$sample['slug']}");
+                $failed++;
+
+                continue;
+            }
+            $work = 'environment-render/'.$sample['slug'].'.mp3';
+            $disk->put($work, (string) file_get_contents($clean));
+            $placed = AudioEffects::apply($work, $sample['effect']);
+            $disk->delete($work);
+            if ($placed === null) {
+                $this->error("fail  {$sample['slug']} ({$sample['effect']})");
+                $failed++;
+
+                continue;
+            }
+            rename($disk->path($placed), public_path(self::ENVIRONMENT_DIR.'/'.$sample['slug'].'.mp3'));
+            $this->info("placed {$sample['slug']} in {$sample['effect']}");
+        }
+
+        return $failed === 0 ? self::SUCCESS : self::FAILURE;
+    }
+
+    /**
      * Gemini 3.8 request: the script and the sign-off as separate parts, so
      * the sign-off gets its own calm delivery after a pause.
      *
@@ -121,7 +189,7 @@ class GenerateShowcaseSamplesCommand extends Command
     private function payload(array $sample, array $signOff): array
     {
         $language = $sample['language'];
-        $isDialogue = $sample['kind'] === 'dialogue';
+        $isDialogue = ($sample['kind'] ?? 'single') === 'dialogue';
         $closing = $signOff[$language.($isDialogue ? '_dialogue' : '')];
         $closingStyle = $this->accentDirection($language, $sample['dialect'])
             .' Calm, clear, friendly sign-off at a natural pace, like the closing line of a professional production.';
