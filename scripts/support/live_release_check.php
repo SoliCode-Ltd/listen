@@ -269,6 +269,83 @@ $section('Generations since the last upload of the usage code', function () use 
     }
 });
 
+$section('Generation speed and reliability (last 7 days)', function () use ($root, $line) {
+    $since = now()->subDays(7);
+    $pct = static function ($values, float $p): string {
+        $v = collect($values)->filter(fn ($x) => $x !== null)->sort()->values();
+
+        return $v->isEmpty() ? '—' : (string) $v[(int) min($v->count() - 1, floor($p * ($v->count() - 1) + 0.5))];
+    };
+    $gens = AudioGeneration::query()->where('created_at', '>=', $since)
+        ->get(['id', 'status', 'is_dialogue', 'tts_provider', 'tts_model', 'tts_latency_ms', 'tts_fallback_used', 'voice_tier', 'input_text', 'created_at', 'updated_at', 'error_message']);
+    $line('Generations', $gens->count().' '.json_encode($gens->countBy('status')));
+    $line('Served from cache', $gens->where('tts_provider', 'cache')->count());
+    $line('Fallback engine used', $gens->where('tts_fallback_used', true)->count());
+    $made = $gens->where('status', 'done')->where('tts_provider', '!=', 'cache');
+    echo "  Made (not cache), seconds — speech request p50/p90/max | whole wait (click to done) p50/p90/max | chars p50\n";
+    foreach ($made->groupBy(fn ($g) => ($g->is_dialogue ? 'dialogue' : 'single').' '.$g->voice_tier.' '.$g->tts_provider.'/'.$g->tts_model) as $key => $list) {
+        $tts = $list->map(fn ($g) => $g->tts_latency_ms !== null ? round($g->tts_latency_ms / 1000, 1) : null);
+        $wait = $list->map(fn ($g) => $g->updated_at && $g->created_at ? $g->created_at->diffInSeconds($g->updated_at) : null);
+        echo sprintf("    %-58s n=%-4d %s/%s/%s | %s/%s/%s | %s\n", $key, $list->count(), $pct($tts, .5), $pct($tts, .9), $pct($tts, 1),
+            $pct($wait, .5), $pct($wait, .9), $pct($wait, 1), $pct($list->map(fn ($g) => mb_strlen((string) $g->input_text)), .5));
+    }
+    echo "  Premium single voice by length (speech request p50 / whole wait p50, seconds):\n";
+    $premium = $made->where('voice_tier', '!=', 'standard')->where('is_dialogue', false);
+    foreach ([[0, 300], [300, 900], [900, 2000], [2000, 100000]] as [$lo, $hi]) {
+        $list = $premium->filter(fn ($g) => ($n = mb_strlen((string) $g->input_text)) >= $lo && $n < $hi);
+        echo sprintf("    %5d-%-6d n=%-4d %s / %s\n", $lo, $hi, $list->count(),
+            $pct($list->map(fn ($g) => $g->tts_latency_ms !== null ? round($g->tts_latency_ms / 1000, 1) : null), .5),
+            $pct($list->map(fn ($g) => $g->updated_at && $g->created_at ? $g->created_at->diffInSeconds($g->updated_at) : null), .5));
+    }
+    echo "  Failed, by message:\n";
+    foreach ($gens->where('status', 'failed')->countBy(fn ($g) => mb_substr(preg_replace('/\d{3,}/', 'N', (string) $g->error_message), 0, 110))->sortDesc()->take(8) as $msg => $n) {
+        echo "       {$n}× {$msg}\n";
+    }
+    if (Schema::hasTable('tts_logs')) {
+        $logs = DB::table('tts_logs')->where('created_at', '>=', $since)->get(['provider', 'status', 'failure_reason', 'fallback_used']);
+        $line('Speech requests logged', $logs->count().' '.json_encode($logs->countBy(fn ($l) => $l->provider.':'.$l->status)));
+        foreach ($logs->whereNotNull('failure_reason')->countBy(fn ($l) => mb_substr(preg_replace('/\d{3,}/', 'N', (string) $l->failure_reason), 0, 110))->sortDesc()->take(8) as $msg => $n) {
+            echo "       {$n}× {$msg}\n";
+        }
+    }
+    if (Schema::hasTable('jobs')) {
+        $oldest = DB::table('jobs')->min('available_at');
+        $line('Jobs waiting now', DB::table('jobs')->count().($oldest ? ', oldest '.(time() - (int) $oldest).' s' : ''));
+    }
+    if (Schema::hasTable('failed_jobs')) {
+        $failed = DB::table('failed_jobs')->where('failed_at', '>=', $since)->get(['exception']);
+        $line('Failed queue jobs', $failed->count());
+        foreach ($failed->countBy(fn ($f) => mb_substr(strtok((string) $f->exception, "\n"), 0, 140))->sortDesc()->take(5) as $msg => $n) {
+            echo "       {$n}× {$msg}\n";
+        }
+    }
+    $since3 = now()->subDays(3)->toDateTimeString();
+    $counts = [];
+    foreach (array_filter(array_merge([$root.'/storage/logs/laravel.log'], glob($root.'/storage/logs/laravel-*.log') ?: []), 'is_file') as $file) {
+        if (filemtime($file) < strtotime($since3)) {
+            continue;
+        }
+        $fh = fopen($file, 'r');
+        while (($row = fgets($fh)) !== false) {
+            if (preg_match('/^\[(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d)[^\]]*\] \w+\.(WARNING|ERROR): ([^{]{0,90})(\{.{0,120})?/', $row, $m) && $m[1] >= $since3
+                && preg_match('/gemini|tts|speech|voice|rewrite|audio|key|quota|timed? ?out/i', $m[3].($m[4] ?? ''))) {
+                $key = $m[2].' '.trim($m[3]).' '.preg_replace(['/\d{3,}/', '/\S+@\S+/'], ['N', '***'], (string) ($m[4] ?? ''));
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        }
+        fclose($fh);
+    }
+    arsort($counts);
+    $line('Speech warnings/errors in the log, 3 days', array_sum($counts));
+    foreach (array_slice($counts, 0, 12, true) as $msg => $n) {
+        echo "       {$n}× {$msg}\n";
+    }
+    foreach (['max_chars_per_request', 'max_parallel_requests', 'timeout_seconds', 'retry_budget_seconds'] as $key) {
+        $line('gemini_tts.'.$key, json_encode(config('services.gemini_tts.'.$key)));
+    }
+    $line('Speech model setting', (string) \App\Support\GeminiTtsModel::resolve());
+});
+
 $section('Credits charged vs audio made (this month, done, not pack)', function () use ($line, $problem, &$deployedAt) {
     $since = $deployedAt ?? now()->startOfMonth();
     // After the upload every finished generation should cost 15 credits a second of its audio.
@@ -314,11 +391,47 @@ $section('Arabic dialect path (last 15 premium Arabic generations with a dialect
     $instruction->setAccessible(true);
     $rows = AudioGeneration::query()->whereIn('target_language', ['ar', 'ar-XA', 'ar-xa'])->whereNotNull('dialect')
         ->where('voice_tier', '!=', 'standard')->latest('id')->limit(15)
-        ->get(['id', 'created_at', 'status', 'dialect', 'voice_name', 'tts_provider', 'tts_model', 'tts_fallback_used', 'style_prompt', 'is_dialogue', 'translate', 'input_text']);
+        ->get(['id', 'created_at', 'status', 'dialect', 'voice_name', 'tts_provider', 'tts_model', 'tts_fallback_used', 'style_prompt', 'is_dialogue', 'translate', 'input_text', 'dialogue_metadata']);
+    // Whether the script (a dialogue: each speaker's lines, per dialect) went through the rewrite.
+    $state = function (string $text, string $dialect) use ($cloning, $instruction): string {
+        $text = trim(\App\Support\GeminiVocalTags::normalizeMarkup(trim($text)));
+        $rule = (string) $instruction->invoke($cloning, $dialect);
+        if ($rule === '' || $text === '') {
+            return 'no rule';
+        }
+        if (method_exists(\App\Support\ArabicDialects::class, 'isPlainFusha') && \App\Support\ArabicDialects::isPlainFusha($dialect) && ! \App\Support\ArabicDialects::looksColloquial($text)) {
+            return 'fusha, none needed';
+        }
+
+        return \Illuminate\Support\Facades\Cache::has('listen:clone-dialect:v3:'.sha1($rule.'|'.$text)) ? 'rewritten' : 'NOT rewritten';
+    };
     foreach ($rows as $g) {
-        $text = trim(\App\Support\GeminiVocalTags::normalizeMarkup(trim((string) $g->input_text)));
-        $rule = (string) $instruction->invoke($cloning, $g->dialect);
-        $rewritten = $rule === '' ? 'no rule' : (\Illuminate\Support\Facades\Cache::has('listen:clone-dialect:v3:'.sha1($rule.'|'.$text)) ? 'rewritten' : 'NOT rewritten');
+        if (! $g->is_dialogue) {
+            $rewritten = $state((string) $g->input_text, (string) $g->dialect);
+        } else {
+            $own = [];
+            foreach ((array) (($g->dialogue_metadata ?? [])['speakers'] ?? []) as $sp) {
+                $name = trim((string) ($sp['name'] ?? ''));
+                if ($name !== '') {
+                    $own[$name] = trim((string) ($sp['dialect'] ?? '')) ?: (string) $g->dialect;
+                }
+            }
+            $current = array_key_first($own);
+            $groups = [];
+            foreach (preg_split("/\r\n|\n|\r/", (string) $g->input_text) ?: [] as $l) {
+                $spoken = trim($l);
+                foreach (array_keys($own) as $name) {
+                    if (str_starts_with($spoken, $name.':')) {
+                        [$current, $spoken] = [$name, trim(substr($spoken, strlen($name) + 1))];
+                        break;
+                    }
+                }
+                if ($spoken !== '') {
+                    $groups[$current !== null ? $own[$current] : (string) $g->dialect][] = $spoken;
+                }
+            }
+            $rewritten = implode(', ', array_map(fn ($d) => $d.': '.$state(implode("\n", $groups[$d]), $d), array_keys($groups)));
+        }
         echo sprintf("  #%d %s %s %s voice=%s via=%s/%s fallback=%s custom_prompt=%s dialogue=%s translate=%s %s\n",
             $g->id, $g->created_at?->format('m-d H:i'), $g->status, $g->dialect, $g->voice_name, $g->tts_provider ?: '?', $g->tts_model ?: '?',
             $g->tts_fallback_used ? 'YES' : 'no', trim((string) $g->style_prompt) !== '' ? 'YES' : 'no', $g->is_dialogue ? 'yes' : 'no',

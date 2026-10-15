@@ -169,25 +169,34 @@ class GenerationErrorsAndChoicesTest extends TestCase
 
     public function test_dialogue_shows_the_dialect_each_speaker_was_given(): void
     {
-        $this->assertSame('', GenerationChoiceLabels::speakerAccents(['speakers' => [['name' => 'حمد', 'dialect' => '']]], 'ar', 'hd'));
-        $this->assertSame('', GenerationChoiceLabels::speakerAccents(null, 'ar', 'hd'));
+        $egypt = 'مصري (قاهري) · Egyptian (Cairene) — ar-EG';
+        $this->assertSame([$egypt, null], GenerationChoiceLabels::spokenAccent('ar-EG', false, null, 'ar', 'hd'));
+        $this->assertSame([$egypt, null], GenerationChoiceLabels::spokenAccent('ar-EG', true, ['speakers' => [['name' => 'حمد', 'dialect' => '']]], 'ar', 'hd'));
+        [$label, $note] = GenerationChoiceLabels::spokenAccent('ar-EG', true, ['speakers' => [['name' => 'حمد', 'dialect' => 'ar-AE'], ['name' => 'حمدة']]], 'ar', 'hd');
+        $this->assertSame($egypt, $label, 'one speaker still uses the main setting');
+        $this->assertStringStartsWith('Except — حمد: ', $note);
 
+        // Every speaker has their own dialect: the main setting is never spoken.
         $generation = AudioGeneration::create($this->audioRow(User::factory()->create(), [
             'dialect' => 'ar-EG', 'target_language' => 'ar', 'voice_tier' => 'hd', 'is_dialogue' => true,
             'dialogue_metadata' => ['speakers' => [
                 ['name' => 'حمد', 'voice_name' => 'voice_194', 'dialect' => 'ar-AE'],
-                ['name' => 'حمدة', 'voice_name' => 'voice_202'],
+                ['name' => 'حمدة', 'voice_name' => 'voice_202', 'dialect' => 'ar-AE'],
             ]],
         ]));
+        [$label, $note] = GenerationChoiceLabels::spokenAccent('ar-EG', true, $generation->dialogue_metadata, 'ar', 'hd');
+        $this->assertStringStartsWith('حمد: ', $label);
+        $this->assertStringContainsString('حمدة: ', $label);
+        $this->assertStringNotContainsString('Cairene', $label);
+        $this->assertSame('Main setting not used: '.$egypt, $note);
         $this->actingAsAdmin();
 
         Livewire::test(ListAudioGenerations::class)
-            ->assertSee('Spoken by the speakers in their own dialect — حمد: ', false)
-            ->assertDontSee('حمدة: ', false);
+            ->assertSee('Main setting not used: ', false);
         $this->get(AudioGenerationResource::getUrl('view', ['record' => $generation]))
             ->assertOk()
-            ->assertSee('مصري (قاهري) · Egyptian (Cairene) — ar-EG · Spoken by the speakers in their own dialect — حمد: ', false)
-            ->assertSee('— ar-AE', false);
+            ->assertSee('— ar-AE', false)
+            ->assertSee('Main setting not used: '.$egypt, false);
     }
 
     public function test_dashboard_generation_edit_and_create_pages_still_open(): void
