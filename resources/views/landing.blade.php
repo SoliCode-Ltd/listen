@@ -665,6 +665,7 @@
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')
     @include('components.home.dialogues')
+    @include('components.home.environments')
 
     <section class="section reveal">
       <div class="apps-shell">

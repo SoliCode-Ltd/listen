@@ -211,8 +211,37 @@
       play(btn.closest('[data-vp-track]'));
       return;
     }
+    // Sound environments: hear the same line clean or in the place. Switching
+    // while it plays carries on from the same moment.
+    var mode = event.target.closest('[data-vp-mode]');
+    if (mode && root.contains(mode)) {
+      var envTrack = mode.closest('[data-vp-track]');
+      var next = envTrack && envTrack.getAttribute('data-src-' + mode.getAttribute('data-vp-mode'));
+      if (!next) return;
+      envTrack.querySelectorAll('[data-vp-mode]').forEach(function (b) { b.setAttribute('aria-pressed', b === mode ? 'true' : 'false'); });
+      envTrack.setAttribute('data-vp-current-mode', mode.getAttribute('data-vp-mode'));
+      if (envTrack.getAttribute('data-src') === next) return;
+      var wasPlaying = current === envTrack && !audio.paused;
+      var at = current === envTrack ? audio.currentTime : 0;
+      envTrack.setAttribute('data-src', next);
+      prepare(envTrack);
+      if (current === envTrack) {
+        audio.src = next;
+        var resume = function () {
+          audio.removeEventListener('loadedmetadata', resume);
+          try { audio.currentTime = Math.min(at, Math.max(0, (audio.duration || at) - 0.05)); } catch (e) {}
+          clock = { media: audio.currentTime, at: performance.now(), shown: audio.currentTime };
+          if (wasPlaying) { var p2 = audio.play(); if (p2 && p2.catch) p2.catch(function () {}); }
+        };
+        audio.addEventListener('loadedmetadata', resume);
+        audio.load();
+      } else {
+        play(envTrack);
+      }
+      return;
+    }
     // A voice or dialogue card plays when pressed anywhere, not only on its button.
-    var pressed = event.target.closest('.vs-card, .vs-dialogue');
+    var pressed = event.target.closest('.vs-card, .vs-dialogue, .vs-env');
     if (pressed && !event.target.closest('a, button')) {
       play(pressed);
       return;
