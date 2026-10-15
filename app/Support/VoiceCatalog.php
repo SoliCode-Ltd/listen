@@ -4,6 +4,9 @@ namespace App\Support;
 
 use App\Models\SiteSetting;
 use App\Models\Voice;
+use App\Models\VoiceSample;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Storage;
 
 class VoiceCatalog
 {
@@ -104,7 +107,7 @@ class VoiceCatalog
         'Tamim' => 'تميم',
         'Hazem' => 'حازم',
         'Raed' => 'رائد',
-        'Yasser' => 'ياسر',
+        'Alaa' => 'علاء',
         // English female names
         'Emma' => 'إيما',
         'Olivia' => 'أوليفيا',
@@ -318,6 +321,7 @@ class VoiceCatalog
 
                 if (self::catalogHasVoices($preferredCatalog)) {
                     $catalog[$tier] = $preferredCatalog;
+
                     continue;
                 }
 
@@ -325,6 +329,7 @@ class VoiceCatalog
                 $fallbackCatalog = self::publicCatalog($tier, $fallbackProvider);
                 if (self::catalogHasVoices($fallbackCatalog)) {
                     $catalog[$tier] = $fallbackCatalog;
+
                     continue;
                 }
 
@@ -361,7 +366,7 @@ class VoiceCatalog
     public static function libraryEntries(bool $arabic): array
     {
         $voices = self::activeQuery()->get();
-        $samples = \App\Models\VoiceSample::query()
+        $samples = VoiceSample::query()
             ->where('is_active', true)
             ->whereIn('voice_name', $voices->pluck('internal_voice_id')->all())
             ->orderByDesc('is_featured')
@@ -402,7 +407,7 @@ class VoiceCatalog
             return null;
         }
 
-        return \Illuminate\Support\Facades\Storage::disk('public')->exists($path) || is_file(public_path($path))
+        return Storage::disk('public')->exists($path) || is_file(public_path($path))
             ? AudioUrl::fromPath($path)
             : null;
     }
@@ -725,8 +730,7 @@ class VoiceCatalog
         string $language,
         ?string $tier = null,
         ?string $provider = null,
-    ): ?Voice
-    {
+    ): ?Voice {
         $id = self::idFromKey($voiceKey);
         if (! $id) {
             return null;
@@ -759,9 +763,9 @@ class VoiceCatalog
     }
 
     /**
-     * @return \Illuminate\Database\Eloquent\Builder<\App\Models\Voice>
+     * @return Builder<Voice>
      */
-    private static function activeQuery(?string $tier = null, ?string $provider = null): \Illuminate\Database\Eloquent\Builder
+    private static function activeQuery(?string $tier = null, ?string $provider = null): Builder
     {
         $query = Voice::query()->where('is_active', true);
 
