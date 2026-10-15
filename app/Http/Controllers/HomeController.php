@@ -383,6 +383,10 @@ class HomeController extends Controller
             );
 
             $text = trim($validated['text']);
+            // Moods and sounds go with words: a script of tags alone has nothing to speak.
+            if (! \App\Support\GeminiVocalTags::hasWords($text)) {
+                throw ValidationException::withMessages(['text' => __('ui.backend.dashboard_text_needs_words')]);
+            }
             $sourceLanguage = SpeechLanguages::detect($text);
             $estimate = UsageEstimator::estimate($text);
             if ($estimate['chars'] > $maxChars) {
@@ -497,6 +501,10 @@ class HomeController extends Controller
         );
 
         $text = trim($validated['text']);
+        // Moods and sounds go with words: a script of tags alone has nothing to speak.
+        if (! \App\Support\GeminiVocalTags::hasWords($text)) {
+            throw ValidationException::withMessages(['text' => __('ui.backend.dashboard_text_needs_words')]);
+        }
         $sourceLanguage = SpeechLanguages::detect($text);
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {
