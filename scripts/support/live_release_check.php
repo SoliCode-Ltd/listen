@@ -345,5 +345,63 @@ $section('Arabic dialect path (last 15 premium Arabic generations with a dialect
     }
 });
 
+$section('PROBE (temporary): dialogues and the rewrite request', function () use ($line) {
+    $line('Queue connection', config('queue.default'));
+    $line('Queue retry_after', config('queue.connections.'.config('queue.default').'.retry_after'));
+    $line('Voice proxy set', trim((string) config('services.gemini_tts.voice_proxy', '')) !== '');
+    $eg = '/(?<!\p{L})(عايز|عايزة|دلوقتي|إزاي|ازاي|إزيك|ازيك|كده|أوي|اوي|مش|ليه|فين|بتاع|خالص|ده|دي|إيه|ايه)(?!\p{L})/u';
+    $fu = '/(?<!\p{L})(لماذا|ماذا|الآن|سوف|لكن|لكنني|ليس|هذا|هذه|أريد|كيف|جدًا|جدا)(?!\p{L})/u';
+    foreach (AudioGeneration::query()->where('is_dialogue', true)->where('dialect', 'ar-EG')->latest('id')->limit(8)->get() as $g) {
+        $speakers = (array) (($g->dialogue_metadata ?? [])['speakers'] ?? []);
+        $names = array_map(fn ($s) => trim((string) ($s['name'] ?? $s['id'] ?? '')), $speakers);
+        $lines = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", (string) $g->input_text) ?: [])));
+        $labelled = count(array_filter($lines, function ($l) use ($names) {
+            foreach ($names as $n) {
+                if ($n !== '' && str_starts_with($l, $n.':')) {
+                    return true;
+                }
+            }
+
+            return false;
+        }));
+        echo sprintf("  #%d speakers=%s lines=%d labelled=%d egyptian_words=%d fusha_words=%d\n", $g->id,
+            implode(', ', array_map(fn ($s) => trim((string) ($s['name'] ?? '?')).'/'.($s['voice_name'] ?? $s['voice'] ?? '?').'/'.(($s['dialect'] ?? '') ?: 'script'), $speakers)),
+            count($lines), $labelled, preg_match_all($eg, (string) $g->input_text), preg_match_all($fu, (string) $g->input_text));
+    }
+
+    $cloning = app(\App\Services\VoiceCloningService::class);
+    $call = function (string $name, ...$args) use ($cloning) {
+        $m = new \ReflectionMethod($cloning, $name);
+        $m->setAccessible(true);
+
+        return $m->invoke($cloning, ...$args);
+    };
+    $block = "مرحبًا يا صديقي، كيف حالك اليوم؟\nأنا بخير، لكنني متعب قليلًا من العمل.\nهذا رائع جدًا <ضحكة> لم أتوقع ذلك.\nهل تريد أن نذهب لنشرب القهوة الآن؟\nنعم بالتأكيد، انتظرني عشر دقائق فقط.";
+    $protected = \App\Support\GeminiVocalTags::protect(trim(\App\Support\GeminiVocalTags::normalizeMarkup($block)));
+    $prompt = $call('rewritePrompt', $protected['text'], $call('rewriteInstruction', 'ar-EG'));
+    $prompt = str_replace("- Do not add a title", "- Keep the line breaks: one output line for each input line, in the same order.\n- Do not add a title", $prompt);
+    foreach ([['gemini-3.5-flash', true], ['gemini-3.5-flash', false], ['gemini-3.6-flash', true]] as [$model, $minimal]) {
+        $config = ['temperature' => 0.2] + ($minimal ? ['thinkingConfig' => ['thinkingLevel' => 'minimal']] : []);
+        $t = microtime(true);
+        try {
+            $r = $call('request', 'POST', '/models/'.$model.':generateContent', ['contents' => [['role' => 'user', 'parts' => [['text' => $prompt]]]], 'generationConfig' => $config], 25);
+            $ms = (int) round((microtime(true) - $t) * 1000);
+            $raw = (string) data_get($r->json(), 'candidates.0.content.parts.0.text', '');
+            $clean = $raw !== '' ? $call('cleanSpokenTranscript', $raw, $protected['text']) : '';
+            $out = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $clean) ?: [])));
+            echo sprintf("  %s minimal=%s: HTTP %d in %d ms, lines %d/5, tag kept=%s, thoughts=%s\n", $model, $minimal ? 'yes' : 'no', $r->status(), $ms, count($out),
+                \App\Support\GeminiVocalTags::placeholdersIntact($clean, count($protected['tags'])) ? 'yes' : 'NO', data_get($r->json(), 'usageMetadata.thoughtsTokenCount', 0));
+            if ($r->status() !== 200) {
+                echo '     '.mb_substr((string) $r->body(), 0, 300)."\n";
+            }
+            foreach ($out as $o) {
+                echo "     | {$o}\n";
+            }
+        } catch (\Throwable $e) {
+            echo sprintf("  %s minimal=%s: FAILED after %d ms: %s\n", $model, $minimal ? 'yes' : 'no', (int) round((microtime(true) - $t) * 1000), mb_substr($e->getMessage(), 0, 160));
+        }
+    }
+});
+
 echo "\n== Summary\n";
 echo $problems === [] ? "  No problems found.\n" : '  '.count($problems)." problem(s) flagged above (lines starting with !!).\n";
