@@ -411,6 +411,22 @@ class GeminiVocalTags
     }
 
     /**
+     * True when a script has something to say once moods and sounds are taken out.
+     * A script of tags alone ("[scared] <scream>") gives no voice anything to read:
+     * the premium voice refuses it and the standard one reads nothing.
+     */
+    public static function hasWords(string $text): bool
+    {
+        foreach (self::parts($text) as $part) {
+            if (preg_match('/[\p{L}\p{N}]/u', self::strip($part['text'])) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Ready a transcript for Gemini 3.8: sounds become <tag>, moods are
      * removed from the spoken text and returned as style cues.
      *

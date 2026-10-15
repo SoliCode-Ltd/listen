@@ -207,6 +207,10 @@ class MessageReaderController extends Controller
         ], $activePlan);
 
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
+        // Moods and sounds go with words: a script of tags alone has nothing to speak.
+        if (! \App\Support\GeminiVocalTags::hasWords($text)) {
+            throw ValidationException::withMessages(['content' => __('ui.backend.dashboard_text_needs_words')]);
+        }
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         $estimate = UsageEstimator::estimate($text);
         if ($estimate['chars'] > $maxChars) {

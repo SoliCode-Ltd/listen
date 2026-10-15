@@ -1423,6 +1423,7 @@ return [
         'pack_not_enough' => 'تبقّى في باقتك :remaining رصيد، وهذا النص يحتاج حوالي :needed رصيد. اختصر النص أو اشترِ باقة أخرى.',
         'pack_ended' => 'نفد رصيد باقتك. اشترِ باقة أخرى أو اختر خطة للمتابعة.',
         'dashboard_request_limit' => 'النص يتجاوز حد :max حرف لخطتك.',
+        'dashboard_text_needs_words' => 'أضف كلمات ينطقها الصوت. الحالات والأصوات مثل [خائف] أو <صرخة> تُكتب مع الكلام، لا وحدها.',
         'dashboard_voice_generated' => 'تم توليد الصوت بنجاح!',
         'dashboard_voice_generation_failed_try_again' => 'فشل توليد الصوت. يرجى المحاولة مرة أخرى.',
         'dashboard_voice_generation_failed_check_jobs' => 'فشل توليد الصوت. تحقق من المهام الأخيرة.',

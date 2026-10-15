@@ -1417,6 +1417,7 @@ return [
         'pack_not_enough' => 'Your pack has :remaining credits left and this text needs about :needed. Shorten it, or buy another pack.',
         'pack_ended' => 'Your pack credits have run out. Buy another pack or choose a plan to continue.',
         'dashboard_request_limit' => 'Text exceeds :max character limit for your plan.',
+        'dashboard_text_needs_words' => 'Add some words for the voice to say. Moods and sounds like [scared] or <scream> go with words, not on their own.',
         'dashboard_voice_generated' => 'Voice generated successfully!',
         'dashboard_voice_generation_failed_try_again' => 'Voice generation failed. Please try again.',
         'dashboard_voice_generation_failed_check_jobs' => 'Voice generation failed. Check your recent jobs.',

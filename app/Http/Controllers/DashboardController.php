@@ -264,6 +264,11 @@ class DashboardController extends Controller
             'emotion.in' => __('ui.backend.emotion_invalid'),
         ]);
 
+        // Moods and sounds go with words: a script of tags alone has nothing to speak.
+        if (! \App\Support\GeminiVocalTags::hasWords(trim((string) ($validated['content'] ?? $validated['text'] ?? '')))) {
+            throw ValidationException::withMessages(['content' => __('ui.backend.dashboard_text_needs_words')]);
+        }
+
         $requestedTier = VoiceTier::normalize((string) ($validated['voice_tier'] ?? $planTier));
         if (SpeechLanguages::premiumOnly($validated['target_language']) && $requestedTier !== VoiceTier::HD) {
             throw ValidationException::withMessages([
