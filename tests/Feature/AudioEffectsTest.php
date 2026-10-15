@@ -77,6 +77,7 @@ class AudioEffectsTest extends TestCase
         $graph = AudioEffects::graph('[in]ROOM(hall,-4),BED(room_tone,-20)[out]', 1.0, $inputs, 3.0, -2.5);
         $this->assertStringContainsString('afir=', $graph);
         $this->assertStringContainsString('volume=-2.5dB,alimiter', $graph, 'one fixed gain, no swelling');
+        $this->assertStringContainsString('sidechaincompress', $graph, 'the background dips while the voice speaks');
         $this->assertSame([false, true], array_column($inputs, 'loop'));
         $this->assertStringEndsWith('ir/hall.flac', $inputs[0]['path']);
         $this->assertStringEndsWith('bed/room_tone.flac', $inputs[1]['path']);
