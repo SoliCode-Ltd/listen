@@ -509,6 +509,10 @@ class GeminiTtsProvider implements TtsProviderInterface
         // each read with its own direction; in a dialogue they apply to the whole script.
         if (GeminiTtsModel::usesStructuredSpeech($model)) {
             if ($isDialogue) {
+                // Each line is rewritten into its speaker's dialect, as a single voice's script is.
+                if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
+                    $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
+                }
                 $prepared = GeminiVocalTags::prepare($text);
                 $text = $prepared['text'];
                 $voiceConfig['vocal_cues'] = $prepared['cues'];
@@ -978,6 +982,70 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return [$part];
+    }
+
+    /**
+     * Rewrite a dialogue's lines into each speaker's dialect (their own, or the
+     * script's). One request per dialect; the "Name:" labels never leave this code.
+     * If a rewrite does not come back line for line, those lines stay as written.
+     *
+     * @param  array<int, array<string, mixed>>  $speakers
+     */
+    private function dialogueInDialects(string $text, array $speakers, string $dialect): string
+    {
+        $own = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
+            if ($name !== '') {
+                $own[$name] = trim((string) ($speaker['dialect'] ?? '')) ?: $dialect;
+            }
+        }
+
+        $lines = preg_split("/\r\n|\n|\r/", $text) ?: [];
+        $current = array_key_first($own);
+        $groups = [];
+        foreach ($lines as $i => $line) {
+            $spoken = trim($line);
+            foreach (array_keys($own) as $name) {
+                if (str_starts_with($spoken, $name.':')) {
+                    $current = $name;
+                    $spoken = trim(substr($spoken, strlen($name) + 1));
+                    break;
+                }
+            }
+            $lineDialect = $current !== null ? $own[$current] : $dialect;
+            if ($spoken === '' || $lineDialect === '') {
+                continue;
+            }
+            $groups[$lineDialect][$i] = $spoken;
+        }
+
+        $cloning = app(VoiceCloningService::class);
+        $startedAt = microtime(true);
+        foreach ($groups as $lineDialect => $spokenLines) {
+            // A slow rewrite must not hold the generation: past 20 seconds the rest stay as written.
+            if (microtime(true) - $startedAt > 20) {
+                break;
+            }
+            $block = implode("\n", $spokenLines);
+            $rewritten = $cloning->speakableText($block, $lineDialect);
+            $newLines = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $rewritten) ?: []), fn ($l) => $l !== ''));
+            if ($rewritten === $block || count($newLines) !== count($spokenLines)) {
+                continue;
+            }
+            foreach (array_keys($spokenLines) as $n => $i) {
+                $label = '';
+                foreach (array_keys($own) as $name) {
+                    if (str_starts_with(trim($lines[$i]), $name.':')) {
+                        $label = $name.': ';
+                        break;
+                    }
+                }
+                $lines[$i] = $label.$newLines[$n];
+            }
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
