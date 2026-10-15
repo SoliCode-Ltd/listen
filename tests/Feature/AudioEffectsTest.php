@@ -51,7 +51,7 @@ class AudioEffectsTest extends TestCase
             $this->assertStringEndsWith('.mp3', $path);
             $seconds = $this->seconds($path);
             $this->assertGreaterThan(1.9, $seconds, $effect.' keeps the whole recording');
-            $this->assertLessThan(4.2, $seconds, $effect.' adds at most a short tail');
+            $this->assertLessThan(5.2, $seconds, $effect.' adds at most a short tail');
         }
         $this->assertSame($before, md5(Storage::disk('public')->get('audio/cache/clean.mp3')), 'the shared clean voice is never changed');
 
@@ -72,7 +72,24 @@ class AudioEffectsTest extends TestCase
             $this->assertSame('2', trim($probe->mustRun()->getOutput()), $effect);
         }
         $this->assertStringContainsString('loudnorm=I=-16', AudioEffects::graph('[in]anull[out]', 0.0));
-        $this->assertStringContainsString('random(2)', AudioEffects::graph('[in]ROOM(1.0,5000,-12,10)[out]', 1.0), 'each ear has its own tail');
+
+        $inputs = [];
+        $graph = AudioEffects::graph('[in]ROOM(hall,-4),BED(room_tone,-20)[out]', 1.0, $inputs, 3.0, -2.5);
+        $this->assertStringContainsString('afir=', $graph);
+        $this->assertStringContainsString('volume=-2.5dB,alimiter', $graph, 'one fixed gain, no swelling');
+        $this->assertSame([false, true], array_column($inputs, 'loop'));
+        $this->assertStringEndsWith('ir/hall.flac', $inputs[0]['path']);
+        $this->assertStringEndsWith('bed/room_tone.flac', $inputs[1]['path']);
+    }
+
+    public function test_every_room_and_background_an_effect_uses_is_shipped(): void
+    {
+        foreach (AudioEffects::ALL as $key => $row) {
+            preg_match_all('/(ROOM|BED)\(([a-z_]+),/', $row[6], $m, PREG_SET_ORDER);
+            foreach ($m as [, $kind, $name]) {
+                $this->assertFileExists(AudioEffects::assetPath($kind === 'ROOM' ? 'ir' : 'bed', $name), $key);
+            }
+        }
     }
 
     public function test_a_premium_generation_keeps_the_effect_and_gets_the_effected_recording(): void
