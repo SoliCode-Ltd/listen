@@ -218,6 +218,12 @@ class TtsService
             if (is_string($encoded) && $encoded !== '' && $encoded !== '[]') {
                 $parts[] = 'speakers:'.$encoded;
             }
+            // An Arabic dialogue in a dialect now has its lines rewritten into that dialect,
+            // so recordings made before that are not reused.
+            if ($provider === 'gemini' && in_array(strtolower($lang), ['ar', 'ar-xa'], true)
+                && (trim((string) ($config['dialect'] ?? '')) !== '' || (is_string($encoded) && str_contains($encoded, '"dialect"')))) {
+                $parts[] = 'script:dialect';
+            }
         }
 
         // Chirp 3 HD standard voices sound different from WaveNet ones, so they

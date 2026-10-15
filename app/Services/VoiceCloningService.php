@@ -687,6 +687,7 @@ class VoiceCloningService
             .(preg_match('/\p{Arabic}/u', $text) ? "- Where Arabic letters allow, spell words the way this variety says them, so a speech engine pronounces them right: گ for a g sound written ق, چ for a ch sound, and the variety's own vowels.\n" : '')
             ."- Do not add a title, notes, labels, or quotation marks.\n"
             ."- Keep every marker like [[0]] or [[1]] exactly as written, once each, in the same place in the sentence.\n"
+            ."- Keep the line breaks: one output line for each input line, in the same order.\n"
             ."- If it is already in that variety, return it unchanged.\n"
             ."- Return only the spoken transcript.\n\n"
             ."Transcript:\n".$text;
@@ -728,23 +729,31 @@ class VoiceCloningService
         $prompt = $this->rewritePrompt($text, $instruction);
 
         foreach (self::TRANSCRIPT_MODELS as $model) {
+            $body = [
+                'contents' => [[
+                    'role' => 'user',
+                    'parts' => [['text' => $prompt]],
+                ]],
+                'generationConfig' => [
+                    'temperature' => 0.2,
+                    // A rewrite needs no reasoning; thinking is what made it time out.
+                    'thinkingConfig' => ['thinkingLevel' => 'minimal'],
+                ],
+            ];
             try {
-                $response = $this->request('POST', '/models/'.$model.':generateContent', [
-                    'contents' => [[
-                        'role' => 'user',
-                        'parts' => [['text' => $prompt]],
-                    ]],
-                    'generationConfig' => [
-                        'temperature' => 0.2,
-                    ],
-                ], 15);
+                $response = $this->request('POST', '/models/'.$model.':generateContent', $body, 25);
+                if ($response->status() === 400 && str_contains(strtolower($this->responseError($response)), 'think')) {
+                    unset($body['generationConfig']['thinkingConfig']);
+                    $response = $this->request('POST', '/models/'.$model.':generateContent', $body, 25);
+                }
             } catch (\Throwable $e) {
+                // A slow model is not a missing one: the next model gets its turn.
                 Log::warning('Cloned-voice dialect rewrite failed.', [
                     'model' => $model,
                     'error' => $e->getMessage(),
                 ]);
 
-                return null;
+                continue;
             }
 
             if ($response->successful()) {

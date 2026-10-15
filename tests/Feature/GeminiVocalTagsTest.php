@@ -512,6 +512,83 @@ class GeminiVocalTagsTest extends TestCase
         $this->assertStringContainsString('Dialect markers to make clearly audible: Saidi', $part['speech_metadata']['style']);
     }
 
+    public function test_dialogue_lines_are_rewritten_into_each_speakers_dialect(): void
+    {
+        $this->fakeGeminiKeys();
+        config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $bodies = [];
+        Http::fake(function ($request) use (&$bodies) {
+            $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
+            if (str_contains($request->url(), 'gemini-3.5-flash:generateContent')) {
+                $prompt = $request->data()['contents'][0]['parts'][0]['text'];
+                $answer = str_contains($prompt, 'Cairene') ? "إزيك يا صاحبي؟\nأنا كويس أوي" : 'شلونك؟';
+
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => $answer]]]]]]);
+            }
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/wav', 'data' => base64_encode($this->wavBytes())]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize("فهد: كيف حالك يا صديقي؟\nسارة: كيف حالك؟\nفهد: أنا بخير جدًا", 'ar', [
+            'dialect' => 'ar-EG',
+            'speakers' => [
+                ['name' => 'فهد', 'voice_name' => 'Iapetus'],
+                ['name' => 'سارة', 'voice_name' => 'Kore', 'dialect' => 'ar-KW'],
+            ],
+        ]);
+
+        $rewrites = collect($bodies)->filter(fn ($b) => str_contains($b['url'], 'gemini-3.5-flash'))->values();
+        $this->assertCount(2, $rewrites, 'one rewrite per dialect');
+        $this->assertSame('minimal', $rewrites[0]['body']['generationConfig']['thinkingConfig']['thinkingLevel']);
+        $this->assertStringNotContainsString('فهد:', $rewrites[0]['body']['contents'][0]['parts'][0]['text'], 'labels are not sent');
+
+        $speech = collect($bodies)->first(fn ($b) => str_contains($b['url'], 'gemini-3.8-flash-tts'));
+        $parts = $speech['body']['contents'][0]['parts'];
+        $this->assertSame(['إزيك يا صاحبي؟', 'شلونك؟', 'أنا كويس أوي'], array_column($parts, 'text'));
+        $this->assertSame(['فهد', 'سارة', 'فهد'], array_map(fn ($p) => $p['speech_metadata']['speaker'], $parts));
+        $this->assertStringContainsString('Egyptian', $parts[0]['speech_metadata']['style']);
+        $this->assertStringContainsString('Kuwaiti', $parts[1]['speech_metadata']['style']);
+    }
+
+    public function test_dialogue_keeps_its_lines_when_the_rewrite_loses_one(): void
+    {
+        $this->fakeGeminiKeys();
+        config(['services.gemini_tts.dialect_rewrite' => true, 'services.gemini_tts.api_key' => 'test-key']);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $bodies = [];
+        Http::fake(function ($request) use (&$bodies) {
+            $bodies[] = ['url' => $request->url(), 'body' => $request->data()];
+            if (str_contains($request->url(), 'gemini-3.5-flash:generateContent')) {
+                return Http::response(['candidates' => [['content' => ['parts' => [['text' => 'سطر واحد بس']]]]]]);
+            }
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/wav', 'data' => base64_encode($this->wavBytes())]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize("فهد: مرحبا\nسارة: أهلا", 'ar', [
+            'dialect' => 'ar-EG',
+            'speakers' => [['name' => 'فهد', 'voice_name' => 'Iapetus'], ['name' => 'سارة', 'voice_name' => 'Kore']],
+        ]);
+
+        $speech = collect($bodies)->first(fn ($b) => str_contains($b['url'], 'gemini-3.8-flash-tts'));
+        $this->assertSame(['مرحبا', 'أهلا'], array_column($speech['body']['contents'][0]['parts'], 'text'));
+    }
+
+    public function test_a_slow_rewrite_model_hands_over_to_the_next_one(): void
+    {
+        config(['services.gemini_tts.api_key' => 'test-key']);
+        Http::fake(function ($request) {
+            if (str_contains($request->url(), 'gemini-3.5-flash:generateContent')) {
+                throw new \Illuminate\Http\Client\ConnectionException('cURL error 28: Operation timed out');
+            }
+
+            return Http::response(['candidates' => [['content' => ['parts' => [['text' => 'أنا عايز أروح دلوقتي']]]]]]);
+        });
+
+        $this->assertSame('أنا عايز أروح دلوقتي', app(\App\Services\VoiceCloningService::class)->speakableText('أريد أن أذهب الآن', 'ar-EG'));
+    }
+
     /**
      * The studio data the page hands its script (components/voice-studio/panel).
      *
