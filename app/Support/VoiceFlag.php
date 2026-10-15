@@ -57,10 +57,10 @@ final class VoiceFlag
         }
 
         return match (EnglishAccents::countryOf($code)) {
-            'US', 'CA', 'JM' => 'americas',
+            'US', 'CA', 'JM', 'TT' => 'americas',
             'GB', 'IE' => 'uk_ie',
-            'ZA', 'NG', 'GH', 'KE' => 'africa',
-            'AU', 'NZ', 'IN', 'SG', 'PK', 'PH' => 'asia_pacific',
+            'ZA', 'NG', 'GH', 'KE', 'UG', 'ZW' => 'africa',
+            'AU', 'NZ', 'IN', 'SG', 'PK', 'PH', 'BD', 'LK', 'MY' => 'asia_pacific',
             default => 'other',
         };
     }

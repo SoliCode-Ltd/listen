@@ -237,6 +237,59 @@ $section('Daily limit audit (Cairo days, last 3 days, all members with a daily l
     $line('Member-days over the daily limit', $over);
 });
 
+// ---------------------------------------------------------------- every member's limits
+// Credits charged by audio length, and no monthly credits on the free plan, apply from
+// RULES_SINCE (live from Oct 14 2026): earlier use this month followed the old rules.
+$section('Every member (free, trial, pack and paid): anything made past a limit since the current rules?', function () use ($mask, $problem, $line) {
+    $access = app(\App\Services\PlanAccessService::class);
+    $rulesSince = max(now()->startOfMonth(), \Carbon\Carbon::parse('2026-10-14 06:00:00'));
+    $line('Checked from (UTC)', $rulesSince->toDateTimeString());
+    $counters = UsageCounter::query()->where('period_ym', now()->format('Y-m'))->get()->keyBy('user_id');
+    $gens = AudioGeneration::query()->where('created_at', '>=', $rulesSince)->whereNotNull('user_id')->where('status', '!=', 'failed')
+        ->get(['id', 'user_id', 'status', 'duration_seconds', 'billed_to_pack', 'input_text', 'voice_tier', 'created_at']);
+    $line('Generations since then / members', $gens->count().' / '.$gens->pluck('user_id')->unique()->count());
+    $flagged = 0;
+    foreach ($gens->groupBy('user_id') as $userId => $mine) {
+        $user = User::query()->find($userId);
+        $quota = $access->resolveQuotaPlanForUserId((int) $userId);
+        $counter = $counters->get($userId);
+        $limit = PlanUsageGuard::charsLimit($quota, $counter);
+        $used = (int) ($counter->total_chars ?? 0);
+        $monthly = $mine->where('billed_to_pack', '!=', true);
+        $tag = sprintf('user %d %s (%s)', $userId, $mask($user?->email), $quota->slug ?? '-');
+        $earned = class_exists(Credits::class) ? Credits::forSeconds((int) $monthly->where('status', 'done')->sum('duration_seconds')) : 0;
+        $issues = [];
+        if ($monthly->isNotEmpty() && $limit <= 0) {
+            $issues[] = $monthly->count().' made on the monthly allowance with no credits on the plan (not a pack)';
+        }
+        if ($used > $limit) {
+            $issues[] = "{$used} credits used of {$limit}";
+        }
+        if ($earned > $used + 450) {
+            $issues[] = "audio since then is worth {$earned} credits but the month's counter holds {$used}";
+        }
+        if (! PlanUsageGuard::hasUnlimitedRequests($quota) && (int) ($counter->total_requests ?? 0) > PlanUsageGuard::planRequests($quota)) {
+            $issues[] = (int) $counter->total_requests.' generations of '.PlanUsageGuard::planRequests($quota).' a month';
+        }
+        $tooLong = $mine->filter(fn ($g) => mb_strlen((string) $g->input_text) > PlanUsageGuard::maxCharsPerRequest($quota) + 50)->count();
+        if ($tooLong > 0) {
+            $issues[] = "{$tooLong} script(s) over ".PlanUsageGuard::maxCharsPerRequest($quota).' characters';
+        }
+        if ($mine->where('voice_tier', 'hd')->isNotEmpty() && $mine->where('voice_tier', 'hd')->where('billed_to_pack', '!=', true)->isNotEmpty()
+            && \App\Support\VoiceTier::normalize((string) ($access->resolveAccessPlanForUserId((int) $userId)?->voice_tier ?? 'standard')) !== \App\Support\VoiceTier::HD) {
+            $issues[] = 'premium voices on a plan without them (not a pack)';
+        }
+        if ($issues !== []) {
+            $flagged++;
+            $problem("{$tag}: ".implode('; ', $issues).'.');
+        }
+    }
+    $line('Members past a limit since then', $flagged);
+    if (Schema::hasTable('char_pack_wallets')) {
+        $line('Pack wallets overdrawn', \App\Models\CharPackWallet::query()->whereColumn('chars_used', '>', 'chars_total')->count());
+    }
+});
+
 // ---------------------------------------------------------------- generations
 $section('Generations since the last upload of the usage code', function () use ($line, $problem, &$deployedAt) {
     $since = $deployedAt ?? now()->subDay();

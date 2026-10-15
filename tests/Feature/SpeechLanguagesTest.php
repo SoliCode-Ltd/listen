@@ -48,7 +48,7 @@ class SpeechLanguagesTest extends TestCase
             $this->assertNotNull(VoiceFlag::url($code, $row['country']), $code.' has a flag');
             $this->assertSame('other', VoiceFlag::region($code), $code);
         }
-        $this->assertGreaterThanOrEqual(45, count(EnglishAccents::ALL));
+        $this->assertGreaterThanOrEqual(60, count(EnglishAccents::ALL));
     }
 
     public function test_the_script_tells_which_language_text_was_left_in(): void
