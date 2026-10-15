@@ -109,7 +109,8 @@ jobs:
           grep -E '^DB_QUEUE_RETRY_AFTER=' .env
           [ -f bootstrap/cache/config.php ] && php artisan config:cache | tail -1
           php artisan queue:restart | tail -1
-          php artisan tinker --execute="echo '  retry_after in use: '.config('queue.connections.'.config('queue.default').'.retry_after').' s ('.config('queue.default').')'.PHP_EOL;"
+          echo "== In use =="
+          php artisan config:show queue.connections.database 2>/dev/null | grep -iE 'retry_after' || echo "  (could not read the config)"
           REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0

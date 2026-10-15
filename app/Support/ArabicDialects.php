@@ -744,6 +744,42 @@ final class ArabicDialects
         return self::ALL[self::normalize($code)]['clone'] ?? null;
     }
 
+    /**
+     * Plain Fusha targets: a script already in Fusha comes back from the rewrite unchanged,
+     * so it is only rewritten when it has colloquial words in it. The other Fusha
+     * registers (classical, White Arabic, oratory, learner, drama) adapt the wording too.
+     */
+    public static function isPlainFusha(?string $code): bool
+    {
+        return in_array(strtoupper(str_replace('_', '-', trim((string) $code))), ['AR', 'AR-XA', 'AR-XA-NW'], true);
+    }
+
+    /** Common words no Fusha text uses, from the main dialect groups. */
+    private const COLLOQUIAL_WORDS = [
+        // Egyptian
+        'عايز', 'عايزة', 'عاوز', 'عاوزة', 'دلوقتي', 'دلوقت', 'إزاي', 'ازاي', 'إزيك', 'ازيك', 'إزيكم', 'ازيكم', 'كده', 'كدا', 'أوي', 'اوي', 'مش', 'ليه', 'فين',
+        'بتاع', 'بتاعة', 'بتاعي', 'بتاعك', 'إيه', 'ايه', 'ده', 'دي', 'علشان', 'عشان', 'بقى', 'بقا', 'يلا', 'يلّا', 'برضه', 'برضو', 'النهارده', 'امبارح', 'إمبارح', 'بكرة', 'أيوه', 'ايوه', 'أيوة', 'ايوة', 'لسه', 'كمان',
+        // Gulf and Iraqi
+        'شلون', 'شلونك', 'شلونكم', 'وش', 'ايش', 'إيش', 'وايد', 'ابغى', 'أبغى', 'ابغي', 'هالحين', 'مب', 'مو', 'شنو', 'شكو', 'ماكو', 'اكو', 'كلش', 'زين', 'يبه', 'چذي', 'جذي', 'وين',
+        // Levantine
+        'شو', 'هيك', 'هلأ', 'هلق', 'هلّق', 'هلا', 'بدي', 'بدك', 'بدنا', 'بدهم', 'منيح', 'منيحة', 'كتير', 'ليش', 'هاد', 'هادا', 'هاي', 'مبارح', 'لهلق', 'إشي', 'اشي',
+        // Maghrebi and Sudanese
+        'بزاف', 'واش', 'كيفاش', 'دابا', 'ديال', 'ديالي', 'والو', 'مزيان', 'برشا', 'باهي', 'توا', 'نتا', 'نتي', 'داير', 'دايرة', 'ياخ',
+    ];
+
+    /**
+     * True when the text has words from a spoken dialect in it (ignoring diacritics).
+     * Used to skip a Fusha rewrite that would change nothing.
+     */
+    public static function looksColloquial(string $text): bool
+    {
+        $plain = (string) preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $text);
+        static $pattern = null;
+        $pattern ??= '/(?<!\p{L})(?:و|ف)?(?:'.implode('|', array_map(fn ($w) => preg_quote((string) preg_replace('/[\x{064B}-\x{065F}\x{0670}]/u', '', $w), '/'), self::COLLOQUIAL_WORDS)).')(?!\p{L})/u';
+
+        return preg_match($pattern, $plain) === 1;
+    }
+
     private static function normalize(?string $code): string
     {
         $code = trim(str_replace('_', '-', (string) $code));

@@ -77,8 +77,9 @@ class AudioGenerationResource extends Resource
                     ->schema([
                         Forms\Components\Placeholder::make('accent_label')
                             ->label('Accent')
-                            ->content(fn (?AudioGeneration $record): string => trim(GenerationChoiceLabels::accent($record?->dialect, $record?->target_language, $record?->voice_tier)
-                                .($record?->is_dialogue && ($speakers = GenerationChoiceLabels::speakerAccents($record->dialogue_metadata, $record->target_language, $record->voice_tier)) !== '' ? ' · '.$speakers : '')))
+                            ->content(fn (?AudioGeneration $record): string => implode(' · ', array_filter(
+                                GenerationChoiceLabels::spokenAccent($record?->dialect, (bool) $record?->is_dialogue, $record?->dialogue_metadata, $record?->target_language, $record?->voice_tier)
+                            )))
                             ->columnSpanFull(),
                         Forms\Components\Placeholder::make('performance_style_label')
                             ->label('Performance style')
@@ -173,12 +174,8 @@ class AudioGenerationResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('dialect')
                     ->label('Accent')
-                    ->state(fn (AudioGeneration $record): string => $record->dialect
-                        ? GenerationChoiceLabels::accent($record->dialect, $record->target_language, $record->voice_tier)
-                        : '—')
-                    ->description(fn (AudioGeneration $record): ?string => $record->is_dialogue
-                        ? (GenerationChoiceLabels::speakerAccents($record->dialogue_metadata, $record->target_language, $record->voice_tier) ?: null)
-                        : null)
+                    ->state(fn (AudioGeneration $record): string => GenerationChoiceLabels::spokenAccent($record->dialect, (bool) $record->is_dialogue, $record->dialogue_metadata, $record->target_language, $record->voice_tier)[0])
+                    ->description(fn (AudioGeneration $record): ?string => GenerationChoiceLabels::spokenAccent($record->dialect, (bool) $record->is_dialogue, $record->dialogue_metadata, $record->target_language, $record->voice_tier)[1])
                     ->wrap()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('status')

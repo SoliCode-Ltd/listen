@@ -35,20 +35,33 @@ final class GenerationChoiceLabels
     }
 
     /**
-     * A dialogue's speakers who were given their own dialect: theirs is the one
-     * spoken on their lines, not the main one. Empty when none were.
+     * The accent a generation was spoken in, and a note under it. A dialogue speaker
+     * given their own dialect speaks it on their lines; when every speaker has one,
+     * the main setting is not used at all, so theirs are shown and the main one is
+     * marked unused.
+     *
+     * @return array{0: string, 1: ?string}
      */
-    public static function speakerAccents(mixed $dialogue, ?string $language = null, ?string $tier = null): string
+    public static function spokenAccent(?string $code, bool $isDialogue, mixed $dialogue, ?string $language = null, ?string $tier = null): array
     {
-        $parts = [];
-        foreach ((array) (is_array($dialogue) ? ($dialogue['speakers'] ?? []) : []) as $speaker) {
-            $code = is_array($speaker) ? trim((string) ($speaker['dialect'] ?? '')) : '';
-            if ($code !== '') {
-                $parts[] = trim((string) ($speaker['name'] ?? '?')).': '.self::accent($code, $language, $tier);
+        $main = trim((string) $code) !== '' ? self::accent($code, $language, $tier) : '—';
+        $speakers = $isDialogue && is_array($dialogue) ? array_values(array_filter((array) ($dialogue['speakers'] ?? []), 'is_array')) : [];
+        $own = [];
+        foreach ($speakers as $speaker) {
+            $dialect = trim((string) ($speaker['dialect'] ?? ''));
+            if ($dialect !== '') {
+                $own[] = trim((string) ($speaker['name'] ?? '?')).': '.self::accent($dialect, $language, $tier);
             }
         }
 
-        return $parts === [] ? '' : 'Spoken by the speakers in their own dialect — '.implode('; ', $parts);
+        if ($own === []) {
+            return [$main, null];
+        }
+        if (count($own) === count($speakers)) {
+            return [implode('; ', $own), 'Main setting not used: '.$main];
+        }
+
+        return [$main, 'Except — '.implode('; ', $own)];
     }
 
     /**

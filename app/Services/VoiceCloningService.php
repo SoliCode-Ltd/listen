@@ -550,6 +550,10 @@ class VoiceCloningService
         if ($text === '' || $instruction === '') {
             return $text;
         }
+        // A Fusha script comes back from a Fusha rewrite unchanged; only colloquial words are worth the wait.
+        if (ArabicDialects::isPlainFusha($dialect) && ! ArabicDialects::looksColloquial($text)) {
+            return $text;
+        }
 
         $cacheKey = 'listen:clone-dialect:v3:'.sha1($instruction.'|'.$text);
         $cached = Cache::get($cacheKey);
@@ -559,7 +563,7 @@ class VoiceCloningService
 
         // Tags are locked as [[0]], [[1]] … so the rewrite cannot drop or translate them.
         $protected = GeminiVocalTags::protect($text);
-        $rewritten = $this->rewriteTranscript($protected['text'], $instruction);
+        $rewritten = $this->rewriteInPieces($protected['text'], $instruction);
         if ($rewritten === null || $rewritten === '') {
             return $text;
         }
@@ -724,35 +728,120 @@ class VoiceCloningService
         return null;
     }
 
-    private function rewriteTranscript(string $text, string $instruction): ?string
+    /** A long script is rewritten in pieces of about this many characters, all at once. */
+    private const REWRITE_PIECE_CHARS = 600;
+
+    /**
+     * Rewrite a script, a long one in pieces sent together so it takes about as long
+     * as a short one. Pieces end at line ends where they can (a dialogue keeps one line
+     * per line), else at sentence ends. However slow the models are, the whole rewrite
+     * never holds the generation for more than 25 seconds. Null when any piece failed.
+     */
+    private function rewriteInPieces(string $text, string $instruction): ?string
+    {
+        $deadline = microtime(true) + 25;
+        $pieces = [];
+        foreach (explode("\n", $text) as $li => $line) {
+            foreach (TextChunker::split($line, self::REWRITE_PIECE_CHARS, 'mb_strlen') as $pi => $part) {
+                $sep = $pi > 0 ? ' ' : ($li > 0 ? "\n" : '');
+                $last = array_key_last($pieces);
+                if ($last !== null && mb_strlen($pieces[$last]['text'].$sep.$part) <= self::REWRITE_PIECE_CHARS) {
+                    $pieces[$last]['text'] .= $sep.$part;
+                } else {
+                    $pieces[] = ['sep' => $sep, 'text' => $part];
+                }
+            }
+        }
+        if (count($pieces) < 2) {
+            return $this->rewriteTranscript($text, $instruction, $deadline);
+        }
+
+        $results = array_fill(0, count($pieces), null);
+        $model = self::TRANSCRIPT_MODELS[0];
+        $key = $this->apiKeys($model)[0] ?? null;
+        if ($key !== null) {
+            $url = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/').'/models/'.$model.':generateContent';
+            foreach (array_chunk(array_keys($pieces), 6) as $batch) {
+                $timeout = min(20, (int) floor($deadline - microtime(true)));
+                if ($timeout < 3) {
+                    break;
+                }
+                try {
+                    $responses = Http::pool(function (Pool $pool) use ($batch, $pieces, $instruction, $url, $key, $timeout) {
+                        foreach ($batch as $i) {
+                            $pool->as((string) $i)->timeout($timeout)->connectTimeout(20)->withOptions($this->httpOptions())
+                                ->withHeaders(['Content-Type' => 'application/json', 'x-goog-api-key' => $key['key']])
+                                ->post($url, $this->rewriteBody($this->rewritePrompt($pieces[$i]['text'], $instruction)));
+                        }
+                    });
+                } catch (\Throwable) {
+                    $responses = [];
+                }
+                foreach ($batch as $i) {
+                    $response = $responses[(string) $i] ?? null;
+                    $raw = $response instanceof Response && $response->successful() ? data_get($response->json(), 'candidates.0.content.parts.0.text') : null;
+                    if (is_string($raw) && trim($raw) !== '') {
+                        $results[$i] = $this->cleanSpokenTranscript($raw, $pieces[$i]['text']);
+                    }
+                }
+            }
+        }
+        // A piece that did not come back goes again on its own (other keys, other model) while time is left.
+        foreach ($results as $i => $result) {
+            if ($result === null) {
+                $results[$i] = $this->rewriteTranscript($pieces[$i]['text'], $instruction, $deadline);
+                if ($results[$i] === null) {
+                    return null;
+                }
+            }
+        }
+
+        $joined = '';
+        foreach ($pieces as $i => $piece) {
+            $joined .= ($i === 0 ? '' : $piece['sep']).$results[$i];
+        }
+
+        return $joined;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function rewriteBody(string $prompt, bool $thinkingLevel = true): array
+    {
+        $config = ['temperature' => 0.2];
+        if ($thinkingLevel) {
+            // Full thinking took 13 s and timed out; minimal (2 s) garbles words now and
+            // then; low (5-6 s) gave a clean script every time on live.
+            $config['thinkingConfig'] = ['thinkingLevel' => 'low'];
+        }
+
+        return [
+            'contents' => [[
+                'role' => 'user',
+                'parts' => [['text' => $prompt]],
+            ]],
+            'generationConfig' => $config,
+        ];
+    }
+
+    private function rewriteTranscript(string $text, string $instruction, ?float $deadline = null): ?string
     {
         $prompt = $this->rewritePrompt($text, $instruction);
         // A rewrite normally takes 5 or 6 seconds; however slow the models are, it never
         // holds the generation for more than 25.
-        $deadline = microtime(true) + 25;
+        $deadline ??= microtime(true) + 25;
         $timeout = fn (): int => min(20, (int) floor($deadline - microtime(true)));
 
         foreach (self::TRANSCRIPT_MODELS as $model) {
             if ($timeout() < 3) {
                 break;
             }
-            $body = [
-                'contents' => [[
-                    'role' => 'user',
-                    'parts' => [['text' => $prompt]],
-                ]],
-                'generationConfig' => [
-                    'temperature' => 0.2,
-                    // Full thinking took 13 s and timed out; minimal (2 s) garbles words now and
-                    // then; low (5-6 s) gave a clean script every time on live.
-                    'thinkingConfig' => ['thinkingLevel' => 'low'],
-                ],
-            ];
+            $body = $this->rewriteBody($prompt);
             try {
                 $response = $this->request('POST', '/models/'.$model.':generateContent', $body, $timeout());
                 if ($response->status() === 400 && str_contains(strtolower($this->responseError($response)), 'think') && $timeout() >= 3) {
-                    unset($body['generationConfig']['thinkingConfig']);
-                    $response = $this->request('POST', '/models/'.$model.':generateContent', $body, $timeout());
+                    $response = $this->request('POST', '/models/'.$model.':generateContent', $this->rewriteBody($prompt, false), $timeout());
                 }
             } catch (\Throwable $e) {
                 // A slow model is not a missing one: the next model gets its turn.
@@ -1346,7 +1435,6 @@ class VoiceCloningService
     {
         $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $url = $baseUrl.$path;
-        $verify = (bool) config('services.gemini_tts.verify_ssl', true);
         $model = GeminiKeyManager::modelFromPath($path, self::MODEL);
         $keys = $this->apiKeys($model);
 
@@ -1354,11 +1442,7 @@ class VoiceCloningService
             throw new \RuntimeException('Gemini API key is not configured.');
         }
 
-        $options = ['verify' => $verify];
-        $proxy = trim((string) config('services.gemini_tts.voice_proxy', ''));
-        if ($proxy !== '') {
-            $options['proxy'] = $proxy;
-        }
+        $options = $this->httpOptions();
 
         $last = null;
         foreach ($keys as $index => $keyInfo) {
@@ -1403,6 +1487,20 @@ class VoiceCloningService
         }
 
         return $last;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function httpOptions(): array
+    {
+        $options = ['verify' => (bool) config('services.gemini_tts.verify_ssl', true)];
+        $proxy = trim((string) config('services.gemini_tts.voice_proxy', ''));
+        if ($proxy !== '') {
+            $options['proxy'] = $proxy;
+        }
+
+        return $options;
     }
 
     /**

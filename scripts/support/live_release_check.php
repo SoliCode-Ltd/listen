@@ -391,11 +391,47 @@ $section('Arabic dialect path (last 15 premium Arabic generations with a dialect
     $instruction->setAccessible(true);
     $rows = AudioGeneration::query()->whereIn('target_language', ['ar', 'ar-XA', 'ar-xa'])->whereNotNull('dialect')
         ->where('voice_tier', '!=', 'standard')->latest('id')->limit(15)
-        ->get(['id', 'created_at', 'status', 'dialect', 'voice_name', 'tts_provider', 'tts_model', 'tts_fallback_used', 'style_prompt', 'is_dialogue', 'translate', 'input_text']);
+        ->get(['id', 'created_at', 'status', 'dialect', 'voice_name', 'tts_provider', 'tts_model', 'tts_fallback_used', 'style_prompt', 'is_dialogue', 'translate', 'input_text', 'dialogue_metadata']);
+    // Whether the script (a dialogue: each speaker's lines, per dialect) went through the rewrite.
+    $state = function (string $text, string $dialect) use ($cloning, $instruction): string {
+        $text = trim(\App\Support\GeminiVocalTags::normalizeMarkup(trim($text)));
+        $rule = (string) $instruction->invoke($cloning, $dialect);
+        if ($rule === '' || $text === '') {
+            return 'no rule';
+        }
+        if (method_exists(\App\Support\ArabicDialects::class, 'isPlainFusha') && \App\Support\ArabicDialects::isPlainFusha($dialect) && ! \App\Support\ArabicDialects::looksColloquial($text)) {
+            return 'fusha, none needed';
+        }
+
+        return \Illuminate\Support\Facades\Cache::has('listen:clone-dialect:v3:'.sha1($rule.'|'.$text)) ? 'rewritten' : 'NOT rewritten';
+    };
     foreach ($rows as $g) {
-        $text = trim(\App\Support\GeminiVocalTags::normalizeMarkup(trim((string) $g->input_text)));
-        $rule = (string) $instruction->invoke($cloning, $g->dialect);
-        $rewritten = $rule === '' ? 'no rule' : (\Illuminate\Support\Facades\Cache::has('listen:clone-dialect:v3:'.sha1($rule.'|'.$text)) ? 'rewritten' : 'NOT rewritten');
+        if (! $g->is_dialogue) {
+            $rewritten = $state((string) $g->input_text, (string) $g->dialect);
+        } else {
+            $own = [];
+            foreach ((array) (($g->dialogue_metadata ?? [])['speakers'] ?? []) as $sp) {
+                $name = trim((string) ($sp['name'] ?? ''));
+                if ($name !== '') {
+                    $own[$name] = trim((string) ($sp['dialect'] ?? '')) ?: (string) $g->dialect;
+                }
+            }
+            $current = array_key_first($own);
+            $groups = [];
+            foreach (preg_split("/\r\n|\n|\r/", (string) $g->input_text) ?: [] as $l) {
+                $spoken = trim($l);
+                foreach (array_keys($own) as $name) {
+                    if (str_starts_with($spoken, $name.':')) {
+                        [$current, $spoken] = [$name, trim(substr($spoken, strlen($name) + 1))];
+                        break;
+                    }
+                }
+                if ($spoken !== '') {
+                    $groups[$current !== null ? $own[$current] : (string) $g->dialect][] = $spoken;
+                }
+            }
+            $rewritten = implode(', ', array_map(fn ($d) => $d.': '.$state(implode("\n", $groups[$d]), $d), array_keys($groups)));
+        }
         echo sprintf("  #%d %s %s %s voice=%s via=%s/%s fallback=%s custom_prompt=%s dialogue=%s translate=%s %s\n",
             $g->id, $g->created_at?->format('m-d H:i'), $g->status, $g->dialect, $g->voice_name, $g->tts_provider ?: '?', $g->tts_model ?: '?',
             $g->tts_fallback_used ? 'YES' : 'no', trim((string) $g->style_prompt) !== '' ? 'YES' : 'no', $g->is_dialogue ? 'yes' : 'no',
