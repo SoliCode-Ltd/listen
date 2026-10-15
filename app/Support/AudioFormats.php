@@ -176,7 +176,9 @@ class AudioFormats
         }
 
         // storage/app/bin is where the "Server deploy" workflow's ffmpeg mode
-        // puts a copy on hosts that have none.
-        return (new ExecutableFinder())->find('ffmpeg', null, [storage_path('app/bin')]);
+        // puts a copy on hosts that have none. The usual system folders are
+        // named too: web PHP (PHP-FPM) often runs with an empty PATH, so a
+        // server ffmpeg the command line finds would otherwise be missed.
+        return (new ExecutableFinder())->find('ffmpeg', null, [storage_path('app/bin'), '/usr/bin', '/usr/local/bin', '/bin']);
     }
 }

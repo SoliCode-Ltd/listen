@@ -83,6 +83,20 @@ class AudioEffectsTest extends TestCase
         $this->assertStringEndsWith('bed/room_tone.flac', $inputs[1]['path']);
     }
 
+    public function test_ffmpeg_is_found_even_when_web_php_has_no_path(): void
+    {
+        if (! is_executable('/usr/bin/ffmpeg') && ! is_executable('/usr/local/bin/ffmpeg')) {
+            $this->markTestSkipped('No system ffmpeg here.');
+        }
+        $path = getenv('PATH');
+        putenv('PATH=');
+        try {
+            $this->assertNotNull(AudioFormats::ffmpegPath());
+        } finally {
+            putenv('PATH='.$path);
+        }
+    }
+
     public function test_every_room_and_background_an_effect_uses_is_shipped(): void
     {
         foreach (AudioEffects::ALL as $key => $row) {

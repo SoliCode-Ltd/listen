@@ -165,6 +165,8 @@ $section('Plans (credits, minutes, limits, profit at full use)', function () use
             number_format($credits), $minutes === null ? '?' : number_format($minutes), (int) ($plan->daily_requests ?? 0),
             (int) $plan->monthly_requests, (int) $plan->max_chars_per_request, $plan->allow_overage ? 'ON' : 'off',
             json_encode($plan->download_formats ?? null), $profit);
+        printf("       voices=%s dialogue=%s sound_environments=%s\n", (string) ($plan->voice_tier ?? 'standard'),
+            ($plan->dialogue_enabled ?? false) ? 'ON' : 'off', ($plan->sound_effects_enabled ?? false) ? 'ON' : 'off');
         if ($plan->allow_overage) {
             $problem("Plan {$plan->slug} still has overage switched on in the database (the code ignores it).");
         }
