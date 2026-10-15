@@ -126,7 +126,7 @@ return [
             'text' => 'أهلين! إيش رأيكم نتمشّى في صنعاء القديمة؟ البيوت مزخرفة والسوق مليان بن وزبيب. قد شفتوا شي أحلى من كذا؟'],
 
         ['slug' => 'ar-sd-nile', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SD', 'gender' => 'male',
-            'voice' => 'Zubenelgenubi', 'speaker' => 'Yasser', 'speaker_ar' => 'ياسر',
+            'voice' => 'Zubenelgenubi', 'speaker' => 'Alaa', 'speaker_ar' => 'علاء',
             'title' => 'Sunset on the Nile', 'title_ar' => 'مغرب على النيل', 'emotion' => 'calm',
             'style' => 'A Sudanese man talking to a close friend. Calm, deep, measured and kind.',
             'text' => 'يا زول، كيفنك؟ هسّي داير أحكي ليك عن الخرطوم ساعة المغرب، والنيل لونه دهبي. حاجة جميلة شديد ياخي.'],
@@ -359,7 +359,7 @@ return [
             'voice' => 'Callirrhoe', 'speaker' => 'Maya',
             'title' => 'Lunch plans', 'title_ar' => 'خطة الغداء', 'emotion' => 'playful',
             'style' => 'A bubbly young woman from Singapore talking to colleagues. Quick, cheerful.',
-            'text' => "Hi everyone! Lunch today we go to the hawker centre, okay? Chicken rice, laksa, then kopi after. Confirm very good one."],
+            'text' => 'Hi everyone! Lunch today we go to the hawker centre, okay? Chicken rice, laksa, then kopi after. Confirm very good one.'],
 
         ['slug' => 'en-ar-welcome', 'kind' => 'single', 'language' => 'en', 'dialect' => 'en-AR', 'gender' => 'male',
             'voice' => 'Sadachbia', 'speaker' => 'Adrian',

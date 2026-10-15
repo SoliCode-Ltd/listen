@@ -171,7 +171,7 @@ class VoiceSeeder extends Seeder
                     ['id' => 'ar-Gemini-HD-Umbriel', 'gender' => 'male', 'display_name' => 'Raed', 'provider_voice_id' => 'Umbriel'],
                     ['id' => 'ar-Gemini-HD-Vindemiatrix', 'gender' => 'female', 'display_name' => 'Jumana', 'provider_voice_id' => 'Vindemiatrix'],
                     ['id' => 'ar-Gemini-HD-Zephyr', 'gender' => 'female', 'display_name' => 'Sawsan', 'provider_voice_id' => 'Zephyr'],
-                    ['id' => 'ar-Gemini-HD-Zubenelgenubi', 'gender' => 'male', 'display_name' => 'Yasser', 'provider_voice_id' => 'Zubenelgenubi'],
+                    ['id' => 'ar-Gemini-HD-Zubenelgenubi', 'gender' => 'male', 'display_name' => 'Alaa', 'provider_voice_id' => 'Zubenelgenubi'],
                 ],
             ],
 
@@ -256,8 +256,8 @@ class VoiceSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array<string, mixed>> $voiceGroups
-     * @param array<string, array<string, array<int, string>>> $namePools
+     * @param  array<int, array<string, mixed>>  $voiceGroups
+     * @param  array<string, array<string, array<int, string>>>  $namePools
      * @return array<int, array<string, string>>
      */
     private function buildVoiceRows(array $voiceGroups, array $namePools): array
@@ -314,7 +314,7 @@ class VoiceSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array<string, string>> $voices
+     * @param  array<int, array<string, string>>  $voices
      */
     private function assertNoConflicts(array $voices): void
     {
