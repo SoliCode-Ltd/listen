@@ -59,6 +59,22 @@ class AudioEffectsTest extends TestCase
         $this->assertNull(AudioEffects::apply('audio/cache/missing.mp3', 'echo'));
     }
 
+    public function test_rooms_are_stereo_around_a_centred_voice_and_every_effect_has_one_loudness(): void
+    {
+        $this->requireFfmpeg();
+        Storage::fake('public');
+        $this->tone('audio/cache/clean.mp3', 2);
+
+        $ffprobe = dirname((string) AudioFormats::ffmpegPath()).'/ffprobe';
+        foreach (['hall', 'phone'] as $effect) {
+            $path = AudioEffects::apply('audio/cache/clean.mp3', $effect);
+            $probe = new Process([$ffprobe, '-v', 'error', '-show_entries', 'stream=channels', '-of', 'csv=p=0', Storage::disk('public')->path($path)]);
+            $this->assertSame('2', trim($probe->mustRun()->getOutput()), $effect);
+        }
+        $this->assertStringContainsString('loudnorm=I=-16', AudioEffects::graph('[in]anull[out]', 0.0));
+        $this->assertStringContainsString('random(2)', AudioEffects::graph('[in]ROOM(1.0,5000,-12,10)[out]', 1.0), 'each ear has its own tail');
+    }
+
     public function test_a_premium_generation_keeps_the_effect_and_gets_the_effected_recording(): void
     {
         $this->requireFfmpeg();
