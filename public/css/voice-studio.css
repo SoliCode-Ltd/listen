@@ -1316,7 +1316,7 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 .vs-panel .translate-row { padding: 1rem 1.1rem; border: 0; border-radius: 0; background: none; }
 .vs-panel .vs-guide { border-top: 1px solid var(--line); }
 .vs-effect-field { margin-top: 0; margin-bottom: 1.5rem; }
-.vs-effect-field .vs-field-label { margin-bottom: .55rem; }
+.vs-effect-field .vs-field-label { margin-bottom: .6rem; font-size: 1rem; font-weight: 700; color: var(--text); }
 
 /* The preview under the workspace: its own box. */
 #generateVoiceSection .output-panel {
