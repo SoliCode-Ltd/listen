@@ -1463,3 +1463,38 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
     transform: none !important;
   }
 }
+
+/* Dialogue card in the side panel: its own padding and one even rhythm, so the
+   general field spacing does not open gaps between a speaker's fields. */
+.vs-panel [data-dialogue] .dialogue-speakers {
+  gap: 0;
+  margin: 0;
+  padding: 0 1.1rem 1.1rem;
+}
+.vs-panel [data-dialogue] .dialogue-speaker-row {
+  gap: .85rem .75rem;
+  align-items: start;
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+.vs-panel [data-dialogue] .dialogue-speaker-row .vs-field { margin: 0; min-width: 0; }
+.vs-panel [data-dialogue] .dialogue-speaker-row .vs-field-label {
+  display: block;
+  margin: 0 0 .45rem;
+  font-size: .8rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.vs-panel [data-dialogue] .dialogue-speaker-label { font-size: .82rem; line-height: 1.4; }
+.vs-panel [data-dialogue] .dialogue-speaker-row input[type="text"],
+.vs-panel [data-dialogue] .dialogue-speaker-row .vs-select-button {
+  height: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  border-radius: 10px;
+  font-size: .9rem;
+}
+.vs-panel [data-dialogue] .dialogue-speaker-row .vs-select-label,
+.vs-panel [data-dialogue] .dialogue-speaker-row input[type="text"] { font-size: .9rem; font-weight: 600; }
+.vs-panel [data-dialogue] .dialogue-guide { margin-top: 1rem; font-size: .8rem; }
+.vs-panel [data-dialogue] .dialogue-example-btn { margin-top: .75rem; }
