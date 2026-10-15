@@ -355,8 +355,8 @@ class GeminiModelSwitchSafetyTest extends TestCase
                         if ($language === 'ar' && $sentCode !== 'ar-XA') {
                             $failures[] = "{$label} sent {$sentCode} instead of ar-XA";
                         }
-                        $expectedCode = in_array($dialect, ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? $dialect
-                            : (in_array(substr($dialect, 0, 5), ['en-US', 'en-GB'], true) ? substr($dialect, 0, 5) : 'en-US');
+                        // A regional accent (en-GB-SC, en-AU-BR) is sent as its country's code.
+                        $expectedCode = in_array(substr($dialect, 0, 5), ['en-US', 'en-GB', 'en-AU', 'en-IN'], true) ? substr($dialect, 0, 5) : 'en-US';
                         if ($language === 'en' && $sentCode !== $expectedCode) {
                             $failures[] = "{$label} sent {$sentCode} instead of {$expectedCode}";
                         }

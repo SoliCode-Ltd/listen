@@ -451,8 +451,8 @@ class GeminiVocalTagsTest extends TestCase
     public function test_every_arab_dialect_is_offered_with_directions(): void
     {
         $codes = TtsStudioConfig::dialectValues('ar');
-        $this->assertCount(122, $codes);
-        foreach (['ar-XA-KH', 'ar-XA-ED', 'ar-XA-DR', 'ar-TD', 'ar-SS', 'ar-IR', 'ar-TR-MR', 'ar-TR-HT', 'ar-DZ-JJ', 'ar-EG-WH', 'ar-IQ-OB', 'ar-QA-OL', 'ar-XA-NW', 'ar-XA-CL', 'ar-XA-WH', 'ar-SA-TH', 'ar-AE-BD', 'ar-BH-BA', 'ar-LB-MT', 'ar-SY-CO', 'ar-PS-FL', 'ar-EG-SH', 'ar-SD-WE', 'ar-IQ-NJ', 'ar-YE-TH', 'ar-MA-FS', 'ar-DZ-TL', 'ar-TN-SA', 'ar-LY-FZ', 'ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-QA-BD', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA'] as $code) {
+        $this->assertCount(147, $codes);
+        foreach (['ar-XA-KH', 'ar-XA-ED', 'ar-XA-DR', 'ar-TD', 'ar-SS', 'ar-IR', 'ar-TR-MR', 'ar-TR-HT', 'ar-DZ-JJ', 'ar-EG-WH', 'ar-IQ-OB', 'ar-QA-OL', 'ar-XA-NW', 'ar-XA-CL', 'ar-XA-WH', 'ar-SA-TH', 'ar-AE-BD', 'ar-BH-BA', 'ar-LB-MT', 'ar-SY-CO', 'ar-PS-FL', 'ar-EG-SH', 'ar-SD-WE', 'ar-IQ-NJ', 'ar-YE-TH', 'ar-MA-FS', 'ar-DZ-TL', 'ar-TN-SA', 'ar-LY-FZ', 'ar-LB-TR', 'ar-SY-DZ', 'ar-JO-HR', 'ar-PS-HB', 'ar-IQ-AN', 'ar-YE-TZ', 'ar-MA-MK', 'ar-DZ-CO', 'ar-TN-SF', 'ar-XA', 'ar-SA', 'ar-SA-HJ', 'ar-QA', 'ar-QA-BD', 'ar-BH', 'ar-YE', 'ar-PS', 'ar-DZ', 'ar-LY', 'ar-SD', 'ar-MR', 'ar-EG-SA', 'ar-NG', 'ar-SA-QT', 'ar-YE-MR', 'ar-MA-DR', 'ar-LB-AK'] as $code) {
             $this->assertContains($code, $codes);
             $this->assertNotNull(ArabicDialects::prompt($code), $code);
             $this->assertNotNull(ArabicDialects::cloneInstruction($code), $code);
