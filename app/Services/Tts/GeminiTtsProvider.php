@@ -1021,7 +1021,12 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         $cloning = app(VoiceCloningService::class);
+        $startedAt = microtime(true);
         foreach ($groups as $lineDialect => $spokenLines) {
+            // A slow rewrite must not hold the generation: past 20 seconds the rest stay as written.
+            if (microtime(true) - $startedAt > 20) {
+                break;
+            }
             $block = implode("\n", $spokenLines);
             $rewritten = $cloning->speakableText($block, $lineDialect);
             $newLines = array_values(array_filter(array_map('trim', preg_split("/\r\n|\n|\r/", $rewritten) ?: []), fn ($l) => $l !== ''));

@@ -727,8 +727,15 @@ class VoiceCloningService
     private function rewriteTranscript(string $text, string $instruction): ?string
     {
         $prompt = $this->rewritePrompt($text, $instruction);
+        // A rewrite normally takes 2 seconds; however slow the models are, it never
+        // holds the generation for more than 25.
+        $deadline = microtime(true) + 25;
+        $timeout = fn (): int => min(20, (int) floor($deadline - microtime(true)));
 
         foreach (self::TRANSCRIPT_MODELS as $model) {
+            if ($timeout() < 3) {
+                break;
+            }
             $body = [
                 'contents' => [[
                     'role' => 'user',
@@ -741,10 +748,10 @@ class VoiceCloningService
                 ],
             ];
             try {
-                $response = $this->request('POST', '/models/'.$model.':generateContent', $body, 25);
-                if ($response->status() === 400 && str_contains(strtolower($this->responseError($response)), 'think')) {
+                $response = $this->request('POST', '/models/'.$model.':generateContent', $body, $timeout());
+                if ($response->status() === 400 && str_contains(strtolower($this->responseError($response)), 'think') && $timeout() >= 3) {
                     unset($body['generationConfig']['thinkingConfig']);
-                    $response = $this->request('POST', '/models/'.$model.':generateContent', $body, 25);
+                    $response = $this->request('POST', '/models/'.$model.':generateContent', $body, $timeout());
                 }
             } catch (\Throwable $e) {
                 // A slow model is not a missing one: the next model gets its turn.

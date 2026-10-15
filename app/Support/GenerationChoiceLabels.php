@@ -35,6 +35,23 @@ final class GenerationChoiceLabels
     }
 
     /**
+     * A dialogue's speakers who were given their own dialect: theirs is the one
+     * spoken on their lines, not the main one. Empty when none were.
+     */
+    public static function speakerAccents(mixed $dialogue, ?string $language = null, ?string $tier = null): string
+    {
+        $parts = [];
+        foreach ((array) (is_array($dialogue) ? ($dialogue['speakers'] ?? []) : []) as $speaker) {
+            $code = is_array($speaker) ? trim((string) ($speaker['dialect'] ?? '')) : '';
+            if ($code !== '') {
+                $parts[] = trim((string) ($speaker['name'] ?? '?')).': '.self::accent($code, $language, $tier);
+            }
+        }
+
+        return $parts === [] ? '' : 'Spoken by the speakers in their own dialect — '.implode('; ', $parts);
+    }
+
+    /**
      * Every accent on offer today, for admin filters: code => "مصري (قاهري) · Egyptian (Cairene)".
      *
      * @return array<string, string>
