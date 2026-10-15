@@ -237,6 +237,69 @@ $section('Daily limit audit (Cairo days, last 3 days, all members with a daily l
     $line('Member-days over the daily limit', $over);
 });
 
+// ---------------------------------------------------------------- every member's limits
+$section('Every member with use this month (free, trial, pack and paid): over any limit?', function () use ($mask, $problem, $line) {
+    $access = app(\App\Services\PlanAccessService::class);
+    $ym = now()->format('Y-m');
+    $monthStart = now()->startOfMonth();
+    $counters = UsageCounter::query()->where('period_ym', $ym)->get()->keyBy('user_id');
+    $gens = AudioGeneration::query()->where('created_at', '>=', $monthStart)->whereNotNull('user_id')
+        ->get(['id', 'user_id', 'status', 'duration_seconds', 'billed_to_pack', 'input_text', 'created_at']);
+    $userIds = $counters->keys()->merge($gens->pluck('user_id'))->unique()->values();
+    $rows = [];
+    $over = 0;
+    foreach ($userIds as $userId) {
+        $user = User::query()->find($userId);
+        $quota = $access->resolveQuotaPlanForUserId((int) $userId);
+        $counter = $counters->get($userId);
+        $mine = $gens->where('user_id', $userId);
+        $made = $mine->where('status', '!=', 'failed');
+        $monthly = $made->where('billed_to_pack', '!=', true);
+        $limit = PlanUsageGuard::charsLimit($quota, $counter);
+        $used = (int) ($counter->total_chars ?? 0);
+        $requests = (int) ($counter->total_requests ?? 0);
+        // What the audio actually made this month costs, against what the counter holds.
+        $earned = class_exists(Credits::class) ? Credits::forSeconds((int) $monthly->where('status', 'done')->sum('duration_seconds')) : 0;
+        $tag = sprintf('user %d %s (%s)', $userId, $mask($user?->email), $quota->slug ?? '-');
+        if ($used > $limit) {
+            $over++;
+            $problem("{$tag}: {$used} credits used, over the {$limit} limit.");
+        }
+        if (! PlanUsageGuard::hasUnlimitedRequests($quota) && $requests > PlanUsageGuard::planRequests($quota)) {
+            $over++;
+            $problem("{$tag}: {$requests} generations this month, over the ".PlanUsageGuard::planRequests($quota).' allowed.');
+        }
+        if ((bool) ($quota?->getAttribute('enforce_trial_minute_cap') ?? false) && (int) ($quota->monthly_minutes ?? 0) > 0
+            && (int) ($counter->total_seconds ?? 0) > (int) $quota->monthly_minutes * 60) {
+            $over++;
+            $problem("{$tag}: ".(int) $counter->total_seconds.' s of trial audio, over the '.((int) $quota->monthly_minutes * 60).' s cap.');
+        }
+        if ($earned > $used + 1500) {
+            $problem("{$tag}: audio made this month is worth {$earned} credits but the counter holds {$used} (under-charged by ".($earned - $used).').');
+        }
+        $tooLong = $made->filter(fn ($g) => mb_strlen((string) $g->input_text) > PlanUsageGuard::maxCharsPerRequest($quota) + 50)->count();
+        if ($tooLong > 0) {
+            $problem("{$tag}: {$tooLong} generation(s) longer than the plan's ".PlanUsageGuard::maxCharsPerRequest($quota).' characters a request.');
+        }
+        $rows[] = [$limit > 0 ? $used / $limit : ($used > 0 ? 9 : 0), sprintf('  %-48s credits %s of %s  requests %d/%s  made %d (pack %d)',
+            $tag, number_format($used), number_format($limit), $requests,
+            PlanUsageGuard::hasUnlimitedRequests($quota) ? '∞' : PlanUsageGuard::planRequests($quota), $made->count(), $made->where('billed_to_pack', true)->count())];
+    }
+    $line('Members with use this month', $userIds->count());
+    $line('Over a monthly limit', $over);
+    echo "  Closest to their credit limit:\n";
+    usort($rows, fn ($a, $b) => $b[0] <=> $a[0]);
+    foreach (array_slice($rows, 0, 8) as [$share, $text]) {
+        echo $text.sprintf('  %.0f%%', $share * 100)."\n";
+    }
+    if (Schema::hasTable('char_pack_wallets')) {
+        foreach (\App\Models\CharPackWallet::query()->whereColumn('chars_used', '>', 'chars_total')->get() as $wallet) {
+            $problem("user {$wallet->user_id}: pack wallet used {$wallet->chars_used} of {$wallet->chars_total}.");
+        }
+        $line('Pack wallets overdrawn', \App\Models\CharPackWallet::query()->whereColumn('chars_used', '>', 'chars_total')->count());
+    }
+});
+
 // ---------------------------------------------------------------- generations
 $section('Generations since the last upload of the usage code', function () use ($line, $problem, &$deployedAt) {
     $since = $deployedAt ?? now()->subDay();
