@@ -3,6 +3,8 @@
 namespace App\Support;
 
 use App\Models\Plan;
+use App\Models\User;
+use App\Models\UserFeatureGrant;
 use Throwable;
 
 /**
@@ -20,6 +22,53 @@ final class PlanFeatures
     public const DIALOGUE = 'dialogue';
 
     public const PROMPT = 'prompt';
+
+    /**
+     * Options an admin can give one member for a while (UserResource → Feature trials).
+     *
+     * @var array<string, string>
+     */
+    public const GRANTABLE = [
+        self::DIALOGUE => 'Dialogue mode (needs a plan on the premium voices)',
+        self::EFFECTS => 'Sound environments',
+    ];
+
+    /**
+     * Whether this member can use the option now: their plan has it, or an
+     * admin gave it to them and the time has not run out.
+     */
+    public static function userHas(?User $user, ?Plan $plan, string $feature): bool
+    {
+        if (self::planOffers($plan, $feature)) {
+            return true;
+        }
+        if (! $user || ! isset(self::GRANTABLE[$feature]) || ! self::granted($user, $feature)) {
+            return false;
+        }
+        // Dialogue needs the premium voices whatever the grant says.
+        if ($feature === self::DIALOGUE) {
+            return $plan !== null && VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD)) === VoiceTier::HD;
+        }
+
+        return true;
+    }
+
+    /**
+     * An active admin grant of the option to this member.
+     */
+    public static function granted(User $user, string $feature): bool
+    {
+        try {
+            return UserFeatureGrant::query()
+                ->where('user_id', $user->id)
+                ->where('feature', $feature)
+                ->active()
+                ->exists();
+        } catch (Throwable) {
+            // Before the migration has run on a server: no grants.
+            return false;
+        }
+    }
 
     public static function planOffers(?Plan $plan, string $feature): bool
     {

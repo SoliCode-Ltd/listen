@@ -6,9 +6,11 @@ use App\Filament\Resources\UserResource\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\CharPackService;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
 use App\Support\Countries;
+use App\Support\DemoAllowance;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -114,12 +116,12 @@ class UserResource extends Resource
                         Forms\Components\Placeholder::make('demo_chars_used_display')
                             ->label(__('ui.admin.users.demo_chars_used'))
                             ->content(fn (?User $record): string => $record
-                                ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format(\App\Support\DemoAllowance::chars())
+                                ? number_format((int) DemoVoiceGeneration::where('user_id', $record->id)->sum('billable_chars')).' / '.number_format(DemoAllowance::chars())
                                 : '0'),
                         Forms\Components\Placeholder::make('pack_chars_display')
                             ->label('Premium pack')
                             ->content(function (?User $record): string {
-                                $pack = $record ? app(\App\Services\Billing\CharPackService::class)->summary((int) $record->id) : null;
+                                $pack = $record ? app(CharPackService::class)->summary((int) $record->id) : null;
 
                                 return $pack && $pack['active']
                                     ? number_format($pack['remaining']).' of '.number_format($pack['total']).' characters left, until '.$pack['expires_at']->format('j M Y')
@@ -502,7 +504,7 @@ HTML;
     public static function getRelations(): array
     {
         return [
-            //
+            UserResource\RelationManagers\FeatureGrantsRelationManager::class,
         ];
     }
 
@@ -550,8 +552,8 @@ HTML;
             });
     }
 
-    private static function latestSubscription(User $user): ?\App\Models\Subscription
+    private static function latestSubscription(User $user): ?Subscription
     {
-        return \App\Models\Subscription::query()->where('user_id', $user->id)->latest('id')->first();
+        return Subscription::query()->where('user_id', $user->id)->latest('id')->first();
     }
 }

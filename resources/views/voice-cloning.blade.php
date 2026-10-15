@@ -76,7 +76,7 @@
     .vc-guidelines h4{margin:0 0 .6rem;font-size:.92rem;color:var(--a)}
     .vc-guidelines ul{list-style:none;padding:0;margin:0;font-size:.86rem;color:var(--muted)}
     .vc-guidelines ul li{padding:.25rem 0;padding-inline-start:1.2rem;position:relative}
-    .vc-guidelines ul li::before{content:"";position:absolute;inset-inline-start:0;top:.65rem;width:6px;height:6px;border-radius:50%;background:var(--a);opacity:.5}
+    .vc-guidelines ul li::before{content:"";position:absolute;inset-inline-start:0;top:calc(.25rem + .5lh - 3px);width:6px;height:6px;border-radius:50%;background:var(--a);opacity:.5}
 
     /* Consent */
     .vc-consent{display:flex;align-items:flex-start;gap:.6rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:color-mix(in oklab,var(--surface2) 60%,var(--surface));margin-bottom:1.2rem}

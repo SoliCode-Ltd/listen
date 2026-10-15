@@ -364,7 +364,9 @@
       content: "";
       width: .42rem;
       height: .42rem;
-      margin-top: .38rem;
+      /* Centred on the first line of the tip, whatever the font size. */
+      margin-top: .6em;
+      margin-top: calc(.5lh - .21rem);
       border-radius: 99px;
       flex-shrink: 0;
       background: var(--a);
