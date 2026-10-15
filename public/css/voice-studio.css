@@ -1431,7 +1431,9 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 /* Side panel settings: one even gap between every block. */
 #generateVoiceSection .vs-pane > * { margin-top: 0; margin-bottom: 0; }
 #generateVoiceSection .vs-pane > * + * { margin-top: 1.4rem; }
-#generateVoiceSection .vs-pane [data-dialogue] { margin-top: 0; }
+/* The dialogue card gets the same gap as any block, locked (in its wrapper) or not. */
+#generateVoiceSection .vs-pane > * + [data-dialogue] { margin-top: 1.4rem; }
+#generateVoiceSection .vs-pane .vs-locked [data-dialogue] { margin-top: 0; }
 
 /* A locked card: the button sits on its own line above the card, never on its border. */
 .vs-locked.vs-locked-card { padding-top: 2.3rem; }
