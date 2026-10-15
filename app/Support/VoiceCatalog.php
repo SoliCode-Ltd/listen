@@ -105,9 +105,9 @@ class VoiceCatalog
         'Mishary' => 'مشاري',
         'Hamed' => 'حامد',
         'Tamim' => 'تميم',
-        'Hazem' => 'حازم',
-        'Raed' => 'رائد',
         'Alaa' => 'علاء',
+        'Raed' => 'رائد',
+        'Yasser' => 'ياسر',
         // English female names
         'Emma' => 'إيما',
         'Olivia' => 'أوليفيا',

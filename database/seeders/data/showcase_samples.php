@@ -84,7 +84,7 @@ return [
             'text' => 'بص بقى، أنا عايزة أقولك حاجة مهمة أوي. البرنامج ده هيوفّر عليك وقت كتير، ودلوقتي تقدر تعمل صوت احترافي في ثانية. جرّبه وقولّي رأيك!'],
 
         ['slug' => 'ar-eg-saidi-wisdom', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-EG-SA', 'gender' => 'male',
-            'voice' => 'Schedar', 'speaker' => 'Hazem', 'speaker_ar' => 'حازم',
+            'voice' => 'Schedar', 'speaker' => 'Alaa', 'speaker_ar' => 'علاء',
             'title' => 'Words of wisdom', 'title_ar' => 'حكمة الجدود', 'emotion' => 'wise',
             'style' => 'An older man from Upper Egypt giving advice to his son. Deep, slow, proud and tender.',
             'text' => 'يا ولدي، اسمع الكلام ده زين. الأرض دي ما بتديش غير اللي يتعب فيها. أبوي كان يگول: اللي يزرع الخير، يحصد الخير. ودلوك جه دورك.'],
@@ -126,7 +126,7 @@ return [
             'text' => 'أهلين! إيش رأيكم نتمشّى في صنعاء القديمة؟ البيوت مزخرفة والسوق مليان بن وزبيب. قد شفتوا شي أحلى من كذا؟'],
 
         ['slug' => 'ar-sd-nile', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-SD', 'gender' => 'male',
-            'voice' => 'Zubenelgenubi', 'speaker' => 'Alaa', 'speaker_ar' => 'علاء',
+            'voice' => 'Zubenelgenubi', 'speaker' => 'Yasser', 'speaker_ar' => 'ياسر',
             'title' => 'Sunset on the Nile', 'title_ar' => 'مغرب على النيل', 'emotion' => 'calm',
             'style' => 'A Sudanese man talking to a close friend. Calm, deep, measured and kind.',
             'text' => 'يا زول، كيفنك؟ هسّي داير أحكي ليك عن الخرطوم ساعة المغرب، والنيل لونه دهبي. حاجة جميلة شديد ياخي.'],
@@ -246,7 +246,7 @@ return [
             'text' => 'واش راك خويا؟ درك نروحو لوهران نسمعو الراي ونتمشاو فالبحر، الجو هايل بزاف، ما تخليش الفرصة.'],
 
         ['slug' => 'ar-mr-hassaniya-tea', 'kind' => 'single', 'language' => 'ar', 'dialect' => 'ar-MR', 'gender' => 'male',
-            'voice' => 'Schedar', 'speaker' => 'Hazem', 'speaker_ar' => 'حازم',
+            'voice' => 'Schedar', 'speaker' => 'Alaa', 'speaker_ar' => 'علاء',
             'title' => 'Three glasses of tea', 'title_ar' => 'كيسان الأتاي', 'emotion' => 'calm',
             'style' => 'An older man from Nouakchott sharing a tea tradition. Slow, deep, Hassaniya melody.',
             'text' => 'أهلاً بيكم! الأتاي عندنا ثلاث كيسان، الأول مرّ كالحياة، والثاني حلو كالحب، والثالث خفيف كالموت. اشربوا وتهنّاو.'],
