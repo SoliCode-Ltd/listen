@@ -540,7 +540,7 @@ class GeminiVocalTagsTest extends TestCase
 
         $rewrites = collect($bodies)->filter(fn ($b) => str_contains($b['url'], 'gemini-3.5-flash'))->values();
         $this->assertCount(2, $rewrites, 'one rewrite per dialect');
-        $this->assertSame('minimal', $rewrites[0]['body']['generationConfig']['thinkingConfig']['thinkingLevel']);
+        $this->assertSame('low', $rewrites[0]['body']['generationConfig']['thinkingConfig']['thinkingLevel']);
         $this->assertStringNotContainsString('فهد:', $rewrites[0]['body']['contents'][0]['parts'][0]['text'], 'labels are not sent');
 
         $speech = collect($bodies)->first(fn ($b) => str_contains($b['url'], 'gemini-3.8-flash-tts'));

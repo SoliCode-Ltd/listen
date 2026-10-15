@@ -727,7 +727,7 @@ class VoiceCloningService
     private function rewriteTranscript(string $text, string $instruction): ?string
     {
         $prompt = $this->rewritePrompt($text, $instruction);
-        // A rewrite normally takes 2 seconds; however slow the models are, it never
+        // A rewrite normally takes 5 or 6 seconds; however slow the models are, it never
         // holds the generation for more than 25.
         $deadline = microtime(true) + 25;
         $timeout = fn (): int => min(20, (int) floor($deadline - microtime(true)));
@@ -743,8 +743,9 @@ class VoiceCloningService
                 ]],
                 'generationConfig' => [
                     'temperature' => 0.2,
-                    // A rewrite needs no reasoning; thinking is what made it time out.
-                    'thinkingConfig' => ['thinkingLevel' => 'minimal'],
+                    // Full thinking took 13 s and timed out; minimal (2 s) garbles words now and
+                    // then; low (5-6 s) gave a clean script every time on live.
+                    'thinkingConfig' => ['thinkingLevel' => 'low'],
                 ],
             ];
             try {
