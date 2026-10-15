@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plan;
 use App\Support\AudioEffects;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Once;
 use Tests\TestCase;
 
 class HomeEnvironmentsTest extends TestCase
@@ -40,6 +42,14 @@ class HomeEnvironmentsTest extends TestCase
             $this->assertStringContainsString('data-vp-mode="clean"', $en);
             $this->assertStringContainsString('env-en-church', $en);
             $this->assertStringNotContainsString('env-ar-', $en);
+            $this->assertStringContainsString('class="vs-env-cta" href="'.route('pricing').'"', $en, 'no plan has them yet: the pricing page');
+            $this->assertStringContainsString('<bdi dir="ltr">+20</bdi> sound environments', $en);
+
+            Plan::factory()->create(['slug' => 'pro', 'voice_tier' => 'hd', 'is_active' => true, 'price_cents' => 4900, 'sound_effects_enabled' => true]);
+            Plan::factory()->create(['slug' => 'studio_max', 'voice_tier' => 'hd', 'is_active' => true, 'price_cents' => 9900, 'sound_effects_enabled' => true]);
+            Once::flush();
+            app()->setLocale('ar');
+            $this->assertStringContainsString('billing?plan=pro', $this->getLocalizedRoute('home')->getContent(), 'the cheapest plan that has them');
         } finally {
             array_map('unlink', $made);
         }
