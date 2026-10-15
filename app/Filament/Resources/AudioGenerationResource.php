@@ -16,6 +16,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Illuminate\Support\HtmlString;
 
 class AudioGenerationResource extends Resource
 {
@@ -44,7 +45,7 @@ class AudioGenerationResource extends Resource
                             ->numeric(),
                         Forms\Components\TextInput::make('voice_name')
                             ->maxLength(255)
-                            ->helperText(fn (?AudioGeneration $record): ?string => $record ? GenerationChoiceLabels::voice($record->voice_name) : null),
+                            ->helperText(fn (?AudioGeneration $record): ?string => $record ? implode(' | ', GenerationChoiceLabels::spokenVoices($record)) : null),
                         Forms\Components\Select::make('voice_tier')
                             ->label('Quality')
                             ->options(self::tierOptions()),
@@ -71,15 +72,15 @@ class AudioGenerationResource extends Resource
                             ->columnSpanFull(),
                     ]),
                 Forms\Components\Section::make('Studio Choices')
-                    ->description('What the member picked, named as the site offers it today.')
+                    ->description(fn (?AudioGeneration $record): string => VoiceTier::normalize((string) $record?->voice_tier) === VoiceTier::STANDARD
+                        ? 'A Standard voice: no accent, style, emotion, speed or pitch is applied.'
+                        : 'What the audio was made with, named as the site offers it today.')
                     ->columns(2)
                     ->visibleOn(['view', 'edit'])
                     ->schema([
                         Forms\Components\Placeholder::make('accent_label')
                             ->label('Accent')
-                            ->content(fn (?AudioGeneration $record): string => implode(' · ', array_filter(
-                                GenerationChoiceLabels::spokenAccent($record?->dialect, (bool) $record?->is_dialogue, $record?->dialogue_metadata, $record?->target_language, $record?->voice_tier)
-                            )))
+                            ->content(fn (?AudioGeneration $record): string => $record ? GenerationChoiceLabels::spokenAccent($record) : '—')
                             ->columnSpanFull(),
                         Forms\Components\Placeholder::make('performance_style_label')
                             ->label('Performance style')
@@ -97,9 +98,13 @@ class AudioGenerationResource extends Resource
                             ->label('Custom direction')
                             ->content(fn (?AudioGeneration $record): string => filled($record?->style_prompt) ? (string) $record->style_prompt : '—')
                             ->columnSpanFull(),
+                        Forms\Components\Placeholder::make('environment_label')
+                            ->label('Sound environment')
+                            ->content(fn (?AudioGeneration $record): string => GenerationChoiceLabels::environment((string) (($record?->settings_snapshot ?? [])['audio_effect'] ?? '')))
+                            ->columnSpanFull(),
                         Forms\Components\Placeholder::make('dialogue_label')
                             ->label('Dialogue speakers')
-                            ->content(fn (?AudioGeneration $record): string => self::dialogueSummary($record))
+                            ->content(fn (?AudioGeneration $record): HtmlString => self::dialogueSummary($record))
                             ->visible(fn (?AudioGeneration $record): bool => (bool) $record?->is_dialogue)
                             ->columnSpanFull(),
                     ]),
@@ -162,7 +167,8 @@ class AudioGenerationResource extends Resource
                     ->placeholder('-'),
                 Tables\Columns\TextColumn::make('voice_name')
                     ->label('Voice')
-                    ->formatStateUsing(fn (?string $state): string => GenerationChoiceLabels::voice($state))
+                    ->state(fn (AudioGeneration $record): array => GenerationChoiceLabels::spokenVoices($record))
+                    ->listWithLineBreaks()
                     ->searchable()
                     ->sortable()
                     ->wrap(),
@@ -174,8 +180,14 @@ class AudioGenerationResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('dialect')
                     ->label('Accent')
-                    ->state(fn (AudioGeneration $record): string => GenerationChoiceLabels::spokenAccent($record->dialect, (bool) $record->is_dialogue, $record->dialogue_metadata, $record->target_language, $record->voice_tier)[0])
-                    ->description(fn (AudioGeneration $record): ?string => GenerationChoiceLabels::spokenAccent($record->dialect, (bool) $record->is_dialogue, $record->dialogue_metadata, $record->target_language, $record->voice_tier)[1])
+                    ->state(fn (AudioGeneration $record): string => GenerationChoiceLabels::spokenAccent($record))
+                    ->wrap()
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('settings')
+                    ->label('Settings')
+                    ->state(fn (AudioGeneration $record): array => GenerationChoiceLabels::settings($record))
+                    ->listWithLineBreaks()
+                    ->placeholder('Default')
                     ->wrap()
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('status')
@@ -282,24 +294,17 @@ class AudioGenerationResource extends Resource
         ];
     }
 
-    private static function dialogueSummary(?AudioGeneration $record): string
+    private static function dialogueSummary(?AudioGeneration $record): HtmlString
     {
-        $speakers = is_array($record?->dialogue_metadata) ? ($record->dialogue_metadata['speakers'] ?? []) : [];
-        if (! is_array($speakers) || $speakers === []) {
-            return '—';
+        $speakers = $record ? GenerationChoiceLabels::speakers($record) : [];
+        if ($speakers === []) {
+            return new HtmlString('—');
         }
 
-        $lines = [];
-        foreach ($speakers as $speaker) {
-            if (! is_array($speaker)) {
-                continue;
-            }
-            $name = trim((string) ($speaker['name'] ?? $speaker['speaker'] ?? ''));
-            $voice = GenerationChoiceLabels::voice((string) ($speaker['voice_name'] ?? $speaker['voice'] ?? ''));
-            $lines[] = ($name !== '' ? $name.': ' : '').$voice;
-        }
-
-        return $lines !== [] ? implode(' | ', $lines) : '—';
+        return new HtmlString(implode('<br>', array_map(
+            fn (array $s): string => e($s['name']).' — voice: '.e($s['voice']).' — accent: '.e($s['accent']),
+            $speakers,
+        )));
     }
 
     /**

@@ -167,36 +167,75 @@ class GenerationErrorsAndChoicesTest extends TestCase
             ->assertSee('HTTP 503: model overloaded', false);
     }
 
-    public function test_dialogue_shows_the_dialect_each_speaker_was_given(): void
+    public function test_dialogue_shows_the_voices_and_dialects_actually_spoken(): void
     {
         $egypt = 'مصري (قاهري) · Egyptian (Cairene) — ar-EG';
-        $this->assertSame([$egypt, null], GenerationChoiceLabels::spokenAccent('ar-EG', false, null, 'ar', 'hd'));
-        $this->assertSame([$egypt, null], GenerationChoiceLabels::spokenAccent('ar-EG', true, ['speakers' => [['name' => 'حمد', 'dialect' => '']]], 'ar', 'hd'));
-        [$label, $note] = GenerationChoiceLabels::spokenAccent('ar-EG', true, ['speakers' => [['name' => 'حمد', 'dialect' => 'ar-AE'], ['name' => 'حمدة']]], 'ar', 'hd');
-        $this->assertSame($egypt, $label, 'one speaker still uses the main setting');
-        $this->assertStringStartsWith('Except — حمد: ', $note);
-
-        // Every speaker has their own dialect: the main setting is never spoken.
-        $generation = AudioGeneration::create($this->audioRow(User::factory()->create(), [
-            'dialect' => 'ar-EG', 'target_language' => 'ar', 'voice_tier' => 'hd', 'is_dialogue' => true,
-            'dialogue_metadata' => ['speakers' => [
-                ['name' => 'حمد', 'voice_name' => 'voice_194', 'dialect' => 'ar-AE'],
-                ['name' => 'حمدة', 'voice_name' => 'voice_202', 'dialect' => 'ar-AE'],
-            ]],
+        $user = User::factory()->create();
+        $dialogue = fn (array $speakers) => new AudioGeneration($this->audioRow($user, [
+            'dialect' => 'ar-EG', 'target_language' => 'ar', 'voice_tier' => 'hd', 'voice_name' => 'ar-main-voice',
+            'is_dialogue' => true, 'dialogue_metadata' => ['speakers' => $speakers],
         ]));
-        [$label, $note] = GenerationChoiceLabels::spokenAccent('ar-EG', true, $generation->dialogue_metadata, 'ar', 'hd');
-        $this->assertStringStartsWith('حمد: ', $label);
-        $this->assertStringContainsString('حمدة: ', $label);
-        $this->assertStringNotContainsString('Cairene', $label);
-        $this->assertSame('Main setting not used: '.$egypt, $note);
+
+        // Nobody has their own dialect: everyone spoke the main one.
+        $same = $dialogue([['name' => 'حمد', 'voice_name' => 'ar-voice-a'], ['name' => 'حمدة', 'voice_name' => 'ar-voice-b', 'dialect' => '']]);
+        $this->assertSame($egypt, GenerationChoiceLabels::spokenAccent($same));
+        $this->assertSame(['حمد: ar-voice-a', 'حمدة: ar-voice-b'], GenerationChoiceLabels::spokenVoices($same), 'the speakers spoke, not the main voice');
+
+        // Both Emirati: one accent, and the unused main one is not mentioned.
+        $emirati = $dialogue([['name' => 'حمد', 'voice_name' => 'ar-voice-a', 'dialect' => 'ar-AE'], ['name' => 'حمدة', 'voice_name' => 'ar-voice-b', 'dialect' => 'ar-AE']]);
+        $this->assertStringEndsWith('— ar-AE', GenerationChoiceLabels::spokenAccent($emirati));
+        $this->assertStringNotContainsString('Cairene', GenerationChoiceLabels::spokenAccent($emirati));
+
+        // Different dialects: one per speaker.
+        $mixed = $dialogue([['name' => 'حمد', 'voice_name' => 'ar-voice-a', 'dialect' => 'ar-AE'], ['name' => 'حمدة', 'voice_name' => 'ar-voice-b']]);
+        $this->assertStringStartsWith('حمد: ', GenerationChoiceLabels::spokenAccent($mixed));
+        $this->assertStringEndsWith('حمدة: '.$egypt, GenerationChoiceLabels::spokenAccent($mixed));
+
+        $saved = AudioGeneration::create($this->audioRow($user, [
+            'dialect' => 'ar-EG', 'target_language' => 'ar', 'voice_tier' => 'hd', 'voice_name' => 'ar-main-voice',
+            'is_dialogue' => true, 'dialogue_metadata' => $emirati->dialogue_metadata,
+        ]));
+        $this->actingAsAdmin();
+        Livewire::test(ListAudioGenerations::class)
+            ->assertSee('حمدة: ar-voice-b', false)
+            ->assertDontSee('Main setting not used', false);
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $saved]))
+            ->assertOk()
+            ->assertSee('حمد — voice: ar-voice-a — accent: ', false)
+            ->assertSee('— ar-AE', false);
+    }
+
+    public function test_every_setting_the_audio_was_made_with_is_shown(): void
+    {
+        $generation = AudioGeneration::create($this->audioRow(User::factory()->create(), [
+            'target_language' => 'ar', 'voice_tier' => 'hd', 'voice_name' => 'ar-main-voice', 'dialect' => 'ar-EG',
+            'performance_style' => 'podcast', 'emotion' => 'warm', 'speed' => 1.2, 'pitch' => -4.0,
+            'style_prompt' => 'Like a late-night radio host', 'settings_snapshot' => ['audio_effect' => 'stadium'],
+        ]));
+        $settings = GenerationChoiceLabels::settings($generation);
+        $this->assertCount(6, $settings);
+        $this->assertStringStartsWith('Style: ', $settings[0]);
+        $this->assertStringStartsWith('Emotion: ', $settings[1]);
+        $this->assertSame('Speed: 1.2x', $settings[2]);
+        $this->assertSame('Pitch: -4', $settings[3]);
+        $this->assertSame('Direction: Like a late-night radio host', $settings[4]);
+        $this->assertSame('Environment: ملعب · Stadium — stadium', $settings[5]);
+
+        $plain = AudioGeneration::create($this->audioRow(User::factory()->create(), ['performance_style' => 'neutral', 'emotion' => 'neutral', 'speed' => 1.0, 'pitch' => 0.0]));
+        $this->assertSame([], GenerationChoiceLabels::settings($plain));
+        $this->assertSame('None', GenerationChoiceLabels::environment(null));
         $this->actingAsAdmin();
 
         Livewire::test(ListAudioGenerations::class)
-            ->assertSee('Main setting not used: ', false);
+            ->assertSee('Environment: ملعب · Stadium — stadium', false)
+            ->assertSee('Speed: 1.2x', false);
         $this->get(AudioGenerationResource::getUrl('view', ['record' => $generation]))
             ->assertOk()
-            ->assertSee('— ar-AE', false)
-            ->assertSee('Main setting not used: '.$egypt, false);
+            ->assertSee('ملعب · Stadium — stadium', false)
+            ->assertSee('Like a late-night radio host', false);
+        $this->get(AudioGenerationResource::getUrl('view', ['record' => $plain]))
+            ->assertOk()
+            ->assertSee('A Standard voice: no accent, style, emotion, speed or pitch is applied.', false);
     }
 
     public function test_dashboard_generation_edit_and_create_pages_still_open(): void
