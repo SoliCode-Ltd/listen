@@ -1115,7 +1115,7 @@ return [
             'no_favorites' => 'اضغط على القلب في أي صوت ليظهر هنا.',
             'no_voices' => 'لا يوجد متحدثون لهذه اللغة بعد.',
         ],
-        'audio_effect' => 'بيئة الصوت',
+        'audio_effect' => 'بيئة الصوت المُحيطة',
         'audio_effect_none' => 'بدون مؤثر (صوت نقي)',
         'picker' => [
             'audio_effect_title' => 'اختر بيئة الصوت',
