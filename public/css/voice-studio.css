@@ -780,7 +780,19 @@ html.vs-modal-open { overflow: hidden; }
   .vs-filter small { min-width: 1.2rem; font-size: .66rem; }
   .vs-modal-body { padding: .75rem 1rem 1.25rem; }
   .vs-cards { grid-template-columns: minmax(0, 1fr); gap: .5rem; }
-  .vs-card { min-height: 64px; }
+  .vs-card { min-height: 56px; padding: .5rem .7rem; gap: .6rem; }
+  /* Phones: calmer type in the picker, so more choices fit on the screen. */
+  .vs-modal-head h2 { font-size: .96rem; }
+  .vs-modal-head p { font-size: .76rem; }
+  .vs-modal-ico, .vs-modal-ico .vs-ico { width: 36px; height: 36px; }
+  .vs-modal-section h3 { font-size: .76rem; padding: .55rem 0 .35rem; }
+  .vs-modal-section h3 .vs-flag { width: 18px; height: 18px; }
+  .vs-card-ico,
+  .vs-card-ico .vs-ico { width: 32px; height: 32px; }
+  .vs-card-ico .vs-flag { width: 30px; height: 30px; }
+  .vs-card-name { font-size: .78rem; }
+  .vs-card-desc { font-size: .68rem; }
+  .vs-modal-search input { font-size: .85rem; min-height: 40px; }
 }
 
 /* ---------- Tag toolbar above the text ---------- */
@@ -1438,3 +1450,16 @@ html[lang="ar"] .vs-pane > .vs-section-title { letter-spacing: 0; font-size: .86
 }
 /* The site's label style adds a bottom margin: the search box then sits higher than the gender buttons. */
 .vs-lib .vs-lib-tools > .vs-lib-search { margin: 0; }
+
+/* Phones: a tag menu opens across the whole toolbar, never past the screen edge. */
+@media (max-width: 600px) {
+  .vs-toolbar { position: relative; }
+  .vs-tb-item { position: static; }
+  .vs-tb-pop {
+    top: calc(100% + 4px);
+    inset-inline: .5rem;
+    width: auto;
+    max-height: min(60vh, 420px);
+    transform: none !important;
+  }
+}
