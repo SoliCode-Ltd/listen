@@ -4,11 +4,13 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Services\PlanAccessService;
+use Database\Factories\UserFactory;
 use Filament\Models\Contracts\FilamentUser;
 use Filament\Panel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +19,7 @@ use Laravel\Cashier\Billable;
 
 class User extends Authenticatable implements FilamentUser
 {
-    /** @use HasFactory<\Database\Factories\UserFactory> */
+    /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
 
     protected static function booted(): void
@@ -96,7 +98,7 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(DemoVoiceGeneration::class);
     }
 
-    public function referralProfile(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function referralProfile(): HasOne
     {
         return $this->hasOne(UserReferralProfile::class);
     }
@@ -109,6 +111,11 @@ class User extends Authenticatable implements FilamentUser
     public function demoRewardTransactions(): HasMany
     {
         return $this->hasMany(DemoRewardTransaction::class);
+    }
+
+    public function featureGrants(): HasMany
+    {
+        return $this->hasMany(UserFeatureGrant::class);
     }
 
     public function clonedVoices(): HasMany

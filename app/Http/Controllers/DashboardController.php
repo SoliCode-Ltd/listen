@@ -14,17 +14,20 @@ use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
+use App\Services\ProfanityFilter;
 use App\Services\VoiceCloningService;
+use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
+use App\Support\PlanFeatures;
+use App\Support\PlanPricingLines;
 use App\Support\PlanUsageGuard;
+use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
-use App\Support\PlanFeatures;
-use App\Support\SpeechLanguages;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -120,7 +123,8 @@ class DashboardController extends Controller
         $usageRequestsPercent = $usageSnapshot['requests_percent'];
 
         // Hybrid TTS: resolve dialogue availability per plan
-        $dialogueEnabled = $planShowcase || (bool) ($activePlan?->dialogue_enabled ?? false);
+        $dialogueEnabled = $planShowcase || (bool) ($activePlan?->dialogue_enabled ?? false)
+            || PlanFeatures::userHas(auth()->user(), $activePlan, PlanFeatures::DIALOGUE);
         $customPromptEnabled = $planShowcase || $this->planAllowsCustomPrompt($activePlan);
         $extensionApiState = $this->extensionApiState(auth()->user());
         $voiceCloningVisible = VoiceCloningAccess::allows(auth()->user(), $activePlan);
@@ -145,7 +149,7 @@ class DashboardController extends Controller
             'planShowcase' => $planShowcase,
             // The plan's own pricing-page lines; "credit card not needed" means nothing once signed in.
             'planLines' => array_values(array_filter(
-                \App\Support\PlanPricingLines::forPlan($activePlan ?? new Plan, app()->getLocale()),
+                PlanPricingLines::forPlan($activePlan ?? new Plan, app()->getLocale()),
                 fn (array $line): bool => $line['label'] !== __('ui.pricing.lines.label_card_needed'),
             )),
             'jobs' => $jobs,
@@ -194,7 +198,7 @@ class DashboardController extends Controller
                     'id' => $v->id,
                     'name' => $v->name,
                     'language_code' => $v->language_code,
-                    'key' => 'cloned_' . $v->id,
+                    'key' => 'cloned_'.$v->id,
                 ])->values()->all()
                 : [],
             'voiceCloningVisible' => $voiceCloningVisible,
@@ -220,7 +224,8 @@ class DashboardController extends Controller
         $billToPack = CharPackService::billsToPack($quotaPlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
-        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false);
+        $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false)
+            || PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::DIALOGUE);
         $requestedTier = VoiceTier::normalize((string) ($request->input('voice_tier') ?? $planTier));
 
         if (VoiceTier::isHigherThan($requestedTier, $planTier)) {
@@ -240,8 +245,8 @@ class DashboardController extends Controller
 
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
-            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
-            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(\App\Services\ProfanityFilter::class))],
+            'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(ProfanityFilter::class))],
+            'text' => ['nullable', 'string', 'max:50000', 'required_without:content', new DoesNotContainProfanity(app(ProfanityFilter::class))],
             'target_language' => ['required', 'in:'.implode(',', SpeechLanguages::codes())],
             'translate' => ['nullable', 'boolean'],
             'voice_key' => ['nullable', 'string', 'max:60'],
@@ -253,7 +258,7 @@ class DashboardController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
-            'audio_effect' => ['nullable', 'string', 'in:'.implode(',', \App\Support\AudioEffects::keys())],
+            'audio_effect' => ['nullable', 'string', 'in:'.implode(',', AudioEffects::keys())],
         ] + DialogueSpeakers::rules(), [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),
@@ -293,7 +298,7 @@ class DashboardController extends Controller
         }
 
         $voiceName = $clonedVoiceId
-            ? ('cloned_' . $clonedVoiceId)
+            ? ('cloned_'.$clonedVoiceId)
             : $this->normalizeVoiceSelection(
                 $validated['target_language'],
                 $voiceKey,
@@ -365,8 +370,8 @@ class DashboardController extends Controller
                     'emotion' => $studioOptions['emotion'],
                     'speed' => $studioOptions['speed'],
                     'pitch' => $studioOptions['pitch'],
-                    // Only on plans with sound environments, and only when this server can add them.
-                    'audio_effect' => PlanFeatures::planOffers($activePlan, PlanFeatures::EFFECTS) && \App\Support\AudioEffects::available()
+                    // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
+                    'audio_effect' => PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::EFFECTS) && AudioEffects::available()
                         ? ($validated['audio_effect'] ?? null)
                         : null,
                     'is_dialogue' => $dialogueEnabled
@@ -601,7 +606,7 @@ class DashboardController extends Controller
 
         $perMonth = __('ui.pricing.per_month_short');
         $card = static function (Plan $plan, string $period, string $headline, string $url, string $cta) use ($price, $locale): array {
-            $lines = \App\Support\PlanPricingLines::forPlan($plan, $locale);
+            $lines = PlanPricingLines::forPlan($plan, $locale);
 
             return [
                 'name' => $plan->getLocalizedName($locale),
@@ -747,7 +752,7 @@ class DashboardController extends Controller
     }
 
     /**
-     * @param array{performance_style:mixed,emotion:mixed} $input
+     * @param  array{performance_style:mixed,emotion:mixed}  $input
      */
     private function ensureRequiredStudioSelections(string $tier, array $input): void
     {
@@ -781,12 +786,12 @@ class DashboardController extends Controller
         // Standard tier: no performance controls — use defaults only.
         if ($normalizedTier === VoiceTier::STANDARD) {
             return [
-                'dialect'  => null,
+                'dialect' => null,
                 'performance_style' => 'neutral',
                 'style_prompt' => null,
-                'emotion'  => 'neutral',
-                'speed'    => 1.0,
-                'pitch'    => 0.0,
+                'emotion' => 'neutral',
+                'speed' => 1.0,
+                'pitch' => 0.0,
             ];
         }
 
@@ -860,7 +865,7 @@ class DashboardController extends Controller
 
         return [
             PlanFeatures::STUDIO => PlanFeatures::lock(PlanFeatures::STUDIO, $premium, $arabic),
-            PlanFeatures::EFFECTS => PlanFeatures::lock(PlanFeatures::EFFECTS, $showcase || PlanFeatures::planOffers($plan, PlanFeatures::EFFECTS), $arabic),
+            PlanFeatures::EFFECTS => PlanFeatures::lock(PlanFeatures::EFFECTS, $showcase || PlanFeatures::userHas(auth()->user(), $plan, PlanFeatures::EFFECTS), $arabic),
             PlanFeatures::DIALOGUE => PlanFeatures::lock(PlanFeatures::DIALOGUE, $premium && $dialogueEnabled, $arabic),
         ];
     }
