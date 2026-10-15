@@ -28,6 +28,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref }}
+          fetch-depth: 0
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -64,9 +65,10 @@ jobs:
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
           echo "Using staging key 1: ${KEY:0:6}...${KEY: -4}"
-          php artisan tts:showcase --set=environments --generate --render --pause=20 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-160
+          php artisan tts:showcase --set=environments --generate --render --pause=20 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-160 || echo "Some clips failed (see above); the ones made are still committed, and the next run makes only the missing ones."
 
       - name: Commit the clips
+        if: always()
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -75,4 +77,5 @@ jobs:
           if git diff --cached --quiet; then echo "No new clips"; exit 1; fi
           git diff --cached --stat
           git commit -m "Homepage sound environments: clips made with staging key 1"
+          git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
