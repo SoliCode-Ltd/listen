@@ -59,11 +59,11 @@ final class AudioEffects
         'hall' => ['g-hall', 'space', 'Concert hall', 'قاعة كبيرة', 'A large hall with a rich, smooth reverb', 'قاعة واسعة بصدى غني وناعم',
             '[in]highpass=f=70,ROOM(hall,-4),BED(room_tone,-24)[out]', 1.6],
         'church' => ['g-church', 'space', 'Cathedral', 'كاتدرائية', 'Stone walls and a long, majestic tail', 'جدران حجرية وصدى طويل مهيب',
-            '[in]highpass=f=70,ROOM(cathedral,-3),BED(room_tone,-22)[out]', 3.0],
+            '[in]highpass=f=70,ROOM(cathedral,-8),BED(room_tone,-22)[out]', 3.0],
         'stadium' => ['g-stadium', 'space', 'Stadium', 'ملعب', 'A vast open arena with the crowd around you', 'ساحة مفتوحة واسعة والجمهور من حولك',
             '[in]highpass=f=120,ROOM(stadium,-4),BED(crowd,-6)[out]', 1.4],
         'cave' => ['g-cave', 'space', 'Cave', 'كهف', 'Deep, dark rock with water dripping', 'صخر عميق ومظلم وقطرات ماء تتساقط',
-            '[in]highpass=f=80,ROOM(cave,-9),BED(cave,-12)[out]', 2.2],
+            '[in]highpass=f=80,ROOM(cave,-11),BED(cave,-12)[out]', 2.2],
         'echo' => ['g-echo', 'space', 'Mountain echo', 'صدى الجبل', 'Clear repeats that bounce from side to side, in the open wind', 'تكرار واضح يرتد بين الجهتين في هواء الجبل',
             '[in]highpass=f=80,asplit=2[ed][es];[es]highpass=f=300,lowpass=f=3200,asplit=4[e1][e2][e3][e4];'
             .'[e1]adelay=420,volume=-9dB[t1];[e2]adelay=840,volume=-13dB,lowpass=f=2600[t2];[e3]adelay=1260,volume=-18dB,lowpass=f=2100[t3];[e4]adelay=1680,volume=-24dB,lowpass=f=1700[t4];'
@@ -72,9 +72,10 @@ final class AudioEffects
         'car' => ['g-car', 'space', 'Inside a car', 'داخل سيارة', 'A small padded cabin on the road', 'مقصورة صغيرة على الطريق',
             '[in]highpass=f=90,equalizer=f=220:t=q:w=1:g=1.5,ROOM(car,-12),BED(car_road,-11)[out]', 0.3],
         'distant' => ['g-far', 'space', 'Far away', 'من بعيد', 'A voice from across a big room', 'صوت قادم من آخر المكان',
-            '[in]highpass=f=180,lowpass=f=3600,ROOM(warehouse,-8),BED(room_tone,-14)[out]', 2.0],
+            '[in]highpass=f=180,lowpass=f=4200,ROOM(warehouse,-14),BED(room_tone,-16)[out]', 2.0],
         'next_room' => ['g-wall', 'space', 'Next room', 'من الغرفة المجاورة', 'Muffled through a wall or a closed door', 'مكتوم خلف جدار أو باب مغلق',
-            '[in]lowpass=f=520,lowpass=f=520,highpass=f=90,ROOM(living_room,-8),BED(room_tone,-18)[out]', 0.5],
+            // The wall takes the highs; a trace of the consonants still comes through, so the words can be followed.
+            '[in]highpass=f=90,equalizer=f=300:t=q:w=1:g=2,lowpass=f=850,lowpass=f=1500,asplit=2[na][nb];[nb]highpass=f=1600,lowpass=f=3200,volume=-22dB[nc];[na][nc]amix=inputs=2:normalize=0:duration=first,ROOM(living_room,-16),BED(room_tone,-20)[out]', 0.5],
 
         // Devices: how the voice sounds through equipment.
         'phone' => ['g-phone', 'device', 'Phone call', 'مكالمة هاتفية', 'Narrow band, like a voice on the phone', 'نطاق ضيق كصوت عبر الهاتف',
@@ -86,9 +87,9 @@ final class AudioEffects
         'tv' => ['g-tv', 'device', 'Old TV', 'تلفاز قديم', 'A small speaker in a living room', 'سماعة صغيرة في غرفة معيشة',
             '[in]highpass=f=220,highpass=f=220,lowpass=f=6000,equalizer=f=1200:t=q:w=1:g=3,acompressor=threshold=0.12:ratio=3:makeup=1.6,ROOM(living_room,-14),BED(room_tone,-20)[out]', 0.5],
         'megaphone' => ['g-megaphone', 'device', 'Megaphone', 'مكبر صوت', 'Loud, harsh and boxy, out in the street', 'صوت عالٍ وحاد كمكبر الصوت في الشارع',
-            '[in]highpass=f=600,highpass=f=600,lowpass=f=3800,equalizer=f=2000:t=q:w=1:g=6,asoftclip=type=hard:threshold=0.5,ROOM(street,-5),BED(street,-14)[out]', 0.7],
+            '[in]highpass=f=500,highpass=f=500,lowpass=f=4200,equalizer=f=2200:t=q:w=1:g=5,asoftclip=type=tanh,ROOM(street,-9),BED(street,-14)[out]', 0.7],
         'announcement' => ['g-podium', 'device', 'Station announcement', 'نداء في محطة', 'Speakers in a big hall, like an airport call', 'سماعات في صالة واسعة كنداء المطار',
-            '[in]highpass=f=350,highpass=f=350,lowpass=f=4200,equalizer=f=2200:t=q:w=1:g=2,acompressor=threshold=0.1:ratio=4:makeup=2,ROOM(terminal,-4),BED(terminal,-11)[out]', 2.0],
+            '[in]highpass=f=300,highpass=f=300,lowpass=f=4800,equalizer=f=2400:t=q:w=1:g=3,acompressor=threshold=0.1:ratio=4:makeup=2,ROOM(terminal,-9),BED(terminal,-12)[out]', 2.0],
         'tape' => ['g-tape', 'device', 'Cassette tape', 'شريط كاسيت', 'Soft hiss and the gentle wobble of old tape', 'خشخشة خفيفة واهتزاز الأشرطة القديمة',
             '[in]highpass=f=90,lowpass=f=7000,vibrato=f=0.6:d=0.05[v];anoisesrc=color=pink:amplitude=0.006[n];[v][n]amix=inputs=2:duration=first:normalize=0[out]', 0.0],
         'vinyl' => ['g-vinyl', 'device', 'Vinyl record', 'أسطوانة قديمة', 'Crackle, dust and the colour of an old record', 'طقطقة وغبار ولون الأسطوانات القديمة',
@@ -96,13 +97,14 @@ final class AudioEffects
 
         // Creative: characters and moods.
         'underwater' => ['g-water', 'creative', 'Underwater', 'تحت الماء', 'Muffled and wavering, with bubbles around', 'مكتوم ومتموج والفقاعات من حوله',
-            '[in]lowpass=f=600,lowpass=f=600,chorus=0.6:0.9:50:0.4:0.25:2,ROOM(bathroom,-12),BED(underwater,-9)[out]', 0.8],
+            // Water takes the highs and makes the voice waver; a trace of the consonants stays so every word can be followed.
+            '[in]highpass=f=90,asplit=2[ua][ub];[ub]highpass=f=1900,lowpass=f=3600,volume=-19dB[uc];[ua]equalizer=f=420:t=q:w=1:g=3,lowpass=f=1150,lowpass=f=2100[ud];[ud][uc]amix=inputs=2:normalize=0:duration=first,vibrato=f=0.9:d=0.12,chorus=0.85:0.9:18:0.25:0.5:1.0,ROOM(helmet,-20),BED(underwater,-14)[out]', 0.3],
         'robot' => ['g-bot', 'creative', 'Robot', 'روبوت', 'Flat, metallic machine voice', 'صوت آلي معدني بلا نبرة',
             "[in]afftfilt=real='hypot(re\\,im)*cos(0)':imag='hypot(re\\,im)*sin(0)':win_size=512:overlap=0.75,flanger=delay=2:depth=1:regen=40:speed=0.3,highpass=f=120,volume=6,ROOM(office,-14)[out]", 0.4],
         'astronaut' => ['g-rocket', 'creative', 'Astronaut', 'رائد فضاء', 'Inside a helmet, over a space radio', 'داخل خوذة عبر لاسلكي الفضاء',
             '[in]highpass=f=350,lowpass=f=3600,ROOM(helmet,-16),acompressor=threshold=0.1:ratio=4:makeup=2,acrusher=bits=11:mode=log:mix=0.2,BED(static,-2)[out]', 0.2],
         'dream' => ['g-moon', 'creative', 'Dream / memory', 'حلم / ذكرى', 'Soft, floating and far, like a flashback', 'ناعم وطافٍ وبعيد كمشهد استرجاع',
-            '[in]lowpass=f=5500,chorus=0.7:0.9:55:0.4:0.3:1.5,ROOM(cathedral,-2),lowpass=f=6000[out]', 2.5],
+            '[in]lowpass=f=6500,chorus=0.8:0.9:40:0.3:0.3:1.2,ROOM(cathedral,-8),lowpass=f=7000[out]', 2.5],
     ];
 
     /**
@@ -243,14 +245,19 @@ final class AudioEffects
             ."[{$id}c][{$id}w]amix=inputs=2:normalize=0:duration=first:weights='1 1'";
     }
 
-    /** The place's background under the voice, faded in and out with the recording. */
+    /**
+     * The place's background under the voice, faded in and out with the
+     * recording. As in a film mix, it dips a few dB while someone speaks and
+     * comes back in the pauses, so it never covers the words.
+     */
     private static function bed(string $id, int $bed, float $levelDb, float $total): string
     {
         $fadeOut = $total > 1.2 ? ',afade=t=out:st='.round($total - 0.8, 3).':d=0.8' : '';
 
-        return "aformat=channel_layouts=stereo[{$id}v];"
+        return "aformat=channel_layouts=stereo,asplit=2[{$id}v][{$id}k];"
             ."[{$bed}:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,volume={$levelDb}dB,afade=t=in:d=0.6{$fadeOut}[{$id}b];"
-            ."[{$id}v][{$id}b]amix=inputs=2:normalize=0:duration=first:weights='1 1'";
+            ."[{$id}b][{$id}k]sidechaincompress=threshold=0.05:ratio=2.5:attack=40:release=650:knee=4[{$id}d];"
+            ."[{$id}v][{$id}d]amix=inputs=2:normalize=0:duration=first:weights='1 1'";
     }
 
     /**
