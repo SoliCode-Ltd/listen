@@ -306,5 +306,44 @@ $section('Laravel log since the upload', function () use ($root, $line, &$deploy
     }
 });
 
+$section('Arabic dialect path (last 15 premium Arabic generations with a dialect)', function () use ($root, $line, $problem) {
+    $line('Dialect rewrite enabled', (bool) config('services.gemini_tts.dialect_rewrite', true));
+    $line('Admin voice mappings (override dialect)', \App\Models\SiteSetting::query()->where('key', 'like', 'voice_mapping_%')->count());
+    $cloning = app(\App\Services\VoiceCloningService::class);
+    $instruction = new \ReflectionMethod($cloning, 'rewriteInstruction');
+    $instruction->setAccessible(true);
+    $rows = AudioGeneration::query()->whereIn('target_language', ['ar', 'ar-XA', 'ar-xa'])->whereNotNull('dialect')
+        ->where('voice_tier', '!=', 'standard')->latest('id')->limit(15)
+        ->get(['id', 'created_at', 'status', 'dialect', 'voice_name', 'tts_provider', 'tts_model', 'tts_fallback_used', 'style_prompt', 'is_dialogue', 'translate', 'input_text']);
+    foreach ($rows as $g) {
+        $text = trim(\App\Support\GeminiVocalTags::normalizeMarkup(trim((string) $g->input_text)));
+        $rule = (string) $instruction->invoke($cloning, $g->dialect);
+        $rewritten = $rule === '' ? 'no rule' : (\Illuminate\Support\Facades\Cache::has('listen:clone-dialect:v3:'.sha1($rule.'|'.$text)) ? 'rewritten' : 'NOT rewritten');
+        echo sprintf("  #%d %s %s %s voice=%s via=%s/%s fallback=%s custom_prompt=%s dialogue=%s translate=%s %s\n",
+            $g->id, $g->created_at?->format('m-d H:i'), $g->status, $g->dialect, $g->voice_name, $g->tts_provider ?: '?', $g->tts_model ?: '?',
+            $g->tts_fallback_used ? 'YES' : 'no', trim((string) $g->style_prompt) !== '' ? 'YES' : 'no', $g->is_dialogue ? 'yes' : 'no',
+            $g->translate ? 'yes' : 'no', $rewritten);
+    }
+    $since = now()->subDays(3)->toDateTimeString();
+    $counts = [];
+    foreach (array_filter(array_merge([$root.'/storage/logs/laravel.log'], glob($root.'/storage/logs/laravel-*.log') ?: []), 'is_file') as $file) {
+        if (filemtime($file) < strtotime($since)) {
+            continue;
+        }
+        $fh = fopen($file, 'r');
+        while (($row = fgets($fh)) !== false) {
+            if (preg_match('/^\[(\d{4}-\d\d-\d\d[ T]\d\d:\d\d:\d\d)[^\]]*\] \w+\.WARNING: ((?:Cloned-voice dialect rewrite|Text request)[^{]{0,80})(.{0,160})/', $row, $m) && $m[1] >= $since) {
+                $key = $m[2].' '.preg_replace('/\d{3,}/', 'N', $m[3]);
+                $counts[$key] = ($counts[$key] ?? 0) + 1;
+            }
+        }
+        fclose($fh);
+    }
+    $line('Rewrite warnings, last 3 days', array_sum($counts));
+    foreach (array_slice($counts, 0, 6, true) as $msg => $n) {
+        echo "       {$n}× {$msg}\n";
+    }
+});
+
 echo "\n== Summary\n";
 echo $problems === [] ? "  No problems found.\n" : '  '.count($problems)." problem(s) flagged above (lines starting with !!).\n";
