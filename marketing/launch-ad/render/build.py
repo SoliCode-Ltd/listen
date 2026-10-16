@@ -97,10 +97,10 @@ AR_ENVS = ["env-ar-radio", "env-ar-phone", "env-ar-cave"]
 EN_ENVS = ["env-en-radio", "env-en-phone", "env-en-cave"]
 CUTS = {
     "ar": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "fahad", "sumaya", F["mansour"], F["sawsan"], F["nawaf"], F["aisha"], "switch", "daisy", F["theodore"], F["luna"], F["charlie"],
+        "hook", "fahad", "sumaya", F["mansour"], F["sawsan"], F["aisha"], "switch", "daisy", F["luna"], F["charlie"],
         "reveal", "envintro", *AR_ENVS, "cta"]),
     "en": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", "theodore", F["luna"], F["charlie"], "switch", "fahad", "sumaya", F["mansour"], F["sawsan"], F["nawaf"],
+        "hook", "daisy", "theodore", F["luna"], F["charlie"], "switch", "fahad", "sumaya", F["mansour"], F["sawsan"],
         "reveal", "envintro", *EN_ENVS, "cta"]),
     # About 30 seconds, for paid placements.
     "ar30": dict(ui="ar", narrator="ad-ar", order=[
@@ -118,9 +118,9 @@ NARRATION = {
 }
 
 # Seconds before the voice starts and after it ends, per scene kind.
-PRE = dict(hook=0.6, speaker=0.38, fast=0.24, switch=0.26, reveal=0.45, envintro=0.32, env=0.36, cta=0.45)
-POST = dict(hook=0.3, speaker=0.26, fast=0.12, switch=0.14, reveal=0.55, envintro=0.25, env=0.38, cta=2.9)
-GRID = 0.25  # half a beat at 120 BPM: every scene starts on the music grid
+PRE = dict(hook=0.55, speaker=0.32, fast=0.22, switch=0.22, reveal=0.4, envintro=0.28, env=0.32, cta=0.4)
+POST = dict(hook=0.25, speaker=0.18, fast=0.08, switch=0.1, reveal=0.45, envintro=0.15, env=0.32, cta=2.5)
+GRID = 0.125  # a sixteenth at 120 BPM: every scene starts on the music grid
 
 
 def lines_text():
@@ -338,7 +338,7 @@ def build(cut_name, out_dir, ratio):
         vo_start, vo_end = start + PRE[pace], start + PRE[pace] + (ve - vs)
         end = vo_end + POST[pace]
         if kind == "cta":
-            end = max(end, vo_end + 2.9)
+            end = max(end, vo_end + 2.5)
         scene = dict(kind=kind, id=item, start=round(start, 3), end=round(end, 3), vo_start=round(vo_start, 3), vo_end=round(vo_end, 3),
                      clip_at=clip_at, words=[dict(w=w["w"], s=None if w["s"] is None else round(w["s"] + clip_at, 3),
                                                   e=None if w["e"] is None else round(w["e"] + clip_at, 3)) for w in words])
