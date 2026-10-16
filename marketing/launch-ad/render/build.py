@@ -28,82 +28,88 @@ FPS = 30
 CAST = {
     "fahad": dict(name_en="Fahad", name_ar="فهد", avatar="ar-fahad", flag="sa", clip="ad-ar-fahad", lang="ar",
                   dialect_en="Saudi · Najdi", dialect_ar="سعودي · نجدي", hue=265,
-                  tr_en="Me? Of course I'm real! What more do you want?"),
+                  tr_en="Me? Of course I'm real! What more do you want?", emo_ar="واثق", emo_en="Confident"),
     "sumaya": dict(name_en="Sumaya", name_ar="سمية", avatar="ar-sumaya", flag="eg", clip="ad-ar-sumaya", lang="ar",
                    dialect_en="Egyptian · Cairo", dialect_ar="مصري · قاهري", hue=330,
-                   tr_en="No way, I'm the real one! Who else laughs like this?"),
+                   tr_en="Seriously?! No way, I'm the real one!", emo_ar="مندهش", emo_en="Surprised"),
     "sawsan": dict(name_en="Sawsan", name_ar="سوسن", avatar="ar-sawsan", flag="lb", clip="ad-ar-sawsan", lang="ar",
                    dialect_en="Lebanese · Beirut", dialect_ar="لبناني · بيروتي", hue=195,
-                   tr_en="Honestly? None of you can tell us apart."),
+                   tr_en="Honestly? None of you can tell us apart.", emo_ar="غامض", emo_en="Mysterious"),
     "nawaf": dict(name_en="Nawaf", name_ar="نواف", avatar="ar-nawaf", flag="ae", clip="ad-ar-nawaf", lang="ar",
                   dialect_en="Emirati", dialect_ar="إماراتي", hue=160,
-                  tr_en="I'm 100% Emirati… what more do you want?"),
+                  tr_en="I'm 100% Emirati… what more do you want?", emo_ar="فخور", emo_en="Proud"),
     "aisha": dict(name_en="Aisha", name_ar="عائشة", avatar="ar-aisha", flag="ma", clip="ad-ar-aisha", lang="ar",
                   dialect_en="Moroccan · Darija", dialect_ar="مغربي · دارجة", hue=15,
-                  tr_en="Can you hear me well? This is real Moroccan Darija!"),
+                  tr_en="Can you hear me well? This is real Moroccan Darija!", emo_ar="متحمس", emo_en="Excited"),
+    "mansour": dict(name_en="Mansour", name_ar="منصور", avatar="ar-mansour", flag="iq", clip="ad-ar-mansour", lang="ar",
+                    dialect_en="Iraqi · Baghdad", dialect_ar="عراقي · بغدادي", hue=210, emo_ar="حزين", emo_en="Sad",
+                    tr_en="Why does nobody believe me? I swear I'm real…"),
     "daisy": dict(name_en="Daisy", name_ar="ديزي", avatar="en-daisy", flag="us", clip="ad-en-daisy", lang="en",
                   dialect_en="American", dialect_ar="أمريكية", hue=220,
-                  tr_ar="حقيقية؟ يا عزيزي، أنا أمريكية حتى النخاع!"),
+                  tr_ar="حقيقية؟ يا عزيزي، أنا أمريكية حتى النخاع!", emo_ar="ساخر", emo_en="Sarcastic"),
     "theodore": dict(name_en="Theodore", name_ar="ثيودور", avatar="en-theodore", flag="gb", clip="ad-en-theodore", lang="en",
                      dialect_en="British", dialect_ar="بريطاني", hue=245,
-                     tr_ar="أؤكد لك… أنا بريطاني جداً."),
+                     tr_ar="أؤكد لك… أنا بريطاني جداً.", emo_ar="هادئ", emo_en="Calm"),
     "finn": dict(name_en="Finn", name_ar="فين", avatar="en-finn", flag="au", clip="ad-en-finn", lang="en",
                  dialect_en="Australian", dialect_ar="أسترالي", hue=40,
-                 tr_ar="بجد يا صاحبي، حقيقي مية بالمية!"),
+                 tr_ar="بجد يا صاحبي، حقيقي مية بالمية!", emo_ar="مرح", emo_en="Playful"),
     "luna": dict(name_en="Luna", name_ar="لونا", avatar="en-luna", flag="in", clip="ad-en-luna", lang="en",
                  dialect_en="Indian", dialect_ar="هندية", hue=300,
-                 tr_ar="يا جماعة، أكيد أنا حقيقية! بس اسمعوا!"),
+                 tr_ar="يا جماعة، أكيد أنا حقيقية! بس اسمعوا!", emo_ar="مرح", emo_en="Playful"),
     "charlie": dict(name_en="Charlie", name_ar="تشارلي", avatar="en-charlie", flag="ng", clip="ad-en-charlie", lang="en",
                     dialect_en="Nigerian", dialect_ar="نيجيري", hue=120,
-                    tr_ar="أنا الحقيقي الوحيد هنا!"),
+                    tr_ar="أنا الحقيقي الوحيد هنا!", emo_ar="غاضب", emo_en="Angry"),
 }
 
 # The homepage sound environments (public/audio/environments), cut to one phrase.
 # ab=word: the scene starts on the clean voice and switches into the place on that word.
 ENVS = {
-    "env-ar-announcement": dict(lang="ar", icon="announcement", hue=205, words=(0, 9), ab=4,
-                                place_ar="نداء في محطة", scene_ar="نداء في المطار · ريم"),
+    "env-ar-radio": dict(lang="ar", icon="radio", hue=35, words=(0, 4), ab=3,
+                         place_ar="راديو قديم", scene_ar="نشرة إذاعية من الماضي · وليد"),
     "env-ar-phone": dict(lang="ar", icon="phone", hue=150, words=(0, 7),
                          place_ar="مكالمة هاتفية", scene_ar="سلمى · مصري"),
-    "env-ar-radio": dict(lang="ar", icon="radio", hue=35, words=(0, 4),
-                         place_ar="راديو قديم", scene_ar="نشرة إذاعية من الماضي · وليد"),
-    "env-en-announcement": dict(lang="en", icon="announcement", hue=205, words=(0, 8), ab=3,
-                                place_en="Station announcement", scene_en="Airport call · Emma"),
+    "env-ar-cave": dict(lang="ar", icon="cave", hue=260, words=(0, 4),
+                        place_ar="كهف", scene_ar="مغامرة في كهف · فارس"),
+    "env-en-radio": dict(lang="en", icon="radio", hue=35, words=(0, 9), ab=5,
+                         place_en="Old radio", scene_en="Radio bulletin from the past · Walter"),
     "env-en-phone": dict(lang="en", icon="phone", hue=150, words=(0, 5),
                          place_en="Phone call", scene_en="Chloe · American"),
-    "env-en-church": dict(lang="en", icon="church", hue=40, words=(0, 8),
-                          place_en="Cathedral", scene_en="Epic trailer · James"),
+    "env-en-cave": dict(lang="en", icon="cave", hue=260, words=(0, 5),
+                        place_en="Cave", scene_en="Cave expedition · Oliver"),
 }
-TAGS = {"laugh": ("ضحكة", "laugh"), "chuckle": ("ضحكة خفيفة", "chuckle")}
+TAGS = {"laugh": ("ضحكة", "laugh"), "chuckle": ("ضحكة خفيفة", "chuckle"), "gasp": ("شهقة", "gasp"), "whispers": ("همس", "whisper"),
+        "sigh": ("تنهيدة", "sigh"), "sob": ("نحيب", "sob"), "snicker": ("ضحكة ساخرة", "snicker"), "giggle": ("قهقهة", "giggle"),
+        "shout": ("صياح", "shout")}
 
 # Two full lines set up the joke, then a fast montage of one phrase each.
 # words=(from, to) picks script words (inclusive); fast=True is a quick cut.
 F = dict(
-    sawsan=("sawsan", dict(words=(1, None), fast=True, tr_en="None of you can tell us apart.")),
+    sawsan=("sawsan", dict(fast=True)),
     nawaf=("nawaf", dict(words=(0, 3), fast=True, tr_en="I'm 100% Emirati…")),
     aisha=("aisha", dict(words=(3, None), fast=True, tr_en="This is real Moroccan Darija!")),
     theodore=("theodore", dict(fast=True)),
     finn=("finn", dict(fast=True)),
     luna=("luna", dict(words=(0, 5), fast=True, tr_ar="يا جماعة، أكيد أنا حقيقية!")),
-    charlie=("charlie", dict(fast=True, tail=0.3)),
+    mansour=("mansour", dict(fast=True)),
+    charlie=("charlie", dict(fast=True, tail=0.35)),
 )
-AR_ENVS = ["env-ar-announcement", "env-ar-phone", "env-ar-radio"]
-EN_ENVS = ["env-en-announcement", "env-en-phone", "env-en-church"]
+AR_ENVS = ["env-ar-radio", "env-ar-phone", "env-ar-cave"]
+EN_ENVS = ["env-en-radio", "env-en-phone", "env-en-cave"]
 CUTS = {
     "ar": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "fahad", "sumaya", F["sawsan"], F["nawaf"], F["aisha"], "switch", "daisy", F["theodore"], F["luna"], F["charlie"],
+        "hook", "fahad", "sumaya", F["mansour"], F["sawsan"], F["nawaf"], F["aisha"], "switch", "daisy", F["theodore"], F["luna"], F["charlie"],
         "reveal", "envintro", *AR_ENVS, "cta"]),
     "en": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", "theodore", F["finn"], F["luna"], F["charlie"], "switch", "fahad", "sumaya", F["nawaf"], F["aisha"],
+        "hook", "daisy", "theodore", F["luna"], F["charlie"], "switch", "fahad", "sumaya", F["mansour"], F["sawsan"], F["nawaf"],
         "reveal", "envintro", *EN_ENVS, "cta"]),
-    # Design preview (no new narration needed).
-    "preview": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "fahad", "sumaya", F["nawaf"], "switch", "daisy", "reveal", *AR_ENVS[:2], "cta"]),
     # About 30 seconds, for paid placements.
     "ar30": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "sumaya", F["nawaf"], F["aisha"], F["luna"], "reveal", AR_ENVS[0], "cta"]),
+        "hook", "sumaya", F["mansour"], F["sawsan"], F["charlie"], "reveal", AR_ENVS[0], "cta"]),
     "en30": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", F["finn"], F["luna"], F["aisha"], "reveal", EN_ENVS[0], "cta"]),
+        "hook", "daisy", F["luna"], F["mansour"], F["sawsan"], "reveal", EN_ENVS[0], "cta"]),
+    # Design preview with the takes that exist now.
+    "preview": dict(ui="ar", narrator="ad-ar", order=[
+        "hook", "fahad", "theodore", "reveal", "envintro", *AR_ENVS, "cta"]),
 }
 
 NARRATION = {
@@ -343,7 +349,8 @@ def build(cut_name, out_dir, ratio):
             foreign = meta["lang"] != ui
             scene.update(name=meta["name_ar" if ui == "ar" else "name_en"], dialect=meta["dialect_ar" if ui == "ar" else "dialect_en"],
                          avatar=meta["avatar"], flag=meta["flag"], hue=meta["hue"], lang=meta["lang"], fast=bool(opts.get("fast")),
-                         tokens=[dict(tag=tag_label(tk["tag"])) if "tag" in tk else tk for tk in tokens], bars=wave_bars(clip),
+                         emotion=meta.get("emo_ar" if ui == "ar" else "emo_en"),
+                         tokens=[dict(tag=tag_label(tk["tag"]), key=tk["tag"]) if "tag" in tk else tk for tk in tokens], bars=wave_bars(clip),
                          tr=(opts.get(tr_key) or meta.get(tr_key)) if foreign else None)
         elif kind == "env":
             meta = ENVS[item]

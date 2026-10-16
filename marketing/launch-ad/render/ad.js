@@ -48,7 +48,18 @@
     church: '<path d="M12 2v4M10 4h4"/><path d="M6 21V11l6-5 6 5v10"/><path d="M3 21h18"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
   };
   const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ENV_ICONS[k] || ENV_ICONS.hall}</svg>`;
-  const TAG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="currentColor" stroke="none"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/></svg>';
+  const FACE = (mouth, extra = '') => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/>${mouth}${extra}</svg>`;
+  const TAG_ICONS = {
+    laugh: FACE('<path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="currentColor" stroke="none"/>'),
+    chuckle: FACE('<path d="M8 14.5c1.2 1.4 2.5 2 4 2s2.8-.6 4-2"/>'),
+    giggle: FACE('<path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="currentColor" stroke="none"/>'),
+    snicker: FACE('<path d="M8.5 15c1.6.6 3.9.9 7-1"/>'),
+    gasp: FACE('<ellipse cx="12" cy="15.5" rx="2" ry="2.5" fill="currentColor" stroke="none"/>'),
+    sob: FACE('<path d="M8.5 16.5c1-1.2 2.2-1.8 3.5-1.8s2.5.6 3.5 1.8"/>', '<path d="M7.6 11.2c-.8 1.2-.8 2.1 0 2.6.8-.5.8-1.4 0-2.6z" fill="currentColor"/>'),
+    sigh: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/></svg>',
+    whispers: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg>',
+    shout: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v4h3l9 5V5L6 10z"/><path d="M18 8.5a5 5 0 0 1 0 7M20.5 6a8.5 8.5 0 0 1 0 12"/></svg>',
+  };
   const PLAY = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l13-7.5z"/></svg>';
   const PAUSE = '<svg viewBox="0 0 24 24" fill="#fff"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1.4"/><rect x="14" y="4.5" width="4.5" height="15" rx="1.4"/></svg>';
   const fmt = s => `0:${String(Math.max(0, Math.floor(s))).padStart(2, '0')}`;
@@ -140,14 +151,15 @@
     css(card, { left: L.cardX + 'px', top: top + 'px', width: L.cardW + 'px', padding: isEnv ? '48px 52px 46px' : `${L.pr.d / 2 - (L.cardY - L.pr.y) + 56}px 56px 46px` });
     const dir = s.lang === 'ar' ? 'rtl' : 'ltr';
     const tokens = (s.tokens || s.words.map((w, i) => ({ word: i })));
-    const script = tokens.map(tk => tk.tag ? `<span class="tag">${TAG_ICON}${tk.tag}</span>` : `<span class="w">${s.words[tk.word].w} </span>`).join('');
+    const script = tokens.map(tk => tk.tag ? `<span class="tag">${TAG_ICONS[tk.key] || TAG_ICONS.laugh}${tk.tag}</span>` : `<span class="w">${s.words[tk.word].w} </span>`).join('');
     const bars = (s.bars || []).map(v => `<i style="height:${Math.round(14 + v * 78)}px"></i>`).join('');
     let head;
     if (isEnv) {
       head = `<div class="envhead"><div class="envicon">${icon(s.icon)}</div><div class="envid"><div class="place">${s.place}</div><div class="scene">${s.scene_label}</div></div></div>` +
         `<div class="seg"><div class="knob"></div><span class="c">${AR ? 'صوت نقي' : 'Clean'}</span><span class="p">${AR ? 'في المكان' : 'In the place'}</span></div>`;
     } else {
-      head = `<div class="head"><div class="who"><img src="assets/${s.flag}.svg"><div class="name">${s.name}</div></div><div class="chip">${s.dialect}</div></div>`;
+      head = `<div class="head"><div class="who"><img src="assets/${s.flag}.svg"><div class="name">${s.name}</div></div>` +
+        `<div class="chips-row"><div class="chip">${s.dialect}</div>${s.emotion ? `<div class="chip emo"><i></i>${s.emotion}</div>` : ''}</div></div>`;
     }
     card.innerHTML = head + `<div class="script ${s.lang === 'ar' ? 'ar' : ''}" dir="${dir}">${script}</div>` +
       (s.tr ? `<div class="tr ${AR ? 'ar' : ''}" dir="${AR ? 'rtl' : 'ltr'}">${s.tr}</div>` : '') +

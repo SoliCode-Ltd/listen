@@ -65,6 +65,9 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 .card .name { font-size: 68px; font-weight: 600; line-height: 1; letter-spacing: -.5px; }
 .chip { display: inline-flex; align-items: center; gap: 10px; padding: 9px 22px; border-radius: 999px; font-size: 30px; font-weight: 600;
   background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
+.chips-row { display: flex; gap: 12px; justify-content: center; }
+.chip.emo { background: #FFEEE5; color: #B4461A; }
+.chip.emo i { width: 12px; height: 12px; border-radius: 50%; background: #F07A43; display: block; }
 .card .script { margin-top: 36px; font-size: 58px; font-weight: 600; line-height: 1.42; text-align: center; text-wrap: balance; color: var(--faint); }
 .card .script .w.said { color: var(--ink); }
 .card .script .w.now { color: var(--brand); }
