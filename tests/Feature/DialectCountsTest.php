@@ -35,7 +35,7 @@ class DialectCountsTest extends TestCase
     {
         $arabic = [
             '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|Dialects)/u',
-            '/أكثر من (\d+) لكنة (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
+            '/أكثر من (\d+) (?:لكنة|لهجة) (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
         ];
         $english = ['/more than (\d+) English/u', '/(\d+)\+ English/u', '/(\d+) لكنة إنجليزية/u', '/بأكثر من (\d+) لكنة:/u'];
         $found = ['arabic' => 0, 'english' => 0];
