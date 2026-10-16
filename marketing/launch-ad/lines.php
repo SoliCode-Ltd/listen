@@ -48,26 +48,30 @@ return [
             'text' => 'أنا؟ <laugh> أكيد حقيقي! وش تبي أكثر من كذا؟'],
 
         ['slug' => 'ad-ar-sumaya', 'language' => 'ar', 'dialect' => 'ar-EG', 'voice' => 'Callirrhoe', 'speaker' => 'Sumaya',
-            'style' => 'A witty, warm woman from Cairo teasing her friends. Quick and playful, then she bursts into a genuine, contagious laugh at the end.',
-            'text' => 'لا يا حبيبي، أنا اللي حقيقية! حد بيضحك كده؟ <laugh>'],
+            'style' => 'A witty woman from Cairo who is genuinely astonished that anyone could doubt her: a sharp, audible gasp first, then fast, surprised and playful, wide-eyed amazement in her voice.',
+            'text' => '<gasp> بجد؟! لا يا حبيبي، أنا اللي حقيقية!'],
 
         ['slug' => 'ad-ar-sawsan', 'language' => 'ar', 'dialect' => 'ar-LB', 'voice' => 'Zephyr', 'speaker' => 'Sawsan',
-            'style' => 'A stylish woman from Beirut, calm and knowing, a little mischievous, as if sharing a secret. Melodic Lebanese intonation, soft smile in the voice.',
-            'text' => 'بصراحة؟ ما حدا فيكن رح يعرف يفرّق بيناتنا.'],
+            'style' => 'A stylish woman from Beirut sharing a secret: she says the first word normally, then drops into a soft, breathy, intimate whisper, mysterious and amused. Melodic Lebanese intonation.',
+            'text' => 'بصراحة؟ <whispers> ما حدا فيكن رح يعرف يفرّق بيناتنا.'],
 
         ['slug' => 'ad-ar-nawaf', 'language' => 'ar', 'dialect' => 'ar-AE', 'voice' => 'Achird', 'speaker' => 'Nawaf',
-            'style' => 'A relaxed, confident Emirati man, unhurried and proud, with a friendly grin. Natural Emirati rhythm.',
-            'text' => 'أنا إماراتي مية بالمية… شو تبون بعد؟'],
+            'style' => 'A relaxed, proud Emirati man. A long, contented sigh first, then unhurried and full of pride, with a confident grin. Natural Emirati rhythm.',
+            'text' => '<sigh> أنا إماراتي مية بالمية… شو تبون بعد؟'],
 
         ['slug' => 'ad-ar-aisha', 'language' => 'ar', 'dialect' => 'ar-MA', 'voice' => 'Erinome', 'speaker' => 'Aisha',
             'style' => 'A joyful, lively young woman from Casablanca, bright and quick, proud of her Darija. Authentic Moroccan pronunciation and rhythm.',
             'text' => 'واش كتسمعني مزيان؟ هادي دارجة مغربية ديال بصح!'],
 
+        ['slug' => 'ad-ar-mansour', 'language' => 'ar', 'dialect' => 'ar-IQ', 'voice' => 'Enceladus', 'speaker' => 'Mansour',
+            'style' => 'A man from Baghdad, comically heartbroken that nobody believes he is real: a real, shaky sob first, then a trembling, tearful, sad voice, over-the-top melodramatic. Authentic Baghdadi Iraqi pronunciation.',
+            'text' => '<sob> ليش محّد يصدّگني؟ والله آني حقيقي…'],
+
         // ── English speakers ────────────────────────────────────────────
 
         ['slug' => 'ad-en-daisy', 'language' => 'en', 'dialect' => 'en-US', 'voice' => 'Kore', 'speaker' => 'Daisy',
-            'style' => 'A bubbly American woman, amused and a little sassy, smiling the whole time.',
-            'text' => 'Real? Honey, I am as American as apple pie!'],
+            'style' => 'A bubbly, sarcastic American woman. A short mocking snicker after the first word, then dripping with playful sarcasm, smiling the whole time.',
+            'text' => 'Real? <snicker> Honey, I am as American as apple pie!'],
 
         ['slug' => 'ad-en-theodore', 'language' => 'en', 'dialect' => 'en-GB', 'voice' => 'Charon', 'speaker' => 'Theodore',
             'style' => 'A distinguished British gentleman with dry wit. A soft chuckle first, then calm, polite and very sure of himself.',
@@ -78,12 +82,12 @@ return [
             'text' => 'Fair dinkum, mate. Real as they come!'],
 
         ['slug' => 'ad-en-luna', 'language' => 'en', 'dialect' => 'en-IN', 'voice' => 'Despina', 'speaker' => 'Luna',
-            'style' => 'A cheerful content creator from Mumbai with a strong, unmistakable Indian English accent, rhythm and intonation (not American or British). Bright, playful, mock-offended.',
-            'text' => 'Arre yaar, obviously I am real! Just listen!'],
+            'style' => 'A cheerful content creator from Mumbai with a strong, unmistakable Indian English accent, rhythm and intonation (not American or British). She giggles first, then bright, playful and mock-offended.',
+            'text' => '<giggle> Arre yaar, obviously I am real! Just listen!'],
 
         ['slug' => 'ad-en-charlie', 'language' => 'en', 'dialect' => 'en-NG', 'voice' => 'Alnilam', 'speaker' => 'Charlie',
-            'style' => 'A big-hearted Nigerian man from Lagos, loud, proud and laughing with his friends. Strong Nigerian English accent.',
-            'text' => 'Abeg, na me be the realest one for here o!'],
+            'style' => 'A big-hearted Nigerian man from Lagos, playfully outraged that anyone doubts him: he shouts the first word, then loud, mock-angry and proud. Strong Nigerian English accent.',
+            'text' => '<shout> Abeg! Na me be the realest one for here o!'],
 
         // ── English narrator (Nathan, American), for the English cut ────
 
