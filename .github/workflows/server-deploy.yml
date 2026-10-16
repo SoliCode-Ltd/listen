@@ -17,6 +17,10 @@ name: Server deploy
 #            DB_QUEUE_RETRY_AFTER=180 in .env (above the 150 s job limit; the
 #            old .env is kept in storage/app/listen-deploy), rebuilds the config
 #            cache and restarts the workers.
+#   billing-trace: read-only. For one Stripe customer (input "customer"),
+#            prints the plans' Stripe prices, the member's local billing rows
+#            and their log lines, plus every local subscription whose price
+#            no plan knows any more. Writes nothing; prints no names or emails.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -28,8 +32,12 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, billing-trace]
         default: inspect
+      customer:
+        description: "billing-trace only: the Stripe customer id (cus_...)"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -55,6 +63,7 @@ jobs:
         env:
           TARGET: ${{ inputs.target }}
           MODE: ${{ inputs.mode }}
+          CUSTOMER: ${{ inputs.customer }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -90,6 +99,34 @@ jobs:
           if [ "$MODE" = migrate ]; then
             $S "$FIND; php artisan migrate:status --pending 2>/dev/null || php artisan migrate:status | grep -i pending || true"
             $S "$FIND; php artisan migrate --force"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = billing-trace ]; then
+            printf '%s' "$CUSTOMER" | grep -qE '^cus_[A-Za-z0-9]+$' || { echo "customer must look like cus_..."; exit 1; }
+            $S "$FIND; CUSTOMER='$CUSTOMER' php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
+          $show = function (string $title, $rows) { echo "== $title ==\n"; foreach ($rows as $r) echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; if (count($rows) === 0) echo "  none\n"; };
+          echo 'App timezone: ', config('app.timezone'), "\n";
+          $plans = $db('plans')->select('id', 'slug', 'price_cents', 'is_active', 'stripe_price_monthly', 'stripe_price_yearly', 'updated_at')->orderBy('id')->get();
+          $show('Plans and their Stripe prices', $plans);
+          $known = $plans->flatMap(fn ($p) => [$p->stripe_price_monthly, $p->stripe_price_yearly])->filter()->values()->all();
+          $users = $db('users')->where('stripe_id', getenv('CUSTOMER'))->select('id', 'created_at', 'stripe_id', 'pm_type', 'pm_last_four', 'subscription_status_checked_at')->get();
+          $show('Members with this Stripe customer', $users);
+          foreach ($users as $u) {
+              $show("billing_subscriptions of member {$u->id}", $db('billing_subscriptions')->where('user_id', $u->id)->orderBy('id')->get());
+              $show("plan subscriptions of member {$u->id}", $db('subscriptions')->where('user_id', $u->id)->orderBy('id')->get());
+          }
+          $show('Local Stripe subscriptions on a price no plan knows (all members)', $db('billing_subscriptions')->whereNotNull('stripe_price')->whereNotIn('stripe_price', $known)->select('id', 'user_id', 'stripe_id', 'stripe_status', 'stripe_price', 'created_at', 'updated_at', 'ends_at')->orderBy('id')->get());
+          REMOTE
+            for u in $($S "$FIND; CUSTOMER='$CUSTOMER' php -r 'require \"vendor/autoload.php\"; \$a = require \"bootstrap/app.php\"; \$a->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap(); echo Illuminate\Support\Facades\DB::table(\"users\")->where(\"stripe_id\", getenv(\"CUSTOMER\"))->pluck(\"id\")->implode(\" \");'"); do
+              echo "== Log lines for member $u (Oct 15-17) =="
+              $S "$FIND; grep -hE '^\[2026-10-1[5-7]' storage/logs/*.log 2>/dev/null | grep -E \"\\\"user_id\\\":$u[,}]\" | cut -c1-400 | tail -60" || echo "  none"
+            done
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
