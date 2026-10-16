@@ -15,6 +15,7 @@ on:
       - .github/workflows/launch-ad-voices.yml
       - marketing/launch-ad/lines.php
       - marketing/launch-ad/transcribe.py
+      - database/seeders/data/environment_samples.php
 
 permissions:
   contents: write
@@ -70,7 +71,9 @@ jobs:
           echo "::add-mask::$KEY"
           php artisan tts:showcase --set=ad --generate --pause=12 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-200 || echo "Some clips failed (see above); the ones made are still committed."
           cp public/audio/launch-ad/*.wav marketing/launch-ad/voices/
-          php -r '$o=[]; foreach ((require "marketing/launch-ad/lines.php")["samples"] as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
+          # The homepage sound environments are used too: their clean takes are transcribed with the ad's lines.
+          for f in public/audio/environments/clean/env-*.mp3; do ffmpeg -v error -y -i "$f" -ar 48000 -ac 1 "marketing/launch-ad/voices/$(basename "$f" .mp3).wav"; done
+          php -r '$o=[]; foreach (array_merge((require "marketing/launch-ad/lines.php")["samples"], (require "database/seeders/data/environment_samples.php")["samples"]) as $s) { $o[$s["slug"]] = ["language" => $s["language"], "text" => trim(preg_replace("/\s*<[^<>]+>\s*/u", " ", $s["text"]))]; } file_put_contents("/tmp/lines.json", json_encode($o, JSON_UNESCAPED_UNICODE));'
 
       - uses: actions/setup-python@v5
         with:

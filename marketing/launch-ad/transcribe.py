@@ -21,9 +21,11 @@ voices, lines_file, out_file = map(pathlib.Path, sys.argv[1:4])
 lines = json.loads(lines_file.read_text(encoding="utf-8"))
 model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 
-result = {}
+result = json.loads(out_file.read_text(encoding="utf-8")) if out_file.exists() else {}
 for wav in sorted(voices.glob("*.wav")):
     slug = wav.stem
+    if slug in result and result[slug].get("script") == lines.get(slug, {}).get("text"):
+        continue  # already transcribed with this script
     line = lines.get(slug, {})
     language = line.get("language", "ar")
     data, rate = sf.read(str(wav), dtype="float32", always_2d=True)

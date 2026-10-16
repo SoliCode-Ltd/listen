@@ -33,6 +33,10 @@ return [
             'style' => 'The playful Egyptian presenter delivers the big reveal of a social ad. A short suspenseful beat on the first word, then a delighted, almost laughing reveal, then proud and clear on the last sentence.',
             'text' => 'الحقيقة؟ ولا واحد فيهم! كل الأصوات دي اتعملت بإسمع.'],
 
+        ['slug' => 'ad-ar-env', 'language' => 'ar', 'dialect' => 'ar-EG', 'voice' => 'Puck', 'speaker' => 'Othman',
+            'style' => 'The playful Egyptian presenter teases one more surprise: a short, knowing beat on the first words, then warm, confident and a little amazed.',
+            'text' => 'ومش بس كده… تقدر تحط أي صوت، في أي مكان.'],
+
         ['slug' => 'ad-ar-cta', 'language' => 'ar', 'dialect' => 'ar-EG', 'voice' => 'Puck', 'speaker' => 'Othman',
             'style' => 'The Egyptian presenter closes the ad: warm, confident and inviting, like the last line of a premium commercial. Clear rhythm, a short pause before the brand name, said with pride.',
             'text' => 'اكتب أي نص، واسمعه بأي لهجة… منصة إسمع.'],
@@ -94,6 +98,10 @@ return [
         ['slug' => 'ad-en-reveal', 'language' => 'en', 'dialect' => 'en-US', 'voice' => 'Orus', 'speaker' => 'Nathan',
             'style' => 'The presenter delivers the big reveal of a social ad: a short suspenseful beat on the first words, then a delighted reveal, then proud and clear.',
             'text' => 'The truth? None of them. Every voice here was made with Listen.'],
+
+        ['slug' => 'ad-en-env', 'language' => 'en', 'dialect' => 'en-US', 'voice' => 'Orus', 'speaker' => 'Nathan',
+            'style' => 'The presenter teases one more surprise: a short, knowing beat on the first words, then warm, confident and a little amazed.',
+            'text' => 'And that\'s not all… put any voice, anywhere.'],
 
         ['slug' => 'ad-en-cta', 'language' => 'en', 'dialect' => 'en-US', 'voice' => 'Orus', 'speaker' => 'Nathan',
             'style' => 'The presenter closes the ad: warm, confident and inviting, like the last line of a premium commercial, a short pause before the brand name.',
