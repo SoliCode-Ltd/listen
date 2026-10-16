@@ -49,6 +49,11 @@
       font-size: clamp(2.4rem, 6vw, 4.5rem);
       line-height: 1.05;
       letter-spacing: -.03em;
+      text-wrap: balance;
+    }
+    /* Two sentences, two lines: "Type anything." / "Hear it in any accent." */
+    .hero h1 .brand-text {
+      display: block;
     }
     html[dir="rtl"] .hero h1 {
       font-size: clamp(2.4rem, 6vw, 4.5rem);
@@ -62,6 +67,7 @@
       font-size: 1.1rem;
       line-height: 1.6;
       max-width: 52ch;
+      text-wrap: pretty;
     }
     .hero-cta {
       display: flex;

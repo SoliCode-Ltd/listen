@@ -35,15 +35,18 @@ class DialectCountsTest extends TestCase
     {
         $arabic = [
             '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|Dialects)/u',
-            '/أكثر من (\d+) لكنة (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
+            '/أكثر من (\d+) (?:لكنة|لهجة) (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
         ];
         $english = ['/more than (\d+) English/u', '/(\d+)\+ English/u', '/(\d+) لكنة إنجليزية/u', '/بأكثر من (\d+) لكنة:/u'];
-        $found = ['arabic' => 0, 'english' => 0];
+        // Both together, as the homepage quotes them: "200+ accents".
+        $total = ['/(\d+)\+ accents/u', '/أكثر من (\d+) لهجة ولكنة/u'];
+        $counts = ['arabic' => DialectCounts::arabic(), 'english' => DialectCounts::english(), 'total' => DialectCounts::arabic() + DialectCounts::english()];
+        $found = ['arabic' => 0, 'english' => 0, 'total' => 0];
 
         foreach (['en', 'ar'] as $locale) {
             $text = implode("\n", Arr::flatten(require lang_path($locale.'/ui.php')));
-            foreach (['arabic' => $arabic, 'english' => $english] as $kind => $patterns) {
-                $expected = $kind === 'arabic' ? DialectCounts::arabic() : DialectCounts::english();
+            foreach (['arabic' => $arabic, 'english' => $english, 'total' => $total] as $kind => $patterns) {
+                $expected = $counts[$kind];
                 foreach ($patterns as $pattern) {
                     preg_match_all($pattern, $text, $m);
                     foreach ($m[1] as $number) {
@@ -56,6 +59,7 @@ class DialectCountsTest extends TestCase
 
         $this->assertGreaterThanOrEqual(12, $found['arabic'], 'the patterns still find the Arabic counts');
         $this->assertGreaterThanOrEqual(6, $found['english'], 'the patterns still find the English counts');
+        $this->assertGreaterThanOrEqual(2, $found['total'], 'the patterns still find the homepage total in both languages');
     }
 
     public function test_seo_texts_quote_the_current_counts(): void

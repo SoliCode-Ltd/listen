@@ -46,7 +46,7 @@ jobs:
       - name: Build the bundle and its checksums
         run: |
           set -euo pipefail
-          git ls-files | grep -v -E '^(\.github/|tests/|\.env|storage/|vendor/|node_modules/|public/storage)' \
+          git ls-files | grep -v -E '^(\.github/|tests/|marketing/|\.env|storage/|vendor/|node_modules/|public/storage)' \
             | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' > files.txt
           tar -czf bundle.tgz -T files.txt
           xargs -d '\n' md5sum < files.txt > manifest.md5
