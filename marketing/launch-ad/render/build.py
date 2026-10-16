@@ -22,7 +22,7 @@ from sound import SR
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parents[2]
 VOICES = ROOT / "marketing/launch-ad/voices"
-FPS = 30
+FPS = 60
 
 # Every speaker is a Listen HD voice with its product name and avatar.
 CAST = {
@@ -62,24 +62,31 @@ CAST = {
 }
 
 # The homepage sound environments (public/audio/environments), cut to one phrase.
-# ab=word: the scene starts on the clean voice and switches into the place on that word.
+# Every one starts on the clean voice and switches into the place on word ab.
 ENVS = {
     "env-ar-radio": dict(lang="ar", icon="radio", hue=35, words=(0, 4), ab=3,
                          place_ar="راديو قديم", scene_ar="نشرة إذاعية من الماضي · وليد"),
-    "env-ar-phone": dict(lang="ar", icon="phone", hue=150, words=(0, 7),
+    "env-ar-phone": dict(lang="ar", icon="phone", hue=150, words=(0, 7), ab=4,
                          place_ar="مكالمة هاتفية", scene_ar="سلمى · مصري"),
-    "env-ar-cave": dict(lang="ar", icon="cave", hue=260, words=(0, 4),
+    "env-ar-cave": dict(lang="ar", icon="cave", hue=260, words=(0, 4), ab=3, ring=0.9,
                         place_ar="كهف", scene_ar="مغامرة في كهف · فارس"),
     "env-en-radio": dict(lang="en", icon="radio", hue=35, words=(0, 9), ab=5,
                          place_en="Old radio", scene_en="Radio bulletin from the past · Walter"),
-    "env-en-phone": dict(lang="en", icon="phone", hue=150, words=(0, 5),
+    "env-en-phone": dict(lang="en", icon="phone", hue=150, words=(0, 9), ab=3,
                          place_en="Phone call", scene_en="Chloe · American"),
-    "env-en-cave": dict(lang="en", icon="cave", hue=260, words=(0, 5),
+    "env-en-cave": dict(lang="en", icon="cave", hue=260, words=(0, 8), ab=4, ring=0.9,
                         place_en="Cave", scene_en="Cave expedition · Oliver"),
 }
-TAGS = {"laugh": ("ضحكة", "laugh"), "chuckle": ("ضحكة خفيفة", "chuckle"), "gasp": ("شهقة", "gasp"), "whispers": ("همس", "whisper"),
-        "sigh": ("تنهيدة", "sigh"), "sob": ("نحيب", "sob"), "snicker": ("ضحكة ساخرة", "snicker"), "giggle": ("قهقهة", "giggle"),
-        "shout": ("صياح", "shout")}
+# Delivery tags as the product names them, in the voice's own language.
+TAGS = {"laugh": ("ضحكة", "Laugh"), "chuckle": ("ضحكة خفيفة", "Chuckle"), "gasp": ("شهقة", "Gasp"), "whispers": ("همس", "Whisper"),
+        "sigh": ("تنهيدة", "Sigh"), "sob": ("نحيب", "Sob"), "snicker": ("ضحكة ساخرة", "Snicker"), "giggle": ("قهقهة", "Giggle"),
+        "shout": ("صياح", "Shout")}
+# The language switch shows the accents and dialects of the language that follows.
+SWITCH_FLAGS = {
+    # Two rows; the middle of each row is the most visible, the ends fade out.
+    "en": ["jm", "ie", "nz", "gb", "us", "au", "ca", "za", "ug", "tt", "ke", "gh", "in", "ng", "ph", "gb-sct", "sg", "pk"],
+    "ar": ["jo", "kw", "ma", "eg", "sa", "ae", "lb", "qa", "om", "bh", "ly", "tn", "iq", "sy", "dz", "ps", "sd", "ye"],
+}
 
 # Two full lines set up the joke, then a fast montage of one phrase each.
 # words=(from, to) picks script words (inclusive); fast=True is a quick cut.
@@ -218,14 +225,6 @@ def script_tokens(script):
     return out
 
 
-def wave_bars(audio, n=44):
-    mono = np.abs(audio.mean(axis=1))
-    seg = max(1, len(mono) // n)
-    v = np.array([np.sqrt(np.mean(mono[k * seg:(k + 1) * seg] ** 2)) for k in range(n)])
-    v = np.sqrt(v / (v.max() + 1e-9))
-    return [round(float(x), 3) for x in v]
-
-
 def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail=None, audio=None):
     audio = load_audio(VOICES / f"{slug}.wav") if audio is None else audio
     s, e = speech_span(audio)
@@ -300,7 +299,7 @@ def env_clip(slug, meta, texts, heard_all):
     lo = meta["words"][0]
     a = max(0.0, (words_all[lo]["s"] - 0.05 if lo else speech_span(audio)[0]) - 0.04)
     # Let the place ring out after the last word.
-    end = int((words[-1]["e"] + a + 0.55) * SR)
+    end = int((words[-1]["e"] + a + meta.get("ring", 0.55)) * SR)
     clip = audio[int(a * SR): end].copy()
     f = int(0.012 * SR); clip[:f] *= np.linspace(0, 1, f)[:, None]
     f = int(0.3 * SR); clip[-f:] *= np.linspace(1, 0, f)[:, None]
@@ -339,24 +338,28 @@ def build(cut_name, out_dir, ratio):
         end = vo_end + POST[pace]
         if kind == "cta":
             end = max(end, vo_end + 2.5)
+        if kind == "env":
+            end = max(end, vo_end + ENVS[item].get("ring", 0.55) - 0.15)  # the place rings out before the next scene
         scene = dict(kind=kind, id=item, start=round(start, 3), end=round(end, 3), vo_start=round(vo_start, 3), vo_end=round(vo_end, 3),
                      clip_at=clip_at, words=[dict(w=w["w"], s=None if w["s"] is None else round(w["s"] + clip_at, 3),
                                                   e=None if w["e"] is None else round(w["e"] + clip_at, 3)) for w in words])
-        tag_label = lambda name: TAGS.get(name, (name, name))[0 if ui == "ar" else 1]
         if kind == "speaker":
             meta = CAST[item]
+            # The card speaks the voice's own language (name, accent, emotion, tags);
+            # only the translation line is in the viewer's language.
+            lang = meta["lang"]
             tr_key = "tr_ar" if ui == "ar" else "tr_en"
-            foreign = meta["lang"] != ui
-            scene.update(name=meta["name_ar" if ui == "ar" else "name_en"], dialect=meta["dialect_ar" if ui == "ar" else "dialect_en"],
-                         avatar=meta["avatar"], flag=meta["flag"], hue=meta["hue"], lang=meta["lang"], fast=bool(opts.get("fast")),
-                         emotion=meta.get("emo_ar" if ui == "ar" else "emo_en"),
-                         tokens=[dict(tag=tag_label(tk["tag"]), key=tk["tag"]) if "tag" in tk else tk for tk in tokens], bars=wave_bars(clip),
-                         tr=(opts.get(tr_key) or meta.get(tr_key)) if foreign else None)
+            scene.update(name=meta[f"name_{lang}"], dialect=meta[f"dialect_{lang}"],
+                         avatar=meta["avatar"], flag=meta["flag"], hue=meta["hue"], lang=lang, fast=bool(opts.get("fast")),
+                         emotion=meta.get(f"emo_{lang}"),
+                         tokens=[dict(tag=TAGS.get(tk["tag"], (tk["tag"], tk["tag"]))[0 if lang == "ar" else 1], key=tk["tag"]) if "tag" in tk else tk
+                                 for tk in tokens],
+                         tr=(opts.get(tr_key) or meta.get(tr_key)) if lang != ui else None)
         elif kind == "env":
             meta = ENVS[item]
             scene.update(lang=meta["lang"], icon=meta["icon"], hue=meta["hue"], place=meta.get(f"place_{ui}") or meta.get("place_ar") or meta.get("place_en"),
                          scene_label=meta.get(f"scene_{ui}") or meta.get("scene_ar") or meta.get("scene_en"), fast=False,
-                         ab_at=None if ab is None else round(ab + clip_at, 3), tokens=tokens, bars=wave_bars(clip), tr=None)
+                         ab_at=None if ab is None else round(ab + clip_at, 3), tokens=tokens, tr=None)
         scene["_clip"] = clip
         scenes.append(scene)
         t = end
@@ -487,15 +490,17 @@ def build(cut_name, out_dir, ratio):
     win = int(SR / FPS)
     amp = np.array([np.sqrt(np.mean(vmono[i * win:(i + 1) * win] ** 2)) if i * win < len(vmono) else 0 for i in range(frames)])
     amp = amp / (np.percentile(amp[amp > 1e-4], 92) + 1e-9)
+    # Quick to rise, slow to fall: the waves breathe with the voice instead of flickering.
     smooth = np.zeros_like(amp)
     for i in range(frames):
         prev = smooth[i - 1] if i else 0
-        smooth[i] = amp[i] if amp[i] > prev else prev * 0.72 + amp[i] * 0.28
+        smooth[i] = prev + (amp[i] - prev) * (0.45 if amp[i] > prev else 0.12)
     beats = [round(b * sound.BEAT, 3) for b in range(int(duration / sound.BEAT) + 1)]
 
     timeline = dict(cut=cut_name, ui=ui, ratio=ratio, fps=FPS, duration=duration, scenes=scenes,
                     amp=[round(float(min(a, 1.6)), 3) for a in smooth], beats=beats, tiles=tiles,
                     tile_times=tile_times, reveal_tiles=reveal_tiles, typing=typing, stats_at=stats_at,
+                    switch_flags=SWITCH_FLAGS["en" if ui == "ar" else "ar"],
                     tile_lang={CAST[k]["avatar"]: CAST[k]["lang"] for k in CAST},
                     tile_flag={CAST[k]["avatar"]: CAST[k]["flag"] for k in CAST})
     (out / "timeline.js").write_text("window.TIMELINE = " + json.dumps(timeline, ensure_ascii=False) + ";\n", encoding="utf-8")
@@ -513,6 +518,8 @@ def build(cut_name, out_dir, ratio):
             im = im.resize((768, 768), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=2))
             im.save(target)
         shutil.copy(ROOT / f"public/images/flags/{meta['flag']}.svg", assets / f"{meta['flag']}.svg")
+    for flag in sum(SWITCH_FLAGS.values(), []):
+        shutil.copy(ROOT / f"public/images/flags/{flag}.svg", assets / f"{flag}.svg")
     for logo in ("logo-ar-light.svg", "logo-light.svg", "icon-128.svg"):
         shutil.copy(ROOT / f"public/images/{logo}", assets / logo)
     (assets / "icon-light.svg").write_text((ROOT / "public/images/icon-128.svg").read_text().replace("#7659FA", "#FFFFFF"))
