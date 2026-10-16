@@ -29,7 +29,7 @@ $app->make(Kernel::class)->bootstrap();
 
 /*
  * October 2026: the product no longer has a free plan, and has more than
- * 100 Arabic and 40 English accents. The page titles and
+ * 140 Arabic and 60 English accents. The page titles and
  * descriptions saved here earlier still said "Free Plan", "Start free",
  * "50 dialects" and "18 accents", and a saved value always wins over the
  * site's own text. A null value deletes the saved override, so the page
@@ -68,8 +68,8 @@ $changes = [
     'seo_register_description_ar' => null,
 
     // The site-wide fallback description, used by pages without their own.
-    'meta_description_en' => 'Natural AI voices in Fusha, 100+ Arabic dialect accents and 40+ English accents, with emotions, performance styles and sound environments. Download MP3.',
-    'meta_description_ar' => 'أصوات طبيعية بالذكاء الاصطناعي بالفصحى وأكثر من 100 لكنة عربية وأكثر من 40 لكنة إنجليزية، مع المشاعر وأساليب الأداء وبيئات الصوت. حمّل MP3.',
+    'meta_description_en' => 'Natural AI voices in Fusha, 140+ Arabic dialect accents and 60+ English accents, with emotions, performance styles and sound environments. Download MP3.',
+    'meta_description_ar' => 'أصوات طبيعية بالذكاء الاصطناعي بالفصحى وأكثر من 140 لكنة عربية وأكثر من 60 لكنة إنجليزية، مع المشاعر وأساليب الأداء وبيئات الصوت. حمّل MP3.',
 ];
 
 if (($restore = getenv('RESTORE')) !== false && $restore !== '') {
