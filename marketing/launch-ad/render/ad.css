@@ -24,7 +24,7 @@ body, .ar, [dir=rtl] { font-family: 'Alexandria', system-ui, sans-serif; color: 
 
 /* Background light */
 .orb { position: absolute; left: 0; top: 0; border-radius: 50%; will-change: transform; }
-#grain { background-image: url(assets/grain.png); background-size: 512px 512px; opacity: .085; mix-blend-mode: multiply; }
+#grain { background-image: url(assets/grain.png); background-size: 512px 512px; opacity: .06; mix-blend-mode: multiply; }
 
 #brand { position: absolute; left: 0; right: 0; display: flex; justify-content: center; }
 #brand img { height: 50px; }

@@ -72,7 +72,7 @@ const run = (cmd, args) => new Promise((resolve, reject) => {
   fs.writeFileSync(list, Array.from({ length: workers }, (_, w) => `file 'seg${w}.mp4'`).filter((_, w) => fs.existsSync(path.join(tmp, `seg${w}.mp4`))).join('\n'));
   await run('ffmpeg', ['-v', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list,
     '-ss', String(from), '-t', String((last - first + 1) / T.fps), '-i', path.resolve(dir, 'mix.wav'),
-    '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
+    '-map', '0:v', '-map', '1:a', '-c:v', 'libx264', '-preset', 'slow', '-crf', '17', '-maxrate', '16M', '-bufsize', '32M', '-profile:v', 'high', '-pix_fmt', 'yuv420p',
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-movflags', '+faststart',
     '-c:a', 'aac', '-b:a', '256k', '-ar', '48000', '-shortest', out]);
   fs.rmSync(tmp, { recursive: true, force: true });

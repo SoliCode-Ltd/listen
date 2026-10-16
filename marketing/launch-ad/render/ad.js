@@ -228,7 +228,6 @@
       const c = i === 1 ? `hsla(${h}, 95%, 85%, .95)` : `rgba(${d.c.join(',')}, .9)`;
       css(o, { width: size + 'px', height: size + 'px', transform: `translate(${x}px, ${y}px)`, background: `radial-gradient(circle at 50% 50%, ${c} 0%, transparent 60%)` });
     });
-    grain.style.backgroundPosition = `${Math.floor(hash(fi) * 512)}px ${Math.floor(hash(fi + 7) * 512)}px`;
     brand.style.opacity = 1 - prog(t, cta.logo_at - .5, .4);
 
     // Hook and reveal tiles.
@@ -319,11 +318,12 @@
     // Player cards.
     players.forEach((p, k) => {
       const s = p.s;
-      if (t < s.start - .15 || t > s.end + .4) { p.root.style.display = 'none'; return; }
+      if (t < s.start - .05 || t > s.end + .05) { p.root.style.display = 'none'; return; }
       p.root.style.display = 'block';
       const dIn = s.fast ? .38 : .55;
-      const inP = E.out5(prog(t, s.start - .08, dIn));
-      const outP = E.in3(prog(t, s.end - .14, .34));
+      // The next card arrives only as this one has left: never two scripts on screen at once.
+      const inP = E.out5(prog(t, s.start + .02, dIn));
+      const outP = E.in3(prog(t, s.end - .26, .26));
       const fromTile = s === firstSpk;
       p.root.style.opacity = 1 - outP;
       p.card.style.transform = `translateY(${(1 - inP) * 200 - outP * 120}px) scale(${lerp(.96, 1, inP) * lerp(1, .95, outP)})`;
