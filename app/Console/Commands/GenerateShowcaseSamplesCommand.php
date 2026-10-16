@@ -30,7 +30,7 @@ class GenerateShowcaseSamplesCommand extends Command
         {--import : Create or update the voice_samples rows for the MP3s on disk}
         {--key= : Gemini API key for --generate (default: GEMINI_TTS_API_KEY)}
         {--only=* : Only these sample slugs}
-        {--set=showcase : Which samples: showcase (dialects, accents, dialogues) or environments (the sound environments section)}
+        {--set=showcase : Which samples: showcase (dialects, accents, dialogues), environments (the sound environments section) or ad (the launch ad, marketing/launch-ad/lines.php)}
         {--render : environments set only: place each clean clip in its sound environment}
         {--force : Regenerate MP3s that already exist}
         {--keep-old : On import, leave the older homepage samples active}
@@ -42,12 +42,20 @@ class GenerateShowcaseSamplesCommand extends Command
 
     private const ENVIRONMENT_DIR = 'audio/environments';
 
+    private const AD_DIR = 'audio/launch-ad';
+
     private string $dir = self::AUDIO_DIR;
+
+    /** mp3 for the site; wav (lossless, 48 kHz) for the launch ad, which is mixed and encoded again later. */
+    private string $ext = 'mp3';
 
     public function handle(): int
     {
         if ($this->option('set') === 'environments') {
             return $this->environments();
+        }
+        if ($this->option('set') === 'ad') {
+            return $this->ad();
         }
 
         if (! $this->option('generate') && ! $this->option('import')) {
@@ -94,7 +102,7 @@ class GenerateShowcaseSamplesCommand extends Command
         $requested = false;
 
         foreach ($samples as $sample) {
-            $target = public_path($this->dir.'/'.$sample['slug'].'.mp3');
+            $target = public_path($this->dir.'/'.$sample['slug'].'.'.$this->ext);
             if (is_file($target) && ! $this->option('force')) {
                 $this->line("skip  {$sample['slug']} (exists)");
 
@@ -120,6 +128,29 @@ class GenerateShowcaseSamplesCommand extends Command
         }
 
         return true;
+    }
+
+    /**
+     * The launch ad's voices (marketing/launch-ad/lines.php): one Gemini request
+     * each, no sign-off, saved as WAV in public/audio/launch-ad.
+     */
+    private function ad(): int
+    {
+        if (! $this->option('generate')) {
+            $this->error('Pass --generate.');
+
+            return self::INVALID;
+        }
+        $samples = (require base_path('marketing/launch-ad/lines.php'))['samples'];
+        $only = array_filter((array) $this->option('only'));
+        if ($only !== []) {
+            $samples = array_values(array_filter($samples, fn (array $s): bool => in_array($s['slug'], $only, true)));
+        }
+        $samples = array_map(fn (array $s): array => $s + ['kind' => 'single', 'sign_off' => false], $samples);
+        $this->dir = self::AD_DIR;
+        $this->ext = 'wav';
+
+        return $this->generate($samples, ['en' => '', 'ar' => '']) ? self::SUCCESS : self::FAILURE;
     }
 
     /**
@@ -320,7 +351,7 @@ class GenerateShowcaseSamplesCommand extends Command
             $ffmpeg, '-y', '-hide_banner', '-loglevel', 'error',
             ...$input, '-i', $raw,
             '-af', 'silenceremove=start_periods=1:start_threshold=-50dB,areverse,silenceremove=start_periods=1:start_threshold=-50dB,areverse,loudnorm=I=-16:TP=-1.5:LRA=11,adelay=120,apad=pad_dur=0.4',
-            '-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k', $target,
+            ...($this->ext === 'wav' ? ['-ar', '48000', '-c:a', 'pcm_s16le'] : ['-ar', '44100', '-c:a', 'libmp3lame', '-b:a', '128k']), $target,
         ]);
         $process->setTimeout(120)->run();
         @unlink($raw);
