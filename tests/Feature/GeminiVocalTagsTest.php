@@ -448,6 +448,9 @@ class GeminiVocalTagsTest extends TestCase
         // Text on one side, the voice library beside it (not under it), the result below both.
         $this->assertMatchesRegularExpression('/class="vs-layout demo-vs-layout".*class="vs-main".*data-vs-editor.*<aside class="vs-side[^"]*">\s*<section class="vs-panel" data-vs-panel/s', $html);
         $this->assertGreaterThan(strpos($html, '</form>'), strpos($html, 'id="outputPlaceholder"'));
+        // One red notice under the generate button, with the upgrade button inside it.
+        $this->assertMatchesRegularExpression('/id="previewBtn".*<div id="errorBox"[^>]*>\s*<span class="error-text" id="errorText"><\/span>\s*<a class="btn btn-primary error-upgrade" id="errorUpgrade"[^>]*hidden>.*?<\/a>\s*<\/div>.*<aside class="vs-side/s', $html);
+        $this->assertStringNotContainsString('id="upgradeBox"', $html);
         // The facts under the title quote the catalogs.
         $this->assertStringContainsString(DialectCounts::arabic().'+</span> Arabic dialects', $html);
         $this->assertStringContainsString(DialectCounts::english().'+</span> English accents', $html);

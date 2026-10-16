@@ -365,6 +365,7 @@ class HomeController extends Controller
                 'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
                 'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
                 'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+                'audio_effect' => ['nullable', 'string', 'in:'.implode(',', AudioEffects::keys())],
             ] + DialogueSpeakers::rules(), [
                 'performance_style.in' => __('ui.backend.performance_style_invalid'),
                 'emotion.in' => __('ui.backend.emotion_invalid'),
@@ -481,6 +482,7 @@ class HomeController extends Controller
             'emotion' => ['nullable', 'string', 'in:'.implode(',', $emotionValues)],
             'speed' => ['nullable', 'numeric', 'min:0.5', 'max:2.0'],
             'pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            'audio_effect' => ['nullable', 'string', 'in:'.implode(',', AudioEffects::keys())],
         ] + DialogueSpeakers::rules(), [
             'performance_style.in' => __('ui.backend.performance_style_invalid'),
             'emotion.in' => __('ui.backend.emotion_invalid'),
@@ -567,6 +569,16 @@ class HomeController extends Controller
                 (int) $request->user()->id,
             );
             $audio['audio_path'] = $this->storeDemoAudioCopy((string) ($audio['audio_path'] ?? ''));
+            // A sound environment, as on the dashboard: added to the demo's own copy of the
+            // voice. If it cannot be added, the member still gets the clean voice.
+            $effect = AudioEffects::available() ? (string) ($validated['audio_effect'] ?? '') : '';
+            if ($effect !== '' && $audio['audio_path'] !== '' && ($effected = AudioEffects::apply($audio['audio_path'], $effect)) !== null) {
+                if (str_starts_with($audio['audio_path'], 'audio/demo/')) {
+                    Storage::disk('public')->delete($audio['audio_path']);
+                }
+                $audio['audio_path'] = $effected;
+                $audio['audio_effect'] = $effect;
+            }
 
             // Use original text chars for demo quota consumption — this is what the user
             // typed and what the frontend counted. Translated text may expand/contract,
@@ -1563,6 +1575,7 @@ class HomeController extends Controller
                     'reward_chars_consumed' => $rewardCharsConsumed !== null ? (int) $rewardCharsConsumed : 0,
                     'total_chars' => $totalChars !== null ? (int) $totalChars : ($originalChars ?? UsageEstimator::estimate($inputText)['chars']),
                     'dialogue_speakers' => ($validated['is_dialogue'] ?? false) ? ($validated['dialogue_speakers'] ?? []) : null,
+                    'audio_effect' => $audio['audio_effect'] ?? null,
                 ],
             ]);
         } catch (\Throwable $e) {

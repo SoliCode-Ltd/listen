@@ -187,6 +187,58 @@ class AudioEffectsTest extends TestCase
         $this->assertSame('أماكن', $meta['audio_effectGroups']['space']);
     }
 
+    public function test_the_demo_offers_the_sound_environments_and_adds_the_chosen_one(): void
+    {
+        $this->requireFfmpeg();
+        Storage::fake('public');
+        $this->tone('audio/voice.mp3', 2);
+        $this->fakeSpeech('audio/voice.mp3');
+        \App\Models\SiteSetting::set('tts_mode', 'hybrid', 'tts');
+        $this->bindDemoProviders();
+        Plan::factory()->create(['slug' => 'free', 'price_cents' => 0, 'voice_tier' => VoiceTier::STANDARD, 'is_active' => true, 'sound_effects_enabled' => false]);
+        $voiceKey = VoiceCatalog::keyFromId((int) $this->voice('hd')->id);
+        $this->actingAs(User::factory()->create());
+
+        $this->assertStringContainsString('data-vs-pick="audio_effect"', $this->getLocalizedRoute('demo.page')->assertOk()->getContent());
+
+        $response = $this->postJsonLocalizedRoute('demo.preview', [
+            'text' => 'Hello there, welcome to the show.',
+            'target_language' => 'en',
+            'voice_tier' => 'hd',
+            'voice_key' => $voiceKey,
+            'audio_effect' => 'hall',
+        ])->assertOk();
+
+        $generation = \App\Models\DemoVoiceGeneration::query()->latest('id')->firstOrFail();
+        $this->assertStringStartsWith('audio/effects/', $generation->audio_path);
+        $this->assertStringContainsString('-hall-', $generation->audio_path);
+        $this->assertStringContainsString($generation->audio_path, (string) $response->json('audio_url'));
+        $this->assertSame('hall', $generation->metadata['audio_effect']);
+        $this->assertSame([], Storage::disk('public')->files('audio/demo'), 'the unused clean copy is not kept');
+        $this->assertTrue(Storage::disk('public')->exists('audio/voice.mp3'), 'the shared clean voice is never changed');
+
+        $this->postJsonLocalizedRoute('demo.preview', [
+            'text' => 'Hello there.',
+            'target_language' => 'en',
+            'voice_tier' => 'hd',
+            'voice_key' => $voiceKey,
+            'audio_effect' => 'nightclub',
+        ])->assertStatus(422)->assertJsonValidationErrors('audio_effect');
+    }
+
+    private function bindDemoProviders(): void
+    {
+        $router = $this->createMock(\App\Services\Tts\TtsRoutingService::class);
+        $router->method('getProviderByName')->willReturnCallback(function (string $name): \App\Contracts\TtsProviderInterface {
+            $provider = $this->createMock(\App\Contracts\TtsProviderInterface::class);
+            $provider->method('name')->willReturn($name);
+            $provider->method('isAvailable')->willReturn(true);
+
+            return $provider;
+        });
+        $this->app->instance(\App\Services\Tts\TtsRoutingService::class, $router);
+    }
+
     private function requireFfmpeg(): void
     {
         if (AudioFormats::ffmpegPath() === null) {

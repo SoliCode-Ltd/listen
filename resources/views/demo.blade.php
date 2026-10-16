@@ -148,7 +148,11 @@
               </div>
             </div>
           </div>
-          <div id="errorBox" class="s-card error-box" style="display:none;"></div>
+          {{-- One red notice under the generate button: the error, with the upgrade button when more credit would help. --}}
+          <div id="errorBox" class="s-card error-box" role="alert" style="display:none;">
+            <span class="error-text" id="errorText"></span>
+            <a class="btn btn-primary error-upgrade" id="errorUpgrade" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" hidden>{{ __('ui.demo.upgrade_plan') }}</a>
+          </div>
         </div>
 
         {{-- Right: the voice library and fine-tuning (shared with the dashboard) --}}
@@ -158,6 +162,12 @@
             <select id="voice_gender" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
               <option value="all">{{ __('ui.demo.any') }}</option>
             </select>
+            {{-- Sound environments, as on the dashboard: added to the voice after it is made. --}}
+            @if(\App\Support\AudioEffects::available())
+              <div class="vs-field vs-effect-field">
+                <x-voice-studio.choice-field name="audio_effect" :label="__('ui.dashboard.audio_effect')" :options="\App\Support\AudioEffects::options()" :default-label="__('ui.dashboard.audio_effect_none')" />
+              </div>
+            @endif
             <div class="vs-row-2 vs-field" data-vs-hd-only>
               <div>
                 <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
@@ -193,10 +203,6 @@
 
       {{-- Below, as on the dashboard: the result --}}
       <div class="demo-output">
-        <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
-          <p id="upgradeText">{{ __('ui.demo.trial_exhausted_text') }}</p>
-          <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" style="width:100%;justify-content:center">{{ __('ui.demo.upgrade_plan') }}</a>
-        </div>
 
         <div class="s-card output-panel" id="audioWrap" style="display:none;">
           <div class="panel-title">
@@ -286,8 +292,8 @@
     const quotaBox = document.getElementById('quotaBox');
     const quotaValue = document.getElementById('quotaValue');
     const quotaFill = document.getElementById('quotaFill');
-    const upgradeBox = document.getElementById('upgradeBox');
-    const upgradeText = document.getElementById('upgradeText');
+    const errorText = document.getElementById('errorText');
+    const errorUpgrade = document.getElementById('errorUpgrade');
     const translateSelect = document.getElementById('translate');
     const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
@@ -464,6 +470,9 @@
     let isGenerating = false;
     let hasQuotaSynced = !toBoolean(currentQuota?.requires_client_sync);
     let liveBillableChars = 0;
+    // Set when Generate was refused because the text is longer than the credit left;
+    // the error and the upgrade offer stay until the text fits again.
+    let overflowNoticeShown = false;
     let charCountFrame = null;
     let lastGeneratedText = '';
     let lastGeneratedChars = 0;
@@ -540,8 +549,19 @@
       audioMeta.textContent = '';
     }
 
+    // The notice shows the error, or on its own the "trial used" text, and the
+    // upgrade button whenever more credit would help.
+    let noticeError = '';
+    let noticeUpgrade = false;
+    function renderNotice() {
+      const text = noticeError || (noticeUpgrade ? i18n.upgrade_text : '');
+      errorBox.style.display = text ? '' : 'none';
+      errorText.textContent = text;
+      errorUpgrade.hidden = !noticeUpgrade;
+    }
+
     function setError(message = '') {
-      if (!message) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
+      if (!message) { noticeError = ''; renderNotice(); return; }
       // Sanitize technical error messages
       const technicalPatterns = [
         /maximum execution time/i,
@@ -559,8 +579,8 @@
       if (technicalPatterns.some(p => p.test(message))) {
         message = i18n.server_overload || i18n.preview_failed;
       }
-      errorBox.style.display = 'block';
-      errorBox.textContent = message;
+      noticeError = message;
+      renderNotice();
       scrollFeedbackIntoView(errorBox);
     }
 
@@ -573,24 +593,22 @@
         feedbackScrollFrame = null;
         const rect = element.getBoundingClientRect();
         const topOffset = 108;
-        const bottomOffset = 24;
+        // Clear of the floating WhatsApp and gift buttons at the bottom of the screen.
+        const bottomOffset = 110;
         const isVisible = rect.top >= topOffset && rect.bottom <= (window.innerHeight - bottomOffset);
         if (isVisible) return;
         const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
         element.scrollIntoView({
           behavior: reduceMotion ? 'auto' : 'smooth',
-          block: 'nearest',
+          block: 'center',
           inline: 'nearest',
         });
       });
     }
 
-    function setUpgradeVisible(show, customMessage = '') {
-      if (!upgradeBox) return;
-      upgradeBox.style.display = show ? 'block' : 'none';
-      if (show && upgradeText) {
-        upgradeText.textContent = customMessage || i18n.upgrade_text;
-      }
+    function setUpgradeVisible(show) {
+      noticeUpgrade = Boolean(show);
+      renderNotice();
     }
 
     // Referral popup invocation policy:
@@ -661,7 +679,13 @@
       }
 
       renderRewardBadge(rewardRemaining);
-      setUpgradeVisible(Boolean(currentQuota.is_exhausted || totalRemaining <= 0));
+      const exhausted = Boolean(currentQuota.is_exhausted || totalRemaining <= 0);
+      const overLimit = hasDraft && liveBillableChars > totalRemaining;
+      if (overflowNoticeShown && !overLimit) {
+        overflowNoticeShown = false;
+        setError('');
+      }
+      setUpgradeVisible(exhausted || (overflowNoticeShown && overLimit));
       resetPreviewButton();
     }
 
@@ -1035,6 +1059,7 @@
 
     async function callEndpoint(endpoint, options = {}) {
       const includeForm = options?.includeForm !== false;
+      overflowNoticeShown = false;
       setError('');
       setUpgradeVisible(false);
       const fd = new FormData();
@@ -1154,6 +1179,7 @@
           hideAudioPreview();
           const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(totalAllowed));
           setError(message);
+          overflowNoticeShown = totalAllowed > 0;
           setUpgradeVisible(true);
           maybeShowReferralPopup({ reason: totalAllowed <= 0 ? 'quota_exhausted' : 'preview_overflow' });
           return;
