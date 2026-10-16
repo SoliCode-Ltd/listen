@@ -12,6 +12,7 @@ use App\Services\Tts\GeminiTtsProvider;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\VoiceCloningService;
 use App\Support\ArabicDialects;
+use App\Support\DialectCounts;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\TtsStudioConfig;
@@ -436,6 +437,20 @@ class GeminiVocalTagsTest extends TestCase
             $this->assertStringContainsString($needle, $html, $needle);
         }
         $this->assertStringContainsString('[calm] How long have you been telling yourself', $html, 'the Premium sample uses the tags');
+    }
+
+    public function test_demo_page_lays_the_studio_out_like_the_dashboard(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $html = $this->getLocalizedRoute('demo.page')->assertOk()->getContent();
+
+        // Text on one side, the voice library beside it (not under it), the result below both.
+        $this->assertMatchesRegularExpression('/class="vs-layout demo-vs-layout".*class="vs-main".*data-vs-editor.*<aside class="vs-side[^"]*">\s*<section class="vs-panel" data-vs-panel/s', $html);
+        $this->assertGreaterThan(strpos($html, '</form>'), strpos($html, 'id="outputPlaceholder"'));
+        // The facts under the title quote the catalogs.
+        $this->assertStringContainsString(DialectCounts::arabic().'+</span> Arabic dialects', $html);
+        $this->assertStringContainsString(DialectCounts::english().'+</span> English accents', $html);
     }
 
     public function test_qatar_offers_doha_and_bedouin_accents_with_their_markers(): void
