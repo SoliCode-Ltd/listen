@@ -19,115 +19,110 @@
     <section class="studio-hero reveal">
       <h1>{{ __('ui.demo.hero_title') }}</h1>
       <p>{{ __('ui.demo.hero_subtitle') }}</p>
+      {{-- What the studio below can do; the counts come from the dialect and accent catalogs. --}}
+      @php $demoAr = app()->getLocale() === 'ar'; @endphp
       <div class="studio-badge-row">
         <span class="studio-badge">
-          <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          <span class="num">{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['ar'] ?? [])) }}</span> {{ __('ui.demo.arabic_voices') }}
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <span class="num" dir="ltr">{{ $demoAr ? '+'.\App\Support\DialectCounts::arabic() : \App\Support\DialectCounts::arabic().'+' }}</span> {{ __('ui.demo.arabic_dialects') }}
         </span>
         <span class="studio-badge">
           <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-          <span class="num">{{ collect($voiceCatalog)->sum(fn ($byLang) => count($byLang['en'] ?? [])) }}</span> {{ __('ui.demo.english_voices') }}
+          <span class="num" dir="ltr">{{ $demoAr ? '+'.\App\Support\DialectCounts::english() : \App\Support\DialectCounts::english().'+' }}</span> {{ __('ui.demo.english_accents') }}
         </span>
         <span class="studio-badge">
-          <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          {{ __('ui.demo.hero_point_1') }}
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+          {{ __('ui.demo.emotions_and_sounds') }}
         </span>
         <span class="studio-badge">
-          <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
-          {{ __('ui.demo.hero_point_3') }}
+          <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          {{ __('ui.demo.hero_point_4') }}
         </span>
       </div>
     </section>
 
-    {{-- ── Studio workspace ── --}}
+    {{-- ── Studio workspace: laid out like the dashboard generator ── --}}
     <section class="studio-workspace">
-      <div class="studio-shell">
-        {{-- ── LEFT: Main editor ── --}}
-        <div class="studio-main">
-
-          {{-- Quota --}}
-          <div class="s-card reveal" id="quotaBox" style="padding:1rem 1.25rem">
-            <div class="quota-panel">
-              <div class="q-head">
-                <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
-                <strong class="q-value" id="quotaValue" dir="ltr">
-                  @php
-                    $qTotalRemaining = (int) ($demoQuota['total_remaining_chars'] ?? ($demoQuota['remaining_chars'] ?? $trialAllowanceChars));
-                    $qTotalLimit = max(
-                        $qTotalRemaining,
-                        (int) ($demoQuota['limit_chars'] ?? $trialAllowanceChars) + (int) ($demoQuota['reward_chars_earned'] ?? 0)
-                    );
-                  @endphp
-                  {{ number_format($qTotalRemaining) }} / {{ number_format($qTotalLimit) }} {{ __('ui.demo.chars_left') }}
-                </strong>
-              </div>
-              <div class="quota-track">
-                <div class="quota-fill" id="quotaFill"></div>
-              </div>
-              <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
-              <div class="reward-badge" id="rewardBadge"
-                   @if ((int) ($demoQuota['reward_chars_remaining'] ?? 0) <= 0) hidden @endif
-                   aria-live="polite">
-                <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
-                  <path d="M20 12v9H4v-9"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
-                </svg>
-                <span>{{ __('ui.referral.reward_badge_prefix') }}</span>
-                <strong dir="ltr"><span data-reward-value>{{ number_format((int) ($demoQuota['reward_chars_remaining'] ?? 0)) }}</span></strong>
-                <span>{{ __('ui.referral.reward_badge_suffix') }}</span>
-              </div>
-            </div>
+      {{-- Quota --}}
+      <div class="s-card reveal" id="quotaBox" style="padding:1rem 1.25rem">
+        <div class="quota-panel">
+          <div class="q-head">
+            <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
+            <strong class="q-value" id="quotaValue" dir="ltr">
+              @php
+                $qTotalRemaining = (int) ($demoQuota['total_remaining_chars'] ?? ($demoQuota['remaining_chars'] ?? $trialAllowanceChars));
+                $qTotalLimit = max(
+                    $qTotalRemaining,
+                    (int) ($demoQuota['limit_chars'] ?? $trialAllowanceChars) + (int) ($demoQuota['reward_chars_earned'] ?? 0)
+                );
+              @endphp
+              {{ number_format($qTotalRemaining) }} / {{ number_format($qTotalLimit) }} {{ __('ui.demo.chars_left') }}
+            </strong>
           </div>
+          <div class="quota-track">
+            <div class="quota-fill" id="quotaFill"></div>
+          </div>
+          <div class="quota-note">{{ __('ui.demo.one_time_trial_credit') }}</div>
+          <div class="reward-badge" id="rewardBadge"
+               @if ((int) ($demoQuota['reward_chars_remaining'] ?? 0) <= 0) hidden @endif
+               aria-live="polite">
+            <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16">
+              <path d="M20 12v9H4v-9"/><path d="M22 7H2v5h20V7z"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>
+            </svg>
+            <span>{{ __('ui.referral.reward_badge_prefix') }}</span>
+            <strong dir="ltr"><span data-reward-value>{{ number_format((int) ($demoQuota['reward_chars_remaining'] ?? 0)) }}</span></strong>
+            <span>{{ __('ui.referral.reward_badge_suffix') }}</span>
+          </div>
+        </div>
+      </div>
 
-          {{-- Text editor --}}
-          <form id="demoForm" class="studio-main" style="gap:1rem">
-            @php
-              $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
-              // Premium samples use the studio tags: [delivery] from that point on, <sound> where it happens.
-              $defaultDemoSampleAr = '[هادئ] بقالك قد إيه بتقول هبدأ؟ <ضحكة خفيفة> كل مرة تقول… بكرة. <تنهيدة> بس بكرة دي مش بتيجي. <وقفة قصيرة> [دافئ] مش محتاج تبقى جاهز مية في المية… ابدأ بس، والباقي هييجي.';
-              $defaultDemoSampleEn = "[calm] How long have you been telling yourself you'll start? <chuckle> Every time you say… tomorrow. <sigh> But tomorrow never comes. <short pause> [warm] You don't need to be completely ready… Just start, and the rest will follow.";
-              // Standard voices (Google WaveNet / Chirp 3 HD) read every character,
-              // so their samples are plain sentences: no timings, [tags] or (cues).
-              $defaultStandardSampleAr = 'منذ متى وأنت تقول لنفسك إنك ستبدأ؟ في كل مرة تقول: غداً. لكن الغد لا يأتي أبداً. لست بحاجة إلى أن تكون مستعداً تماماً. ابدأ فقط، وسيأتي الباقي.';
-              $defaultStandardSampleEn = "How long have you been telling yourself you'll start? Every time, you say: tomorrow. But tomorrow never comes. You don't need to be completely ready. Just start, and the rest will follow.";
-              $sampleSetting = fn (string $key, string $default): string => ($value = trim((string) \App\Models\SiteSetting::get($key, ''))) !== '' ? $value : $default;
-              $demoSampleScripts = [
-                'hd' => [
-                  'ar' => $sampleSetting('demo_sample_ar', $defaultDemoSampleAr),
-                  'en' => $sampleSetting('demo_sample_en', $defaultDemoSampleEn),
-                ],
-                'standard' => [
-                  'ar' => $sampleSetting('demo_sample_standard_ar', $defaultStandardSampleAr),
-                  'en' => $sampleSetting('demo_sample_standard_en', $defaultStandardSampleEn),
-                ],
-              ];
-            @endphp
-            <div class="s-card s-card-editor reveal">
-              <div class="editor-label">
-                <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                {{ __('ui.demo.text_input') }}
-                <span class="char-count" id="charCounter" dir="ltr"></span>
+      <form id="demoForm" class="vs-layout demo-vs-layout">
+        @php
+          $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
+          // Premium samples use the studio tags: [delivery] from that point on, <sound> where it happens.
+          $defaultDemoSampleAr = '[هادئ] بقالك قد إيه بتقول هبدأ؟ <ضحكة خفيفة> كل مرة تقول… بكرة. <تنهيدة> بس بكرة دي مش بتيجي. <وقفة قصيرة> [دافئ] مش محتاج تبقى جاهز مية في المية… ابدأ بس، والباقي هييجي.';
+          $defaultDemoSampleEn = "[calm] How long have you been telling yourself you'll start? <chuckle> Every time you say… tomorrow. <sigh> But tomorrow never comes. <short pause> [warm] You don't need to be completely ready… Just start, and the rest will follow.";
+          // Standard voices (Google WaveNet / Chirp 3 HD) read every character,
+          // so their samples are plain sentences: no timings, [tags] or (cues).
+          $defaultStandardSampleAr = 'منذ متى وأنت تقول لنفسك إنك ستبدأ؟ في كل مرة تقول: غداً. لكن الغد لا يأتي أبداً. لست بحاجة إلى أن تكون مستعداً تماماً. ابدأ فقط، وسيأتي الباقي.';
+          $defaultStandardSampleEn = "How long have you been telling yourself you'll start? Every time, you say: tomorrow. But tomorrow never comes. You don't need to be completely ready. Just start, and the rest will follow.";
+          $sampleSetting = fn (string $key, string $default): string => ($value = trim((string) \App\Models\SiteSetting::get($key, ''))) !== '' ? $value : $default;
+          $demoSampleScripts = [
+            'hd' => [
+              'ar' => $sampleSetting('demo_sample_ar', $defaultDemoSampleAr),
+              'en' => $sampleSetting('demo_sample_en', $defaultDemoSampleEn),
+            ],
+            'standard' => [
+              'ar' => $sampleSetting('demo_sample_standard_ar', $defaultStandardSampleAr),
+              'en' => $sampleSetting('demo_sample_standard_en', $defaultStandardSampleEn),
+            ],
+          ];
+        @endphp
+        {{-- Left: the text, with its settings above and the generate button below --}}
+        <div class="vs-main">
+          <div class="vs-editor-card reveal">
+            <x-voice-studio.setbar studio-id="studioPanel" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
+              <div>
+                <label class="vs-field-label" for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
+                <select id="voice_tier" name="voice_tier">
+                  @foreach($demoTiers as $tier)
+                    <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>{{ $tier['label'] }}</option>
+                  @endforeach
+                </select>
               </div>
-              <x-voice-studio.setbar studio-id="studioPanel" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
-                <div>
-                  <label class="vs-field-label" for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
-                  <select id="voice_tier" name="voice_tier">
-                    @foreach($demoTiers as $tier)
-                      <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>{{ $tier['label'] }}</option>
-                    @endforeach
-                  </select>
-                </div>
-                <div>
-                  <label class="vs-field-label" for="target_language">{{ __('ui.demo.voice_language') }}</label>
-                  <select id="target_language" name="target_language">
-                    <option value="ar">{{ __('ui.demo.arabic') }}</option>
-                    <option value="en">{{ __('ui.demo.english') }}</option>
-                  </select>
-                </div>
-              </x-voice-studio.setbar>
-              <div class="tag-editor demo-tag-editor" data-vs-editor>
-                <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
-                <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+              <div>
+                <label class="vs-field-label" for="target_language">{{ __('ui.demo.voice_language') }}</label>
+                <select id="target_language" name="target_language">
+                  <option value="ar">{{ __('ui.demo.arabic') }}</option>
+                  <option value="en">{{ __('ui.demo.english') }}</option>
+                </select>
               </div>
+            </x-voice-studio.setbar>
+            <div class="tag-editor demo-tag-editor" data-vs-editor>
+              <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
+              <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+            </div>
+            <div class="demo-samples">
               <div class="sample-chips">
                 <button class="sample-chip" type="button" data-sample-key="en">{{ __('ui.demo.english_sample') }}</button>
                 <button class="sample-chip" type="button" data-sample-key="ar">{{ __('ui.demo.arabic_sample') }}</button>
@@ -137,92 +132,92 @@
                 <span>{{ $isArabicLocale ? 'اضغط على عينات النص بالأعلى (عربي / إنجليزي) لتعبئة أمثلة جاهزة. ثم أضف الأصوات والمشاعر من شريط الوسوم فوق النص ليبدو الصوت بشريًا أكثر.' : 'Click the sample chips above (Arabic / English) to load ready scripts, then add sounds and feelings from the tag bar above the text for a more human voice.' }}</span>
               </div>
             </div>
-
-            {{-- Voice studio: voice, sound effects and delivery (shared with the dashboard) --}}
-            <div class="reveal">
-            <x-voice-studio.panel :show-tags="true">
-              {{-- The library filters speakers by gender itself; the page script still reads this field. --}}
-              <select id="voice_gender" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
-                <option value="all">{{ __('ui.demo.any') }}</option>
-              </select>
-              <div class="vs-row-2 vs-field" data-vs-hd-only>
-                <div>
-                  <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
-                  <div class="slider-wrap">
-                    <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
-                  </div>
+            <div class="vs-editor-foot">
+              <span class="char-count" id="charCounter" dir="ltr"></span>
+              <div class="generate-row">
+                <div class="wave-bar" id="heroWave" aria-hidden="true">
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
                 </div>
-                <div>
-                  <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
-                  <div class="slider-wrap">
-                    <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
-                  </div>
-                </div>
-              </div>
-              <div class="vs-field">
-              <div class="translate-row">
-                <div class="translate-info">
-                  <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
-                  <div class="hint" id="translateHint">{{ __('ui.demo.translate_disabled_hint') }}</div>
-                </div>
-                <label class="toggle-switch" aria-label="{{ __('ui.demo.translate_before_speaking') }}">
-                  <input type="checkbox" id="translateToggle">
-                  <span class="toggle-slider"></span>
-                </label>
-                <input type="hidden" name="translate" id="translate" value="0">
-              </div>
-              {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
-              <x-voice-studio.dialogue />
-              </div>
-            </x-voice-studio.panel>
-            </div>
-
-            {{-- Generate row with waveform --}}
-            <div class="generate-row reveal">
-              <button class="btn-generate" type="button" id="previewBtn">
-                <span>
-                  <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                  {{ __('ui.demo.generate_voice') }}
-                </span>
-              </button>
-              <div class="wave-bar" id="heroWave" aria-hidden="true">
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
-                <span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span>
+                <button class="btn-generate" type="button" id="previewBtn">
+                  <span>
+                    <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    {{ __('ui.demo.generate_voice') }}
+                  </span>
+                </button>
               </div>
             </div>
-            <div id="errorBox" class="s-card error-box" style="display:none;"></div>
-          </form>
+          </div>
+          <div id="errorBox" class="s-card error-box" style="display:none;"></div>
         </div>
 
-        {{-- ── RIGHT: Sidebar ── --}}
-        <aside class="studio-sidebar">
-
-          <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
-            <p id="upgradeText">{{ __('ui.demo.trial_exhausted_text') }}</p>
-            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" style="width:100%;justify-content:center">{{ __('ui.demo.upgrade_plan') }}</a>
-          </div>
-
-          <div class="s-card output-panel" id="audioWrap" style="display:none;">
-            <div class="panel-title">
-              <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-              {{ __('ui.demo.hero_point_4') }}
+        {{-- Right: the voice library and fine-tuning (shared with the dashboard) --}}
+        <aside class="vs-side reveal">
+          <x-voice-studio.panel :show-tags="true">
+            {{-- The library filters speakers by gender itself; the page script still reads this field. --}}
+            <select id="voice_gender" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
+              <option value="all">{{ __('ui.demo.any') }}</option>
+            </select>
+            <div class="vs-row-2 vs-field" data-vs-hd-only>
+              <div>
+                <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
+                <div class="slider-wrap">
+                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
+                </div>
+              </div>
+              <div>
+                <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
+                <div class="slider-wrap">
+                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
+                </div>
+              </div>
             </div>
-            <audio
-              id="previewAudio"
-              controls
-              preload="none"
-              data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
-            ></audio>
-            <div class="audio-meta" id="audioMeta"></div>
-          </div>
-
-          <div class="s-card output-panel reveal" id="outputPlaceholder">
-            <div class="output-placeholder">
-              <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
-              {{ __('ui.demo.hero_point_4') }}
+            <div class="vs-field">
+            <div class="translate-row">
+              <div class="translate-info">
+                <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
+                <div class="hint" id="translateHint">{{ __('ui.demo.translate_disabled_hint') }}</div>
+              </div>
+              <label class="toggle-switch" aria-label="{{ __('ui.demo.translate_before_speaking') }}">
+                <input type="checkbox" id="translateToggle">
+                <span class="toggle-slider"></span>
+              </label>
+              <input type="hidden" name="translate" id="translate" value="0">
             </div>
-          </div>
+            {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
+            <x-voice-studio.dialogue />
+            </div>
+          </x-voice-studio.panel>
         </aside>
+      </form>
+
+      {{-- Below, as on the dashboard: the result --}}
+      <div class="demo-output">
+        <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
+          <p id="upgradeText">{{ __('ui.demo.trial_exhausted_text') }}</p>
+          <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" style="width:100%;justify-content:center">{{ __('ui.demo.upgrade_plan') }}</a>
+        </div>
+
+        <div class="s-card output-panel" id="audioWrap" style="display:none;">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            {{ __('ui.demo.hero_point_4') }}
+          </div>
+          <audio
+            id="previewAudio"
+            controls
+            preload="none"
+            data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
+          ></audio>
+          <div class="audio-meta" id="audioMeta"></div>
+        </div>
+
+        <div class="s-card output-panel reveal" id="outputPlaceholder">
+          <div class="output-placeholder">
+            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            {{ __('ui.demo.hero_point_4') }}
+          </div>
+        </div>
       </div>
     </section>
   </main>
