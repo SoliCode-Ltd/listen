@@ -756,6 +756,7 @@ return [
         'upgrade_text' => 'Guest demo quota reached. Create a free account to unlock :chars characters and continue instantly.',
         'upgrade_text_raw' => 'Guest demo quota reached. Create a free account to unlock :chars characters and continue instantly.',
         'trial_exhausted_text' => 'Your trial allowance has been used. Upgrade your plan to continue generating voice.',
+        'trial_overflow_text' => 'Your text is longer than the trial credit you have left. Shorten it, or upgrade your plan for more characters.',
         'upgrade_plan' => 'Upgrade Plan',
         'create_free_account' => 'Create Free Account',
         'no_speakers' => 'No speakers available',
