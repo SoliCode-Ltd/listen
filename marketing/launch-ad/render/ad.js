@@ -64,6 +64,12 @@
     css(b, { left: ['-12%', '66%', '8%', '46%'][i] });
     return b;
   });
+  const bokeh = Array.from({ length: 26 }, (_, i) => {
+    const b = el('div', 'bokeh', bg);
+    const size = 10 + hash(i + 3) * 46;
+    css(b, { width: size + 'px', height: size + 'px', opacity: .08 + hash(i + 11) * .22 });
+    return { el: b, x: hash(i + 1), y: hash(i + 2), sp: .01 + hash(i + 5) * .03, size, depth: .3 + hash(i + 9) * .7 };
+  });
   const vignette = el('div', 'layer', stage); vignette.id = 'vignette';
 
   // ── HUD ────────────────────────────────────────────────────
@@ -142,7 +148,7 @@
     css(glow, { left: (L.av.x - D / 2 - 18) + 'px', top: (L.av.y - D / 2 - 18) + 'px', width: (D + 36) + 'px', height: (D + 36) + 'px' });
     const ring = el('div', 'ring', root);
     css(ring, { left: (L.av.x - D / 2 - 16) + 'px', top: (L.av.y - D / 2 - 16) + 'px', width: (D + 32) + 'px', height: (D + 32) + 'px' });
-    const av = el('div', 'av', root, `<img src="assets/${s.avatar}.png">`);
+    const av = el('div', 'av', root, `<img src="assets/${s.avatar}.png"><div class="glint"></div>`);
     css(av, { left: (L.av.x - D / 2) + 'px', top: (L.av.y - D / 2) + 'px', width: D + 'px', height: D + 'px' });
     let feature = null;
     if (s.chip) {
@@ -156,7 +162,7 @@
       (s.tr ? `<div class="tr ${AR ? 'ar' : ''}" dir="${AR ? 'rtl' : 'ltr'}">${s.tr}</div>` : ''));
     css(cap, { top: L.capY + 'px', width: L.capW + 'px', marginLeft: (-L.capW / 2) + 'px' });
     if (s.stadium) cap.querySelector('.line').style.fontSize = '64px';
-    return { s, idx, root, viz, ctx: viz.getContext('2d'), glow, ring, av, feature, plate, cap, words: [...cap.querySelectorAll('.w')], tr: cap.querySelector('.tr') };
+    return { s, idx, root, viz, ctx: viz.getContext('2d'), glow, ring, av, glint: av.querySelector('.glint'), feature, plate, cap, words: [...cap.querySelectorAll('.w')], tr: cap.querySelector('.tr') };
   });
 
   // ── CTA ────────────────────────────────────────────────────
@@ -189,6 +195,9 @@
   const btn = el('div', 'cta-btn', ctaRoot, `${AR ? 'ابدأ الآن' : 'Start now'}<span class="shine"></span>`);
   css(btn, { top: L.btnY + 'px' });
   const shine = btn.querySelector('.shine');
+  const faces = el('div', 'faces', ctaRoot, T.tiles.map(a => `<img src="assets/${a}.png">`).join(''));
+  css(faces, { top: (L.btnY + (T.ratio === '4x5' ? 150 : 200)) + 'px' });
+  const faceEls = [...faces.querySelectorAll('img')];
   const tagline = el('div', 'title', ctaRoot, AR ? 'اكتب… واسمع' : 'Type it. Hear it.');
   tagline.classList.add('grad');
   css(tagline, { top: (L.logoY - 170) + 'px', fontSize: '76px' });
@@ -273,6 +282,11 @@
       css(b, { width: size + 'px', height: size + 'px', transform: `translate(${x}px, ${y}px)`, background: `radial-gradient(circle at 50% 50%, ${d.c} 0%, transparent 62%)` });
     });
     grid.style.transform = `translateY(${(t * 14) % 44}px)`;
+    bokeh.forEach((b, i) => {
+      const y = ((b.y - t * b.sp * b.depth) % 1 + 1) % 1;
+      const x = b.x + Math.sin(t * .4 + i) * .02;
+      b.el.style.transform = `translate(${x * L.W - b.size / 2}px, ${y * L.H - b.size / 2}px)`;
+    });
     const fi = Math.floor(t * T.fps);
     grain.style.backgroundPosition = `${Math.floor(hash(fi) * 512)}px ${Math.floor(hash(fi + 7) * 512)}px`;
 
@@ -359,8 +373,9 @@
       const dir = (k % 2 ? -1 : 1) * (AR ? -1 : 1);
       const ein = E.outExpo(inP); const eout = E.inExpo(outP);
       const fromTile = k === 0;
-      const x = fromTile ? 0 : (1 - ein) * 260 * dir - eout * 260 * dir;
-      const sc = fromTile ? 1 : lerp(1.12, 1, ein) * lerp(1, .9, eout);
+      const push = 1 + prog(t, s.start, s.end - s.start) * .035;
+      const x = fromTile || s.fast ? 0 : (1 - ein) * 260 * dir - eout * 260 * dir;
+      const sc = (fromTile ? 1 : s.fast ? lerp(1.35, 1, ein) * lerp(1, .8, eout) : lerp(1.12, 1, ein) * lerp(1, .9, eout)) * push;
       p.root.style.opacity = (fromTile ? 1 : clamp(ein * 1.4)) * (1 - eout);
       p.root.style.transform = `translateX(${x}px) scale(${sc})`;
       p.root.style.filter = (1 - ein + eout) > .02 && !fromTile ? `blur(${(1 - ein) * 14 + eout * 14}px)` : 'none';
@@ -376,6 +391,9 @@
       p.glow.style.opacity = pres;
       const bob = Math.sin(t * 3.1 + k) * 1.1 * clamp(a);
       p.av.style.transform = `translateY(${-a * 9}px) scale(${1 + a * .03}) rotate(${bob}deg)`;
+      const gl = prog(t, s.start + .15, .7);
+      p.glint.style.transform = `translateX(${lerp(-120, 120, E.inOut3(gl))}%) skewX(-18deg)`;
+      p.glint.style.opacity = gl > 0 && gl < 1 ? .9 : 0;
 
       const plateIn = E.outBack(prog(t, s.start + .12, .5), 1.6);
       p.plate.style.opacity = clamp(plateIn);
@@ -489,6 +507,10 @@
       css(url, { opacity: u, transform: `translateY(${(1 - u) * 30}px)` });
       const b = E.outBack(prog(t, cta.logo_at + .55, .5), 1.8);
       css(btn, { opacity: clamp(b * 1.4), transform: `translateX(-50%) scale(${b * (1 + Math.sin(Math.max(0, t - cta.logo_at - 1.2) * 4) * .025)})` });
+      faceEls.forEach((f, i) => {
+        const a = E.outBack(prog(t, cta.logo_at + .7 + i * .04, .4), 2);
+        f.style.opacity = clamp(a * 1.4); f.style.transform = `translateY(${(1 - a) * 30}px) scale(${a})`;
+      });
       const sp = ((t - cta.logo_at - 1.1) % 1.6) / 1.6;
       shine.style.left = (t > cta.logo_at + 1.1 ? lerp(-40, 140, sp) : -40) + '%';
     }
