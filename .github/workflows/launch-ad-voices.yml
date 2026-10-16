@@ -78,7 +78,7 @@ jobs:
 
       - name: Transcribe with word timings
         run: |
-          pip install -q requests faster-whisper==1.1.1
+          pip install -q requests soundfile scipy faster-whisper==1.1.1
           python marketing/launch-ad/transcribe.py marketing/launch-ad/voices /tmp/lines.json marketing/launch-ad/voices/words.json
 
       - name: Commit the voices

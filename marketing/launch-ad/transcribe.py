@@ -12,7 +12,10 @@ import json
 import pathlib
 import sys
 
+import numpy as np
+import soundfile as sf
 from faster_whisper import WhisperModel
+from scipy.signal import resample_poly
 
 voices, lines_file, out_file = map(pathlib.Path, sys.argv[1:4])
 lines = json.loads(lines_file.read_text(encoding="utf-8"))
@@ -23,8 +26,10 @@ for wav in sorted(voices.glob("*.wav")):
     slug = wav.stem
     line = lines.get(slug, {})
     language = line.get("language", "ar")
+    data, rate = sf.read(str(wav), dtype="float32", always_2d=True)
+    audio = resample_poly(data.mean(axis=1), 16000, rate).astype(np.float32)
     segments, info = model.transcribe(
-        str(wav),
+        audio,
         language=language,
         word_timestamps=True,
         beam_size=5,
