@@ -404,12 +404,13 @@ html[dir="rtl"] .perf-grid select {
 .vs-editor-foot .wave-bar { flex: 0 1 160px }
 .vs-editor-foot .btn-generate { min-width: 0; padding: .75rem 1.5rem }
 .vs-main > .error-box { margin: 0 }
-/* The upgrade offer sits right under the error that needs it: the message, then the button. */
-.vs-main > .upgrade-box { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin: 0; padding: .9rem 1rem .9rem 1.1rem }
-.vs-main > .upgrade-box p { margin: 0; flex: 1 1 auto; color: var(--text); font-size: .92rem; font-weight: 600; line-height: 1.5 }
-.vs-main > .upgrade-box .btn { flex: 0 0 auto; justify-content: center; white-space: nowrap }
+/* One red notice: the message, and the upgrade button beside it when more credit would help. */
+.vs-main > .error-box { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem .85rem 1.1rem }
+.vs-main > .error-box .error-text { flex: 1 1 auto; line-height: 1.55; font-weight: 600 }
+.vs-main > .error-box .error-upgrade { flex: 0 0 auto; justify-content: center; white-space: nowrap }
+.vs-main > .error-box .error-upgrade[hidden] { display: none !important }
 @media (max-width: 640px) {
-  .vs-main > .upgrade-box { flex-direction: column; align-items: stretch }
+  .vs-main > .error-box { flex-direction: column; align-items: stretch }
 }
 .demo-output { display: grid; gap: 1rem; margin-top: 1.25rem }
 

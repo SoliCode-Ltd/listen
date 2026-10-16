@@ -148,11 +148,10 @@
               </div>
             </div>
           </div>
-          <div id="errorBox" class="s-card error-box" style="display:none;"></div>
-          {{-- Shown with the error when the trial runs out, right where the member is looking. --}}
-          <div class="s-card upgrade-box" id="upgradeBox" style="display:none;">
-            <p id="upgradeText">{{ __('ui.demo.trial_exhausted_text') }}</p>
-            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}">{{ __('ui.demo.upgrade_plan') }}</a>
+          {{-- One red notice under the generate button: the error, with the upgrade button when more credit would help. --}}
+          <div id="errorBox" class="s-card error-box" role="alert" style="display:none;">
+            <span class="error-text" id="errorText"></span>
+            <a class="btn btn-primary error-upgrade" id="errorUpgrade" href="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}" hidden>{{ __('ui.demo.upgrade_plan') }}</a>
           </div>
         </div>
 
@@ -234,7 +233,6 @@
   @php
     $demoI18n = [
       'upgrade_text' => __('ui.demo.trial_exhausted_text'),
-      'trial_overflow_text' => __('ui.demo.trial_overflow_text'),
       'chars_left' => __('ui.demo.chars_left'),
       'quota_total_start' => __('ui.demo.quota_total_start'),
       'translate_enabled_hint' => __('ui.demo.translate_enabled_hint'),
@@ -294,8 +292,8 @@
     const quotaBox = document.getElementById('quotaBox');
     const quotaValue = document.getElementById('quotaValue');
     const quotaFill = document.getElementById('quotaFill');
-    const upgradeBox = document.getElementById('upgradeBox');
-    const upgradeText = document.getElementById('upgradeText');
+    const errorText = document.getElementById('errorText');
+    const errorUpgrade = document.getElementById('errorUpgrade');
     const translateSelect = document.getElementById('translate');
     const translateToggle = document.getElementById('translateToggle');
     const translateHint = document.getElementById('translateHint');
@@ -551,8 +549,19 @@
       audioMeta.textContent = '';
     }
 
+    // The notice shows the error, or on its own the "trial used" text, and the
+    // upgrade button whenever more credit would help.
+    let noticeError = '';
+    let noticeUpgrade = false;
+    function renderNotice() {
+      const text = noticeError || (noticeUpgrade ? i18n.upgrade_text : '');
+      errorBox.style.display = text ? '' : 'none';
+      errorText.textContent = text;
+      errorUpgrade.hidden = !noticeUpgrade;
+    }
+
     function setError(message = '') {
-      if (!message) { errorBox.style.display = 'none'; errorBox.textContent = ''; return; }
+      if (!message) { noticeError = ''; renderNotice(); return; }
       // Sanitize technical error messages
       const technicalPatterns = [
         /maximum execution time/i,
@@ -570,8 +579,8 @@
       if (technicalPatterns.some(p => p.test(message))) {
         message = i18n.server_overload || i18n.preview_failed;
       }
-      errorBox.style.display = 'block';
-      errorBox.textContent = message;
+      noticeError = message;
+      renderNotice();
       scrollFeedbackIntoView(errorBox);
     }
 
@@ -597,12 +606,9 @@
       });
     }
 
-    function setUpgradeVisible(show, customMessage = '') {
-      if (!upgradeBox) return;
-      upgradeBox.style.display = show ? '' : 'none';
-      if (show && upgradeText) {
-        upgradeText.textContent = customMessage || i18n.upgrade_text;
-      }
+    function setUpgradeVisible(show) {
+      noticeUpgrade = Boolean(show);
+      renderNotice();
     }
 
     // Referral popup invocation policy:
@@ -679,7 +685,7 @@
         overflowNoticeShown = false;
         setError('');
       }
-      setUpgradeVisible(exhausted || (overflowNoticeShown && overLimit), exhausted ? '' : i18n.trial_overflow_text);
+      setUpgradeVisible(exhausted || (overflowNoticeShown && overLimit));
       resetPreviewButton();
     }
 
@@ -1174,8 +1180,7 @@
           const message = i18n.selected_chars_exceed.replace(':selected', formatNumber(selectedChars)).replace(':remaining', formatNumber(totalAllowed));
           setError(message);
           overflowNoticeShown = totalAllowed > 0;
-          setUpgradeVisible(true, totalAllowed > 0 ? i18n.trial_overflow_text : '');
-          scrollFeedbackIntoView(upgradeBox);
+          setUpgradeVisible(true);
           maybeShowReferralPopup({ reason: totalAllowed <= 0 ? 'quota_exhausted' : 'preview_overflow' });
           return;
         }
@@ -1232,7 +1237,6 @@
         } else if (serverSaysExhausted || isTrialExhaustedMessage(message)) {
           setUpgradeVisible(true);
           renderQuota({ ...currentQuota, is_exhausted: true, remaining_chars: 0, used_chars: Number(currentQuota.limit_chars || 0) });
-          scrollFeedbackIntoView(upgradeBox);
           maybeShowReferralPopup({ reason: 'quota_exhausted' });
         }
       } finally {
