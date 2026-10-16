@@ -130,7 +130,7 @@ return [
         'hero_title_before' => 'Type anything.',
         'hero_title_highlight' => 'Hear it in any accent.',
         'hero_title_after' => '',
-        'hero_subtitle' => 'Natural, studio-quality AI voices in 140+ Arabic dialects and 60+ English accents, in one click.',
+        'hero_subtitle' => '200+ accents. Real emotion. Studio-quality voices that sound truly human, in one click.',
         'trial_button' => 'Start :days-day free trial',
         'try_demo' => 'Try Demo',
         'create_free_account' => 'Create Your Account',
