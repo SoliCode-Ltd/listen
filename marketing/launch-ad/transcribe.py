@@ -25,11 +25,11 @@ model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 result = json.loads(out_file.read_text(encoding="utf-8")) if out_file.exists() else {}
 for wav in sorted(voices.glob("*.wav")):
     slug = wav.stem
+    line = lines.get(slug, {})
     digest = hashlib.md5(wav.read_bytes()).hexdigest()
     old = result.get(slug) or {}
     if old.get("md5") == digest or ("md5" not in old and old and old.get("script") == line.get("text")):
         continue  # this take is already transcribed
-    line = lines.get(slug, {})
     language = line.get("language", "ar")
     data, rate = sf.read(str(wav), dtype="float32", always_2d=True)
     audio = resample_poly(data.mean(axis=1), 16000, rate).astype(np.float32)
