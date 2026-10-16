@@ -296,16 +296,16 @@ def music(duration, sections):
                 add(pluck_bus, stereo(p, pan=(-0.35 if step % 4 == 0 else 0.35)), ts, gain)
             if here in ("groove", "lift", "outro"):
                 if step % 4 == 0:
-                    add(drum_bus, kick(), ts, 0.9)
+                    add(drum_bus, kick(), ts, 0.55)
                     kick_times.append(ts)
                 if step % 4 == 2:
-                    add(drum_bus, hat(open_=(here == "lift" and step % 8 == 6)), ts, 0.55)
+                    add(drum_bus, hat(open_=(here == "lift" and step % 8 == 6)), ts, 0.32)
                 if step % 2 == 1:
-                    add(drum_bus, hat(gain=0.45), ts, 0.4)
+                    add(drum_bus, hat(gain=0.45), ts, 0.2)
                 if here == "lift" and step in (4, 12):
-                    add(drum_bus, clap(), ts, 0.5)
+                    add(drum_bus, clap(), ts, 0.28)
                 if step % 2 == 0:
-                    add(bass_bus, bass(root - 12, BEAT / 2 * 0.9), ts, 0.55)
+                    add(bass_bus, bass(root - 12, BEAT / 2 * 0.9), ts, 0.42)
 
     # Ping-pong delay on the plucks (dotted eighth).
     delay = int(BEAT * 0.75 * SR)

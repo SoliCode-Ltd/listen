@@ -1,22 +1,23 @@
-/* Listen launch ad: every frame is a pure function of time.
- * window.seek(t) puts the whole stage in its state at t seconds, so the
- * capture script can step through the ad frame by frame. */
+/* Listen launch ad, light studio design. Every frame is a pure function of
+ * time: window.seek(t) sets the whole stage to its state at t seconds. */
 (() => {
   const T = window.TIMELINE;
   const AR = T.ui === 'ar';
   const LAYOUTS = {
-    '9x16': { W: 1080, H: 1920, hudY: 196, av: { x: 540, y: 770, d: 560 }, plateY: 1112, capY: 1300, capW: 990,
-      titleY: 340, tilesTop: 650, tileS: 220, tileGap: 26, cardY: 560, cardW: 960, tagY: 420, logoY: 545, logoH: 200, statsY: 820, urlY: 1080, btnY: 1170, facesY: 1345,
-      revealY: 380, waveY: 1560, waveH: 200 },
-    '4x5': { W: 1080, H: 1350, hudY: 36, av: { x: 540, y: 470, d: 420 }, plateY: 722, capY: 885, capW: 990,
-      titleY: 150, tilesTop: 380, tileS: 176, tileGap: 22, cardY: 300, cardW: 940, tagY: 120, logoY: 225, logoH: 160, statsY: 430, urlY: 655, btnY: 735, facesY: 885,
-      revealY: 150, waveY: 1150, waveH: 160 },
+    '9x16': { W: 1080, H: 1920, brandY: 150, pr: { x: 540, y: 600, d: 400 }, cardY: 745, cardX: 60, cardW: 960, wmY: 1330, wmS: 520,
+      hookY: 300, tilesTop: 790, tileS: 196, tileGap: 40, switchY: 560, revealY: 330, bannerY: 1000,
+      envTitleY: 330, envCardY: 560, introY: 520, introIconsY: 980,
+      studioY: 560, tagY: 420, logoY: 540, logoH: 190, statsY: 820, urlY: 1080, btnY: 1170, facesY: 1345 },
+    '4x5': { W: 1080, H: 1350, brandY: 56, pr: { x: 540, y: 300, d: 250 }, cardY: 380, cardX: 80, cardW: 920, wmY: 1010, wmS: 300,
+      hookY: 120, tilesTop: 500, tileS: 160, tileGap: 30, switchY: 380, revealY: 120, bannerY: 700,
+      envTitleY: 120, envCardY: 290, introY: 330, introIconsY: 700,
+      studioY: 260, tagY: 130, logoY: 230, logoH: 160, statsY: 450, urlY: 690, btnY: 770, facesY: 920 },
   };
   const L = LAYOUTS[T.ratio] || LAYOUTS['9x16'];
   document.documentElement.style.setProperty('--W', L.W + 'px');
   document.documentElement.style.setProperty('--H', L.H + 'px');
-  const stage = document.getElementById('stage');
   if (AR) document.documentElement.setAttribute('dir', 'rtl');
+  const stage = document.getElementById('stage');
 
   // ── Helpers ────────────────────────────────────────────────
   const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
@@ -24,487 +25,362 @@
   const prog = (t, a, d) => clamp((t - a) / d);
   const E = {
     out3: x => 1 - Math.pow(1 - x, 3),
+    out5: x => 1 - Math.pow(1 - x, 5),
     outExpo: x => (x >= 1 ? 1 : 1 - Math.pow(2, -10 * x)),
-    inExpo: x => (x <= 0 ? 0 : Math.pow(2, 10 * x - 10)),
-    inOut3: x => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
-    outBack: (x, s = 1.9) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2),
     in3: x => x * x * x,
+    inOut3: x => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2),
+    outBack: (x, s = 1.4) => 1 + (s + 1) * Math.pow(x - 1, 3) + s * Math.pow(x - 1, 2),
   };
-  // A damped spring from 0 to 1.
-  const spring = (x, k = 9, z = .42) => (x <= 0 ? 0 : 1 - Math.exp(-z * k * x) * Math.cos(k * Math.sqrt(1 - z * z) * x));
-  const amp = t => {
-    const f = t * T.fps; const i = Math.floor(f); const a = T.amp[i] || 0; const b = T.amp[i + 1] || 0;
-    return lerp(a, b, f - i);
-  };
-  const el = (tag, cls, parent, html) => {
-    const n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (html != null) n.innerHTML = html;
-    (parent || stage).appendChild(n);
-    return n;
-  };
-  const css = (n, o) => { for (const k in o) n.style[k] = o[k]; };
+  const amp = t => { const f = t * T.fps; const i = Math.floor(f); return lerp(T.amp[i] || 0, T.amp[i + 1] || 0, f - i); };
   const hash = i => { const x = Math.sin(i * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
-  const ICONS = {
-    laugh: '<svg viewBox="0 0 24 24" fill="none" stroke="#ffd54a" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="#ffd54a" stroke="none"/><path d="M8 9.5l1.6 1M16 9.5l-1.6 1"/></svg>',
-    stadium: '<svg viewBox="0 0 24 24" fill="none" stroke="#8fd3ff" stroke-width="2" stroke-linejoin="round"><ellipse cx="12" cy="14" rx="9.5" ry="5"/><ellipse cx="12" cy="13" rx="5" ry="2.2"/><path d="M4 7v5M20 7v5M4 7l2 1.2M20 7l-2 1.2"/></svg>',
-    play: '<svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l13-7.5z"/></svg>',
+  const el = (tag, cls, parent, html) => { const n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; (parent || stage).appendChild(n); return n; };
+  const css = (n, o) => { for (const k in o) n.style[k] = o[k]; };
+  const isAr = s => /[؀-ۿ]/.test(s);
+  const scenes = T.scenes;
+  const sceneOf = k => scenes.find(s => s.kind === k);
+  const LOGO = AR ? 'assets/logo-ar-light.svg' : 'assets/logo-light.svg';
+  const ENV_ICONS = {
+    announcement: '<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>',
+    phone: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+    radio: '<path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9"/><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5"/><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5"/><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19"/>',
+    cave: '<path d="M2 20 9 6l4 6 2-3 7 11z"/><path d="M10 20c0-2.2 .9-3.6 2-3.6s2 1.4 2 3.6"/>',
+    hall: '<path d="M3 21h18M5 21V10M9 21V10M15 21V10M19 21V10"/><path d="M2 10l10-6 10 6z"/>',
+    church: '<path d="M12 2v4M10 4h4"/><path d="M6 21V11l6-5 6 5v10"/><path d="M3 21h18"/><path d="M10 21v-4a2 2 0 0 1 4 0v4"/>',
   };
-  const speakers = T.scenes.filter(s => s.kind === 'speaker');
-  const sceneOf = kind => T.scenes.find(s => s.kind === kind);
-  const isArabicText = s => /[؀-ۿ]/.test(s);
+  const icon = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${ENV_ICONS[k] || ENV_ICONS.hall}</svg>`;
+  const TAG_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9.5"/><path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="currentColor" stroke="none"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/></svg>';
+  const PLAY = '<svg viewBox="0 0 24 24" fill="#fff"><path d="M7 4.5v15l13-7.5z"/></svg>';
+  const PAUSE = '<svg viewBox="0 0 24 24" fill="#fff"><rect x="5.5" y="4.5" width="4.5" height="15" rx="1.4"/><rect x="14" y="4.5" width="4.5" height="15" rx="1.4"/></svg>';
+  const fmt = s => `0:${String(Math.max(0, Math.floor(s))).padStart(2, '0')}`;
 
-  // ── Background ─────────────────────────────────────────────
+  // ── Background: warm paper with drifting pastel light ──────
   const bg = el('div', 'layer', stage);
-  const blobs = [0, 1, 2].map(() => el('div', 'blob', bg));
-  const grid = el('div', 'layer', bg); grid.id = 'grid';
-  const beams = el('div', 'layer', bg);
-  const beamEls = [0, 1, 2, 3].map(i => {
-    const b = el('div', 'beam', beams);
-    css(b, { left: ['-12%', '66%', '8%', '46%'][i] });
-    return b;
-  });
-  const bokeh = Array.from({ length: 26 }, (_, i) => {
-    const b = el('div', 'bokeh', bg);
-    const size = 10 + hash(i + 3) * 46;
-    css(b, { width: size + 'px', height: size + 'px', opacity: .08 + hash(i + 11) * .22 });
-    return { el: b, x: hash(i + 1), y: hash(i + 2), sp: .01 + hash(i + 5) * .03, size, depth: .3 + hash(i + 9) * .7 };
-  });
-  const vignette = el('div', 'layer', stage); vignette.id = 'vignette';
+  const ORBS = [
+    { x: .12, y: .14, s: 1.05, c: [255, 214, 194] },  // peach
+    { x: .92, y: .30, s: 1.0, c: [206, 196, 255] },   // lavender
+    { x: .20, y: .78, s: 1.1, c: [196, 228, 255] },   // sky
+    { x: .88, y: .92, s: .95, c: [205, 239, 224] },   // mint
+  ];
+  const orbs = ORBS.map(() => el('div', 'orb', bg));
+  const grain = el('div', 'layer', stage); grain.id = 'grain';
 
-  // ── HUD ────────────────────────────────────────────────────
-  const hud = el('div', 'abs', stage); hud.id = 'hud';
-  css(hud, { left: 0, right: 0, top: L.hudY + 'px' });
-  const hudLogo = el('img', 'logo', hud); hudLogo.src = AR ? 'assets/logo-ar-dark.svg' : 'assets/logo-dark.svg';
-  const pill = el('div', 'pill', hud, `<span class="dot"></span><span>${AR ? 'مين فيهم الحقيقي؟' : 'Which one is real?'}</span><span class="count"></span>`);
-  const pillCount = pill.querySelector('.count');
+  // Small logo at the top, through the ad.
+  const brand = el('div', '', stage, `<img src="${LOGO}">`); brand.id = 'brand';
+  css(brand, { top: L.brandY + 'px' });
 
-  // ── Tiles ──────────────────────────────────────────────────
+  // ── Tiles (hook, reveal) ───────────────────────────────────
   const tilesLayer = el('div', 'layer', stage);
-  const rows = (() => {
-    const n = T.tiles.length; if (n === 11) return [4, 3, 4];
-    const r = Math.ceil(n / 4); const base = Math.floor(n / r); const extra = n % r;
-    return Array.from({ length: r }, (_, i) => base + (i < extra ? 1 : 0));
-  })();
+  const rows = (() => { const n = T.tiles.length; if (n === 11) return [4, 3, 4]; const r = Math.ceil(n / 4); const b = Math.floor(n / r); const x = n % r; return Array.from({ length: r }, (_, i) => b + (i < x ? 1 : 0)); })();
   const tilePos = [];
-  { let k = 0; rows.forEach((n, r) => {
-      const w = n * L.tileS + (n - 1) * L.tileGap; const x0 = (L.W - w) / 2;
-      for (let i = 0; i < n && k < T.tiles.length; i++, k++) tilePos.push({ x: x0 + i * (L.tileS + L.tileGap), y: L.tilesTop + r * (L.tileS + L.tileGap) });
-  }); }
-  const tiles = T.tiles.map((avatar, i) => {
-    const t = el('div', 'tile', tilesLayer);
-    t.innerHTML = `<div class="glow"></div><div class="face"><img src="assets/${avatar}.png"></div><div class="dim"></div><div class="flag"><img src="assets/${T.tile_flag[avatar]}.svg"></div>` +
-      `<div class="stamp"><img src="assets/icon-128.svg">AI</div>`;
+  { let k = 0; rows.forEach((n, r) => { const w = n * L.tileS + (n - 1) * L.tileGap; const x0 = (L.W - w) / 2; for (let i = 0; i < n && k < T.tiles.length; i++, k++) tilePos.push({ x: x0 + i * (L.tileS + L.tileGap), y: L.tilesTop + r * (L.tileS + L.tileGap) }); }); }
+  const tiles = T.tiles.map(avatar => {
+    const t = el('div', 'tile', tilesLayer, `<div class="face"><img src="assets/${avatar}.png"></div><div class="flag"><img src="assets/${T.tile_flag[avatar]}.svg"></div>` +
+      `<div class="badge"><img src="assets/icon-light.svg">${AR ? 'إسمع' : 'Listen'}</div>`);
     css(t, { width: L.tileS + 'px', height: L.tileS + 'px' });
-    return { root: t, glow: t.querySelector('.glow'), dim: t.querySelector('.dim'), stamp: t.querySelector('.stamp'), flag: t.querySelector('.flag'), avatar };
+    return { root: t, badge: t.querySelector('.badge'), flag: t.querySelector('.flag'), avatar };
   });
 
   // ── Titles ─────────────────────────────────────────────────
-  const words = (sc, cls = 'w') => sc.words.map(w => `<span class="${cls}">${w.w} </span>`).join('');
+  const wordsHtml = (ws, accentFrom = Infinity) => ws.map((w, i) => `<span class="w${i >= accentFrom ? ' accent' : ''}">${w.w} </span>`).join('');
   const hook = sceneOf('hook');
-  const hookTitle = el('div', 'title ' + (isArabicText(hook.words.map(w => w.w).join('')) ? 'ar' : ''), stage, words(hook));
-  css(hookTitle, { top: L.titleY + 'px', fontSize: (T.ratio === '4x5' ? 76 : 92) + 'px', lineHeight: 1.25, padding: '0 60px' });
+  const hookTitle = el('div', 'title display' + (isAr(hook.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(hook.words, hook.words.length - 1));
+  css(hookTitle, { top: L.hookY + 'px', fontSize: (T.ratio === '4x5' ? 84 : 104) + 'px' });
   const hookWords = [...hookTitle.querySelectorAll('.w')];
-  hookWords.forEach((w, i) => { if (i >= hookWords.length - 2) w.classList.add('grad'); });
 
-  const sw = sceneOf('switch') || { start: -9, end: -9, vo_start: -9, vo_end: -9, words: [] };
-  const swTitle = el('div', 'title', stage, words(sw));
-  css(swTitle, { top: (L.av.y - 330) + 'px', fontSize: '124px', lineHeight: 1.1 });
+  const sw = sceneOf('switch') || { start: -9, end: -9, words: [] };
+  const swTitle = el('div', 'title display' + (isAr(sw.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(sw.words, sw.words.length - 1));
+  css(swTitle, { top: L.switchY + 'px', fontSize: (T.ratio === '4x5' ? 110 : 128) + 'px' });
   const swWords = [...swTitle.querySelectorAll('.w')];
-  swWords.forEach(w => w.classList.add('grad'));
-  const nextLangFlags = (() => {
-    const i = T.scenes.indexOf(sw);
-    if (i < 0) return [];
-    return T.scenes.slice(i + 1).filter(s => s.kind === 'speaker').map(s => s.flag).filter((f, k, a) => a.indexOf(f) === k);
-  })();
-  const swFlags = nextLangFlags.map(f => { const n = el('img', 'abs', stage); n.src = `assets/${f}.svg`; css(n, { width: '120px', height: '120px', borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 0 5px rgba(255,255,255,.9), 0 14px 40px rgba(0,0,0,.5)' }); return n; });
+  const swFlags = (() => { const i = scenes.indexOf(sw); if (i < 0) return []; return scenes.slice(i + 1).filter(s => s.kind === 'speaker').map(s => s.flag).filter((f, k, a) => a.indexOf(f) === k); })()
+    .map(f => el('div', 'flagchip', stage, `<img src="assets/${f}.svg">`));
 
   const reveal = sceneOf('reveal');
   const phrases = [];
-  reveal.words.forEach(w => {
-    if (!phrases.length || /[؟?!.]$/.test(phrases[phrases.length - 1].text.trim())) phrases.push({ words: [], text: '' });
-    const p = phrases[phrases.length - 1]; p.words.push(w); p.text += w.w + ' ';
-  });
+  reveal.words.forEach(w => { if (!phrases.length || /[؟?!.]$/.test(phrases[phrases.length - 1].text.trim())) phrases.push({ words: [], text: '' }); const p = phrases[phrases.length - 1]; p.words.push(w); p.text += w.w + ' '; });
   const revealEls = phrases.map((p, i) => {
-    const n = el('div', 'title' + (isArabicText(p.text) ? ' ar' : ''), stage, p.words.map(w => `<span class="w">${w.w} </span>`).join(''));
-    css(n, { fontSize: (i === 1 ? 118 : i === 0 ? 96 : 54) + 'px', lineHeight: 1.15, padding: '0 50px' });
-    const ws = [...n.querySelectorAll('.w')];
-    if (i === 1) ws.forEach(w => w.classList.add('grad'));
     if (i === 2) {
-      n.classList.add('banner');
-      ws[ws.length - 1].classList.add('grad2');
+      const n = el('div', 'banner' + (isAr(p.text) ? ' ar' : ''), stage, `<img src="assets/icon-128.svg"><span>${p.text.trim()}</span>`);
+      return n;
     }
+    const n = el('div', 'title display' + (isAr(p.text) ? ' ar' : ''), stage, wordsHtml(p.words, i === 1 ? 0 : Infinity));
+    css(n, { fontSize: (i === 1 ? (T.ratio === '4x5' ? 112 : 132) : (T.ratio === '4x5' ? 84 : 100)) + 'px' });
     return n;
   });
 
-  // ── Speaker scenes ─────────────────────────────────────────
-  const D = L.av.d;
-  const vizSize = Math.round(D * 1.9);
-  const spk = speakers.map((s, idx) => {
-    const root = el('div', 'spk', stage);
-    const viz = el('canvas', 'viz', root); viz.width = vizSize; viz.height = vizSize;
-    css(viz, { left: (L.av.x - vizSize / 2) + 'px', top: (L.av.y - vizSize / 2) + 'px', width: vizSize + 'px', height: vizSize + 'px' });
-    const glow = el('div', 'ringglow', root);
-    css(glow, { left: (L.av.x - D / 2 - 18) + 'px', top: (L.av.y - D / 2 - 18) + 'px', width: (D + 36) + 'px', height: (D + 36) + 'px' });
-    const ring = el('div', 'ring', root);
-    css(ring, { left: (L.av.x - D / 2 - 16) + 'px', top: (L.av.y - D / 2 - 16) + 'px', width: (D + 32) + 'px', height: (D + 32) + 'px' });
-    const av = el('div', 'av', root, `<img src="assets/${s.avatar}.png"><div class="glint"></div>`);
-    css(av, { left: (L.av.x - D / 2) + 'px', top: (L.av.y - D / 2) + 'px', width: D + 'px', height: D + 'px' });
-    let feature = null;
-    if (s.chip) {
-      feature = el('div', 'feature' + (AR ? ' ar' : ''), root, `${ICONS[s.chip_icon] || ''}<span>${s.chip}</span>`);
-      css(feature, { top: (L.av.y - D / 2 - 10) + 'px', [AR ? 'right' : 'left']: (L.av.x + D * .18) + 'px' });
+  const intro = sceneOf('envintro');
+  let introTitle = null; let introWords = []; let introIcons = [];
+  if (intro) {
+    const split = intro.words.findIndex(w => /^(في|anywhere)/.test(w.w));
+    introTitle = el('div', 'title display' + (isAr(intro.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(intro.words, split < 0 ? Infinity : split));
+    css(introTitle, { top: L.introY + 'px', fontSize: (T.ratio === '4x5' ? 80 : 96) + 'px' });
+    introWords = [...introTitle.querySelectorAll('.w')];
+    introIcons = ['announcement', 'phone', 'radio', 'hall', 'cave', 'church'].map(k => el('div', 'envchip', stage, icon(k)));
+  }
+
+  // ── Player cards ───────────────────────────────────────────
+  const players = scenes.filter(s => s.kind === 'speaker' || s.kind === 'env').map((s, idx) => {
+    const root = el('div', 'spk' + (AR ? ' ar' : ''), stage);
+    const isEnv = s.kind === 'env';
+    let halo = null; let portrait = null;
+    if (!isEnv) {
+      const D = L.pr.d;
+      halo = el('div', 'halo', root);
+      css(halo, { left: (L.pr.x - D) + 'px', top: (L.pr.y - D) + 'px', width: D * 2 + 'px', height: D * 2 + 'px',
+        background: `radial-gradient(circle, hsla(${s.hue}, 90%, 78%, .75) 0%, hsla(${s.hue}, 90%, 82%, .35) 38%, transparent 68%)` });
+      portrait = el('div', 'portrait', root, `<img src="assets/${s.avatar}.png">`);
+      css(portrait, { left: (L.pr.x - D / 2) + 'px', top: (L.pr.y - D / 2) + 'px', width: D + 'px', height: D + 'px' });
     }
-    const plate = el('div', 'plate' + (AR ? ' ar' : ''), root, `<div class="who"><img src="assets/${s.flag}.svg"><div class="name">${s.name}</div></div><div class="dialect">${s.dialect}</div>`);
-    css(plate, { top: L.plateY + 'px' });
-    const capDir = s.lang === 'ar' ? 'rtl' : 'ltr';
-    const cap = el('div', 'cap' + (s.lang === 'ar' ? ' ar' : ''), root, `<div class="line" dir="${capDir}">${s.words.map(w => `<span class="w">${w.w} </span>`).join('')}</div>` +
-      (s.tr ? `<div class="tr ${AR ? 'ar' : ''}" dir="${AR ? 'rtl' : 'ltr'}">${s.tr}</div>` : ''));
-    css(cap, { top: L.capY + 'px', width: L.capW + 'px', marginLeft: (-L.capW / 2) + 'px' });
-    if (s.stadium) cap.querySelector('.line').style.fontSize = '64px';
-    return { s, idx, root, viz, ctx: viz.getContext('2d'), glow, ring, av, glint: av.querySelector('.glint'), feature, plate, cap, words: [...cap.querySelectorAll('.w')], tr: cap.querySelector('.tr') };
+    let wm = null;
+    if (isEnv) {
+      wm = el('div', 'envwm', root, icon(s.icon));
+      css(wm, { left: (L.W / 2 - L.wmS / 2) + 'px', top: L.wmY + 'px', width: L.wmS + 'px', height: L.wmS + 'px' });
+    }
+    const card = el('div', 'card', root);
+    const top = isEnv ? L.envCardY : L.cardY;
+    css(card, { left: L.cardX + 'px', top: top + 'px', width: L.cardW + 'px', padding: isEnv ? '48px 52px 46px' : `${L.pr.d / 2 - (L.cardY - L.pr.y) + 56}px 56px 46px` });
+    const dir = s.lang === 'ar' ? 'rtl' : 'ltr';
+    const tokens = (s.tokens || s.words.map((w, i) => ({ word: i })));
+    const script = tokens.map(tk => tk.tag ? `<span class="tag">${TAG_ICON}${tk.tag}</span>` : `<span class="w">${s.words[tk.word].w} </span>`).join('');
+    const bars = (s.bars || []).map(v => `<i style="height:${Math.round(14 + v * 78)}px"></i>`).join('');
+    let head;
+    if (isEnv) {
+      head = `<div class="envhead"><div class="envicon">${icon(s.icon)}</div><div class="envid"><div class="place">${s.place}</div><div class="scene">${s.scene_label}</div></div></div>` +
+        `<div class="seg"><div class="knob"></div><span class="c">${AR ? 'صوت نقي' : 'Clean'}</span><span class="p">${AR ? 'في المكان' : 'In the place'}</span></div>`;
+    } else {
+      head = `<div class="head"><div class="who"><img src="assets/${s.flag}.svg"><div class="name">${s.name}</div></div><div class="chip">${s.dialect}</div></div>`;
+    }
+    card.innerHTML = head + `<div class="script ${s.lang === 'ar' ? 'ar' : ''}" dir="${dir}">${script}</div>` +
+      (s.tr ? `<div class="tr ${AR ? 'ar' : ''}" dir="${AR ? 'rtl' : 'ltr'}">${s.tr}</div>` : '') +
+      `<div class="player"><div class="btn">${PAUSE}</div><div class="bars">${bars}</div><div class="time">0:00</div></div>`;
+    const seg = card.querySelector('.seg');
+    return { s, idx, root, halo, portrait, card, isEnv, wm, words: [...card.querySelectorAll('.script .w')], bars: [...card.querySelectorAll('.bars i')],
+      time: card.querySelector('.time'), seg, knob: seg && seg.querySelector('.knob'), segC: seg && seg.querySelector('.c'), segP: seg && seg.querySelector('.p') };
   });
+  const firstEnv = scenes.find(s => s.kind === 'env');
+  const lastEnv = [...scenes].reverse().find(s => s.kind === 'env');
+  let envTitle = null;
+  if (firstEnv) {
+    envTitle = el('div', 'title display' + (AR ? ' ar' : ''), stage, AR ? 'ضع صوتك في <span class="accent">أي مكان</span>' : 'Put your voice <span class="accent">anywhere</span>');
+    css(envTitle, { top: L.envTitleY + 'px', fontSize: (T.ratio === '4x5' ? 68 : 82) + 'px' });
+  }
 
   // ── CTA ────────────────────────────────────────────────────
   const cta = sceneOf('cta');
   const ctaRoot = el('div', 'layer' + (AR ? ' ar' : ''), stage);
-  const card = el('div', 'card', ctaRoot);
-  css(card, { left: ((L.W - L.cardW) / 2) + 'px', top: L.cardY + 'px', width: L.cardW + 'px' });
+  const studio = el('div', 'studio', ctaRoot);
+  css(studio, { left: L.cardX + 'px', top: L.studioY + 'px', width: L.cardW + 'px' });
   const typed = AR ? 'أهلاً بيك… ده صوتك الجديد!' : 'Hey there… meet your new voice!';
   const chipsData = AR
-    ? [['sa', 'سعودي'], ['eg', 'مصري'], ['lb', 'لبناني'], ['ae', 'إماراتي'], ['ma', 'مغربي'], ['us', 'أمريكي'], ['gb', 'بريطاني'], ['au', 'أسترالي'], ['in', 'هندي']]
-    : [['us', 'American'], ['gb', 'British'], ['au', 'Australian'], ['in', 'Indian'], ['ng', 'Nigerian'], ['sa', 'Saudi'], ['eg', 'Egyptian'], ['lb', 'Lebanese'], ['ma', 'Moroccan']];
-  card.innerHTML = `<div class="bar"><i></i><i></i><i></i><b>${AR ? 'استوديو إسمع' : 'Listen Studio'}</b></div>` +
+    ? [['sa', 'سعودي'], ['eg', 'مصري'], ['lb', 'لبناني'], ['ae', 'إماراتي'], ['ma', 'مغربي'], ['us', 'أمريكي']]
+    : [['us', 'American'], ['gb', 'British'], ['au', 'Australian'], ['in', 'Indian'], ['sa', 'Saudi'], ['eg', 'Egyptian']];
+  studio.innerHTML = `<div class="bar"><i></i><i></i><i></i><b>${AR ? 'استوديو إسمع' : 'Listen Studio'}</b></div>` +
     `<div class="text" dir="${AR ? 'rtl' : 'ltr'}"><span class="typed"></span><span class="caret"></span></div>` +
     `<div class="chips">${chipsData.map(([f, n]) => `<span class="chip"><img src="assets/${f}.svg">${n}</span>`).join('')}</div>` +
-    `<div class="play"><div class="btn">${ICONS.play}</div><div class="wave">${Array.from({ length: 34 }, () => '<i></i>').join('')}</div></div>`;
-  const typedEl = card.querySelector('.typed'); const caret = card.querySelector('.caret');
-  const chipsEl = card.querySelector('.chips'); const chipEls = [...card.querySelectorAll('.chip')];
-  const playBtn = card.querySelector('.btn'); const waveBars = [...card.querySelectorAll('.wave i')];
-  const stats = el('div', 'stats', ctaRoot,
-    `<div class="stat"><div class="n" dir="ltr">+140</div><div class="l">${AR ? 'لهجة عربية' : 'Arabic dialects'}</div></div>` +
-    `<div class="stat"><div class="n" dir="ltr">+60</div><div class="l">${AR ? 'لكنة إنجليزية' : 'English accents'}</div></div>`);
-  css(stats, { top: L.statsY + 'px' });
-  const statN = [...stats.querySelectorAll('.n')]; const statEls = [...stats.querySelectorAll('.stat')];
-  if (T.ratio === '4x5') stats.classList.add('small');
-  const endLogo = el('img', 'endlogo', ctaRoot); endLogo.src = AR ? 'assets/logo-ar-dark.svg' : 'assets/logo-dark.svg';
-  css(endLogo, { height: L.logoH + 'px', top: L.logoY + 'px' });
-  const url = el('div', 'url', ctaRoot, 'listenai.studio'); css(url, { top: L.urlY + 'px' }); url.setAttribute('dir', 'ltr');
-  const btn = el('div', 'cta-btn', ctaRoot, `${AR ? 'ابدأ الآن' : 'Start now'}<span class="shine"></span>`);
-  css(btn, { top: L.btnY + 'px' });
-  const shine = btn.querySelector('.shine');
-  const faces = el('div', 'faces', ctaRoot, T.tiles.map(a => `<img src="assets/${a}.png">`).join(''));
-  css(faces, { top: L.facesY + 'px' });
-  const faceEls = [...faces.querySelectorAll('img')];
-  const tagline = el('div', 'title', ctaRoot, AR ? 'اكتب… واسمع' : 'Type it. Hear it.');
-  tagline.classList.add('grad');
+    `<div class="player"><div class="btn">${PLAY}</div><div class="bars">${Array.from({ length: 40 }, (_, i) => `<i style="height:${Math.round(14 + 70 * (.3 + .7 * Math.abs(Math.sin(i * .7) * Math.sin(i * .23 + 1))))}px"></i>`).join('')}</div><div class="time">0:04</div></div>`;
+  const typedEl = studio.querySelector('.typed'); const caret = studio.querySelector('.caret');
+  const chipEls = [...studio.querySelectorAll('.chip')]; const studioBtn = studio.querySelector('.btn'); const studioBars = [...studio.querySelectorAll('.bars i')];
+  const tagline = el('div', 'title display' + (AR ? ' ar' : ''), ctaRoot, AR ? 'اكتب… <span class="accent">واسمع</span>' : 'Type it. <span class="accent">Hear it.</span>');
   css(tagline, { top: L.tagY + 'px', fontSize: (T.ratio === '4x5' ? 64 : 76) + 'px' });
+  const endLogo = el('img', 'endlogo', ctaRoot); endLogo.src = LOGO; css(endLogo, { height: L.logoH + 'px', top: L.logoY + 'px' });
+  const stats = el('div', 'stats' + (T.ratio === '4x5' ? ' small' : ''), ctaRoot,
+    `<div class="stat"><div class="n">+140</div><div class="l ${AR ? 'ar' : ''}">${AR ? 'لهجة عربية' : 'Arabic dialects'}</div></div>` +
+    `<div class="stat"><div class="n">+60</div><div class="l ${AR ? 'ar' : ''}">${AR ? 'لكنة إنجليزية' : 'English accents'}</div></div>`);
+  css(stats, { top: L.statsY + 'px' });
+  if (AR) stats.style.flexDirection = 'row-reverse';
+  const statEls = [...stats.querySelectorAll('.stat')]; const statN = [...stats.querySelectorAll('.n')];
+  const url = el('div', 'url', ctaRoot, 'listenai.studio'); url.setAttribute('dir', 'ltr'); css(url, { top: L.urlY + 'px' });
+  const btn = el('div', 'cta-btn', ctaRoot, `${AR ? 'ابدأ الآن' : 'Start now'}<span class="shine"></span>`); css(btn, { top: L.btnY + 'px' });
+  const shine = btn.querySelector('.shine');
+  const faces = el('div', 'faces', ctaRoot, T.tiles.map(a => `<img src="assets/${a}.png">`).join('')); css(faces, { top: L.facesY + 'px' });
+  const faceEls = [...faces.querySelectorAll('img')];
 
-  const wave = el('canvas', 'abs', stage); wave.width = L.W; wave.height = L.waveH * 2;
-  css(wave, { left: 0, top: (L.waveY - L.waveH) + 'px', width: L.W + 'px', height: (L.waveH * 2) + 'px' });
-  const wctx = wave.getContext('2d');
-  function drawWave(t, a, on) {
-    const c = wctx; const Wd = L.W; const mid = L.waveH; c.clearRect(0, 0, Wd, mid * 2);
-    if (on <= 0.01) return;
-    const N = 54; const gap = Wd / N;
-    for (let i = 0; i < N; i++) {
-      const x = gap * (i + .5);
-      const edge = Math.sin((i + .5) / N * Math.PI);
-      const n1 = .5 + .5 * Math.sin(i * .77 + t * 7.1) * Math.cos(i * .29 - t * 4.3);
-      const hgt = (6 + (a * 0.85 + .08) * mid * .82 * n1) * edge * on;
-      const g = c.createLinearGradient(0, mid - hgt, 0, mid + hgt);
-      g.addColorStop(0, 'rgba(201,184,255,.0)'); g.addColorStop(.35, 'rgba(160,140,255,.55)');
-      g.addColorStop(.5, 'rgba(118,89,250,.9)'); g.addColorStop(.65, 'rgba(76,141,255,.45)'); g.addColorStop(1, 'rgba(76,141,255,0)');
-      c.fillStyle = g; c.beginPath(); c.roundRect(x - 4.5, mid - hgt, 9, hgt * 2, 5); c.fill();
-    }
-  }
-  const flash = el('div', 'layer', stage); flash.id = 'flash';
-  const grain = el('div', 'layer', stage); grain.id = 'grain';
-
-  // ── Viz ───────────────────────────────────────────────────
-  function drawViz(p, t, a, presence) {
-    const c = p.ctx; const S = vizSize; c.clearRect(0, 0, S, S);
-    if (presence <= 0.01) return;
-    const cx = S / 2; const cy = S / 2; const r0 = D / 2 + 34;
-    const hue = p.s.hue; const N = 96;
-    c.lineCap = 'round';
-    for (let k = 0; k < 3; k++) {
-      const ph = ((t * 0.9 + k / 3) % 1);
-      const r = r0 + ph * (D * 0.42);
-      c.beginPath(); c.arc(cx, cy, r, 0, Math.PI * 2);
-      c.strokeStyle = `hsla(${hue}, 90%, 72%, ${(1 - ph) * 0.32 * clamp(a * 1.4) * presence})`;
-      c.lineWidth = 3; c.stroke();
-    }
-    for (let i = 0; i < N; i++) {
-      const ang = (i / N) * Math.PI * 2 - Math.PI / 2;
-      const n1 = Math.sin(i * 1.7 + t * 9.3) * Math.sin(i * 0.37 - t * 5.1);
-      const n2 = Math.sin(i * 0.23 + t * 2.1);
-      const len = 8 + presence * a * (34 + 70 * (0.5 + 0.5 * n1)) * (0.75 + 0.25 * n2);
-      const x1 = cx + Math.cos(ang) * r0; const y1 = cy + Math.sin(ang) * r0;
-      const x2 = cx + Math.cos(ang) * (r0 + len); const y2 = cy + Math.sin(ang) * (r0 + len);
-      c.strokeStyle = `hsla(${hue + Math.sin(ang) * 30}, 92%, ${66 + 10 * n2}%, ${0.85 * presence})`;
-      c.lineWidth = 7; c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.stroke();
-    }
-  }
-
-  // ── Scene state ───────────────────────────────────────────
+  // ── Frame ──────────────────────────────────────────────────
+  const speakers = scenes.filter(s => s.kind === 'speaker');
   const firstSpk = speakers[0];
-  const lastSpk = speakers[speakers.length - 1];
-  const hueAt = t => {
-    let h = 262;
-    for (const s of speakers) { if (t >= s.start - 0.2) h = s.hue; }
-    if (t >= reveal.start) h = 262;
+  const tintAt = t => {
+    let h = 255;
+    for (const s of scenes) if ((s.kind === 'speaker' || s.kind === 'env') && t >= s.start - .2) h = s.hue;
+    if (t >= reveal.start && (!firstEnv || t < firstEnv.start - .2)) h = 255;
+    if (t >= cta.start - .2) h = 255;
     return h;
-  };
-  let lastHue = null;
-  const shakeAt = t => {
-    let s = 0;
-    const d = t - reveal.impact; if (d > 0 && d < 0.5) s += (1 - d / 0.5) * 22;
-    for (const p of spk) if (p.s.stadium) { const a = amp(t); if (t > p.s.vo_start && t < p.s.vo_start + 2.6) s += a * 9; }
-    return s;
   };
 
   function seek(t) {
-    // Background: drifting blobs, tinted by the speaker on screen.
-    const h = hueAt(t);
-    if (lastHue === null) lastHue = h;
-    const blobDefs = [
-      { x: .18, y: .22, s: 1.15, c: `hsla(${h}, 88%, 58%, .55)` },
-      { x: .86, y: .62, s: 1.25, c: 'hsla(258, 90%, 62%, .50)' },
-      { x: .30, y: .95, s: 1.1, c: 'hsla(218, 95%, 58%, .42)' },
-    ];
-    blobs.forEach((b, i) => {
-      const d = blobDefs[i]; const size = L.W * d.s;
-      const x = d.x * L.W + Math.sin(t * .23 + i * 2) * 90 - size / 2;
-      const y = d.y * L.H + Math.cos(t * .19 + i) * 110 - size / 2;
-      css(b, { width: size + 'px', height: size + 'px', transform: `translate(${x}px, ${y}px)`, background: `radial-gradient(circle at 50% 50%, ${d.c} 0%, transparent 62%)` });
+    const fi = Math.round(t * T.fps);
+    // Background light.
+    const h = tintAt(t);
+    orbs.forEach((o, i) => {
+      const d = ORBS[i]; const size = L.W * d.s * 1.25;
+      const x = d.x * L.W + Math.sin(t * .17 + i * 1.9) * 70 - size / 2;
+      const y = d.y * L.H + Math.cos(t * .13 + i * 1.3) * 90 - size / 2;
+      const c = i === 1 ? `hsla(${h}, 95%, 85%, .95)` : `rgba(${d.c.join(',')}, .9)`;
+      css(o, { width: size + 'px', height: size + 'px', transform: `translate(${x}px, ${y}px)`, background: `radial-gradient(circle at 50% 50%, ${c} 0%, transparent 60%)` });
     });
-    grid.style.transform = `translateY(${(t * 14) % 44}px)`;
-    bokeh.forEach((b, i) => {
-      const y = ((b.y - t * b.sp * b.depth) % 1 + 1) % 1;
-      const x = b.x + Math.sin(t * .4 + i) * .02;
-      b.el.style.transform = `translate(${x * L.W - b.size / 2}px, ${y * L.H - b.size / 2}px)`;
-    });
-    const fi = Math.floor(t * T.fps);
     grain.style.backgroundPosition = `${Math.floor(hash(fi) * 512)}px ${Math.floor(hash(fi + 7) * 512)}px`;
+    brand.style.opacity = 1 - prog(t, cta.logo_at - .5, .4);
 
-    // Stadium beams.
-    const stad = spk.find(p => p.s.stadium);
-    const beamOn = stad ? clamp(prog(t, stad.s.start, .3) - prog(t, stad.s.end - .1, .3)) : 0;
-    beams.style.opacity = beamOn;
-    beamEls.forEach((b, i) => { b.style.transform = `rotate(${(i % 2 ? -1 : 1) * (18 + Math.sin(t * 1.3 + i) * 10)}deg)`; });
-
-    // Shake.
-    const sh = shakeAt(t);
-    stage.style.transform = sh > 0.1 ? `translate(${(hash(fi * 3) - .5) * sh}px, ${(hash(fi * 5) - .5) * sh}px)` : '';
-
-    // Voice waveform along the bottom, whenever someone talks.
-    const talking = T.scenes.some(s => t >= s.vo_start - .1 && t <= s.vo_end + .1);
-    const waveOn = clamp(prog(t, .2, .6) - prog(t, T.duration - .6, .5));
-    const playing = t > T.typing[T.typing.length - 1] + .25 && t < cta.logo_at;
-    drawWave(t, talking ? amp(t) : playing ? .55 : 0, waveOn);
-
-    // HUD: during the speakers.
-    const hudOn = clamp(prog(t, firstSpk.start - .1, .4) - prog(t, reveal.start - .2, .3));
-    hud.style.opacity = hudOn;
-    hud.style.transform = `translateY(${(1 - E.out3(hudOn)) * -30}px)`;
-    const cur = speakers.filter(s => t >= s.start - .15).length;
-    pillCount.textContent = cur ? `${cur}/${speakers.length}` : '';
-
-    // ── Hook: tiles pop in, title types in, then the first tile becomes the first speaker.
-    const toFirst = prog(t, hook.end - .5, .5);
-    const tf = E.inOut3(toFirst);
-    const revealIn = (i) => E.outBack(prog(t, reveal.start + .1 + i * .045, .45), 1.4);
-    const revealOut = prog(t, cta.start - .35, .45);
+    // Hook and reveal tiles.
+    const toFirst = E.inOut3(prog(t, hook.end - .55, .55));
+    const revealOut = prog(t, reveal.end - .35, .4);
+    const third = phrases[2] ? phrases[2].words[0].s : reveal.end;
     tiles.forEach((tile, i) => {
       const p = tilePos[i];
-      let x = p.x; let y = p.y; let s = 0; let o = 1; let rad = 34; let size = L.tileS;
-      const pop = E.outBack(prog(t, T.tile_times[i], .42), 2.2);
+      let x = p.x; let y = p.y; let s = 0; let o = 1; let size = L.tileS; let rad = 30;
       if (t < hook.end) {
+        const pop = E.outBack(prog(t, T.tile_times[i], .55), 1.3);
+        y += Math.sin(t * 1.6 + i * .9) * 6 + (1 - E.out3(prog(t, T.tile_times[i], .6))) * 50;
         s = pop;
-        const bob = Math.sin(t * 2.2 + i) * 5; y += bob;
         if (tile.avatar === firstSpk.avatar) {
-          // Shared-element move into the speaker's avatar.
-          x = lerp(p.x, L.av.x - D / 2, tf); y = lerp(p.y + bob, L.av.y - D / 2, tf); size = lerp(L.tileS, D, tf); rad = lerp(34, 50, tf);
-        } else {
-          s = pop * (1 - E.in3(toFirst) * .6); o = 1 - toFirst;
-        }
-        const talk = (Math.sin(t * 6 + i * 2.3) > .6 ? 1 : 0) * clamp((t - hook.vo_start) * 3) * (1 - toFirst);
-        tile.glow.style.opacity = talk * .9 * clamp(amp(t) * 2);
-        tile.stamp.style.opacity = 0; tile.dim.style.opacity = 0;
-      } else if (t >= reveal.start - .1 && t < cta.start + .2) {
-        s = revealIn(i) * (1 - E.in3(revealOut));
+          x = lerp(p.x, L.pr.x - L.pr.d / 2, toFirst); y = lerp(y, L.pr.y - L.pr.d / 2, toFirst); size = lerp(L.tileS, L.pr.d, toFirst); rad = lerp(30, 50, toFirst);
+        } else { s *= 1 - toFirst * .25; o = 1 - toFirst; }
+        tile.badge.style.opacity = 0;
+      } else if (t >= reveal.start - .1 && t < reveal.end + .1) {
+        s = E.outBack(prog(t, reveal.start + .05 + i * .04, .5), 1.3) * (1 - revealOut * .2);
         o = 1 - revealOut;
-        y += Math.sin(t * 2 + i) * 4;
-        const suspense = clamp(prog(t, reveal.start + .4, .4) - prog(t, reveal.impact - .05, .1));
-        tile.dim.style.opacity = suspense * .55;
-        const st = E.outBack(prog(t, T.reveal_tiles[i], .35), 2.6);
-        tile.stamp.style.opacity = clamp(st * 1.5);
-        tile.stamp.style.transform = `translate(-50%, -50%) rotate(${-8 + (i % 3) * 5}deg) scale(${lerp(2.2, 1, st)})`;
-        tile.glow.style.opacity = st > 0 ? .55 * (1 - prog(t, T.reveal_tiles[i] + .2, .6)) : 0;
-        const third = phrases.length > 2 ? phrases[2].words[0].s : reveal.end;
-        const shrink = E.inOut3(prog(t, third - .25, .45));
-        s *= 1 - shrink * .08; tile.dim.style.opacity = Math.max(suspense * .55, shrink * .6);
-      } else { s = 0; o = 0; }
-      css(tile.root, { left: x + 'px', top: y + 'px', width: size + 'px', height: size + 'px', borderRadius: rad + '%',
-        transform: `scale(${s})`, opacity: o, display: (s > 0.001 && o > 0.001) ? 'block' : 'none' });
-      tile.flag.style.opacity = (tile.avatar === firstSpk.avatar && t < hook.end) ? 1 - tf : 1;
+        y += Math.sin(t * 1.6 + i * .9) * 5;
+        const bd = E.outBack(prog(t, T.reveal_tiles[i], .4), 1.8);
+        tile.badge.style.opacity = clamp(bd * 1.4);
+        tile.badge.style.transform = `translateX(-50%) scale(${bd})`;
+        const dim = E.inOut3(prog(t, third - .25, .45));
+        o *= 1 - dim * .55; s *= 1 - dim * .05;
+      } else { o = 0; }
+      css(tile.root, { left: x + 'px', top: y + 'px', width: size + 'px', height: size + 'px', transform: `scale(${s})`, opacity: o, display: s > .001 && o > .001 ? 'block' : 'none' });
+      tile.root.querySelector('.face').style.borderRadius = rad + '%';
+      tile.flag.style.opacity = tile.avatar === firstSpk.avatar && t < hook.end ? 1 - toFirst : 1;
     });
 
-    // Hook title.
     hookWords.forEach((w, i) => {
-      const wd = hook.words[i]; const a = E.outExpo(prog(t, wd.s - .06, .35));
-      const out = E.in3(prog(t, hook.end - .45, .4));
-      w.style.opacity = a * (1 - out);
-      w.style.transform = `translateY(${(1 - a) * 40 - out * 60}px) scale(${lerp(1.25, 1, a)})`;
-      w.style.filter = `blur(${(1 - a) * 12}px)`;
+      const a = E.out5(prog(t, hook.words[i].s - .08, .45)); const out = E.out3(prog(t, hook.end - .8, .35));
+      w.style.opacity = a * (1 - out); w.style.transform = `translateY(${(1 - a) * 34 - out * 40}px)`;
     });
     hookTitle.style.display = t < hook.end + .1 ? 'block' : 'none';
 
-    // ── Speakers.
-    spk.forEach((p, k) => {
-      const s = p.s;
-      const inP = prog(t, s.start - .05, .5);
-      const outP = prog(t, s.end - .16, .32);
-      if (t < s.start - .1 || t > s.end + .3) { p.root.style.opacity = 0; p.root.style.display = 'none'; return; }
-      p.root.style.display = 'block';
-      const dir = (k % 2 ? -1 : 1) * (AR ? -1 : 1);
-      const ein = E.outExpo(inP); const eout = E.inExpo(outP);
-      const fromTile = k === 0;
-      const push = 1 + prog(t, s.start, s.end - s.start) * .035;
-      const x = fromTile || s.fast ? 0 : (1 - ein) * 260 * dir - eout * 260 * dir;
-      const sc = (fromTile ? 1 : s.fast ? lerp(1.35, 1, ein) * lerp(1, .8, eout) : lerp(1.12, 1, ein) * lerp(1, .9, eout)) * push;
-      p.root.style.opacity = (fromTile ? 1 : clamp(ein * 1.4)) * (1 - eout);
-      p.root.style.transform = `translateX(${x}px) scale(${sc})`;
-      p.root.style.filter = (1 - ein + eout) > .02 && !fromTile ? `blur(${(1 - ein) * 14 + eout * 14}px)` : 'none';
-
-      const a = t >= s.vo_start - .05 && t <= s.vo_end + .1 ? amp(t) : amp(t) * .3;
-      const pres = clamp(prog(t, s.start + .1, .35));
-      drawViz(p, t, a, pres * (1 - eout));
-      const ringA = (t * 70 + k * 40) % 360;
-      p.ring.style.background = `conic-gradient(from ${ringA}deg, hsl(${s.hue},95%,70%), #7659FA, #4C8DFF, hsl(${s.hue},95%,70%))`;
-      p.ring.style.transform = `scale(${1 + a * .035})`;
-      p.ring.style.opacity = pres;
-      p.glow.style.boxShadow = `0 0 ${50 + a * 70}px ${10 + a * 22}px hsla(${s.hue}, 90%, 60%, ${.35 + a * .3})`;
-      p.glow.style.opacity = pres;
-      const bob = Math.sin(t * 3.1 + k) * 1.1 * clamp(a);
-      p.av.style.transform = `translateY(${-a * 9}px) scale(${1 + a * .03}) rotate(${bob}deg)`;
-      const gl = prog(t, s.start + .15, .7);
-      p.glint.style.transform = `translateX(${lerp(-120, 120, E.inOut3(gl))}%) skewX(-18deg)`;
-      p.glint.style.opacity = gl > 0 && gl < 1 ? .9 : 0;
-
-      const plateIn = E.outBack(prog(t, s.start + .12, .5), 1.6);
-      p.plate.style.opacity = clamp(plateIn);
-      p.plate.style.transform = `translateY(${(1 - plateIn) * 40}px)`;
-      if (p.feature) {
-        const f = E.outBack(prog(t, s.vo_start + .25, .45), 2.2);
-        p.feature.style.opacity = clamp(f * 1.3);
-        p.feature.style.transform = `scale(${f}) translateY(${Math.sin(t * 2.4) * 6}px) rotate(${AR ? 4 : -4}deg)`;
-      }
-      // Karaoke caption: each word rises in as it is said, the current word lit.
-      p.words.forEach((w, i) => {
-        const wd = s.words[i];
-        const on = E.outExpo(prog(t, wd.s - .05, .28));
-        const lit = t >= wd.s - .05 && t <= wd.e + .05;
-        const popP = prog(t, wd.s - .05, .3);
-        w.style.opacity = .22 + .78 * on;
-        w.style.transform = `scale(${1 + Math.sin(popP * Math.PI) * .09})`;
-        w.classList.toggle('hl', lit);
-      });
-      if (p.tr) p.tr.style.opacity = clamp(prog(t, s.vo_start + .2, .4));
-    });
-
-    // ── Switch title and flags.
+    // Switch.
     {
-      const s = sw; const vis = t >= s.start - .1 && t <= s.end + .3;
-      swTitle.style.display = vis ? 'block' : 'none';
-      const inP = E.outBack(prog(t, s.start, .4), 1.8); const outP = E.inExpo(prog(t, s.end - .1, .3));
-      swWords.forEach((w, i) => {
-        const a = E.outBack(prog(t, s.words[i].s - .1, .35), 2);
-        w.style.opacity = clamp(a) * (1 - outP);
-        w.style.transform = `scale(${lerp(.4, 1, a) * (1 + outP * .6)})`;
-      });
+      const vis = t >= sw.start - .1 && t <= sw.end + .3; swTitle.style.display = vis ? 'block' : 'none';
+      const out = E.in3(prog(t, sw.end - .15, .3));
+      swWords.forEach((w, i) => { const a = E.out5(prog(t, sw.words[i].s - .12, .4)); w.style.opacity = a * (1 - out); w.style.transform = `translateY(${(1 - a) * 40 - out * 30}px)`; });
+      const n = swFlags.length; const gap = 136; const x0 = (L.W - (n * 112 + (n - 1) * (gap - 112))) / 2;
       swFlags.forEach((f, i) => {
-        const a = E.outBack(prog(t, s.start + .05 + i * .06, .4), 1.6);
-        const ang = (i / swFlags.length) * Math.PI * 2 + t * 1.6;
-        const R = 300 * a + outP * 400;
-        f.style.display = vis ? 'block' : 'none';
-        css(f, { left: (L.av.x - 60 + Math.cos(ang) * R) + 'px', top: (L.av.y + 120 - 60 + Math.sin(ang) * R * .5) + 'px', opacity: clamp(a) * (1 - outP), transform: `scale(${a * (0.85 + 0.15 * Math.sin(ang))})`, zIndex: Math.sin(ang) > 0 ? 3 : 1 });
+        const a = E.outBack(prog(t, sw.start + .1 + i * .05, .45), 1.6);
+        css(f, { display: vis ? 'block' : 'none', left: (x0 + i * gap) + 'px', top: (L.switchY + (T.ratio === '4x5' ? 230 : 300) + Math.sin(t * 2 + i) * 6) + 'px', opacity: clamp(a) * (1 - out), transform: `scale(${a})` });
       });
     }
 
-    // ── Reveal titles.
+    // Reveal titles and banner.
     revealEls.forEach((n, i) => {
-      const ph = phrases[i]; const st = ph.words[0].s; const en = reveal.end;
-      const vis = t >= st - .2 && t <= en + .3;
-      n.style.display = vis ? 'block' : 'none';
+      const ph = phrases[i]; const st = ph.words[0].s; const vis = t >= st - .25 && t <= reveal.end + .3;
+      n.style.display = vis ? (i === 2 ? 'flex' : 'block') : 'none';
       if (!vis) return;
-      let top = L.revealY; let o = 1; let s = 1;
+      const out = E.in3(prog(t, reveal.end - .3, .35));
       if (i === 0) {
-        const a = E.outExpo(prog(t, st - .1, .4)); const out = prog(t, phrases[1] ? phrases[1].words[0].s - .08 : en, .12);
-        o = a * (1 - out); s = lerp(.85, 1, a) * (1 + out * .4);
+        const a = E.out5(prog(t, st - .15, .45)); const next = phrases[1] ? phrases[1].words[0].s : reveal.end;
+        const gone = prog(t, next - .1, .15);
+        css(n, { top: L.revealY + 'px', opacity: a * (1 - gone), transform: `translateY(${(1 - a) * 30}px)` });
       } else if (i === 1) {
-        const a = prog(t, st - .04, .22); s = lerp(2.2, 1, E.outExpo(a)); o = clamp(a * 2.5);
-        const third = phrases[2] ? phrases[2].words[0].s : en + 1;
-        const up = E.inOut3(prog(t, third - .25, .45));
-        top = L.revealY - up * 0; s *= 1 - up * .12;
+        const a = E.out5(prog(t, st - .06, .35));
+        css(n, { top: L.revealY + 'px', opacity: a * (1 - out), transform: `scale(${lerp(1.18, 1, a)})` });
       } else {
-        const a = E.outBack(prog(t, st - .15, .5), 1.6); o = clamp(a); s = lerp(.8, 1, a); top = L.tilesTop + L.tileS + L.tileGap + L.tileS / 2 - 60;
+        const a = E.outBack(prog(t, st - .15, .55), 1.3);
+        css(n, { top: L.bannerY + 'px', opacity: clamp(a * 1.3) * (1 - out), transform: `translateX(-50%) scale(${lerp(.85, 1, a)})` });
       }
-      const out = E.in3(prog(t, en - .25, .35)); o *= 1 - out;
-      css(n, { top: top + 'px', opacity: o, transform: (i === 2 ? 'translateX(-50%) ' : '') + `scale(${s})` });
-      n.querySelectorAll('.w').forEach((w, j) => {
-        const wd = ph.words[j]; const a = E.outExpo(prog(t, wd.s - .08, .3));
-        w.style.opacity = i === 1 ? 1 : .25 + .75 * a;
-      });
     });
-    const imp = t - reveal.impact;
-    flash.style.opacity = imp > 0 && imp < .35 ? (1 - imp / .35) * .75 : 0;
 
-    // ── CTA.
-    const vis = t >= cta.start - .3;
-    ctaRoot.style.display = vis ? 'block' : 'none';
-    if (vis) {
+    // Environment intro.
+    if (intro) {
+      const vis = t >= intro.start - .1 && t <= intro.end + .3;
+      introTitle.style.display = vis ? 'block' : 'none';
+      const out = E.in3(prog(t, intro.end - .2, .35));
+      introWords.forEach((w, i) => { const a = E.out5(prog(t, intro.words[i].s - .1, .4)); w.style.opacity = a * (1 - out); w.style.transform = `translateY(${(1 - a) * 34 - out * 30}px)`; });
+      const n = introIcons.length; const gap = 160; const x0 = (L.W - ((n - 1) * gap + 136)) / 2;
+      introIcons.forEach((c, i) => {
+        const a = E.outBack(prog(t, intro.start + .2 + i * .07, .5), 1.6);
+        css(c, { display: vis ? 'grid' : 'none', left: (x0 + i * gap) + 'px', top: (L.introIconsY + Math.sin(t * 2.2 + i * 1.3) * 10 + (i % 2) * 40) + 'px', opacity: clamp(a) * (1 - out), transform: `scale(${a}) rotate(${(i % 2 ? 4 : -4)}deg)` });
+      });
+    }
+    if (envTitle) {
+      const a = E.out5(prog(t, firstEnv.start, .5)); const out = E.in3(prog(t, lastEnv.end - .2, .35));
+      envTitle.style.display = t >= firstEnv.start - .1 && t <= lastEnv.end + .3 ? 'block' : 'none';
+      css(envTitle, { opacity: a * (1 - out), transform: `translateY(${(1 - a) * 24}px)` });
+    }
+
+    // Player cards.
+    players.forEach((p, k) => {
+      const s = p.s;
+      if (t < s.start - .15 || t > s.end + .4) { p.root.style.display = 'none'; return; }
+      p.root.style.display = 'block';
+      const dIn = s.fast ? .38 : .55;
+      const inP = E.out5(prog(t, s.start - .08, dIn));
+      const outP = E.in3(prog(t, s.end - .14, .34));
+      const fromTile = s === firstSpk;
+      p.root.style.opacity = 1 - outP;
+      p.card.style.transform = `translateY(${(1 - inP) * 200 - outP * 120}px) scale(${lerp(.96, 1, inP) * lerp(1, .95, outP)})`;
+      p.card.style.opacity = clamp(inP * 1.3);
+      const a = t >= s.vo_start - .05 && t <= s.vo_end + .1 ? amp(t) : 0;
+      if (p.portrait) {
+        const pin = fromTile ? 1 : E.outBack(prog(t, s.start - .05, dIn + .1), 1.25);
+        p.portrait.style.opacity = fromTile ? (t >= hook.end - .02 ? 1 : 0) : clamp(pin * 1.3);
+        p.portrait.style.transform = `translateY(${-a * 5 - outP * 60}px) scale(${(fromTile ? 1 : lerp(.8, 1, pin)) * (1 + a * .018)})`;
+        p.halo.style.opacity = clamp(prog(t, s.start, .5)) * (1 - outP);
+        p.halo.style.transform = `scale(${1 + a * .07 + Math.sin(t * 1.4) * .02})`;
+      }
+      // Karaoke: said words in ink, the current word in brand, upcoming words light.
+      p.words.forEach((w, i) => {
+        const wd = s.words[i];
+        w.classList.toggle('now', t >= wd.s - .04 && t <= wd.e + .04);
+        w.classList.toggle('said', t > wd.e + .04);
+      });
+      // Player: progress through the clip's own waveform.
+      const pr = prog(t, s.vo_start, Math.max(.1, s.vo_end - s.vo_start));
+      const on = Math.floor(pr * p.bars.length);
+      p.bars.forEach((b, i) => b.classList.toggle('on', i < on));
+      p.time.textContent = fmt(pr * (s.vo_end - s.vo_start));
+      if (p.wm) {
+        const placedNow = s.ab_at == null || t >= s.ab_at;
+        const w = E.out5(prog(t, s.ab_at == null ? s.start + .1 : s.ab_at - .1, .6));
+        p.wm.style.opacity = (placedNow ? w : 0) * (1 - outP);
+        p.wm.style.transform = `translateY(${(1 - w) * 40 + Math.sin(t * 1.3) * 8}px) scale(${lerp(.9, 1, w) * (1 + a * .03)})`;
+      }
+      if (p.seg) {
+        const placed = s.ab_at == null ? 1 : E.inOut3(prog(t, s.ab_at - .12, .3));
+        const half = (L.cardW - 104 - 16) / 2;
+        const right = AR ? 0 : 1; // the knob sits on the active option
+        const pos = AR ? lerp(half, 0, placed) : lerp(0, half, placed);
+        css(p.knob, { left: (8 + pos) + 'px', width: half + 'px' });
+        p.segC.classList.toggle('on', placed < .5); p.segP.classList.toggle('on', placed >= .5);
+      }
+    });
+
+    // CTA: the studio types, picks a dialect and plays; then the end card.
+    const cvis = t >= cta.start - .3; ctaRoot.style.display = cvis ? 'block' : 'none';
+    if (cvis) {
       const t0 = cta.start;
-      const cardIn = E.outExpo(prog(t, t0 - .1, .6)); const cardOut = E.inExpo(prog(t, cta.logo_at - .35, .35));
-      const statsOut = 0;
-      css(card, { opacity: cardIn * (1 - cardOut), transform: `translateY(${(1 - cardIn) * 120 - cardOut * 80}px) scale(${lerp(.92, 1, cardIn) * lerp(1, .94, cardOut)})` });
-      const typeP = prog(t, T.typing[0] - .02, T.typing[T.typing.length - 1] - T.typing[0] + .1);
-      const chars = Math.round(typed.length * typeP);
-      typedEl.textContent = typed.slice(0, chars);
-      caret.style.opacity = (Math.floor(t * 3) % 2 === 0 || typeP < 1) ? 1 : 0;
-      const pick = Math.min(4, Math.floor(prog(t, T.typing[T.typing.length - 1] - .3, .9) * 5));
+      const sin = E.out5(prog(t, t0 - .1, .6)); const sout = E.in3(prog(t, cta.logo_at - .4, .35));
+      css(studio, { opacity: sin * (1 - sout), transform: `translateY(${(1 - sin) * 160 - sout * 80}px) scale(${lerp(.96, 1, sin) * lerp(1, .95, sout)})` });
+      const t1 = T.typing[0]; const t2 = T.typing[T.typing.length - 1];
+      const typeP = prog(t, t1 - .02, t2 - t1 + .1);
+      typedEl.textContent = typed.slice(0, Math.round(typed.length * typeP));
+      caret.style.opacity = typeP < 1 || Math.floor(t * 3) % 2 === 0 ? 1 : 0;
+      const pick = Math.min(4, Math.floor(prog(t, t2 - .25, .8) * 5));
       chipEls.forEach((c, i) => c.classList.toggle('on', typeP > .6 && i === pick));
-      const press = prog(t, T.typing[T.typing.length - 1] + .15, .25);
-      playBtn.style.transform = `scale(${1 - Math.sin(press * Math.PI) * .12})`;
-      const playing = prog(t, T.typing[T.typing.length - 1] + .25, .2);
-      waveBars.forEach((b, i) => {
-        const v = playing * (0.25 + 0.75 * Math.abs(Math.sin(i * .9 + t * 8) * Math.sin(i * .31 - t * 3.3)));
-        b.style.height = (14 + v * 92) + 'px';
-      });
-      // Stats count up.
+      const playing = t > t2 + .3;
+      studioBtn.innerHTML = playing ? PAUSE : PLAY;
+      const sp = prog(t, t2 + .3, Math.max(.3, cta.logo_at - t2 - .6));
+      studioBars.forEach((b, i) => b.classList.toggle('on', i < Math.floor(sp * studioBars.length)));
+
+      const lg = E.out5(prog(t, cta.logo_at, .6));
+      css(endLogo, { opacity: lg, transform: `translateX(-50%) translateY(${(1 - lg) * 30}px) scale(${lerp(.9, 1, lg)})` });
+      const tg = E.out5(prog(t, cta.logo_at + .2, .5)); css(tagline, { opacity: tg, transform: `translateY(${(1 - tg) * 24}px)` });
       statEls.forEach((s, i) => {
-        const a = E.outBack(prog(t, T.stats_at + i * .25, .5), 1.7);
-        s.style.opacity = clamp(a) * (1 - statsOut);
-        s.style.transform = `translateY(${(1 - a) * 60 - statsOut * 40}px) scale(${a})`;
-        const target = i === 0 ? 140 : 60;
-        statN[i].textContent = '+' + Math.round(target * E.out3(prog(t, T.stats_at + i * .25, .9)));
+        const a = E.out5(prog(t, T.stats_at + i * .15, .55));
+        s.style.opacity = a; s.style.transform = `translateY(${(1 - a) * 40}px)`;
+        statN[i].textContent = '+' + Math.round((i === 0 ? 140 : 60) * E.out3(prog(t, T.stats_at + i * .15, .9)));
       });
-      // End card.
-      const lg = E.outBack(prog(t, cta.logo_at, .6), 1.5);
-      css(endLogo, { opacity: clamp(lg * 1.3), transform: `translateX(-50%) scale(${lerp(.6, 1, lg)})`, filter: `drop-shadow(0 0 ${40 * lg}px rgba(118,89,250,.6))` });
-      const tg = E.outExpo(prog(t, cta.logo_at + .2, .5));
-      css(tagline, { opacity: tg, transform: `translateY(${(1 - tg) * 30}px)` });
-      const u = E.outExpo(prog(t, T.stats_at + .55, .5));
-      css(url, { opacity: u, transform: `translateY(${(1 - u) * 30}px)` });
-      const b = E.outBack(prog(t, T.stats_at + .7, .5), 1.8);
-      css(btn, { opacity: clamp(b * 1.4), transform: `translateX(-50%) scale(${b * (1 + Math.sin(Math.max(0, t - cta.logo_at - 1.2) * 4) * .025)})` });
-      faceEls.forEach((f, i) => {
-        const a = E.outBack(prog(t, T.stats_at + .9 + i * .04, .4), 2);
-        f.style.opacity = clamp(a * 1.4); f.style.transform = `translateY(${(1 - a) * 30}px) scale(${a})`;
-      });
-      const sp = ((t - cta.logo_at - 1.1) % 1.6) / 1.6;
-      shine.style.left = (t > cta.logo_at + 1.1 ? lerp(-40, 140, sp) : -40) + '%';
+      const u = E.out5(prog(t, T.stats_at + .5, .5)); css(url, { opacity: u, transform: `translateY(${(1 - u) * 20}px)` });
+      const b = E.outBack(prog(t, T.stats_at + .65, .55), 1.4); css(btn, { opacity: clamp(b * 1.3), transform: `translateX(-50%) scale(${b})` });
+      faceEls.forEach((f, i) => { const a = E.outBack(prog(t, T.stats_at + .85 + i * .035, .45), 1.6); f.style.opacity = clamp(a * 1.3); f.style.transform = `translateY(${(1 - a) * 24}px) scale(${a})`; });
+      const sh = ((t - T.stats_at - 1.4) % 1.8) / 1.8;
+      shine.style.left = (t > T.stats_at + 1.4 ? lerp(-40, 140, sh) : -40) + '%';
     }
   }
 

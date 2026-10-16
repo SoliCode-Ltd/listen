@@ -28,11 +28,9 @@ FPS = 30
 CAST = {
     "fahad": dict(name_en="Fahad", name_ar="فهد", avatar="ar-fahad", flag="sa", clip="ad-ar-fahad", lang="ar",
                   dialect_en="Saudi · Najdi", dialect_ar="سعودي · نجدي", hue=265,
-                  chip_en="Natural laugh", chip_ar="ضحكة طبيعية", chip_icon="laugh",
                   tr_en="Me? Of course I'm real! What more do you want?"),
     "sumaya": dict(name_en="Sumaya", name_ar="سمية", avatar="ar-sumaya", flag="eg", clip="ad-ar-sumaya", lang="ar",
-                   dialect_en="Egyptian · Cairo", dialect_ar="مصري · قاهري", hue=320,
-                   chip_en="Natural laugh", chip_ar="ضحكة طبيعية", chip_icon="laugh",
+                   dialect_en="Egyptian · Cairo", dialect_ar="مصري · قاهري", hue=330,
                    tr_en="No way, I'm the real one! Who else laughs like this?"),
     "sawsan": dict(name_en="Sawsan", name_ar="سوسن", avatar="ar-sawsan", flag="lb", clip="ad-ar-sawsan", lang="ar",
                    dialect_en="Lebanese · Beirut", dialect_ar="لبناني · بيروتي", hue=195,
@@ -41,17 +39,13 @@ CAST = {
                   dialect_en="Emirati", dialect_ar="إماراتي", hue=160,
                   tr_en="I'm 100% Emirati… what more do you want?"),
     "aisha": dict(name_en="Aisha", name_ar="عائشة", avatar="ar-aisha", flag="ma", clip="ad-ar-aisha", lang="ar",
-                  dialect_en="Moroccan · Darija", dialect_ar="مغربي · دارجة", hue=10,
+                  dialect_en="Moroccan · Darija", dialect_ar="مغربي · دارجة", hue=15,
                   tr_en="Can you hear me well? This is real Moroccan Darija!"),
-    "sultan": dict(name_en="Sultan", name_ar="سلطان", avatar="ar-sultan", flag="sa", clip="stadium", lang="ar",
-                   dialect_en="Saudi · Commentator", dialect_ar="سعودي · معلّق رياضي", hue=135,
-                   chip_en="Sound environment: Stadium", chip_ar="بيئة الصوت: ملعب", chip_icon="stadium",
-                   tr_en="GOOOAL! Wow, wow!", stadium=True),
     "daisy": dict(name_en="Daisy", name_ar="ديزي", avatar="en-daisy", flag="us", clip="ad-en-daisy", lang="en",
                   dialect_en="American", dialect_ar="أمريكية", hue=220,
                   tr_ar="حقيقية؟ يا عزيزي، أنا أمريكية حتى النخاع!"),
     "theodore": dict(name_en="Theodore", name_ar="ثيودور", avatar="en-theodore", flag="gb", clip="ad-en-theodore", lang="en",
-                     dialect_en="British", dialect_ar="بريطاني", hue=250,
+                     dialect_en="British", dialect_ar="بريطاني", hue=245,
                      tr_ar="أؤكد لك… أنا بريطاني جداً."),
     "finn": dict(name_en="Finn", name_ar="فين", avatar="en-finn", flag="au", clip="ad-en-finn", lang="en",
                  dialect_en="Australian", dialect_ar="أسترالي", hue=40,
@@ -64,44 +58,68 @@ CAST = {
                     tr_ar="أنا الحقيقي الوحيد هنا!"),
 }
 
+# The homepage sound environments (public/audio/environments), cut to one phrase.
+# ab=word: the scene starts on the clean voice and switches into the place on that word.
+ENVS = {
+    "env-ar-announcement": dict(lang="ar", icon="announcement", hue=205, words=(0, 9), ab=4,
+                                place_ar="نداء في محطة", scene_ar="نداء في المطار · ريم"),
+    "env-ar-phone": dict(lang="ar", icon="phone", hue=150, words=(0, 7),
+                         place_ar="مكالمة هاتفية", scene_ar="سلمى · مصري"),
+    "env-ar-radio": dict(lang="ar", icon="radio", hue=35, words=(0, 4),
+                         place_ar="راديو قديم", scene_ar="نشرة إذاعية من الماضي · وليد"),
+    "env-en-announcement": dict(lang="en", icon="announcement", hue=205, words=(0, 8), ab=3,
+                                place_en="Station announcement", scene_en="Airport call · Emma"),
+    "env-en-phone": dict(lang="en", icon="phone", hue=150, words=(0, 5),
+                         place_en="Phone call", scene_en="Chloe · American"),
+    "env-en-church": dict(lang="en", icon="church", hue=40, words=(0, 8),
+                          place_en="Cathedral", scene_en="Epic trailer · James"),
+}
+TAGS = {"laugh": ("ضحكة", "laugh"), "chuckle": ("ضحكة خفيفة", "chuckle")}
+
 # Two full lines set up the joke, then a fast montage of one phrase each.
 # words=(from, to) picks script words (inclusive); fast=True is a quick cut.
-FAST_AR = [
-    ("sawsan", dict(words=(1, None), fast=True, tr_en="None of you can tell us apart.")),
-    ("nawaf", dict(words=(0, 3), fast=True, tr_en="I'm 100% Emirati…")),
-    ("aisha", dict(words=(3, None), fast=True, tr_en="This is real Moroccan Darija!")),
-    ("sultan", dict(goal=True, fast=True, tr_en="GOOOAL!")),
-]
-FAST_EN = [
-    ("finn", dict(fast=True)),
-    ("luna", dict(words=(0, 5), fast=True, tr_ar="يا جماعة، أكيد أنا حقيقية!")),
-    ("charlie", dict(fast=True, tail=0.5)),
-]
+F = dict(
+    sawsan=("sawsan", dict(words=(1, None), fast=True, tr_en="None of you can tell us apart.")),
+    nawaf=("nawaf", dict(words=(0, 3), fast=True, tr_en="I'm 100% Emirati…")),
+    aisha=("aisha", dict(words=(3, None), fast=True, tr_en="This is real Moroccan Darija!")),
+    theodore=("theodore", dict(fast=True)),
+    finn=("finn", dict(fast=True)),
+    luna=("luna", dict(words=(0, 5), fast=True, tr_ar="يا جماعة، أكيد أنا حقيقية!")),
+    charlie=("charlie", dict(fast=True, tail=0.3)),
+)
+AR_ENVS = ["env-ar-announcement", "env-ar-phone", "env-ar-radio"]
+EN_ENVS = ["env-en-announcement", "env-en-phone", "env-en-church"]
 CUTS = {
     "ar": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "fahad", "sumaya", *FAST_AR, "switch", "daisy", ("theodore", dict(fast=True)), *FAST_EN, "reveal", "cta"]),
+        "hook", "fahad", "sumaya", F["sawsan"], F["nawaf"], F["aisha"], "switch", "daisy", F["theodore"], F["luna"], F["charlie"],
+        "reveal", "envintro", *AR_ENVS, "cta"]),
     "en": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", "theodore", *FAST_EN, "switch", "fahad", "sumaya", *FAST_AR, "reveal", "cta"]),
+        "hook", "daisy", "theodore", F["finn"], F["luna"], F["charlie"], "switch", "fahad", "sumaya", F["nawaf"], F["aisha"],
+        "reveal", "envintro", *EN_ENVS, "cta"]),
+    # Design preview (no new narration needed).
+    "preview": dict(ui="ar", narrator="ad-ar", order=[
+        "hook", "fahad", "sumaya", F["nawaf"], "switch", "daisy", "reveal", *AR_ENVS[:2], "cta"]),
     # About 30 seconds, for paid placements.
     "ar30": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "sumaya", FAST_AR[1], FAST_AR[2], FAST_AR[3], FAST_EN[1], "reveal", "cta"]),
+        "hook", "sumaya", F["nawaf"], F["aisha"], F["luna"], "reveal", AR_ENVS[0], "cta"]),
     "en30": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", FAST_EN[0], FAST_EN[1], FAST_AR[2], FAST_AR[3], "reveal", "cta"]),
+        "hook", "daisy", F["finn"], F["luna"], F["aisha"], "reveal", EN_ENVS[0], "cta"]),
 }
 
 NARRATION = {
-    "ad-ar": dict(hook="ad-ar-hook", switch="ad-ar-english", reveal="ad-ar-reveal", cta="ad-ar-cta"),
-    "ad-en": dict(hook="ad-en-hook", switch="ad-en-arabic", reveal="ad-en-reveal", cta="ad-en-cta"),
+    "ad-ar": dict(hook="ad-ar-hook", switch="ad-ar-english", reveal="ad-ar-reveal", envintro="ad-ar-env", cta="ad-ar-cta"),
+    "ad-en": dict(hook="ad-en-hook", switch="ad-en-arabic", reveal="ad-en-reveal", envintro="ad-en-env", cta="ad-en-cta"),
 }
 
 # Seconds before the voice starts and after it ends, per scene kind.
-PRE = dict(hook=0.6, speaker=0.34, fast=0.2, switch=0.24, reveal=0.45, cta=0.45)
-POST = dict(hook=0.3, speaker=0.26, fast=0.1, switch=0.14, reveal=0.65, cta=2.9)
+PRE = dict(hook=0.6, speaker=0.38, fast=0.24, switch=0.26, reveal=0.45, envintro=0.32, env=0.36, cta=0.45)
+POST = dict(hook=0.3, speaker=0.26, fast=0.12, switch=0.14, reveal=0.55, envintro=0.25, env=0.38, cta=2.9)
 GRID = 0.25  # half a beat at 120 BPM: every scene starts on the music grid
 
 
 def lines_text():
-    php = "echo json_encode(array_column((require 'marketing/launch-ad/lines.php')['samples'], 'text', 'slug'), JSON_UNESCAPED_UNICODE);"
+    php = ("echo json_encode(array_column(array_merge((require 'marketing/launch-ad/lines.php')['samples'], "
+           "(require 'database/seeders/data/environment_samples.php')['samples']), 'text', 'slug'), JSON_UNESCAPED_UNICODE);")
     out = subprocess.run(["php", "-r", php], cwd=ROOT, capture_output=True, text=True, check=True).stdout
     return json.loads(out)
 
@@ -180,20 +198,30 @@ def caption_words(script, heard, offset, speech_start=0.0):
     return out
 
 
-def stadium_clip(goal_only=False):
-    audio = load_audio(ROOT / "public/audio/environments/env-ar-stadium.mp3")
-    end = 3.0 if goal_only else 4.95
-    cut = audio[: int(end * SR)].copy()
-    fade = int((0.3 if goal_only else 0.35) * SR)
-    cut[-fade:] *= np.linspace(1, 0, fade)[:, None]
-    words = [dict(w="قووووول!", s=0.1, e=2.75)]
-    if not goal_only:
-        words += [dict(w="يا", s=3.15, e=3.42), dict(w="سلام", s=3.42, e=3.95), dict(w="يا", s=3.95, e=4.2), dict(w="سلام!", s=4.2, e=4.75)]
-    return cut, 0.08, words[-1]["e"] + 0.02, words
+def script_tokens(script):
+    """The script as words and delivery tags, in order: [("w", i) | ("tag", name)]."""
+    import re
+    out, i = [], 0
+    for part in re.split(r"(<[^<>]+>)", script):
+        if part.startswith("<"):
+            out.append(("tag", part.strip("<>").strip()))
+        else:
+            for _ in part.split():
+                out.append(("w", i))
+                i += 1
+    return out
 
 
-def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail=None):
-    audio = load_audio(VOICES / f"{slug}.wav")
+def wave_bars(audio, n=44):
+    mono = np.abs(audio.mean(axis=1))
+    seg = max(1, len(mono) // n)
+    v = np.array([np.sqrt(np.mean(mono[k * seg:(k + 1) * seg] ** 2)) for k in range(n)])
+    v = np.sqrt(v / (v.max() + 1e-9))
+    return [round(float(x), 3) for x in v]
+
+
+def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail=None, audio=None):
+    audio = load_audio(VOICES / f"{slug}.wav") if audio is None else audio
     s, e = speech_span(audio)
     heard = (heard_all.get(slug) or {}).get("words") or []
     words = caption_words(texts.get(slug, ""), heard, 0.0, s)
@@ -201,8 +229,20 @@ def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail
         span = (e - s) / max(1, len(words))
         for i, w in enumerate(words):
             w["s"], w["e"] = s + i * span, s + (i + 1) * span
+    toks = script_tokens(texts.get(slug, ""))
+    lo, hi = word_range or (0, None)
+    last = len(words) - 1 if hi is None else hi
+    tokens, seen = [], 0
+    for kind, v in toks:
+        if kind == "w":
+            if lo <= v <= last:
+                tokens.append(dict(word=v - lo))
+            seen += 1
+        # A tag sits between word seen-1 and word seen: keep it inside the cut,
+        # or at an edge only when the cut reaches that edge of the line.
+        elif lo < seen <= last or (seen == lo == 0) or (seen == last + 1 and hi is None):
+            tokens.append(dict(tag=v))
     if word_range:
-        lo, hi = word_range
         words = words[lo: (hi + 1) if hi is not None else None]
         s = max(s, words[0]["s"] - 0.05) if lo else s
         e = min(e, words[-1]["e"] + 0.08) if hi is not None else e
@@ -217,7 +257,48 @@ def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail
     clip[:fade] *= np.linspace(0, 1, fade)[:, None]
     clip[-fade * 4:] *= np.linspace(1, 0, fade * 4)[:, None]
     words = [dict(w=w["w"], s=w["s"] - a, e=w["e"] - a) for w in words]
-    return clip, s - a, e - a, words
+    return clip, s - a, e - a, words, tokens
+
+
+def env_clip(slug, meta, texts, heard_all):
+    """A homepage environment line: placed in its environment, or (ab) clean
+    first and then switched into the place at the same moment of the take."""
+    clean = load_audio(ROOT / f"public/audio/environments/clean/{slug}.mp3")
+    placed = load_audio(ROOT / f"public/audio/environments/{slug}.mp3")
+    # Align the placed take to the clean one (effects can add a little delay).
+    a_env = np.abs(clean[: SR * 4].mean(axis=1)); b_env = np.abs(placed[: SR * 4].mean(axis=1))
+    k = 48
+    a_env = a_env[: len(a_env) // k * k].reshape(-1, k).mean(axis=1); b_env = b_env[: len(b_env) // k * k].reshape(-1, k).mean(axis=1)
+    m = min(len(a_env), len(b_env))
+    corr = [np.dot(a_env[: m - 60], b_env[d: d + m - 60]) for d in range(0, 60)]
+    offset = int(np.argmax(corr)) * k
+    placed = placed[offset:]
+    n = max(len(clean), len(placed))
+    clean = np.pad(clean, ((0, n - len(clean)), (0, 0))); placed = np.pad(placed, ((0, n - len(placed)), (0, 0)))
+    words_all = caption_words(texts.get(slug, ""), (heard_all.get(slug) or {}).get("words") or [], 0.0, speech_span(clean)[0])
+    if any(w["s"] is None for w in words_all):
+        s0, e0 = speech_span(clean)
+        span = (e0 - s0) / len(words_all)
+        for i, w in enumerate(words_all):
+            w["s"], w["e"] = s0 + i * span, s0 + (i + 1) * span
+    if meta.get("ab") is not None:
+        switch_at = words_all[meta["ab"]]["s"] - 0.06
+        x = int(switch_at * SR); fade = int(0.07 * SR)
+        ramp = np.clip((np.arange(n) - x) / fade, 0, 1)[:, None]
+        audio = clean * (1 - ramp) + placed * ramp
+    else:
+        switch_at = None
+        audio = placed
+    clip, vs, ve, words, tokens = prepared_clip(slug, texts, heard_all, meta["words"], audio=audio)
+    # prepared_clip trimmed from a = max(0, s - 0.04); recover that start to place the switch.
+    lo = meta["words"][0]
+    a = max(0.0, (words_all[lo]["s"] - 0.05 if lo else speech_span(audio)[0]) - 0.04)
+    # Let the place ring out after the last word.
+    end = int((words[-1]["e"] + a + 0.55) * SR)
+    clip = audio[int(a * SR): end].copy()
+    f = int(0.012 * SR); clip[:f] *= np.linspace(0, 1, f)[:, None]
+    f = int(0.3 * SR); clip[-f:] *= np.linspace(1, 0, f)[:, None]
+    return clip, vs, ve, words, tokens, (None if switch_at is None else switch_at - a)
 
 
 def snap(t):
@@ -235,15 +316,16 @@ def build(cut_name, out_dir, ratio):
     t = 0.0
     for entry in cut["order"]:
         item, opts = entry if isinstance(entry, tuple) else (entry, {})
-        kind = "speaker" if item in CAST else item
+        kind = "speaker" if item in CAST else "env" if item in ENVS else item
+        ab = None
         if kind == "speaker":
             meta = CAST[item]
-            if meta.get("stadium"):
-                clip, vs, ve, words = stadium_clip(goal_only=opts.get("goal", False))
-            else:
-                clip, vs, ve, words = prepared_clip(meta["clip"], texts, heard_all, opts.get("words"), opts.get("lead_trim", False), opts.get("tail"))
+            clip, vs, ve, words, tokens = prepared_clip(meta["clip"], texts, heard_all, opts.get("words"), opts.get("lead_trim", False), opts.get("tail"))
+        elif kind == "env":
+            meta = ENVS[item]
+            clip, vs, ve, words, tokens, ab = env_clip(item, meta, texts, heard_all)
         else:
-            clip, vs, ve, words = prepared_clip(narr[kind], texts, heard_all)
+            clip, vs, ve, words, tokens = prepared_clip(narr[kind], texts, heard_all)
         pace = "fast" if opts.get("fast") else kind
         start = 0.0 if not scenes else snap(t)
         clip_at = start + PRE[pace] - vs
@@ -254,15 +336,20 @@ def build(cut_name, out_dir, ratio):
         scene = dict(kind=kind, id=item, start=round(start, 3), end=round(end, 3), vo_start=round(vo_start, 3), vo_end=round(vo_end, 3),
                      clip_at=clip_at, words=[dict(w=w["w"], s=None if w["s"] is None else round(w["s"] + clip_at, 3),
                                                   e=None if w["e"] is None else round(w["e"] + clip_at, 3)) for w in words])
+        tag_label = lambda name: TAGS.get(name, (name, name))[0 if ui == "ar" else 1]
         if kind == "speaker":
             meta = CAST[item]
             tr_key = "tr_ar" if ui == "ar" else "tr_en"
             foreign = meta["lang"] != ui
             scene.update(name=meta["name_ar" if ui == "ar" else "name_en"], dialect=meta["dialect_ar" if ui == "ar" else "dialect_en"],
-                         avatar=meta["avatar"], flag=meta["flag"], hue=meta["hue"], lang=meta["lang"], stadium=bool(meta.get("stadium")),
-                         fast=bool(opts.get("fast")), id=item,
-                         chip=meta.get("chip_ar" if ui == "ar" else "chip_en"), chip_icon=meta.get("chip_icon"),
+                         avatar=meta["avatar"], flag=meta["flag"], hue=meta["hue"], lang=meta["lang"], fast=bool(opts.get("fast")),
+                         tokens=[dict(tag=tag_label(tk["tag"])) if "tag" in tk else tk for tk in tokens], bars=wave_bars(clip),
                          tr=(opts.get(tr_key) or meta.get(tr_key)) if foreign else None)
+        elif kind == "env":
+            meta = ENVS[item]
+            scene.update(lang=meta["lang"], icon=meta["icon"], hue=meta["hue"], place=meta.get(f"place_{ui}") or meta.get("place_ar") or meta.get("place_en"),
+                         scene_label=meta.get(f"scene_{ui}") or meta.get("scene_ar") or meta.get("scene_en"), fast=False,
+                         ab_at=None if ab is None else round(ab + clip_at, 3), tokens=tokens, bars=wave_bars(clip), tr=None)
         scene["_clip"] = clip
         scenes.append(scene)
         t = end
@@ -294,6 +381,8 @@ def build(cut_name, out_dir, ratio):
     # ── Music and sound design ──
     first_speaker = next(s for s in scenes if s["kind"] == "speaker")
     switch = next((s for s in scenes if s["kind"] == "switch"), None)
+    envs = [s for s in scenes if s["kind"] in ("env", "envintro")]
+    after_reveal = envs[0]["start"] if envs else cta["start"]
     if switch:
         middle = [(first_speaker["start"], switch["start"], "groove"), (switch["start"], switch["end"], "intro"), (switch["end"], reveal["start"], "lift")]
     else:
@@ -303,40 +392,46 @@ def build(cut_name, out_dir, ratio):
         (0, first_speaker["start"], "intro"),
         *middle,
         (reveal["start"], reveal["impact"], "hold"),
-        (reveal["impact"], cta["start"], "lift"),
+        (reveal["impact"], after_reveal, "lift"),
+        *([(after_reveal, cta["start"], "hold")] if envs else []),
         (cta["start"], duration - 1.6, "outro"),
     ]
     music = sound.music(duration + 0.5, sections)
     music = music[:n] if len(music) >= n else np.pad(music, ((0, n - len(music)), (0, 0)))
+    # The environments are heard on their own: the music steps back under them.
+    if envs:
+        g = np.ones(n)
+        a0, a1 = int(envs[0]["start"] * SR), int(cta["start"] * SR)
+        ramp = int(0.4 * SR)
+        g[a0:a1] = 0.35
+        g[a0:a0 + ramp] = np.linspace(1, 0.35, ramp)
+        g[a1 - ramp:a1] = np.linspace(0.35, 1, ramp)
+        music *= g[:, None]
     sfx = np.zeros((n, 2))
 
     hook = scenes[0]
     tiles = [CAST[sc["id"]]["avatar"] for sc in scenes if sc["kind"] == "speaker"]
-    tile_times = [round(0.12 + i * 0.07, 3) for i in range(len(tiles))]
+    tile_times = [round(0.1 + i * 0.06, 3) for i in range(len(tiles))]
     for i, tt in enumerate(tile_times):
-        sound.add(sfx, sound.pop(pitch=0.9 + 0.05 * (i % 5), pan=((i % 4) - 1.5) / 2.5), tt, 0.22)
-    sound.add(sfx, sound.riser(1.2), first_speaker["start"] - 1.2, 0.1)
+        sound.add(sfx, sound.pop(pitch=0.85 + 0.04 * (i % 5), pan=((i % 4) - 1.5) / 2.5), tt, 0.12)
     for i, sc in enumerate(scenes[1:], start=1):
-        if sc["kind"] in ("speaker", "switch", "cta"):
-            sound.add(sfx, sound.whoosh(0.5, pan_from=0.7 if i % 2 else -0.7, pan_to=-0.7 if i % 2 else 0.7), sc["start"] - 0.3, 0.2)
-        if sc.get("stadium"):
-            sound.add(sfx, sound.butter(sound.impact(0.6), "lowpass", 180), sc["vo_start"] - 0.05, 0.3)
-    sound.add(sfx, sound.whoosh(0.7, rising=False), reveal["start"] - 0.4, 0.24)
-    sound.add(sfx, sound.riser(1.4), reveal["impact"] - 1.4, 0.2)
-    # The hit is mostly sub-bass so it lands under the narrator's words, not on them.
-    sound.add(sfx, sound.butter(sound.impact(), "lowpass", 160), reveal["impact"] - 0.03, 0.75)
-    sound.add(sfx, sound.butter(sound.impact(), "highpass", 160), reveal["impact"] - 0.03, 0.12)
-    reveal_tiles = [round(reveal["impact"] + 0.12 + i * 0.05, 3) for i in range(len(tiles))]
+        if sc["kind"] in ("speaker", "switch", "env", "envintro", "cta"):
+            sound.add(sfx, sound.whoosh(0.45, pan_from=0.5 if i % 2 else -0.5, pan_to=-0.5 if i % 2 else 0.5), sc["start"] - 0.28, 0.1)
+        if sc.get("ab_at"):
+            sound.add(sfx, sound.tick(1.4), sc["ab_at"] - 0.1, 0.9)
+    sound.add(sfx, sound.riser(1.2), reveal["impact"] - 1.2, 0.1)
+    sound.add(sfx, sound.butter(sound.impact(), "lowpass", 150), reveal["impact"] - 0.03, 0.5)
+    reveal_tiles = [round(reveal["impact"] + 0.25 + i * 0.05, 3) for i in range(len(tiles))]
     for i, tt in enumerate(reveal_tiles):
-        sound.add(sfx, sound.pop(pitch=1.25 + 0.04 * (i % 6), pan=((i % 4) - 1.5) / 2.5), tt, 0.12)
-    typing = [round(cta["start"] + 0.55 + k * 0.075 + (0.02 if k % 3 == 0 else 0), 3) for k in range(18)]
+        sound.add(sfx, sound.pop(pitch=1.2 + 0.03 * (i % 6), pan=((i % 4) - 1.5) / 2.5), tt, 0.07)
+    if envs:
+        sound.add(sfx, sound.shimmer(), envs[0]["start"] + 0.1, 0.18)
+    typing = [round(cta["start"] + 0.55 + k * 0.07 + (0.02 if k % 3 == 0 else 0), 3) for k in range(18)]
     for tt in typing:
-        sound.add(sfx, sound.tick(), tt, 0.3)
+        sound.add(sfx, sound.tick(), tt, 0.22)
     stats_at = round(cta["logo_at"] + 0.45, 3)
-    sound.add(sfx, sound.pop(1.1), stats_at, 0.35)
-    sound.add(sfx, sound.pop(1.3), stats_at + 0.25, 0.35)
-    sound.add(sfx, sound.butter(sound.impact(0.55), "lowpass", 160), cta["logo_at"], 0.45)
-    sound.add(sfx, sound.shimmer(), cta["vo_end"] - 0.05, 0.4)
+    sound.add(sfx, sound.butter(sound.impact(0.5), "lowpass", 150), cta["logo_at"], 0.3)
+    sound.add(sfx, sound.shimmer(), cta["vo_end"] - 0.05, 0.3)
 
     # ── Mix: music ducks under the voices ──
     def lufs_gain(x, target):
@@ -346,7 +441,7 @@ def build(cut_name, out_dir, ratio):
         return 10 ** ((target - loud) / 20)
 
     vo *= lufs_gain(vo, -16)
-    music *= lufs_gain(music, -25)
+    music *= lufs_gain(music, -26)
     env = np.sqrt(np.maximum(sound.butter(vo.mean(axis=1) ** 2, "lowpass", 8), 0))
     env = np.clip(env / (np.percentile(env[env > 1e-4], 60) + 1e-9), 0, 1)
     # Slow release so the music comes back between lines, not between words.
@@ -411,8 +506,9 @@ def build(cut_name, out_dir, ratio):
             im = im.resize((768, 768), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=2, percent=60, threshold=2))
             im.save(target)
         shutil.copy(ROOT / f"public/images/flags/{meta['flag']}.svg", assets / f"{meta['flag']}.svg")
-    for logo in ("logo-ar-dark.svg", "logo-dark.svg", "icon-128.svg"):
+    for logo in ("logo-ar-light.svg", "logo-light.svg", "icon-128.svg"):
         shutil.copy(ROOT / f"public/images/{logo}", assets / logo)
+    (assets / "icon-light.svg").write_text((ROOT / "public/images/icon-128.svg").read_text().replace("#7659FA", "#FFFFFF"))
     grain = assets / "grain.png"
     if not grain.exists():
         noise = (np.random.default_rng(3).normal(128, 42, (512, 512))).clip(0, 255).astype(np.uint8)
@@ -420,7 +516,7 @@ def build(cut_name, out_dir, ratio):
 
     print(f"{cut_name}: {duration:.2f}s, {len(scenes)} scenes -> {out}")
     for sc in scenes:
-        print(f"  {sc['start']:6.2f}-{sc['end']:6.2f} {sc['kind']:8s} {sc['id']:9s} vo {sc['vo_start']:.2f}-{sc['vo_end']:.2f}  " +
+        print(f"  {sc['start']:6.2f}-{sc['end']:6.2f} {sc['kind']:8s} {sc['id'][:19]:19s} vo {sc['vo_start']:.2f}-{sc['vo_end']:.2f}  " +
               " ".join(w["w"] for w in sc["words"]))
 
 
