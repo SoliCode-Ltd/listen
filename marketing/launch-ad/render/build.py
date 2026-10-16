@@ -104,9 +104,9 @@ CUTS = {
         "reveal", "envintro", *EN_ENVS, "cta"]),
     # About 30 seconds, for paid placements.
     "ar30": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "sumaya", F["mansour"], F["sawsan"], F["charlie"], "reveal", AR_ENVS[0], "cta"]),
+        "hook", "sumaya", F["mansour"], F["sawsan"], "reveal", AR_ENVS[0], "cta"]),
     "en30": dict(ui="en", narrator="ad-en", order=[
-        "hook", "daisy", F["luna"], F["mansour"], F["sawsan"], "reveal", EN_ENVS[0], "cta"]),
+        "hook", "daisy", F["luna"], F["mansour"], "reveal", EN_ENVS[0], "cta"]),
     # Design preview with the takes that exist now.
     "preview": dict(ui="ar", narrator="ad-ar", order=[
         "hook", "fahad", "theodore", "reveal", "envintro", *AR_ENVS, "cta"]),
