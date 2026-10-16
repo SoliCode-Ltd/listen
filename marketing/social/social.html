@@ -1,0 +1,189 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Listen social images</title>
+<link rel="stylesheet" href="../launch-ad/render/fonts/fonts.css">
+<style>
+  /* Facebook page images in the launch ad's look: warm paper, pastel light,
+     Alexandria, the brand violet and the real speaker avatars.
+     ?v=profile | profile-light | cover-en | cover-ar  (render.cjs screenshots each at 2x). */
+  :root { --paper: #F7F5F1; --ink: #111114; --muted: #6E6B78; --brand: #5B3DF5; --brand-icon: #7659FA; --brand-soft: #EFEBFF; --line: rgba(17,17,20,.08); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: var(--paper); font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); -webkit-font-smoothing: antialiased; }
+  #art { position: relative; overflow: hidden; background: var(--paper); }
+  .orb { position: absolute; border-radius: 50%; }
+  .grain { position: absolute; inset: 0; opacity: .05; mix-blend-mode: multiply; background-size: 512px 512px; }
+  .abs { position: absolute; }
+
+  /* Profile photo */
+  .pf { position: absolute; inset: 0; display: grid; place-items: center; }
+  .pf.violet { background: radial-gradient(circle at 28% 22%, #A48BFF 0%, rgba(164,139,255,0) 46%), linear-gradient(145deg, #8467FF 0%, #6243F7 48%, #4B2FDB 100%); }
+  .pf svg { width: 56%; height: 56%; overflow: visible; }
+
+  /* Cover */
+  .copy { position: absolute; top: 170px; bottom: 234px; display: flex; flex-direction: column; justify-content: center; }
+  .copy .logo { height: 50px; align-self: flex-start; margin-bottom: 24px; }
+  [dir=rtl] .copy .logo { align-self: flex-start; }
+  .copy h1 { font-weight: 600; font-size: 72px; line-height: 1.12; letter-spacing: -1.6px; white-space: nowrap; }
+  [dir=rtl] .copy h1 { letter-spacing: 0; line-height: 1.28; font-size: 72px; }
+  .copy h1 .accent { color: var(--brand); }
+  .chips { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 12px; padding: 13px 24px; border-radius: 999px; background: #fff; border: 1px solid var(--line);
+    font-size: 25px; font-weight: 600; color: var(--ink); box-shadow: 0 10px 26px rgba(40,30,90,.07); white-space: nowrap; }
+  .chip b { color: var(--brand); font-weight: 700; }
+  .chip svg { width: 28px; height: 28px; color: var(--brand-icon); }
+  .url { margin-top: 24px; align-self: flex-start; display: inline-flex; align-items: center; gap: 14px; padding: 16px 32px; border-radius: 999px;
+    background: var(--ink); color: #fff; font-size: 30px; font-weight: 600; direction: ltr; box-shadow: 0 18px 40px rgba(17,17,20,.22); }
+  .url svg { width: 26px; height: 26px; }
+
+  /* Voice cards, as in the ad */
+  .vc { position: absolute; width: 520px; padding: 150px 34px 20px; border-radius: 40px; background: #fff; border: 1px solid var(--line);
+    box-shadow: 0 40px 90px rgba(40,30,90,.14), 0 6px 18px rgba(40,30,90,.06); text-align: center; }
+  .vc .ph { position: absolute; left: 50%; top: -96px; width: 192px; height: 192px; margin-left: -96px; border-radius: 50%; }
+  .vc .ring { position: absolute; inset: -14px; border-radius: 50%; border: 4px solid var(--brand-icon); }
+  .vc .face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; background: #fff; box-shadow: 0 0 0 8px #fff, 0 20px 46px rgba(40,30,90,.2); }
+  .vc .face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vc .badge { position: absolute; width: 52px; height: 52px; border-radius: 50%; overflow: hidden; box-shadow: 0 0 0 5px #fff, 0 6px 14px rgba(40,30,90,.2); bottom: -2px; right: -2px; }
+  .vc .badge.l { right: auto; left: -2px; }
+  .vc .badge img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vc .name { font-size: 38px; font-weight: 600; line-height: 1; }
+  .vc .row { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+  .vc .tagc { padding: 6px 16px; border-radius: 999px; font-size: 19px; font-weight: 600; background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
+  .vc .tagc.emo { background: #FFEEE5; color: #B4461A; }
+  .vc .line { margin-top: 20px; font-size: 28px; font-weight: 600; line-height: 1.45; text-wrap: balance; }
+  .vc .line .soft { color: #C9C6D2; }
+  .vc .line .now { color: var(--brand); }
+  .vc .dt { display: inline-flex; align-items: center; gap: 6px; vertical-align: middle; margin: 0 8px; padding: 2px 12px 2px 9px; border-radius: 11px; font-size: 18px; font-weight: 500;
+    background: #FFE29A; color: #8A5A00; border: 1px solid #E6B446; line-height: 1.3; }
+  .vc .dt svg { width: 21px; height: 21px; }
+  .vc canvas { display: block; margin: 16px auto 0; }
+
+  /* Voice tags around the card: avatar, name and accent, in the voice's own language */
+  .pill { position: absolute; display: flex; align-items: center; gap: 14px; padding: 10px 24px 10px 10px; border-radius: 999px; background: #fff;
+    border: 1px solid var(--line); box-shadow: 0 18px 40px rgba(40,30,90,.13); white-space: nowrap; z-index: 3; }
+  .pill[dir=rtl] { padding: 10px 10px 10px 24px; }
+  .pill .av { position: relative; width: 64px; height: 64px; flex: none; }
+  .pill .av img.f { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+  .pill .av .fl { position: absolute; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; right: -3px; bottom: -3px; box-shadow: 0 0 0 3px #fff; }
+  .pill[dir=rtl] .av .fl { right: auto; left: -3px; }
+  .pill .av .fl img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pill .nm { font-size: 24px; font-weight: 600; line-height: 1.15; }
+  .pill .dl { font-size: 18px; font-weight: 500; color: var(--muted); line-height: 1.3; }
+</style>
+</head>
+<body>
+<div id="art"></div>
+<script>
+(() => {
+  const v = new URLSearchParams(location.search).get('v') || 'cover-en';
+  const art = document.getElementById('art');
+  const IMG = '../../public/images/';
+  const isCover = v.startsWith('cover');
+  const AR = v === 'cover-ar';
+  const [W, H] = isCover ? [1640, 924] : [1024, 1024];
+  Object.assign(art.style, { width: W + 'px', height: H + 'px' });
+  if (AR) document.documentElement.setAttribute('dir', 'rtl');
+  const el = (cls, html, parent = art) => { const n = document.createElement('div'); n.className = cls; if (html) n.innerHTML = html; parent.appendChild(n); return n; };
+  const BARS = fill => `<svg viewBox="0 0 128 128"><g fill="${fill}">${[[5, 59, 10], [23, 42, 44], [41, 28, 72], [59, 14, 100], [77, 28, 72], [95, 42, 44], [113, 59, 10]]
+    .map(([x, y, h]) => `<rect x="${x}" y="${y}" width="10" height="${h}" rx="5"/>`).join('')}</g></svg>`;
+
+  // Soft pastel light, as behind the ad.
+  const light = orbs => orbs.forEach(([x, y, s, c, a]) => {
+    const o = el('orb'); const size = s * W;
+    Object.assign(o.style, { left: (x * W - size / 2) + 'px', top: (y * H - size / 2) + 'px', width: size + 'px', height: size + 'px',
+      background: `radial-gradient(circle, rgba(${c}, ${a}) 0%, rgba(${c}, 0) 62%)` });
+  });
+  const grain = () => {
+    const c = document.createElement('canvas'); c.width = c.height = 512; const g = c.getContext('2d'); const d = g.createImageData(512, 512);
+    let s = 7; const rnd = () => { s = (s * 16807) % 2147483647; return s / 2147483647; };
+    for (let i = 0; i < d.data.length; i += 4) { const n = 128 + (rnd() + rnd() + rnd() - 1.5) * 70; d.data[i] = d.data[i + 1] = d.data[i + 2] = n; d.data[i + 3] = 255; }
+    g.putImageData(d, 0, 0); el('grain').style.backgroundImage = `url(${c.toDataURL()})`;
+  };
+
+  if (v === 'profile') {
+    el('pf violet', BARS('#FFFFFF'));
+  } else if (v === 'profile-light') {
+    light([[.15, .12, 1.1, '255,214,194', .95], [.95, .35, 1.0, '206,196,255', .95], [.2, .95, 1.0, '196,228,255', .9], [.92, .95, .9, '205,239,224', .9]]);
+    grain();
+    el('pf', BARS('#7659FA'));
+  } else {
+    light([[.08, .1, .62, '255,214,194', .95], [.62, .02, .5, '206,196,255', .9], [.98, .45, .6, '206,196,255', .95], [.25, 1.0, .6, '196,228,255', .9], [.8, 1.05, .5, '205,239,224', .9]]);
+    grain();
+
+    // The words: what Listen does, in the page's language.
+    const copy = el('copy');
+    Object.assign(copy.style, AR ? { right: '150px', width: '760px' } : { left: '150px', width: '780px' });
+    const ICON = {
+      ar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 12h2M7 8v8M11 5v14M15 8v8M19 11v2"/></svg>',
+      emo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M8 14.5c1.2 1.4 2.5 2 4 2s2.8-.6 4-2"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/></svg>',
+      arrow: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    };
+    copy.innerHTML = AR
+      ? `<img class="logo" src="${IMG}logo-ar-light.svg"><h1>اكتب أي نص…<br><span class="accent">واسمعه بأي لهجة</span></h1>` +
+        `<div class="chips"><span class="chip"><b>+140</b> لهجة عربية</span><span class="chip"><b>+60</b> لكنة إنجليزية</span><span class="chip">${ICON.emo} مشاعر وبيئات صوت</span></div>` +
+        `<div class="url">listenai.studio ${ICON.arrow}</div>`
+      : `<img class="logo" src="${IMG}logo-light.svg"><h1>Type anything.<br><span class="accent">Hear it in any accent.</span></h1>` +
+        `<div class="chips"><span class="chip"><b>140+</b> Arabic dialects</span><span class="chip"><b>60+</b> English accents</span><span class="chip">${ICON.emo} Emotions &amp; places</span></div>` +
+        `<div class="url">listenai.studio ${ICON.arrow}</div>`;
+
+    // Two voice cards, one Arabic and one English, with more voices floating around them.
+    const stageX = AR ? 0 : W - 760; // the half of the cover the cards live in
+    const LAUGH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/><path d="M7.5 13.5c1 2.4 2.6 3.6 4.5 3.6s3.5-1.2 4.5-3.6z" fill="currentColor" stroke="none"/></svg>';
+    const SNICKER = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M8.5 9.5h.01M15.5 9.5h.01" stroke-width="3"/><path d="M8.5 15c1.6.6 3.9.9 7-1"/></svg>';
+    const card = (o) => {
+      const c = el('vc');
+      c.setAttribute('dir', o.rtl ? 'rtl' : 'ltr');
+      c.innerHTML = `<div class="ph"><div class="ring"></div><div class="face"><img src="${IMG}speakers/${o.avatar}.webp"></div><div class="badge${o.rtl ? ' l' : ''}"><img src="${IMG}flags/${o.flag}.svg"></div></div>` +
+        `<div class="name">${o.name}</div><div class="row"><span class="tagc">${o.dialect}</span><span class="tagc emo">• ${o.emo}</span></div>` +
+        `<div class="line">${o.line}</div><canvas width="430" height="72"></canvas>`;
+      Object.assign(c.style, { left: o.x + 'px', top: o.y + 'px', transform: `rotate(${o.r}deg)`, zIndex: o.z });
+      wave(c.querySelector('canvas'), o.seed);
+      return c;
+    };
+    const ar = { avatar: 'ar-fahad', flag: 'sa', name: 'فهد', dialect: 'سعودي · نجدي', emo: 'واثق', rtl: true, seed: 1.3,
+      line: `أنا؟ <span class="dt">${LAUGH}ضحكة</span> <span class="now">أكيد حقيقي!</span>` };
+    const en = { avatar: 'en-daisy', flag: 'us', name: 'Daisy', dialect: 'American', emo: 'Sarcastic', rtl: false, seed: 4.1,
+      line: `Real? <span class="dt">${SNICKER}Snicker</span> Honey, <span class="now">I am</span> <span class="soft">as American as apple pie!</span>` };
+    const hero = AR ? ar : en;
+    card({ ...hero, x: AR ? 120 : W - 120 - 520, y: 268, r: 0, z: 2 });
+    // [avatar, flag, name, accent, rtl, x (from the stage's outer edge), y]
+    const tags = AR
+      ? [['ar-sumaya', 'eg', 'سمية', 'مصري · قاهري', true, 16, 252], ['en-daisy', 'us', 'Daisy', 'American', false, 580, 214],
+         ['ar-sawsan', 'lb', 'سوسن', 'لبناني · بيروتي', true, 560, 650], ['en-luna', 'in', 'Luna', 'Indian', false, 22, 666]]
+      : [['ar-fahad', 'sa', 'فهد', 'سعودي · نجدي', true, 580, 214], ['en-theodore', 'gb', 'Theodore', 'British', false, 16, 252],
+         ['ar-sumaya', 'eg', 'سمية', 'مصري · قاهري', true, 560, 650], ['en-luna', 'in', 'Luna', 'Indian', false, 22, 666]];
+    tags.forEach(([a, f, name, accent, rtl, x, y]) => {
+      const t = el('pill', `<div class="av"><img class="f" src="${IMG}speakers/${a}.webp"><div class="fl"><img src="${IMG}flags/${f}.svg"></div></div><div><div class="nm">${name}</div><div class="dl">${accent}</div></div>`);
+      t.setAttribute('dir', rtl ? 'rtl' : 'ltr');
+      // x counts from the cover's edge on the cards' side, so the layout mirrors for Arabic.
+      Object.assign(t.style, { top: y + 'px' });
+      if (AR) t.style.left = x + 'px'; else t.style.right = x + 'px';
+    });
+  }
+
+  // The brand waves from the ad, frozen mid-word.
+  function wave(cv, seed) {
+    const g = cv.getContext('2d'); const w = cv.width; const h = cv.height; const mid = h / 2; const N = 140;
+    const grad = g.createLinearGradient(0, 0, w, 0);
+    grad.addColorStop(0, 'rgba(118,89,250,0)'); grad.addColorStop(.5, 'rgba(118,89,250,.35)'); grad.addColorStop(1, 'rgba(118,89,250,0)');
+    g.fillStyle = grad; g.fillRect(0, mid - 1, w, 2);
+    g.globalCompositeOperation = 'multiply';
+    [[1.15, 2.3, 0, 1, '118,89,250', .5], [1.6, 3.1, 1.9, .82, '170,150,255', .42], [.9, 2.7, 3.7, .64, '255,168,204', .38]].forEach(([f1, f2, p, k, c, a]) => {
+      const ys = []; for (let i = 0; i <= N; i++) { const x = i / N; const env = Math.pow(Math.sin(Math.PI * x), 2.4);
+        ys.push((mid - 3) * .92 * k * env * (Math.sin(2 * Math.PI * f1 * x + seed * 2.1 + p) * .64 + Math.sin(2 * Math.PI * f2 * x + seed * 3.3 + p * 1.7) * .36)); }
+      g.beginPath(); ys.forEach((y, i) => (i ? g.lineTo(i / N * w, mid - y) : g.moveTo(0, mid - y)));
+      for (let i = N; i >= 0; i--) g.lineTo(i / N * w, mid + ys[i]);
+      g.closePath(); g.fillStyle = `rgba(${c},${a})`; g.fill();
+    });
+  }
+
+  window.ready = (async () => {
+    await document.fonts.ready;
+    await Promise.all([...document.images].map(i => (i.complete ? i.decode().catch(() => {}) : new Promise(r => { i.onload = i.onerror = () => r(); }))));
+    return { W, H };
+  })();
+})();
+</script>
+</body>
+</html>
