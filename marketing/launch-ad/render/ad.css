@@ -16,8 +16,8 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width: var(--W); height: var(--H); overflow: hidden; background: var(--paper); -webkit-font-smoothing: antialiased; }
-body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: var(--ink); }
-.ar, [dir=rtl] { font-family: 'IBM Plex Sans Arabic', 'IBM Plex Sans', sans-serif; }
+/* Alexandria, the website's font, for Arabic and English alike. */
+body, .ar, [dir=rtl] { font-family: 'Alexandria', system-ui, sans-serif; color: var(--ink); }
 #stage { position: relative; width: var(--W); height: var(--H); overflow: hidden; background: var(--paper); }
 .layer { position: absolute; inset: 0; pointer-events: none; }
 .abs { position: absolute; }
@@ -32,8 +32,8 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 /* Words */
 .w { display: inline-block; white-space: pre; }
 .title { position: absolute; left: 0; right: 0; text-align: center; padding: 0 70px; text-wrap: balance; color: var(--ink); }
-.title.display { font-weight: 600; letter-spacing: -1.5px; line-height: 1.12; }
-.title.display.ar { letter-spacing: 0; line-height: 1.32; }
+.title.display { font-weight: 600; letter-spacing: -1px; line-height: 1.16; }
+.title.display.ar { letter-spacing: 0; line-height: 1.38; }
 .title .soft { color: var(--muted); font-weight: 500; }
 .accent { color: var(--brand); }
 
@@ -62,19 +62,19 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 .card .head { display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .card .who { display: flex; align-items: center; gap: 16px; }
 .card .who img { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(0,0,0,.08); }
-.card .name { font-size: 68px; font-weight: 600; line-height: 1; letter-spacing: -.5px; }
-.chip { display: inline-flex; align-items: center; gap: 10px; padding: 9px 22px; border-radius: 999px; font-size: 30px; font-weight: 600;
+.card .name { font-size: 62px; font-weight: 600; line-height: 1; letter-spacing: -.5px; }
+.chip { display: inline-flex; align-items: center; gap: 10px; padding: 9px 22px; border-radius: 999px; font-size: 27px; font-weight: 600;
   background: var(--brand-soft); color: var(--brand); white-space: nowrap; }
 .chips-row { display: flex; gap: 12px; justify-content: center; }
 .chip.emo { background: #FFEEE5; color: #B4461A; }
 .chip.emo i { width: 12px; height: 12px; border-radius: 50%; background: #F07A43; display: block; }
-.card .script { margin-top: 36px; font-size: 58px; font-weight: 600; line-height: 1.42; text-align: center; text-wrap: balance; color: var(--faint); }
+.card .script { margin-top: 36px; font-size: 50px; font-weight: 600; line-height: 1.42; text-align: center; text-wrap: balance; color: var(--faint); }
 .card .script .w.said { color: var(--ink); }
 .card .script .w.now { color: var(--brand); }
 .tag { display: inline-flex; align-items: center; gap: 8px; vertical-align: middle; margin: 0 6px; padding: 4px 16px 4px 12px; border-radius: 14px;
-  font-size: 30px; font-weight: 600; background: #FFF4D6; color: #8A5A00; border: 1px solid #F3DDA0; line-height: 1.3; }
+  font-size: 26px; font-weight: 500; background: #FFF4D6; color: #8A5A00; border: 1px solid #F3DDA0; line-height: 1.3; }
 .tag svg { width: 30px; height: 30px; }
-.card .tr { margin-top: 18px; font-size: 32px; font-weight: 500; color: var(--muted); text-align: center; line-height: 1.4; }
+.card .tr { margin-top: 18px; font-size: 28px; font-weight: 500; color: var(--muted); text-align: center; line-height: 1.4; }
 .player { display: flex; align-items: center; gap: 26px; margin-top: 40px; direction: ltr; }
 .player .btn { width: 92px; height: 92px; border-radius: 50%; background: var(--ink); display: grid; place-items: center; flex: none; }
 .player .btn svg { width: 34px; height: 34px; }
@@ -88,10 +88,10 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 .envicon { width: 108px; height: 108px; border-radius: 32px; display: grid; place-items: center; background: var(--brand-soft); color: var(--brand-icon); flex: none; }
 .envicon svg { width: 58px; height: 58px; }
 .envid { display: flex; flex-direction: column; gap: 8px; }
-.envid .place { font-size: 52px; font-weight: 600; line-height: 1.1; }
-.envid .scene { font-size: 30px; font-weight: 500; color: var(--muted); }
+.envid .place { font-size: 46px; font-weight: 600; line-height: 1.1; }
+.envid .scene { font-size: 26px; font-weight: 500; color: var(--muted); }
 .seg { position: relative; display: flex; margin-top: 34px; padding: 8px; border-radius: 999px; background: #F2F0F7; width: 100%; }
-.seg span { position: relative; z-index: 1; flex: 1; text-align: center; padding: 18px 0; font-size: 32px; font-weight: 600; color: var(--muted); }
+.seg span { position: relative; z-index: 1; flex: 1; text-align: center; padding: 18px 0; font-size: 28px; font-weight: 600; color: var(--muted); }
 .seg span.on { color: #fff; }
 .seg .knob { position: absolute; top: 8px; bottom: 8px; border-radius: 999px; background: var(--ink); box-shadow: 0 8px 20px rgba(17,17,20,.22); }
 .envwm { position: absolute; color: rgba(91, 61, 245, .13); }
@@ -99,7 +99,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 
 /* Reveal banner */
 .banner { position: absolute; left: 50%; display: flex; align-items: center; gap: 18px; padding: 26px 42px; border-radius: 999px; white-space: nowrap;
-  background: #fff; border: 1px solid var(--line); box-shadow: 0 30px 70px rgba(40,30,90,.16); font-size: 46px; font-weight: 600; }
+  background: #fff; border: 1px solid var(--line); box-shadow: 0 30px 70px rgba(40,30,90,.16); font-size: 40px; font-weight: 600; }
 .banner img { height: 46px; }
 
 /* Studio card (CTA) */
@@ -108,7 +108,7 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 .studio .bar { display: flex; align-items: center; gap: 12px; margin-bottom: 30px; }
 .studio .bar i { width: 16px; height: 16px; border-radius: 50%; background: #E6E3EE; display: block; }
 .studio .bar b { margin-inline-start: auto; font-size: 28px; font-weight: 600; color: var(--muted); }
-.studio .text { font-size: 56px; font-weight: 600; min-height: 150px; line-height: 1.35; }
+.studio .text { font-size: 48px; font-weight: 600; min-height: 150px; line-height: 1.35; }
 .studio .caret { display: inline-block; width: 5px; height: 60px; background: var(--brand); vertical-align: middle; margin-inline-start: 6px; border-radius: 3px; }
 .studio .chips { display: flex; gap: 14px; margin: 26px 0 8px; flex-wrap: nowrap; overflow: hidden; }
 .studio .chips .chip { background: #F2F0F7; color: var(--ink-2); flex: none; }
@@ -119,13 +119,13 @@ body { font-family: 'IBM Plex Sans', 'IBM Plex Sans Arabic', sans-serif; color: 
 .endlogo { position: absolute; left: 50%; }
 .stats { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 24px; direction: ltr; }
 .stat { min-width: 400px; padding: 30px 34px; border-radius: 36px; text-align: center; background: #fff; border: 1px solid var(--line); box-shadow: 0 24px 60px rgba(40,30,90,.10); }
-.stat .n { font-size: 100px; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--ink); font-variant-numeric: tabular-nums; }
-.stat .l { font-size: 34px; font-weight: 600; color: var(--muted); margin-top: 10px; }
+.stat .n { font-size: 92px; font-weight: 700; line-height: 1; letter-spacing: -2px; color: var(--ink); font-variant-numeric: tabular-nums; }
+.stat .l { font-size: 30px; font-weight: 600; color: var(--muted); margin-top: 10px; }
 .stats.small .stat { min-width: 330px; padding: 22px 26px; }
 .stats.small .stat .n { font-size: 78px; }
 .stats.small .stat .l { font-size: 28px; }
-.url { position: absolute; left: 0; right: 0; text-align: center; font-size: 44px; font-weight: 600; color: var(--ink-2); letter-spacing: .3px; }
-.cta-btn { position: absolute; left: 50%; padding: 30px 80px; border-radius: 999px; font-size: 48px; font-weight: 600; white-space: nowrap; overflow: hidden;
+.url { position: absolute; left: 0; right: 0; text-align: center; font-size: 40px; font-weight: 600; color: var(--ink-2); letter-spacing: .3px; }
+.cta-btn { position: absolute; left: 50%; padding: 30px 80px; border-radius: 999px; font-size: 42px; font-weight: 600; white-space: nowrap; overflow: hidden;
   background: var(--ink); color: #fff; box-shadow: 0 24px 50px rgba(17,17,20,.25); }
 .cta-btn .shine { position: absolute; top: -20%; width: 30%; height: 140%; background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); transform: skewX(-20deg); }
 .faces { position: absolute; left: 0; right: 0; display: flex; justify-content: center; direction: ltr; }

@@ -8,6 +8,7 @@ initial prompt so the transcript (and so the word timings) follows it. The
 transcript is kept next to the script, so a wrong or cut-off clip shows up.
 """
 
+import hashlib
 import json
 import pathlib
 import sys
@@ -24,8 +25,9 @@ model = WhisperModel("large-v3", device="cpu", compute_type="int8")
 result = json.loads(out_file.read_text(encoding="utf-8")) if out_file.exists() else {}
 for wav in sorted(voices.glob("*.wav")):
     slug = wav.stem
-    if slug in result and result[slug].get("script") == lines.get(slug, {}).get("text"):
-        continue  # already transcribed with this script
+    digest = hashlib.md5(wav.read_bytes()).hexdigest()
+    if slug in result and result[slug].get("md5") == digest:
+        continue  # this exact take is already transcribed
     line = lines.get(slug, {})
     language = line.get("language", "ar")
     data, rate = sf.read(str(wav), dtype="float32", always_2d=True)
@@ -47,6 +49,7 @@ for wav in sorted(voices.glob("*.wav")):
         "script": line.get("text"),
         "heard": " ".join(w["w"] for w in words),
         "duration": round(info.duration, 3),
+        "md5": digest,
         "words": words,
     }
     print(f"{slug} ({info.duration:.2f}s): {result[slug]['heard']}", flush=True)

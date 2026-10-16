@@ -95,12 +95,12 @@
   const wordsHtml = (ws, accentFrom = Infinity) => ws.map((w, i) => `<span class="w${i >= accentFrom ? ' accent' : ''}">${w.w} </span>`).join('');
   const hook = sceneOf('hook');
   const hookTitle = el('div', 'title display' + (isAr(hook.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(hook.words, hook.words.length - 1));
-  css(hookTitle, { top: L.hookY + 'px', fontSize: (T.ratio === '4x5' ? 84 : 104) + 'px' });
+  css(hookTitle, { top: L.hookY + 'px', fontSize: (T.ratio === '4x5' ? 74 : 90) + 'px' });
   const hookWords = [...hookTitle.querySelectorAll('.w')];
 
   const sw = sceneOf('switch') || { start: -9, end: -9, words: [] };
   const swTitle = el('div', 'title display' + (isAr(sw.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(sw.words, sw.words.length - 1));
-  css(swTitle, { top: L.switchY + 'px', fontSize: (T.ratio === '4x5' ? 110 : 128) + 'px' });
+  css(swTitle, { top: L.switchY + 'px', fontSize: (T.ratio === '4x5' ? 96 : 110) + 'px' });
   const swWords = [...swTitle.querySelectorAll('.w')];
   const swFlags = (() => { const i = scenes.indexOf(sw); if (i < 0) return []; return scenes.slice(i + 1).filter(s => s.kind === 'speaker').map(s => s.flag).filter((f, k, a) => a.indexOf(f) === k); })()
     .map(f => el('div', 'flagchip', stage, `<img src="assets/${f}.svg">`));
@@ -114,7 +114,7 @@
       return n;
     }
     const n = el('div', 'title display' + (isAr(p.text) ? ' ar' : ''), stage, wordsHtml(p.words, i === 1 ? 0 : Infinity));
-    css(n, { fontSize: (i === 1 ? (T.ratio === '4x5' ? 112 : 132) : (T.ratio === '4x5' ? 84 : 100)) + 'px' });
+    css(n, { fontSize: (i === 1 ? (T.ratio === '4x5' ? 98 : 116) : (T.ratio === '4x5' ? 74 : 88)) + 'px' });
     return n;
   });
 
@@ -123,7 +123,7 @@
   if (intro) {
     const split = intro.words.findIndex(w => /^(في|anywhere)/.test(w.w));
     introTitle = el('div', 'title display' + (isAr(intro.words.map(w => w.w).join('')) ? ' ar' : ''), stage, wordsHtml(intro.words, split < 0 ? Infinity : split));
-    css(introTitle, { top: L.introY + 'px', fontSize: (T.ratio === '4x5' ? 80 : 96) + 'px' });
+    css(introTitle, { top: L.introY + 'px', fontSize: (T.ratio === '4x5' ? 68 : 80) + 'px' });
     introWords = [...introTitle.querySelectorAll('.w')];
     introIcons = ['announcement', 'phone', 'radio', 'hall', 'cave', 'church'].map(k => el('div', 'envchip', stage, icon(k)));
   }
@@ -173,7 +173,7 @@
   let envTitle = null;
   if (firstEnv) {
     envTitle = el('div', 'title display' + (AR ? ' ar' : ''), stage, AR ? 'ضع صوتك في <span class="accent">أي مكان</span>' : 'Put your voice <span class="accent">anywhere</span>');
-    css(envTitle, { top: L.envTitleY + 'px', fontSize: (T.ratio === '4x5' ? 68 : 82) + 'px' });
+    css(envTitle, { top: L.envTitleY + 'px', fontSize: (T.ratio === '4x5' ? 60 : 72) + 'px' });
   }
 
   // ── CTA ────────────────────────────────────────────────────
@@ -192,7 +192,7 @@
   const typedEl = studio.querySelector('.typed'); const caret = studio.querySelector('.caret');
   const chipEls = [...studio.querySelectorAll('.chip')]; const studioBtn = studio.querySelector('.btn'); const studioBars = [...studio.querySelectorAll('.bars i')];
   const tagline = el('div', 'title display' + (AR ? ' ar' : ''), ctaRoot, AR ? 'اكتب… <span class="accent">واسمع</span>' : 'Type it. <span class="accent">Hear it.</span>');
-  css(tagline, { top: L.tagY + 'px', fontSize: (T.ratio === '4x5' ? 64 : 76) + 'px' });
+  css(tagline, { top: L.tagY + 'px', fontSize: (T.ratio === '4x5' ? 56 : 66) + 'px' });
   const endLogo = el('img', 'endlogo', ctaRoot); endLogo.src = LOGO; css(endLogo, { height: L.logoH + 'px', top: L.logoY + 'px' });
   const stats = el('div', 'stats' + (T.ratio === '4x5' ? ' small' : ''), ctaRoot,
     `<div class="stat"><div class="n">+140</div><div class="l ${AR ? 'ar' : ''}">${AR ? 'لهجة عربية' : 'Arabic dialects'}</div></div>` +
