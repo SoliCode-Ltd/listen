@@ -9,10 +9,10 @@
       hookY: 300, tilesTop: 790, tileS: 196, tileGap: 40, switchY: 560, flagsY: 870, flag: 120, revealY: 330, bannerY: 1000,
       envTitleY: 390, envCardY: 610, introY: 520, introIconsY: 980, waveH: 170,
       studioY: 560, tagY: 420, logoY: 540, logoH: 190, statsY: 820, urlY: 1080, btnY: 1170, facesY: 1345 },
-    '4x5': { W: 1080, H: 1350, brandY: 56, pr: { x: 540, y: 300, d: 236 }, cardY: 330, cardX: 80, cardW: 920, wmY: 1010, wmS: 300,
-      hookY: 120, tilesTop: 500, tileS: 160, tileGap: 30, switchY: 300, flagsY: 560, flag: 104, revealY: 120, bannerY: 700,
-      envTitleY: 120, envCardY: 290, introY: 330, introIconsY: 700, waveH: 130,
-      studioY: 260, tagY: 130, logoY: 230, logoH: 160, statsY: 450, urlY: 690, btnY: 770, facesY: 920 },
+    '4x5': { W: 1080, H: 1350, brandY: 56, pr: { x: 540, y: 362, d: 236 }, cardY: 392, cardX: 80, cardW: 920, wmY: 960, wmS: 320,
+      hookY: 160, tilesTop: 560, tileS: 180, tileGap: 34, switchY: 390, flagsY: 650, flag: 104, revealY: 170, bannerY: 760,
+      envTitleY: 170, envCardY: 340, introY: 420, introIconsY: 770, waveH: 130,
+      studioY: 380, tagY: 210, logoY: 310, logoH: 160, statsY: 530, urlY: 770, btnY: 850, facesY: 1000 },
   };
   const L = LAYOUTS[T.ratio] || LAYOUTS['9x16'];
   document.documentElement.style.setProperty('--W', L.W + 'px');
