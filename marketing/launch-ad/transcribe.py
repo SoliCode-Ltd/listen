@@ -26,8 +26,9 @@ result = json.loads(out_file.read_text(encoding="utf-8")) if out_file.exists() e
 for wav in sorted(voices.glob("*.wav")):
     slug = wav.stem
     digest = hashlib.md5(wav.read_bytes()).hexdigest()
-    if slug in result and result[slug].get("md5") == digest:
-        continue  # this exact take is already transcribed
+    old = result.get(slug) or {}
+    if old.get("md5") == digest or ("md5" not in old and old and old.get("script") == line.get("text")):
+        continue  # this take is already transcribed
     line = lines.get(slug, {})
     language = line.get("language", "ar")
     data, rate = sf.read(str(wav), dtype="float32", always_2d=True)
