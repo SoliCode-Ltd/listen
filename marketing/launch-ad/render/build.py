@@ -75,11 +75,11 @@ FAST_AR = [
 FAST_EN = [
     ("finn", dict(fast=True)),
     ("luna", dict(words=(0, 5), fast=True, tr_ar="يا جماعة، أكيد أنا حقيقية!")),
-    ("charlie", dict(fast=True)),
+    ("charlie", dict(fast=True, tail=0.5)),
 ]
 CUTS = {
     "ar": dict(ui="ar", narrator="ad-ar", order=[
-        "hook", "fahad", "sumaya", *FAST_AR, "switch", "daisy", ("theodore", dict(fast=True, lead_trim=True)), *FAST_EN, "reveal", "cta"]),
+        "hook", "fahad", "sumaya", *FAST_AR, "switch", "daisy", ("theodore", dict(fast=True)), *FAST_EN, "reveal", "cta"]),
     "en": dict(ui="en", narrator="ad-en", order=[
         "hook", "daisy", "theodore", *FAST_EN, "switch", "fahad", "sumaya", *FAST_AR, "reveal", "cta"]),
     # About 30 seconds, for paid placements.
@@ -96,7 +96,7 @@ NARRATION = {
 
 # Seconds before the voice starts and after it ends, per scene kind.
 PRE = dict(hook=0.6, speaker=0.34, fast=0.2, switch=0.24, reveal=0.45, cta=0.45)
-POST = dict(hook=0.3, speaker=0.26, fast=0.1, switch=0.14, reveal=0.65, cta=2.2)
+POST = dict(hook=0.3, speaker=0.26, fast=0.1, switch=0.14, reveal=0.65, cta=2.9)
 GRID = 0.25  # half a beat at 120 BPM: every scene starts on the music grid
 
 
@@ -129,33 +129,54 @@ def speech_span(audio, threshold_db=-42):
     return loud[0] * hop / SR, (loud[-1] + 1) * hop / SR
 
 
-def caption_words(script, heard, offset):
-    """Script words timed from the transcript's words (shifted by offset)."""
+def _norm(word):
+    import re
+    w = re.sub(r"[\u064B-\u0652\u0640]", "", word)  # diacritics, tatweel
+    w = re.sub(r"[إأآا]", "ا", w).replace("ى", "ي").replace("ة", "ه")
+    return re.sub(r"[^\w]", "", w.lower())
+
+
+def caption_words(script, heard, offset, speech_start=0.0):
+    """Script words timed from the transcript: matching words take the
+    transcript's times, the rest are spread between their neighbours."""
+    import difflib
     import re
     clean = re.sub(r"\s*<[^<>]+>\s*", " ", script).strip()
     words = clean.split()
     if not heard:
         return [dict(w=w, s=None, e=None) for w in words]
-    if len(heard) == len(words):
-        return [dict(w=w, s=h["start"] - offset, e=h["end"] - offset) for w, h in zip(words, heard)]
-    # Map by character position: the n-th character of the script is spoken
-    # when the n-th character of the transcript is.
-    hc = np.cumsum([0] + [max(1, len(h["w"])) for h in heard])
-    ht = [heard[0]["start"]] + [h["end"] for h in heard]
-    starts = [h["start"] for h in heard]
-    sc = np.cumsum([0] + [len(w) for w in words])
-    total_h, total_s = hc[-1], sc[-1]
-
-    def at(frac):
-        x = frac * total_h
-        i = int(np.searchsorted(hc, x, side="right") - 1)
-        i = min(max(i, 0), len(heard) - 1)
-        within = (x - hc[i]) / max(1, hc[i + 1] - hc[i])
-        return starts[i] + within * (heard[i]["end"] - starts[i])
-
+    times = [None] * len(words)
+    sm = difflib.SequenceMatcher(a=[_norm(w) for w in words], b=[_norm(h["w"]) for h in heard], autojunk=False)
+    for tag, i1, i2, j1, j2 in sm.get_opcodes():
+        if tag == "equal" or (tag == "replace" and i2 - i1 == j2 - j1):
+            for k in range(i2 - i1):
+                times[i1 + k] = (heard[j1 + k]["start"], heard[j1 + k]["end"])
+    # Words the transcript missed: share the gap between known neighbours by length.
+    i = 0
+    while i < len(words):
+        if times[i] is not None:
+            i += 1
+            continue
+        j = i
+        while j < len(words) and times[j] is None:
+            j += 1
+        lo = times[i - 1][1] if i > 0 else speech_start
+        hi = times[j][0] if j < len(words) else heard[-1]["end"]
+        if i == 0 and j < len(words):
+            # Leading words: said right at the start, at a natural pace.
+            hi = min(hi, lo + sum(len(w) for w in words[i:j]) * 0.075 + 0.15)
+        total = sum(len(w) for w in words[i:j]) or 1
+        cur = lo
+        for k in range(i, j):
+            d = (hi - lo) * len(words[k]) / total
+            times[k] = (cur, cur + d)
+            cur += d
+        i = j
     out = []
-    for k, w in enumerate(words):
-        out.append(dict(w=w, s=at(sc[k] / total_s) - offset, e=at(sc[k + 1] / total_s) - offset))
+    for k, (w, (a, b)) in enumerate(zip(words, times)):
+        if k == 0:
+            a = max(a, speech_start)
+        out.append(dict(w=w, s=a - offset, e=max(b, a + 0.05) - offset))
     return out
 
 
@@ -171,11 +192,11 @@ def stadium_clip(goal_only=False):
     return cut, 0.08, words[-1]["e"] + 0.02, words
 
 
-def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False):
+def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False, tail=None):
     audio = load_audio(VOICES / f"{slug}.wav")
     s, e = speech_span(audio)
     heard = (heard_all.get(slug) or {}).get("words") or []
-    words = caption_words(texts.get(slug, ""), heard, 0.0)
+    words = caption_words(texts.get(slug, ""), heard, 0.0, s)
     if any(w["s"] is None for w in words):
         span = (e - s) / max(1, len(words))
         for i, w in enumerate(words):
@@ -185,6 +206,8 @@ def prepared_clip(slug, texts, heard_all, word_range=None, lead_trim=False):
         words = words[lo: (hi + 1) if hi is not None else None]
         s = max(s, words[0]["s"] - 0.05) if lo else s
         e = min(e, words[-1]["e"] + 0.08) if hi is not None else e
+    if tail is not None and words:
+        e = min(e, words[-1]["e"] + tail)
     if lead_trim and words:
         s = max(s, words[0]["s"] - 0.06)
     a = max(0.0, s - 0.04)
@@ -218,7 +241,7 @@ def build(cut_name, out_dir, ratio):
             if meta.get("stadium"):
                 clip, vs, ve, words = stadium_clip(goal_only=opts.get("goal", False))
             else:
-                clip, vs, ve, words = prepared_clip(meta["clip"], texts, heard_all, opts.get("words"), opts.get("lead_trim", False))
+                clip, vs, ve, words = prepared_clip(meta["clip"], texts, heard_all, opts.get("words"), opts.get("lead_trim", False), opts.get("tail"))
         else:
             clip, vs, ve, words = prepared_clip(narr[kind], texts, heard_all)
         pace = "fast" if opts.get("fast") else kind
@@ -227,7 +250,7 @@ def build(cut_name, out_dir, ratio):
         vo_start, vo_end = start + PRE[pace], start + PRE[pace] + (ve - vs)
         end = vo_end + POST[pace]
         if kind == "cta":
-            end = max(end, vo_end + 2.4)
+            end = max(end, vo_end + 2.9)
         scene = dict(kind=kind, id=item, start=round(start, 3), end=round(end, 3), vo_start=round(vo_start, 3), vo_end=round(vo_end, 3),
                      clip_at=clip_at, words=[dict(w=w["w"], s=None if w["s"] is None else round(w["s"] + clip_at, 3),
                                                   e=None if w["e"] is None else round(w["e"] + clip_at, 3)) for w in words])
@@ -259,7 +282,8 @@ def build(cut_name, out_dir, ratio):
     impact_word = next((w for w in reveal["words"] if w["w"].startswith(("ولا", "None"))), reveal["words"][min(1, len(reveal["words"]) - 1)])
     reveal["impact"] = impact_word["s"]
     cta = next(s for s in scenes if s["kind"] == "cta")
-    cta["logo_at"] = round(cta["vo_end"] - 0.9, 3)
+    brand = next((w for w in cta["words"] if w["w"].startswith(("منصة", "Listen"))), cta["words"][-1])
+    cta["logo_at"] = round(brand["s"] - 0.1, 3)
 
     # ── Voice track ──
     n = int((duration + 1.0) * SR)
@@ -290,27 +314,29 @@ def build(cut_name, out_dir, ratio):
     tiles = [CAST[sc["id"]]["avatar"] for sc in scenes if sc["kind"] == "speaker"]
     tile_times = [round(0.12 + i * 0.07, 3) for i in range(len(tiles))]
     for i, tt in enumerate(tile_times):
-        sound.add(sfx, sound.pop(pitch=0.9 + 0.05 * (i % 5), pan=((i % 4) - 1.5) / 2.5), tt, 0.35)
-    sound.add(sfx, sound.riser(1.2), first_speaker["start"] - 1.2, 0.18)
+        sound.add(sfx, sound.pop(pitch=0.9 + 0.05 * (i % 5), pan=((i % 4) - 1.5) / 2.5), tt, 0.22)
+    sound.add(sfx, sound.riser(1.2), first_speaker["start"] - 1.2, 0.1)
     for i, sc in enumerate(scenes[1:], start=1):
         if sc["kind"] in ("speaker", "switch", "cta"):
-            sound.add(sfx, sound.whoosh(0.5, pan_from=0.7 if i % 2 else -0.7, pan_to=-0.7 if i % 2 else 0.7), sc["start"] - 0.22, 0.42)
+            sound.add(sfx, sound.whoosh(0.5, pan_from=0.7 if i % 2 else -0.7, pan_to=-0.7 if i % 2 else 0.7), sc["start"] - 0.3, 0.2)
         if sc.get("stadium"):
-            sound.add(sfx, sound.impact(0.6), sc["vo_start"], 0.35)
-    sound.add(sfx, sound.whoosh(0.7, rising=False), reveal["start"] - 0.3, 0.45)
-    sound.add(sfx, sound.riser(1.4), reveal["impact"] - 1.4, 0.32)
-    sound.add(sfx, sound.impact(), reveal["impact"] - 0.02, 0.85)
+            sound.add(sfx, sound.butter(sound.impact(0.6), "lowpass", 180), sc["vo_start"] - 0.05, 0.3)
+    sound.add(sfx, sound.whoosh(0.7, rising=False), reveal["start"] - 0.4, 0.24)
+    sound.add(sfx, sound.riser(1.4), reveal["impact"] - 1.4, 0.2)
+    # The hit is mostly sub-bass so it lands under the narrator's words, not on them.
+    sound.add(sfx, sound.butter(sound.impact(), "lowpass", 160), reveal["impact"] - 0.03, 0.75)
+    sound.add(sfx, sound.butter(sound.impact(), "highpass", 160), reveal["impact"] - 0.03, 0.12)
     reveal_tiles = [round(reveal["impact"] + 0.12 + i * 0.05, 3) for i in range(len(tiles))]
     for i, tt in enumerate(reveal_tiles):
-        sound.add(sfx, sound.pop(pitch=1.25 + 0.04 * (i % 6), pan=((i % 4) - 1.5) / 2.5), tt, 0.22)
+        sound.add(sfx, sound.pop(pitch=1.25 + 0.04 * (i % 6), pan=((i % 4) - 1.5) / 2.5), tt, 0.12)
     typing = [round(cta["start"] + 0.55 + k * 0.075 + (0.02 if k % 3 == 0 else 0), 3) for k in range(18)]
     for tt in typing:
-        sound.add(sfx, sound.tick(), tt, 0.5)
-    stats_at = round(cta["start"] + 2.2, 3)
+        sound.add(sfx, sound.tick(), tt, 0.3)
+    stats_at = round(cta["logo_at"] + 0.45, 3)
     sound.add(sfx, sound.pop(1.1), stats_at, 0.35)
     sound.add(sfx, sound.pop(1.3), stats_at + 0.25, 0.35)
-    sound.add(sfx, sound.impact(0.55), cta["logo_at"], 0.5)
-    sound.add(sfx, sound.shimmer(), cta["logo_at"], 0.55)
+    sound.add(sfx, sound.butter(sound.impact(0.55), "lowpass", 160), cta["logo_at"], 0.45)
+    sound.add(sfx, sound.shimmer(), cta["vo_end"] - 0.05, 0.4)
 
     # ── Mix: music ducks under the voices ──
     def lufs_gain(x, target):
@@ -335,7 +361,12 @@ def build(cut_name, out_dir, ratio):
     music_gain = 1 - 0.55 * duck
     music_under = sound.butter(music, "bandstop", [1400, 3800], order=1) * 0.35 + music * 0.65
     music = music * (1 - duck)[:, None] * music_gain[:, None] + music_under * duck[:, None] * music_gain[:, None]
+    sfx = sfx * (1 - 0.45 * duck)[:, None]
     mix = vo + music + sfx * 0.9
+    stems = pathlib.Path(out_dir) / cut_name / "stems"
+    stems.mkdir(parents=True, exist_ok=True)
+    for name, x in (("vo", vo), ("music", music), ("sfx", sfx * 0.9)):
+        sf.write(stems / f"{name}.wav", x.astype(np.float32), SR, subtype="FLOAT")
     mix = mix[: int((duration + 0.2) * SR)]
     tail = int(0.5 * SR)
     mix[-tail:] *= np.linspace(1, 0, tail)[:, None]

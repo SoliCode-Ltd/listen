@@ -6,11 +6,11 @@
   const AR = T.ui === 'ar';
   const LAYOUTS = {
     '9x16': { W: 1080, H: 1920, hudY: 196, av: { x: 540, y: 770, d: 560 }, plateY: 1112, capY: 1300, capW: 990,
-      titleY: 340, tilesTop: 650, tileS: 220, tileGap: 26, cardY: 520, cardW: 960, statsY: 1080, featsY: 1310,
-      logoY: 700, logoH: 210, urlY: 990, btnY: 1110, revealY: 380, waveY: 1560, waveH: 200 },
+      titleY: 340, tilesTop: 650, tileS: 220, tileGap: 26, cardY: 560, cardW: 960, tagY: 420, logoY: 545, logoH: 200, statsY: 820, urlY: 1080, btnY: 1170, facesY: 1345,
+      revealY: 380, waveY: 1560, waveH: 200 },
     '4x5': { W: 1080, H: 1350, hudY: 36, av: { x: 540, y: 470, d: 420 }, plateY: 722, capY: 885, capW: 990,
-      titleY: 150, tilesTop: 380, tileS: 176, tileGap: 22, cardY: 230, cardW: 940, statsY: 760, featsY: 975,
-      logoY: 420, logoH: 170, urlY: 655, btnY: 760, revealY: 150, waveY: 1150, waveH: 160 },
+      titleY: 150, tilesTop: 380, tileS: 176, tileGap: 22, cardY: 300, cardW: 940, tagY: 120, logoY: 225, logoH: 160, statsY: 430, urlY: 655, btnY: 735, facesY: 885,
+      revealY: 150, waveY: 1150, waveH: 160 },
   };
   const L = LAYOUTS[T.ratio] || LAYOUTS['9x16'];
   document.documentElement.style.setProperty('--W', L.W + 'px');
@@ -186,9 +186,7 @@
     `<div class="stat"><div class="n" dir="ltr">+60</div><div class="l">${AR ? 'لكنة إنجليزية' : 'English accents'}</div></div>`);
   css(stats, { top: L.statsY + 'px' });
   const statN = [...stats.querySelectorAll('.n')]; const statEls = [...stats.querySelectorAll('.stat')];
-  const feats = el('div', 'feats', ctaRoot, (AR ? ['مشاعر', 'حوارات', 'بيئات صوت', 'استنساخ صوتك'] : ['Emotions', 'Dialogues', 'Sound environments', 'Voice cloning']).map(f => `<span class="chip">${f}</span>`).join(''));
-  css(feats, { top: L.featsY + 'px' });
-  const featEls = [...feats.querySelectorAll('.chip')];
+  if (T.ratio === '4x5') stats.classList.add('small');
   const endLogo = el('img', 'endlogo', ctaRoot); endLogo.src = AR ? 'assets/logo-ar-dark.svg' : 'assets/logo-dark.svg';
   css(endLogo, { height: L.logoH + 'px', top: L.logoY + 'px' });
   const url = el('div', 'url', ctaRoot, 'listenai.studio'); css(url, { top: L.urlY + 'px' }); url.setAttribute('dir', 'ltr');
@@ -196,11 +194,11 @@
   css(btn, { top: L.btnY + 'px' });
   const shine = btn.querySelector('.shine');
   const faces = el('div', 'faces', ctaRoot, T.tiles.map(a => `<img src="assets/${a}.png">`).join(''));
-  css(faces, { top: (L.btnY + (T.ratio === '4x5' ? 150 : 200)) + 'px' });
+  css(faces, { top: L.facesY + 'px' });
   const faceEls = [...faces.querySelectorAll('img')];
   const tagline = el('div', 'title', ctaRoot, AR ? 'اكتب… واسمع' : 'Type it. Hear it.');
   tagline.classList.add('grad');
-  css(tagline, { top: (L.logoY - 170) + 'px', fontSize: '76px' });
+  css(tagline, { top: L.tagY + 'px', fontSize: (T.ratio === '4x5' ? 64 : 76) + 'px' });
 
   const wave = el('canvas', 'abs', stage); wave.width = L.W; wave.height = L.waveH * 2;
   css(wave, { left: 0, top: (L.waveY - L.waveH) + 'px', width: L.W + 'px', height: (L.waveH * 2) + 'px' });
@@ -303,7 +301,7 @@
     // Voice waveform along the bottom, whenever someone talks.
     const talking = T.scenes.some(s => t >= s.vo_start - .1 && t <= s.vo_end + .1);
     const waveOn = clamp(prog(t, .2, .6) - prog(t, T.duration - .6, .5));
-    const playing = t > T.typing[T.typing.length - 1] + .9 && t < cta.logo_at;
+    const playing = t > T.typing[T.typing.length - 1] + .25 && t < cta.logo_at;
     drawWave(t, talking ? amp(t) : playing ? .55 : 0, waveOn);
 
     // HUD: during the speakers.
@@ -468,19 +466,18 @@
     ctaRoot.style.display = vis ? 'block' : 'none';
     if (vis) {
       const t0 = cta.start;
-      const cardIn = E.outExpo(prog(t, t0 - .1, .6)); const cardOut = E.inExpo(prog(t, T.stats_at - .25, .35));
-      const statsOut = E.inExpo(prog(t, cta.logo_at - .3, .35));
+      const cardIn = E.outExpo(prog(t, t0 - .1, .6)); const cardOut = E.inExpo(prog(t, cta.logo_at - .35, .35));
+      const statsOut = 0;
       css(card, { opacity: cardIn * (1 - cardOut), transform: `translateY(${(1 - cardIn) * 120 - cardOut * 80}px) scale(${lerp(.92, 1, cardIn) * lerp(1, .94, cardOut)})` });
       const typeP = prog(t, T.typing[0] - .02, T.typing[T.typing.length - 1] - T.typing[0] + .1);
       const chars = Math.round(typed.length * typeP);
       typedEl.textContent = typed.slice(0, chars);
       caret.style.opacity = (Math.floor(t * 3) % 2 === 0 || typeP < 1) ? 1 : 0;
-      const pick = Math.floor(clamp(prog(t, T.typing[T.typing.length - 1], .9)) * 4.99);
-      chipEls.forEach((c, i) => c.classList.toggle('on', typeP >= 1 && i === pick));
-      chipsEl.style.transform = `translateX(${(AR ? 1 : -1) * E.inOut3(prog(t, t0 + .4, 2.2)) * 360}px)`;
-      const press = prog(t, T.typing[T.typing.length - 1] + .8, .25);
+      const pick = Math.min(4, Math.floor(prog(t, T.typing[T.typing.length - 1] - .3, .9) * 5));
+      chipEls.forEach((c, i) => c.classList.toggle('on', typeP > .6 && i === pick));
+      const press = prog(t, T.typing[T.typing.length - 1] + .15, .25);
       playBtn.style.transform = `scale(${1 - Math.sin(press * Math.PI) * .12})`;
-      const playing = prog(t, T.typing[T.typing.length - 1] + .9, .2);
+      const playing = prog(t, T.typing[T.typing.length - 1] + .25, .2);
       waveBars.forEach((b, i) => {
         const v = playing * (0.25 + 0.75 * Math.abs(Math.sin(i * .9 + t * 8) * Math.sin(i * .31 - t * 3.3)));
         b.style.height = (14 + v * 92) + 'px';
@@ -493,22 +490,17 @@
         const target = i === 0 ? 140 : 60;
         statN[i].textContent = '+' + Math.round(target * E.out3(prog(t, T.stats_at + i * .25, .9)));
       });
-      featEls.forEach((f, i) => {
-        const a = E.outBack(prog(t, T.stats_at + .5 + i * .09, .4), 2);
-        f.style.opacity = clamp(a) * (1 - statsOut);
-        f.style.transform = `scale(${a})`;
-      });
       // End card.
       const lg = E.outBack(prog(t, cta.logo_at, .6), 1.5);
       css(endLogo, { opacity: clamp(lg * 1.3), transform: `translateX(-50%) scale(${lerp(.6, 1, lg)})`, filter: `drop-shadow(0 0 ${40 * lg}px rgba(118,89,250,.6))` });
-      const tg = E.outExpo(prog(t, cta.logo_at + .25, .5));
+      const tg = E.outExpo(prog(t, cta.logo_at + .2, .5));
       css(tagline, { opacity: tg, transform: `translateY(${(1 - tg) * 30}px)` });
-      const u = E.outExpo(prog(t, cta.logo_at + .4, .5));
+      const u = E.outExpo(prog(t, T.stats_at + .55, .5));
       css(url, { opacity: u, transform: `translateY(${(1 - u) * 30}px)` });
-      const b = E.outBack(prog(t, cta.logo_at + .55, .5), 1.8);
+      const b = E.outBack(prog(t, T.stats_at + .7, .5), 1.8);
       css(btn, { opacity: clamp(b * 1.4), transform: `translateX(-50%) scale(${b * (1 + Math.sin(Math.max(0, t - cta.logo_at - 1.2) * 4) * .025)})` });
       faceEls.forEach((f, i) => {
-        const a = E.outBack(prog(t, cta.logo_at + .7 + i * .04, .4), 2);
+        const a = E.outBack(prog(t, T.stats_at + .9 + i * .04, .4), 2);
         f.style.opacity = clamp(a * 1.4); f.style.transform = `translateY(${(1 - a) * 30}px) scale(${a})`;
       });
       const sp = ((t - cta.logo_at - 1.1) % 1.6) / 1.6;
