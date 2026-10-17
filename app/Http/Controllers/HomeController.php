@@ -25,6 +25,7 @@ use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
 use App\Support\DialogueSpeakers;
+use App\Support\DiscountTerms;
 use App\Support\FreeAllowance;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
@@ -1076,6 +1077,23 @@ class HomeController extends Controller
                 ? $this->localizedPricingService->convertedQuoteFromUsd($originalMonthlyCents, 'monthly', $countryContext, 'stripe', $locale)
                 : null;
 
+            // How long the discount lasts and the card price after it. Manual payments
+            // never renew by themselves, so they get no "then" line.
+            $discountTerms = ['monthly' => null, 'yearly' => null];
+            if ($hasDiscount && $originalMonthlyQuote && $manualMethod === null) {
+                $fullYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
+                    (int) round($baseMonthlyCents * 12 * (1 - $yearlyDiscountPercent / 100)),
+                    'yearly',
+                    $countryContext,
+                    'stripe',
+                    $locale
+                );
+                $discountTerms = [
+                    'monthly' => DiscountTerms::line($plan, 'monthly', $discountPercentage, (string) $originalMonthlyQuote['amount_formatted']),
+                    'yearly' => DiscountTerms::line($plan, 'yearly', min(99, $discountPercentage + $yearlyDiscountPercent), (string) $fullYearlyQuote['amount_formatted']),
+                ];
+            }
+
             return [
                 'slug' => $plan->slug,
                 'name' => $localizedName,
@@ -1091,6 +1109,8 @@ class HomeController extends Controller
                 'discount_ends_at' => $discountEndsAt,
                 'original_price_monthly_cents' => $originalMonthlyCents,
                 'original_price_monthly_formatted' => $originalMonthlyQuote ? (string) $originalMonthlyQuote['amount_formatted'] : null,
+                'discount_terms_monthly' => $discountTerms['monthly'],
+                'discount_terms_yearly' => $discountTerms['yearly'],
                 'display_payment_method' => $manualMethod ?? 'stripe',
                 'display_currency' => (string) $displayMonthlyQuote['currency'],
                 'display_price_monthly_minor' => (int) $displayMonthlyQuote['amount_minor'],

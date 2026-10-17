@@ -290,6 +290,11 @@ return [
         'discount_was' => 'was',
         'discount_limited_offer' => 'Limited Time Offer',
         'discount_expired' => 'Offer ended',
+        // How long a discount lasts and the price after it (plan cards and checkout).
+        'discount_terms_first_month' => ':percent% off your first month, then :price/month',
+        'discount_terms_first_months' => ':percent% off your first :months months, then :price/month',
+        'discount_terms_first_year' => ':percent% off your first year, then :price/year',
+        'discount_terms_forever' => ':percent% off for as long as you stay subscribed',
         'lines' => [
             'label_voice_quality' => 'Voice quality',
             'label_max_chars_per_request' => 'Max text per generation',
@@ -402,6 +407,8 @@ return [
         'pay_choice_sub' => ':amount today. Your plan starts with full limits right away.',
         'due_today' => 'Due today',
         'trial_quote_hint' => 'Then :amount on :date unless you cancel before.',
+        'discount_quote_hint' => ':terms. Full price from :date unless you cancel before.',
+        'discount_quote_hint_forever' => ':terms.',
         'trial_active_notice' => 'Your :plan trial is active. Until it is paid, usage is capped at the :quota allowance: :credits credits (:minutes minutes of audio) and :per_request characters of text per voice. Cancel before the trial ends to avoid the charge.',
         'trial_canceled_notice' => 'Your :plan trial is canceled, so you will not be charged. You can keep using it until :date.',
         'trial_admin_test_title' => 'Admin test cards',

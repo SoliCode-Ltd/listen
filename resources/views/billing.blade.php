@@ -1545,6 +1545,14 @@
       quoteHint.textContent = selected.method === 'stripe'
         ? `${i18n.you_will_be_charged} ${amountBidi} (${cycleLabel(selected.meta)}).`
         : `${i18n.you_will_pay_manually} ${amountBidi}.`;
+      // A discount: today's price, how long it lasts, and when the full price starts.
+      const discountHint = selected.method === 'stripe' && selected.plan.has_discount
+        ? String(selected.plan.discount_terms?.[selected.cycle] || '')
+        : '';
+      if (discountHint) {
+        quoteAmountLabel.textContent = i18n.due_today;
+        quoteHint.textContent = discountHint;
+      }
       if (isTrialCheckout()) {
         const trial = trialState();
         quoteAmount.textContent = trial.zeroPlain;

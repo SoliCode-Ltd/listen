@@ -281,9 +281,9 @@ class StripeProductSyncService
             return null;
         }
 
-        $couponData = [
+        $duration = $plan->stripeCouponDuration();
+        $couponData = $duration + [
             'percent_off' => (float) $plan->discount_percentage,
-            'duration' => 'once',
             'name' => $plan->name . ' - ' . $plan->discount_percentage . '% Off',
             'metadata' => [
                 'listen_plan_slug' => $plan->slug,
@@ -301,6 +301,8 @@ class StripeProductSyncService
                 $existing = $stripe->coupons->retrieve($existingCouponId);
                 if (
                     (float) $existing->percent_off === (float) $plan->discount_percentage
+                    && (string) $existing->duration === $duration['duration']
+                    && (int) ($existing->duration_in_months ?? 0) === (int) ($duration['duration_in_months'] ?? 0)
                     && $existing->valid
                 ) {
                     return $existingCouponId; // No change needed
@@ -313,7 +315,12 @@ class StripeProductSyncService
         }
 
         // Create new coupon
-        $couponData['id'] = 'listen_' . $plan->slug . '_discount_' . $plan->discount_percentage;
+        // A first-payment coupon keeps the original id; other durations get their own.
+        $couponData['id'] = 'listen_' . $plan->slug . '_discount_' . $plan->discount_percentage . match ($duration['duration']) {
+            'repeating' => '_m' . $duration['duration_in_months'],
+            'forever' => '_forever',
+            default => '',
+        };
         try {
             $coupon = $stripe->coupons->create($couponData);
             return $coupon->id;

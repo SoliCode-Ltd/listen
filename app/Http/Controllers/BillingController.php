@@ -18,6 +18,7 @@ use App\Services\DemoHistoryImporter;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\StripeWebhookEmailService;
+use App\Support\DiscountTerms;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -1146,6 +1147,7 @@ class BillingController extends Controller
                     $checkoutPlan['has_discount'] = true;
                     $checkoutPlan['discount_percentage'] = (int) $plan->discount_percentage;
                     $checkoutPlan['discount_ends_at'] = $plan->discount_ends_at?->toIso8601String();
+                    $checkoutPlan['discount_terms'] = $this->checkoutDiscountTerms($plan, $countryContext, $locale);
                 }
 
                 return $checkoutPlan;
@@ -1207,6 +1209,36 @@ class BillingController extends Controller
         ];
     }
 
+    /**
+     * For each cycle at checkout: what the discount covers and when the full
+     * price starts, e.g. "30% off your first month, then $9.00/month. Full price
+     * from 17 Nov 2026 unless you cancel before."
+     *
+     * @return array{monthly: string, yearly: string}
+     */
+    private function checkoutDiscountTerms(Plan $plan, array $countryContext, string $locale): array
+    {
+        $promoPercent = max(0, min(99, (int) $plan->discount_percentage));
+        $yearlyPercent = SiteSetting::yearlyDiscountPercent();
+        // The prices Stripe charges once the discount is used up.
+        $fullCents = [
+            'monthly' => (int) $plan->price_cents,
+            'yearly' => (int) round((int) $plan->price_cents * 12 * SiteSetting::yearlyDiscountMultiplier()),
+        ];
+
+        $hints = [];
+        foreach ($fullCents as $cycle => $cents) {
+            $price = (string) $this->localizedPricingService->convertedQuoteFromUsd($cents, $cycle, $countryContext, 'stripe', $locale)['amount_formatted'];
+            $terms = DiscountTerms::line($plan, $cycle, $cycle === 'yearly' ? min(99, $promoPercent + $yearlyPercent) : $promoPercent, $price);
+            $from = DiscountTerms::fullPriceFrom($plan, $cycle);
+            $hints[$cycle] = $from
+                ? __('ui.billing.discount_quote_hint', ['terms' => $terms, 'date' => $this->formatCarbonDate($from)])
+                : __('ui.billing.discount_quote_hint_forever', ['terms' => $terms]);
+        }
+
+        return $hints;
+    }
+
     private function resolveCheckoutCouponId(Plan $plan, string $billingCycle): ?string
     {
         if (! $plan->hasActiveDiscount()) {
@@ -1229,7 +1261,9 @@ class BillingController extends Controller
         // Convert promo% to an equivalent coupon so total discount is additive on original total.
         $denominator = max(1, 100 - $yearlyPercent);
         $adjustedCouponPercent = max(0.01, min(99.99, round(($promoPercent / $denominator) * 100, 2)));
-        $couponId = 'lis_y_'.substr(sha1($plan->slug.'|'.$promoPercent.'|'.$yearlyPercent.'|'.$adjustedCouponPercent), 0, 22);
+        $duration = $plan->stripeCouponDuration();
+        $durationKey = $duration['duration'] === 'once' ? '' : '|'.$duration['duration'].($duration['duration_in_months'] ?? '');
+        $couponId = 'lis_y_'.substr(sha1($plan->slug.'|'.$promoPercent.'|'.$yearlyPercent.'|'.$adjustedCouponPercent.$durationKey), 0, 22);
 
         try {
             $existing = Cashier::stripe()->coupons->retrieve($couponId, []);
@@ -1240,10 +1274,9 @@ class BillingController extends Controller
             // Will create coupon below.
         }
 
-        $couponData = [
+        $couponData = $duration + [
             'id' => $couponId,
             'percent_off' => $adjustedCouponPercent,
-            'duration' => 'once',
             'name' => $plan->name.' - Yearly additive promo',
             'metadata' => [
                 'listen_plan_slug' => (string) $plan->slug,
