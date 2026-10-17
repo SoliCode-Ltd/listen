@@ -1077,10 +1077,10 @@ class HomeController extends Controller
                 ? $this->localizedPricingService->convertedQuoteFromUsd($originalMonthlyCents, 'monthly', $countryContext, 'stripe', $locale)
                 : null;
 
-            // How long the discount lasts and the card price after it. Manual payments
-            // never renew by themselves, so they get no "then" line.
-            $discountTerms = ['monthly' => null, 'yearly' => null];
-            if ($hasDiscount && $originalMonthlyQuote && $manualMethod === null) {
+            // How long the discount lasts, and the regular price after it in the
+            // currency the card shows (the same amount as the crossed-out price).
+            $discountTerms = null;
+            if ($hasDiscount && $originalMonthlyQuote) {
                 $fullYearlyQuote = $this->localizedPricingService->convertedQuoteFromUsd(
                     (int) round($baseMonthlyCents * 12 * (1 - $yearlyDiscountPercent / 100)),
                     'yearly',
@@ -1088,9 +1088,12 @@ class HomeController extends Controller
                     'stripe',
                     $locale
                 );
+                $yearlyPercent = min(99, $discountPercentage + $yearlyDiscountPercent);
                 $discountTerms = [
-                    'monthly' => DiscountTerms::line($plan, 'monthly', $discountPercentage, (string) $originalMonthlyQuote['amount_formatted']),
-                    'yearly' => DiscountTerms::line($plan, 'yearly', min(99, $discountPercentage + $yearlyDiscountPercent), (string) $fullYearlyQuote['amount_formatted']),
+                    'offer_monthly' => DiscountTerms::offer($plan, 'monthly', $discountPercentage),
+                    'then_monthly' => DiscountTerms::then($plan, 'monthly', (string) $originalMonthlyQuote['amount_formatted']),
+                    'offer_yearly' => DiscountTerms::offer($plan, 'yearly', $yearlyPercent),
+                    'then_yearly' => DiscountTerms::then($plan, 'yearly', (string) $fullYearlyQuote['amount_formatted']),
                 ];
             }
 
@@ -1109,8 +1112,7 @@ class HomeController extends Controller
                 'discount_ends_at' => $discountEndsAt,
                 'original_price_monthly_cents' => $originalMonthlyCents,
                 'original_price_monthly_formatted' => $originalMonthlyQuote ? (string) $originalMonthlyQuote['amount_formatted'] : null,
-                'discount_terms_monthly' => $discountTerms['monthly'],
-                'discount_terms_yearly' => $discountTerms['yearly'],
+                'discount_terms' => $discountTerms,
                 'display_payment_method' => $manualMethod ?? 'stripe',
                 'display_currency' => (string) $displayMonthlyQuote['currency'],
                 'display_price_monthly_minor' => (int) $displayMonthlyQuote['amount_minor'],

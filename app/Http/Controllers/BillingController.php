@@ -1214,7 +1214,10 @@ class BillingController extends Controller
      * price starts, e.g. "30% off your first month, then $9.00/month. Full price
      * from 17 Nov 2026 unless you cancel before."
      *
-     * @return array{monthly: string, yearly: string}
+     * InstaPay / Vodafone Cash pay once and never renew by themselves, so their
+     * note ("manual_monthly", "manual_yearly") says the discount is on this payment.
+     *
+     * @return array<string, string>
      */
     private function checkoutDiscountTerms(Plan $plan, array $countryContext, string $locale): array
     {
@@ -1234,6 +1237,12 @@ class BillingController extends Controller
             $hints[$cycle] = $from
                 ? __('ui.billing.discount_quote_hint', ['terms' => $terms, 'date' => $this->formatCarbonDate($from)])
                 : __('ui.billing.discount_quote_hint_forever', ['terms' => $terms]);
+
+            $egp = $this->localizedPricingService->convertUsdMinorToCurrency($cents, 'EGP');
+            $hints['manual_'.$cycle] = __('ui.billing.discount_quote_hint_manual_'.($cycle === 'yearly' ? 'year' : 'month'), [
+                'percent' => $cycle === 'yearly' ? min(99, $promoPercent + $yearlyPercent) : $promoPercent,
+                'price' => "\u{2066}".$this->localizedPricingService->formatAmount($egp, 'EGP', $locale)."\u{2069}",
+            ]);
         }
 
         return $hints;

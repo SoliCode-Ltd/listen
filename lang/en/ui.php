@@ -291,10 +291,13 @@ return [
         'discount_limited_offer' => 'Limited Time Offer',
         'discount_expired' => 'Offer ended',
         // How long a discount lasts and the price after it (plan cards and checkout).
-        'discount_terms_first_month' => ':percent% off your first month, then :price/month',
-        'discount_terms_first_months' => ':percent% off your first :months months, then :price/month',
-        'discount_terms_first_year' => ':percent% off your first year, then :price/year',
-        'discount_terms_forever' => ':percent% off for as long as you stay subscribed',
+        'discount_offer_first_month' => ':percent% off your first month',
+        'discount_offer_first_months' => ':percent% off your first :months months',
+        'discount_offer_first_year' => ':percent% off your first year',
+        'discount_offer_forever' => ':percent% off for as long as you stay subscribed',
+        'discount_then_month' => 'Then :price/month',
+        'discount_then_year' => 'Then :price/year',
+        'discount_terms_join' => ', ',
         'lines' => [
             'label_voice_quality' => 'Voice quality',
             'label_max_chars_per_request' => 'Max text per generation',
@@ -409,6 +412,9 @@ return [
         'trial_quote_hint' => 'Then :amount on :date unless you cancel before.',
         'discount_quote_hint' => ':terms. Full price from :date unless you cancel before.',
         'discount_quote_hint_forever' => ':terms.',
+        // InstaPay / Vodafone Cash: one payment that does not renew by itself.
+        'discount_quote_hint_manual_month' => ':percent% off this payment. The regular price is :price/month.',
+        'discount_quote_hint_manual_year' => ':percent% off this payment. The regular price is :price/year.',
         'trial_active_notice' => 'Your :plan trial is active. Until it is paid, usage is capped at the :quota allowance: :credits credits (:minutes minutes of audio) and :per_request characters of text per voice. Cancel before the trial ends to avoid the charge.',
         'trial_canceled_notice' => 'Your :plan trial is canceled, so you will not be charged. You can keep using it until :date.',
         'trial_admin_test_title' => 'Admin test cards',

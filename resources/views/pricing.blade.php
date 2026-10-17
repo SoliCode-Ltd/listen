@@ -251,31 +251,56 @@
     .price-note.savings {
       color: #F43F5E;
     }
+    /* How long the discount lasts (bold) and the regular price after it (muted). */
     .discount-terms {
       display: flex;
-      align-items: flex-start;
-      gap: .45rem;
-      margin: .65rem 0 0;
-      padding: .5rem .65rem;
+      align-items: center;
+      gap: .7rem;
+      margin: .8rem 0 0;
+      padding: .65rem .8rem;
       border-radius: var(--radius-lg);
-      background: color-mix(in oklab, #F43F5E 8%, transparent);
-      border: 1px solid color-mix(in oklab, #F43F5E 24%, transparent);
-      color: var(--text);
-      font-size: .8rem;
-      font-weight: 600;
-      line-height: 1.45;
+      background: color-mix(in oklab, #F43F5E 6%, transparent);
+      border: 1px solid color-mix(in oklab, #F43F5E 20%, transparent);
       text-align: start;
     }
-    .discount-terms svg {
+    .discount-terms-icon {
       flex: 0 0 auto;
-      width: 15px;
-      height: 15px;
-      margin-top: .1rem;
+      display: grid;
+      place-items: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: color-mix(in oklab, #F43F5E 14%, transparent);
+    }
+    .discount-terms-icon svg {
+      width: 16px;
+      height: 16px;
       fill: none;
       stroke: #F43F5E;
       stroke-width: 2;
       stroke-linecap: round;
       stroke-linejoin: round;
+    }
+    .discount-terms-body {
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+      min-width: 0;
+    }
+    .discount-terms-offer {
+      color: var(--text);
+      font-size: .86rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+    .discount-terms-then {
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 500;
+      line-height: 1.35;
+    }
+    .discount-terms-then[hidden] {
+      display: none;
     }
 
     .plan-quota {
@@ -1049,12 +1074,17 @@
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
 
-          // How long the discount lasts and the price after it, for the cycle shown.
+          // How long the discount lasts and the regular price after it, for the cycle shown.
           var terms = card.querySelector('.discount-terms');
           if (terms) {
-            var termsText = terms.querySelector('.discount-terms-text');
-            if (termsText) {
-              termsText.textContent = String(terms.getAttribute(isYearly ? 'data-terms-yearly' : 'data-terms-monthly') || '');
+            var cycle = isYearly ? 'yearly' : 'monthly';
+            var offer = terms.querySelector('.discount-terms-offer');
+            var then = terms.querySelector('.discount-terms-then');
+            var thenText = String(terms.getAttribute('data-then-' + cycle) || '');
+            if (offer) offer.textContent = String(terms.getAttribute('data-offer-' + cycle) || '');
+            if (then) {
+              then.textContent = thenText;
+              then.hidden = thenText === '';
             }
           }
 
