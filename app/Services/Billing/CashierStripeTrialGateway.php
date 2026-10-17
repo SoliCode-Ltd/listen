@@ -2,7 +2,9 @@
 
 namespace App\Services\Billing;
 
+use App\Exceptions\TrialStartException;
 use App\Models\User;
+use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 
 class CashierStripeTrialGateway implements StripeTrialGateway
@@ -85,6 +87,20 @@ class CashierStripeTrialGateway implements StripeTrialGateway
 
     public function createTrialSubscription(string $customerId, string $priceId, string $paymentMethodId, int $trialDays, array $metadata): array
     {
+        // Never start a trial next to a subscription Stripe still charges for,
+        // whatever our own copy says.
+        $listed = Cashier::stripe()->subscriptions->all(['customer' => $customerId, 'status' => 'all', 'limit' => 20]);
+        $live = collect($listed->data ?? [])
+            ->filter(fn ($sub) => in_array((string) ($sub->status ?? ''), ['active', 'trialing', 'past_due', 'unpaid'], true));
+        if ($live->isNotEmpty()) {
+            Log::error('Trial stopped: Stripe still charges this customer for another subscription.', [
+                'stripe_customer' => $customerId,
+                'stripe_subscriptions' => $live->pluck('id')->values()->all(),
+            ]);
+
+            throw new TrialStartException('ui.backend.billing_already_subscribed', 409);
+        }
+
         $subscription = Cashier::stripe()->subscriptions->create([
             'customer' => $customerId,
             'items' => [

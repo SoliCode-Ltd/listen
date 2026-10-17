@@ -1456,6 +1456,7 @@ return [
         'billing_add_payment_method' => 'يرجى إضافة طريقة دفع.',
         'billing_update_subscription_failed' => 'فشل تحديث الاشتراك.',
         'billing_plan_not_active_yet' => 'الخطة ليست مفعّلة بعد. يرجى الانتظار.',
+        'billing_already_subscribed' => 'لديك اشتراك فعّال بالفعل، لذلك لم يتم خصم أي مبلغ. حدّث الصفحة لترى خطتك.',
         'billing_subscription_updated' => 'تم تحديث الاشتراك بنجاح!',
         'billing_update_card_failed' => 'فشل تحديث طريقة الدفع.',
         'billing_payment_method_updated' => 'تم تحديث طريقة الدفع.',
