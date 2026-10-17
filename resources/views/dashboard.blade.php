@@ -2024,21 +2024,6 @@
       font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
-    .usage-ring {
-      --p: 0;
-      width: 132px; height: 132px; border-radius: 50%;
-      background: conic-gradient(var(--a, #6A45F2) calc(var(--p) * 1%), color-mix(in oklab, var(--line) 85%, transparent) 0);
-      display: grid; place-items: center;
-      transition: background .4s ease;
-    }
-    .usage-ring-inner {
-      width: 104px; height: 104px; border-radius: 50%;
-      background: var(--surface);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .usage-ring-inner b { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
-    .usage-ring-inner span { font-size: .82rem; color: var(--muted); }
     .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
     .usage-tile {
       display: flex; flex-direction: column; gap: .45rem;
@@ -2075,9 +2060,6 @@
     .usage-health .dot.failed { background: #ef4444; box-shadow: 0 0 0 3px color-mix(in oklab, #ef4444 22%, transparent); }
     @media (max-width: 760px) {
       .usage-hero { grid-template-columns: 1fr; }
-      .usage-ring { justify-self: center; width: 104px; height: 104px; }
-      .usage-ring-inner { width: 82px; height: 82px; }
-      .usage-ring-inner b { font-size: 1.35rem; }
       .usage-tiles { grid-template-columns: 1fr; }
       .usage-health-row { flex-wrap: nowrap; gap: .9rem; }
       .usage-health-item { gap: .35rem; }
@@ -2158,6 +2140,74 @@
     /* The menu's divider runs to the bottom of the window, however short the open section is. */
     @media (min-width: 981px) {
       .dashboard-layout { min-height: calc(100vh - 9.25rem); }
+    }
+
+    /* The gauge: how much of this month is used, as a ring beside the minutes left. */
+    #commandCenterSection .usage-hero { grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.6rem; }
+    .usage-ring {
+      --p: 0;
+      position: relative;
+      flex: none;
+      width: 136px;
+      height: 136px;
+    }
+    .usage-ring::before {
+      content: "";
+      position: absolute;
+      inset: 17px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--a) 10%, var(--surface)), var(--surface) 70%);
+      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--a) 10%, var(--line));
+    }
+    /* Visible overflow, so the arc's soft glow is never cut off at the square edge. */
+    .usage-ring svg { position: relative; display: block; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+    .usage-ring-track { fill: none; stroke: color-mix(in oklab, var(--a) 13%, var(--line)); stroke-width: 9; }
+    .usage-ring-arc {
+      fill: none;
+      stroke: url(#usageRingGradient);
+      stroke-width: 9;
+      stroke-linecap: round;
+      stroke-dasharray: calc(var(--p) * 1px) 200px;
+      /* A rounded end draws a dot at 0%: nothing shows until something is used. */
+      opacity: clamp(0, calc(var(--p) * 4), 1);
+      filter: drop-shadow(0 2px 6px color-mix(in oklab, var(--a) 45%, transparent));
+      transition: stroke-dasharray .7s cubic-bezier(.22, .61, .36, 1), stroke .3s ease;
+    }
+    .usage-ring.is-high .usage-ring-arc { stroke: #F59E0B; filter: none; }
+    .usage-ring.is-low .usage-ring-arc { stroke: #EF4444; filter: none; }
+    .usage-ring-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+    }
+    .usage-ring-inner b { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-ring-inner span { margin-top: .15rem; font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    html[dir="rtl"] .usage-ring-inner span { letter-spacing: 0; text-transform: none; font-size: .85rem; }
+    /* Mixed with the text colour: darker on light, lighter on dark, readable on both. */
+    .usage-ring.is-high .usage-ring-inner b { color: color-mix(in oklab, #F59E0B 62%, var(--text)); }
+    .usage-ring.is-low .usage-ring-inner b { color: color-mix(in oklab, #EF4444 72%, var(--text)); }
+    @media (prefers-reduced-motion: reduce) {
+      .usage-ring-arc { transition: none; }
+    }
+    @media (max-width: 760px) {
+      #commandCenterSection .usage-hero { grid-template-columns: auto minmax(0, 1fr); gap: 1.1rem 1.25rem; }
+      #commandCenterSection .usage-hero-cta { grid-column: 1 / -1; }
+      .usage-ring { width: 112px; height: 112px; }
+      .usage-ring::before { inset: 14px; }
+      .usage-ring-inner b { font-size: 1.4rem; }
+    }
+    @media (max-width: 420px) {
+      /* Phones: the ring on top, everything centred under it. */
+      #commandCenterSection .usage-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+      #commandCenterSection .usage-hero-main { width: 100%; }
+      #commandCenterSection .usage-hero-head,
+      #commandCenterSection .usage-hero-value,
+      #commandCenterSection .usage-hero-chips { justify-content: center; }
+      #commandCenterSection .usage-hero-cta { width: 100%; }
     }
 
     /* One meter: minutes left, the credits behind them, and a way back to the studio. */
@@ -2539,8 +2589,29 @@
             $minutesLeft = \App\Support\Credits::minutesFor($remainingChars);
             $minutesTotal = \App\Support\Credits::minutesFor((int) $planChars);
           @endphp
-          {{-- One meter: the minutes of audio left (from the credits left), with the credits behind them. --}}
+          @php
+            $ringPercent = max(0, min(100, (int) $creditsUsedPercent));
+            // The ring turns amber when most of the month is used, and red when almost none is left.
+            $ringState = $ringPercent >= 95 ? 'is-low' : ($ringPercent >= 80 ? 'is-high' : '');
+          @endphp
+          {{-- One gauge: how much of this month is used, beside the minutes and credits left. --}}
           <div class="usage-hero" @if($freeNoChars) style="display:none" @endif>
+            <div class="usage-ring {{ $ringState }}" id="usageCreditsRing" style="--p: {{ $ringPercent }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $ringPercent]) }}">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <defs>
+                  <linearGradient id="usageRingGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#A28FFF"/>
+                    <stop offset="1" stop-color="#5B3FE6"/>
+                  </linearGradient>
+                </defs>
+                <circle class="usage-ring-track" cx="60" cy="60" r="52"/>
+                <circle class="usage-ring-arc" cx="60" cy="60" r="52" pathLength="100"/>
+              </svg>
+              <div class="usage-ring-inner">
+                <b id="usageCreditsPercent">{{ $ringPercent }}%</b>
+                <span>{{ __('ui.dashboard.used_short') }}</span>
+              </div>
+            </div>
             <div class="usage-hero-main">
               <div class="usage-hero-head">
                 <span class="usage-hero-label">{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.minutes_left_label') }}</span>
@@ -2552,7 +2623,6 @@
                 <strong id="usageMinutesLeft">{{ number_format($minutesLeft) }}</strong>
                 <span id="usageMinutesTotal">{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($minutesTotal)]) }}</span>
               </div>
-              <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
                 <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
@@ -3372,7 +3442,6 @@
     const jobsTableBody = document.getElementById('jobsTableBody');
     const usageCharsText = document.getElementById('usageCharsText');
     const usageRequestsText = document.getElementById('usageRequestsText');
-    const usageCharsMeter = document.getElementById('usageCharsMeter');
     const usageRequestsMeter = document.getElementById('usageRequestsMeter');
     const kpiRequests = document.getElementById('kpiRequests');
     const kpiChars = document.getElementById('kpiChars');
@@ -3950,7 +4019,6 @@
         creditLive.dataset.remaining = String(usage.remaining_chars);
         refreshCreditLive();
       }
-      if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
       const creditsLeftEl = document.getElementById('usageCreditsLeft');
       if (creditsLeftEl && usage.remaining_chars !== undefined) creditsLeftEl.textContent = formatNumber(usage.remaining_chars);
       const minutesLeftEl = document.getElementById('usageMinutesLeft');
@@ -3960,8 +4028,11 @@
       const ring = document.getElementById('usageCreditsRing');
       const ringPercent = document.getElementById('usageCreditsPercent');
       if (ring && usage.chars_percent !== undefined) {
-        const p = Math.max(0, Math.min(100, Number(usage.chars_percent) || 0));
+        const p = Math.max(0, Math.min(100, Math.round(Number(usage.chars_percent) || 0)));
         ring.style.setProperty('--p', p);
+        ring.classList.toggle('is-high', p >= 80 && p < 95);
+        ring.classList.toggle('is-low', p >= 95);
+        ring.setAttribute('aria-label', formatQuotaText(@json(__('ui.dashboard.credits_used_percent')), { percent: p }));
         if (ringPercent) ringPercent.textContent = p + '%';
       }
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
