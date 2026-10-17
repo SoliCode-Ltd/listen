@@ -158,7 +158,8 @@ class HomeController extends Controller
         $language = $isArabicLocale ? 'ar' : 'en';
 
         // Each page holds its own language: Arabic samples on the Arabic page, English on the English one.
-        $data = Cache::remember('samples_page:'.$language, 300, function () use ($isArabicLocale, $language): array {
+        // The key names the data's shape, so a deploy never reads a copy cached by older code.
+        $data = Cache::remember('samples_page:v2:'.$language, 300, function () use ($isArabicLocale, $language): array {
             $cards = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
