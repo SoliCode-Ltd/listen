@@ -1,7 +1,7 @@
 {{--
   A small drawing above each figure in the homepage facts strip, showing what the
   number means: real dialect greetings, the countries' accents, the places a voice
-  can be heard in, and the moods a line can be delivered in. Decorative only.
+  can be heard in, and the style picker with one style chosen. Decorative only.
 --}}
 @props(['kind'])
 <div class="fact-art fact-art-{{ $kind }}" aria-hidden="true">
@@ -32,11 +32,17 @@
       <span class="fa-tile" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M2 27 11 12l5 7 4-5 10 13z"/><path d="M22 6a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"/></svg></span>
       @break
     @case('styles')
-      {{-- One voice, four ways to deliver a line: calm, excited, surprised, serious. --}}
-      <span class="fa-face" style="--i: 0"><svg viewBox="0 0 32 32"><path d="M8.5 14q2.5 2.5 5 0M18.5 14q2.5 2.5 5 0"/><path d="M11 20.5q5 3.5 10 0"/></svg></span>
-      <span class="fa-face is-on" style="--i: 1"><svg viewBox="0 0 32 32"><path d="M8.5 14.5q2.5-3.5 5 0M18.5 14.5q2.5-3.5 5 0"/><path class="fa-fill" d="M9.5 18.5h13a6.5 6.5 0 0 1-13 0z"/></svg></span>
-      <span class="fa-face" style="--i: 2"><svg viewBox="0 0 32 32"><path d="M8.5 9.5q2.5-1.6 5 0M18.5 9.5q2.5-1.6 5 0"/><circle class="fa-fill" cx="11" cy="14" r="1.7"/><circle class="fa-fill" cx="21" cy="14" r="1.7"/><ellipse cx="16" cy="22" rx="2.6" ry="3.1"/></svg></span>
-      <span class="fa-face" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M8.5 10.5h5M18.5 10.5h5"/><circle class="fa-fill" cx="11" cy="14.5" r="1.7"/><circle class="fa-fill" cx="21" cy="14.5" r="1.7"/><path d="M12 21.5h8"/></svg></span>
+      {{-- The style picker as it looks in the studio: three real styles, one chosen. --}}
+      <span class="fa-menu">
+        @foreach(['calm', 'excited', 'news'] as $i => $style)
+          <span class="fa-option{{ $style === 'excited' ? ' is-on' : '' }}" style="--i: {{ $i }}">
+            <span>{{ __('ui.samples.moods.'.$style) }}</span>
+            @if($style === 'excited')
+              <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+            @endif
+          </span>
+        @endforeach
+      </span>
       @break
   @endswitch
 </div>
