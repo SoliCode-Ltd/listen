@@ -442,9 +442,6 @@
       height: .95rem;
       fill: currentColor;
     }
-    html[dir="rtl"] .hero-listen-play {
-      transform: scaleX(-1);
-    }
     .hero-listen-stop,
     .hero-listen-bars {
       display: none;
@@ -482,7 +479,7 @@
       .hero-listen-bars i { animation: none; }
     }
 
-    /* What Listen has, in real numbers. */
+    /* What Listen has, in real numbers, each drawn above its figure. */
     .facts {
       padding: .5rem 0 2rem;
     }
@@ -490,6 +487,8 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       margin: 0;
+      padding: 0;
+      list-style: none;
       border: 1px solid var(--line);
       border-radius: 1.25rem;
       background: var(--surface);
@@ -497,36 +496,107 @@
     }
     .fact {
       display: flex;
-      flex-direction: column-reverse;
-      justify-content: flex-end;
-      gap: .25rem;
-      padding: 1.35rem 1.5rem;
+      flex-direction: column;
+      gap: .2rem;
+      padding: 1.35rem 1.5rem 1.4rem;
     }
     .fact + .fact {
       border-inline-start: 1px solid var(--line);
     }
-    .fact dt {
-      color: var(--muted);
-      font-size: .92rem;
-      font-weight: 500;
-    }
-    .fact dd {
-      margin: 0;
+    .fact-value {
+      margin-top: .9rem;
       font-size: clamp(1.6rem, 3vw, 2.1rem);
       font-weight: 800;
       line-height: 1.1;
       letter-spacing: -.02em;
       font-variant-numeric: tabular-nums;
     }
-    html[dir="rtl"] .fact dd {
-      text-align: right;
+    .fact-label {
+      color: var(--muted);
+      font-size: .92rem;
+      font-weight: 500;
     }
-    @media (max-width: 760px) {
+
+    /* The drawings: one shared stage, quiet colours, one entrance when the strip appears. */
+    .fact-art {
+      position: relative;
+      height: 88px;
+      border-radius: .9rem;
+      background:
+        radial-gradient(120% 120% at 0% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 60%),
+        color-mix(in oklab, var(--a) 4%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
+      overflow: hidden;
+    }
+    .fact-art-dialects {
+      display: flex;
+      flex-wrap: wrap;
+      align-content: center;
+      justify-content: center;
+      gap: .45rem .5rem;
+      padding: .5rem .75rem;
+    }
+    .fa-bubble {
+      padding: .26rem .7rem .32rem;
+      border-radius: 14px 14px 14px 5px;
+      background: var(--surface);
+      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      color: var(--accent-text);
+      font-size: .86rem;
+      font-weight: 700;
+      line-height: 1.3;
+      white-space: nowrap;
+      box-shadow: 0 6px 14px -10px color-mix(in oklab, var(--a) 60%, transparent);
+    }
+    /* A loose, staggered cluster, like messages arriving. */
+    .fa-bubble:nth-child(odd) { transform: translateY(-4px); }
+    .fa-bubble:nth-child(even) { transform: translateY(4px); border-radius: 14px 14px 5px 14px; }
+    .fa-bubble:nth-child(2) { background: var(--brand-accent); border-color: transparent; color: #fff; }
+    .fact-art-accents { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .55rem; }
+    .fa-flags { display: flex; }
+    .fa-flags img {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      object-fit: cover;
+      box-shadow: 0 0 0 2.5px var(--surface), 0 4px 10px -4px rgba(20, 16, 50, .35);
+    }
+    .fa-flags img + img { margin-inline-start: -6px; }
+    .fa-wave { width: 62%; height: 22px; fill: color-mix(in oklab, var(--a) 55%, var(--surface)); }
+    .fact-art-places { display: flex; align-items: center; justify-content: center; gap: .5rem; }
+    .fa-tile {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--surface);
+      border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
+      color: var(--accent-text);
+    }
+    .fa-tile:nth-child(odd) { transform: translateY(-7px); }
+    .fa-tile:nth-child(even) { transform: translateY(7px); }
+    .fa-tile.is-on { background: var(--brand-accent); border-color: transparent; color: #fff; box-shadow: 0 10px 20px -10px color-mix(in oklab, var(--a) 80%, transparent); }
+    .fa-tile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .fact-art-styles { display: grid; place-items: center; }
+    .fa-moods { width: 82%; height: 56px; }
+    @media (prefers-reduced-motion: no-preference) {
+      .facts.reveal:not(.show) .fa-bubble,
+      .facts.reveal:not(.show) .fa-flags img,
+      .facts.reveal:not(.show) .fa-tile { opacity: 0; }
+      .facts.show .fa-bubble { animation: faPop .5s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 90ms); }
+      .facts.show .fa-flags img { animation: faSlide .45s ease-out both; animation-delay: calc(.15s + var(--i) * 60ms); }
+      .facts.show .fa-tile { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 80ms); }
+      .facts.show .fa-wave rect,
+      .facts.show .fa-moods rect { transform-box: fill-box; transform-origin: center; animation: faGrow .6s ease-out both; animation-delay: calc(.2s + var(--i) * 25ms); }
+    }
+    @keyframes faPop { from { opacity: 0; transform: scale(.7); } }
+    @keyframes faSlide { from { opacity: 0; transform: translateX(-10px); } }
+    @keyframes faGrow { from { transform: scaleY(.15); } }
+    /* Two drawings a row once four would squeeze them. */
+    @media (max-width: 1080px) {
       .facts-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .fact {
-        padding: 1.1rem 1.15rem;
       }
       .fact:nth-child(3) {
         border-inline-start: 0;
@@ -534,6 +604,26 @@
       .fact:nth-child(n + 3) {
         border-top: 1px solid var(--line);
       }
+    }
+    @media (max-width: 760px) {
+      .fact {
+        padding: 1rem;
+      }
+      .fa-bubble { font-size: .78rem; padding: .22rem .55rem .28rem; }
+      .fact-art-dialects { gap: .35rem .4rem; padding: .4rem .5rem; }
+      .fact-art { height: 80px; }
+      .fa-tile { width: 36px; height: 36px; border-radius: 10px; }
+      .fa-tile svg { width: 21px; height: 21px; }
+      .fact-art-places { gap: .35rem; }
+      .fa-flags img { width: 28px; height: 28px; }
+    }
+    /* Small phones: one flag and one place fewer, so nothing spills over. */
+    @media (max-width: 420px) {
+      .fa-flags img { width: 26px; height: 26px; }
+      .fa-flags img + img { margin-inline-start: -8px; }
+      .fa-flags img:nth-child(6), .fa-tile:nth-child(4) { display: none; }
+      .fa-tile { width: 33px; height: 33px; border-radius: 9px; }
+      .fa-tile svg { width: 19px; height: 19px; }
     }
 
     .reveal {
@@ -855,24 +945,25 @@
       // Real counts, rounded down to the ten so each claim stays true as more are added.
       $factPlaces = (int) (floor(count(array_filter(\App\Support\AudioEffects::ALL, fn ($row) => $row[1] !== 'clean')) / 10) * 10);
       $facts = [
-        ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects')],
-        ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents')],
-        ['value' => $factPlaces, 'label' => __('ui.landing.fact_places')],
-        ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles')],
+        ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'],
+        ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'],
+        ['value' => $factPlaces, 'label' => __('ui.landing.fact_places'), 'art' => 'places'],
+        ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles'), 'art' => 'styles'],
       ];
     @endphp
     <section class="facts reveal" aria-label="{{ __('ui.landing.facts_label') }}">
-      <dl class="facts-grid">
+      <ul class="facts-grid">
         @foreach($facts as $fact)
           @if($fact['value'] > 0)
-            <div class="fact">
-              <dt>{{ $fact['label'] }}</dt>
+            <li class="fact">
+              <x-home.fact-art :kind="$fact['art']" />
               {{-- "140+" in English, "+140" in Arabic, as the rest of the copy writes it. --}}
-              <dd><bdi dir="ltr">{{ app()->getLocale() === 'ar' ? '+'.$fact['value'] : $fact['value'].'+' }}</bdi></dd>
-            </div>
+              <strong class="fact-value"><bdi dir="ltr">{{ app()->getLocale() === 'ar' ? '+'.$fact['value'] : $fact['value'].'+' }}</bdi></strong>
+              <span class="fact-label">{{ $fact['label'] }}</span>
+            </li>
           @endif
         @endforeach
-      </dl>
+      </ul>
     </section>
 
     {{-- Voice cloning, announced in one slim line under the hero. --}}

@@ -7,7 +7,7 @@
        Plans in one aligned row: every card's name, price, button, minutes and
        lines start at the same height (CSS subgrid), so plans compare at a glance. */
     .pricing-page {
-      width: min(1320px, 94%);
+      width: min(1440px, 94%);
       margin: 0 auto;
     }
 
@@ -37,21 +37,6 @@
       mask-image: radial-gradient(ellipse 48% 62% at 50% 38%, #000 25%, transparent 75%);
       opacity: .5;
     }
-    .hero-eyebrow {
-      display: inline-flex;
-      align-items: center;
-      margin-bottom: 1.1rem;
-      padding: .32rem .85rem;
-      border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line));
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
-      color: var(--accent-text);
-      font-size: .78rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-    }
-    html[dir="rtl"] .hero-eyebrow { letter-spacing: 0; font-size: .85rem; }
     .page-hero h1 {
       margin: 0 auto .9rem;
       max-width: 18ch;
@@ -139,165 +124,188 @@
       color: #fff;
     }
 
-    /* ── Plan cards ── */
+    /* ── Plan cards ──
+       Monthly plans in one aligned row (CSS subgrid: every card's badge, name, price,
+       button, minutes and lines start at the same height). Never narrower than they
+       read well: four plans fill the row, five or six go three to a row, and smaller
+       screens take two, then one. */
     .plans-grid {
-      --plans: 5;
+      --cols: 4;
       display: grid;
-      grid-template-columns: repeat(var(--plans), minmax(0, 1fr));
-      column-gap: 1rem;
+      grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+      column-gap: 1.25rem;
       row-gap: 0;
       align-items: stretch;
+      margin-inline: auto;
     }
+    .plans-grid[data-count="1"] { --cols: 1; max-width: 440px; }
+    .plans-grid[data-count="2"] { --cols: 2; max-width: 900px; }
+    .plans-grid[data-count="3"] { --cols: 3; max-width: 1200px; }
+    .plans-grid[data-count="5"],
+    .plans-grid[data-count="6"] { --cols: 6; max-width: 1200px; }
+    .plans-grid[data-count="5"] > .plan-card,
+    .plans-grid[data-count="6"] > .plan-card { grid-column: span 2; }
+    /* Five plans: the last two sit centred under the first three. */
+    .plans-grid[data-count="5"] > .plan-card:nth-child(4) { grid-column: 2 / span 2; }
     .plan-card {
       position: relative;
       display: grid;
       grid-row: span 5;
       grid-template-rows: subgrid;
       row-gap: 0;
-      margin-bottom: 1rem;
-      padding: 1.5rem 1.25rem 1.35rem;
+      margin-bottom: 1.25rem;
+      padding: 1.6rem 1.6rem 1.5rem;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 1.1rem;
-      transition: border-color .25s ease, box-shadow .25s ease;
+      border-radius: 1.35rem;
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
     .plan-card:hover {
-      border-color: color-mix(in oklab, var(--a) 28%, var(--line));
-      box-shadow: var(--shadow);
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      box-shadow: 0 24px 48px -32px rgba(30, 20, 80, .35);
     }
+    /* The recommended plan, filled with the brand colour: everything inside follows its colours. */
     .plan-card.popular {
-      border: 1.5px solid transparent;
+      --text: #FFFFFF;
+      --muted: rgba(255, 255, 255, .78);
+      --line: rgba(255, 255, 255, .2);
+      --accent-text: #E6E0FF;
+      --surface2: rgba(255, 255, 255, .1);
+      --ok: #86EFC4;
+      color: #FFFFFF;
+      border-color: transparent;
       background:
-        linear-gradient(180deg, color-mix(in oklab, var(--a) 8%, var(--surface)), var(--surface) 40%) padding-box,
-        linear-gradient(165deg, #9580FF, var(--brand-accent) 45%, color-mix(in oklab, var(--a) 35%, var(--line))) border-box;
-      box-shadow: 0 24px 50px -24px color-mix(in oklab, var(--a) 55%, transparent);
+        radial-gradient(120% 70% at 100% 0%, rgba(255, 255, 255, .16), transparent 55%),
+        linear-gradient(165deg, #3A22C4 0%, #5638EA 48%, #7254F7 100%);
+      box-shadow: 0 30px 60px -30px rgba(74, 48, 217, .75);
     }
+    .plan-card.popular:hover { box-shadow: 0 34px 64px -30px rgba(74, 48, 217, .85); }
     .plan-top { display: flex; flex-direction: column; align-items: flex-start; }
+    /* Every card keeps the badge row, so the plan names line up. */
+    .plan-badges { display: flex; align-items: center; min-height: 1.65rem; margin-bottom: .75rem; }
     .popular-badge {
       display: inline-flex;
       align-items: center;
-      gap: .3rem;
-      margin-bottom: .6rem;
-      padding: .22rem .6rem;
+      padding: .25rem .7rem;
       border-radius: var(--radius-full);
-      background: var(--brand-accent);
-      color: #fff;
-      font-size: .72rem;
+      background: rgba(255, 255, 255, .16);
+      border: 1px solid rgba(255, 255, 255, .32);
+      color: #FFFFFF;
+      font-size: .76rem;
       font-weight: 700;
-      letter-spacing: .02em;
     }
-    .popular-crown { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
     .plan-name {
       margin: 0;
-      font-size: 1.15rem;
+      font-size: 1.3rem;
       font-weight: 700;
       letter-spacing: -.01em;
     }
+    html[dir="rtl"] .plan-name { letter-spacing: 0; }
     .plan-desc {
-      margin: .35rem 0 0;
+      margin: .4rem 0 0;
       color: var(--muted);
-      font-size: .86rem;
-      line-height: 1.5;
-      min-height: 2.6em;
+      font-size: .9rem;
+      line-height: 1.55;
+      min-height: 3.1em;
     }
 
     .plan-pricing {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: .35rem;
-      padding: 1.1rem 0 1.15rem;
+      gap: .3rem;
+      padding: 1.35rem 0 1.4rem;
     }
     .price-original-row { display: inline-flex; align-items: center; gap: .5rem; }
     .price-original {
       color: var(--muted);
-      font-size: .92rem;
+      font-size: .95rem;
       text-decoration: line-through;
       text-decoration-thickness: 1.5px;
     }
     .price-off {
-      padding: .1rem .45rem;
+      padding: .12rem .5rem;
       border-radius: var(--radius-full);
       background: color-mix(in oklab, var(--ok) 15%, transparent);
       color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .74rem;
+      font-size: .76rem;
       font-weight: 700;
     }
-    .price-row { display: flex; align-items: baseline; gap: .3rem; }
+    .plan-card.popular .price-off { background: rgba(255, 255, 255, .18); color: #FFFFFF; }
+    .price-row { display: flex; align-items: baseline; gap: .35rem; }
     .price-amount {
-      font-size: clamp(1.9rem, 2.6vw, 2.35rem);
+      font-size: clamp(2.2rem, 2.9vw, 2.8rem);
       font-weight: 800;
       line-height: 1;
-      letter-spacing: -.03em;
+      letter-spacing: -.035em;
       font-variant-numeric: tabular-nums;
     }
-    .price-period { color: var(--muted); font-size: .9rem; font-weight: 500; }
-    .price-note { color: var(--muted); font-size: .8rem; min-height: 0; }
+    .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
+    .price-note { color: var(--muted); font-size: .84rem; min-height: 0; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
 
-    /* The offer, in two plain lines: what it is, and the price after it. */
+    /* The offer in one box: what it is, the price after it, and when it ends. */
     .discount-terms {
-      display: block;
-      margin-top: .15rem;
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+      align-self: stretch;
+      margin-top: .55rem;
+      padding: .75rem .9rem .8rem;
+      border-radius: .9rem;
+      background: color-mix(in oklab, var(--a) 7%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 20%, var(--line));
     }
-    .discount-terms-icon { display: none; }
-    .discount-terms-body { display: flex; flex-direction: column; gap: .05rem; }
-    .discount-terms-offer { color: var(--accent-text); font-size: .8rem; font-weight: 700; line-height: 1.45; }
-    .discount-terms-then { color: var(--muted); font-size: .78rem; line-height: 1.45; }
+    .plan-card.popular .discount-terms { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .22); }
+    .discount-terms-offer { color: var(--accent-text); font-size: .88rem; font-weight: 700; line-height: 1.45; }
+    .discount-terms-then { color: var(--muted); font-size: .82rem; line-height: 1.45; }
     .discount-terms-then[hidden] { display: none; }
-
-    /* Every card keeps the badge row, so the plan names line up. */
-    .plan-badges { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: 1.45rem; margin-bottom: .6rem; }
-    .plan-badges .popular-badge { margin-bottom: 0; }
-    /* When the offer ends: a small chip that counts down. */
-    .discount-countdown {
+    .offer-ends {
       display: inline-flex;
       align-items: center;
-      gap: .3rem;
-      padding: .22rem .55rem;
-      border-radius: var(--radius-full);
-      background: color-mix(in oklab, var(--a) 10%, transparent);
-      color: var(--accent-text);
-      font-size: .72rem;
-      font-weight: 700;
-      white-space: nowrap;
+      gap: .4rem;
+      margin-top: .45rem;
+      padding-top: .5rem;
+      border-top: 1px dashed color-mix(in oklab, var(--a) 22%, var(--line));
+      color: var(--text);
+      font-size: .82rem;
+      font-weight: 600;
     }
-    .discount-countdown > svg { width: .8rem; height: .8rem; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; }
-    .countdown-digits { display: inline-flex; gap: .25rem; font-variant-numeric: tabular-nums; }
-    .countdown-unit { display: inline-flex; align-items: baseline; }
-    .countdown-unit[hidden] { display: none; }
-    .countdown-num { font-weight: 800; }
-    .countdown-lbl { font-weight: 600; }
+    .plan-card.popular .offer-ends { border-top-color: rgba(255, 255, 255, .25); }
+    .offer-ends[hidden] { display: none; }
+    .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--accent-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
     .plan-trial-chip {
       display: inline-flex;
       align-items: center;
       gap: .35rem;
-      margin-top: .2rem;
-      padding: .22rem .6rem;
+      margin-top: .35rem;
+      padding: .24rem .65rem;
       border-radius: var(--radius-full);
       background: color-mix(in oklab, var(--ok) 14%, transparent);
       color: color-mix(in oklab, var(--ok) 50%, var(--text));
-      font-size: .76rem;
+      font-size: .78rem;
       font-weight: 700;
     }
     .plan-trial-chip svg { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
     .plans-grid.is-yearly [data-trial-monthly-only],
-    .plans-grid:not(.is-yearly) [data-trial-yearly-only] {
+    .plans-grid:not(.is-yearly) [data-trial-yearly-only],
+    .plans-side.is-yearly [data-trial-monthly-only],
+    .plans-side:not(.is-yearly) [data-trial-yearly-only] {
       display: none !important;
     }
 
-    .plan-action { padding-bottom: 1.25rem; }
+    .plan-action { padding-bottom: 1.4rem; }
     .plan-btn {
       display: flex;
       align-items: center;
       justify-content: center;
       width: 100%;
-      min-height: 46px;
+      min-height: 48px;
       padding: .6rem 1rem;
       border-radius: var(--btn-radius);
-      font-size: .93rem;
+      font-size: .95rem;
       font-weight: 700;
       text-align: center;
       text-decoration: none;
@@ -305,6 +313,8 @@
     }
     .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; }
     .plan-btn.btn-primary:hover { background: var(--brand-hover); }
+    .plan-card.popular .plan-btn.btn-primary { background: #FFFFFF; color: #3F27C4; }
+    .plan-card.popular .plan-btn.btn-primary:hover { background: #F1EEFF; }
     .plan-btn.btn-outline {
       background: transparent;
       color: var(--text);
@@ -312,6 +322,7 @@
     }
     .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in oklab, var(--a) 7%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .plan-card.popular .plan-btn:focus-visible { outline-color: #FFFFFF; }
     .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
     .plan-btn.btn-disabled {
       background: var(--surface2);
@@ -324,28 +335,27 @@
     .plan-quota {
       display: flex;
       flex-direction: column;
-      gap: .35rem;
-      padding: 1.05rem 0;
+      gap: .4rem;
+      padding: 1.2rem 0;
       border-top: 1px solid var(--line);
-      border-bottom: 1px solid var(--line);
       font-size: .9rem;
       font-weight: 600;
     }
-    .plan-minutes { display: flex; flex-direction: column; }
+    .plan-minutes { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem; }
     .plan-minutes-number {
-      font-size: 1.45rem;
+      font-size: 1.6rem;
       font-weight: 800;
-      line-height: 1.15;
+      line-height: 1.1;
       letter-spacing: -.02em;
       font-variant-numeric: tabular-nums;
     }
-    .plan-minutes-unit { color: var(--muted); font-size: .82rem; font-weight: 500; }
+    .plan-minutes-unit { color: var(--muted); font-size: .86rem; font-weight: 500; }
     .plan-quota-credits {
       display: inline-flex;
       align-items: center;
-      gap: .35rem;
+      gap: .4rem;
       color: var(--muted);
-      font-size: .8rem;
+      font-size: .82rem;
       font-weight: 500;
       cursor: help;
     }
@@ -353,32 +363,38 @@
     .plan-quota-amount { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: .25rem; }
     .plan-quota-number { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
 
+    /* The plan's lines: the label on one side, its value on the other. */
     .plan-features {
       list-style: none;
       margin: 0;
-      padding: 1rem 0 0;
+      padding: 1.1rem 0 0;
+      border-top: 1px solid var(--line);
       display: flex;
       flex-direction: column;
       gap: .7rem;
     }
+    /* A long label wraps on its own side; the value stays on one line, on the other. */
     .plan-features li {
       display: flex;
-      flex-direction: column;
-      gap: .1rem;
-      font-size: .85rem;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: .75rem;
+      font-size: .88rem;
     }
     .feature-label {
       display: inline-flex;
       align-items: flex-start;
-      gap: .45rem;
+      flex: 1 1 auto;
+      min-width: 0;
+      gap: .5rem;
       color: var(--muted);
       line-height: 1.4;
     }
     .feature-label svg {
       flex: none;
-      width: .95rem;
-      height: .95rem;
-      margin-top: .1rem;
+      width: 1rem;
+      height: 1rem;
+      margin-top: .12rem;
       fill: none;
       stroke: currentColor;
       stroke-width: 2;
@@ -386,13 +402,45 @@
       stroke-linejoin: round;
     }
     .feature-value {
-      padding-inline-start: 1.4rem;
+      flex: none;
+      max-width: 55%;
       color: var(--text);
       font-weight: 650;
       line-height: 1.4;
+      text-align: end;
     }
     .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
+
+    /* A plan to try the voices and one-time packs: the same cards, laid on their side. */
+    .plans-side { margin: 1.75rem auto 0; max-width: 1200px; }
+    .plans-side-title { margin: 0 0 1rem; text-align: center; font-size: 1.1rem; font-weight: 700; }
+    .plans-side-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
+      gap: 1.25rem;
+    }
+    .plans-side .plan-card {
+      grid-row: auto;
+      grid-template-rows: none;
+      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+      grid-template-areas: "top pricing" "quota action" "features features";
+      column-gap: 1.5rem;
+      align-items: start;
+      margin: 0;
+      padding: 1.4rem 1.5rem;
+    }
+    .plans-side .plan-top { grid-area: top; }
+    .plans-side .plan-badges.is-empty { display: none; }
+    .plans-side .plan-desc { min-height: 0; }
+    .plans-side .plan-pricing { grid-area: pricing; padding: 0; align-items: flex-end; text-align: end; }
+    .plans-side .plan-quota { grid-area: quota; align-self: center; padding: 1rem 0 0; margin-top: 1rem; }
+    .plans-side .plan-action { grid-area: action; align-self: end; padding: 1rem 0 0; }
+    .plans-side .plan-features { grid-area: features; flex-direction: row; flex-wrap: wrap; gap: .45rem 1.25rem; margin-top: 1.1rem; padding-top: .9rem; }
+    .plans-side .plan-features:empty { display: none; }
+    .plans-side .plan-features li { justify-content: flex-start; }
+    .plans-side .feature-label { flex: none; }
+    .plans-side .feature-value { max-width: none; }
 
     /* Trust line and what every plan includes, right under the cards. */
     .plans-trust {
@@ -723,11 +771,26 @@
     }
 
     /* ── Smaller screens ── */
-    @media (max-width: 1199px) {
-      .plans-grid { --plans: 3 !important; }
+    @media (max-width: 1240px) {
+      .plans-grid[data-count="4"],
+      .plans-grid[data-count="5"],
+      .plans-grid[data-count="6"] { --cols: 2; max-width: 900px; }
+      .plans-grid[data-count="5"] > .plan-card,
+      .plans-grid[data-count="6"] > .plan-card,
+      .plans-grid[data-count="5"] > .plan-card:nth-child(4) { grid-column: auto; }
+    }
+    @media (max-width: 1000px) {
+      .plans-grid[data-count="3"] { --cols: 2; max-width: 900px; }
+    }
+    /* Two to a row with an odd plan left over: it sits centred under the pair. */
+    @media (min-width: 641px) and (max-width: 1240px) {
+      .plans-grid[data-count="5"] > .plan-card:last-child,
+      .plans-grid[data-count="3"] > .plan-card:last-child { grid-column: 1 / -1; width: calc(50% - .625rem); justify-self: center; }
+    }
+    @media (min-width: 1001px) {
+      .plans-grid[data-count="3"] > .plan-card:last-child { grid-column: auto; width: auto; }
     }
     @media (max-width: 860px) {
-      .plans-grid { --plans: 2 !important; }
       .features-grid { grid-template-columns: 1fr; }
       .faq-section { grid-template-columns: 1fr; gap: 1.25rem; }
       .faq-intro { position: static; }
@@ -736,15 +799,15 @@
     @media (max-width: 600px) {
       .pricing-page { width: min(100% - 2rem, 1320px); }
       .page-hero { padding: 2.25rem 0 1.5rem; }
-      .plans-grid { --plans: 1 !important; }
+      .plans-grid[data-count] { --cols: 1; max-width: 520px; }
+      .plans-grid[data-count] > .plan-card { grid-column: auto !important; width: auto !important; }
+      .plans-side .plan-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "pricing" "quota" "action" "features"; }
+      .plans-side .plan-pricing { align-items: flex-start; text-align: start; padding-top: 1rem; }
       .plan-card { padding: 1.35rem 1.15rem 1.2rem; }
       .plan-desc { min-height: 0; }
       .plan-badges.is-empty { display: none; }
       .page-hero { padding-top: 2.75rem; }
       .plans-common { padding: 1.2rem 1.1rem 1.3rem; }
-      /* A full-width card has room for each label and its value on one line. */
-      .plan-features li { flex-direction: row; justify-content: space-between; align-items: baseline; gap: .75rem; }
-      .feature-value { padding-inline-start: 0; text-align: end; }
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 3.5rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
@@ -789,6 +852,29 @@
           'trial_yearly' => in_array('yearly', $trialCycles, true),
         ];
       };
+      // When an offer ends, in words: "Offer ends in 4 days", "… in 7 hours", "… in 12 minutes".
+      $offerEndsText = static function (?string $endsAt): string {
+        $seconds = $endsAt ? \Illuminate\Support\Carbon::parse($endsAt)->getTimestamp() - now()->getTimestamp() : 0;
+        if ($seconds <= 0) return '';
+        if ($seconds >= 2 * 86400) return trans_choice('ui.pricing.offer_ends_days', intdiv($seconds, 86400));
+        if ($seconds >= 3600) return trans_choice('ui.pricing.offer_ends_hours', intdiv($seconds, 3600));
+        return trans_choice('ui.pricing.offer_ends_minutes', max(1, (int) ceil($seconds / 60)));
+      };
+      // Monthly plans share the main row; a plan to try and one-time packs sit in their own band.
+      $mainPlans = [];
+      $sidePlans = [];
+      foreach ($pricingPlans as $planIndex => $pricingPlan) {
+        $isSidePlan = !empty($pricingPlan['is_pack']) || (int) ($pricingPlan['price_monthly_cents'] ?? 0) <= 0;
+        if ($isSidePlan) {
+          $sidePlans[$planIndex] = $pricingPlan;
+        } else {
+          $mainPlans[$planIndex] = $pricingPlan;
+        }
+      }
+      if ($mainPlans === []) {
+        $mainPlans = $sidePlans;
+        $sidePlans = [];
+      }
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
       $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
       // The icon drawn beside each line, on the cards and in "Every plan includes".
@@ -834,11 +920,19 @@
           $compareRows[$creditsLabel][$comparePlan['slug']] ??= number_format((int) ($comparePlan['monthly_chars'] ?? 0));
         }
       }
-      // A line every plan has with the same value is said once, under the cards.
+      // A line every monthly plan has with the same value is said once, under the cards.
+      // (The plans in the side band show all their own lines.)
       $commonLines = [];
-      if (count($comparePlans) > 1) {
-        foreach ($compareRows as $label => $values) {
-          if ($label !== $creditsLabel && count($values) === count($comparePlans) && count(array_unique($values)) === 1) {
+      $mainSlugs = array_column($mainPlans, 'slug');
+      if (count($mainSlugs) > 1) {
+        foreach ($mainPlans as $mainPlan) {
+          foreach ($mainPlan['features'] as $line) {
+            $label = (string) ($line['label'] ?? '');
+            $mainValues[$label][$mainPlan['slug']] = (string) ($line['value'] ?? $includedMark);
+          }
+        }
+        foreach ($mainValues ?? [] as $label => $values) {
+          if ($label !== '' && count($values) === count($mainSlugs) && count(array_unique($values)) === 1) {
             $commonLines[$label] = reset($values);
           }
         }
@@ -859,9 +953,6 @@
           </span>
         </div>
       @endif
-      @if(empty($trialPromo['show']))
-        <span class="hero-eyebrow">{{ __('ui.nav.pricing') }}</span>
-      @endif
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
       <div class="billing-wrapper">
@@ -878,11 +969,23 @@
       </div>
     </section>
 
-    <section class="plans-grid" style="--plans: {{ min(5, max(1, count($pricingPlans))) }}">
-      @foreach($pricingPlans as $index => $plan)
+    <section class="plans-grid" data-count="{{ min(6, max(1, count($mainPlans))) }}">
+      @foreach($mainPlans as $index => $plan)
         @include('components._plan-card', ['plan' => $plan, 'index' => $index])
       @endforeach
     </section>
+
+    @if($sidePlans !== [])
+      {{-- A plan to try the voices and one-time packs: the same cards, laid out on their side. --}}
+      <section class="plans-side" aria-labelledby="plansSideTitle">
+        <h2 class="plans-side-title" id="plansSideTitle">{{ __('ui.pricing.other_ways_title') }}</h2>
+        <div class="plans-side-list">
+          @foreach($sidePlans as $index => $plan)
+            @include('components._plan-card', ['plan' => $plan, 'index' => $index, 'pricingHiddenLabels' => [$minutesLabel]])
+          @endforeach
+        </div>
+      </section>
+    @endif
 
     <div class="plans-trust reveal">
       <span>{!! $tick !!}{{ __('ui.pricing.badge_no_card') }}</span>
@@ -892,7 +995,7 @@
 
     @if($commonLines !== [])
       <section class="plans-common reveal" aria-labelledby="plansCommonTitle">
-        <h2 class="plans-common-title" id="plansCommonTitle">{{ __('ui.pricing.every_plan_includes') }}</h2>
+        <h2 class="plans-common-title" id="plansCommonTitle">{{ $sidePlans !== [] ? __('ui.pricing.every_monthly_plan_includes') : __('ui.pricing.every_plan_includes') }}</h2>
         <ul class="plans-common-list">
           @foreach($commonLines as $label => $value)
             <li>
@@ -1156,7 +1259,7 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
-        document.querySelectorAll('.plans-grid').forEach(function(el) {
+        document.querySelectorAll('.plans-grid, .plans-side').forEach(function(el) {
           el.classList.toggle('is-yearly', yearly);
         });
         updatePrices();
@@ -1186,55 +1289,47 @@
       revealElements.forEach(function(el) { revealObserver.observe(el); });
     })();
   </script>
+  @php
+    // The offer-ends wording in every plural form, for the minute-by-minute update.
+    $offerEndsForms = [
+      'days' => explode('|', __('ui.pricing.offer_ends_days')),
+      'hours' => explode('|', __('ui.pricing.offer_ends_hours')),
+      'minutes' => explode('|', __('ui.pricing.offer_ends_minutes')),
+    ];
+  @endphp
   <script>
-    /* ── Discount countdown timers ──────────────────── */
+    /* ── When each offer ends, in words, kept current ── */
     (function() {
-      var countdowns = document.querySelectorAll('.discount-countdown');
-      if (!countdowns.length) return;
-
-      function pad(n) { return n < 10 ? '0' + n : '' + n; }
-
-      function updateCountdown(el) {
-        var ends = el.getAttribute('data-ends');
-        if (!ends) return false;
-        var endTime = new Date(ends).getTime();
-        var now = Date.now();
-        var diff = Math.max(0, endTime - now);
-
-        if (diff <= 0) {
-          el.style.display = 'none';
-          return false;
+      var lines = document.querySelectorAll('.offer-ends[data-ends]');
+      if (!lines.length) return;
+      var forms = @json($offerEndsForms);
+      var arabic = document.documentElement.lang === 'ar';
+      // The same plural rules the server uses (Laravel's): six forms in Arabic, two in English.
+      function form(list, n) {
+        var i;
+        if (arabic) {
+          var m = n % 100;
+          i = n === 0 ? 0 : n === 1 ? 1 : n === 2 ? 2 : (m >= 3 && m <= 10) ? 3 : (m >= 11 && m <= 99) ? 4 : 5;
+        } else {
+          i = n === 1 ? 0 : 1;
         }
-
-        var d = Math.floor(diff / 86400000);
-        var h = Math.floor((diff % 86400000) / 3600000);
-        var m = Math.floor((diff % 3600000) / 60000);
-        var s = Math.floor((diff % 60000) / 1000);
-
-        var units = el.querySelectorAll('.countdown-num');
-        units.forEach(function(unit) {
-          var key = unit.getAttribute('data-unit');
-          var val = key === 'd' ? pad(d) : key === 'h' ? pad(h) : key === 'm' ? pad(m) : pad(s);
-          if (unit.textContent !== val) {
-            unit.textContent = val;
-          }
-          if (key === 'd') {
-            unit.parentElement.hidden = d === 0;
-          }
-        });
-
-        return true;
+        return String(list[Math.min(i, list.length - 1)] || '').replace(':count', String(n));
       }
-
-      function tickAll() {
-        var anyActive = false;
-        countdowns.forEach(function(el) {
-          if (updateCountdown(el)) anyActive = true;
+      function refresh() {
+        var any = false;
+        lines.forEach(function(el) {
+          var seconds = Math.floor((new Date(el.getAttribute('data-ends')).getTime() - Date.now()) / 1000);
+          if (!(seconds > 0)) { el.hidden = true; return; }
+          any = true;
+          var text = seconds >= 172800 ? form(forms.days, Math.floor(seconds / 86400))
+            : seconds >= 3600 ? form(forms.hours, Math.floor(seconds / 3600))
+            : form(forms.minutes, Math.max(1, Math.ceil(seconds / 60)));
+          var out = el.querySelector('.offer-ends-text');
+          if (out && out.textContent !== text) out.textContent = text;
         });
-        if (anyActive) requestAnimationFrame(function() { setTimeout(tickAll, 1000); });
+        if (any) setTimeout(refresh, 30000);
       }
-
-      tickAll();
+      refresh();
     })();
   </script>
 </body>

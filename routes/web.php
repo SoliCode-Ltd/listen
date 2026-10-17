@@ -133,6 +133,7 @@ Route::group([
 ], function (): void {
     Route::get('/', [HomeController::class, 'index'])->name('home');
     Route::get('/pricing', [HomeController::class, 'pricingPage'])->name('pricing');
+    Route::get('/voice-samples', [HomeController::class, 'samplesPage'])->name('samples');
     Route::get('/free-trial', [HomeController::class, 'startFreeTrial'])->name('trial.start');
     Route::get('/premium-pack', [\App\Http\Controllers\CharPackController::class, 'start'])->name('pack.start');
     Route::get('/ai-text-to-speech', [HomeController::class, 'seoLandingPage'])->defaults('page', 'ai_text_to_speech')->name('seo.ai-text-to-speech');

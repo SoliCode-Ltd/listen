@@ -1,5 +1,5 @@
-{{-- Homepage voice player: voice and dialogue cards ([data-vp-track] with a [data-vp-play] button),
-     region chips ([data-vp-region]) and "show all" buttons ([data-vp-more]). One clip plays at a time. --}}
+{{-- Voice player for the homepage and the samples page: voice and dialogue cards ([data-vp-track] with a
+     [data-vp-play] button) and region or mood chips ([data-vp-region]). One clip plays at a time. --}}
 <script>
 (function () {
   if (window.__vpPlayerBooted) return;
@@ -246,12 +246,6 @@
       play(pressed);
       return;
     }
-    var more = event.target.closest('[data-vp-more]');
-    if (more) {
-      var list = more.parentElement.previousElementSibling;
-      if (list) list.classList.add('is-expanded');
-      return;
-    }
     var chip = event.target.closest('[data-vp-region]');
     if (chip) {
       var region = chip.getAttribute('data-vp-region');
@@ -263,8 +257,6 @@
         card.hidden = region !== 'all' && card.getAttribute('data-region') !== region;
         if (card.hidden && current === card) { audio.pause(); stop(); rest(card); }
       });
-      var wrap = section.querySelector('.vs-more-wrap');
-      if (wrap) wrap.hidden = region !== 'all';
     }
   });
 })();

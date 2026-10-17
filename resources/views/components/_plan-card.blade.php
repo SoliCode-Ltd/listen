@@ -44,22 +44,10 @@
   {{-- 1. Name and who it is for --}}
   <div class="plan-top">
     {{-- On every card, empty or not, so the names line up across the row. --}}
-    <div class="plan-badges {{ $isPopular || ($hasDiscount && !$isFree && $discountEndsAt) ? '' : 'is-empty' }}">
-        @if($isPopular)
-          <span class="popular-badge"><svg class="popular-crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.2l4.6 3.6L12 5l3.9 6.8 4.6-3.6-1.7 9.3H5.2z"/><path d="M5.4 19.6h13.2"/></svg>{{ __('ui.pricing.most_popular') }}</span>
-        @endif
-        {{-- When the offer ends: a small chip that counts down. --}}
-        @if($hasDiscount && !$isFree && $discountEndsAt)
-          <span class="discount-countdown" data-ends="{{ $discountEndsAt }}" title="{{ __('ui.pricing.discount_offer_ends') }}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            <span class="countdown-label">{{ __('ui.pricing.ends_in') }}</span>
-            <span class="countdown-digits">
-              <span class="countdown-unit"><span class="countdown-num" data-unit="d">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_days_short') }}</span></span>
-              <span class="countdown-unit"><span class="countdown-num" data-unit="h">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_hours_short') }}</span></span>
-              <span class="countdown-unit"><span class="countdown-num" data-unit="m">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_minutes_short') }}</span></span>
-            </span>
-          </span>
-        @endif
+    <div class="plan-badges {{ $isPopular ? '' : 'is-empty' }}">
+      @if($isPopular)
+        <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
+      @endif
     </div>
     <h2 class="plan-name">{{ $planDisplayName($plan) }}</h2>
     <p class="plan-desc">{{ $planDescription($plan) }}</p>
@@ -85,14 +73,21 @@
         $terms = $plan['discount_terms'];
       @endphp
       {{-- How long the discount lasts and the regular price after it, for the cycle shown. --}}
+      {{-- The offer in one box: what it is, the price after it, and when it ends, in words. --}}
       <div class="discount-terms"
            data-offer-monthly="{{ $terms['offer_monthly'] }}" data-then-monthly="{{ $terms['then_monthly'] ?? '' }}"
            data-offer-yearly="{{ $terms['offer_yearly'] }}" data-then-yearly="{{ $terms['then_yearly'] ?? '' }}">
-        <span class="discount-terms-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
-        <span class="discount-terms-body">
-          <strong class="discount-terms-offer">{{ $terms['offer_monthly'] }}</strong>
-          <span class="discount-terms-then" @if(empty($terms['then_monthly'])) hidden @endif>{{ $terms['then_monthly'] ?? '' }}</span>
-        </span>
+        <strong class="discount-terms-offer">{{ $terms['offer_monthly'] }}</strong>
+        <span class="discount-terms-then" @if(empty($terms['then_monthly'])) hidden @endif>{{ $terms['then_monthly'] ?? '' }}</span>
+        @if($discountEndsAt)
+          @php $endsText = $offerEndsText($discountEndsAt); @endphp
+          @if($endsText !== '')
+            <span class="offer-ends" data-ends="{{ $discountEndsAt }}">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 1.5M9.5 2.5h5"/></svg>
+              <span class="offer-ends-text">{{ $endsText }}</span>
+            </span>
+          @endif
+        @endif
       </div>
     @endif
     @php

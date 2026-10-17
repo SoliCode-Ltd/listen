@@ -22,6 +22,7 @@ use App\Services\TranslationService;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use App\Support\AudioEffects;
+use App\Support\HeroCast;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
 use App\Support\DialogueSpeakers;
@@ -144,6 +145,46 @@ class HomeController extends Controller
                     ->all(),
             ];
         });
+    }
+
+    /**
+     * Every sample made with the latest voices, on one page: the hero cast on
+     * the stage, Arabic dialects, English accents, moods, dialogues and sound
+     * environments, in both languages, labelled in the page language.
+     */
+    public function samplesPage()
+    {
+        $isArabicLocale = app()->getLocale() === 'ar';
+
+        $data = Cache::remember('samples_page:'.($isArabicLocale ? 'ar' : 'en'), 300, function () use ($isArabicLocale): array {
+            $cards = VoiceSample::query()
+                ->active()
+                ->whereIn('category', ['hero', 'dialogue'])
+                // Made by the latest voices (imported by tts:showcase); older recordings stay off this page.
+                ->where('provider', 'gemini')
+                ->orderByDesc('is_featured')
+                ->ordered()
+                ->get()
+                ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '')
+                ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale))
+                // The page language first; the order within each language stays as set.
+                ->sortBy(fn (array $card): int => $card['language'] === ($isArabicLocale ? 'ar' : 'en') ? 0 : 1);
+            $singles = $cards->where('kind', 'single');
+
+            return [
+                'arabicVoices' => $singles->where('language', 'ar')->values()->all(),
+                'englishVoices' => $singles->where('language', 'en')->values()->all(),
+                'moodVoices' => $singles->filter(fn (array $card): bool => $card['emotion'] !== '')->values()->all(),
+                'dialogues' => $cards->where('kind', 'dialogue')->values()->all(),
+            ];
+        });
+
+        return view('samples', $data + [
+            'stageCast' => HeroCast::everyone($isArabicLocale),
+            'environments' => $isArabicLocale
+                ? array_merge($this->environmentSamples('ar'), $this->environmentSamples('en'))
+                : array_merge($this->environmentSamples('en'), $this->environmentSamples('ar')),
+        ]);
     }
 
     public function pricingPage(Request $request)
@@ -1717,6 +1758,8 @@ class HomeController extends Controller
 
         return [
             'id' => (int) $sample->id,
+            'kind' => $sample->category === 'dialogue' ? 'dialogue' : 'single',
+            'emotion' => strtolower(trim((string) $sample->emotion)),
             'title' => trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title)),
             'language' => $language,
             'dialect' => (string) $sample->dialect,

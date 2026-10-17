@@ -34,6 +34,7 @@
   }
   $navLinks = [
     ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
+    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
     ['route' => 'demo.page', 'label' => __('ui.nav.demo'), 'guest' => true],
     ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
@@ -47,12 +48,13 @@
   $authNavLinks = [
     ['route' => 'home', 'label' => __('ui.nav.home'), 'guest' => false],
     ['route' => 'dashboard', 'label' => __('ui.nav.dashboard'), 'guest' => false],
+    ['route' => 'samples', 'label' => __('ui.nav.samples'), 'guest' => false],
     ['route' => 'pricing', 'label' => __('ui.nav.pricing'), 'guest' => false],
     ['route' => 'browsers-extension.page', 'label' => __('ui.nav.extension'), 'guest' => false],
     ['route' => 'contact', 'label' => __('ui.nav.contact'), 'guest' => false],
   ];
   if ($showDemoLinkForAuthenticated) {
-    array_splice($authNavLinks, 2, 0, [[
+    array_splice($authNavLinks, 3, 0, [[
       'route' => 'demo.page',
       'label' => __('ui.nav.demo'),
       'guest' => false,
