@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\SubscriptionStillLiveException;
 use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
@@ -9,6 +10,7 @@ use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\SavedPaymentMethodRecorder;
+use App\Services\Billing\StripePricePlans;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\Billing\TrialOutcomeService;
 use App\Services\BillingSyncService;
@@ -37,6 +39,7 @@ class BillingController extends Controller
         private readonly TrialEligibilityService $trialEligibility,
         private readonly SavedPaymentMethodRecorder $savedCards,
         private readonly TrialOutcomeService $trialOutcomes,
+        private readonly StripePricePlans $stripePrices,
     ) {}
 
     public function index(Request $request)
@@ -191,10 +194,7 @@ class BillingController extends Controller
         $next = null;
 
         if ($stripeValid && $subscription) {
-            $plan = $this->resolvePlanFromBillingSubscription($subscription);
-            if ($plan) {
-                $cycle = (string) $subscription->stripe_price === $this->resolveStripePriceId((string) $plan->slug, 'yearly') ? 'yearly' : 'monthly';
-            }
+            $cycle = $this->billingSubscriptionPlan($subscription)['cycle'] ?? null;
             $since = $subscription->created_at ? $this->formatCarbonDate($subscription->created_at) : null;
             if ($upcoming) {
                 $next = ['amount' => $upcoming['charged'] ?? $upcoming['total'], 'date' => $upcoming['date'] ?? null, 'discount' => $upcoming['discount'] ?? null, 'manual' => false];
@@ -384,23 +384,30 @@ class BillingController extends Controller
             }
 
             $subscription = $this->currentDefaultSubscription($user);
+            if (! $subscription || ! $subscription->valid()) {
+                // Our copy can be out of date: Stripe decides. A subscription it still
+                // runs is used as it is, so nobody is ever charged for a second one.
+                $subscription = $this->liveSubscriptionInStripe($user) ?? $subscription;
+            }
+            // The same plan and cycle, at today's price or an older one the member kept.
+            $samePlan = $subscription && $this->isOnPlan($subscription, $priceId, (string) $planRecord->slug, (string) $validated['billing_cycle']);
             $charged = true;
 
             // Same plan while a cancellation is scheduled: undo the cancellation, charge nothing now.
-            if ($subscription && $subscription->onGracePeriod() && $subscription->hasPrice($priceId)) {
+            if ($subscription && $subscription->onGracePeriod() && $samePlan) {
                 $subscription->resume();
                 $charged = false;
             }
 
-            if ($subscription && $subscription->valid() && $subscription->onTrial() && ($subscription->hasPrice($priceId) || ! $request->boolean('end_trial'))) {
+            if ($subscription && $subscription->valid() && $subscription->onTrial() && ($samePlan || ! $request->boolean('end_trial'))) {
                 // Never end a free trial without the member saying so: the same plan
                 // keeps the trial (nothing is charged), another plan asks first.
-                if ($paymentMethod !== '' && $subscription->hasPrice($priceId)) {
+                if ($paymentMethod !== '' && $samePlan) {
                     $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }
                 $this->billingSyncService->syncIfStale($user, true);
                 $trialEnds = $this->formatDateLabel($subscription->trial_ends_at?->toDateString());
-                if ($subscription->hasPrice($priceId)) {
+                if ($samePlan) {
                     return response()->json([
                         'ok' => false,
                         'already_on_trial' => true,
@@ -425,7 +432,7 @@ class BillingController extends Controller
                     return $notCharged;
                 }
             } elseif ($subscription && $subscription->valid()) {
-                if (! $subscription->hasPrice($priceId)) {
+                if (! $samePlan) {
                     try {
                         $subscription->swap($priceId, $couponId ? ['discounts' => [['coupon' => $couponId]]] : []);
                         if ($paymentMethod !== '') {
@@ -475,6 +482,18 @@ class BillingController extends Controller
                 'ok' => false,
                 'message' => $firstMessage !== '' ? $firstMessage : __('ui.backend.billing_add_payment_method'),
             ], 422);
+        } catch (SubscriptionStillLiveException $exception) {
+            Log::error('Checkout stopped: Stripe still charges this member for another subscription.', [
+                'user_id' => $user->id,
+                'plan' => $validated['plan'] ?? null,
+                'stripe_subscriptions' => $exception->subscriptionIds,
+            ]);
+            $this->billingSyncService->syncIfStale($user, true);
+
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_already_subscribed'),
+            ], 409);
         } catch (\Throwable $exception) {
             Log::warning('Unable to update Stripe subscription.', [
                 'user_id' => $user->id,
@@ -738,6 +757,12 @@ class BillingController extends Controller
             ]);
         }
 
+        // Never start a second subscription while Stripe still charges for one.
+        $live = $this->liveStripeSubscriptions($user, ['active', 'trialing', 'past_due', 'unpaid']);
+        if ($live !== []) {
+            throw new SubscriptionStillLiveException(array_map(fn ($sub) => (string) $sub->id, $live));
+        }
+
         $builder = $user->newSubscription('default', $priceId);
 
         if ($couponId) {
@@ -876,10 +901,74 @@ class BillingController extends Controller
             ->first();
     }
 
+    /**
+     * The member's subscription Stripe still runs, saved to our copy, when ours
+     * has none. One that charges now wins over one that is behind on payment.
+     */
+    private function liveSubscriptionInStripe(User $user): ?BillingSubscription
+    {
+        $live = collect($this->liveStripeSubscriptions($user, ['active', 'trialing', 'past_due', 'unpaid']))
+            ->sortBy(fn ($sub) => in_array((string) $sub->status, ['active', 'trialing'], true) ? 0 : 1)
+            ->first();
+        if (! $live) {
+            return null;
+        }
+
+        $this->billingSyncService->persistBillingSubscription($user, $live);
+
+        return BillingSubscription::query()->where('stripe_id', (string) $live->id)->first();
+    }
+
+    /**
+     * The member's Stripe subscriptions in these statuses, newest first.
+     *
+     * @param  list<string>  $statuses
+     * @return list<object>
+     */
+    private function liveStripeSubscriptions(User $user, array $statuses): array
+    {
+        $customerId = trim((string) $user->stripe_id);
+        if ($customerId === '') {
+            return [];
+        }
+
+        $list = Cashier::stripe()->subscriptions->all(['customer' => $customerId, 'status' => 'all', 'limit' => 20]);
+
+        return collect(isset($list->data) ? $list->data : [])
+            ->filter(fn ($sub) => in_array((string) ($sub->status ?? ''), $statuses, true))
+            ->sortByDesc(fn ($sub) => (int) ($sub->created ?? 0))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Whether the subscription already is this plan and cycle, at today's price
+     * or at an older price the member kept.
+     */
+    private function isOnPlan(BillingSubscription $subscription, string $priceId, string $planSlug, string $cycle): bool
+    {
+        if ($subscription->hasPrice($priceId)) {
+            return true;
+        }
+
+        $current = $this->billingSubscriptionPlan($subscription);
+
+        return $current !== null && (string) $current['plan']->slug === $planSlug && $current['cycle'] === $cycle;
+    }
+
     private function retireStaleSubscription(BillingSubscription $subscription): void
     {
         $stripeId = trim((string) $subscription->stripe_id);
         $stripeStatus = strtolower((string) $subscription->stripe_status);
+
+        // Stripe decides, not our copy: a subscription we marked canceled can still be charging.
+        if ($stripeId !== '') {
+            try {
+                $stripeStatus = strtolower((string) (Cashier::stripe()->subscriptions->retrieve($stripeId, [])->status ?? $stripeStatus));
+            } catch (\Throwable) {
+                // Stripe could not be read: keep our copy's status.
+            }
+        }
 
         if ($stripeId !== '' && ! in_array($stripeStatus, ['canceled', 'incomplete_expired'], true)) {
             try {
@@ -1615,6 +1704,17 @@ class BillingController extends Controller
 
     private function resolvePlanFromBillingSubscription(BillingSubscription $subscription): ?Plan
     {
+        return $this->billingSubscriptionPlan($subscription)['plan'] ?? null;
+    }
+
+    /**
+     * The plan and cycle of a member's Stripe subscription, also when it is on
+     * a price the plan has since replaced.
+     *
+     * @return array{plan: Plan, cycle: string}|null
+     */
+    private function billingSubscriptionPlan(BillingSubscription $subscription): ?array
+    {
         $priceId = trim((string) $subscription->stripe_price);
 
         if ($priceId === '') {
@@ -1622,36 +1722,7 @@ class BillingController extends Controller
             $priceId = trim((string) ($firstItem?->stripe_price ?? ''));
         }
 
-        if ($priceId === '') {
-            return null;
-        }
-
-        $slug = $this->mapPriceIdToPlanSlug($priceId);
-        if ($slug === null) {
-            return null;
-        }
-
-        return Plan::query()->where('slug', $slug)->first();
-    }
-
-    private function mapPriceIdToPlanSlug(string $priceId): ?string
-    {
-        $priceId = trim($priceId);
-        if ($priceId === '') {
-            return null;
-        }
-
-        // Check admin-set prices (SiteSetting) first, then .env config
-        $plans = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->pluck('slug');
-        foreach ($plans as $slug) {
-            foreach (['monthly', 'yearly'] as $cycle) {
-                if ($priceId === $this->resolveStripePriceId((string) $slug, $cycle)) {
-                    return (string) $slug;
-                }
-            }
-        }
-
-        return null;
+        return $priceId === '' ? null : $this->stripePrices->planFor($priceId, true);
     }
 
     /**

@@ -1450,6 +1450,7 @@ return [
         'billing_add_payment_method' => 'Please add a payment method.',
         'billing_update_subscription_failed' => 'Failed to update subscription.',
         'billing_plan_not_active_yet' => 'Plan is not active yet. Please wait.',
+        'billing_already_subscribed' => 'You already have an active subscription, so nothing was charged. Refresh the page to see your plan.',
         'billing_subscription_updated' => 'Subscription updated successfully!',
         'billing_update_card_failed' => 'Failed to update payment method.',
         'billing_payment_method_updated' => 'Payment method updated.',

@@ -226,6 +226,9 @@ class ScriptedStripeClient implements ClientInterface
 
     public array $setupIntentMetadata = [];
 
+    /** Subscriptions Stripe lists for the customer. */
+    public array $listedSubscriptions = [];
+
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
         $method = strtolower($method);
@@ -258,6 +261,10 @@ class ScriptedStripeClient implements ClientInterface
 
         if ($path === '/v1/setup_intents/seti_edge') {
             return $this->json(['id' => 'seti_edge', 'object' => 'setup_intent', 'status' => 'succeeded', 'customer' => 'cus_edge', 'payment_method' => 'pm_edge', 'metadata' => $this->setupIntentMetadata]);
+        }
+
+        if ($path === '/v1/subscriptions' && $method === 'get') {
+            return $this->json(['object' => 'list', 'data' => $this->listedSubscriptions, 'has_more' => false, 'url' => '/v1/subscriptions']);
         }
 
         if ($path === '/v1/invoices' && $method === 'get') {

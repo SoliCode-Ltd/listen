@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\StripePricePlans;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
@@ -15,6 +16,7 @@ class BillingSyncService
 {
     public function __construct(
         private readonly PlanAccessService $planAccessService,
+        private readonly StripePricePlans $stripePrices,
     ) {}
 
     public function syncIfStale(User $user, bool $force = false): void
@@ -50,6 +52,7 @@ class BillingSyncService
         $targetPlan = $currentPlan ?: $freePlan;
         $periodEnd = now()->addMonth();
         $periodStart = null;
+        $keepPlanAsIs = false;
 
         if ($user->stripe_id) {
             try {
@@ -65,9 +68,18 @@ class BillingSyncService
                         'pm_last_four' => null,
                     ])->save();
                 } else {
-                    $stripeSubscription = $this->resolveRelevantStripeSubscription($user->stripe_id);
+                    [$stripeSubscription, $unknownPaid] = $this->resolveRelevantStripeSubscription($user->stripe_id);
+                    $selectedPaid = in_array((string) ($stripeSubscription->status ?? ''), ['active', 'trialing'], true);
 
-                    if ($stripeSubscription) {
+                    if ($unknownPaid !== [] && ! $selectedPaid) {
+                        // Stripe is still charging for a subscription no plan owns. Never
+                        // take a paying member's plan away for that: keep it and flag it.
+                        Log::error('A member pays for a Stripe subscription whose price no plan knows. Their plan was kept.', [
+                            'user_id' => $user->id,
+                            'stripe_subscriptions' => $unknownPaid,
+                        ]);
+                        $keepPlanAsIs = true;
+                    } elseif ($stripeSubscription) {
                         $selectedStatus = (string) ($stripeSubscription->status ?? '');
                         $mappedSlug = $this->mappedPlanSlugForSubscription($stripeSubscription);
                         $mappedPlan = $mappedSlug ? Plan::query()->where('slug', $mappedSlug)->first() : null;
@@ -143,7 +155,9 @@ class BillingSyncService
             }
         }
 
-        $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
+        if (! $keepPlanAsIs) {
+            $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
+        }
 
         $user->forceFill([
             'subscription_status_checked_at' => now(),
@@ -183,7 +197,13 @@ class BillingSyncService
         return $count;
     }
 
-    private function resolveRelevantStripeSubscription(string $stripeCustomerId): ?object
+    /**
+     * The member's subscription that decides their plan, and the ids of any live
+     * subscriptions Stripe charges for that no plan owns.
+     *
+     * @return array{0: ?object, 1: list<string>}
+     */
+    private function resolveRelevantStripeSubscription(string $stripeCustomerId): array
     {
         $subscriptions = Cashier::stripe()->subscriptions->all([
             'customer' => $stripeCustomerId,
@@ -202,7 +222,15 @@ class BillingSyncService
             'canceled' => 7,
         ];
 
-        $sorted = collect($subscriptions->data ?? [])
+        $all = collect($subscriptions->data ?? []);
+        $unknownPaid = $all
+            ->filter(fn ($sub) => in_array((string) ($sub->status ?? ''), ['active', 'trialing', 'past_due', 'unpaid'], true))
+            ->filter(fn ($sub) => $this->mappedPlanSlugForSubscription($sub) === null)
+            ->map(fn ($sub) => (string) $sub->id)
+            ->values()
+            ->all();
+
+        $sorted = $all
             ->filter(fn ($sub) => $this->mappedPlanSlugForSubscription($sub) !== null)
             ->sort(function ($left, $right) use ($statusPriority) {
                 $leftPriority = $statusPriority[(string) ($left->status ?? '')] ?? 99;
@@ -216,10 +244,10 @@ class BillingSyncService
             })
             ->values();
 
-        return $sorted->first();
+        return [$sorted->first(), $unknownPaid];
     }
 
-    private function persistBillingSubscription(User $user, object $stripeSubscription): void
+    public function persistBillingSubscription(User $user, object $stripeSubscription): void
     {
         $stripeItems = collect($stripeSubscription->items->data ?? []);
         $primaryItem = $stripeItems->first();
@@ -265,61 +293,14 @@ class BillingSyncService
 
     private function mappedPlanSlugForSubscription(object $stripeSubscription): ?string
     {
-        $knownPriceToSlug = $this->knownPriceToSlugMap();
-        $items = collect($stripeSubscription->items->data ?? []);
-
-        foreach ($items as $item) {
-            $priceId = (string) ($item->price->id ?? '');
-            if ($priceId !== '' && isset($knownPriceToSlug[$priceId])) {
-                return $knownPriceToSlug[$priceId];
+        foreach ($stripeSubscription->items->data ?? [] as $item) {
+            $match = $this->stripePrices->planFor($item->price ?? null);
+            if ($match !== null) {
+                return (string) $match['plan']->slug;
             }
         }
 
         return null;
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    private function knownPriceToSlugMap(): array
-    {
-        $map = [];
-        
-        // 1. PRIMARY: Read from Plan model (auto-synced Stripe prices)
-        $plans = Plan::query()->select(['slug', 'stripe_price_monthly', 'stripe_price_yearly'])->orderBy('id')->get();
-        foreach ($plans as $plan) {
-            foreach ([trim((string) $plan->stripe_price_monthly), trim((string) $plan->stripe_price_yearly)] as $priceId) {
-                if ($priceId === '') {
-                    continue;
-                }
-
-                if (isset($map[$priceId]) && $map[$priceId] !== (string) $plan->slug) {
-                    Log::error('The same Stripe price is set on two plans. The first plan keeps it.', [
-                        'price_id' => $priceId,
-                        'kept_plan' => $map[$priceId],
-                        'ignored_plan' => (string) $plan->slug,
-                    ]);
-
-                    continue;
-                }
-
-                $map[$priceId] = (string) $plan->slug;
-            }
-        }
-        
-        // 2. FALLBACK: Legacy config values (for backwards compatibility)
-        $prices = config('services.stripe.prices', []);
-
-        foreach ((array) $prices as $slug => $cycles) {
-            foreach ((array) $cycles as $priceId) {
-                $priceId = trim((string) $priceId);
-                if ($priceId !== '' && !isset($map[$priceId])) {
-                    $map[$priceId] = (string) $slug;
-                }
-            }
-        }
-
-        return $map;
     }
 
     /**

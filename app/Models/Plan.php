@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Billing\StripePricePlans;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,6 +15,19 @@ class Plan extends Model
 
     /** A one-time character pack: bought once, never renews. */
     public const KIND_PACK = 'pack';
+
+    protected static function booted(): void
+    {
+        // Members who bought at the price a plan leaves keep paying it, so it
+        // must keep meaning this plan.
+        static::updating(function (Plan $plan): void {
+            foreach (['stripe_price_monthly' => 'monthly', 'stripe_price_yearly' => 'yearly'] as $column => $cycle) {
+                if ($plan->isDirty($column)) {
+                    app(StripePricePlans::class)->rememberPlanPrice($plan, $plan->getOriginal($column), $cycle);
+                }
+            }
+        });
+    }
 
     protected $fillable = [
         'slug',

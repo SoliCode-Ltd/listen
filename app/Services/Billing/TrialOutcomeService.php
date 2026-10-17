@@ -13,6 +13,7 @@ class TrialOutcomeService
     public function __construct(
         private readonly ReferralQualificationService $referrals,
         private readonly TrialEligibilityService $eligibility,
+        private readonly StripePricePlans $stripePrices,
     ) {}
 
     /**
@@ -26,16 +27,13 @@ class TrialOutcomeService
             return;
         }
 
-        $plan = Plan::query()
-            ->where('stripe_price_monthly', $priceId)
-            ->orWhere('stripe_price_yearly', $priceId)
-            ->orderBy('id')
-            ->first();
-        if (! $plan instanceof Plan) {
+        $match = $this->stripePrices->planFor($priceId, true);
+        if ($match === null) {
             return;
         }
 
-        $cycle = trim((string) $plan->stripe_price_yearly) === $priceId ? 'yearly' : 'monthly';
+        $plan = $match['plan'];
+        $cycle = $match['cycle'];
         if ((int) $trial->plan_id === (int) $plan->id && (string) $trial->billing_cycle === $cycle) {
             return;
         }

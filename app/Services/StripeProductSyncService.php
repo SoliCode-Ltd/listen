@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Services\Billing\StripePricePlans;
 use Illuminate\Support\Facades\Log;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
@@ -80,13 +81,21 @@ class StripeProductSyncService
             $productId = $this->syncProduct($stripe, $plan);
             $plan->stripe_product_id = $productId;
 
+            // Members who bought at the price a plan leaves keep that price, so it
+            // must keep meaning this plan (remembered before it is replaced).
+            $pricePlans = app(StripePricePlans::class);
+            $pricePlans->rememberPlanPrice($plan, $plan->stripe_price_monthly, 'monthly');
+            $pricePlans->rememberPlanPrice($plan, $plan->stripe_price_yearly, 'yearly');
+
             // Create monthly price (if not exists or price changed)
             $monthlyPriceId = $this->syncPrice($stripe, $plan, 'month', $productId);
             $plan->stripe_price_monthly = $monthlyPriceId;
+            $pricePlans->rememberPlanPrice($plan, $monthlyPriceId, 'monthly');
 
             // Create yearly price (20% discount)
             $yearlyPriceId = $this->syncPrice($stripe, $plan, 'year', $productId);
             $plan->stripe_price_yearly = $yearlyPriceId;
+            $pricePlans->rememberPlanPrice($plan, $yearlyPriceId, 'yearly');
 
             // Sync discount coupon
             $couponId = $this->syncCoupon($stripe, $plan);
