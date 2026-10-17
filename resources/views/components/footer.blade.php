@@ -22,20 +22,11 @@
       ['label' => 'LinkedIn', 'url' => $linkedinUrl, 'icon' => 'linkedin'],
     ];
 
+    // Only the accounts set in the admin: an icon that goes nowhere looks unfinished.
     foreach ($rawSocialLinks as $item) {
       if ($item['url'] !== '' && filter_var($item['url'], FILTER_VALIDATE_URL)) {
         $socialLinks[] = $item;
       }
-    }
-
-    // Keep social icons visible by default when enabled, even before links are configured.
-    if (empty($socialLinks)) {
-      $socialLinks = [
-        ['label' => 'Twitter', 'url' => '#', 'icon' => 'twitter'],
-        ['label' => 'GitHub', 'url' => '#', 'icon' => 'github'],
-        ['label' => 'Facebook', 'url' => '#', 'icon' => 'facebook'],
-        ['label' => 'LinkedIn', 'url' => '#', 'icon' => 'linkedin'],
-      ];
     }
   }
 

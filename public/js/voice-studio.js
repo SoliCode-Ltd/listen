@@ -53,6 +53,8 @@
     wrap.appendChild(select);
     select.classList.add('vs-select-native');
     select.tabIndex = -1;
+    // The button below stands in for it, with the field's label.
+    select.setAttribute('aria-hidden', 'true');
 
     var button = document.createElement('button');
     button.type = 'button';

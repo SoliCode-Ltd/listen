@@ -902,4 +902,7 @@
   }
 })();
 </script>
+{{-- In the dashboard, help sits in the sidebar instead of a button over the studio. --}}
+@unless(request()->routeIs('dashboard'))
 @include('components.whatsapp-widget')
+@endunless

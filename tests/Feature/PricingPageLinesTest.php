@@ -187,7 +187,9 @@ class PricingPageLinesTest extends TestCase
         $page->assertSee('class="credit-icon plan-quota-coin"', false);
         $page->assertSee('<strong class="plan-quota-number">320,000</strong>', false);
         $page->assertSee('<span class="plan-quota-unit">'.__('ui.pricing.characters_per_month', [], $locale).'</span>', false);
-        $page->assertSee(__('ui.pricing.lines.voice_minutes_value', ['count' => '355'], $locale));
+        // The minutes lead the quota, above the credits.
+        $page->assertSee('<strong class="plan-minutes-number">355</strong>', false);
+        $page->assertSee(__('ui.pricing.minutes_per_month', [], $locale));
         $page->assertSee($locale === 'ar' ? 'سطر إضافي من المالك' : 'Owner extra line');
         $page->assertDontSee('Stale hand-written line');
         $page->assertDontSee('سطر قديم مكتوب يدويًا');

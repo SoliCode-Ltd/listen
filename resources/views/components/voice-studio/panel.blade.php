@@ -71,6 +71,10 @@
   </div>
 
   <div class="vs-pane">
+    @if(trim((string) $slot) !== '')
+      {{-- Speed, pitch, sound and the rest: how the chosen voice delivers the text. --}}
+      <h3 class="vs-pane-title">{{ __('ui.dashboard.delivery_title') }}</h3>
+    @endif
     {{ $slot }}
   </div>
 

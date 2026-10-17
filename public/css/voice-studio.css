@@ -151,6 +151,13 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
   color: var(--muted);
 }
 .vs-pane { padding: .6rem 1.85rem 1.85rem; }
+/* Settings for how the voice delivers the text, under their own heading. */
+.vs-pane-title {
+  margin: 1rem 0 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text);
+}
 .vs-pane[hidden] { display: none; }
 .vs-pane-hint {
   display: flex;

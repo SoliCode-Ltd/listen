@@ -7,8 +7,10 @@
   if ($yearlyCents <= 0 && $monthlyCents > 0) {
     $yearlyCents = (int) round($monthlyCents * 12 * \App\Models\SiteSetting::yearlyDiscountMultiplier());
   }
-  $displayMonthlyFormatted = (string) ($plan['display_price_monthly_formatted'] ?? '$0.00');
-  $displayYearlyMonthlyFormatted = (string) ($plan['display_price_yearly_monthly_formatted'] ?? $displayMonthlyFormatted);
+  // "$9.00" reads as "$9" on the card; "$86.40" keeps its cents.
+  $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
+  $displayMonthlyFormatted = $wholePrice((string) ($plan['display_price_monthly_formatted'] ?? '$0.00'));
+  $displayYearlyMonthlyFormatted = $wholePrice((string) ($plan['display_price_yearly_monthly_formatted'] ?? $displayMonthlyFormatted));
   $displayYearlyTotalFormatted = (string) ($plan['display_price_yearly_total_formatted'] ?? $displayYearlyMonthlyFormatted);
   $displaySavingsFormatted = (string) ($plan['display_savings_formatted'] ?? '');
   $isFree = $monthlyCents <= 0;
@@ -16,9 +18,14 @@
   $hasDiscount = !empty($plan['has_discount']);
   $discountPercent = (int) ($plan['discount_percentage'] ?? 0);
   $discountEndsAt = $plan['discount_ends_at'] ?? null;
-  $originalFormatted = $plan['original_price_monthly_formatted'] ?? null;
+  $originalFormatted = isset($plan['original_price_monthly_formatted']) ? $wholePrice((string) $plan['original_price_monthly_formatted']) : null;
+  $isPopular = $plan['is_popular'] && !$isCurrent;
+  // The card shows what sets this plan apart; lines every plan shares are listed once under the cards.
+  $cardLines = array_values(array_filter($plan['features'], fn ($line) => !in_array($line['label'] ?? '', $pricingHiddenLabels ?? [], true)));
+  $includedMark = __('ui.pricing.included_mark');
+  $minutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
 @endphp
-<div class="plan-card {{ $plan['is_popular'] && !$isCurrent ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} reveal"
+<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} reveal"
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-is-pack="{{ $isPack ? '1' : '0' }}"
@@ -36,26 +43,37 @@
      data-original-monthly="{{ e($originalFormatted) }}"
      @endif>
 
-  @if($plan['is_popular'] && !$isCurrent)
-    <span class="popular-badge"><svg class="popular-crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.2l4.6 3.6L12 5l3.9 6.8 4.6-3.6-1.7 9.3H5.2z"/><path d="M5.4 19.6h13.2"/></svg>{{ __('ui.pricing.most_popular') }}</span>
-  @endif
-
-  {{-- Discount ribbon --}}
-  @if($hasDiscount && !$isFree)
-    <div class="discount-ribbon">
-      <span class="discount-ribbon-inner discount-ribbon-text">{{ __('ui.pricing.discount_badge', ['percent' => $discountPercent]) }}</span>
-    </div>
-  @endif
-
-  <div class="plan-header">
+  {{-- 1. Name and who it is for --}}
+  <div class="plan-top">
+    @if($isPopular || ($hasDiscount && !$isFree && $discountEndsAt))
+      <div class="plan-badges">
+        @if($isPopular)
+          <span class="popular-badge"><svg class="popular-crown" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 8.2l4.6 3.6L12 5l3.9 6.8 4.6-3.6-1.7 9.3H5.2z"/><path d="M5.4 19.6h13.2"/></svg>{{ __('ui.pricing.most_popular') }}</span>
+        @endif
+        {{-- When the offer ends: a small chip that counts down. --}}
+        @if($hasDiscount && !$isFree && $discountEndsAt)
+          <span class="discount-countdown" data-ends="{{ $discountEndsAt }}" title="{{ __('ui.pricing.discount_offer_ends') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span class="countdown-label">{{ __('ui.pricing.ends_in') }}</span>
+            <span class="countdown-digits">
+              <span class="countdown-unit"><span class="countdown-num" data-unit="d">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_days_short') }}</span></span>
+              <span class="countdown-unit"><span class="countdown-num" data-unit="h">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_hours_short') }}</span></span>
+              <span class="countdown-unit"><span class="countdown-num" data-unit="m">00</span><span class="countdown-lbl">{{ __('ui.pricing.unit_minutes_short') }}</span></span>
+            </span>
+          </span>
+        @endif
+      </div>
+    @endif
     <h2 class="plan-name">{{ $planDisplayName($plan) }}</h2>
     <p class="plan-desc">{{ $planDescription($plan) }}</p>
   </div>
 
+  {{-- 2. Price, and the offer when there is one --}}
   <div class="plan-pricing">
     @if($hasDiscount && !$isFree && $originalFormatted)
       <div class="price-original-row">
         <span class="price-original" dir="ltr">{{ $originalFormatted }}</span>
+        <span class="price-off discount-ribbon-text">{{ __('ui.pricing.discount_badge', ['percent' => $discountPercent]) }}</span>
       </div>
     @endif
     <div class="price-row">
@@ -96,37 +114,49 @@
     @endif
   </div>
 
-  {{-- Countdown timer for discounted plans --}}
-  @if($hasDiscount && !$isFree && $discountEndsAt)
-    <div class="discount-countdown" data-ends="{{ $discountEndsAt }}">
-      <div class="countdown-label">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
-        <span>{{ __('ui.pricing.discount_offer_ends') }}</span>
-      </div>
-      <div class="countdown-digits">
-        <div class="countdown-unit">
-          <span class="countdown-num" data-unit="d">00</span>
-          <span class="countdown-lbl">{{ __('ui.pricing.discount_days') }}</span>
-        </div>
-        <span class="countdown-sep">:</span>
-        <div class="countdown-unit">
-          <span class="countdown-num" data-unit="h">00</span>
-          <span class="countdown-lbl">{{ __('ui.pricing.discount_hours') }}</span>
-        </div>
-        <span class="countdown-sep">:</span>
-        <div class="countdown-unit">
-          <span class="countdown-num" data-unit="m">00</span>
-          <span class="countdown-lbl">{{ __('ui.pricing.discount_minutes') }}</span>
-        </div>
-        <span class="countdown-sep">:</span>
-        <div class="countdown-unit">
-          <span class="countdown-num" data-unit="s">00</span>
-          <span class="countdown-lbl">{{ __('ui.pricing.discount_seconds') }}</span>
-        </div>
-      </div>
-    </div>
-  @endif
+  {{-- 3. The button, at the same height on every card --}}
+  @php
+    $trialLabel = __('ui.pricing.start_trial_cta', ['days' => (int) ($trialPromo['days'] ?? 7)]);
+    $fallbackLabel = auth()->check() ? __('ui.pricing.upgrade_now') : __('ui.pricing.get_started');
+    $fallbackUrl = static fn (string $cycle): string => auth()->check()
+      ? route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => $cycle])
+      : route('register');
+    $monthlyUrl = $trialMonthly ? route('trial.start', ['plan' => $plan['slug']]) : $fallbackUrl('monthly');
+    $yearlyUrl = $trialYearly ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
+    $monthlyLabel = $trialMonthly ? $trialLabel : $fallbackLabel;
+    $yearlyLabel = $trialYearly ? $trialLabel : $fallbackLabel;
+    // The recommended plan gets the filled button; the others an outline.
+    $buttonStyle = $isPopular ? 'btn-primary' : 'btn-outline';
+  @endphp
+  <div class="plan-action">
+    @if($isPack)
+      @if(!auth()->check())
+        <a class="plan-btn {{ $buttonStyle }}" href="{{ route('pack.start') }}">{{ $plan['button_text'] ?: __('ui.pack.buy') }}</a>
+      @elseif(!empty($plan['can_buy_pack']))
+        <a class="plan-btn {{ $buttonStyle }}" href="{{ route('billing.pack') }}">{{ !empty($plan['has_pack']) ? __('ui.pack.buy_again') : ($plan['button_text'] ?: __('ui.pack.buy')) }}</a>
+      @else
+        <span class="plan-btn btn-disabled">{{ __('ui.pack.for_free_members') }}</span>
+      @endif
+    @elseif(auth()->check() && $isCurrent)
+      <span class="plan-btn btn-disabled">{{ __('ui.pricing.current_plan') }}</span>
+    @elseif(auth()->check() && ($isLower || $plan['slug'] === 'free'))
+      <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
+    @elseif($plan['slug'] === 'free')
+      <a class="plan-btn {{ $buttonStyle }}" href="{{ route('register') }}">{{ __('ui.pricing.start_free') }}</a>
+    @else
+      <a
+        class="plan-btn {{ $buttonStyle }}"
+        href="{{ $monthlyUrl }}"
+        data-upgrade-link="1"
+        data-monthly-href="{{ $monthlyUrl }}"
+        data-yearly-href="{{ $yearlyUrl }}"
+        data-monthly-label="{{ $monthlyLabel }}"
+        data-yearly-label="{{ $yearlyLabel }}"
+      >{{ $monthlyLabel }}</a>
+    @endif
+  </div>
 
+  {{-- 4. How much voice it gives: minutes first, the credits behind them second --}}
   @php
     $creditsQuota = ! $isPack && empty($plan['free_try_chars']);
   @endphp
@@ -136,6 +166,12 @@
     @elseif(!empty($plan['free_try_chars']))
       {{ __('ui.pack.free_try_headline', ['count' => number_format((int) $plan['free_try_chars'])]) }}
     @else
+      @if($minutes > 0)
+        <span class="plan-minutes">
+          <strong class="plan-minutes-number">{{ number_format($minutes) }}</strong>
+          <span class="plan-minutes-unit">{{ __('ui.pricing.minutes_per_month') }}</span>
+        </span>
+      @endif
       <span class="plan-quota-credits" title="{{ __('ui.pricing.credits_hint') }}">
         <x-credit-icon class="plan-quota-coin" />
         <span class="plan-quota-amount">
@@ -146,8 +182,9 @@
     @endif
   </div>
 
+  {{-- 5. What sets it apart --}}
   <ul class="plan-features">
-    @foreach($plan['features'] as $feature)
+    @foreach($cardLines as $feature)
       @php
         $iconSvg = match($feature['icon'] ?? 'check') {
           'activity' => '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
@@ -163,55 +200,20 @@
           'users' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
           'heart' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
           'sliders' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
-          default => '<circle cx="12" cy="12" r="12" style="fill:var(--brand-accent);stroke:none;" opacity="0.15"/><circle cx="12" cy="12" r="9" style="fill:var(--brand-accent);stroke:none;"/><path d="M8.5 12L10.5 14.5L16 9" style="stroke:white;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none;"/>',
+          default => '<path d="M20 6 9 17l-5-5"/>',
         };
+        $value = (string) ($feature['value'] ?? $includedMark);
+        $isTick = $value === '' || $value === $includedMark;
       @endphp
-    <li>
+    <li class="{{ $isTick ? 'is-tick' : '' }}">
       <span class="feature-label">
-        <svg viewBox="0 0 24 24">{!! $iconSvg !!}</svg>
+        <svg viewBox="0 0 24 24" aria-hidden="true">{!! $isTick ? '<path d="M20 6 9 17l-5-5"/>' : $iconSvg !!}</svg>
         {{ $feature['label'] ?? '' }}
       </span>
-      <span class="feature-value">{{ $feature['value'] ?? __('ui.pricing.included_mark') }}</span>
+      @unless($isTick)
+        <span class="feature-value">{{ $value }}</span>
+      @endunless
     </li>
     @endforeach
   </ul>
-
-  @php
-    $trialLabel = __('ui.pricing.start_trial_cta', ['days' => (int) ($trialPromo['days'] ?? 7)]);
-    $fallbackLabel = auth()->check() ? __('ui.pricing.upgrade_now') : __('ui.pricing.get_started');
-    $fallbackUrl = static fn (string $cycle): string => auth()->check()
-      ? route('billing.page', ['plan' => $plan['slug'], 'billing_cycle' => $cycle])
-      : route('register');
-    $monthlyUrl = $trialMonthly ? route('trial.start', ['plan' => $plan['slug']]) : $fallbackUrl('monthly');
-    $yearlyUrl = $trialYearly ? route('trial.start', ['plan' => $plan['slug'], 'billing_cycle' => 'yearly']) : $fallbackUrl('yearly');
-    $monthlyLabel = $trialMonthly ? $trialLabel : $fallbackLabel;
-    $yearlyLabel = $trialYearly ? $trialLabel : $fallbackLabel;
-  @endphp
-  <div class="plan-action">
-    @if($isPack)
-      @if(!auth()->check())
-        <a class="plan-btn btn-primary" href="{{ route('pack.start') }}">{{ $plan['button_text'] ?: __('ui.pack.buy') }}</a>
-      @elseif(!empty($plan['can_buy_pack']))
-        <a class="plan-btn btn-primary" href="{{ route('billing.pack') }}">{{ !empty($plan['has_pack']) ? __('ui.pack.buy_again') : ($plan['button_text'] ?: __('ui.pack.buy')) }}</a>
-      @else
-        <span class="plan-btn btn-disabled">{{ __('ui.pack.for_free_members') }}</span>
-      @endif
-    @elseif(auth()->check() && $isCurrent)
-      <span class="plan-btn btn-disabled">{{ __('ui.pricing.current_plan') }}</span>
-    @elseif(auth()->check() && ($isLower || $plan['slug'] === 'free'))
-      <span class="plan-btn btn-disabled">{{ __('ui.pricing.downgrade') }}</span>
-    @elseif($plan['slug'] === 'free')
-      <a class="plan-btn btn-primary" href="{{ route('register') }}">{{ __('ui.pricing.start_free') }}</a>
-    @else
-      <a
-        class="plan-btn btn-primary"
-        href="{{ $monthlyUrl }}"
-        data-upgrade-link="1"
-        data-monthly-href="{{ $monthlyUrl }}"
-        data-yearly-href="{{ $yearlyUrl }}"
-        data-monthly-label="{{ $monthlyLabel }}"
-        data-yearly-label="{{ $yearlyLabel }}"
-      >{{ $monthlyLabel }}</a>
-    @endif
-  </div>
 </div>
