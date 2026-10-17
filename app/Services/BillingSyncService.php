@@ -153,6 +153,10 @@ class BillingSyncService
                     'error' => $exception->getMessage(),
                 ]);
             }
+        } elseif ($currentPlan && (int) $currentPlan->price_cents > 0) {
+            // No Stripe customer, so the plan was paid by hand or given by the team:
+            // it ends on the date it was given, never a month from each visit.
+            $keepPlanAsIs = true;
         }
 
         if (! $keepPlanAsIs) {

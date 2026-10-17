@@ -127,6 +127,16 @@
     }
     .detail-sub { display: block; margin-top: .15rem; font-size: .8rem; font-weight: 500; color: var(--muted); }
     .detail-saving { color: var(--ok, #16a34a); }
+    .no-cancel-note {
+      display: flex;
+      align-items: flex-start;
+      gap: .5rem;
+      margin: .9rem 0 0;
+      font-size: .85rem;
+      line-height: 1.55;
+      color: var(--muted);
+    }
+    .no-cancel-note svg { flex: none; width: 16px; height: 16px; margin-top: .17rem; }
     .actions .btn:not(.btn-primary):not(.btn-danger) {
       background: transparent;
       border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 45%, var(--line));
@@ -323,6 +333,8 @@
         flex-direction: column;
         gap: .2rem;
       }
+      /* Stacked, the value and its note line up with the label. */
+      .detail-row dd { text-align: start; }
       .actions .btn {
         flex: 1 1 100%;
         justify-content: center;
@@ -366,6 +378,23 @@
       'cancellation scheduled', 'past due', 'past_due', 'unpaid', 'incomplete payment', 'incomplete' => 'pending',
       default => 'canceled',
     };
+    // A plan that does not renew by itself: given by the Listen team, or paid by InstaPay / Vodafone Cash.
+    $granted = !empty($manual['granted']);
+    $noRenewal = !empty($manual['status']) && empty($manual['expired']) && ($granted || !empty($manual['paid_manually']));
+    $endsLabel = $granted ? __('ui.manage_subscription.active_until') : __('ui.manage_subscription.paid_until');
+    $manualNotice = null;
+    if ($granted && !empty($manual['status'])) {
+      $noticeArgs = ['plan' => $manual['plan_name'] ?? '', 'date' => $manual['ends_at'] ?? ''];
+      $manualNotice = match (true) {
+        !empty($manual['expired']) => !empty($manual['ends_at']) ? __('ui.manage_subscription.granted_expired_notice', $noticeArgs) : null,
+        !empty($manual['ends_at']) => __('ui.manage_subscription.granted_active_notice', $noticeArgs),
+        default => __('ui.manage_subscription.granted_open_notice', $noticeArgs),
+      };
+    } elseif (!empty($manual['status']) && !empty($manual['ends_at']) && ($manual['expired'] || !empty($manual['paid_manually']))) {
+      $manualNotice = $manual['expired']
+        ? __('ui.manage_subscription.manual_expired_notice', ['date' => $manual['ends_at']])
+        : __('ui.manage_subscription.manual_active_notice', ['date' => $manual['ends_at']]);
+    }
   @endphp
   @include('components.header')
 
@@ -384,11 +413,9 @@
         {{ __('ui.manage_subscription.manual_pending_notice', ['plan' => $manual['pending_plan']]) }}
       </div>
     @endif
-    @if(!empty($manual['status']) && !empty($manual['ends_at']) && ($manual['expired'] || !empty($manual['paid_manually'])))
+    @if($manualNotice)
       <div class="message {{ $manual['expired'] ? 'error' : 'info' }}" style="margin-top:-.4rem;margin-bottom:1rem;">
-        {{ $manual['expired']
-            ? __('ui.manage_subscription.manual_expired_notice', ['date' => $manual['ends_at']])
-            : __('ui.manage_subscription.manual_active_notice', ['date' => $manual['ends_at']]) }}
+        {{ $manualNotice }}
       </div>
     @endif
     @if($billingProfileRemoved)
@@ -407,7 +434,7 @@
         <span class="status-badge {{ $statusClass }}" id="subscriptionStatusBadge">{{ $subscriptionStatusLabel }}</span>
       </div>
       <div class="status-item">
-        <small>{{ !empty($manual['ends_at']) && empty($manual['expired']) ? __('ui.manage_subscription.paid_until') : __('ui.manage_subscription.next_billing') }}</small>
+        <small>{{ !empty($manual['ends_at']) && empty($manual['expired']) ? $endsLabel : __('ui.manage_subscription.next_billing') }}</small>
         <b>
           @if(!empty($upcomingCharge['total']))
             <bdi>{{ $upcomingCharge['total'] }}</bdi>{{ !empty($upcomingCharge['date']) ? ' ' . __('ui.manage_subscription.on_date', ['date' => $upcomingCharge['date']]) : '' }}
@@ -478,6 +505,21 @@
               </dd>
             </div>
           @endif
+          @if($noRenewal)
+            @if($granted && empty($billing['next']))
+              <div class="detail-row">
+                <dt>{{ __('ui.manage_subscription.next_payment') }}</dt>
+                <dd>
+                  {{ __('ui.manage_subscription.next_payment_none') }}
+                  <small class="detail-sub">{{ __('ui.manage_subscription.nothing_charged') }}</small>
+                </dd>
+              </div>
+            @endif
+            <div class="detail-row">
+              <dt>{{ __('ui.manage_subscription.auto_renew') }}</dt>
+              <dd>{{ __('ui.manage_subscription.auto_renew_off') }}</dd>
+            </div>
+          @endif
           @if($subscriptionRenewsAt && ! $isCancellationScheduled)
             <div class="detail-row" id="renewsOnRow">
               <dt>{{ __('ui.manage_subscription.renews_on') }}</dt>
@@ -492,7 +534,7 @@
           @endif
           @if(!empty($manual['ends_at']))
             <div class="detail-row">
-              <dt>{{ $manual['expired'] ? __('ui.manage_subscription.access_ends_on') : __('ui.manage_subscription.paid_until') }}</dt>
+              <dt>{{ $manual['expired'] ? __('ui.manage_subscription.access_ends_on') : $endsLabel }}</dt>
               <dd>{{ $manual['ends_at'] }}</dd>
             </div>
           @endif
@@ -500,7 +542,7 @@
 
         <div class="actions">
           @if(!empty($manual['plan_slug']))
-            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $manual['plan_slug']]) }}">{{ __('ui.manage_subscription.renew_plan') }}</a>
+            <a class="btn btn-primary" href="{{ route('billing.page', ['plan' => $manual['plan_slug']]) }}">{{ $granted && empty($manual['expired']) ? __('ui.manage_subscription.keep_plan') : __('ui.manage_subscription.renew_plan') }}</a>
           @endif
           <a class="btn {{ empty($manual['plan_slug']) ? 'btn-primary' : '' }}" href="{{ route('billing.page') }}">{{ __('ui.manage_subscription.change_plan') }}</a>
           @if($isCancellationScheduled)
@@ -510,6 +552,14 @@
             <button class="btn btn-danger" id="cancelBtn" type="button">{{ __('ui.manage_subscription.cancel_subscription') }}</button>
           @endif
         </div>
+        @if($noRenewal && ! $hasCancelableSubscription)
+          <p class="no-cancel-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="7.9" r="1.05" fill="currentColor"/></svg>
+            <span>{{ !empty($manual['ends_at'])
+                ? __('ui.manage_subscription.nothing_to_cancel', ['date' => $manual['ends_at']])
+                : __('ui.manage_subscription.nothing_to_cancel_open') }}</span>
+          </p>
+        @endif
         <div id="subscriptionMessage" class="message"></div>
       </div>
 

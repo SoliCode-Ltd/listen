@@ -3,8 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\SubscriptionResource\Pages;
+use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\CharGift;
+use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Services\Billing\CharGiftService;
@@ -37,6 +39,29 @@ class SubscriptionResource extends Resource
     {
         return parent::getEloquentQuery()
             ->whereHas('plan', fn (Builder $plan) => $plan->where('price_cents', '>', 0));
+    }
+
+    /**
+     * A paid plan given here to a member with no card subscription is kept
+     * exactly as set. Any other payment state lets the billing sync take it
+     * back (Stripe has no subscription for it) or keep moving its end date.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    public static function keepHandGivenPlan(array $data, int $userId): array
+    {
+        $plan = Plan::query()->find((int) ($data['plan_id'] ?? 0));
+        $paysByCard = BillingSubscription::query()
+            ->where('user_id', $userId)
+            ->whereIn('stripe_status', ['active', 'trialing', 'past_due'])
+            ->exists();
+
+        if ($plan && (int) $plan->price_cents > 0 && ! $paysByCard) {
+            $data['billing_payment_state'] = 'manual_override';
+        }
+
+        return $data;
     }
 
     public static function form(Form $form): Form
@@ -75,7 +100,8 @@ class SubscriptionResource extends Resource
                                 'failed' => 'Failed',
                                 'grace' => 'Grace',
                                 'manual_override' => 'Manual Override (Admin)',
-                            ]),
+                            ])
+                            ->helperText('A paid plan given to a member who has no card subscription is always saved as Manual Override, so it stays exactly as set and ends on its end date.'),
                     ]),
                 Forms\Components\Section::make('Billing Period')
                     ->columns(2)

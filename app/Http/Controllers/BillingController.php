@@ -226,7 +226,8 @@ class BillingController extends Controller
                 $since = $this->formatCarbonDate($first->reviewed_at ?? $first->created_at);
 
                 // Not renewed automatically: what renewing costs today, and by when.
-                $plan = Plan::query()->where('slug', $manual['plan_slug'])->first();
+                // A plan the team gave has no price to renew at.
+                $plan = empty($manual['granted']) ? Plan::query()->where('slug', $manual['plan_slug'])->first() : null;
                 $quote = $plan ? $this->localizedPricingService->egpPriceQuote($plan, $cycle ?? 'monthly', (string) $latest->payment_method, $locale) : null;
                 if ($quote) {
                     $next = [
@@ -263,7 +264,7 @@ class BillingController extends Controller
      * A plan paid by InstaPay / Vodafone Cash: no Stripe subscription, an end
      * date set when the payment was approved, and no automatic renewal.
      *
-     * @return array{status:?string, ends_at:?string, expired:bool, plan_slug:?string, pending_plan:?string, paid_manually:bool}|null
+     * @return array{status:?string, ends_at:?string, expired:bool, plan_slug:?string, plan_name?:string, pending_plan:?string, paid_manually:bool, granted?:bool}|null
      */
     private function manualSubscriptionState(User $user): ?array
     {
@@ -282,17 +283,30 @@ class BillingController extends Controller
         }
 
         // A paid plan without a card subscription: paid by InstaPay / Vodafone Cash, or set by an admin.
-        $paidManually = (string) $local->billing_payment_state === 'manual_override';
         $end = $local->current_period_end;
         $expired = (string) $local->status !== 'active' || ($end !== null && $end->isPast());
+        // Given by the Listen team: nothing was paid for this plan, by hand or by card.
+        $granted = ! \App\Models\ManualPaymentRequest::query()
+                ->where('user_id', $user->id)
+                ->where('plan_id', $local->plan_id)
+                ->where('status', \App\Models\ManualPaymentRequest::STATUS_APPROVED)
+                ->exists()
+            && ! BillingSubscription::query()
+                ->where('user_id', $user->id)
+                ->whereNotIn('stripe_status', ['canceled', 'incomplete_expired'])
+                ->exists()
+            && ! $this->planAccessService->userHasUnpaidTrialWindow((int) $user->id);
+        $paidManually = ! $granted && (string) $local->billing_payment_state === 'manual_override';
 
         return [
             'status' => $expired ? 'Expired' : ($paidManually ? 'Active manual' : 'Active'),
             'ends_at' => $end ? $this->formatCarbonDate($end) : null,
             'expired' => $expired,
             'plan_slug' => (string) $local->plan?->slug,
+            'plan_name' => $local->plan ? ($local->plan->getLocalizedName((string) app()->getLocale()) ?: (string) $local->plan->name) : '',
             'pending_plan' => $pendingPlan,
             'paid_manually' => $paidManually,
+            'granted' => $granted,
         ];
     }
 
