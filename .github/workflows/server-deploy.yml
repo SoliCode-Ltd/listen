@@ -21,6 +21,10 @@ name: Server deploy
 #            prints the plans' Stripe prices, the member's local billing rows
 #            and their log lines, plus every local subscription whose price
 #            no plan knows any more. Writes nothing; prints no names or emails.
+#   plan-audit: read-only. Every member on a paid plan with no card
+#            subscription: how the plan is saved, whether anything was paid
+#            for it, and whether it needs a look. Writes nothing; prints
+#            member ids only.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -32,7 +36,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, billing-trace]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -127,6 +131,53 @@ jobs:
               echo "== Log lines for member $u (Oct 15-17) =="
               $S "$FIND; grep -hE '^\[2026-10-1[5-7]' storage/logs/*.log 2>/dev/null | grep -E \"\\\"user_id\\\":$u[,}]\" | cut -c1-400 | tail -60" || echo "  none"
             done
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = plan-audit ]; then
+            $S "$FIND; php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
+          $now = now()->toDateTimeString();
+          echo "Now (UTC): $now\n";
+          $paidPlans = $db('plans')->where('price_cents', '>', 0)->where(fn ($q) => $q->where('kind', 'subscription')->orWhereNull('kind'))->pluck('slug', 'id');
+          // A member's plan is their newest plan row.
+          $latest = $db('subscriptions')->selectRaw('max(id) as id')->groupBy('user_id')->pluck('id');
+          $rows = $db('subscriptions')->whereIn('id', $latest)->where('status', 'active')->whereIn('plan_id', $paidPlans->keys())->orderBy('user_id')->get();
+          $totals = [];
+          echo "== Members on a paid plan with no card subscription ==\n";
+          foreach ($rows as $r) {
+              $card = $db('billing_subscriptions')->where('user_id', $r->user_id)->whereNotIn('stripe_status', ['canceled', 'incomplete_expired'])->exists();
+              if ($card) { $totals['on a card subscription (not listed)'] = ($totals['on a card subscription (not listed)'] ?? 0) + 1; continue; }
+              $stripeCustomer = trim((string) $db('users')->where('id', $r->user_id)->value('stripe_id')) !== '';
+              $approved = $db('manual_payment_requests')->where('user_id', $r->user_id)->where('plan_id', $r->plan_id)->where('status', 'approved')->orderByDesc('id')->get(['reviewed_at', 'billing_cycle']);
+              $otherOverride = $db('subscriptions')->where('user_id', $r->user_id)->where('id', '!=', $r->id)->where('status', 'active')->where('billing_payment_state', 'manual_override')->exists();
+              $state = (string) $r->billing_payment_state;
+              $ended = $r->current_period_end !== null && $r->current_period_end < $now;
+              $source = $approved->isNotEmpty() ? 'paid by InstaPay / Vodafone Cash' : 'given by the team';
+              $verdict = match (true) {
+                  $state === 'manual_override' => 'OK, kept as set',
+                  $ended => 'ended',
+                  $stripeCustomer && $otherOverride => 'CHECK: saved as '.$state.', kept only because an older row is Manual Override',
+                  $stripeCustomer => 'CHECK: saved as '.$state.', has a Stripe customer',
+                  default => 'CHECK: saved as '.$state.', end date was pushed a month from each visit until today',
+              };
+              $totals[$source.' / '.$verdict] = ($totals[$source.' / '.$verdict] ?? 0) + 1;
+              echo '  ', json_encode([
+                  'member' => $r->user_id, 'plan' => $paidPlans[$r->plan_id], 'saved_as' => $state,
+                  'period_start' => $r->current_period_start, 'period_end' => $r->current_period_end,
+                  'row_created' => $r->created_at, 'row_updated' => $r->updated_at, 'stripe_customer' => $stripeCustomer,
+                  'approved_payments_for_plan' => $approved->count(), 'last_approved' => $approved->first()->reviewed_at ?? null,
+                  'source' => $source, 'verdict' => $verdict,
+              ], JSON_UNESCAPED_SLASHES), "\n";
+          }
+          echo "== Totals ==\n";
+          foreach ($totals as $k => $n) echo "  $k: $n\n";
+          if ($totals === []) echo "  none\n";
+          REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
