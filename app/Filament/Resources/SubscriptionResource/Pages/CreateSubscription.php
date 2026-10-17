@@ -15,6 +15,6 @@ class CreateSubscription extends CreateRecord
             $data['billing_payment_state'] = 'manual_override';
         }
 
-        return $data;
+        return SubscriptionResource::keepHandGivenPlan($data, (int) ($data['user_id'] ?? 0));
     }
 }

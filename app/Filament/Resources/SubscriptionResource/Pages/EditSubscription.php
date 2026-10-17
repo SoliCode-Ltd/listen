@@ -19,7 +19,7 @@ class EditSubscription extends EditRecord
             $data['billing_payment_state'] = 'manual_override';
         }
 
-        return $data;
+        return SubscriptionResource::keepHandGivenPlan($data, (int) ($data['user_id'] ?? $this->record->user_id));
     }
 
     protected function getHeaderActions(): array
