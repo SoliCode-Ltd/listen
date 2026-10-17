@@ -206,7 +206,7 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
   width: 32%;
   height: 32%;
   border-radius: 50%;
-  background: var(--brand-accent, #7659FA) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M9 6.2v11.6a.9.9 0 0 0 1.4.75l9-5.8a.9.9 0 0 0 0-1.5l-9-5.8A.9.9 0 0 0 9 6.2z'/%3E%3C/svg%3E") 56% 50% / 52% no-repeat;
+  background: var(--brand-accent, #7659FA) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M7.5 6.2v11.6a.9.9 0 0 0 1.4.75l9-5.8a.9.9 0 0 0 0-1.5l-9-5.8A.9.9 0 0 0 7.5 6.2z'/%3E%3C/svg%3E") 50% 50% / 52% no-repeat;
   box-shadow: 0 0 0 3px var(--vs-card, #0B0B0F), 0 6px 14px rgba(118, 89, 250, .4);
   pointer-events: none;
   transition: opacity .2s ease, transform .2s ease;

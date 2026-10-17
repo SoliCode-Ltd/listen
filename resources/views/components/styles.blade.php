@@ -1361,7 +1361,8 @@ form:has(button.mobile-nav-link) {
   width: 15px;
   height: 15px;
   fill: currentColor;
-  margin-left: 2px;
+  /* Centred by the icon's own drawing, so play and pause both sit in the middle. */
+  margin-left: 0;
   transition: transform 0.2s ease;
 }
 .custom-audio-play.playing svg {
@@ -1552,7 +1553,7 @@ html[dir="rtl"] .user-dropdown {
 }
 
 html[dir="rtl"] .custom-audio-play svg {
-  margin-left: 2px;
+  margin-left: 0;
   margin-right: 0;
 }
 

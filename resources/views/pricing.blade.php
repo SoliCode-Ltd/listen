@@ -1,4 +1,7 @@
-@include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing', 'faqItems' => array_map(fn ($n) => ['question' => __('ui.pricing.faq'.$n.'_q'), 'answer' => __('ui.pricing.faq'.$n.'_a')], [1, 2, 3, 4])])
+@php
+  $faqNumbers = [1, 2, 5, 6, 3, 4];
+@endphp
+@include('components.page-head', ['pageTitle' => __('ui.seo.pricing_title'), 'page' => 'pricing', 'faqItems' => array_map(fn ($n) => ['question' => __('ui.pricing.faq'.$n.'_q'), 'answer' => __('ui.pricing.faq'.$n.'_a')], $faqNumbers)])
   <style>
     /* ── Pricing page ───────────────────────────────────────────────
        Plans in one aligned row: every card's name, price, button, minutes and
@@ -9,24 +12,63 @@
     }
 
     .page-hero {
+      position: relative;
+      isolation: isolate;
       text-align: center;
-      padding: 3.75rem 1rem 2.25rem;
+      padding: 4.25rem 1rem 2.5rem;
     }
+    /* A soft violet light and a faint dot grid behind the title. */
+    .page-hero::before,
+    .page-hero::after {
+      content: "";
+      position: absolute;
+      inset: -1.5rem 0 auto;
+      height: 460px;
+      z-index: -1;
+      pointer-events: none;
+    }
+    .page-hero::before {
+      background: radial-gradient(46% 58% at 50% 34%, color-mix(in oklab, var(--a) 17%, transparent), transparent 72%);
+    }
+    .page-hero::after {
+      background-image: radial-gradient(color-mix(in oklab, var(--a) 30%, transparent) 1px, transparent 1.3px);
+      background-size: 22px 22px;
+      -webkit-mask-image: radial-gradient(ellipse 48% 62% at 50% 38%, #000 25%, transparent 75%);
+      mask-image: radial-gradient(ellipse 48% 62% at 50% 38%, #000 25%, transparent 75%);
+      opacity: .5;
+    }
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      margin-bottom: 1.1rem;
+      padding: .32rem .85rem;
+      border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line));
+      border-radius: var(--radius-full);
+      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      color: var(--accent-text);
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    html[dir="rtl"] .hero-eyebrow { letter-spacing: 0; font-size: .85rem; }
     .page-hero h1 {
-      margin: 0 0 .85rem;
-      font-size: clamp(2rem, 4vw, 2.9rem);
-      letter-spacing: -.03em;
+      margin: 0 auto .9rem;
+      max-width: 18ch;
+      font-size: clamp(2.2rem, 4.6vw, 3.4rem);
+      line-height: 1.08;
+      letter-spacing: -.035em;
       text-wrap: balance;
     }
     html[dir="rtl"] .page-hero h1 {
       letter-spacing: 0;
-      line-height: 1.25;
+      line-height: 1.3;
     }
     .page-hero .lead {
       color: var(--muted);
       max-width: 58ch;
-      margin: 0 auto 1.75rem;
-      font-size: 1.05rem;
+      margin: 0 auto 2rem;
+      font-size: 1.08rem;
       line-height: 1.65;
       text-wrap: pretty;
     }
@@ -124,10 +166,11 @@
       box-shadow: var(--shadow);
     }
     .plan-card.popular {
-      border: 1.5px solid var(--brand-accent);
+      border: 1.5px solid transparent;
       background:
-        linear-gradient(180deg, color-mix(in oklab, var(--a) 7%, var(--surface)), var(--surface) 42%);
-      box-shadow: 0 18px 44px -18px color-mix(in oklab, var(--a) 45%, transparent);
+        linear-gradient(180deg, color-mix(in oklab, var(--a) 8%, var(--surface)), var(--surface) 40%) padding-box,
+        linear-gradient(165deg, #9580FF, var(--brand-accent) 45%, color-mix(in oklab, var(--a) 35%, var(--line))) border-box;
+      box-shadow: 0 24px 50px -24px color-mix(in oklab, var(--a) 55%, transparent);
     }
     .plan-top { display: flex; flex-direction: column; align-items: flex-start; }
     .popular-badge {
@@ -204,7 +247,8 @@
     .discount-terms-then { color: var(--muted); font-size: .78rem; line-height: 1.45; }
     .discount-terms-then[hidden] { display: none; }
 
-    .plan-badges { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .6rem; }
+    /* Every card keeps the badge row, so the plan names line up. */
+    .plan-badges { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: 1.45rem; margin-bottom: .6rem; }
     .plan-badges .popular-badge { margin-bottom: 0; }
     /* When the offer ends: a small chip that counts down. */
     .discount-countdown {
@@ -268,6 +312,7 @@
     }
     .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in oklab, var(--a) 7%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
     .plan-btn.btn-disabled {
       background: var(--surface2);
       color: var(--muted);
@@ -363,45 +408,46 @@
     .plans-trust svg { width: 1rem; height: 1rem; fill: none; stroke: var(--ok); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
     .plans-common {
-      margin: 2.25rem auto 0;
-      padding: 1.25rem 1.5rem;
-      max-width: 980px;
+      margin: 2rem 0 0;
+      padding: 1.35rem 1.6rem 1.5rem;
       border: 1px solid var(--line);
-      border-radius: 1rem;
-      background: var(--surface);
-      text-align: center;
+      border-radius: 1.1rem;
+      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 4%, var(--surface)), var(--surface));
     }
     .plans-common-title {
-      margin: 0 0 .85rem;
-      font-size: .82rem;
+      margin: 0 0 1.1rem;
+      text-align: center;
+      font-size: .8rem;
       font-weight: 700;
-      letter-spacing: .06em;
+      letter-spacing: .08em;
       text-transform: uppercase;
       color: var(--muted);
     }
-    html[dir="rtl"] .plans-common-title { letter-spacing: 0; }
-    .plans-common ul {
+    html[dir="rtl"] .plans-common-title { letter-spacing: 0; font-size: .9rem; }
+    .plans-common-list {
       list-style: none;
       margin: 0;
       padding: 0;
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: .55rem;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: .9rem 1.5rem;
     }
-    .plans-common li {
-      display: inline-flex;
-      align-items: center;
-      gap: .4rem;
-      padding: .42rem .8rem;
-      border-radius: var(--radius-full);
-      background: var(--surface2);
-      border: 1px solid var(--line);
-      font-size: .85rem;
-      color: var(--muted);
+    .plans-common-list li { display: flex; align-items: center; gap: .8rem; min-width: 0; }
+    .plans-common-icon {
+      display: grid;
+      place-items: center;
+      flex: none;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: .8rem;
+      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      color: var(--accent-text);
     }
-    .plans-common li b { color: var(--text); font-weight: 650; }
-    .plans-common li svg { width: .9rem; height: .9rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    .plans-common-icon svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .plans-common-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+    .plans-common-text b { font-size: 1rem; font-weight: 700; color: var(--text); }
+    .plans-common-text small { color: var(--muted); font-size: .84rem; }
 
     /* ── Section headings ── */
     .section-title {
@@ -418,38 +464,62 @@
       font-size: 1rem;
     }
 
-    /* ── Comparison table ── */
-    .compare { padding: 4.5rem 0 1rem; }
+    /* ── Comparison table: each plan's name, price and button on top ── */
+    .compare { padding: 5.5rem 0 1rem; }
     .compare-scroll {
       overflow-x: auto;
       border: 1px solid var(--line);
-      border-radius: 1rem;
+      border-radius: 1.1rem;
       background: var(--surface);
+      box-shadow: 0 24px 48px -36px rgba(20, 16, 50, .35);
     }
     .compare-scroll:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .compare-table {
       width: 100%;
-      min-width: 760px;
-      border-collapse: collapse;
+      min-width: 820px;
+      border-collapse: separate;
+      border-spacing: 0;
       font-size: .9rem;
     }
+    /* Each row's divider is drawn on its own top edge: the pinned first column is painted
+       row by row, and a bottom edge could be covered by the row below at fractional sizes. */
     .compare-table th,
     .compare-table td {
       padding: .85rem 1rem;
       text-align: center;
-      border-bottom: 1px solid var(--line);
+      border-top: 1px solid var(--line);
       vertical-align: middle;
     }
-    .compare-table tbody tr:last-child th,
-    .compare-table tbody tr:last-child td { border-bottom: 0; }
+    .compare-table thead th { border-top: 0; border-bottom: 1px solid var(--line); }
+    .compare-table tbody tr:first-child th,
+    .compare-table tbody tr:first-child td { border-top: 0; }
     .compare-table thead th {
       position: sticky;
       top: 0;
-      background: var(--surface2);
-      font-size: .9rem;
-      font-weight: 700;
+      z-index: 2;
+      padding: 1.15rem .9rem 1.1rem;
+      background: var(--surface);
+      vertical-align: bottom;
     }
-    .compare-table thead th.is-popular { color: var(--accent-text); }
+    .compare-plan { min-width: 136px; }
+    .compare-plan-badge {
+      display: block;
+      min-height: 1.3rem;
+      color: var(--accent-text);
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    html[dir="rtl"] .compare-plan-badge { letter-spacing: 0; font-size: .78rem; }
+    .compare-plan-name { display: block; font-size: 1rem; font-weight: 700; color: var(--text); }
+    .compare-plan-price { display: flex; justify-content: center; align-items: baseline; gap: .2rem; margin: .2rem 0 .8rem; }
+    .compare-plan-price b { font-size: 1.55rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .compare-plan-price small { color: var(--muted); font-size: .8rem; font-weight: 500; }
+    .compare-table thead th.is-popular {
+      background: color-mix(in oklab, var(--a) 7%, var(--surface));
+      box-shadow: inset 0 3px 0 var(--brand-accent);
+    }
     .compare-table th[scope="row"],
     .compare-table thead th:first-child {
       text-align: start;
@@ -459,16 +529,30 @@
       inset-inline-start: 0;
       background: var(--surface);
       z-index: 1;
-      min-width: 200px;
+      min-width: 210px;
     }
-    .compare-table thead th:first-child { background: var(--surface2); z-index: 2; color: var(--text); font-weight: 700; }
-    .compare-table td { font-weight: 600; color: var(--text); }
-    .compare-table td.is-popular { background: color-mix(in oklab, var(--a) 5%, transparent); }
-    .compare-tick { width: 1.1rem; height: 1.1rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
+    .compare-table thead th:first-child { z-index: 3; color: var(--text); font-size: .85rem; font-weight: 700; }
+    .compare-row-label { display: inline-flex; align-items: center; gap: .6rem; }
+    .compare-row-label svg { width: 1rem; height: 1rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
+    .compare-table td { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+    .compare-table td.is-popular { background: color-mix(in oklab, var(--a) 5%, var(--surface)); }
+    .compare-table tbody tr:hover th,
+    .compare-table tbody tr:hover td { background: color-mix(in oklab, var(--a) 3%, var(--surface)); }
+    .compare-table tbody tr:hover td.is-popular { background: color-mix(in oklab, var(--a) 8%, var(--surface)); }
+    .compare-tick { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
     .compare-no { color: color-mix(in oklab, var(--muted) 70%, transparent); font-weight: 500; }
+    /* Wide screens: the plan names, prices and buttons stay in view while you read down. */
+    @media (min-width: 1100px) {
+      .compare-scroll { overflow: visible; }
+      .compare-table thead th { top: 64px; }
+      .compare-table thead th:first-child { border-start-start-radius: 1.1rem; }
+      .compare-table thead th:last-child { border-start-end-radius: 1.1rem; }
+      .compare-table tbody tr:last-child th { border-end-start-radius: 1.1rem; }
+      .compare-table tbody tr:last-child td:last-child { border-end-end-radius: 1.1rem; }
+    }
 
     /* ── Included in every plan ── */
-    .features-section { padding: 4.5rem 0 1rem; }
+    .features-section { padding: 5.5rem 0 1rem; }
     .features-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -477,8 +561,14 @@
     .feature-card {
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 1rem;
-      padding: 1.5rem;
+      border-radius: 1.1rem;
+      padding: 1.6rem;
+      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+    }
+    .feature-card:hover {
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      box-shadow: 0 20px 40px -28px color-mix(in oklab, var(--a) 55%, transparent);
+      transform: translateY(-2px);
     }
     .feature-icon {
       width: 2.6rem;
@@ -493,36 +583,111 @@
     .feature-card h3 { font-size: 1.05rem; margin: 0 0 .5rem; }
     .feature-card p { color: var(--muted); font-size: .93rem; margin: 0; line-height: 1.6; }
 
-    /* ── FAQ ── */
-    .faq-section { padding: 4.5rem 0 1rem; }
-    .faq-grid {
+    /* ── FAQ: the heading on one side, questions that open on the other ── */
+    .faq-section {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
+      gap: 3rem;
+      align-items: start;
+      padding: 5.5rem 0 1rem;
     }
+    .faq-intro { position: sticky; top: 6rem; }
+    .faq-intro .section-title { text-align: start; }
+    .faq-intro p { margin: 0 0 1rem; color: var(--muted); font-size: 1rem; line-height: 1.6; }
+    .faq-contact {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      min-height: 44px;
+      color: var(--accent-text);
+      font-weight: 700;
+      text-decoration: none;
+    }
+    .faq-contact:hover { text-decoration: underline; }
+    .faq-contact svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+    html[dir="rtl"] .faq-contact svg { transform: scaleX(-1); }
+    .faq-list { display: flex; flex-direction: column; gap: .65rem; }
     .faq-item {
-      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: 1rem;
-      padding: 1.4rem 1.5rem;
+      background: var(--surface);
+      transition: border-color .2s ease, box-shadow .2s ease;
     }
-    .faq-item h3 { font-size: 1rem; margin: 0 0 .55rem; font-weight: 700; }
-    .faq-item p { color: var(--muted); font-size: .93rem; margin: 0; line-height: 1.6; }
+    .faq-item[open] {
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      box-shadow: 0 16px 34px -26px color-mix(in oklab, var(--a) 55%, transparent);
+    }
+    .faq-item summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      min-height: 44px;
+      padding: 1.05rem 1.3rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      list-style: none;
+    }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: -2px; border-radius: 1rem; }
+    .faq-toggle { flex: none; width: 1.1rem; height: 1.1rem; fill: none; stroke: var(--accent-text); stroke-width: 2.2; stroke-linecap: round; transition: transform .2s ease; }
+    .faq-item[open] .faq-toggle { transform: rotate(45deg); }
+    .faq-item p { margin: 0; padding: 0 1.3rem 1.2rem; color: var(--muted); font-size: .95rem; line-height: 1.65; }
 
-    /* ── Closing call to action ── */
+    /* ── Closing panel, in the brand colour with a sound wave along the bottom ── */
     .cta-section {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      margin: 5.5rem 0 3.5rem;
+      padding: clamp(2.75rem, 6vw, 4.25rem) clamp(1.25rem, 4vw, 3rem) clamp(3.5rem, 7vw, 5rem);
+      border-radius: 1.5rem;
       text-align: center;
-      padding: clamp(2.25rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 3rem);
+      color: #fff;
       background:
-        radial-gradient(120% 140% at 50% 0%, color-mix(in oklab, var(--a) 14%, transparent), transparent 60%),
-        var(--surface);
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
-      border-radius: 1.25rem;
-      margin: 4.5rem 0 3.5rem;
+        radial-gradient(70% 120% at 100% 0%, rgba(255, 255, 255, .12), transparent 60%),
+        linear-gradient(135deg, #4A30D9 0%, #6145F2 55%, #7254F7 100%);
+      box-shadow: 0 34px 70px -36px rgba(74, 48, 217, .7);
     }
-    .cta-section h2 { margin: 0 0 .6rem; font-size: clamp(1.5rem, 3vw, 2.1rem); text-wrap: balance; }
-    .cta-section p { color: var(--muted); margin: 0 0 1.5rem; font-size: 1rem; }
+    .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.02em; text-wrap: balance; }
+    html[dir="rtl"] .cta-section h2 { letter-spacing: 0; }
+    .cta-section p { margin: 0 0 1.75rem; color: rgba(255, 255, 255, .92); font-size: 1.05rem; }
     .cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; }
+    .cta-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 48px;
+      padding: 0 1.6rem;
+      border-radius: var(--btn-radius);
+      font-size: .95rem;
+      font-weight: 700;
+      text-decoration: none;
+      transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+    }
+    .cta-btn:hover { transform: translateY(-1px); }
+    .cta-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+    .cta-btn-solid { background: #fff; color: #3F27C4; }
+    .cta-btn-solid:hover { background: #F1EEFF; }
+    .cta-btn-ghost { border: 1.5px solid rgba(255, 255, 255, .6); color: #fff; }
+    .cta-btn-ghost:hover { border-color: #fff; background: rgba(255, 255, 255, .12); }
+    .cta-wave {
+      position: absolute;
+      inset: auto 0 0;
+      z-index: -1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: 9px;
+      height: 64px;
+      opacity: .16;
+      pointer-events: none;
+    }
+    .cta-wave i { flex: none; width: 6px; height: var(--h); border-radius: 3px 3px 0 0; background: #fff; }
+    @media (prefers-reduced-motion: reduce) {
+      .cta-btn:hover, .feature-card:hover { transform: none; }
+    }
 
     .trial-pill {
       display: inline-flex;
@@ -564,7 +729,9 @@
     @media (max-width: 860px) {
       .plans-grid { --plans: 2 !important; }
       .features-grid { grid-template-columns: 1fr; }
-      .faq-grid { grid-template-columns: 1fr; }
+      .faq-section { grid-template-columns: 1fr; gap: 1.25rem; }
+      .faq-intro { position: static; }
+      .faq-intro .section-title, .faq-intro { text-align: center; }
     }
     @media (max-width: 600px) {
       .pricing-page { width: min(100% - 2rem, 1320px); }
@@ -572,13 +739,16 @@
       .plans-grid { --plans: 1 !important; }
       .plan-card { padding: 1.35rem 1.15rem 1.2rem; }
       .plan-desc { min-height: 0; }
+      .plan-badges.is-empty { display: none; }
+      .page-hero { padding-top: 2.75rem; }
+      .plans-common { padding: 1.2rem 1.1rem 1.3rem; }
       /* A full-width card has room for each label and its value on one line. */
       .plan-features li { flex-direction: row; justify-content: space-between; align-items: baseline; gap: .75rem; }
       .feature-value { padding-inline-start: 0; text-align: end; }
       .billing-toggle button { padding: 0 .9rem; }
-      .compare, .features-section, .faq-section { padding-top: 3rem; }
+      .compare, .features-section, .faq-section { padding-top: 3.5rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
-      .cta-section { margin-top: 3rem; }
+      .cta-section { margin-top: 3.5rem; border-radius: 1.2rem; }
     }
   </style>
 </head>
@@ -597,24 +767,78 @@
       $planSlugs = collect($pricingPlans)->pluck('slug')->values();
       $currentPlanIndex = $planSlugs->search($activePlanSlug);
       if ($currentPlanIndex === false) $currentPlanIndex = 0;
+      $trialPromo = $trialPromo ?? [];
 
-      // Every line on the cards, with each subscription plan's value, for the comparison table.
+      // Where a plan stands for this visitor: shared by its card and the comparison table.
+      $planState = static function (array $plan, int $index) use ($activePlanSlug, $currentPlanIndex, $trialPromo): array {
+        $isPack = !empty($plan['is_pack']);
+        $isCurrent = $activePlanSlug === $plan['slug'];
+        $isFree = max(0, (int) ($plan['price_monthly_cents'] ?? 0)) <= 0;
+        $isLower = auth()->check() && $index < $currentPlanIndex && $plan['slug'] !== 'free' && !$isPack;
+        $trialCycles = !empty($trialPromo['show']) && !$isFree && !$isCurrent && !$isLower
+          ? ($trialPromo['plan_cycles'][$plan['slug']] ?? [])
+          : [];
+
+        return [
+          'is_pack' => $isPack,
+          'is_current' => $isCurrent,
+          'is_free' => $isFree,
+          'is_lower' => $isLower,
+          'is_popular' => !empty($plan['is_popular']) && !$isCurrent,
+          'trial_monthly' => in_array('monthly', $trialCycles, true),
+          'trial_yearly' => in_array('yearly', $trialCycles, true),
+        ];
+      };
+      // "$9.00" reads as "$9"; "$86.40" keeps its cents.
+      $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
+      // The icon drawn beside each line, on the cards and in "Every plan includes".
+      $lineIcon = static fn (?string $icon): string => match ($icon ?? 'check') {
+        'activity' => '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
+        'type' => '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>',
+        'lock' => '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+        'bolt' => '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+        'mic' => '<path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
+        'globe' => '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+        'clock' => '<circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/>',
+        'star' => '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+        'shield' => '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+        'download' => '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+        'users' => '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+        'heart' => '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+        'sliders' => '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
+        default => '<path d="M20 6 9 17l-5-5"/>',
+      };
+
+      // The comparison table is built from the plans' own card data (Admin → Plans):
+      // nothing in it is typed twice. Every line on the cards, with each plan's value,
+      // and the credits each card shows under its minutes.
       $includedMark = __('ui.pricing.included_mark');
+      $minutesLabel = __('ui.pricing.lines.label_voice_minutes');
+      $creditsLabel = __('ui.pricing.compare_credits');
       $comparePlans = array_values(array_filter($pricingPlans, fn ($p) => empty($p['is_pack'])));
       $compareRows = [];
+      $lineIcons = [];
       foreach ($comparePlans as $comparePlan) {
         foreach ($comparePlan['features'] as $line) {
           $label = (string) ($line['label'] ?? '');
           if ($label !== '') {
             $compareRows[$label][$comparePlan['slug']] = (string) ($line['value'] ?? $includedMark);
+            $lineIcons[$label] ??= (string) ($line['icon'] ?? 'check');
           }
+          if ($label === $minutesLabel && empty($comparePlan['free_try_chars'])) {
+            $compareRows[$creditsLabel][$comparePlan['slug']] = number_format((int) ($comparePlan['monthly_chars'] ?? 0));
+          }
+        }
+        // Right under the minutes, or last when the minutes line is switched off.
+        if (empty($comparePlan['free_try_chars'])) {
+          $compareRows[$creditsLabel][$comparePlan['slug']] ??= number_format((int) ($comparePlan['monthly_chars'] ?? 0));
         }
       }
       // A line every plan has with the same value is said once, under the cards.
       $commonLines = [];
       if (count($comparePlans) > 1) {
         foreach ($compareRows as $label => $values) {
-          if (count($values) === count($comparePlans) && count(array_unique($values)) === 1) {
+          if ($label !== $creditsLabel && count($values) === count($comparePlans) && count(array_unique($values)) === 1) {
             $commonLines[$label] = reset($values);
           }
         }
@@ -634,6 +858,9 @@
             {{ __(!empty($trialPromo['all_plans']) ? 'ui.pricing.trial_pill_text' : 'ui.pricing.trial_pill_text_selected') }}
           </span>
         </div>
+      @endif
+      @if(empty($trialPromo['show']))
+        <span class="hero-eyebrow">{{ __('ui.nav.pricing') }}</span>
       @endif
       <h1>{{ __('ui.pricing.hero_title') }}</h1>
       <p class="lead">{{ __('ui.pricing.hero_subtitle') }}</p>
@@ -666,9 +893,18 @@
     @if($commonLines !== [])
       <section class="plans-common reveal" aria-labelledby="plansCommonTitle">
         <h2 class="plans-common-title" id="plansCommonTitle">{{ __('ui.pricing.every_plan_includes') }}</h2>
-        <ul>
+        <ul class="plans-common-list">
           @foreach($commonLines as $label => $value)
-            <li>{!! $tick !!}<span>{{ $label }}</span>@if($value !== '' && $value !== $includedMark)<b>{{ $value }}</b>@endif</li>
+            <li>
+              <span class="plans-common-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! $lineIcon($lineIcons[$label] ?? 'check') !!}</svg></span>
+              <span class="plans-common-text">
+                @if($value !== '' && $value !== $includedMark)
+                  <b>{{ $value }}</b><small>{{ $label }}</small>
+                @else
+                  <b>{{ $label }}</b>
+                @endif
+              </span>
+            </li>
           @endforeach
         </ul>
       </section>
@@ -682,16 +918,35 @@
           <table class="compare-table">
             <thead>
               <tr>
-                <th scope="col">{{ __('ui.pricing.compare_feature') }}</th>
-                @foreach($comparePlans as $comparePlan)
-                  <th scope="col" class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}">{{ $planDisplayName($comparePlan) }}</th>
+                <th scope="col" class="compare-corner">{{ __('ui.pricing.compare_feature') }}</th>
+                @foreach($comparePlans as $compareIndex => $comparePlan)
+                  @php
+                    // Its place among all the plans, as on the cards (for "current plan" and "downgrade").
+                    $compareAt = (int) array_search($comparePlan['slug'], array_column($pricingPlans, 'slug'), true);
+                    $comparePopular = $planState($comparePlan, $compareAt)['is_popular'];
+                    $compareMonthly = $wholePrice((string) ($comparePlan['display_price_monthly_formatted'] ?? ''));
+                    $compareYearly = $wholePrice((string) ($comparePlan['display_price_yearly_monthly_formatted'] ?? $compareMonthly));
+                  @endphp
+                  <th scope="col" class="compare-plan {{ $comparePopular ? 'is-popular' : '' }}">
+                    <span class="compare-plan-badge">{{ $comparePopular ? __('ui.pricing.most_popular') : '' }}</span>
+                    <span class="compare-plan-name">{{ $planDisplayName($comparePlan) }}</span>
+                    <span class="compare-plan-price" dir="ltr">
+                      <b data-compare-price data-monthly="{{ $compareMonthly }}" data-yearly="{{ $compareYearly }}">{{ $compareMonthly }}</b><small>{{ __('ui.pricing.per_month_short') }}</small>
+                    </span>
+                    @include('components._plan-button', ['plan' => $comparePlan, 'index' => $compareAt, 'small' => true])
+                  </th>
                 @endforeach
               </tr>
             </thead>
             <tbody>
               @foreach($compareRows as $label => $values)
                 <tr>
-                  <th scope="row">{{ $label }}</th>
+                  <th scope="row">
+                    <span class="compare-row-label">
+                      <svg viewBox="0 0 24 24" aria-hidden="true">{!! $label === $creditsLabel ? '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2a3 3 0 0 0-2.8-1.7c-1.7 0-3 1-3 2.3 0 3.2 6 1.6 6 4.6 0 1.3-1.3 2.3-3 2.3a3.2 3.2 0 0 1-3-1.8M12 6v1.5M12 16.5V18"/>' : $lineIcon($lineIcons[$label] ?? 'check') !!}</svg>
+                      {{ $label }}
+                    </span>
+                  </th>
                   @foreach($comparePlans as $comparePlan)
                     @php $cell = $values[$comparePlan['slug']] ?? null; @endphp
                     <td class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}">
@@ -740,27 +995,39 @@
       </div>
     </section>
 
-    <section class="faq-section">
-      <h2 class="section-title reveal">{{ __('ui.pricing.faq_title') }}</h2>
-      <div class="faq-grid">
-        @foreach([1, 2, 3, 4] as $faq)
-          <article class="faq-item reveal">
-            <h3>{{ __('ui.pricing.faq'.$faq.'_q') }}</h3>
+    <section class="faq-section" aria-labelledby="faqTitle">
+      <div class="faq-intro reveal">
+        <h2 class="section-title" id="faqTitle">{{ __('ui.pricing.faq_title') }}</h2>
+        <p>{{ __('ui.pricing.faq_subtitle') }}</p>
+        <a class="faq-contact" href="{{ route('contact') }}">{{ __('ui.pricing.faq_contact') }}<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></a>
+      </div>
+      <div class="faq-list reveal">
+        @foreach($faqNumbers as $faq)
+          <details class="faq-item" @if($loop->first) open @endif>
+            <summary>
+              <span>{{ __('ui.pricing.faq'.$faq.'_q') }}</span>
+              <svg class="faq-toggle" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+            </summary>
             <p>{{ __('ui.pricing.faq'.$faq.'_a') }}</p>
-          </article>
+          </details>
         @endforeach
       </div>
     </section>
 
     <section class="cta-section reveal">
+      <span class="cta-wave" aria-hidden="true">
+        @for($bar = 0; $bar < 64; $bar++)
+          <i style="--h: {{ 14 + (int) round(46 * abs(sin($bar * .55)) * (.45 + .55 * abs(cos($bar * .17)))) }}px"></i>
+        @endfor
+      </span>
       <h2>{{ __('ui.pricing.cta_title') }}</h2>
       <p>{{ __('ui.pricing.cta_subtitle') }}</p>
       <div class="cta-actions">
         @auth
-          <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
+          <a class="cta-btn cta-btn-solid" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
         @else
-          <a class="btn btn-primary" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
-          <a class="btn" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
+          <a class="cta-btn cta-btn-solid" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
+          <a class="cta-btn cta-btn-ghost" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
         @endauth
       </div>
     </section>
@@ -776,6 +1043,7 @@
       'billed_monthly' => __('ui.pricing.billed_monthly'),
       'year' => __('ui.pricing.year'),
       'billed_yearly_total' => __('ui.pricing.billed_yearly_total'),
+      'or_yearly' => __('ui.pricing.or_yearly'),
       'save' => __('ui.pricing.save'),
     ];
   @endphp
@@ -790,6 +1058,9 @@
       var i18n = @json($pricingI18n);
       var discountI18n = @json(['badge' => __('ui.pricing.discount_badge')]);
       var yearlyDiscountPercent = {{ $yearlyDiscountPercent ?? 20 }};
+
+      // A price inside an Arabic sentence keeps its own order ("3.20 US$", never "$US 3.20").
+      function ltr(text) { return '\u2066' + text + '\u2069'; }
 
       function updatePrices() {
         planCards.forEach(function(card) {
@@ -827,12 +1098,15 @@
             priceNote.className = 'price-note price-note-text';
           } else if (isYearly) {
             priceValue.textContent = displayYearlyMonthly;
-            priceNote.textContent = i18n.billed_yearly_total.replace(':total', displayYearlyTotal);
+            priceNote.textContent = i18n.billed_yearly_total.replace(':total', ltr(displayYearlyTotal));
             priceNote.className = 'price-note price-note-text';
           } else {
-            // The switch above already says "monthly".
+            // The switch above already says "monthly": point to the yearly price instead,
+            // unless the card is busy with its own offer.
             priceValue.textContent = displayMonthly;
-            priceNote.textContent = '';
+            priceNote.textContent = !terms && displayYearlyMonthly !== displayMonthly
+              ? i18n.or_yearly.replace(':price', ltr(displayYearlyMonthly))
+              : '';
             priceNote.className = 'price-note price-note-text';
           }
         });
@@ -869,6 +1143,12 @@
         });
       }
 
+      function updateComparePrices() {
+        document.querySelectorAll('[data-compare-price]').forEach(function(el) {
+          el.textContent = String(el.getAttribute(isYearly ? 'data-yearly' : 'data-monthly') || '');
+        });
+      }
+
       function setBillingMode(yearly) {
         isYearly = yearly;
         monthlyBtn.classList.toggle('active', !yearly);
@@ -882,6 +1162,7 @@
         updatePrices();
         updateUpgradeLinks();
         updateDiscountBadges();
+        updateComparePrices();
       }
 
       monthlyBtn.addEventListener('click', function() { setBillingMode(false); });

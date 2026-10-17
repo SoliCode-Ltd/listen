@@ -837,7 +837,7 @@
           {{-- The voices on the right play when pressed; this says so, and plays them all. --}}
           <button type="button" class="hero-listen" data-hero-listen aria-pressed="false">
             <span class="hero-listen-icon" aria-hidden="true">
-              <svg class="hero-listen-play" viewBox="0 0 24 24"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></svg>
+              <svg class="hero-listen-play" viewBox="0 0 24 24"><path d="M6.4 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L7.92 4.29A1 1 0 0 0 6.4 5.14z"/></svg>
               <svg class="hero-listen-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
             </span>
             <span>{{ __('ui.landing.hero_listen') }}</span>

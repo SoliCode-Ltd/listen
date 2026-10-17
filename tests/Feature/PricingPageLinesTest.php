@@ -201,6 +201,42 @@ class PricingPageLinesTest extends TestCase
             ->assertDontSee(__('ui.pricing.lines.label_max_chars_per_request', [], $locale));
     }
 
+    public function test_the_comparison_table_is_built_from_the_card_data(): void
+    {
+        $starter = $this->premiumPlan(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_chars' => 500000, 'max_chars_per_request' => 5000]);
+        $creator = $this->premiumPlan(['slug' => 'creator', 'name' => 'Creator', 'price_cents' => 2200, 'monthly_chars' => 1500000, 'max_chars_per_request' => 20000]);
+        $locale = app()->getLocale();
+
+        $table = function (): string {
+            $html = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
+            $start = strpos($html, 'class="compare-table"');
+            $this->assertNotFalse($start, 'the page has the comparison table');
+
+            return substr($html, $start, strpos($html, '</table>', $start) - $start);
+        };
+
+        $html = $table();
+        // Every value on each card is in the table, and each plan's credits a month.
+        foreach ([$starter, $creator] as $plan) {
+            foreach ($this->lines($plan, $locale) as $value) {
+                $this->assertStringContainsString(e($value), $html);
+            }
+            $this->assertStringContainsString('>'.number_format($plan->monthly_chars).'<', str_replace(["\n", ' '], '', $html));
+        }
+        $this->assertStringContainsString(__('ui.pricing.compare_credits', [], $locale), $html);
+        // The prices at the top of the table are the ones on the cards.
+        $page = $this->getLocalizedRoute('pricing')->getContent();
+        preg_match_all('/data-display-monthly="([^"]+)"/', $page, $cardPrices);
+        preg_match_all('/data-compare-price data-monthly="([^"]+)"/', $page, $tablePrices);
+        $this->assertSame($cardPrices[1], $tablePrices[1]);
+
+        // A change in the admin reaches the cards and the table at once.
+        $creator->update(['max_chars_per_request' => 30000]);
+        $changed = $this->lines($creator->fresh(), $locale)[__('ui.pricing.lines.label_max_chars_per_request', [], $locale)];
+        $this->assertStringContainsString(e($changed), $table());
+        $this->getLocalizedRoute('pricing')->assertSee('<span class="feature-value">'.e($changed).'</span>', false);
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Admin form
     // ──────────────────────────────────────────────────────────────────
