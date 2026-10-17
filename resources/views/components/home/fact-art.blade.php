@@ -1,7 +1,7 @@
 {{--
   A small drawing above each figure in the homepage facts strip, showing what the
   number means: real dialect greetings, the countries' accents, the places a voice
-  can be heard in, and one sentence delivered in different moods. Decorative only.
+  can be heard in, and the style picker with one style chosen. Decorative only.
 --}}
 @props(['kind'])
 <div class="fact-art fact-art-{{ $kind }}" aria-hidden="true">
@@ -32,19 +32,17 @@
       <span class="fa-tile" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M2 27 11 12l5 7 4-5 10 13z"/><path d="M22 6a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"/></svg></span>
       @break
     @case('styles')
-      {{-- The same line, calm, then excited, then whispered. --}}
-      <svg class="fa-moods" viewBox="0 0 180 56" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="factMoodGradient" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#A28FFF"/>
-            <stop offset=".5" stop-color="#7659FA"/>
-            <stop offset="1" stop-color="#5B3FE6"/>
-          </linearGradient>
-        </defs>
-        @foreach([10, 14, 12, 16, 13, 15, 11, 30, 44, 22, 50, 36, 48, 26, 40, 18, 8, 6, 9, 5, 7, 4, 6, 3] as $i => $h)
-          <rect x="{{ $i * 7.5 + 1 }}" y="{{ (56 - $h) / 2 }}" width="4" height="{{ $h }}" rx="2" fill="url(#factMoodGradient)" style="--i: {{ $i }}"/>
+      {{-- The style picker as it looks in the studio: three real styles, one chosen. --}}
+      <span class="fa-menu">
+        @foreach(['calm', 'excited', 'news'] as $i => $style)
+          <span class="fa-option{{ $style === 'excited' ? ' is-on' : '' }}" style="--i: {{ $i }}">
+            <span>{{ __('ui.samples.moods.'.$style) }}</span>
+            @if($style === 'excited')
+              <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+            @endif
+          </span>
         @endforeach
-      </svg>
+      </span>
       @break
   @endswitch
 </div>

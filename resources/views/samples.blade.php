@@ -17,16 +17,10 @@
     $key = 'ui.samples.moods.'.$mood;
     return __($key) !== $key ? __($key) : ucfirst($mood);
   };
-  // The page language's voices come first.
-  $languageSections = [
-    ['id' => 'arabic-dialects', 'cards' => $arabicVoices, 'copy' => 'arabic'],
-    ['id' => 'english-accents', 'cards' => $englishVoices, 'copy' => 'english'],
-  ];
-  if (! $isArabicUi) {
-    $languageSections = array_reverse($languageSections);
-  }
+  // Each page holds its own language: Arabic dialects on the Arabic page, English accents on the English one.
+  $voiceSection = $isArabicUi ? ['id' => 'arabic-dialects', 'copy' => 'arabic'] : ['id' => 'english-accents', 'copy' => 'english'];
   $sections = array_values(array_filter([
-    ...array_map(fn (array $ls): ?array => $ls['cards'] !== [] ? ['id' => $ls['id'], 'label' => __('ui.samples.'.$ls['copy'].'_title'), 'count' => count($ls['cards'])] : null, $languageSections),
+    $voices !== [] ? ['id' => $voiceSection['id'], 'label' => __('ui.samples.'.$voiceSection['copy'].'_title'), 'count' => count($voices)] : null,
     $moods !== [] ? ['id' => 'moods', 'label' => __('ui.samples.moods_title'), 'count' => count($moods)] : null,
     $dialogues !== [] ? ['id' => 'conversations', 'label' => __('ui.samples.conversations_title'), 'count' => count($dialogues)] : null,
     $environments !== [] ? ['id' => 'sound-environments', 'label' => __('ui.samples.environments_title'), 'count' => count($environments)] : null,
@@ -155,7 +149,7 @@
     .stage-progress span { display: block; height: 100%; width: calc(var(--p, 0) * 100%); background: linear-gradient(90deg, var(--stage-lilac), #FFFFFF); }
     .stage-hint { margin: -.75rem 0 0; color: rgba(255, 255, 255, .6); font-size: .86rem; text-align: center; }
 
-    /* The section bar: jump to a section, or keep one language */
+    /* The section bar: jump to a section */
     .samples-bar {
       position: sticky;
       top: 64px;
@@ -170,11 +164,10 @@
       margin: 0 auto;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 1rem;
       min-height: 58px;
     }
-    .samples-jump { display: flex; gap: .25rem; margin: 0; padding: 0; list-style: none; overflow-x: auto; scrollbar-width: none; }
+    /* Centred while it fits; scrolls from the start when it does not. */
+    .samples-jump { display: flex; gap: .25rem; max-width: 100%; margin: 0 auto; padding: 0; list-style: none; overflow-x: auto; scrollbar-width: none; }
     .samples-jump::-webkit-scrollbar { display: none; }
     .samples-jump a {
       display: inline-flex;
@@ -192,31 +185,11 @@
     .samples-jump a:hover { color: var(--text); background: var(--surface2); }
     .samples-jump a[aria-current="true"] { color: var(--accent-text); background: color-mix(in oklab, var(--a) 10%, transparent); }
     .samples-jump b { font-size: .78rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-    .samples-lang { display: inline-grid; grid-auto-flow: column; padding: .2rem; border: 1px solid var(--line); border-radius: var(--radius-full); background: var(--surface); flex: none; }
-    .samples-lang button {
-      min-height: 34px;
-      padding: 0 .8rem;
-      border: 0;
-      border-radius: var(--radius-full);
-      background: transparent;
-      color: var(--muted);
-      font: inherit;
-      font-size: .84rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .samples-lang button[aria-pressed="true"] { background: var(--brand-accent); color: #FFFFFF; }
-    .samples-lang button:focus-visible, .samples-jump a:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+    .samples-jump a:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
 
     /* The sections */
     .samples-section { width: min(1200px, 92%); margin: 0 auto; padding: clamp(3rem, 7vw, 5rem) 0 0; scroll-margin-top: 130px; }
     .samples-section .vs-head { margin-bottom: 1.25rem; }
-    .samples-page[data-lang="ar"] [data-language="en"],
-    .samples-page[data-lang="en"] [data-language="ar"],
-    .samples-page[data-lang="ar"] #english-accents,
-    .samples-page[data-lang="en"] #arabic-dialects { display: none !important; }
-    .samples-page[data-lang="ar"] [data-jump="english-accents"],
-    .samples-page[data-lang="en"] [data-jump="arabic-dialects"] { display: none; }
     .samples-moods { margin-bottom: 1.25rem; }
 
     /* The way out */
@@ -256,8 +229,10 @@
     @media (max-width: 900px) {
       .stage-console { grid-template-columns: minmax(0, 1fr) auto; }
       .stage-queue { grid-column: 1 / -1; justify-content: flex-start; }
-      .samples-lang { display: none; }
       .samples-cta { grid-template-columns: 1fr; }
+      /* The two buttons side by side, the same size. */
+      .samples-cta-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+      .samples-cta a { padding: .5rem .6rem; text-align: center; line-height: 1.3; }
     }
     @media (max-width: 640px) {
       /* Long chip rows scroll sideways on phones instead of stacking five deep. */
@@ -276,7 +251,7 @@
       .stage-console { grid-template-columns: 1fr; justify-items: start; }
       .stage-controls { justify-self: center; }
       /* Every voice in one row. */
-      .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: .3rem; width: 100%; }
+      .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 46px); justify-content: center; gap: .5rem; width: 100%; }
       .stage-pick { width: 100%; height: auto; aspect-ratio: 1; }
       .stage-avatar, .stage-avatar img { width: 60px; height: 60px; }
       .stage-avatar canvas { inset: -14px; width: 88px; height: 88px; }
@@ -287,7 +262,7 @@
 <body>
   @include('components.header')
 
-  <main class="samples-page" data-lang="all">
+  <main class="samples-page">
     @if($stageCast !== [])
       {{-- The stage: the hero voices, one after another, each line lit word by word as it is spoken. --}}
       <section class="stage" data-stage aria-labelledby="samplesTitle">
@@ -341,40 +316,36 @@
             <li><a href="#{{ $section['id'] }}" data-jump="{{ $section['id'] }}">{{ $section['label'] }} <b>{{ $section['count'] }}</b></a></li>
           @endforeach
         </ul>
-        <div class="samples-lang" role="group" aria-label="{{ __('ui.samples.lang_label') }}">
-          <button type="button" data-samples-lang="all" aria-pressed="true">{{ __('ui.samples.lang_all') }}</button>
-          <button type="button" data-samples-lang="ar" aria-pressed="false">{{ __('ui.samples.lang_ar') }}</button>
-          <button type="button" data-samples-lang="en" aria-pressed="false">{{ __('ui.samples.lang_en') }}</button>
-        </div>
       </div>
     </nav>
 
-    @foreach($languageSections as ['id' => $sectionId, 'cards' => $cards, 'copy' => $copyKey])
-      @if($cards !== [])
-        @php $regions = $regionsOf($cards); @endphp
-        <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
-          <div class="vs-head">
-            <div>
-              <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
-              <p class="vs-lead">{{ __('ui.samples.'.$copyKey.'_lead') }}</p>
-            </div>
+    @if($voices !== [])
+      @php
+        ['id' => $sectionId, 'copy' => $copyKey] = $voiceSection;
+        $regions = $regionsOf($voices);
+      @endphp
+      <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
+        <div class="vs-head">
+          <div>
+            <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
+            <p class="vs-lead">{{ __('ui.samples.'.$copyKey.'_lead') }}</p>
           </div>
-          @if(count($regions) > 1)
-            <div class="vs-chips" role="tablist" aria-label="{{ __('ui.landing.region_label') }}">
-              <button type="button" class="vs-chip" role="tab" aria-selected="true" data-vp-region="all">{{ __('ui.landing.region_all') }}</button>
-              @foreach($regions as $region)
-                <button type="button" class="vs-chip" role="tab" aria-selected="false" data-vp-region="{{ $region }}">{{ __('ui.landing.region_'.$region) }}</button>
-              @endforeach
-            </div>
-          @endif
-          <div class="vs-grid">
-            @foreach($cards as $sample)
-              @include('components.home.voice-card', ['sample' => $sample])
+        </div>
+        @if(count($regions) > 1)
+          <div class="vs-chips" role="tablist" aria-label="{{ __('ui.landing.region_label') }}">
+            <button type="button" class="vs-chip" role="tab" aria-selected="true" data-vp-region="all">{{ __('ui.landing.region_all') }}</button>
+            @foreach($regions as $region)
+              <button type="button" class="vs-chip" role="tab" aria-selected="false" data-vp-region="{{ $region }}">{{ __('ui.landing.region_'.$region) }}</button>
             @endforeach
           </div>
-        </section>
-      @endif
-    @endforeach
+        @endif
+        <div class="vs-grid">
+          @foreach($voices as $sample)
+            @include('components.home.voice-card', ['sample' => $sample])
+          @endforeach
+        </div>
+      </section>
+    @endif
 
     @if($moods !== [])
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
@@ -440,8 +411,8 @@
           <a class="is-solid" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
           <a class="is-ghost" href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a>
         @else
-          <a class="is-solid" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
-          <a class="is-ghost" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
+          <a class="is-solid" href="{{ route('demo.page') }}">{{ __('ui.samples.cta_try') }}</a>
+          <a class="is-ghost" href="{{ route('register') }}">{{ __('ui.samples.cta_signup') }}</a>
         @endauth
       </div>
     </section>
@@ -604,9 +575,8 @@
     drawHalo(0);
   })();
 
-  /* ── The section bar: the section in view is marked; one language can be kept ── */
+  /* ── The section bar: the section in view is marked ── */
   (function () {
-    var page = document.querySelector('.samples-page');
     var links = document.querySelectorAll('.samples-jump a');
     if (window.IntersectionObserver && links.length) {
       var byId = {};
@@ -619,12 +589,6 @@
       }, { rootMargin: '-40% 0px -55% 0px' });
       document.querySelectorAll('.samples-section').forEach(function (s) { observer.observe(s); });
     }
-    document.querySelectorAll('[data-samples-lang]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        page.setAttribute('data-lang', btn.getAttribute('data-samples-lang'));
-        document.querySelectorAll('[data-samples-lang]').forEach(function (b) { b.setAttribute('aria-pressed', b === btn ? 'true' : 'false'); });
-      });
-    });
   })();
   </script>
 </body>

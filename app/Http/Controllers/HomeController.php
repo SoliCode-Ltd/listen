@@ -155,35 +155,34 @@ class HomeController extends Controller
     public function samplesPage()
     {
         $isArabicLocale = app()->getLocale() === 'ar';
+        $language = $isArabicLocale ? 'ar' : 'en';
 
-        $data = Cache::remember('samples_page:'.($isArabicLocale ? 'ar' : 'en'), 300, function () use ($isArabicLocale): array {
+        // Each page holds its own language: Arabic samples on the Arabic page, English on the English one.
+        // The key names the data's shape, so a deploy never reads a copy cached by older code.
+        $data = Cache::remember('samples_page:v2:'.$language, 300, function () use ($isArabicLocale, $language): array {
             $cards = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
+                ->where('language', $language)
                 // Made by the latest voices (imported by tts:showcase); older recordings stay off this page.
                 ->where('provider', 'gemini')
                 ->orderByDesc('is_featured')
                 ->ordered()
                 ->get()
                 ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '')
-                ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale))
-                // The page language first; the order within each language stays as set.
-                ->sortBy(fn (array $card): int => $card['language'] === ($isArabicLocale ? 'ar' : 'en') ? 0 : 1);
+                ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale));
             $singles = $cards->where('kind', 'single');
 
             return [
-                'arabicVoices' => $singles->where('language', 'ar')->values()->all(),
-                'englishVoices' => $singles->where('language', 'en')->values()->all(),
+                'voices' => $singles->values()->all(),
                 'moodVoices' => $singles->filter(fn (array $card): bool => $card['emotion'] !== '')->values()->all(),
                 'dialogues' => $cards->where('kind', 'dialogue')->values()->all(),
             ];
         });
 
         return view('samples', $data + [
-            'stageCast' => HeroCast::everyone($isArabicLocale),
-            'environments' => $isArabicLocale
-                ? array_merge($this->environmentSamples('ar'), $this->environmentSamples('en'))
-                : array_merge($this->environmentSamples('en'), $this->environmentSamples('ar')),
+            'stageCast' => array_values(array_filter(HeroCast::for($language), fn (array $person): bool => $person['audio'] !== null)),
+            'environments' => $this->environmentSamples($language),
         ]);
     }
 

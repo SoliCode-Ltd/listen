@@ -10,7 +10,7 @@ class VoiceSamplesPageTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_the_page_has_every_latest_voice_in_both_languages(): void
+    public function test_each_page_has_every_latest_voice_in_its_own_language(): void
     {
         $this->artisan('tts:showcase', ['--import' => true]);
         // An older recording is never on the page.
@@ -21,33 +21,41 @@ class VoiceSamplesPageTest extends TestCase
 
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('samples')->assertOk();
-        $this->assertCount(38, $en->viewData('arabicVoices'));
-        $this->assertCount(29, $en->viewData('englishVoices'));
-        $this->assertCount(14, $en->viewData('dialogues'));
+        $this->assertCount(29, $en->viewData('voices'));
+        $this->assertCount(6, $en->viewData('dialogues'));
         $this->assertNotEmpty($en->viewData('moodVoices'));
-        $this->assertCount(12, $en->viewData('environments'));
-        $this->assertCount(10, $en->viewData('stageCast'));
-        // The page language comes first: on the stage and in the sections.
-        $this->assertSame('en', $en->viewData('stageCast')[0]['language']);
-        $this->assertSame('en', $en->viewData('environments')[0]['language']);
-        $en->assertSeeInOrder(['id="english-accents"', 'id="arabic-dialects"', 'id="moods"', 'id="conversations"', 'id="sound-environments"'], false);
-        $en->assertSee('<title>AI Voice Samples: Arabic Dialects and English Accents', false);
-        $en->assertSee('images/speakers/ar-sultan.webp', false);
+        $this->assertCount(6, $en->viewData('environments'));
+        $this->assertCount(5, $en->viewData('stageCast'));
+        // English only: voices, moods, conversations, places and the stage.
+        foreach (['voices', 'moodVoices', 'dialogues', 'environments', 'stageCast'] as $key) {
+            $this->assertSame(['en'], array_values(array_unique(array_column($en->viewData($key), 'language'))), $key);
+        }
+        $en->assertSeeInOrder(['id="english-accents"', 'id="moods"', 'id="conversations"', 'id="sound-environments"'], false);
+        $en->assertDontSee('id="arabic-dialects"', false);
+        $en->assertDontSee('data-samples-lang', false);
+        $en->assertSee('<title>English AI Voice Samples: Accents, Moods and Conversations', false);
         $en->assertSee('images/speakers/en-daisy.webp', false);
-        $en->assertSee('data-vp-region="maghreb"', false);
         $en->assertSee('data-vp-region="uk_ie"', false);
+        $en->assertDontSee('images/speakers/ar-', false);
         $en->assertDontSee('An older voice.');
         $en->assertDontSee('&lt;laugh&gt;', false);
         $en->assertDontSee('These voices were created with Listen.');
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('samples')->assertOk();
-        $this->assertSame('ar', $ar->viewData('stageCast')[0]['language']);
-        $ar->assertSeeInOrder(['id="arabic-dialects"', 'id="english-accents"'], false);
+        $this->assertCount(38, $ar->viewData('voices'));
+        $this->assertCount(8, $ar->viewData('dialogues'));
+        $this->assertCount(6, $ar->viewData('environments'));
+        $this->assertCount(5, $ar->viewData('stageCast'));
+        foreach (['voices', 'moodVoices', 'dialogues', 'environments', 'stageCast'] as $key) {
+            $this->assertSame(['ar'], array_values(array_unique(array_column($ar->viewData($key), 'language'))), $key);
+        }
+        $ar->assertSee('id="arabic-dialects"', false);
+        $ar->assertDontSee('id="english-accents"', false);
         $ar->assertSee('نماذج الأصوات');
         $ar->assertSee('سعودي (نجدي)');
-        // English names keep their order inside an Arabic sentence.
-        $ar->assertSee('<bdi>Daisy</bdi> و<bdi>Theodore</bdi>', false);
+        $ar->assertSee('data-vp-region="maghreb"', false);
+        $ar->assertDontSee('images/speakers/en-', false);
     }
 
     public function test_the_menu_footer_and_home_link_to_the_page(): void
