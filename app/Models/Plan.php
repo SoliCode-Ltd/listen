@@ -16,6 +16,13 @@ class Plan extends Model
     /** A one-time character pack: bought once, never renews. */
     public const KIND_PACK = 'pack';
 
+    /** How long each buyer keeps the plan's discount. */
+    public const DISCOUNT_FIRST_PAYMENT = 'once';
+
+    public const DISCOUNT_FIRST_MONTHS = 'repeating';
+
+    public const DISCOUNT_FOREVER = 'forever';
+
     protected static function booted(): void
     {
         // Members who bought at the price a plan leaves keep paying it, so it
@@ -39,6 +46,8 @@ class Plan extends Model
         'price_cents',
         'discount_percentage',
         'discount_ends_at',
+        'discount_duration',
+        'discount_duration_months',
         'monthly_minutes',
         'monthly_chars',
         'premium_voice_minutes',
@@ -99,6 +108,7 @@ class Plan extends Model
         'queue_priority_weight' => 'integer',
         'discount_percentage' => 'integer',
         'discount_ends_at' => 'datetime',
+        'discount_duration_months' => 'integer',
         'voice_cloning_enabled' => 'boolean',
         'voice_cloning_max_voices' => 'integer',
         'download_formats' => 'array',
@@ -269,6 +279,45 @@ class Plan extends Model
         }
 
         return $this->discount_ends_at->isFuture();
+    }
+
+    /**
+     * How long each buyer keeps the discount: the first payment only (the
+     * default), the first few months, or for as long as they stay subscribed.
+     */
+    public function discountDuration(): string
+    {
+        $duration = (string) ($this->discount_duration ?? '');
+
+        if ($duration === self::DISCOUNT_FIRST_MONTHS && $this->discountMonths() !== null) {
+            return self::DISCOUNT_FIRST_MONTHS;
+        }
+
+        return $duration === self::DISCOUNT_FOREVER ? self::DISCOUNT_FOREVER : self::DISCOUNT_FIRST_PAYMENT;
+    }
+
+    /**
+     * For a "first few months" discount: how many monthly payments it covers (2 to 12).
+     */
+    public function discountMonths(): ?int
+    {
+        $months = (int) ($this->discount_duration_months ?? 0);
+
+        return $months >= 2 && $months <= 12 ? $months : null;
+    }
+
+    /**
+     * The duration fields of the Stripe coupon that gives this discount.
+     *
+     * @return array{duration: string, duration_in_months?: int}
+     */
+    public function stripeCouponDuration(): array
+    {
+        return match ($this->discountDuration()) {
+            self::DISCOUNT_FIRST_MONTHS => ['duration' => 'repeating', 'duration_in_months' => (int) $this->discountMonths()],
+            self::DISCOUNT_FOREVER => ['duration' => 'forever'],
+            default => ['duration' => 'once'],
+        };
     }
 
     /**

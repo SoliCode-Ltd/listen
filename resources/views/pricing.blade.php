@@ -251,6 +251,32 @@
     .price-note.savings {
       color: #F43F5E;
     }
+    .discount-terms {
+      display: flex;
+      align-items: flex-start;
+      gap: .45rem;
+      margin: .65rem 0 0;
+      padding: .5rem .65rem;
+      border-radius: var(--radius-lg);
+      background: color-mix(in oklab, #F43F5E 8%, transparent);
+      border: 1px solid color-mix(in oklab, #F43F5E 24%, transparent);
+      color: var(--text);
+      font-size: .8rem;
+      font-weight: 600;
+      line-height: 1.45;
+      text-align: start;
+    }
+    .discount-terms svg {
+      flex: 0 0 auto;
+      width: 15px;
+      height: 15px;
+      margin-top: .1rem;
+      fill: none;
+      stroke: #F43F5E;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
 
     .plan-quota {
       display: inline-block;
@@ -1022,6 +1048,15 @@
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
+
+          // How long the discount lasts and the price after it, for the cycle shown.
+          var terms = card.querySelector('.discount-terms');
+          if (terms) {
+            var termsText = terms.querySelector('.discount-terms-text');
+            if (termsText) {
+              termsText.textContent = String(terms.getAttribute(isYearly ? 'data-terms-yearly' : 'data-terms-monthly') || '');
+            }
+          }
 
           if (card.getAttribute('data-is-pack') === '1') {
             // A pack is paid once: the monthly/yearly switch does not change it.

@@ -65,6 +65,13 @@
       <span class="price-period">{{ $isPack ? __('ui.pack.one_time') : __('ui.pricing.per_month_short') }}</span>
     </div>
     <div class="price-note price-note-text"></div>
+    @if($hasDiscount && !$isFree && !empty($plan['discount_terms_monthly']))
+      {{-- How long the discount lasts and the price after it, for the cycle shown. --}}
+      <p class="discount-terms" data-terms-monthly="{{ $plan['discount_terms_monthly'] }}" data-terms-yearly="{{ $plan['discount_terms_yearly'] ?? $plan['discount_terms_monthly'] }}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg>
+        <span class="discount-terms-text">{{ $plan['discount_terms_monthly'] }}</span>
+      </p>
+    @endif
     @php
       $trialCycles = !empty($trialPromo['show']) && !$isFree && !$isCurrent && !$isLower
         ? ($trialPromo['plan_cycles'][$plan['slug']] ?? [])

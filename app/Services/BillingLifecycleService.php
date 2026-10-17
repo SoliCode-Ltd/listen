@@ -55,6 +55,12 @@ class BillingLifecycleService
                         continue;
                     }
 
+                    // A card subscription gets Stripe's own branded reminder with the
+                    // amount, so it is never reminded twice.
+                    if ($this->renewsByCard((int) $user->id)) {
+                        continue;
+                    }
+
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
                     $planName = (string) ($subscription->plan?->name ?? 'your plan');
                     $displayName = $this->displayName($user);
@@ -93,6 +99,14 @@ class BillingLifecycleService
         }
 
         return $sent;
+    }
+
+    private function renewsByCard(int $userId): bool
+    {
+        return BillingSubscription::query()
+            ->where('user_id', $userId)
+            ->whereIn('stripe_status', ['active', 'trialing', 'past_due'])
+            ->exists();
     }
 
     public function handlePaymentFailed(?string $stripeCustomerId): void

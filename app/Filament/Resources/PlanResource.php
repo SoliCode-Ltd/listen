@@ -6,6 +6,7 @@ use App\Filament\Resources\PlanResource\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\StripeProductSyncService;
+use App\Support\DiscountTerms;
 use App\Support\PlanPricingLines;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -142,7 +143,7 @@ class PlanResource extends Resource
                             }),
                     ]),
                 Forms\Components\Section::make('Discount / Promotion')
-                    ->description('Set a time-limited discount. The discounted price shows on the pricing page with a countdown timer. After expiry, prices revert automatically.')
+                    ->description('Set a time-limited discount. The discounted price shows on the pricing page with a countdown timer, and the pricing page and checkout say exactly how long each buyer keeps it and what they pay after. After the offer ends, new buyers pay the normal price.')
                     ->columns(2)
                     ->schema([
                         Forms\Components\TextInput::make('discount_percentage')
@@ -155,23 +156,53 @@ class PlanResource extends Resource
                             ->reactive()
                             ->helperText('Leave empty to disable discount'),
                         Forms\Components\DateTimePicker::make('discount_ends_at')
-                            ->label('Discount Ends At')
+                            ->label('Offer Ends At')
                             ->nullable()
                             ->native(false)
                             ->displayFormat('M d, Y H:i')
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
-                            ->helperText('Leave empty for an indefinite discount'),
-                        Forms\Components\Placeholder::make('discount_preview')
-                            ->label('Discounted Price Preview')
+                            ->helperText('When new buyers stop getting the discount. Leave empty to keep the offer on.'),
+                        Forms\Components\Select::make('discount_duration')
+                            ->label('How long each buyer keeps it')
+                            ->options([
+                                Plan::DISCOUNT_FIRST_PAYMENT => 'First payment only',
+                                Plan::DISCOUNT_FIRST_MONTHS => 'First few months',
+                                Plan::DISCOUNT_FOREVER => 'For as long as they stay subscribed',
+                            ])
+                            ->default(Plan::DISCOUNT_FIRST_PAYMENT)
+                            ->selectablePlaceholder(false)
+                            ->reactive()
                             ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
+                            ->helperText('Buyers who already have the discount keep what they bought. A yearly plan gets it on its first yearly payment, unless it is "for as long as they stay subscribed".'),
+                        Forms\Components\TextInput::make('discount_duration_months')
+                            ->label('Number of months')
+                            ->numeric()
+                            ->minValue(2)
+                            ->maxValue(12)
+                            ->default(3)
+                            ->suffix('months')
+                            ->reactive()
+                            ->visible(fn (Get $get) => ! empty($get('discount_percentage')) && $get('discount_duration') === Plan::DISCOUNT_FIRST_MONTHS)
+                            ->required(fn (Get $get) => ! empty($get('discount_percentage')) && $get('discount_duration') === Plan::DISCOUNT_FIRST_MONTHS)
+                            ->helperText('2 to 12 monthly payments.'),
+                        Forms\Components\Placeholder::make('discount_preview')
+                            ->label('What buyers see')
+                            ->visible(fn (Get $get) => ! empty($get('discount_percentage')))
+                            ->columnSpanFull()
                             ->content(function (Get $get, ?Plan $record) {
                                 $priceDollars = (float) ($get('price_dollars') ?? ($record ? $record->price_cents / 100 : 0));
                                 $discount = (int) ($get('discount_percentage') ?? 0);
                                 if ($priceDollars <= 0 || $discount <= 0) return 'N/A';
                                 $discounted = round($priceDollars * (1 - $discount / 100), 2);
                                 $endsAt = $get('discount_ends_at');
-                                $endLabel = $endsAt ? ' (until ' . \Carbon\Carbon::parse($endsAt)->format('M j, Y g:i A') . ')' : ' (indefinite)';
-                                return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo' . $endLabel;
+                                $endLabel = $endsAt ? 'Offer until ' . \Carbon\Carbon::parse($endsAt)->format('M j, Y g:i A') : 'Offer has no end date';
+                                $preview = new Plan([
+                                    'discount_duration' => $get('discount_duration'),
+                                    'discount_duration_months' => $get('discount_duration_months'),
+                                ]);
+                                $terms = DiscountTerms::line($preview, 'monthly', $discount, '$' . number_format($priceDollars, 2));
+
+                                return '$' . number_format($priceDollars, 2) . ' → $' . number_format($discounted, 2) . '/mo. ' . $endLabel . '. Monthly buyers read: "' . str_replace(["\u{2066}", "\u{2069}"], '', $terms) . '"';
                             }),
                     ]),
                 Forms\Components\Section::make('Voice & Quality')
