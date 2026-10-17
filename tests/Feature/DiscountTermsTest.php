@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Http\Controllers\BillingController;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CashierStripePackGateway;
@@ -111,9 +112,31 @@ class DiscountTermsTest extends TestCase
             ->get($this->localizedRoute('pricing'))
             ->assertOk()
             ->assertSee('class="discount-terms"', false)
-            ->assertSee('30% off your first month, then')
-            ->assertSee('data-terms-yearly', false)
-            ->assertSee('50% off your first year, then');
+            ->assertSee('30% off your first month')
+            ->assertSee('/month', false)
+            ->assertSee('data-offer-yearly="50% off your first year"', false)
+            ->assertSee('data-then-yearly="Then', false);
+    }
+
+    public function test_egyptian_visitors_paying_by_instapay_see_the_note_too(): void
+    {
+        SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        SiteSetting::set('manual_instapay_enabled', '1', 'billing');
+        SiteSetting::set('manual_instapay_number', '0123456789', 'billing');
+        Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'pro', 'name' => 'Pro', 'price_cents' => 4900, 'is_active' => true,
+            'discount_percentage' => 10, 'discount_ends_at' => now()->addWeek(),
+            'discount_duration' => 'repeating', 'discount_duration_months' => 2,
+        ]);
+
+        app()->setLocale('ar');
+        $this->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('pricing'))
+            ->assertOk()
+            ->assertSee('class="discount-terms"', false)
+            ->assertSee('خصم 10% على أول شهرين')
+            ->assertSee('شهرياً');
     }
 
     public function test_checkout_says_when_the_full_price_starts(): void

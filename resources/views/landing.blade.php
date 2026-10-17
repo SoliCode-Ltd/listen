@@ -47,6 +47,8 @@
     .hero h1 {
       margin: 0 0 1rem;
       font-size: clamp(2.4rem, 6vw, 4.5rem);
+      /* Bold, not black: the site font's heaviest weight looks like another typeface. */
+      font-weight: 700;
       line-height: 1.05;
       letter-spacing: -.03em;
       text-wrap: balance;

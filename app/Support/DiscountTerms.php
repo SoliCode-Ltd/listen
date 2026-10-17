@@ -12,31 +12,56 @@ use Carbon\CarbonInterface;
 class DiscountTerms
 {
     /**
-     * For example "30% off your first month, then $9.00/month".
+     * The offer itself, e.g. "30% off your first month".
      *
      * @param  int  $percent  the discount shown for this cycle
-     * @param  string  $fullPrice  the price after the discount, formatted, for one cycle
      */
-    public static function line(Plan $plan, string $cycle, int $percent, string $fullPrice): string
+    public static function offer(Plan $plan, string $cycle, int $percent): string
     {
-        $price = self::isolate($fullPrice);
-
         if ($plan->discountDuration() === Plan::DISCOUNT_FOREVER) {
-            return __('ui.pricing.discount_terms_forever', ['percent' => $percent]);
+            return __('ui.pricing.discount_offer_forever', ['percent' => $percent]);
         }
 
         // A yearly plan is paid once a year, so any discount shorter than a year covers its first payment.
         if ($cycle === 'yearly') {
-            return __('ui.pricing.discount_terms_first_year', ['percent' => $percent, 'price' => $price]);
+            return __('ui.pricing.discount_offer_first_year', ['percent' => $percent]);
         }
 
         if ($plan->discountDuration() === Plan::DISCOUNT_FIRST_MONTHS) {
             $months = (int) $plan->discountMonths();
 
-            return trans_choice('ui.pricing.discount_terms_first_months', $months, ['percent' => $percent, 'months' => $months, 'price' => $price]);
+            return trans_choice('ui.pricing.discount_offer_first_months', $months, ['percent' => $percent, 'months' => $months]);
         }
 
-        return __('ui.pricing.discount_terms_first_month', ['percent' => $percent, 'price' => $price]);
+        return __('ui.pricing.discount_offer_first_month', ['percent' => $percent]);
+    }
+
+    /**
+     * The regular price that follows, e.g. "Then $9.00/month", or null when
+     * the discount never ends.
+     *
+     * @param  string  $fullPrice  the price after the discount, formatted, for one cycle
+     */
+    public static function then(Plan $plan, string $cycle, string $fullPrice): ?string
+    {
+        if ($plan->discountDuration() === Plan::DISCOUNT_FOREVER) {
+            return null;
+        }
+
+        $key = $cycle === 'yearly' ? 'ui.pricing.discount_then_year' : 'ui.pricing.discount_then_month';
+
+        return __($key, ['price' => self::isolate($fullPrice)]);
+    }
+
+    /**
+     * Both in one sentence, e.g. "30% off your first month, then $9.00/month".
+     */
+    public static function line(Plan $plan, string $cycle, int $percent, string $fullPrice): string
+    {
+        $offer = self::offer($plan, $cycle, $percent);
+        $then = self::then($plan, $cycle, $fullPrice);
+
+        return $then === null ? $offer : $offer.__('ui.pricing.discount_terms_join').mb_strtolower(mb_substr($then, 0, 1)).mb_substr($then, 1);
     }
 
     /**

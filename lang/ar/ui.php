@@ -292,10 +292,13 @@ return [
         'discount_limited_offer' => 'عرض لفترة محدودة',
         'discount_expired' => 'انتهى العرض',
         // مدة الخصم والسعر بعده (بطاقات الخطط وصفحة الدفع).
-        'discount_terms_first_month' => 'خصم :percent% على أول شهر، ثم :price شهرياً',
-        'discount_terms_first_months' => '{2} خصم :percent% على أول شهرين، ثم :price شهرياً|[3,10] خصم :percent% على أول :months أشهر، ثم :price شهرياً|[11,*] خصم :percent% على أول :months شهراً، ثم :price شهرياً',
-        'discount_terms_first_year' => 'خصم :percent% على أول سنة، ثم :price سنوياً',
-        'discount_terms_forever' => 'خصم :percent% طوال مدة اشتراكك',
+        'discount_offer_first_month' => 'خصم :percent% على أول شهر',
+        'discount_offer_first_months' => '{2} خصم :percent% على أول شهرين|[3,10] خصم :percent% على أول :months أشهر|[11,*] خصم :percent% على أول :months شهراً',
+        'discount_offer_first_year' => 'خصم :percent% على أول سنة',
+        'discount_offer_forever' => 'خصم :percent% طوال مدة اشتراكك',
+        'discount_then_month' => 'ثم :price شهرياً',
+        'discount_then_year' => 'ثم :price سنوياً',
+        'discount_terms_join' => '، ',
         'lines' => [
             'label_voice_quality' => 'جودة الصوت',
             'label_max_chars_per_request' => 'أقصى نص في المرة الواحدة',
@@ -410,6 +413,9 @@ return [
         'trial_quote_hint' => 'ثم :amount في :date ما لم تلغِ قبل ذلك.',
         'discount_quote_hint' => ':terms. السعر الكامل يبدأ من :date ما لم تلغِ قبل ذلك.',
         'discount_quote_hint_forever' => ':terms.',
+        // إنستاباي / فودافون كاش: دفعة واحدة لا تتجدد تلقائياً.
+        'discount_quote_hint_manual_month' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price شهرياً.',
+        'discount_quote_hint_manual_year' => 'خصم :percent% على هذه الدفعة. السعر المعتاد :price سنوياً.',
         'trial_active_notice' => 'تجربة :plan نشطة. حتى يتم الدفع، الاستخدام محدود بحدود خطة :quota: :credits رصيد (:minutes دقيقة صوت) و:per_request حرف من النص في المرة الواحدة. ألغِ قبل انتهاء التجربة لتجنب الخصم.',
         'trial_canceled_notice' => 'تم إلغاء تجربة :plan، لذلك لن يتم الخصم. يمكنك الاستمرار في استخدامها حتى :date.',
         'trial_admin_test_title' => 'بطاقات اختبار للمسؤول',
