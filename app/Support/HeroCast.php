@@ -110,6 +110,8 @@ final class HeroCast
                 'flag' => VoiceFlag::url($person['dialect']),
                 // Delivery tags like <laugh> are spoken, not shown.
                 'line' => trim((string) preg_replace('/\s*<[^<>]+>\s*/u', ' ', $person['line'])),
+                // The line with its tags, so a player can allow time for each laugh or sigh.
+                'script' => $person['line'],
                 'audio' => is_file(public_path($path)) ? AudioUrl::fromPath($path) : null,
             ];
         }, self::CAST[$language]);

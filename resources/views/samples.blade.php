@@ -85,10 +85,20 @@
       text-wrap: balance;
     }
     /* Before the first play the line reads in full; once a voice speaks, words light as they are said. */
-    .stage.is-live .stage-text .w { color: rgba(255, 255, 255, .3); transition: color .18s ease; }
-    .stage.is-live .stage-text .w.is-lit { color: #FFFFFF; }
-    .stage.is-live .stage-text .w.is-now { color: var(--stage-lilac); }
-    @media (prefers-reduced-motion: reduce) { .stage-text .w { transition: none; } }
+    /* Once a voice plays, each word fills in from the side it is read from, in step with the voice. */
+    .stage.is-live .stage-text .w {
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      background-image: linear-gradient(var(--sweep, to right), #FFFFFF calc(var(--f, 0) * 118% - 18%), rgba(255, 255, 255, .3) calc(var(--f, 0) * 118%));
+    }
+    .stage-text[dir="rtl"] .w { --sweep: to left; }
+    /* Room inside each word's box for dots and strokes that reach past the line, so the fill never cuts them. */
+    .stage-text .w { padding: .3em .08em; margin: 0 -.08em; }
+    /* The line and the speaker change together, with a short fade. */
+    .stage-line, .stage-who { transition: opacity .22s ease, transform .22s ease; }
+    .stage.is-swapping .stage-line, .stage.is-swapping .stage-who { opacity: 0; transform: translateY(6px); }
+    @media (prefers-reduced-motion: reduce) { .stage-line, .stage-who { transition: none; } }
 
     .stage-console {
       display: grid;
@@ -96,9 +106,10 @@
       align-items: center;
       gap: 1.25rem 2rem;
     }
-    .stage-who { display: flex; align-items: center; gap: .9rem; min-width: 0; }
-    .stage-avatar { position: relative; flex: none; width: 76px; height: 76px; }
-    .stage-avatar canvas { position: absolute; inset: -16px; width: 108px; height: 108px; }
+    .stage-who { display: flex; align-items: center; gap: 1.9rem; min-width: 0; }
+    /* The ring round the avatar is drawn on a canvas reaching --ring past its edge. */
+    .stage-avatar { --ring: 26px; position: relative; flex: none; width: 76px; height: 76px; }
+    .stage-avatar canvas { position: absolute; inset: calc(var(--ring) * -1); width: calc(100% + var(--ring) * 2); max-width: none; height: calc(100% + var(--ring) * 2); pointer-events: none; }
     .stage-avatar img { position: relative; width: 76px; height: 76px; border-radius: 50%; object-fit: cover; background: #2A2160; box-shadow: 0 0 0 3px rgba(255, 255, 255, .14); }
     .stage-id { display: flex; flex-direction: column; min-width: 0; gap: .2rem; }
     .stage-id strong { font-size: 1.15rem; font-weight: 700; }
@@ -146,7 +157,8 @@
     .stage-pick:hover { opacity: .9; }
     .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--stage-ink), 0 0 0 4px var(--stage-lilac); border-radius: 50%; }
     .stage-progress { height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-    .stage-progress span { display: block; height: 100%; width: calc(var(--p, 0) * 100%); background: linear-gradient(90deg, var(--stage-lilac), #FFFFFF); }
+    .stage-progress span { display: block; height: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, var(--stage-lilac), #FFFFFF); will-change: transform; }
+    html[dir="rtl"] .stage-progress span { transform-origin: right center; background: linear-gradient(270deg, var(--stage-lilac), #FFFFFF); }
     .stage-hint { margin: -.75rem 0 0; color: rgba(255, 255, 255, .6); font-size: .86rem; text-align: center; }
 
     /* The section bar: jump to a section */
@@ -253,8 +265,9 @@
       /* Every voice in one row. */
       .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 46px); justify-content: center; gap: .5rem; width: 100%; }
       .stage-pick { width: 100%; height: auto; aspect-ratio: 1; }
+      .stage-who { gap: 1.6rem; padding-inline-start: 10px; }
       .stage-avatar, .stage-avatar img { width: 60px; height: 60px; }
-      .stage-avatar canvas { inset: -14px; width: 88px; height: 88px; }
+      .stage-avatar { --ring: 22px; }
       .samples-bar { top: 64px; }
     }
   </style>
@@ -422,7 +435,7 @@
   @include('components.scripts')
   @include('components.voice-player-script')
   <script>
-  /* ── The stage: one voice after another, each word lit as it is spoken ── */
+  /* ── The stage: one voice after another, each word filling in as it is spoken ── */
   (function () {
     var stage = document.querySelector('[data-stage]');
     if (!stage) return;
@@ -442,43 +455,115 @@
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var audio = new Audio();
     audio.preload = 'none';
-    var index = 0, words = [], weights = [], total = 0, frame = 0, level = 0;
-    var loudness = {};
+    var index = 0, tokens = [], frame = 0, swapTimer = 0, smooth = 0, lastTs = 0, bar = null;
+    var clips = {};
+    // Delivery cues like <laugh> are heard, not shown: roughly how long each one takes.
+    var CUE_SECONDS = { laugh: .9, chuckle: .6, gasp: .45, sigh: .7 };
 
-    // The clip's loudness, 10 ms at a time, so the halo moves with the voice.
+    // When the clip has voice in it, 10 ms at a time: the words fill in only while someone is speaking.
     function analyse(src) {
-      if (loudness[src] || !window.fetch || !(window.OfflineAudioContext || window.webkitOfflineAudioContext)) return;
-      loudness[src] = { pending: true };
+      if (!src || clips[src] || !window.fetch || !(window.OfflineAudioContext || window.webkitOfflineAudioContext)) return;
+      clips[src] = { pending: true };
       fetch(src, { credentials: 'same-origin' }).then(function (r) { return r.arrayBuffer(); }).then(function (buf) {
         var Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         return new Promise(function (ok, fail) { new Ctx(1, 2, 44100).decodeAudioData(buf, ok, fail); });
       }).then(function (decoded) {
-        var data = decoded.getChannelData(0), hop = Math.round(decoded.sampleRate * .01), rms = [], peak = 0;
-        for (var i = 0; i < data.length; i += hop) {
+        var data = decoded.getChannelData(0), hop = Math.round(decoded.sampleRate * .01), rms = [], peak = 0, i, j;
+        for (i = 0; i < data.length; i += hop) {
           var sum = 0, n = Math.min(hop, data.length - i);
-          for (var j = 0; j < n; j++) sum += data[i + j] * data[i + j];
+          for (j = 0; j < n; j++) sum += data[i + j] * data[i + j];
           var v = Math.sqrt(sum / Math.max(1, n)); rms.push(v); if (v > peak) peak = v;
         }
-        loudness[src] = { rms: rms, peak: peak || 1 };
-      }).catch(function () { loudness[src] = null; });
+        // Voice is where the level is above a share of the loudest moment; dips under 90 ms are inside a word.
+        var floor = (peak || 1) * .1, on = rms.map(function (v) { return v > floor; }), last = -1;
+        for (i = 0; i < on.length; i++) {
+          if (!on[i]) continue;
+          if (last >= 0 && i - last - 1 <= 9) for (j = last + 1; j < i; j++) on[j] = true;
+          last = i;
+        }
+        var cum = [0];
+        for (i = 0; i < on.length; i++) cum.push(cum[i] + (on[i] ? .01 : 0));
+        clips[src] = { rms: rms, peak: peak || 1, cum: cum, voiced: Math.max(.01, cum[cum.length - 1]) };
+        if (cast[index].audio === src) schedule();
+      }).catch(function () { clips[src] = null; });
     }
 
-    // The line as words, each weighted by its length, to light in step with the clip.
+    // The script as words and cues, in order: words are shown, cues only take time.
+    function parse(script) {
+      var out = [];
+      String(script).split(/(<[^<>]+>)/).forEach(function (part) {
+        if (!part) return;
+        var cue = part.match(/^<\s*([a-z]+)/i);
+        if (cue) { out.push({ cue: cue[1].toLowerCase() }); return; }
+        part.split(/(\s+)/).forEach(function (piece) {
+          if (!piece) return;
+          out.push(/^\s+$/.test(piece) ? { space: piece } : { word: piece, weight: piece.replace(/[^\p{L}\p{N}]/gu, '').length + 1 });
+        });
+      });
+      return out;
+    }
+    // Shares the clip's speaking time out between the cues and the words, each word by its length.
+    function schedule() {
+      var info = clips[cast[index].audio];
+      var total = info && info.cum ? info.voiced : 1, cueRaw = 0, weight = 0;
+      tokens.forEach(function (t) { if (t.cue) cueRaw += CUE_SECONDS[t.cue] || .5; if (t.word) weight += t.weight; });
+      // Without the clip's timing yet, the cues get a share of the line instead of seconds.
+      var cueTotal = info && info.cum ? Math.min(cueRaw, total * .45) : Math.min(.3, cueRaw / 4);
+      var cueScale = cueRaw > 0 ? cueTotal / cueRaw : 0, perWeight = (total - cueTotal) / Math.max(1, weight), at = 0;
+      tokens.forEach(function (t) {
+        if (t.cue) at += (CUE_SECONDS[t.cue] || .5) * cueScale;
+        if (t.word) { t.start = at; at += t.weight * perWeight; t.end = at; }
+      });
+    }
+    // Seconds of voice heard by time t.
+    function voicedAt(t) {
+      var info = clips[cast[index].audio];
+      if (info && info.cum) {
+        var f = t * 100, i = Math.floor(f);
+        if (i >= info.cum.length - 1) return info.voiced;
+        return i < 0 ? 0 : info.cum[i] + (info.cum[i + 1] - info.cum[i]) * (f - i);
+      }
+      // Until the timing is known: a short breath in, then even pacing.
+      var d = audio.duration || 0;
+      return d > 0 ? Math.max(0, Math.min(1, (t / d - .04) / .9)) : 0;
+    }
+    // The player's clock, run on the screen's frames and eased towards the audio's own time,
+    // so it never steps or slips backwards between the browser's coarse time updates.
+    function clock(ts) {
+      var ct = audio.currentTime || 0;
+      if (audio.paused || !lastTs || Math.abs(ct - smooth) > .3) {
+        smooth = ct;
+      } else {
+        var next = smooth + (ts - lastTs) / 1000 * (audio.playbackRate || 1);
+        next += (ct - next) * .1;
+        smooth = Math.max(smooth, next);
+      }
+      lastTs = audio.paused ? 0 : ts;
+      return smooth;
+    }
+
     function setLine(person) {
+      tokens = parse(person.script || person.line);
       textEl.textContent = '';
       textEl.setAttribute('dir', person.language === 'ar' ? 'rtl' : 'ltr');
       textEl.setAttribute('lang', person.language);
-      words = []; weights = []; total = 0;
-      String(person.line).split(/(\s+)/).forEach(function (part) {
-        if (!part) return;
-        if (/^\s+$/.test(part)) { textEl.appendChild(document.createTextNode(part)); return; }
-        var span = document.createElement('span');
-        span.className = 'w';
-        span.textContent = part;
-        textEl.appendChild(span);
-        words.push(span);
-        var w = part.replace(/[^\p{L}\p{N}]/gu, '').length + 1;
-        weights.push(w); total += w;
+      tokens.forEach(function (t) {
+        if (t.space) { textEl.appendChild(document.createTextNode(t.space)); return; }
+        if (!t.word) return;
+        t.el = document.createElement('span');
+        t.el.className = 'w';
+        t.el.textContent = t.word;
+        t.f = -1;
+        textEl.appendChild(t.el);
+      });
+      schedule();
+    }
+    function paintWords(v) {
+      tokens.forEach(function (t) {
+        if (!t.el) return;
+        var f = t.end > t.start ? (v - t.start) / (t.end - t.start) : (v >= t.end ? 1 : 0);
+        f = f < 0 ? 0 : (f > 1 ? 1 : f);
+        if (f !== t.f && (Math.abs(f - t.f) > .003 || f === 0 || f === 1)) { t.f = f; t.el.style.setProperty('--f', f.toFixed(3)); }
       });
     }
     function show(i) {
@@ -490,53 +575,97 @@
       if (person.flag) flagEl.src = person.flag;
       if (person.avatar) avatarEl.src = person.avatar;
       picks.forEach(function (p, k) { p.setAttribute('aria-current', k === index ? 'true' : 'false'); });
-      progressEl.style.setProperty('--p', '0');
+      if (bar) { bar.cancel(); bar = null; }
+      progressEl.style.transform = 'scaleX(0)';
+      smooth = 0;
+      lastTs = 0;
       paintWords(0);
     }
-    function paintWords(ratio) {
-      // The voice needs a breath before the first word and leaves a short tail.
-      var spoken = Math.max(0, Math.min(1, (ratio - .04) / .9)) * total, acc = 0;
-      words.forEach(function (w, k) {
-        var start = acc; acc += weights[k];
-        w.classList.toggle('is-lit', spoken >= acc);
-        w.classList.toggle('is-now', spoken > start && spoken < acc);
-      });
+    // The line and the speaker fade out and back in together when the voice changes.
+    function change(i, then) {
+      clearTimeout(swapTimer);
+      if (reduced) { show(i); if (then) then(); return; }
+      stage.classList.add('is-swapping');
+      swapTimer = setTimeout(function () {
+        show(i);
+        stage.classList.remove('is-swapping');
+        if (then) then();
+      }, 220);
     }
-    function drawHalo(t) {
+
+    // The ring: bars all the way round the avatar, rising with the voice.
+    var BARS = 72, levels = new Float32Array(BARS), level = 0, ringSize = 0;
+    function sizeRing() {
       if (!ctx2d) return;
-      var info = loudness[cast[index].audio];
-      var target = 0;
-      if (!audio.paused && info && info.rms) {
-        var f = Math.min(info.rms.length - 1, Math.round(t * 100));
-        target = Math.min(1, Math.sqrt((info.rms[f] || 0) / info.peak));
+      var box = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+      ringSize = box.width;
+      canvas.width = Math.round(box.width * dpr);
+      canvas.height = Math.round(box.height * dpr);
+      ctx2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function drawRing(t, live) {
+      if (!ctx2d || !ringSize) return;
+      var info = clips[cast[index].audio], target = 0;
+      if (live && info && info.rms) {
+        var f = Math.max(0, Math.min(info.rms.length - 1, Math.round(t * 100)));
+        target = Math.min(1, Math.sqrt(info.rms[f] / info.peak));
       }
-      level += (target - level) * .3;
-      var w = canvas.width, h = canvas.height, cx = w / 2, cy = h / 2, inner = w * .37;
-      ctx2d.clearRect(0, 0, w, h);
-      var bars = 56;
-      for (var b = 0; b < bars; b++) {
-        var a = (b / bars) * Math.PI * 2 - Math.PI / 2;
-        var wobble = .55 + .45 * Math.sin(b * 1.7 + t * 6);
-        var len = 4 + level * w * .11 * wobble;
-        ctx2d.strokeStyle = 'rgba(201, 190, 255,' + (.25 + .6 * level).toFixed(3) + ')';
-        ctx2d.lineWidth = 3;
-        ctx2d.lineCap = 'round';
+      level += (target - level) * .2;
+      var c = ringSize / 2, inner = avatarEl.offsetWidth / 2 + 6, room = c - inner - 2;
+      ctx2d.clearRect(0, 0, ringSize, ringSize);
+      if (level > .02) {
+        var glow = ctx2d.createRadialGradient(c, c, inner - 6, c, c, c);
+        glow.addColorStop(0, 'rgba(118, 89, 250,' + (.38 * level).toFixed(3) + ')');
+        glow.addColorStop(1, 'rgba(118, 89, 250, 0)');
+        ctx2d.fillStyle = glow;
         ctx2d.beginPath();
-        ctx2d.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
-        ctx2d.lineTo(cx + Math.cos(a) * (inner + len), cy + Math.sin(a) * (inner + len));
-        ctx2d.stroke();
+        ctx2d.arc(c, c, c, 0, Math.PI * 2);
+        ctx2d.fill();
       }
+      ctx2d.lineCap = 'round';
+      ctx2d.lineWidth = 2.2;
+      ctx2d.strokeStyle = 'rgba(201, 190, 255,' + (.45 + .5 * level).toFixed(3) + ')';
+      // Every bar in one path, drawn in one stroke.
+      ctx2d.beginPath();
+      for (var b = 0; b < BARS; b++) {
+        var a = b / BARS * Math.PI * 2 - Math.PI / 2;
+        // A slow, even ripple round the circle, so no bar jumps on its own.
+        var shape = .5 + .5 * Math.sin(b * .52 + t * 2.4) * Math.cos(b * .21 - t * 1.3);
+        levels[b] += (level * (.3 + .7 * shape) - levels[b]) * .25;
+        var len = 2 + levels[b] * (room - 2), cos = Math.cos(a), sin = Math.sin(a);
+        ctx2d.moveTo(c + cos * inner, c + sin * inner);
+        ctx2d.lineTo(c + cos * (inner + len), c + sin * (inner + len));
+      }
+      ctx2d.stroke();
     }
-    function tick() {
-      var t = audio.currentTime || 0, d = audio.duration || 0;
-      var ratio = d > 0 ? Math.min(1, t / d) : 0;
-      progressEl.style.setProperty('--p', ratio.toFixed(4));
-      paintWords(ratio);
-      if (!reduced) drawHalo(t);
-      frame = audio.paused ? 0 : requestAnimationFrame(tick);
+
+    // The progress line runs as one animation from where the clip is to its end, drawn by the
+    // browser off the main thread; it is set again only if it drifts from the audio.
+    function runBar() {
+      var d = audio.duration || 0, t = audio.currentTime || 0;
+      if (!(d > 0 && isFinite(d)) || !progressEl.animate) return;
+      if (bar) bar.cancel();
+      bar = progressEl.animate([{ transform: 'scaleX(' + Math.min(1, t / d).toFixed(4) + ')' }, { transform: 'scaleX(1)' }],
+        { duration: Math.max(1, (d - t) * 1000), easing: 'linear', fill: 'forwards' });
+      bar.startFrom = t / d;
+      if (audio.paused) bar.pause();
     }
-    function play(i) {
-      if (typeof i === 'number' && i !== index) show(i);
+    function barAt() {
+      if (!bar || !bar.effect) return -1;
+      var timing = bar.effect.getComputedTiming();
+      return bar.startFrom + (1 - bar.startFrom) * (timing.progress || 0);
+    }
+    function tick(ts) {
+      var t = clock(ts), d = audio.duration || 0;
+      if (!progressEl.animate) progressEl.style.transform = 'scaleX(' + (d > 0 ? Math.min(1, t / d) : 0).toFixed(4) + ')';
+      else if (!audio.paused && d > 0 && Math.abs(barAt() - t / d) > .02) runBar();
+      paintWords(voicedAt(t));
+      var live = !audio.paused && !reduced;
+      drawRing(t, live);
+      // Keeps drawing while the voice plays and while the ring settles after it stops.
+      frame = (live || level > .01) ? requestAnimationFrame(tick) : 0;
+    }
+    function play() {
       var person = cast[index];
       if (!person.audio) return;
       if (audio.getAttribute('data-src') !== person.audio) {
@@ -551,28 +680,41 @@
       stage.classList.add('is-playing', 'is-live');
       playBtn.setAttribute('aria-label', playBtn.getAttribute('data-label-pause'));
       // One clip at a time on the page: the cards below stop when the stage plays.
-      document.querySelectorAll('audio').forEach(function (el) { if (!el.paused) el.pause(); });
+      document.querySelectorAll('audio').forEach(function (el) { if (el !== audio && !el.paused) el.pause(); });
       document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: audio } }));
+      // The next voice's timing is ready before it starts.
+      analyse((cast[index + 1] || {}).audio);
       if (!frame) frame = requestAnimationFrame(tick);
     });
+    audio.addEventListener('playing', runBar);
+    audio.addEventListener('waiting', function () { if (bar) bar.pause(); });
+    audio.addEventListener('seeked', runBar);
     audio.addEventListener('pause', function () {
+      if (bar) bar.pause();
       stage.classList.remove('is-playing');
       playBtn.setAttribute('aria-label', playBtn.getAttribute('data-label-play'));
-      drawHalo(audio.currentTime || 0);
+      if (!frame) frame = requestAnimationFrame(tick);
     });
     // Played in order, the voices carry on to the next one.
-    audio.addEventListener('ended', function () { paintWords(1); if (index < cast.length - 1) play(index + 1); });
+    audio.addEventListener('ended', function () {
+      paintWords(Infinity);
+      if (bar) { bar.finish(); }
+      progressEl.style.transform = 'scaleX(1)';
+      if (index < cast.length - 1) change(index + 1, play);
+    });
     document.addEventListener('listen:audio-play', function (e) {
       if (e.detail && e.detail.source !== audio && !audio.paused) audio.pause();
     });
     playBtn.addEventListener('click', function () { if (audio.paused) play(); else audio.pause(); });
-    stage.querySelector('[data-stage-prev]').addEventListener('click', function () { var was = !audio.paused; audio.pause(); show(index - 1); if (was) play(); });
-    stage.querySelector('[data-stage-next]').addEventListener('click', function () { var was = !audio.paused; audio.pause(); show(index + 1); if (was) play(); });
+    stage.querySelector('[data-stage-prev]').addEventListener('click', function () { var was = !audio.paused; audio.pause(); change(index - 1, was ? play : null); });
+    stage.querySelector('[data-stage-next]').addEventListener('click', function () { var was = !audio.paused; audio.pause(); change(index + 1, was ? play : null); });
     picks.forEach(function (p) {
-      p.addEventListener('click', function () { audio.pause(); play(parseInt(p.getAttribute('data-stage-pick'), 10)); });
+      p.addEventListener('click', function () { audio.pause(); change(parseInt(p.getAttribute('data-stage-pick'), 10), play); });
     });
+    window.addEventListener('resize', function () { sizeRing(); drawRing(0, false); });
     show(0);
-    drawHalo(0);
+    sizeRing();
+    drawRing(0, false);
   })();
 
   /* ── The section bar: the section in view is marked ── */
