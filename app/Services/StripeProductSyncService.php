@@ -21,6 +21,12 @@ use Stripe\StripeClient;
  */
 class StripeProductSyncService
 {
+    /**
+     * What a subscription charge shows on the customer's card statement: the
+     * brand they bought from, with the company Stripe has verified.
+     */
+    public const STATEMENT_DESCRIPTOR = 'LISTEN BY SOLICODE';
+
     private ?StripeClient $stripe = null;
 
     /**
@@ -145,7 +151,8 @@ class StripeProductSyncService
         if (!empty($plan->stripe_product_id)) {
             try {
                 $stripe->products->update($plan->stripe_product_id, [
-                    'name' => $plan->name . ' Plan',
+                    'name' => $this->productName($plan),
+                    'statement_descriptor' => self::STATEMENT_DESCRIPTOR,
                     'description' => $this->buildProductDescription($plan),
                     'metadata' => $metadata,
                     'active' => $plan->is_active,
@@ -169,7 +176,8 @@ class StripeProductSyncService
         if (count($existingProducts->data) > 0) {
             $productId = $existingProducts->data[0]->id;
             $stripe->products->update($productId, [
-                'name' => $plan->name . ' Plan',
+                'name' => $this->productName($plan),
+                'statement_descriptor' => self::STATEMENT_DESCRIPTOR,
                 'description' => $this->buildProductDescription($plan),
                 'metadata' => $metadata,
                 'active' => $plan->is_active,
@@ -179,12 +187,24 @@ class StripeProductSyncService
 
         // Create new product
         $product = $stripe->products->create([
-            'name' => $plan->name . ' Plan',
+            'name' => $this->productName($plan),
+            'statement_descriptor' => self::STATEMENT_DESCRIPTOR,
             'description' => $this->buildProductDescription($plan),
             'metadata' => $metadata,
         ]);
 
         return $product->id;
+    }
+
+    /**
+     * The plan as customers read it in Stripe's emails, receipts and invoices:
+     * "Listen Starter".
+     */
+    public function productName(Plan $plan): string
+    {
+        $name = trim((string) $plan->name);
+
+        return str_starts_with(strtolower($name), 'listen') ? $name : 'Listen ' . $name;
     }
 
     /**

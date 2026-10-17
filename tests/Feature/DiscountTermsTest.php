@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\BillingController;
 use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\CashierStripePackGateway;
 use App\Services\BillingLifecycleService;
 use App\Services\StripeProductSyncService;
 use App\Support\DiscountTerms;
@@ -159,14 +161,73 @@ class DiscountTermsTest extends TestCase
         $this->assertNull(Subscription::query()->where('user_id', $card->id)->value('billing_reminder_7d_sent_at'));
         $this->assertNotNull(Subscription::query()->where('user_id', $other->id)->value('billing_reminder_7d_sent_at'));
     }
+
+    public function test_stripe_shows_listen_on_receipts_and_card_statements(): void
+    {
+        $stripe = new CouponStripeClient;
+        ApiRequestor::setHttpClient($stripe);
+        $plan = Plan::factory()->create(['slug' => 'lite', 'name' => 'Starter', 'price_cents' => 900]);
+
+        $sync = new ReflectionMethod(StripeProductSyncService::class, 'syncProduct');
+        $sync->setAccessible(true);
+        $sync->invoke(app(StripeProductSyncService::class), new StripeClient('sk_test_fake'), $plan);
+
+        $this->assertSame('Listen Starter', $stripe->products['name'] ?? null);
+        $this->assertSame('LISTEN BY SOLICODE', $stripe->products['statement_descriptor'] ?? null);
+        $this->assertSame('Listen Pro', app(StripeProductSyncService::class)->productName(new Plan(['name' => 'Listen Pro'])));
+    }
+
+    public function test_a_pack_charge_ends_with_listen_on_the_card_statement(): void
+    {
+        config(['cashier.secret' => 'sk_test_fake', 'cashier.key' => 'pk_test_fake']);
+        $stripe = new CouponStripeClient;
+        ApiRequestor::setHttpClient($stripe);
+
+        app(CashierStripePackGateway::class)->chargeCard('cus_x', 'pm_x', 500, 'usd', 'Listen pack', [], 'key_x');
+
+        $this->assertSame('LISTEN', $stripe->intent['statement_descriptor_suffix'] ?? null);
+    }
+
+    public function test_the_site_still_names_the_plan_on_invoices_with_listen_in_the_product_name(): void
+    {
+        Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter']);
+        Plan::factory()->create(['slug' => 'pro', 'name' => 'Pro']);
+
+        $guess = new ReflectionMethod(BillingController::class, 'guessSlugFromDescription');
+        $guess->setAccessible(true);
+        $controller = app(BillingController::class);
+
+        $this->assertSame('starter', $guess->invoke($controller, '1 × Listen Starter (at $9.00 / month)'));
+        $this->assertSame('pro', $guess->invoke($controller, '1 × Listen Pro (at $49.00 / month)'));
+        $this->assertSame('starter', $guess->invoke($controller, '1 × Starter Plan (at $9.00 / month)'));
+    }
 }
 
 class CouponStripeClient implements ClientInterface
 {
     public array $created = [];
 
+    public array $products = [];
+
+    public array $intent = [];
+
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
+        $path = (string) parse_url($absUrl, PHP_URL_PATH);
+        if ($path === '/v1/products/search') {
+            return [json_encode(['object' => 'search_result', 'data' => [], 'has_more' => false, 'url' => '/v1/products/search']), 200, []];
+        }
+        if (strtolower($method) === 'post' && $path === '/v1/payment_intents') {
+            $this->intent = (array) $params;
+
+            return [json_encode(['id' => 'pi_x', 'object' => 'payment_intent', 'status' => 'succeeded', 'client_secret' => null, 'amount' => 500, 'currency' => 'usd', 'customer' => 'cus_x', 'metadata' => []]), 200, []];
+        }
+        if (strtolower($method) === 'post' && $path === '/v1/products') {
+            $this->products = (array) $params;
+
+            return [json_encode(['id' => 'prod_new', 'object' => 'product'] + (array) $params), 200, []];
+        }
+
         if (strtolower($method) === 'post' && parse_url($absUrl, PHP_URL_PATH) === '/v1/coupons') {
             $this->created = (array) $params;
 

@@ -37,6 +37,8 @@ class CashierStripePackGateway implements StripePackGateway
                 'payment_method_types' => ['card'],
                 'confirm' => true,
                 'description' => $description,
+                // Shown on the card statement after the company name: "...* LISTEN".
+                'statement_descriptor_suffix' => 'LISTEN',
                 'metadata' => $metadata,
             ], ['idempotency_key' => $idempotencyKey]);
         } catch (CardException $exception) {
