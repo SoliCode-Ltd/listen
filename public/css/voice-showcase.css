@@ -195,6 +195,26 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
 .vs-speaker.is-live .vs-speaker-play .vs-icon-play { display: none; }
 .vs-speaker.is-live .vs-speaker-play .vs-icon-pause { display: block; }
 .vs-speaker.is-live .vs-speaker-play { background: rgba(15, 12, 30, .22); }
+/* A small play badge on every speaker, so it is plain that each one can be heard.
+   It steps aside on hover and while that speaker plays (the full badge shows then). */
+.vs-speaker::after {
+  content: "";
+  position: absolute;
+  right: -3%;
+  bottom: -3%;
+  z-index: 2;
+  width: 32%;
+  height: 32%;
+  border-radius: 50%;
+  background: var(--brand-accent, #7659FA) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23fff' d='M7.5 6.2v11.6a.9.9 0 0 0 1.4.75l9-5.8a.9.9 0 0 0 0-1.5l-9-5.8A.9.9 0 0 0 7.5 6.2z'/%3E%3C/svg%3E") 50% 50% / 52% no-repeat;
+  box-shadow: 0 0 0 3px var(--vs-card, #0B0B0F), 0 6px 14px rgba(118, 89, 250, .4);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+html[data-theme="light"] .vs-speaker::after { box-shadow: 0 0 0 3px #FFFFFF, 0 6px 14px rgba(118, 89, 250, .3); }
+[dir="rtl"] .vs-speaker::after { right: auto; left: -3%; transform: scaleX(-1); }
+.vs-speaker:hover::after, .vs-speaker.is-live::after { opacity: 0; transform: scale(.6); }
+[dir="rtl"] .vs-speaker:hover::after, [dir="rtl"] .vs-speaker.is-live::after { transform: scale(-.6, .6); }
 
 /* What the speaker says, on crystal glass: see-through with a strong blur, a
    bright edge, a soft sheen across the top and a gentle shadow. The line, then

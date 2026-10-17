@@ -2024,21 +2024,6 @@
       font-size: .88rem; color: var(--text);
     }
     .usage-chip svg { width: 14px; height: 14px; fill: none; stroke: var(--a, #6A45F2); stroke-width: 2; stroke-linecap: round; }
-    .usage-ring {
-      --p: 0;
-      width: 132px; height: 132px; border-radius: 50%;
-      background: conic-gradient(var(--a, #6A45F2) calc(var(--p) * 1%), color-mix(in oklab, var(--line) 85%, transparent) 0);
-      display: grid; place-items: center;
-      transition: background .4s ease;
-    }
-    .usage-ring-inner {
-      width: 104px; height: 104px; border-radius: 50%;
-      background: var(--surface);
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--line) 70%, transparent);
-    }
-    .usage-ring-inner b { font-size: 1.55rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
-    .usage-ring-inner span { font-size: .82rem; color: var(--muted); }
     .usage-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .9rem; margin-top: .9rem; }
     .usage-tile {
       display: flex; flex-direction: column; gap: .45rem;
@@ -2075,9 +2060,6 @@
     .usage-health .dot.failed { background: #ef4444; box-shadow: 0 0 0 3px color-mix(in oklab, #ef4444 22%, transparent); }
     @media (max-width: 760px) {
       .usage-hero { grid-template-columns: 1fr; }
-      .usage-ring { justify-self: center; width: 104px; height: 104px; }
-      .usage-ring-inner { width: 82px; height: 82px; }
-      .usage-ring-inner b { font-size: 1.35rem; }
       .usage-tiles { grid-template-columns: 1fr; }
       .usage-health-row { flex-wrap: nowrap; gap: .9rem; }
       .usage-health-item { gap: .35rem; }
@@ -2124,6 +2106,297 @@
     .credit-live.is-spending { border-color: color-mix(in oklab, var(--a, #6A45F2) 40%, var(--line)); }
     .credit-live.is-short { border-color: color-mix(in oklab, var(--danger, #ef4444) 55%, var(--line)); background: color-mix(in oklab, var(--danger, #ef4444) 8%, var(--surface)); }
     .credit-live.is-short .credit-live-value { color: var(--danger, #ef4444); }
+    /* ── App frame: the menu and its help links stay in view; no website footer. ── */
+    .dashboard-shell { padding-bottom: 3rem !important; }
+    .dashboard-menu-inner { position: sticky; top: 5.5rem; }
+    .dashboard-menu-inner .dashboard-menu-list { position: static; }
+    .dm-short { display: none; }
+    .dashboard-menu-foot {
+      display: flex;
+      flex-direction: column;
+      gap: .35rem;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--line);
+    }
+    .dashboard-help {
+      display: flex;
+      align-items: center;
+      gap: .7rem;
+      min-height: 40px;
+      padding: .45rem .75rem;
+      border-radius: 10px;
+      color: var(--muted);
+      font-size: .9rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .dashboard-help:hover { color: var(--text); background: var(--surface2); }
+    .dashboard-help svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .dashboard-legal { display: flex; flex-wrap: wrap; gap: .25rem 1rem; padding: .2rem .75rem; }
+    .dashboard-legal a { display: inline-flex; align-items: center; min-height: 24px; color: var(--muted); font-size: .8rem; text-decoration: none; }
+    .dashboard-legal a:hover { color: var(--text); text-decoration: underline; }
+    .dashboard-menu-link.active { color: var(--accent-text); }
+    /* The menu's divider runs to the bottom of the window, however short the open section is. */
+    @media (min-width: 981px) {
+      .dashboard-layout { min-height: calc(100vh - 9.25rem); }
+    }
+
+    /* The gauge: how much of this month is used, as a ring beside the minutes left. */
+    #commandCenterSection .usage-hero { grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.6rem; }
+    .usage-ring {
+      --p: 0;
+      position: relative;
+      flex: none;
+      width: 136px;
+      height: 136px;
+    }
+    .usage-ring::before {
+      content: "";
+      position: absolute;
+      inset: 17px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 50% 35%, color-mix(in oklab, var(--a) 10%, var(--surface)), var(--surface) 70%);
+      box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--a) 10%, var(--line));
+    }
+    /* Visible overflow, so the arc's soft glow is never cut off at the square edge. */
+    .usage-ring svg { position: relative; display: block; width: 100%; height: 100%; overflow: visible; transform: rotate(-90deg); }
+    .usage-ring-track { fill: none; stroke: color-mix(in oklab, var(--a) 13%, var(--line)); stroke-width: 9; }
+    .usage-ring-arc {
+      fill: none;
+      stroke: url(#usageRingGradient);
+      stroke-width: 9;
+      stroke-linecap: round;
+      stroke-dasharray: calc(var(--p) * 1px) 200px;
+      /* A rounded end draws a dot at 0%: nothing shows until something is used. */
+      opacity: clamp(0, calc(var(--p) * 4), 1);
+      filter: drop-shadow(0 2px 6px color-mix(in oklab, var(--a) 45%, transparent));
+      transition: stroke-dasharray .7s cubic-bezier(.22, .61, .36, 1), stroke .3s ease;
+    }
+    .usage-ring.is-high .usage-ring-arc { stroke: #F59E0B; filter: none; }
+    .usage-ring.is-low .usage-ring-arc { stroke: #EF4444; filter: none; }
+    .usage-ring-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.1;
+    }
+    .usage-ring-inner b { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .usage-ring-inner span { margin-top: .15rem; font-size: .78rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+    html[dir="rtl"] .usage-ring-inner span { letter-spacing: 0; text-transform: none; font-size: .85rem; }
+    /* Mixed with the text colour: darker on light, lighter on dark, readable on both. */
+    .usage-ring.is-high .usage-ring-inner b { color: color-mix(in oklab, #F59E0B 62%, var(--text)); }
+    .usage-ring.is-low .usage-ring-inner b { color: color-mix(in oklab, #EF4444 72%, var(--text)); }
+    @media (prefers-reduced-motion: reduce) {
+      .usage-ring-arc { transition: none; }
+    }
+    @media (max-width: 760px) {
+      #commandCenterSection .usage-hero { grid-template-columns: auto minmax(0, 1fr); gap: 1.1rem 1.25rem; }
+      #commandCenterSection .usage-hero-cta { grid-column: 1 / -1; }
+      .usage-ring { width: 112px; height: 112px; }
+      .usage-ring::before { inset: 14px; }
+      .usage-ring-inner b { font-size: 1.4rem; }
+    }
+    @media (max-width: 420px) {
+      /* Phones: the ring on top, everything centred under it. */
+      #commandCenterSection .usage-hero { grid-template-columns: 1fr; justify-items: center; text-align: center; }
+      #commandCenterSection .usage-hero-main { width: 100%; }
+      #commandCenterSection .usage-hero-head,
+      #commandCenterSection .usage-hero-value,
+      #commandCenterSection .usage-hero-chips { justify-content: center; }
+      #commandCenterSection .usage-hero-cta { width: 100%; }
+    }
+
+    /* One meter: minutes left, the credits behind them, and a way back to the studio. */
+    .usage-hero-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .6rem; }
+    .usage-hero-label { display: inline; font-size: .95rem; }
+    .usage-hero-plan {
+      display: inline-flex;
+      padding: .12rem .55rem;
+      border-radius: 999px;
+      background: color-mix(in oklab, var(--a) 10%, transparent);
+      color: var(--accent-text);
+      font-size: .78rem;
+      font-weight: 700;
+    }
+    .usage-chip .credit-icon { font-size: 1.05rem; }
+    .usage-chip b { font-variant-numeric: tabular-nums; }
+    .usage-hero-cta {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      min-height: 46px;
+      padding: 0 1.2rem;
+      border-radius: var(--btn-radius);
+      background: var(--brand-accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: .95rem;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: background-color .2s ease;
+    }
+    .usage-hero-cta:hover { background: var(--brand-hover); }
+    .usage-hero-cta:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
+    .usage-hero-cta svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+    @media (max-width: 760px) {
+      .usage-hero-cta { justify-self: stretch; justify-content: center; }
+    }
+
+    /* ── Studio ── */
+    /* The voice's name: one slim line under the text, optional. */
+    .vs-name-row {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      padding: .6rem 1.2rem;
+      border-top: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
+    }
+    .vs-name-row label { flex: none; margin: 0; font-size: .85rem; font-weight: 600; color: var(--muted); white-space: nowrap; }
+    #generateVoiceSection .vs-name-row input {
+      flex: 1 1 auto;
+      min-width: 0;
+      width: auto;
+      height: 40px;
+      min-height: 40px;
+      margin: 0;
+      padding: 0 .8rem;
+      border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-size: .92rem;
+      box-shadow: none;
+    }
+    #generateVoiceSection .vs-name-row input:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
+    @media (max-width: 420px) {
+      .vs-name-row { flex-direction: column; align-items: stretch; gap: .4rem; }
+      #generateVoiceSection .vs-name-row input { width: 100%; }
+    }
+    /* What the text will cost, before generating. */
+    .char-counter-est { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .char-counter-est:empty { display: none; }
+
+    /* One column: the chosen voice above the text, a tap away from the library. */
+    .vs-voice-jump { display: none; }
+    #generateVoiceSection .vs-panel { scroll-margin-top: 5.5rem; }
+    @media (max-width: 1180px) {
+      .vs-voice-jump:not([hidden]) {
+        display: flex;
+        align-items: center;
+        gap: .7rem;
+        width: 100%;
+        min-height: 56px;
+        padding: .5rem .9rem .5rem .55rem;
+        border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
+        border-radius: 14px;
+        background: var(--surface);
+        color: var(--text);
+        font: inherit;
+        text-align: start;
+        cursor: pointer;
+      }
+      html[dir="rtl"] .vs-voice-jump:not([hidden]) { padding: .5rem .55rem .5rem .9rem; }
+      .vs-voice-jump:hover { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); }
+      .vs-voice-jump:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
+    }
+    .vs-voice-jump-face {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      flex: none;
+      width: 40px;
+      height: 40px;
+      overflow: hidden;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--a), var(--b, #8B5CF6));
+      color: #fff;
+      font-weight: 800;
+    }
+    .vs-voice-jump-face img { width: 100%; height: 100%; object-fit: cover; }
+    .vs-voice-jump-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.25; }
+    .vs-voice-jump-text small { font-size: .75rem; color: var(--muted); }
+    .vs-voice-jump-text strong { overflow: hidden; font-size: .95rem; text-overflow: ellipsis; white-space: nowrap; }
+    .vs-voice-jump-change { flex: none; font-size: .85rem; font-weight: 700; color: var(--accent-text); }
+
+    /* Before the first voice: one quiet line, not an empty box. */
+    #generatedOutputPlaceholder.output-empty { min-height: 0; padding: .9rem 1.1rem; border-style: dashed; background: transparent; }
+    #generatedOutputPlaceholder .output-placeholder { flex-direction: row; padding: 0; opacity: .85; }
+    #generatedOutputPlaceholder .output-placeholder svg { width: 20px; height: 20px; }
+    /* The ready voice: a player docked at the bottom of the screen while the studio is open. */
+    #generatedAudioWrap.output-dock {
+      position: sticky;
+      bottom: 1rem;
+      z-index: 40;
+      min-height: 0;
+      padding: .9rem 1.2rem 1rem;
+      border-color: color-mix(in oklab, var(--a) 35%, var(--line));
+      background: color-mix(in oklab, var(--surface) 94%, transparent);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 18px 40px -18px rgba(15, 12, 40, .35);
+    }
+    .output-dock-head { display: flex; align-items: baseline; gap: .35rem .9rem; min-width: 0; margin-bottom: .5rem; }
+    #generatedAudioWrap.output-dock .panel-title { flex: none; margin: 0; font-size: .8rem; color: var(--accent-text); }
+    #generatedAudioWrap.output-dock .audio-meta { min-width: 0; margin: 0; overflow: hidden; font-size: .8rem; text-overflow: ellipsis; white-space: nowrap; }
+    #generatedAudioWrap.output-dock .custom-audio-wrapper { margin: 0; padding: .45rem .8rem; }
+    @media (max-width: 640px) {
+      #generatedAudioWrap.output-dock { padding: .65rem .75rem .75rem; border-radius: 1rem; }
+    }
+
+    /* Phones: the sections become a tab bar at the bottom of the screen. */
+    @media (max-width: 640px) {
+      .dashboard-menu,
+      html[dir="rtl"] .dashboard-menu {
+        position: fixed !important;
+        inset: auto 0 0 0;
+        z-index: 95;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0;
+        border-top: 1px solid var(--line);
+        background: color-mix(in oklab, var(--bg) 90%, transparent);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        transform: none !important;
+        opacity: 1 !important;
+      }
+      .dashboard-menu-inner { position: static; }
+      .dashboard-menu .dashboard-menu-list {
+        display: grid !important;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(0, 1fr);
+        gap: 0 !important;
+        padding: .3rem .25rem calc(.3rem + env(safe-area-inset-bottom));
+      }
+      .dashboard-menu .dashboard-menu-link {
+        flex-direction: column;
+        justify-content: center;
+        gap: .2rem;
+        min-height: 54px;
+        padding: .3rem .15rem;
+        border: 0;
+        border-radius: 10px;
+        background: transparent;
+        font-size: .7rem;
+        font-weight: 600;
+        text-align: center;
+      }
+      .dashboard-menu .dashboard-menu-link svg { width: 21px; height: 21px; }
+      .dashboard-menu .dashboard-menu-link.active { background: transparent; color: var(--accent-text); }
+      .dashboard-menu .dm-label { display: none; }
+      .dashboard-menu .dm-short { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+      .dashboard-menu-foot { display: none; }
+      .dashboard-shell { padding-bottom: calc(5.25rem + env(safe-area-inset-bottom)) !important; }
+      /* Above the tab bar. */
+      #generatedAudioWrap.output-dock { bottom: calc(4.6rem + env(safe-area-inset-bottom)); }
+      /* One section at a time: it starts right under the header. */
+      .dashboard-panel, #commandCenterSection { margin-top: 0 !important; }
+    }
   </style>
 </head>
 <body>
@@ -2193,38 +2466,60 @@
 
   <main class="main-content dashboard-shell" style="max-width: 1880px; padding: 2rem clamp(.75rem, 1.8vw, 1.75rem); margin: 0 auto; min-height: 80vh;">
     <div class="dashboard-layout">
+      @php
+        // Members with credits open straight into the studio; without any, on the
+        // overview, where the plans to choose from are.
+        $dashboardStartSection = (!empty($packOffer) || (!empty($usageSnapshot['no_free_chars']) && (int) ($usageSnapshot['plan_chars'] ?? 0) <= 0))
+          ? 'commandCenterSection'
+          : 'generateVoiceSection';
+      @endphp
       <aside class="reveal dashboard-menu">
+        <div class="dashboard-menu-inner">
         <nav class="dashboard-menu-list" aria-label="{{ __('ui.dashboard.menu_panel') }}">
-          <a class="dashboard-menu-link active" href="#commandCenterSection" data-dashboard-nav>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
-            <span>{{ __('ui.dashboard.command_center') }}</span>
-          </a>
-          <a class="dashboard-menu-link" href="#generateVoiceSection" data-dashboard-nav>
+          <a class="dashboard-menu-link {{ $dashboardStartSection === 'generateVoiceSection' ? 'active' : '' }}" href="#generateVoiceSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
-            <span>{{ __('ui.dashboard.generate_new_voice') }}</span>
-          </a>
-
-          @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
-          <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M17.5 9.5a3 3 0 0 1 0 5M20 7a6.5 6.5 0 0 1 0 10"/></svg>
-            <span>{{ __('ui.nav.voice_cloning') }}</span>
-          </a>
-          @endif
-
-          <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg>
-            <span>{{ __('ui.dashboard.plan_and_defaults') }}</span>
+            <span class="dm-label">{{ __('ui.dashboard.generate_new_voice') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_create') }}</span>
           </a>
           <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M12 7.8V12l3 2"/></svg>
-            <span>{{ __('ui.dashboard.recent_voices') }}</span>
+            <span class="dm-label">{{ __('ui.dashboard.recent_voices') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_history') }}</span>
           </a>
-
+          @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
+          <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M17.5 9.5a3 3 0 0 1 0 5M20 7a6.5 6.5 0 0 1 0 10"/></svg>
+            <span class="dm-label">{{ __('ui.nav.voice_cloning') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_cloning') }}</span>
+          </a>
+          @endif
+          <a class="dashboard-menu-link {{ $dashboardStartSection === 'commandCenterSection' ? 'active' : '' }}" href="#commandCenterSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
+            <span class="dm-label">{{ __('ui.dashboard.command_center') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_overview') }}</span>
+          </a>
+          <a class="dashboard-menu-link" href="#planDefaultsSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2.2"/><path d="M3 10h18M7 14.5h4"/></svg>
+            <span class="dm-label">{{ __('ui.dashboard.plan_and_defaults') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_plan') }}</span>
+          </a>
         </nav>
+        {{-- Help and the legal pages, here instead of a website footer. --}}
+        <div class="dashboard-menu-foot">
+          <a class="dashboard-help" href="{{ route('contact') }}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg>
+            {{ __('ui.dashboard.help_link') }}
+          </a>
+          <div class="dashboard-legal">
+            <a href="{{ route('legal.privacy') }}">{{ __('ui.footer.privacy') }}</a>
+            <a href="{{ route('legal.terms') }}">{{ __('ui.footer.terms') }}</a>
+          </div>
+        </div>
+        </div>
       </aside>
 
       <div class="dashboard-content">
-    <section id="commandCenterSection" class="dashboard-panel active" data-dashboard-section>
+    <section id="commandCenterSection" class="dashboard-panel {{ $dashboardStartSection === 'commandCenterSection' ? 'active' : '' }}" data-dashboard-section>
       <div class="hero-grid">
         <article class="page-card reveal command-card">
           <h1>
@@ -2290,26 +2585,47 @@
             $minutesUsed = ((int) ($usageSnapshot['seconds_used'] ?? 0)) / 60;
           @endphp
 
-          {{-- Credits: what is left this month (or in the pack), with the voice minutes they give. --}}
+          @php
+            $minutesLeft = \App\Support\Credits::minutesFor($remainingChars);
+            $minutesTotal = \App\Support\Credits::minutesFor((int) $planChars);
+          @endphp
+          @php
+            $ringPercent = max(0, min(100, (int) $creditsUsedPercent));
+            // The ring turns amber when most of the month is used, and red when almost none is left.
+            $ringState = $ringPercent >= 95 ? 'is-low' : ($ringPercent >= 80 ? 'is-high' : '');
+          @endphp
+          {{-- One gauge: how much of this month is used, beside the minutes and credits left. --}}
           <div class="usage-hero" @if($freeNoChars) style="display:none" @endif>
+            <div class="usage-ring {{ $ringState }}" id="usageCreditsRing" style="--p: {{ $ringPercent }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => $ringPercent]) }}">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <defs>
+                  <linearGradient id="usageRingGradient" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stop-color="#A28FFF"/>
+                    <stop offset="1" stop-color="#5B3FE6"/>
+                  </linearGradient>
+                </defs>
+                <circle class="usage-ring-track" cx="60" cy="60" r="52"/>
+                <circle class="usage-ring-arc" cx="60" cy="60" r="52" pathLength="100"/>
+              </svg>
+              <div class="usage-ring-inner">
+                <b id="usageCreditsPercent">{{ $ringPercent }}%</b>
+                <span>{{ __('ui.dashboard.used_short') }}</span>
+              </div>
+            </div>
             <div class="usage-hero-main">
               <div class="usage-hero-head">
-                <x-credit-icon class="usage-hero-coin" />
-                <div>
-                  <span class="usage-hero-label">{{ __('ui.dashboard.credits_left_label') }}</span>
-                  <span class="usage-hero-plan">{{ $packMode ? __('ui.pack.meter_label') : $activePlanDisplayName }}</span>
-                </div>
+                <span class="usage-hero-label">{{ $packMode ? __('ui.pack.meter_label') : __('ui.dashboard.minutes_left_label') }}</span>
+                @unless($packMode)
+                  <span class="usage-hero-plan">{{ $activePlanDisplayName }}</span>
+                @endunless
               </div>
               <div class="usage-hero-value">
-                <strong id="usageCreditsLeft">{{ number_format($remainingChars) }}</strong>
-                <span>{{ __('ui.dashboard.credits_of_total', ['total' => number_format($planChars)]) }}</span>
+                <strong id="usageMinutesLeft">{{ number_format($minutesLeft) }}</strong>
+                <span id="usageMinutesTotal">{{ __('ui.dashboard.minutes_left_of', ['total' => number_format($minutesTotal)]) }}</span>
               </div>
-              <div class="meter-track"><div class="meter-fill" id="usageCharsMeter" style="width:{{ max(0, 100 - $usageCharsPercent) }}%"></div></div>
               <small class="usage-hero-caption" id="usageCharsText">{{ __('ui.dashboard.chars_remaining_of_total', ['remaining' => number_format($remainingChars), 'total' => number_format($planChars)]) }}</small>
               <div class="usage-hero-chips">
-                @if (! $packMode && $minutesLimit > 0)
-                  <span class="usage-chip"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="usageMinutesText">{{ __('ui.dashboard.voice_minutes_used', ['used' => number_format($minutesUsed, 1), 'total' => number_format($minutesLimit)]) }}</span></span>
-                @endif
+                <span class="usage-chip" title="{{ __('ui.pricing.credits_hint') }}"><x-credit-icon /><span><b id="usageCreditsLeft">{{ number_format($remainingChars) }}</b> {{ __('ui.dashboard.credits_left_suffix') }}</span></span>
                 @if ($packMode && $packEndsOn)
                   <span class="usage-chip">{{ __('ui.pack.meter_ends', ['date' => $packEndsOn]) }}</span>
                 @endif
@@ -2318,12 +2634,10 @@
                 @endif
               </div>
             </div>
-            <div class="usage-ring" id="usageCreditsRing" style="--p: {{ max(0, min(100, $creditsUsedPercent)) }}" role="img" aria-label="{{ __('ui.dashboard.credits_used_percent', ['percent' => max(0, min(100, $creditsUsedPercent))]) }}">
-              <div class="usage-ring-inner">
-                <b id="usageCreditsPercent">{{ max(0, min(100, $creditsUsedPercent)) }}%</b>
-                <span>{{ __('ui.dashboard.used_short') }}</span>
-              </div>
-            </div>
+            <a class="usage-hero-cta" href="#generateVoiceSection" data-dashboard-go="generateVoiceSection">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg>
+              {{ __('ui.dashboard.generate_new_voice') }}
+            </a>
           </div>
 
           {{-- This month at a glance --}}
@@ -2334,7 +2648,9 @@
                 <small>{{ __('ui.dashboard.requests_usage') }}</small>
               </div>
               <b id="kpiRequests">{{ number_format($usage->total_requests) }}</b>
-              <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
+              @unless($requestsUnlimited)
+                <div class="meter-track"><div class="meter-fill requests" id="usageRequestsMeter" style="width:{{ max(0, 100 - $usageRequestsPercent) }}%"></div></div>
+              @endunless
               <small class="usage-tile-foot" id="usageRequestsText">
                 @if ($requestsUnlimited)
                   {{ __('ui.dashboard.used_requests_of_unlimited', ['used' => number_format($usage->total_requests)]) }}
@@ -2378,7 +2694,7 @@
       </div>
     </section>
 
-    <section id="generateVoiceSection" class="dashboard-panel" data-dashboard-section>
+    <section id="generateVoiceSection" class="dashboard-panel {{ $dashboardStartSection === 'generateVoiceSection' ? 'active' : '' }}" data-dashboard-section>
       <article class="page-card reveal queue-card" id="queueCardSection">
         <h1><span class="grad-text">{{ __('ui.dashboard.generate_new_voice') }}</span></h1>
         @if($planShowcase ?? false)
@@ -2402,10 +2718,15 @@
         <form id="voiceForm" method="POST" action="{{ route('dashboard.queue') }}" class="vs-layout">
           @csrf
           <div class="vs-main">
-            <div class="editor-panel">
-            <label>{{ __('ui.dashboard.title_optional') }}</label>
-            <input name="title" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ $prefillValue('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" />
-          </div>
+            {{-- One column (tablets and phones): the voice library sits below, so say which voice is chosen here. --}}
+            <button type="button" class="vs-voice-jump" id="voiceJump" hidden>
+              <span class="vs-voice-jump-face" id="voiceJumpFace" aria-hidden="true"></span>
+              <span class="vs-voice-jump-text">
+                <small>{{ __('ui.dashboard.voice_jump_label') }}</small>
+                <strong id="voiceJumpName"></strong>
+              </span>
+              <span class="vs-voice-jump-change">{{ __('ui.dashboard.voice_jump_change') }}</span>
+            </button>
 
             <div class="vs-editor-card">
               <x-voice-studio.setbar :lock="$featureLocks['studio'] ?? null" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
@@ -2421,11 +2742,17 @@
                 <div class="tag-editor-backdrop" id="tagEditorBackdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
                 <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
               </div>
+              {{-- Left empty, the history names the voice from its first words. --}}
+              <div class="vs-name-row">
+                <label for="voiceTitle">{{ __('ui.dashboard.title_optional') }}</label>
+                <input name="title" id="voiceTitle" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" value="{{ $prefillValue('title') }}" placeholder="{{ __('ui.dashboard.notification_summary') }}" maxlength="255" />
+              </div>
               <div class="vs-editor-foot">
             <div class="editor-counters">
               <div class="char-counter" id="charCounter">
                 <div class="char-counter-text"><b id="charCount">0</b><span class="char-counter-sep">/</span><span id="charLimit">{{ number_format($maxCharsPerRequest) }}</span> <span class="char-counter-unit">{{ __('ui.dashboard.characters') }}</span></div>
                 <div class="char-counter-track" aria-hidden="true"><span id="charCounterFill"></span></div>
+                <span class="char-counter-est" id="audioEstimate" aria-live="polite"></span>
               </div>
               <div class="credit-live" id="creditLive" data-remaining="{{ (int) ($usageSnapshot['remaining_chars'] ?? 0) }}" title="{{ __('ui.pricing.credits_hint') }}" aria-live="polite">
                 <x-credit-icon />
@@ -2491,18 +2818,21 @@
           </aside>
         </form>
 
-        <div class="s-card output-panel" id="generatedAudioWrap" style="display:none;">
-          <div class="panel-title">
-            <svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-            {{ __('ui.dashboard.instant_preview') }}
+        {{-- Once a voice is ready its player stays at the bottom of the screen while you work. --}}
+        <div class="s-card output-panel output-dock" id="generatedAudioWrap" style="display:none;" role="region" aria-label="{{ __('ui.dashboard.output_title') }}">
+          <div class="output-dock-head">
+            <div class="panel-title">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+              {{ __('ui.dashboard.output_title') }}
+            </div>
+            <div class="audio-meta" id="generatedAudioMeta"></div>
           </div>
           <audio id="generatedPreviewAudio" controls preload="none"></audio>
-          <div class="audio-meta" id="generatedAudioMeta"></div>
         </div>
 
-        <div class="s-card output-panel reveal show" id="generatedOutputPlaceholder">
+        <div class="s-card output-panel output-empty reveal show" id="generatedOutputPlaceholder">
           <div class="output-placeholder">
-            <svg viewBox="0 0 24 24"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
             {{ __('ui.dashboard.instant_preview') }}
           </div>
         </div>
@@ -3015,7 +3345,6 @@
     </div>
   </main>
 
-  @include('components.footer')
   @include('components.scripts')
   @php
     $dashboardI18n = [
@@ -3113,7 +3442,6 @@
     const jobsTableBody = document.getElementById('jobsTableBody');
     const usageCharsText = document.getElementById('usageCharsText');
     const usageRequestsText = document.getElementById('usageRequestsText');
-    const usageCharsMeter = document.getElementById('usageCharsMeter');
     const usageRequestsMeter = document.getElementById('usageRequestsMeter');
     const kpiRequests = document.getElementById('kpiRequests');
     const kpiChars = document.getElementById('kpiChars');
@@ -3633,6 +3961,15 @@
       const remaining = Number(box.dataset.remaining || 0);
       const cost = estimateCreditsFor(input ? input.value : '');
       const after = remaining - cost;
+      const estimateEl = document.getElementById('audioEstimate');
+      if (estimateEl) {
+        // 15 credits buy a second of audio (900 a minute).
+        const seconds = Math.round(cost / ({{ \App\Support\Credits::PER_MINUTE }} / 60));
+        estimateEl.textContent = cost <= 0 ? '' : formatQuotaText(@json(__('ui.dashboard.estimate_line')), {
+          duration: Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'),
+          credits: formatNumber(cost),
+        });
+      }
       box.classList.toggle('is-spending', cost > 0 && after >= 0);
       box.classList.toggle('is-short', cost > 0 && after < 0);
       labelEl.textContent = cost <= 0
@@ -3682,14 +4019,20 @@
         creditLive.dataset.remaining = String(usage.remaining_chars);
         refreshCreditLive();
       }
-      if (usageCharsMeter) usageCharsMeter.style.width = meterWidthFromUsedPercent(usage.chars_percent);
       const creditsLeftEl = document.getElementById('usageCreditsLeft');
       if (creditsLeftEl && usage.remaining_chars !== undefined) creditsLeftEl.textContent = formatNumber(usage.remaining_chars);
+      const minutesLeftEl = document.getElementById('usageMinutesLeft');
+      if (minutesLeftEl && usage.remaining_chars !== undefined) {
+        minutesLeftEl.textContent = formatNumber(Math.floor(Math.max(0, Number(usage.remaining_chars) || 0) / {{ \App\Support\Credits::PER_MINUTE }}));
+      }
       const ring = document.getElementById('usageCreditsRing');
       const ringPercent = document.getElementById('usageCreditsPercent');
       if (ring && usage.chars_percent !== undefined) {
-        const p = Math.max(0, Math.min(100, Number(usage.chars_percent) || 0));
+        const p = Math.max(0, Math.min(100, Math.round(Number(usage.chars_percent) || 0)));
         ring.style.setProperty('--p', p);
+        ring.classList.toggle('is-high', p >= 80 && p < 95);
+        ring.classList.toggle('is-low', p >= 95);
+        ring.setAttribute('aria-label', formatQuotaText(@json(__('ui.dashboard.credits_used_percent')), { percent: p }));
         if (ringPercent) ringPercent.textContent = p + '%';
       }
       if (usageRequestsMeter) usageRequestsMeter.style.width = meterWidthFromUsedPercent(usage.requests_percent);
@@ -4091,11 +4434,8 @@
         if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
         wasSuccessful = true;
         if (data?.job?.audio_url) {
+          // The player docks at the bottom of the screen: no jump away from the text.
           showGeneratedPreview(data.job);
-          // Scroll smoothly to the generated audio section
-          if (generatedAudioWrap) {
-            generatedAudioWrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          }
         }
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
@@ -4205,6 +4545,45 @@
     });
     targetLanguage?.addEventListener('change', function () { dialogueMode?.refresh(); });
 
+    // One column: the chosen voice above the text; a tap scrolls to the library.
+    (function () {
+      const jump = document.getElementById('voiceJump');
+      const select = document.getElementById('voice_key');
+      const nameEl = document.getElementById('voiceJumpName');
+      const faceEl = document.getElementById('voiceJumpFace');
+      if (!jump || !select || !nameEl || !faceEl) return;
+      let voices = {};
+      try {
+        voices = (JSON.parse(document.querySelector('#generateVoiceSection [data-vs-meta]')?.textContent || '{}') || {}).voices || {};
+      } catch (e) { /* the button still names the voice */ }
+      function refresh() {
+        const option = select.options[select.selectedIndex];
+        if (!option || !option.value) { jump.hidden = true; return; }
+        const label = String(option.textContent || '').trim();
+        const avatar = String((voices[option.value] || {}).a || option.dataset.avatar || '');
+        nameEl.textContent = label;
+        faceEl.textContent = '';
+        if (avatar) {
+          const img = document.createElement('img');
+          img.src = avatar;
+          img.alt = '';
+          img.width = 40;
+          img.height = 40;
+          faceEl.appendChild(img);
+        } else {
+          faceEl.textContent = label.charAt(0).toUpperCase();
+        }
+        jump.hidden = false;
+      }
+      select.addEventListener('change', refresh);
+      new MutationObserver(refresh).observe(select, { childList: true });
+      refresh();
+      jump.addEventListener('click', function () {
+        const panel = document.querySelector('#generateVoiceSection .vs-panel');
+        panel?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      });
+    })();
+
     // Live character counter
     function updateCharCounter() {
       if (!contentInput || !charCountEl || !charCounter) return;
@@ -4230,7 +4609,7 @@
       const savedSectionId = String(window.localStorage?.getItem('dashboard_active_section') || '');
       const initialSectionId = validDashboardSectionIds.includes(hashSectionId)
         ? hashSectionId
-        : (validDashboardSectionIds.includes(savedSectionId) ? savedSectionId : (validDashboardSectionIds[0] || 'overviewSection'));
+        : (validDashboardSectionIds.includes(savedSectionId) ? savedSectionId : @json($dashboardStartSection));
 
       if (initialSectionId) {
         setActiveDashboardSection(initialSectionId);
@@ -4257,6 +4636,15 @@
 
     window.addEventListener('hashchange', function() {
       syncSectionFromHash(true);
+    });
+    document.querySelectorAll('[data-dashboard-go]').forEach(function(link) {
+      link.addEventListener('click', function(event) {
+        const menuLink = document.querySelector('.dashboard-menu-link[href="#' + link.getAttribute('data-dashboard-go') + '"]');
+        if (!menuLink) return;
+        event.preventDefault();
+        menuLink.click();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
     });
 
     (function openRequestedClonedVoice() {

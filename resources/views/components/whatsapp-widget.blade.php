@@ -4,7 +4,7 @@
   $whatsappNumber = \App\Models\SiteSetting::get('whatsapp_number', '201553212603');
   $whatsappMessage = $isAr
     ? 'مرحباً، أريد الاستفسار عن خدمات منصة إسمع'
-    : 'Hello, I would like to ask about Listen Studio services';
+    : 'Hello, I would like to ask about Listen';
   $whatsappUrl = 'https://wa.me/' . $whatsappNumber . '?text=' . urlencode($whatsappMessage);
 @endphp
 
@@ -33,7 +33,7 @@
           </div>
           <div class="wa-panel-info">
             <h3 class="wa-panel-heading">{{ $isAr ? 'تواصل معنا' : 'Contact Us' }}</h3>
-            <span class="wa-panel-brand">{{ $isAr ? 'منصة إسمع' : 'Listen Studio' }}</span>
+            <span class="wa-panel-brand">{{ $isAr ? 'منصة إسمع' : 'Listen' }}</span>
           </div>
         </div>
         <button id="waPanelClose" class="wa-panel-close" type="button" aria-label="{{ $isAr ? 'إغلاق' : 'Close' }}">
@@ -43,7 +43,7 @@
 
       {{-- Body --}}
       <div class="wa-panel-body">
-        <p class="wa-panel-text">{{ $isAr ? 'فريق منصة إسمع جاهز لمساعدتك عبر واتساب' : 'The Listen Studio team is ready to help you on WhatsApp' }}</p>
+        <p class="wa-panel-text">{{ $isAr ? 'فريق منصة إسمع جاهز لمساعدتك عبر واتساب' : 'The Listen team is ready to help you on WhatsApp' }}</p>
       </div>
 
       {{-- CTA --}}
@@ -332,29 +332,30 @@ html[data-theme="light"] .wa-panel {
 
 /* ===== RESPONSIVE ===== */
 @media (max-width: 640px) {
+  /* Smaller and tucked into the corner, so it covers less of the page. */
   .wa-widget {
-    bottom: 1rem;
-    right: 1rem;
+    bottom: .85rem;
+    right: .85rem;
   }
 
   html[dir="rtl"] .wa-widget {
     right: auto;
-    left: 1rem;
+    left: .85rem;
   }
 
   .wa-fab {
-    width: 52px;
-    height: 52px;
+    width: 46px;
+    height: 46px;
   }
 
   .wa-fab-icon {
-    width: 26px;
-    height: 26px;
+    width: 24px;
+    height: 24px;
   }
 
   .wa-panel {
     position: fixed;
-    bottom: calc(52px + 1rem + 0.75rem);
+    bottom: calc(46px + .85rem + 0.75rem);
     right: 1rem;
     left: 1rem;
     width: auto;

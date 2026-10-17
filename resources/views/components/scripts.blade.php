@@ -337,7 +337,7 @@
       playBtn.className = 'custom-audio-play';
       playBtn.type = 'button';
       playBtn.setAttribute('aria-label', i18n.audio_play || 'Play');
-      playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+      playBtn.innerHTML = '<svg viewBox="0 0 24 24"><path d="M7.5 5v14l11-7z"/></svg>';
       var allowDownload = audio.dataset.downloadDisabled !== '1' && audio.dataset.downloadAllowed !== '0';
 
       var currTime = document.createElement('span');
@@ -496,7 +496,7 @@
         updateDuration();
         updateProgress();
       });
-      var playIconMarkup = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
+      var playIconMarkup = '<svg viewBox="0 0 24 24"><path d="M7.5 5v14l11-7z"/></svg>';
       var pauseIconMarkup = '<svg viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>';
       var setPlayButtonState = function(isPlaying) {
         playBtn.classList.toggle('playing', !!isPlaying);
@@ -902,4 +902,7 @@
   }
 })();
 </script>
+{{-- In the dashboard, help sits in the sidebar instead of a button over the studio. --}}
+@unless(request()->routeIs('dashboard'))
 @include('components.whatsapp-widget')
+@endunless

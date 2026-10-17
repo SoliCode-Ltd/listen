@@ -55,10 +55,13 @@ class DashboardUsageMeterTest extends TestCase
         $response->assertDontSee('id="headerCreditBalance"', false);
         $response->assertSee('id="creditLiveValue">480,000</strong>', false);
         $response->assertSee('data-remaining="480000"', false);
-        // 500,000 credits at 900 a minute = 555 voice minutes; none used yet.
-        $response->assertSee('0.0 of 555 voice minutes used', false);
+        // One meter, in minutes: 480,000 credits left at 900 a minute = 533 of 555 minutes.
+        $response->assertSee('id="usageMinutesLeft">533</strong>', false);
+        $response->assertSee('of 555 minutes', false);
         $response->assertSee('72 / 100 requests remaining', false);
-        $response->assertSee('id="usageCharsMeter" style="width:96%"', false);
+        // The ring: 20,000 of 500,000 credits used this month.
+        $response->assertSee('id="usageCreditsRing" style="--p: 4"', false);
+        $response->assertSee('id="usageCreditsPercent">4%</b>', false);
         $response->assertSee('id="usageRequestsMeter" style="width:72%"', false);
     }
 }

@@ -56,7 +56,7 @@ class FooterSocialSettingsTest extends TestCase
             ->assertDontSee('aria-label="Facebook"', false);
     }
 
-    public function test_footer_social_links_fallback_to_default_icons_when_no_urls_are_set(): void
+    public function test_no_social_icons_show_until_an_account_is_set(): void
     {
         SiteSetting::set('footer_social_enabled', '1', 'general');
         SiteSetting::set('footer_social_twitter_url', '', 'general');
@@ -64,12 +64,12 @@ class FooterSocialSettingsTest extends TestCase
         SiteSetting::set('footer_social_github_url', '', 'general');
         SiteSetting::set('footer_social_linkedin_url', '', 'general');
 
+        // An icon that goes nowhere looks unfinished.
         $this->getLocalizedRoute('home')
             ->assertOk()
-            ->assertSee('aria-label="Twitter"', false)
-            ->assertSee('aria-label="Facebook"', false)
-            ->assertSee('aria-label="GitHub"', false)
-            ->assertSee('aria-label="LinkedIn"', false)
-            ->assertSee('href="#"', false);
+            ->assertDontSee('aria-label="Twitter"', false)
+            ->assertDontSee('aria-label="Facebook"', false)
+            ->assertDontSee('aria-label="GitHub"', false)
+            ->assertDontSee('aria-label="LinkedIn"', false);
     }
 }

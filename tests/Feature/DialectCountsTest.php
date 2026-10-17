@@ -34,7 +34,7 @@ class DialectCountsTest extends TestCase
     public function test_every_number_written_in_the_language_files_matches_the_catalogs(): void
     {
         $arabic = [
-            '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|Dialects)/u',
+            '/more than (\d+) (?:Arabic|regional)/u', '/(\d+)\+ (?:Arabic|[Dd]ialects)/u',
             '/أكثر من (\d+) (?:لكنة|لهجة) (?:عربية|محلية)/u', '/\x{2066}\+(\d+)\x{2069} لهجة/u',
         ];
         $english = ['/more than (\d+) English/u', '/(\d+)\+ English/u', '/(\d+) لكنة إنجليزية/u', '/بأكثر من (\d+) لكنة:/u'];

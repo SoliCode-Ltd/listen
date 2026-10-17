@@ -20,6 +20,8 @@
   --brand-hover: #5B3DF5;
   --brand-active: #4C2DEB;
   --brand-subtle: #A99CFF;
+  /* Violet for small text: readable on every background (WCAG AA). */
+  --accent-text: #9580FF;
   --brand-accent-glow: rgba(118, 89, 250, 0.4);
   --ok: #32c58d;
   --danger: #ee4a77;
@@ -35,7 +37,9 @@ html[data-theme="light"] {
   --surface2: #F5F6FB;
   --line: #E6E8F0;
   --text: #0F172A;
-  --muted: #6B7280;
+  /* Grey text stays readable on the light grey cards too. */
+  --muted: #5F6673;
+  --accent-text: #6247EE;
   --shadow: 0 4px 12px rgba(0,0,0,.06);
   --shadow-sm: 0 2px 6px rgba(0,0,0,.04);
   --a: #7659FA;
@@ -318,8 +322,13 @@ html[data-theme="light"] .site-logo.logo-light {
 }
 
 .btn:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 3px;
 }
 
 .btn-primary {
@@ -1352,7 +1361,8 @@ form:has(button.mobile-nav-link) {
   width: 15px;
   height: 15px;
   fill: currentColor;
-  margin-left: 2px;
+  /* Centred by the icon's own drawing, so play and pause both sit in the middle. */
+  margin-left: 0;
   transition: transform 0.2s ease;
 }
 .custom-audio-play.playing svg {
@@ -1543,7 +1553,7 @@ html[dir="rtl"] .user-dropdown {
 }
 
 html[dir="rtl"] .custom-audio-play svg {
-  margin-left: 2px;
+  margin-left: 0;
   margin-right: 0;
 }
 

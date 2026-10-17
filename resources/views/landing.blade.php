@@ -1,5 +1,7 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.home_title'), 'page' => 'home'])
-  @php($voiceShowcaseCss = public_path('css/voice-showcase.css'))
+  @php
+    $voiceShowcaseCss = public_path('css/voice-showcase.css');
+  @endphp
   <link rel="stylesheet" href="{{ asset('css/voice-showcase.css') }}?v={{ is_file($voiceShowcaseCss) ? filemtime($voiceShowcaseCss) : '1' }}">
   <style>
     .bg-orb {
@@ -20,12 +22,12 @@
     }
 
     :root {
-      --landing-section-space: 3rem;
-      --landing-section-space-mobile: 2rem;
+      --landing-section-space: 4.5rem;
+      --landing-section-space-mobile: 2.5rem;
     }
 
     .hero {
-      padding: var(--landing-section-space) 0;
+      padding: 4rem 0 2.5rem;
     }
     .hero-grid {
       display: grid;
@@ -103,25 +105,30 @@
       padding: var(--landing-section-space) 0;
     }
     .section h2 {
-      margin: 0 0 .5rem;
-      font-size: clamp(1.6rem, 3.5vw, 2.4rem);
+      margin: 0 0 .65rem;
+      font-size: clamp(1.6rem, 3.2vw, 2.3rem);
+      letter-spacing: -.02em;
       text-align: center;
+      text-wrap: balance;
+    }
+    html[dir="rtl"] .section h2 {
+      letter-spacing: 0;
     }
     .section .section-lead {
-      margin: 0 0 2rem;
+      margin: 0 auto 2.25rem;
+      max-width: 60ch;
       color: var(--muted);
       font-size: 1.05rem;
+      line-height: 1.65;
       text-align: center;
-      margin-left: auto;
-      margin-right: auto;
+      text-wrap: pretty;
     }
 
     /* ─── Listen Anywhere Section ─── */
     .apps-shell {
       position: relative;
       overflow: hidden;
-      padding: clamp(2rem, 3vw, 3rem);
-
+      padding: 0;
     }
     .apps-shell::after {
       content: "";
@@ -219,8 +226,7 @@
       display: none;
     }
     .app-card:hover {
-      transform: translateY(-5px) scale(1.005);
-      border-color: var(--line);
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
       box-shadow: var(--shadow);
     }
     .app-card-head {
@@ -239,11 +245,19 @@
       flex-shrink: 0;
       box-shadow: 0 4px 10px rgba(0,0,0,.08);
     }
+    .app-icon {
+      color: var(--accent-text);
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      border-color: color-mix(in oklab, var(--a) 22%, var(--line));
+      box-shadow: none;
+    }
     .app-icon svg {
-      width: 1.15rem;
-      height: 1.15rem;
-      stroke: var(--text);
+      width: 1.25rem;
+      height: 1.25rem;
+      stroke: currentColor;
       stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
       fill: none;
     }
     .app-icon img {
@@ -288,65 +302,95 @@
     .app-link {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: .45rem;
-      padding: .42rem .95rem;
-      border-radius: var(--radius-full);
+      min-height: 44px;
+      padding: 0 1.25rem;
+      border-radius: var(--btn-radius);
       background: var(--brand-accent);
       color: #fff;
-      font-size: .85rem;
+      font-size: .92rem;
       font-weight: 700;
       text-decoration: none;
-      transition: opacity .2s ease, transform .2s ease;
+      transition: background-color .2s ease;
       white-space: nowrap;
     }
     .app-link:hover {
-      opacity: .88;
-      transform: scale(1.03);
+      background: var(--brand-hover);
+    }
+    .app-link:focus-visible {
+      outline: 2px solid var(--brand-accent);
+      outline-offset: 3px;
     }
 
     .premium-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 1rem;
     }
     .premium-card {
-      background: var(--surface2);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
-      padding: 1.5rem;
-      box-shadow: var(--shadow);
-      transition: transform .25s ease, border-color .25s ease;
+      padding: 1.5rem 1.35rem;
+      transition: border-color .25s ease, box-shadow .25s ease;
     }
     .premium-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--brand-accent);
+      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
+      box-shadow: var(--shadow);
+    }
+    .premium-icon {
+      width: 2.6rem;
+      height: 2.6rem;
+      border-radius: .8rem;
+      display: grid;
+      place-items: center;
+      margin-bottom: 1rem;
+      color: var(--accent-text);
+      background: color-mix(in oklab, var(--a) 10%, var(--surface));
+      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+    }
+    .premium-icon svg {
+      width: 1.25rem;
+      height: 1.25rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
     }
     .premium-card h3 {
-      margin: 0 0 .55rem;
+      margin: 0 0 .5rem;
       font-size: 1.05rem;
     }
     .premium-card p {
-      margin: 0 0 .75rem;
+      flex: 1;
+      margin: 0 0 1rem;
       color: var(--muted);
-      font-size: .95rem;
-      line-height: 1.55;
+      font-size: .93rem;
+      line-height: 1.6;
     }
     .premium-metric {
-      display: inline-block;
-      padding: .35rem .7rem;
-      border-radius: var(--radius-full);
-      border: 1px solid var(--line);
-      font-size: .9rem;
-      color: var(--muted);
+      align-self: flex-start;
+      font-size: .82rem;
+      font-weight: 700;
+      color: var(--accent-text);
     }
 
     .cta-section {
       text-align: center;
-      padding: 3rem;
-      background: var(--surface2);
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      padding: clamp(2.25rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem);
+      background:
+        radial-gradient(120% 140% at 50% 0%, color-mix(in oklab, var(--a) 14%, transparent), transparent 60%),
+        var(--surface);
+      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      border-radius: 1.25rem;
       margin: 0;
+    }
+    .cta-section h2 {
+      text-wrap: balance;
     }
     .cta-section h2 {
       margin: 0 0 .65rem;
@@ -354,6 +398,142 @@
     .cta-section p {
       color: var(--muted);
       margin: 0 0 1.25rem;
+    }
+
+    .hero-listen {
+      display: inline-flex;
+      align-items: center;
+      gap: .6rem;
+      margin-top: 1.35rem;
+      min-height: 44px;
+      padding: .35rem .9rem .35rem .4rem;
+      border: 0;
+      border-radius: var(--radius-full);
+      background: transparent;
+      color: var(--text);
+      font: inherit;
+      font-size: .95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color .2s ease;
+    }
+    html[dir="rtl"] .hero-listen {
+      padding: .35rem .4rem .35rem .9rem;
+    }
+    .hero-listen:hover {
+      background: color-mix(in oklab, var(--a) 9%, transparent);
+    }
+    .hero-listen:focus-visible {
+      outline: 2px solid var(--brand-accent);
+      outline-offset: 2px;
+    }
+    .hero-listen-icon {
+      width: 2.25rem;
+      height: 2.25rem;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      color: #fff;
+      background: var(--brand-accent);
+      box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 35%, transparent);
+    }
+    .hero-listen-icon svg {
+      width: .95rem;
+      height: .95rem;
+      fill: currentColor;
+    }
+    html[dir="rtl"] .hero-listen-play {
+      transform: scaleX(-1);
+    }
+    .hero-listen-stop,
+    .hero-listen-bars {
+      display: none;
+    }
+    .hero-listen[aria-pressed="true"] .hero-listen-play {
+      display: none;
+    }
+    .hero-listen[aria-pressed="true"] .hero-listen-stop {
+      display: block;
+    }
+    .hero-listen[aria-pressed="true"] .hero-listen-bars {
+      display: inline-flex;
+    }
+    .hero-listen-bars {
+      align-items: flex-end;
+      gap: 2px;
+      height: 14px;
+      color: var(--accent-text);
+    }
+    .hero-listen-bars i {
+      width: 3px;
+      height: 100%;
+      border-radius: 2px;
+      background: currentColor;
+      animation: heroBars .9s ease-in-out infinite;
+    }
+    .hero-listen-bars i:nth-child(2) { animation-delay: .15s; }
+    .hero-listen-bars i:nth-child(3) { animation-delay: .3s; }
+    .hero-listen-bars i:nth-child(4) { animation-delay: .45s; }
+    @keyframes heroBars {
+      0%, 100% { transform: scaleY(.35); }
+      50% { transform: scaleY(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .hero-listen-bars i { animation: none; }
+    }
+
+    /* What Listen has, in real numbers. */
+    .facts {
+      padding: .5rem 0 2rem;
+    }
+    .facts-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      margin: 0;
+      border: 1px solid var(--line);
+      border-radius: 1.25rem;
+      background: var(--surface);
+      overflow: hidden;
+    }
+    .fact {
+      display: flex;
+      flex-direction: column-reverse;
+      justify-content: flex-end;
+      gap: .25rem;
+      padding: 1.35rem 1.5rem;
+    }
+    .fact + .fact {
+      border-inline-start: 1px solid var(--line);
+    }
+    .fact dt {
+      color: var(--muted);
+      font-size: .92rem;
+      font-weight: 500;
+    }
+    .fact dd {
+      margin: 0;
+      font-size: clamp(1.6rem, 3vw, 2.1rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -.02em;
+      font-variant-numeric: tabular-nums;
+    }
+    html[dir="rtl"] .fact dd {
+      text-align: right;
+    }
+    @media (max-width: 760px) {
+      .facts-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .fact {
+        padding: 1.1rem 1.15rem;
+      }
+      .fact:nth-child(3) {
+        border-inline-start: 0;
+      }
+      .fact:nth-child(n + 3) {
+        border-top: 1px solid var(--line);
+      }
     }
 
     .reveal {
@@ -374,9 +554,11 @@
     @media (max-width: 960px) {
       .hero-grid,
       .apps-intro,
-      .apps-grid,
-      .premium-grid {
+      .apps-grid {
         grid-template-columns: 1fr;
+      }
+      .premium-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
       }
       .hero {
         padding: var(--landing-section-space-mobile) 0;
@@ -418,8 +600,11 @@
     }
 
     @media (max-width: 640px) {
+      .premium-grid {
+        grid-template-columns: 1fr;
+      }
       .hero {
-        padding: var(--landing-section-space-mobile) 0;
+        padding: 2rem 0 1.5rem;
       }
       .hero-cta {
         flex-direction: column;
@@ -431,109 +616,114 @@
       }
     }
 
-    .hero:has(+ .clone-announce) {
-      padding-bottom: 1.75rem;
-    }
+    /* Voice cloning: one slim line under the hero. */
     .clone-announce {
-      padding: 0;
-    }
-    .clone-announce + .section {
-      padding-top: 4.25rem;
+      padding: 0 0 .5rem;
     }
     .clone-announce-card {
       display: flex;
       align-items: center;
-      gap: 1.25rem;
-      padding: 1.15rem 1.35rem;
-      border-radius: 1.25rem;
-      border: 1px solid color-mix(in oklab, var(--a) 34%, var(--line));
-      background:
-        radial-gradient(90% 140% at 0% 0%, color-mix(in oklab, var(--a) 16%, transparent), transparent 58%),
-        var(--surface);
-      box-shadow: 0 18px 40px color-mix(in oklab, var(--a) 12%, transparent);
+      gap: 1rem;
+      padding: .85rem 1rem .85rem .85rem;
+      border-radius: 1rem;
+      border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line));
+      background: color-mix(in oklab, var(--a) 6%, var(--surface));
     }
     html[dir="rtl"] .clone-announce-card {
-      background:
-        radial-gradient(90% 140% at 100% 0%, color-mix(in oklab, var(--a) 16%, transparent), transparent 58%),
-        var(--surface);
+      padding: .85rem .85rem .85rem 1rem;
     }
     .clone-announce-mark {
-      width: 3.5rem;
-      height: 3.5rem;
+      width: 2.5rem;
+      height: 2.5rem;
       flex: none;
-      border-radius: 1rem;
+      border-radius: .75rem;
       display: grid;
       place-items: center;
-      color: var(--a);
-      background: color-mix(in oklab, var(--a) 14%, var(--surface2));
-      border: 1px solid color-mix(in oklab, var(--a) 28%, transparent);
+      color: #fff;
+      background: var(--brand-accent);
     }
     .clone-announce-wave {
-      width: 2.05rem;
-      height: 2.05rem;
+      width: 1.3rem;
+      height: 1.3rem;
       display: block;
     }
     .clone-announce-copy {
       flex: 1;
       min-width: 0;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
-      gap: .2rem;
+      flex-wrap: wrap;
+      align-items: baseline;
+      column-gap: .55rem;
+      row-gap: .1rem;
     }
     .clone-announce-copy h2 {
       margin: 0;
       text-align: start;
-      font-size: clamp(1.2rem, 2vw, 1.55rem);
-      line-height: 1.35;
-      letter-spacing: -.02em;
-    }
-    html[dir="rtl"] .clone-announce-copy h2 {
-      letter-spacing: 0;
+      font-size: 1rem;
+      font-weight: 700;
       line-height: 1.5;
-      font-size: clamp(1.25rem, 2vw, 1.6rem);
+      letter-spacing: 0;
     }
     .clone-announce-copy p {
       margin: 0;
       color: var(--muted);
-      font-size: 1rem;
-      line-height: 1.6;
-      max-width: 46ch;
+      font-size: .95rem;
+      line-height: 1.5;
     }
-    html[dir="rtl"] .clone-announce-copy p {
-      font-size: 1.02rem;
-      line-height: 1.75;
-    }
-    .clone-announce-card .btn {
+    .clone-announce-link {
       flex: none;
-      min-height: 48px;
-      margin-inline-start: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      min-height: 44px;
+      padding: 0 1rem;
+      border-radius: var(--btn-radius);
+      color: var(--accent-text);
+      font-weight: 700;
+      font-size: .92rem;
+      text-decoration: none;
       white-space: nowrap;
-      padding-inline: 1.45rem;
+      transition: background-color .2s ease;
     }
-    .clone-announce-card .btn:focus-visible {
-      outline: 2px solid var(--text);
-      outline-offset: 3px;
+    .clone-announce-link:hover {
+      background: color-mix(in oklab, var(--a) 10%, transparent);
+    }
+    .clone-announce-link:focus-visible {
+      outline: 2px solid var(--brand-accent);
+      outline-offset: 2px;
+    }
+    .clone-announce-link svg {
+      width: 1rem;
+      height: 1rem;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2.2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    html[dir="rtl"] .clone-announce-link svg {
+      transform: scaleX(-1);
     }
     @media (max-width: 760px) {
-      .hero:has(+ .clone-announce) {
-        padding-bottom: 1.25rem;
-      }
-      .clone-announce + .section {
-        padding-top: 2.75rem;
-      }
       .clone-announce-card {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        gap: .85rem 1rem;
-        padding: 1.05rem 1rem 1rem;
+        align-items: start;
+        gap: .2rem .85rem;
       }
-      .clone-announce-card .btn {
-        grid-column: 1 / -1;
-        width: 100%;
-        margin-inline-start: 0;
+      .clone-announce-copy {
+        display: block;
+      }
+      .clone-announce-link {
+        grid-column: 2;
+        justify-self: start;
+        min-height: 40px;
+        padding: 0;
         margin-top: .15rem;
+      }
+      .clone-announce-link:hover {
+        background: none;
+        text-decoration: underline;
       }
     }
 
@@ -578,8 +768,7 @@
       .hero-art {
         justify-content: center;
       }
-      .apps-grid,
-      .premium-grid {
+      .apps-grid {
         grid-template-columns: 1fr;
       }
       .apps-intro {
@@ -598,6 +787,11 @@
     @media (max-width: 640px) {
       .hero-art {
         padding-inline: .5rem;
+      }
+      /* On phones the voice circle sits under the buttons: smaller, so the
+         page reaches the voices sooner. */
+      .hero-art .vs-art {
+        max-width: min(330px, 86vw);
       }
       .bg-orb {
         animation: none;
@@ -621,7 +815,6 @@
     <section class="hero">
       <div class="hero-grid">
         <div class="reveal">
-          <!-- <span class="eyebrow">Enterprise Voice Platform</span> -->
           <h1>{{ __('ui.landing.hero_title_before') }} <span class="brand-text">{{ __('ui.landing.hero_title_highlight') }}</span> {{ __('ui.landing.hero_title_after') }}</h1>
           <p class="lead">{{ __('ui.landing.hero_subtitle') }}</p>
           <div class="hero-cta">
@@ -641,6 +834,15 @@
               @endif
             @endguest
           </div>
+          {{-- The voices on the right play when pressed; this says so, and plays them all. --}}
+          <button type="button" class="hero-listen" data-hero-listen aria-pressed="false">
+            <span class="hero-listen-icon" aria-hidden="true">
+              <svg class="hero-listen-play" viewBox="0 0 24 24"><path d="M6.4 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L7.92 4.29A1 1 0 0 0 6.4 5.14z"/></svg>
+              <svg class="hero-listen-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>
+            </span>
+            <span>{{ __('ui.landing.hero_listen') }}</span>
+            <span class="hero-listen-bars" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+          </button>
         </div>
 
         <aside class="hero-art reveal">
@@ -649,9 +851,34 @@
       </div>
     </section>
 
-    <section class="clone-announce" aria-labelledby="cloneAnnounceTitle">
+    @php
+      // Real counts, rounded down to the ten so each claim stays true as more are added.
+      $factPlaces = (int) (floor(count(array_filter(\App\Support\AudioEffects::ALL, fn ($row) => $row[1] !== 'clean')) / 10) * 10);
+      $facts = [
+        ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects')],
+        ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents')],
+        ['value' => $factPlaces, 'label' => __('ui.landing.fact_places')],
+        ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles')],
+      ];
+    @endphp
+    <section class="facts reveal" aria-label="{{ __('ui.landing.facts_label') }}">
+      <dl class="facts-grid">
+        @foreach($facts as $fact)
+          @if($fact['value'] > 0)
+            <div class="fact">
+              <dt>{{ $fact['label'] }}</dt>
+              {{-- "140+" in English, "+140" in Arabic, as the rest of the copy writes it. --}}
+              <dd><bdi dir="ltr">{{ app()->getLocale() === 'ar' ? '+'.$fact['value'] : $fact['value'].'+' }}</bdi></dd>
+            </div>
+          @endif
+        @endforeach
+      </dl>
+    </section>
+
+    {{-- Voice cloning, announced in one slim line under the hero. --}}
+    <section class="clone-announce reveal" aria-labelledby="cloneAnnounceTitle">
       <div class="clone-announce-card">
-        <div class="clone-announce-mark" aria-hidden="true">
+        <span class="clone-announce-mark" aria-hidden="true">
           <svg class="clone-announce-wave" viewBox="0 0 128 128" fill="currentColor">
             <rect x="8" y="59" width="10" height="10" rx="5"/>
             <rect x="26" y="42" width="10" height="44" rx="5"/>
@@ -661,12 +888,15 @@
             <rect x="98" y="42" width="10" height="44" rx="5"/>
             <rect x="116" y="59" width="10" height="10" rx="5"/>
           </svg>
-        </div>
+        </span>
         <div class="clone-announce-copy">
           <h2 id="cloneAnnounceTitle">{{ __('ui.landing.clone_announce_title') }}</h2>
           <p>{{ __('ui.landing.clone_announce_body') }}</p>
         </div>
-        <a class="btn btn-primary" href="{{ route('pricing') }}">{{ __('ui.landing.clone_announce_cta') }}</a>
+        <a class="clone-announce-link" href="{{ route('pricing') }}">
+          {{ __('ui.landing.clone_announce_cta') }}
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
       </div>
     </section>
 
@@ -692,13 +922,8 @@
         <div class="apps-grid">
           <article class="app-card reveal">
             <div class="app-card-head">
-              <div class="app-icon" aria-hidden="true" style="filter: grayscale(100%) contrast(1.2) brightness(1.2);">
-                <svg viewBox="0 0 24 24">
-                  <circle cx="12" cy="12" r="8.5"></circle>
-                  <path d="M3.5 12h17"></path>
-                  <path d="M12 3.5a14 14 0 0 1 0 17"></path>
-                  <path d="M12 3.5a14 14 0 0 0 0 17"></path>
-                </svg>
+              <div class="app-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4M7.5 12.5v-3M10.5 13.5v-5M13.5 13.5v-5M16.5 12.5v-3"/></svg>
               </div>
               <h3>{{ __('ui.landing.section1_card1_title') }}</h3>
             </div>
@@ -713,14 +938,8 @@
           </article>
           <article class="app-card reveal">
             <div class="app-card-head">
-              <div class="app-icon" aria-hidden="true" style="filter: grayscale(100%) contrast(1.2) brightness(1.2);">
-                <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <circle cx="12" cy="12" r="4"></circle>
-                  <line x1="21.17" y1="8" x2="12" y2="8"></line>
-                  <line x1="3.95" y1="6.06" x2="8.54" y2="14"></line>
-                  <line x1="10.88" y1="21.94" x2="15.46" y2="14"></line>
-                </svg>
+              <div class="app-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24"><path d="M10 3.5a2 2 0 0 1 4 0V5h3.5A1.5 1.5 0 0 1 19 6.5V10h-1.5a2 2 0 0 0 0 4H19v3.5a1.5 1.5 0 0 1-1.5 1.5H14v-1.5a2 2 0 0 0-4 0V19H6.5A1.5 1.5 0 0 1 5 17.5V14h1.5a2 2 0 0 0 0-4H5V6.5A1.5 1.5 0 0 1 6.5 5H10z"/></svg>
               </div>
               <h3>{{ __('ui.landing.section1_card2_title') }}</h3>
             </div>
@@ -738,21 +957,25 @@
       <p class="section-lead">{{ __('ui.landing.section2_subtitle') }}</p>
       <div class="premium-grid">
         <article class="premium-card reveal">
+          <span class="premium-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></span>
           <h3>{{ __('ui.landing.section2_card1_title') }}</h3>
           <p>{{ __('ui.landing.section2_card1_body') }}</p>
           <span class="premium-metric">{{ __('ui.landing.section2_card1_metric') }}</span>
         </article>
         <article class="premium-card reveal">
+          <span class="premium-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H12L11 22l8.5-11.5H12z"/></svg></span>
           <h3>{{ __('ui.landing.section2_card2_title') }}</h3>
           <p>{{ __('ui.landing.section2_card2_body') }}</p>
           <span class="premium-metric">{{ __('ui.landing.section2_card2_metric') }}</span>
         </article>
         <article class="premium-card reveal">
+          <span class="premium-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg></span>
           <h3>{{ __('ui.landing.section2_card3_title') }}</h3>
           <p>{{ __('ui.landing.section2_card3_body') }}</p>
           <span class="premium-metric">{{ __('ui.landing.section2_card3_metric') }}</span>
         </article>
         <article class="premium-card reveal">
+          <span class="premium-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 8h18M7 6h.01M10 6h.01"/></svg></span>
           <h3>{{ __('ui.landing.section2_card4_title') }}</h3>
           <p>{{ __('ui.landing.section2_card4_body') }}</p>
           <span class="premium-metric">{{ __('ui.landing.section2_card4_metric') }}</span>
@@ -776,5 +999,22 @@
   @include('components.footer')
   @include('components.scripts')
   @include('components.voice-player-script')
+  <script>
+    // "Hear the voices" plays the hero conversation, and shows when it is playing.
+    (function () {
+      var button = document.querySelector('[data-hero-listen]');
+      var mark = document.querySelector('[data-vs-play-all]');
+      if (!button) return;
+      if (!mark) { button.hidden = true; return; }
+      var cast = mark.closest('.vs-cast');
+      button.addEventListener('click', function () { mark.click(); });
+      var sync = function () {
+        button.setAttribute('aria-pressed', cast && cast.classList.contains('is-playing-all') ? 'true' : 'false');
+      };
+      if (cast && window.MutationObserver) {
+        new MutationObserver(sync).observe(cast, { attributes: true, attributeFilter: ['class'] });
+      }
+    })();
+  </script>
 </body>
 </html>
