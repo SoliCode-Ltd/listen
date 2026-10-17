@@ -578,17 +578,31 @@
     .fa-tile:nth-child(even) { transform: translateY(7px); }
     .fa-tile.is-on { background: var(--brand-accent); border-color: transparent; color: #fff; box-shadow: 0 10px 20px -10px color-mix(in oklab, var(--a) 80%, transparent); }
     .fa-tile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .fact-art-styles { display: grid; place-items: center; }
-    .fa-moods { width: 82%; height: 56px; }
+    .fact-art-styles { display: flex; align-items: center; justify-content: center; gap: .45rem; }
+    .fa-face {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--surface);
+      border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
+      color: var(--accent-text);
+    }
+    .fa-face.is-on { width: 52px; height: 52px; background: var(--brand-accent); border-color: transparent; color: #fff; box-shadow: 0 10px 20px -10px color-mix(in oklab, var(--a) 80%, transparent); }
+    .fa-face svg { width: 36px; height: 36px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+    .fa-face.is-on svg { width: 44px; height: 44px; }
+    .fa-face .fa-fill { fill: currentColor; stroke: none; }
     @media (prefers-reduced-motion: no-preference) {
       .facts.reveal:not(.show) .fa-bubble,
       .facts.reveal:not(.show) .fa-flags img,
-      .facts.reveal:not(.show) .fa-tile { opacity: 0; }
+      .facts.reveal:not(.show) .fa-tile,
+      .facts.reveal:not(.show) .fa-face { opacity: 0; }
       .facts.show .fa-bubble { animation: faPop .5s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 90ms); }
       .facts.show .fa-flags img { animation: faSlide .45s ease-out both; animation-delay: calc(.15s + var(--i) * 60ms); }
-      .facts.show .fa-tile { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 80ms); }
-      .facts.show .fa-wave rect,
-      .facts.show .fa-moods rect { transform-box: fill-box; transform-origin: center; animation: faGrow .6s ease-out both; animation-delay: calc(.2s + var(--i) * 25ms); }
+      .facts.show .fa-tile,
+      .facts.show .fa-face { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 80ms); }
+      .facts.show .fa-wave rect { transform-box: fill-box; transform-origin: center; animation: faGrow .6s ease-out both; animation-delay: calc(.2s + var(--i) * 25ms); }
     }
     @keyframes faPop { from { opacity: 0; transform: scale(.7); } }
     @keyframes faSlide { from { opacity: 0; transform: translateX(-10px); } }
@@ -614,14 +628,18 @@
       .fact-art { height: 80px; }
       .fa-tile { width: 36px; height: 36px; border-radius: 10px; }
       .fa-tile svg { width: 21px; height: 21px; }
-      .fact-art-places { gap: .35rem; }
+      .fact-art-places, .fact-art-styles { gap: .35rem; }
       .fa-flags img { width: 28px; height: 28px; }
+      .fa-face { width: 36px; height: 36px; }
+      .fa-face svg { width: 31px; height: 31px; }
+      .fa-face.is-on { width: 44px; height: 44px; }
+      .fa-face.is-on svg { width: 38px; height: 38px; }
     }
     /* Small phones: one flag and one place fewer, so nothing spills over. */
     @media (max-width: 420px) {
       .fa-flags img { width: 26px; height: 26px; }
       .fa-flags img + img { margin-inline-start: -8px; }
-      .fa-flags img:nth-child(6), .fa-tile:nth-child(4) { display: none; }
+      .fa-flags img:nth-child(6), .fa-tile:nth-child(4), .fa-face:nth-child(4) { display: none; }
       .fa-tile { width: 33px; height: 33px; border-radius: 9px; }
       .fa-tile svg { width: 19px; height: 19px; }
     }
@@ -794,26 +812,34 @@
     html[dir="rtl"] .clone-announce-link svg {
       transform: scaleX(-1);
     }
+    /* Phones: the mark beside the title, the sentence across the full width, then a full-width button. */
     @media (max-width: 760px) {
-      .clone-announce-card {
+      .clone-announce-card,
+      html[dir="rtl"] .clone-announce-card {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr);
-        align-items: start;
-        gap: .2rem .85rem;
+        align-items: center;
+        gap: .8rem .85rem;
+        padding: 1.15rem 1.15rem 1.2rem;
       }
       .clone-announce-copy {
-        display: block;
+        display: contents;
+      }
+      .clone-announce-copy h2 {
+        font-size: 1.05rem;
+        line-height: 1.4;
+      }
+      .clone-announce-copy p {
+        grid-column: 1 / -1;
+        font-size: .95rem;
+        line-height: 1.65;
       }
       .clone-announce-link {
-        grid-column: 2;
-        justify-self: start;
-        min-height: 40px;
-        padding: 0;
-        margin-top: .15rem;
-      }
-      .clone-announce-link:hover {
-        background: none;
-        text-decoration: underline;
+        grid-column: 1 / -1;
+        justify-content: center;
+        min-height: 46px;
+        border: 1.5px solid color-mix(in oklab, var(--a) 40%, var(--line));
+        background: var(--surface);
       }
     }
 

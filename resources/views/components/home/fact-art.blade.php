@@ -1,7 +1,7 @@
 {{--
   A small drawing above each figure in the homepage facts strip, showing what the
   number means: real dialect greetings, the countries' accents, the places a voice
-  can be heard in, and one sentence delivered in different moods. Decorative only.
+  can be heard in, and the moods a line can be delivered in. Decorative only.
 --}}
 @props(['kind'])
 <div class="fact-art fact-art-{{ $kind }}" aria-hidden="true">
@@ -32,19 +32,11 @@
       <span class="fa-tile" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M2 27 11 12l5 7 4-5 10 13z"/><path d="M22 6a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"/></svg></span>
       @break
     @case('styles')
-      {{-- The same line, calm, then excited, then whispered. --}}
-      <svg class="fa-moods" viewBox="0 0 180 56" preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="factMoodGradient" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stop-color="#A28FFF"/>
-            <stop offset=".5" stop-color="#7659FA"/>
-            <stop offset="1" stop-color="#5B3FE6"/>
-          </linearGradient>
-        </defs>
-        @foreach([10, 14, 12, 16, 13, 15, 11, 30, 44, 22, 50, 36, 48, 26, 40, 18, 8, 6, 9, 5, 7, 4, 6, 3] as $i => $h)
-          <rect x="{{ $i * 7.5 + 1 }}" y="{{ (56 - $h) / 2 }}" width="4" height="{{ $h }}" rx="2" fill="url(#factMoodGradient)" style="--i: {{ $i }}"/>
-        @endforeach
-      </svg>
+      {{-- One voice, four ways to deliver a line: calm, excited, surprised, serious. --}}
+      <span class="fa-face" style="--i: 0"><svg viewBox="0 0 32 32"><path d="M8.5 14q2.5 2.5 5 0M18.5 14q2.5 2.5 5 0"/><path d="M11 20.5q5 3.5 10 0"/></svg></span>
+      <span class="fa-face is-on" style="--i: 1"><svg viewBox="0 0 32 32"><path d="M8.5 14.5q2.5-3.5 5 0M18.5 14.5q2.5-3.5 5 0"/><path class="fa-fill" d="M9.5 18.5h13a6.5 6.5 0 0 1-13 0z"/></svg></span>
+      <span class="fa-face" style="--i: 2"><svg viewBox="0 0 32 32"><path d="M8.5 9.5q2.5-1.6 5 0M18.5 9.5q2.5-1.6 5 0"/><circle class="fa-fill" cx="11" cy="14" r="1.7"/><circle class="fa-fill" cx="21" cy="14" r="1.7"/><ellipse cx="16" cy="22" rx="2.6" ry="3.1"/></svg></span>
+      <span class="fa-face" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M8.5 10.5h5M18.5 10.5h5"/><circle class="fa-fill" cx="11" cy="14.5" r="1.7"/><circle class="fa-fill" cx="21" cy="14.5" r="1.7"/><path d="M12 21.5h8"/></svg></span>
       @break
   @endswitch
 </div>
