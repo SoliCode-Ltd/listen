@@ -154,7 +154,8 @@
     });
 
     window.addEventListener('resize', function() {
-      if (window.innerWidth > 960 && mobileNav.classList.contains('open')) {
+      // Same width as the header's menu-button breakpoint (styles: max-width 1180px).
+      if (window.innerWidth > 1180 && mobileNav.classList.contains('open')) {
         closeMobileMenu(false);
       }
     });

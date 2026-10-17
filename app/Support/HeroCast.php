@@ -88,6 +88,28 @@ final class HeroCast
     }
 
     /**
+     * Both casts, the page language's first, labelled in the page language:
+     * the voice samples page plays them one after another.
+     *
+     * @return array<int, array{name: string, language: string, avatar: ?string, dialect: string, dialect_label: string, flag: ?string, line: string, audio: ?string}>
+     */
+    public static function everyone(bool $arabicUi): array
+    {
+        $all = [];
+        foreach ($arabicUi ? ['ar', 'en'] : ['en', 'ar'] as $language) {
+            foreach (self::for($language) as $i => $person) {
+                $source = self::CAST[$language][$i];
+                $all[] = [
+                    'name' => $arabicUi ? ($source['name_ar'] ?? $source['name']) : $source['name'],
+                    'dialect_label' => VoiceFlag::label($source['dialect'], $arabicUi),
+                ] + $person;
+            }
+        }
+
+        return array_values(array_filter($all, fn (array $person): bool => $person['audio'] !== null));
+    }
+
+    /**
      * The cast for a page language, ready to show and play.
      *
      * @return array<int, array{name: string, language: string, avatar: ?string, dialect: string, dialect_label: string, flag: ?string, line: string, audio: ?string}>

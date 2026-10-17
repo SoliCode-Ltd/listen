@@ -1,5 +1,5 @@
 {{-- Homepage voices in the page language: avatar, dialect or accent, and a waveform player.
-     Region chips filter the cards; without a filter the first nine show until "Show all voices". --}}
+     Region chips filter the cards; without a filter the first nine show, and "Show all voices" opens the samples page. --}}
 @php
   $vsVoices = $showcaseVoices ?? [];
   $vsRegions = array_values(array_unique(array_column($vsVoices, 'region')));
@@ -24,27 +24,10 @@
   @endif
   <div class="vs-grid">
     @foreach($vsVoices as $i => $sample)
-      <article class="vs-card{{ $i >= 9 ? ' vs-more' : '' }}" data-vp-track data-src="{{ $sample['audio_url'] }}" data-region="{{ $sample['region'] }}">
-        <header class="vs-card-head">
-          <x-home.speaker-avatar :avatar="$sample['avatar']" :name="$sample['speaker']" :flag="$sample['flag']" size="lg" />
-          <span class="vs-card-id">
-            <span class="vs-card-dialect">{{ $sample['dialect_label'] }}</span>
-            <span class="vs-card-speaker">{{ $sample['speaker'] }} · {{ $sample['title'] }}</span>
-          </span>
-        </header>
-        <p class="vs-card-text" dir="{{ $sample['language'] === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $sample['language'] }}">{{ $sample['text'] }}</p>
-        <footer class="vs-card-foot">
-          <button type="button" class="vs-play" data-vp-play aria-label="{{ __('ui.landing.showcase_play') }}: {{ $sample['dialect_label'] }}, {{ $sample['title'] }}" data-label-play="{{ __('ui.landing.showcase_play') }}" data-label-pause="{{ __('ui.landing.showcase_pause') }}">
-            <svg class="vs-icon-play vs-flip" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.14v13.72a1 1 0 0 0 1.52.85l11.1-6.86a1 1 0 0 0 0-1.7L9.52 4.29A1 1 0 0 0 8 5.14z"/></svg>
-            <svg class="vs-icon-pause" width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>
-          </button>
-          <x-home.mini-wave :seed="$sample['id']" />
-        </footer>
-      </article>
+      @include('components.home.voice-card', ['sample' => $sample, 'cardClass' => $i >= 9 ? ' vs-more' : ''])
     @endforeach
   </div>
-  @if(count($vsVoices) > 9)
-    <div class="vs-more-wrap"><button type="button" class="vs-more-btn" data-vp-more>{{ __('ui.landing.showcase_more') }}</button></div>
-  @endif
+  {{-- Every voice, in both languages, is on the voice samples page. --}}
+  <div class="vs-more-wrap"><a class="vs-more-btn" href="{{ route('samples') }}#{{ app()->getLocale() === 'ar' ? 'arabic-dialects' : 'english-accents' }}">{{ __('ui.landing.showcase_more') }}</a></div>
 </section>
 @endif
