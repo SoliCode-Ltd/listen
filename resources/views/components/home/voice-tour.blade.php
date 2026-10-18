@@ -9,7 +9,7 @@
       <ul class="tour-row" data-tour>
         @foreach($voiceTour as $i => $item)
           @php $tourName = __('ui.landing.tour_'.$item['key'].'_title'); @endphp
-          <li class="tour-item{{ $i === 0 ? ' is-picked' : '' }}" data-tour-item="{{ $i }}" data-vp-track @if($item['src'] !== '') data-src="{{ $item['src'] }}" @endif>
+          <li class="tour-item{{ $i === 0 ? ' is-picked' : '' }}" data-tour-item="{{ $i }}" data-orb-host data-vp-track @if($item['src'] !== '') data-src="{{ $item['src'] }}" @endif>
             <button type="button" class="tour-pick" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}" aria-controls="tourCaption"
               @if($item['src'] !== '')
                 data-vp-play
@@ -20,7 +20,8 @@
                 aria-label="{{ $tourName }}"
               @endif
             >
-              <x-orb :name="$item['key']" class="tour-orb" />
+              {{-- The picked orb keeps flowing. --}}
+              <x-orb :name="$item['key']" @class(['tour-orb', 'is-live' => $i === 0]) />
               @if($item['src'] !== '')
                 <span class="tour-play" aria-hidden="true">
                   <svg class="tour-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
@@ -38,7 +39,7 @@
           <div class="tour-copy" data-tour-copy="{{ $i }}" @if($i !== 0) hidden @endif>
             <h3>{{ __('ui.landing.tour_'.$item['key'].'_title') }}</h3>
             <p>{{ __('ui.landing.tour_'.$item['key'].'_body') }}</p>
-            <a class="btn tour-more" href="{{ $item['more'] }}">{{ $item['key'] === 'cloning' ? __('ui.landing.tour_cloning_cta') : __('ui.landing.tour_more') }}</a>
+            <a class="btn tour-more" href="{{ $item['more'] }}">{{ __('ui.landing.tour_more') }}</a>
           </div>
         @endforeach
       </div>
@@ -59,6 +60,7 @@
         var on = el === item;
         el.classList.toggle('is-picked', on);
         el.querySelector('.tour-pick').setAttribute('aria-pressed', on ? 'true' : 'false');
+        el.querySelector('.tour-orb').classList.toggle('is-live', on);
       });
       document.querySelectorAll('[data-tour-copy]').forEach(function (el) { el.hidden = el.getAttribute('data-tour-copy') !== index; });
       // On a phone the row scrolls: bring the picked orb to the middle.

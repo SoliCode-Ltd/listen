@@ -7,9 +7,15 @@
  *   <span class="orb" data-orb="arabic" data-orb-colors="#..,#..,#..,#.."><canvas></canvas></span>
  *
  * One WebGL context draws every orb and copies each frame into the orb's own
- * canvas, so a page with many orbs stays light. An orb moves only while it is
- * hovered, focused (.is-live) or playing (inside a playing [data-vp-track]);
- * the rest keep a still frame. Without WebGL the CSS sphere stays as it is.
+ * canvas, so a page with many orbs stays light. Without WebGL the CSS sphere
+ * stays as it is; with reduced motion every orb keeps a still frame.
+ *
+ * How an orb behaves, on every page: in view, its colour drifts gently on its
+ * own (the chosen one, .is-live, a little more); hovering or focusing it or its
+ * card ([data-orb-host]) quickens and brightens it; a voice playing in its card
+ * ([data-vp-track]), on its stage or anywhere in its section ([data-orb-follow])
+ * makes it light up, flow with the voice, ripple with the loudness and breathe
+ * a halo around it.
  */
 (function () {
   'use strict';
@@ -21,7 +27,7 @@
   var VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
   var FRAG = [
     'precision highp float;',
-    'uniform vec2 uRes; uniform float uSize; uniform float uTime; uniform float uLevel; uniform float uSeed;',
+    'uniform vec2 uRes; uniform float uSize; uniform float uTime; uniform float uLevel; uniform float uSeed; uniform float uLift;',
     'uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3;',
     'float hash(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }',
     'float noise(vec3 x){',
@@ -36,10 +42,10 @@
     '  if (r > 1.0) { gl_FragColor = vec4(0.0); return; }',
     '  vec3 n = vec3(uv, sqrt(max(0.0, 1.0 - r * r)));',
     // The colour turns slowly with the sphere, in large soft fields like light inside glass.
-    '  float a = uTime * 0.1 + uSeed;',
+    '  float a = uTime * 0.16 + uSeed;',
     '  vec3 q = vec3(n.x * cos(a) - n.z * sin(a), n.y, n.x * sin(a) + n.z * cos(a));',
     '  vec3 s = q * 0.7 + uSeed;',
-    '  vec3 w = vec3(fbm(s + vec3(0.0, 0.0, uTime * 0.05)), fbm(s + vec3(5.2, 1.3, 2.8)), fbm(s + vec3(1.7, 9.2, uTime * 0.04)));',
+    '  vec3 w = vec3(fbm(s + vec3(0.0, 0.0, uTime * 0.11)), fbm(s + vec3(5.2, 1.3, 2.8 + uTime * 0.05)), fbm(s + vec3(1.7, 9.2, uTime * 0.08)));',
     '  float v = fbm(s * 0.8 + 1.7 * w);',
     // Listen's mark: rings that ripple out from the centre with the voice.
     '  float ring = sin(r * 17.0 + (w.x - 0.5) * 7.0 - uTime * 5.0);',
@@ -58,6 +64,8 @@
     '  float rim = pow(1.0 - n.z, 2.6);',
     '  col = mix(col, mix(uC2, uC3, 0.6), rim * 0.55);',
     '  col += uLevel * 0.05 * uC3;',
+    // Lit up: hovered a little, playing more, with the voice.
+    '  col = mix(col, mix(uC2, uC3, 0.7), uLift);',
     // Fine film grain, so the light reads as a surface rather than a gradient.
     '  float g = hash(vec3(floor(gl_FragCoord.xy), floor(uTime * 10.0)));',
     '  col += (g - 0.5) * 0.05;',
@@ -96,7 +104,7 @@
     var pos = gl.getAttribLocation(prog, 'p');
     gl.enableVertexAttribArray(pos);
     gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uSize', 'uTime', 'uLevel', 'uSeed', 'uC0', 'uC1', 'uC2', 'uC3'].forEach(function (k) { loc[k] = gl.getUniformLocation(prog, k); });
+    ['uRes', 'uSize', 'uTime', 'uLevel', 'uSeed', 'uLift', 'uC0', 'uC1', 'uC2', 'uC3'].forEach(function (k) { loc[k] = gl.getUniformLocation(prog, k); });
     gl.clearColor(0, 0, 0, 0);
     return true;
   }
@@ -123,6 +131,8 @@
       seed: seed / 97,
       time: 0,
       level: 0,
+      lift: 0,
+      speed: 1,
       size: 0,
       visible: false,
       hover: false,
@@ -148,6 +158,7 @@
     gl.uniform1f(loc.uTime, o.time);
     gl.uniform1f(loc.uLevel, o.level);
     gl.uniform1f(loc.uSeed, o.seed);
+    gl.uniform1f(loc.uLift, o.lift);
     gl.uniform3fv(loc.uC0, o.colors[0]);
     gl.uniform3fv(loc.uC1, o.colors[1]);
     gl.uniform3fv(loc.uC2, o.colors[2]);
@@ -165,27 +176,40 @@
   function voiceLevel(o) {
     var track = o.el.closest('[data-vp-track]');
     if (track && track.classList.contains('is-playing')) return Math.max(0, Math.min(1, track.__vpLevel || 0));
-    // The homepage conversation has its own player: a steady, breathing ripple while it plays.
-    if (o.el.closest('.is-playing-all')) return 0.3 + 0.18 * Math.abs(Math.sin(o.time * 2.2));
+    // The homepage conversation plays its own lines and keeps their loudness on its stage.
+    var cast = o.el.closest('[data-vs-cast]');
+    if (cast && cast.classList.contains('is-voicing')) return Math.max(0, Math.min(1, cast.__vpLevel || 0));
+    // A section's orb follows whichever card in the section is playing.
+    var section = o.el.closest('[data-orb-follow]');
+    var playing = section && section.querySelector('[data-vp-track].is-playing');
+    if (playing) return Math.max(0, Math.min(1, playing.__vpLevel || 0));
     return -1;
   }
-  function isLive(o) {
-    if (!o.visible) return false;
-    return o.hover || o.el.classList.contains('is-live') || voiceLevel(o) >= 0 || !!o.el.closest('.is-playing');
-  }
 
-  var frame = 0, last = 0, idle = 0;
+  var frame = 0, last = 0, idle = 0, beat = false;
   function tick(now) {
     var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
     last = now;
+    beat = !beat;
     var any = false;
     orbs.forEach(function (o) {
-      var live = isLive(o);
-      var target = live ? Math.max(0, voiceLevel(o)) : 0;
-      if (!live && o.level < 0.002) return;
+      if (!o.visible) return;
       any = true;
-      o.level += (target - o.level) * Math.min(1, dt * 10);
-      if (!reduced) o.time += dt * (live ? 1 : 0.5);
+      var voice = voiceLevel(o);
+      var playing = voice >= 0;
+      var chosen = o.el.classList.contains('is-live');
+      var targetLevel = playing ? voice : 0;
+      var targetLift = playing ? 0.1 + 0.22 * voice : (o.hover ? 0.07 : 0);
+      var targetSpeed = playing ? 2.2 + 2.6 * voice : (o.hover ? 2.1 : (chosen ? 1 : 0.7));
+      var k = Math.min(1, dt * 8);
+      o.level += (targetLevel - o.level) * k;
+      o.lift += (targetLift - o.lift) * k;
+      o.speed += (targetSpeed - o.speed) * Math.min(1, dt * 4);
+      o.time += dt * o.speed;
+      // The halo around a playing orb breathes with it (CSS reads --orb-glow).
+      o.el.style.setProperty('--orb-glow', o.level.toFixed(3));
+      // A resting orb is drawn every other frame: the same slow drift for half the work.
+      if (beat && !chosen && !playing && !o.hover && o.lift < 0.005 && o.level < 0.005) return;
       draw(o);
     });
     if (any) { idle = 0; } else { idle += dt; }
@@ -223,8 +247,12 @@
     var o = state(el);
     if (o.attached) return;
     o.attached = true;
-    el.addEventListener('pointerenter', function () { o.hover = true; wake(); });
-    el.addEventListener('pointerleave', function () { o.hover = false; });
+    // Hovering or focusing the orb's card counts as hovering the orb.
+    var host = el.closest('[data-orb-host]') || el;
+    host.addEventListener('pointerenter', function () { o.hover = true; wake(); });
+    host.addEventListener('pointerleave', function () { o.hover = false; });
+    host.addEventListener('focusin', function () { o.hover = true; wake(); });
+    host.addEventListener('focusout', function (e) { if (!host.contains(e.relatedTarget)) o.hover = false; });
     if (io) { io.observe(el); } else { o.visible = true; draw(o); }
     if (ro) ro.observe(el);
   }

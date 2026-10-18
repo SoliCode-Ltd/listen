@@ -19,14 +19,14 @@ class VoiceOrbsTest extends TestCase
         $en = $this->getLocalizedRoute('home')->assertOk();
         $tour = $en->viewData('voiceTour');
         // English on the English page only.
-        $this->assertSame(['english', 'emotions', 'dialogue', 'places', 'cloning'], array_column($tour, 'key'));
-        // Every kind but cloning plays a real sample; cloning leads to the plans that include it.
+        $this->assertSame(['english', 'emotions', 'dialogue', 'places'], array_column($tour, 'key'));
+        // Every orb plays a real sample: nothing in the tour is silent.
         foreach ($tour as $item) {
-            $this->assertSame($item['key'] !== 'cloning', $item['src'] !== '', $item['key']);
+            $this->assertNotSame('', $item['src'], $item['key']);
         }
-        $this->assertSame(route('pricing'), $tour[4]['more']);
         $this->assertStringEndsWith('#english-accents', $tour[0]['more']);
         $en->assertDontSee('data-orb="arabic"', false);
+        $en->assertDontSee('data-orb="cloning"', false);
         $en->assertSee('Every kind of voice, in one studio');
         $en->assertSee('data-orb="places"', false);
         $en->assertSee('js/listen-orbs.js', false);
@@ -36,7 +36,7 @@ class VoiceOrbsTest extends TestCase
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('home')->assertOk();
         // Arabic on the Arabic page only.
-        $this->assertSame(['arabic', 'emotions', 'dialogue', 'places', 'cloning'], array_column($ar->viewData('voiceTour'), 'key'));
+        $this->assertSame(['arabic', 'emotions', 'dialogue', 'places'], array_column($ar->viewData('voiceTour'), 'key'));
         $ar->assertDontSee('data-orb="english"', false);
         $ar->assertSee('كل أنواع الأصوات في استوديو واحد');
     }
@@ -60,5 +60,16 @@ class VoiceOrbsTest extends TestCase
         // Only the recommended plan's orb is alive; its card is held in a violet ring, not filled.
         $this->assertSame(1, substr_count($html, 'plan-orb is-live'));
         $page->assertSee('box-shadow: 0 0 0 2px var(--brand-accent)', false);
+
+        // No two orbs on the page look alike: every plan, the teams band and the closing panel
+        // each have their own colours.
+        preg_match_all('/data-orb="([a-z_]+)" data-orb-colors="([^"]+)"/', $html, $orbs);
+        $this->assertContains('teams', $orbs[1]);
+        $this->assertContains('listen', $orbs[1]);
+        $this->assertSame(count($orbs[2]), count(array_unique($orbs[2])), implode(', ', $orbs[1]));
+        // Hovering a card wakes its orb: every plan card, the teams band and the closing panel.
+        $this->assertSame(4, preg_match_all('/class="plan-card[^"]*" data-orb-host/', $html));
+        $this->assertMatchesRegularExpression('/class="team-band[^>]*data-orb-host/', $html);
+        $this->assertMatchesRegularExpression('/class="closing-panel[^>]*data-orb-host/', $html);
     }
 }

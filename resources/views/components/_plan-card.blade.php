@@ -23,7 +23,7 @@
   $includedMark = __('ui.pricing.included_mark');
   $minutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
 @endphp
-<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} reveal"
+<div class="plan-card {{ $isPopular ? 'popular' : '' }} {{ $hasDiscount ? 'has-discount' : '' }} {{ $isCurrent ? 'is-current' : '' }} reveal" data-orb-host
      data-plan-slug="{{ $plan['slug'] }}"
      data-is-free="{{ $isFree ? '1' : '0' }}"
      data-is-pack="{{ $isPack ? '1' : '0' }}"

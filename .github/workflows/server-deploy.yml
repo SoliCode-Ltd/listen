@@ -94,6 +94,16 @@ jobs:
           echo "== Files that differ from ${{ inputs.target == 'live' && 'main' || github.ref_name }} (or are missing) =="
           $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED open or read/  (missing)/; s/: FAILED$/  (changed)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
           echo "== $(wc -l < diff.txt) file(s) =="
+          # Where each of those came from: when it last changed on the server, and whether it is main's copy.
+          if [ -s diff.txt ]; then
+            main_sha="$(git fetch -q --depth=1 origin main 2>/dev/null && git rev-parse FETCH_HEAD || true)"
+            sed 's/  ([a-z]*)$//' diff.txt > names.txt
+            $S "$FIND; while read -r f; do [ -f \"\$f\" ] && echo \"\$(md5sum < \"\$f\" | cut -c1-32) \$(date -u -r \"\$f\" '+%Y-%m-%d %H:%M') \$f\"; done; true" < names.txt > server.txt || true
+            while read -r sum day time file; do
+              main_sum="$( { [ -n "$main_sha" ] && git show "$main_sha:$file" 2>/dev/null || true; } | md5sum | cut -c1-32)"
+              echo "  $file: last changed $day $time UTC$( [ "$sum" = "$main_sum" ] && echo ', same as main' || true)"
+            done < server.txt
+          fi
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
           echo "composer.lock:"; grep -q '^composer.lock' diff.txt && echo "  CHANGED: run composer install by hand" || echo "  same"
           echo "ffmpeg (sound environments, download formats):"
@@ -246,4 +256,9 @@ jobs:
             html="$(curl -s --max-time 30 -L "$BASE$path" || true)"
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
             echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
+          done
+          # Text the server could not find shows as its key ("ui.pricing.team_title"); list any.
+          for path in /ar /en /ar/pricing /en/pricing; do
+            keys="$(curl -s --max-time 30 -L "$BASE$path" | grep -oE '>[[:space:]]*ui\.[a-z0-9_]+\.[a-z0-9_.]+' | sed 's/^>[[:space:]]*//' | sort -u | tr '\n' ' ' || true)"
+            echo "$path: untranslated keys: ${keys:-none}"
           done

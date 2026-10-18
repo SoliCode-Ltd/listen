@@ -32,7 +32,7 @@
       @endforeach
     </svg>
 
-    <button type="button" class="vs-cast-mark" data-vs-play-all aria-label="{{ __('ui.landing.hero_play_all') }}" title="{{ __('ui.landing.hero_play_all') }}">
+    <button type="button" class="vs-cast-mark" data-orb-host data-vs-play-all aria-label="{{ __('ui.landing.hero_play_all') }}" title="{{ __('ui.landing.hero_play_all') }}">
       <span class="vs-cast-mark-ring"></span><span class="vs-cast-mark-ring"></span>
       <x-orb name="listen" class="vs-cast-orb" />
       <svg class="vs-cast-mark-logo" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
@@ -100,6 +100,39 @@
     var audio = new Audio();
     audio.preload = 'none';
     var active = 0, timer = null, mode = null, queue = [];
+    var levelFrame = 0, levelSrc = null, levelInfo = null;
+
+    // While a line plays, the stage keeps its live loudness (0..1) for the Listen orb in the middle,
+    // which ripples with it: measured from the clip itself when it can be, a gentle pulse otherwise.
+    function follow(src) {
+      cancelAnimationFrame(levelFrame);
+      stage.classList.add('is-voicing');
+      stage.__vpLevel = stage.__vpLevel || 0;
+      levelSrc = src;
+      levelInfo = null;
+      if (window.ListenVoiceAnalyse) {
+        window.ListenVoiceAnalyse(src).then(function (info) { if (levelSrc === src) levelInfo = info; });
+      }
+      (function step() {
+        var target = 0;
+        if (!audio.paused) {
+          if (levelInfo && levelInfo.rms.length) {
+            var f = Math.min(levelInfo.rms.length - 1, Math.max(0, Math.round(audio.currentTime * 100)));
+            target = Math.min(1, Math.sqrt((levelInfo.rms[f] || 0) / levelInfo.loud));
+          } else {
+            target = 0.35 + 0.2 * Math.abs(Math.sin(audio.currentTime * 7));
+          }
+        }
+        stage.__vpLevel += (target - stage.__vpLevel) * 0.25;
+        levelFrame = requestAnimationFrame(step);
+      })();
+    }
+    function unfollow() {
+      cancelAnimationFrame(levelFrame);
+      levelSrc = null;
+      stage.classList.remove('is-voicing');
+      stage.__vpLevel = 0;
+    }
 
     function show(i) {
       active = i;
@@ -120,6 +153,7 @@
       mode = null;
       queue = [];
       stage.classList.remove('is-playing-all');
+      unfollow();
       setLive(null);
       autoplay(true);
     }
@@ -133,6 +167,7 @@
       document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: stage } }));
       var p = audio.play();
       if (p && p.catch) p.catch(stop);
+      follow(src);
     }
     function next() {
       if (!queue.length) { stop(); return; }

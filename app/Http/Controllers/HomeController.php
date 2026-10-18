@@ -125,8 +125,7 @@ class HomeController extends Controller
                 : ['key' => 'english', 'src' => $pick('en', 'hero', $everyday), 'more' => $samplesPage.'#english-accents'],
             ['key' => 'emotions', 'src' => $pick($language, 'hero', ['excited', 'dramatic', 'happy', 'playful']), 'more' => $samplesPage.'#moods'],
             ['key' => 'dialogue', 'src' => $pick($language, 'dialogue', ['comedy', 'conversational', 'friendly']), 'more' => $samplesPage.'#conversations'],
-            ['key' => 'places', 'src' => (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],
-            ['key' => 'cloning', 'src' => '', 'more' => route('pricing')],
+            ['key' => 'places', 'src' => $this->environmentMorph($language) ?: (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],
         ];
     }
 
@@ -162,6 +161,17 @@ class HomeController extends Controller
         }
 
         return $out;
+    }
+
+    /**
+     * The sound environments' "before and after": the voice starts clean, then
+     * moves into the cave mid-sentence (scripts/tts/environment_morph.py).
+     */
+    private function environmentMorph(string $language): string
+    {
+        $path = 'audio/environments/morph/env-'.$language.'-cave.mp3';
+
+        return is_file(public_path($path)) ? asset($path).'?v='.filemtime(public_path($path)) : '';
     }
 
     /**

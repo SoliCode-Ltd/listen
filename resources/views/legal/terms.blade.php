@@ -1,40 +1,16 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.terms_title'), 'page' => 'terms'])
   <style>
-    .bg-orb {
-      position: fixed;
-      z-index: -1;
-      pointer-events: none;
-      border-radius: 999px;
-      filter: blur(36px);
-      opacity: .2;
-      animation: float 10s ease-in-out infinite;
-    }
-    .bg-orb.a {
-      width: 14rem;
-      height: 14rem;
-      background: color-mix(in oklab, var(--a) 72%, white 28%);
-      left: -5rem;
-      top: 12vh;
-    }
-    .bg-orb.b {
-      width: 18rem;
-      height: 18rem;
-      background: color-mix(in oklab, var(--b) 72%, white 28%);
-      right: -5rem;
-      bottom: 6vh;
-      animation-delay: -3s;
-    }
     .legal-page {
       padding: 2.5rem 0 3rem;
     }
     .legal-shell {
       width: min(860px, 100%);
       margin: 0 auto;
-      padding: 1.5rem;
-      border-radius: var(--radius-lg);
+      padding: clamp(1.5rem, 3vw, 2.5rem);
+      border-radius: var(--card-radius);
       border: 1px solid var(--line);
       background: var(--surface);
-      box-shadow: var(--shadow);
+      box-shadow: var(--card-shadow);
     }
     .legal-kicker {
       display: inline-flex;
@@ -44,14 +20,14 @@
       padding: .38rem .74rem;
       border-radius: var(--radius-full);
       border: 1px solid var(--line);
-      font-size: .78rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: .8rem;
+      font-weight: 600;
       color: var(--muted);
     }
     .legal-shell h1 {
       margin: 0 0 .5rem;
       font-size: clamp(1.8rem, 4vw, 2.6rem);
+      font-weight: 600;
       letter-spacing: -.02em;
     }
     .legal-updated {
@@ -90,10 +66,6 @@
       color: var(--text);
       text-underline-offset: 3px;
     }
-    @keyframes float {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-12px); }
-    }
     @media (max-width: 640px) {
       .legal-page {
         padding: 1.5rem 0 2rem;
@@ -105,8 +77,6 @@
   </style>
 </head>
 <body>
-  <div class="bg-orb a"></div>
-  <div class="bg-orb b"></div>
 
   @include('components.header')
 

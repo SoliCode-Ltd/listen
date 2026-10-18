@@ -3,6 +3,8 @@
   $contactWhatsappUrl = 'https://wa.me/'.$contactWhatsapp.'?text='.rawurlencode(__('ui.contact.whatsapp_message'));
   $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
   $contactTopics = ['billing', 'voices', 'account', 'other'];
+  // A link can pick the topic for the visitor (the pricing page's "Contact us" picks plans and billing).
+  $contactTopic = in_array(request()->query('topic'), $contactTopics, true) ? __('ui.contact.topic_'.request()->query('topic')) : '';
   // The wave's resting shape: tall in the middle, like the Listen mark, with some life in it.
   $contactBars = [];
   for ($i = 0; $i < 44; $i++) {
@@ -31,10 +33,10 @@
     .contact-intro h1 {
       margin: 0 0 1rem;
       color: var(--text);
-      font-size: clamp(2.4rem, 4.6vw, 3.6rem);
-      font-weight: 700;
-      line-height: 1.1;
-      letter-spacing: -.02em;
+      font-size: var(--page-title-size);
+      font-weight: 600;
+      line-height: 1.12;
+      letter-spacing: -.03em;
     }
     .contact-intro p { margin: 0; max-width: 40ch; color: var(--muted); font-size: 1.08rem; line-height: 1.7; }
 
@@ -79,15 +81,16 @@
       gap: .9rem;
       padding: .85rem 1rem;
       border: 1px solid var(--line);
-      border-radius: 1rem;
+      border-radius: var(--card-radius);
       background: var(--surface);
+      box-shadow: var(--card-shadow);
       color: var(--text);
       text-decoration: none;
       transition: border-color .2s ease;
     }
-    .contact-way:hover { border-color: color-mix(in oklab, var(--brand-accent) 45%, var(--line)); }
+    .contact-way:hover { border-color: color-mix(in oklab, var(--text) 18%, var(--line)); }
     .contact-way:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
-    .contact-way-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: .8rem; background: color-mix(in oklab, var(--brand-accent) 12%, transparent); color: var(--accent-text); }
+    .contact-way-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: .75rem; background: color-mix(in oklab, var(--a) 10%, var(--surface)); color: var(--accent-text); }
     .contact-way-icon svg { width: 20px; height: 20px; }
     .contact-way-text { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
     .contact-way-text strong { font-size: .98rem; font-weight: 700; }
@@ -99,20 +102,19 @@
       align-self: start;
       padding: clamp(1.5rem, 3.4vw, 2.5rem);
       border: 1px solid var(--line);
-      border-radius: 1.5rem;
+      border-radius: var(--card-radius);
       background: var(--surface);
-      box-shadow: var(--shadow);
+      box-shadow: var(--card-shadow);
     }
-    html[data-theme="light"] .contact-card { box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 24px 48px -32px rgba(15, 23, 42, .22); }
     .contact-topics { margin: 0 0 1.5rem; padding: 0; border: 0; }
     .contact-topics legend { margin-bottom: .7rem; padding: 0; color: var(--text); font-size: .95rem; font-weight: 700; }
     .contact-topic-list { display: flex; flex-wrap: wrap; gap: .5rem; }
     .contact-topic {
       min-height: 40px;
       padding: 0 1rem;
-      border: 1px solid var(--line);
+      border: 1px solid var(--line-strong);
       border-radius: 999px;
-      background: transparent;
+      background: var(--surface);
       color: var(--muted);
       font: inherit;
       font-size: .9rem;
@@ -120,8 +122,9 @@
       cursor: pointer;
       transition: color .15s ease, border-color .15s ease, background-color .15s ease;
     }
-    .contact-topic:hover { color: var(--text); border-color: color-mix(in oklab, var(--brand-accent) 45%, var(--line)); }
-    .contact-topic[aria-pressed="true"] { border-color: var(--brand-accent); background: color-mix(in oklab, var(--brand-accent) 12%, transparent); color: var(--accent-text); }
+    .contact-topic:hover { color: var(--text); border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong)); }
+    /* Chosen: the same solid violet chip as the voice filters. */
+    .contact-topic[aria-pressed="true"] { border-color: var(--brand-accent); background: var(--brand-accent); color: #FFFFFF; }
     .contact-topic:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
 
     .contact-form { display: grid; gap: 1.15rem; }
@@ -132,9 +135,9 @@
     .contact-field textarea {
       width: 100%;
       padding: .85rem 1rem;
-      border: 1.5px solid var(--line);
-      border-radius: .85rem;
-      background: var(--bg);
+      border: 1px solid var(--line-strong);
+      border-radius: .75rem;
+      background: var(--surface);
       color: var(--text);
       font: inherit;
       font-size: 1rem;
@@ -155,15 +158,16 @@
       justify-content: center;
       gap: .6rem;
       width: 100%;
-      min-height: 54px;
+      min-height: 48px;
       margin-top: .35rem;
       border: 0;
       border-radius: var(--btn-radius);
       background: var(--brand-accent);
+      box-shadow: var(--lift);
       color: #FFFFFF;
       font: inherit;
-      font-size: 1.05rem;
-      font-weight: 700;
+      font-size: 1rem;
+      font-weight: 600;
       cursor: pointer;
       transition: background-color .2s ease;
     }
@@ -250,7 +254,7 @@
 
             <div class="contact-field">
               <label for="subject">{{ __('ui.contact.subject') }}</label>
-              <input type="text" id="subject" name="subject" value="{{ old('subject') }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
+              <input type="text" id="subject" name="subject" value="{{ old('subject', $contactTopic) }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
               <span class="text-danger" data-error-for="subject" @unless($errors->has('subject')) style="display: none;" @endunless>{{ $errors->first('subject') }}</span>
             </div>
 
@@ -370,6 +374,7 @@
         });
       });
       subject.addEventListener('input', mark);
+      mark();
     })();
 
     (function () {

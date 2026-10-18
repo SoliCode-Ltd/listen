@@ -22,13 +22,14 @@ class Orbs
         'dialogue' => ['#15606B', '#2DB7A6', '#A294FF', '#EEF0FF'],
         // Sound environments: a deep space lit by one warm light.
         'places' => ['#14295E', '#2672B4', '#46C6CC', '#F6D38A'],
-        // Voice cloning: a pearl that mirrors your own voice.
-        'cloning' => ['#5A5282', '#9C93CC', '#DFDAF5', '#FFFFFF'],
-        // Plans, from the lightest to the deepest.
+        // Plans, from the lightest to the deepest. Each has its own colours, never the
+        // Listen orb's, so no two orbs on the pricing page look alike.
         'starter' => ['#124456', '#46B0A2', '#BDEBDA', '#F5FFFA'],
-        'creator' => ['#24138A', '#7659FA', '#C9BEFF', '#FFE3D3'],
+        'creator' => ['#3A1C8C', '#8B5CF6', '#F0ABFC', '#FFF1FB'],
         'pro' => ['#46163C', '#C04E7C', '#F2B544', '#FFF1D6'],
         'studio_max' => ['#17144A', '#3A31B4', '#7E62FF', '#F2C46E'],
+        // More minutes or a whole team: a pearl.
+        'teams' => ['#5A5282', '#9C93CC', '#DFDAF5', '#FFFFFF'],
     ];
 
     /**

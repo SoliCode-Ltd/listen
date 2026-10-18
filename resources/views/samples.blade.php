@@ -165,6 +165,8 @@
     .stage-id strong { font-size: 1.15rem; font-weight: 700; }
     .stage-id span { display: inline-flex; align-items: center; gap: .45rem; color: var(--st-faint); font-size: .9rem; }
     .stage-id img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+    .stage-id .stage-flag-ar { width: 18px; height: 18px; color: #FFFFFF; font-size: .6rem; }
+    .stage-id [hidden] { display: none !important; }
     .stage-controls { display: flex; align-items: center; gap: .75rem; }
     .stage-btn {
       display: grid;
@@ -253,46 +255,11 @@
     .samples-section { width: min(1200px, 92%); margin: 0 auto; padding: clamp(3rem, 7vw, 5rem) 0 0; scroll-margin-top: 130px; }
     .samples-section .vs-head { margin-bottom: 1.25rem; }
     .samples-moods { margin-bottom: 1.25rem; }
-
-    /* The way out */
-    .samples-cta {
-      width: min(1200px, 92%);
-      margin: clamp(3.5rem, 8vw, 5.5rem) auto clamp(3rem, 6vw, 4rem);
-      padding: clamp(2.25rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 3rem);
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 1.5rem 2.5rem;
-      border-radius: 1.5rem;
-      color: #FFFFFF;
-      background: #6145F2;
-    }
-    .samples-cta h2 { margin: 0 0 .4rem; color: #FFFFFF; font-size: clamp(1.5rem, 3vw, 2.1rem); }
-    .samples-cta p { margin: 0; color: rgba(255, 255, 255, .9); max-width: 52ch; }
-    .samples-cta-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
-    .samples-cta a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 48px;
-      padding: 0 1.5rem;
-      border-radius: var(--btn-radius);
-      font-weight: 700;
-      text-decoration: none;
-    }
-    .samples-cta .is-solid { background: #FFFFFF; color: #3F27C4; }
-    .samples-cta .is-solid:hover { background: #F1EEFF; }
-    .samples-cta .is-ghost { border: 1.5px solid rgba(255, 255, 255, .6); color: #FFFFFF; }
-    .samples-cta .is-ghost:hover { border-color: #FFFFFF; background: rgba(255, 255, 255, .12); }
-    .samples-cta a:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
+    .samples-closing { width: min(1200px, 92%); margin: 0 auto; }
 
     @media (max-width: 900px) {
       .stage-console { grid-template-columns: minmax(0, 1fr) auto; }
       .stage-queue { grid-column: 1 / -1; justify-content: flex-start; }
-      .samples-cta { grid-template-columns: 1fr; }
-      /* The two buttons side by side, the same size. */
-      .samples-cta-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
-      .samples-cta a { padding: .5rem .6rem; text-align: center; line-height: 1.3; }
     }
     @media (max-width: 640px) {
       /* Long chip rows scroll sideways on phones instead of stacking five deep. */
@@ -344,7 +311,12 @@
               </span>
               <span class="stage-id">
                 <strong data-stage-name>{{ $stageCast[0]['name'] }}</strong>
-                <span><img data-stage-flag src="{{ $stageCast[0]['flag'] }}" alt="" width="18" height="18"><span data-stage-dialect>{{ $stageCast[0]['dialect_label'] }}</span></span>
+                {{-- The speaker's flag, or the Arabic letter for a voice with no single country (Modern Standard Arabic). --}}
+                <span>
+                  <img data-stage-flag src="{{ $stageCast[0]['flag'] ?? '' }}" alt="" width="18" height="18" @if(empty($stageCast[0]['flag'])) hidden @endif>
+                  <span class="vs-flag vs-flag-ar stage-flag-ar" data-stage-flag-ar aria-hidden="true" @if(! empty($stageCast[0]['flag'])) hidden @endif>ع</span>
+                  <span data-stage-dialect>{{ $stageCast[0]['dialect_label'] }}</span>
+                </span>
               </span>
             </div>
             <div class="stage-controls">
@@ -386,8 +358,8 @@
         ['id' => $sectionId, 'copy' => $copyKey] = $voiceSection;
         $regions = $regionsOf($voices);
       @endphp
-      <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="$sectionId === 'arabic-dialects' ? 'arabic' : 'english'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
@@ -412,8 +384,8 @@
 
     @if($moods !== [])
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
-      <section class="samples-section" id="moods" aria-labelledby="moods-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="moods" aria-labelledby="moods-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'emotions'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="moods-title">{{ __('ui.samples.moods_title') }}</h2>
@@ -434,8 +406,8 @@
     @endif
 
     @if($dialogues !== [])
-      <section class="samples-section" id="conversations" aria-labelledby="conversations-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="conversations" aria-labelledby="conversations-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'dialogue'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="conversations-title">{{ __('ui.samples.conversations_title') }}</h2>
@@ -451,8 +423,8 @@
     @endif
 
     @if($environments !== [])
-      <section class="samples-section" id="sound-environments" aria-labelledby="sound-environments-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="sound-environments" aria-labelledby="sound-environments-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'places'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="sound-environments-title">{{ __('ui.samples.environments_title') }}</h2>
@@ -467,21 +439,17 @@
       </section>
     @endif
 
-    <section class="samples-cta" aria-labelledby="samplesCtaTitle">
-      <div>
-        <h2 id="samplesCtaTitle">{{ __('ui.samples.cta_title') }}</h2>
-        <p>{{ __('ui.samples.cta_body') }}</p>
-      </div>
-      <div class="samples-cta-actions">
-        @auth
-          <a class="is-solid" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
-          <a class="is-ghost" href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a>
-        @else
-          <a class="is-solid" href="{{ route('demo.page') }}">{{ __('ui.samples.cta_try') }}</a>
-          <a class="is-ghost" href="{{ route('register') }}">{{ __('ui.samples.cta_signup') }}</a>
-        @endauth
-      </div>
-    </section>
+    <div class="samples-closing">
+      @auth
+        <x-closing-panel :title="__('ui.samples.cta_title')" :body="__('ui.samples.cta_body')"
+          :primary="['href' => route('dashboard'), 'label' => __('ui.pricing.go_to_dashboard')]"
+          :secondary="['href' => route('pricing'), 'label' => __('ui.nav.pricing')]" />
+      @else
+        <x-closing-panel :title="__('ui.samples.cta_title')" :body="__('ui.samples.cta_body')"
+          :primary="['href' => route('demo.page'), 'label' => __('ui.samples.cta_try')]"
+          :secondary="['href' => route('register'), 'label' => __('ui.samples.cta_signup')]" />
+      @endauth
+    </div>
   </main>
 
   @include('components.footer')
@@ -500,6 +468,7 @@
     var nameEl = stage.querySelector('[data-stage-name]');
     var dialectEl = stage.querySelector('[data-stage-dialect]');
     var flagEl = stage.querySelector('[data-stage-flag]');
+    var flagArEl = stage.querySelector('[data-stage-flag-ar]');
     var avatarEl = stage.querySelector('[data-stage-avatar]');
     var playBtn = stage.querySelector('[data-stage-play]');
     var progressEl = stage.querySelector('[data-stage-progress]');
@@ -596,7 +565,10 @@
       setLine(person);
       nameEl.textContent = person.name;
       dialectEl.textContent = person.dialect_label;
+      // A voice with no single country shows the Arabic letter, never the last speaker's flag.
       if (person.flag) flagEl.src = person.flag;
+      flagEl.hidden = !person.flag;
+      if (flagArEl) flagArEl.hidden = !!person.flag;
       if (person.avatar) avatarEl.src = person.avatar;
       picks.forEach(function (p, k) { p.setAttribute('aria-current', k === index ? 'true' : 'false'); });
       if (bar) { bar.cancel(); bar = null; }
