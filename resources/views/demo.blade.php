@@ -100,27 +100,30 @@
         @endphp
         {{-- Left: the text, with its settings above and the generate button below --}}
         <div class="vs-main">
+          {{-- The demo always uses the premium voices. --}}
+          <input type="hidden" id="voice_tier" name="voice_tier" value="{{ $defaultTier }}">
+          {{-- One column (tablets and phones): the voice library sits below, so say which voice is chosen here. --}}
+          <button type="button" class="vs-voice-jump" id="voiceJump" hidden>
+            <span class="vs-voice-jump-face" id="voiceJumpFace" aria-hidden="true"></span>
+            <span class="vs-voice-jump-text">
+              <small>{{ __('ui.dashboard.voice_jump_label') }}</small>
+              <strong id="voiceJumpName"></strong>
+            </span>
+            <span class="vs-voice-jump-change">{{ __('ui.dashboard.voice_jump_change') }}</span>
+          </button>
           <div class="vs-editor-card reveal">
             <x-voice-studio.setbar studio-id="studioPanel" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
               <div>
-                <label class="vs-field-label" for="voice_tier">{{ __('ui.demo.voice_quality') }}</label>
-                <select id="voice_tier" name="voice_tier">
-                  @foreach($demoTiers as $tier)
-                    <option value="{{ $tier['key'] }}" {{ $tier['key'] === $defaultTier ? 'selected' : '' }}>{{ $tier['label'] }}</option>
-                  @endforeach
-                </select>
-              </div>
-              <div>
-                <label class="vs-field-label" for="target_language">{{ __('ui.demo.voice_language') }}</label>
+                <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
                 <select id="target_language" name="target_language">
-                  <option value="ar">{{ __('ui.demo.arabic') }}</option>
-                  <option value="en">{{ __('ui.demo.english') }}</option>
+                  <option value="ar">{{ __('ui.dashboard.arabic') }}</option>
+                  <option value="en">{{ __('ui.dashboard.english') }}</option>
                 </select>
               </div>
             </x-voice-studio.setbar>
-            <div class="tag-editor demo-tag-editor" data-vs-editor>
-              <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
-              <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+            <div class="tag-editor" data-vs-editor>
+              <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
+              <textarea id="text" name="text" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" required></textarea>
             </div>
             <div class="demo-samples">
               <div class="sample-chips">
@@ -168,34 +171,21 @@
                 <x-voice-studio.choice-field name="audio_effect" :label="__('ui.dashboard.audio_effect')" :options="\App\Support\AudioEffects::options()" :default-label="__('ui.dashboard.audio_effect_none')" />
               </div>
             @endif
-            <div class="vs-row-2 vs-field" data-vs-hd-only>
-              <div>
-                <div class="vs-field-label"><span>{{ __('ui.demo.speed', ['default' => 'Speed']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">1.0</span></span></div>
-                <div class="slider-wrap">
-                  <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" aria-label="{{ __('ui.demo.speed', ['default' => 'Speed']) }}">
+            {{-- Dialogue mode: premium voices only. --}}
+            <x-voice-studio.dialogue />
+            <x-voice-studio.speed-pitch data-vs-hd-only />
+            <div class="s-card vs-field">
+              <label class="compact-toggle-row" for="translateToggle">
+                <div class="txt">
+                  <div class="t-title">🌐 {{ __('ui.demo.translate_before_speaking') }}</div>
+                  <div class="t-desc" id="translateHint">{{ __('ui.demo.translate_disabled_hint') }}</div>
                 </div>
-              </div>
-              <div>
-                <div class="vs-field-label"><span>{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">0</span></span></div>
-                <div class="slider-wrap">
-                  <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="0" aria-label="{{ __('ui.demo.pitch', ['default' => 'Pitch']) }}">
+                <div class="toggle-switch" aria-label="{{ __('ui.demo.translate_before_speaking') }}">
+                  <input type="checkbox" id="translateToggle">
+                  <span class="toggle-slider"></span>
                 </div>
-              </div>
-            </div>
-            <div class="vs-field">
-            <div class="translate-row">
-              <div class="translate-info">
-                <label for="translateToggle">{{ __('ui.demo.translate_before_speaking') }}</label>
-                <div class="hint" id="translateHint">{{ __('ui.demo.translate_disabled_hint') }}</div>
-              </div>
-              <label class="toggle-switch" aria-label="{{ __('ui.demo.translate_before_speaking') }}">
-                <input type="checkbox" id="translateToggle">
-                <span class="toggle-slider"></span>
               </label>
               <input type="hidden" name="translate" id="translate" value="0">
-            </div>
-            {{-- Dialogue mode: premium voices only, hidden for standard voices. --}}
-            <x-voice-studio.dialogue />
             </div>
           </x-voice-studio.panel>
         </aside>
@@ -1054,8 +1044,44 @@
       voiceLabel: voiceDisplayLabel,
       allowed: () => normalizeTier(voiceTier?.value || 'standard') === 'hd',
     });
-    voiceTier?.addEventListener('change', () => dialogueMode?.refresh());
     targetLanguage?.addEventListener('change', () => dialogueMode?.refresh());
+
+    // One column, as on the dashboard: the chosen voice above the text; a tap scrolls to the library.
+    (function () {
+      const jump = document.getElementById('voiceJump');
+      const nameEl = document.getElementById('voiceJumpName');
+      const faceEl = document.getElementById('voiceJumpFace');
+      if (!jump || !voiceSelect || !nameEl || !faceEl) return;
+      let voices = {};
+      try {
+        voices = (JSON.parse(document.querySelector('#demoForm [data-vs-meta]')?.textContent || '{}') || {}).voices || {};
+      } catch (e) { /* the button still names the voice */ }
+      function refresh() {
+        const option = voiceSelect.options[voiceSelect.selectedIndex];
+        if (!option || !option.value) { jump.hidden = true; return; }
+        const label = String(option.textContent || '').trim();
+        const avatar = String((voices[option.value] || {}).a || option.dataset.avatar || '');
+        nameEl.textContent = label;
+        faceEl.textContent = '';
+        if (avatar) {
+          const img = document.createElement('img');
+          img.src = avatar;
+          img.alt = '';
+          img.width = 40;
+          img.height = 40;
+          faceEl.appendChild(img);
+        } else {
+          faceEl.textContent = label.charAt(0).toUpperCase();
+        }
+        jump.hidden = false;
+      }
+      voiceSelect.addEventListener('change', refresh);
+      new MutationObserver(refresh).observe(voiceSelect, { childList: true });
+      refresh();
+      jump.addEventListener('click', function () {
+        document.querySelector('#demoForm .vs-panel')?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
+      });
+    })();
 
     async function callEndpoint(endpoint, options = {}) {
       const includeForm = options?.includeForm !== false;

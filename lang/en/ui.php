@@ -1165,6 +1165,8 @@ return [
         'dialect_auto' => 'Auto-detect',
         'speed' => 'Speed',
         'pitch' => 'Pitch',
+        'speed_hint' => 'How fast the voice speaks. 1.0× is a natural pace.',
+        'pitch_hint' => "How high or deep the voice sounds. 0 keeps the voice's own tone.",
         'dialogue_mode' => 'Dialogue Mode',
         'dialogue_hint' => 'Two voices in one recording: write who says what.',
         'dialogue_guide' => 'Start each line with the speaker\'s name and a colon, for example: :example. Write each speaker\'s lines in their own dialect.',

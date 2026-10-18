@@ -1090,25 +1090,6 @@
       background: color-mix(in oklab, var(--surface) 80%, transparent);
       margin-top: .6rem;
     }
-    .compact-toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      padding: .85rem 1rem;
-      cursor: pointer;
-    }
-    .compact-toggle-row .t-title {
-      font-weight: 700;
-      color: var(--text);
-      font-size: .9rem;
-      margin-bottom: .2rem;
-    }
-    .compact-toggle-row .t-desc {
-      font-size: .8rem;
-      color: var(--muted);
-      line-height: 1.3;
-    }
     .output-panel {
       min-height: 120px;
       margin-top: 1rem;
@@ -2257,47 +2238,6 @@
     .char-counter-est { font-size: .78rem; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .char-counter-est:empty { display: none; }
 
-    /* One column: the chosen voice above the text, a tap away from the library. */
-    .vs-voice-jump { display: none; }
-    #generateVoiceSection .vs-panel { scroll-margin-top: 5.5rem; }
-    @media (max-width: 1180px) {
-      .vs-voice-jump:not([hidden]) {
-        display: flex;
-        align-items: center;
-        gap: .7rem;
-        width: 100%;
-        min-height: 56px;
-        padding: .5rem .9rem .5rem .55rem;
-        border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-        border-radius: 14px;
-        background: var(--surface);
-        color: var(--text);
-        font: inherit;
-        text-align: start;
-        cursor: pointer;
-      }
-      html[dir="rtl"] .vs-voice-jump:not([hidden]) { padding: .5rem .55rem .5rem .9rem; }
-      .vs-voice-jump:hover { border-color: color-mix(in oklab, var(--a) 45%, var(--line)); }
-      .vs-voice-jump:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; }
-    }
-    .vs-voice-jump-face {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex: none;
-      width: 40px;
-      height: 40px;
-      overflow: hidden;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--a), var(--b, #8B5CF6));
-      color: #fff;
-      font-weight: 800;
-    }
-    .vs-voice-jump-face img { width: 100%; height: 100%; object-fit: cover; }
-    .vs-voice-jump-text { display: flex; flex-direction: column; min-width: 0; flex: 1 1 auto; line-height: 1.25; }
-    .vs-voice-jump-text small { font-size: .75rem; color: var(--muted); }
-    .vs-voice-jump-text strong { overflow: hidden; font-size: .95rem; text-overflow: ellipsis; white-space: nowrap; }
-    .vs-voice-jump-change { flex: none; font-size: .85rem; font-weight: 700; color: var(--accent-text); }
 
     /* Before the first voice: one quiet line, not an empty box. */
     #generatedOutputPlaceholder.output-empty { min-height: 0; padding: .9rem 1.1rem; border-style: dashed; background: transparent; }
@@ -2762,20 +2702,7 @@
                 <x-voice-studio.dialogue :on="$prefillDialogue === '1' && ! ($featureLocks['dialogue'] ?? null)" :preset="$reusePreset ?? []" />
               </x-voice-studio.locked>
               <x-voice-studio.locked :lock="$featureLocks['studio'] ?? null">
-                <div class="vs-row-2 vs-field">
-                  <div>
-                    <div class="vs-field-label"><span>{{ __('ui.dashboard.speed') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="speedVal" data-unit="×">{{ number_format((float) $prefillValue('speed', '1.0'), 1) }}</span></span></div>
-                    <div class="slider-wrap">
-                      <input type="range" name="speed" id="speed" min="0.5" max="2.0" step="0.1" value="{{ $prefillValue('speed', '1.0') }}" aria-label="{{ __('ui.dashboard.speed') }}">
-                    </div>
-                  </div>
-                  <div>
-                    <div class="vs-field-label"><span>{{ __('ui.dashboard.pitch') }}</span><span class="vs-value" dir="ltr"><span class="slider-value" id="pitchVal">{{ $prefillValue('pitch', '0') }}</span></span></div>
-                    <div class="slider-wrap">
-                      <input type="range" name="pitch" id="pitch" min="-10" max="10" step="1" value="{{ $prefillValue('pitch', '0') }}" aria-label="{{ __('ui.dashboard.pitch') }}">
-                    </div>
-                  </div>
-                </div>
+                <x-voice-studio.speed-pitch :speed="$prefillValue('speed', '1.0')" :pitch="$prefillValue('pitch', '0')" />
               </x-voice-studio.locked>
               <div class="s-card vs-field">
                 <label class="compact-toggle-row" for="translateToggle">
