@@ -45,9 +45,8 @@
   --page-title-size: clamp(2.1rem, 3.6vw, 3rem);
 }
 html[data-theme="light"] {
-  /* One calm, neutral ground a step below white, so the white header, cards and footer
-     stand on it; the colour is left to the voice orbs. */
-  --bg: #F4F4F7;
+  /* A white page; white cards on it are drawn by their hairline and small shadow. */
+  --bg: #FFFFFF;
   --surface: #FFFFFF;
   --surface2: #F4F4F6;
   --line: #E6E6EB;
@@ -81,6 +80,15 @@ body {
   color: var(--text);
   min-height: 100vh;
   overflow-x: hidden;
+}
+
+/* One soft violet light at the top of every page, scrolling away with it; below it the
+   colour is left to the voice orbs. */
+html[data-theme="light"] body {
+  background: var(--bg) radial-gradient(70% 640px at 50% -160px, rgba(118, 89, 250, .2), rgba(118, 89, 250, .06) 55%, transparent 80%) no-repeat;
+}
+html:not([data-theme="light"]) body {
+  background: var(--bg) radial-gradient(70% 640px at 50% -160px, rgba(118, 89, 250, .16), rgba(118, 89, 250, .04) 55%, transparent 80%) no-repeat;
 }
 
 html[dir="rtl"] body {
