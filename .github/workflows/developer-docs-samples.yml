@@ -96,6 +96,15 @@ jobs:
           rm -f tts-settings.json
           if [ "$status" -ne 0 ]; then tail -n 40 storage/logs/laravel.log 2>/dev/null | cut -c1-300 | grep -v -F "$KEY" || true; exit "$status"; fi
 
+      # Kept with the run as well, so a recording is never lost if the commit below fails.
+      - name: Keep the recordings with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-docs-recordings
+          path: public/audio/developers/*.mp3
+          if-no-files-found: ignore
+          retention-days: 30
+
       - name: Commit the recordings
         run: |
           set -euo pipefail
@@ -105,5 +114,7 @@ jobs:
           if git diff --cached --quiet; then echo "No new recordings"; exit 0; fi
           git diff --cached --stat
           git commit -m "Developer docs: the recordings their requests returned, made with staging key 1"
+          # The app writes some tracked files as it runs (the extension's config): not ours to commit.
+          git reset --hard HEAD
           git pull --rebase origin "${GITHUB_REF#refs/heads/}"
           git push origin HEAD:${GITHUB_REF#refs/heads/}
