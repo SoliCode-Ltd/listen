@@ -207,7 +207,11 @@
     }
     .stage-pick img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
     .stage-pick:hover { opacity: .9; }
-    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--st-pick-gap), 0 0 0 4px var(--st-now); border-radius: 50%; }
+    /* The chosen voice: a ring inside its own circle (the photo shrinks a little), so the
+       ring stays centred and never spills onto the voices beside it. */
+    .stage-pick img { transition: transform .2s ease; }
+    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: inset 0 0 0 2px var(--st-now); }
+    .stage-pick[aria-current="true"] img { transform: scale(.8); }
     .stage-progress { height: 3px; border-radius: 3px; background: var(--st-track); overflow: hidden; }
     .stage-progress span { display: block; height: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, var(--st-bar-from), var(--st-bar-to)); will-change: transform; }
     html[dir="rtl"] .stage-progress span { transform-origin: right center; background: linear-gradient(270deg, var(--st-bar-from), var(--st-bar-to)); }
@@ -277,15 +281,14 @@
     @media (max-width: 560px) {
       .stage-console { grid-template-columns: 1fr; justify-items: center; }
       .stage-controls { justify-self: center; }
-      /* Every voice in one row, with room for the chosen one's ring. */
-      .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 44px); justify-content: center; gap: .6rem; width: 100%; padding: 5px; box-sizing: border-box; }
+      /* Every voice in one row. */
+      .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 46px); justify-content: center; gap: .5rem; width: 100%; }
       .stage-pick { width: 100%; height: auto; aspect-ratio: 1; }
-      .stage-pick[aria-current="true"] { z-index: 1; box-shadow: 0 0 0 2px var(--st-pick-gap), 0 0 0 3.5px var(--st-now); }
       /* The speaker sits centred: the avatar, then the name and dialect under it. */
       .stage-who { flex-direction: column; gap: 1.15rem; padding-top: 14px; text-align: center; }
       .stage-id { align-items: center; }
       .stage-avatar, .stage-avatar img { width: 72px; height: 72px; }
-      .stage-avatar { --ring: 20px; }
+      .stage-avatar { --ring: 22px; }
       .samples-bar { top: 64px; }
     }
   </style>
@@ -630,15 +633,13 @@
         ctx2d.arc(c, c, c, 0, Math.PI * 2);
         ctx2d.fill();
       }
-      // A phone's smaller ring (under 120px) gets fewer bars, so they read as bars and not a dotted line.
-      var count = ringSize < 120 ? 40 : BARS;
       ctx2d.lineCap = 'round';
-      ctx2d.lineWidth = ringSize < 120 ? 2.6 : 2.2;
+      ctx2d.lineWidth = 2.2;
       ctx2d.strokeStyle = 'rgba(' + ringRgb + ',' + (.45 + .5 * level).toFixed(3) + ')';
       // Every bar in one path, drawn in one stroke.
       ctx2d.beginPath();
-      for (var b = 0; b < count; b++) {
-        var a = b / count * Math.PI * 2 - Math.PI / 2;
+      for (var b = 0; b < BARS; b++) {
+        var a = b / BARS * Math.PI * 2 - Math.PI / 2;
         // A slow, even ripple round the circle, so no bar jumps on its own.
         var shape = .5 + .5 * Math.sin(b * .52 + t * 2.4) * Math.cos(b * .21 - t * 1.3);
         levels[b] += (level * (.3 + .7 * shape) - levels[b]) * .25;
