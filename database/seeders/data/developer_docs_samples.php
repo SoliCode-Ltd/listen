@@ -11,14 +11,15 @@
 
 return [
     'ar' => [
-        // Sumaya, in Lebanese: the voice and dialect clients ask for most.
+        // Sumaya, in Egyptian (the most widely understood dialect, and hers on
+        // the home page), as an assistant saying what the English sample says.
         'voice' => 'ar-Gemini-HD-Callirrhoe',
-        'audio' => 'audio/developers/ar-sumaya-lebanese.mp3',
+        'audio' => 'audio/developers/ar-sumaya-egyptian.mp3',
         'body' => [
             'model_id' => 'listen_tts_premium_v1',
-            'text' => 'أهلين فيك! أنا مساعدك الصوتي. فيك تسألني عن أي شي، وأنا هون لساعدك بكل يلّي بتحتاجه.',
+            'text' => 'أهلاً بيك، منوّر تاني! اسألني عن أي حاجة تحبها، وأنا هساعدك على طول.',
             'language_code' => 'ar',
-            'dialect' => 'ar-LB',
+            'dialect' => 'ar-EG',
             'style' => 'assistant',
             'emotion' => 'warm',
             'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
