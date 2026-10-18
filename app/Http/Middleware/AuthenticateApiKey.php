@@ -18,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
 /**
  * Authenticates a developer API request by its key (X-Listen-Api-Key header,
  * or "Authorization: Bearer"), and refuses keys that are revoked, members who
- * are blocked and plans that do not include the API.
+ * are blocked, plans that do not include the API and unpaid trials.
  *
  * Sets on the request: api_key (ApiKey), api_plan (?Plan, the access plan),
  * api_quota_plan (?Plan) and the user resolver.
@@ -69,7 +69,11 @@ class AuthenticateApiKey
         }
 
         $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
-        if (! ApiPlanAccess::enabled($plan)) {
+        $status = ApiPlanAccess::statusFor((int) $user->id, $plan);
+        if ($status === ApiPlanAccess::TRIAL) {
+            throw ApiError::notDuringTrial();
+        }
+        if ($status !== ApiPlanAccess::OK) {
             throw ApiError::notInPlan();
         }
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $plan);

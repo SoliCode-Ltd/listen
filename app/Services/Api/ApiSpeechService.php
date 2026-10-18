@@ -13,6 +13,7 @@ use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
 use App\Support\Api\ApiError;
 use App\Support\Api\ApiModels;
+use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiVoiceCatalog;
 use App\Support\AudioFormats;
 use App\Support\GeminiVocalTags;
@@ -157,38 +158,42 @@ class ApiSpeechService
                 'The text contains words that are not allowed. Change the text and try again.', 'text');
         }
 
-        [$reservation, $recorded] = $this->meter->reserve($userId, $apiKey, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
-            $userId,
-            [
-                'source_type' => 'api',
-                'title' => $spec['title'],
-                'content' => $spec['text'],
-                'language' => $spec['source_language'],
-                'status' => $status,
-                'received_at' => now(),
-            ],
-            [
-                'input_text' => $spec['text'],
-                'source_language' => $spec['source_language'],
-                'target_language' => $spec['language'],
-                'voice_tier' => $spec['tier'],
-                'voice_name' => $spec['voice_name'],
-                'tts_provider' => str_starts_with($spec['voice_name'], 'cloned_') ? 'gemini' : VoiceCatalog::providerForName($spec['voice_name']),
-                'translate' => $spec['translate'],
-                'duration_seconds' => $estimate['seconds'],
-                'status' => $status,
-                'dialect' => $studio['dialect'],
-                'performance_style' => $studio['performance_style'],
-                'style_prompt' => $studio['style_prompt'],
-                'emotion' => $studio['emotion'],
-                'speed' => $studio['speed'],
-                'pitch' => $studio['pitch'],
-                'is_dialogue' => false,
-                'dialogue_metadata' => null,
-                'billed_to_pack' => $reservation['billed_to_pack'],
-                'api_key_id' => (int) $apiKey->id,
-            ],
-        ));
+        [$reservation, $recorded] = $this->meter->reserve($userId, $apiKey, $quotaPlan, $estimate, function (array $reservation) use ($userId, $apiKey, $plan, $async, $spec, $estimate, $status, $studio): array {
+            $this->assertQueueRoom($userId, $plan, $async);
+
+            return $this->audioGenerationRecorder->createForUser(
+                $userId,
+                [
+                    'source_type' => 'api',
+                    'title' => $spec['title'],
+                    'content' => $spec['text'],
+                    'language' => $spec['source_language'],
+                    'status' => $status,
+                    'received_at' => now(),
+                ],
+                [
+                    'input_text' => $spec['text'],
+                    'source_language' => $spec['source_language'],
+                    'target_language' => $spec['language'],
+                    'voice_tier' => $spec['tier'],
+                    'voice_name' => $spec['voice_name'],
+                    'tts_provider' => str_starts_with($spec['voice_name'], 'cloned_') ? 'gemini' : VoiceCatalog::providerForName($spec['voice_name']),
+                    'translate' => $spec['translate'],
+                    'duration_seconds' => $estimate['seconds'],
+                    'status' => $status,
+                    'dialect' => $studio['dialect'],
+                    'performance_style' => $studio['performance_style'],
+                    'style_prompt' => $studio['style_prompt'],
+                    'emotion' => $studio['emotion'],
+                    'speed' => $studio['speed'],
+                    'pitch' => $studio['pitch'],
+                    'is_dialogue' => false,
+                    'dialogue_metadata' => null,
+                    'billed_to_pack' => $reservation['billed_to_pack'],
+                    'api_key_id' => (int) $apiKey->id,
+                ],
+            );
+        });
 
         $job = $recorded['job'];
 
@@ -216,6 +221,37 @@ class ApiSpeechService
         }
 
         return $job;
+    }
+
+    /** Most background generations one member may have waiting or running, for each generation they may run at once. */
+    public const QUEUED_PER_SLOT = 5;
+
+    /**
+     * Background generations share the queue with the extension, so one
+     * member may only have a few waiting at a time. Runs inside the metering
+     * transaction (the member's requests are taken one at a time), so the
+     * count cannot be raced.
+     */
+    private function assertQueueRoom(int $userId, ?Plan $plan, bool $async): void
+    {
+        if (! $async) {
+            return;
+        }
+
+        $limit = max(10, ApiPlanAccess::concurrency($plan) * self::QUEUED_PER_SLOT);
+        $waiting = AudioGeneration::query()
+            ->where('user_id', $userId)
+            ->whereNotNull('api_key_id')
+            ->whereIn('status', ['queued', 'processing'])
+            // A generation stuck far longer than any job may run no longer holds a place.
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->count();
+
+        if ($waiting >= $limit) {
+            throw new ApiError(429, ApiError::TYPE_RATE_LIMIT, 'queue_limit_exceeded',
+                "You already have {$waiting} background generations waiting or running (your limit is {$limit}). Wait for some to finish, then try again.",
+                null, ['Retry-After' => '10'], ['queue_limit' => $limit]);
+        }
     }
 
     /**

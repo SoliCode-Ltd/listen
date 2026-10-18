@@ -25,7 +25,7 @@ final class OpenApiSpec
                 'title' => 'Listen API',
                 'version' => self::VERSION,
                 'summary' => 'Arabic and English text to speech: studio voices, Arabic dialects, English accents and your own cloned voices.',
-                'description' => 'Turn text into natural Arabic and English speech. Generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit: there is never any overage. Full guide: '.url('/developers'),
+                'description' => 'Turn text into natural Arabic and English speech. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Available on paid plans that allow commercial use. Full guide: '.url('/developers'),
                 'contact' => ['name' => 'Listen support', 'email' => 'support@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
@@ -106,7 +106,7 @@ final class OpenApiSpec
                     'tags' => ['Text to speech'],
                     'operationId' => 'textToSpeechAsync',
                     'summary' => 'Convert text to speech in the background',
-                    'description' => 'Queues the generation and answers at once with a history item. Poll GET /v1/history/{history_item_id} until its status is completed or failed, then download the audio. Best for long texts. Credits are reserved now and given back if the generation fails.',
+                    'description' => 'Queues the generation and answers at once with a history item. Poll GET /v1/history/{history_item_id} until its status is completed or failed, then download the audio. Best for long texts. Credits are reserved now and given back if the generation fails. Each account may have a few background generations waiting at once (429 queue_limit_exceeded).',
                     'parameters' => [$voiceIdParam],
                     'requestBody' => $ttsBody,
                     'responses' => [
@@ -465,12 +465,12 @@ final class OpenApiSpec
             '400' => 'The body is not valid JSON.',
             '401' => 'Missing or invalid API key.',
             '402' => 'Not enough credits on the plan or on the key\'s monthly limit.',
-            '403' => 'Your plan or key does not allow this.',
+            '403' => 'Your plan or key does not allow this (the API needs a paid plan with commercial use, and starts after the first payment, not during a free trial).',
             '404' => 'Not found.',
             '409' => 'Not possible in the item\'s current state.',
             '410' => 'The audio is no longer stored.',
             '422' => 'A parameter is not valid.',
-            '429' => 'Rate, concurrency or daily limit reached; see Retry-After.',
+            '429' => 'Rate, concurrency, background-queue or daily limit reached; see Retry-After.',
             '502' => 'The generation failed; no credits were charged.',
         ];
 

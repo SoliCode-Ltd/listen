@@ -389,8 +389,8 @@ class PlanResource extends Resource
                     ->schema([
                         Forms\Components\Toggle::make('api_access_enabled')
                             ->label('Include the developer API')
-                            ->helperText('Members on this plan can create keys at /dashboard/api-keys. Turning it off stops their keys at once (the keys are kept).')
-                            ->default(false)
+                            ->helperText('On by default. The API only works on a paid plan (or pack) that also allows commercial use, never on a free plan or during an unpaid trial. Turning it off, or turning commercial use off, stops this plan\'s keys at once (the keys are kept). Limits, credits and voices always follow this plan\'s current settings.')
+                            ->default(true)
                             ->columnSpan(3),
                         Forms\Components\TextInput::make('api_requests_per_minute')
                             ->label('Requests a minute (per key)')

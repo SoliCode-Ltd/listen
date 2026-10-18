@@ -29,7 +29,8 @@
     .keys-edit summary { cursor: pointer; color: var(--muted); font-size: .85rem; }
     .keys-edit form { display: grid; gap: .5rem; margin-top: .5rem; max-width: 360px; }
     .keys-revoked td { opacity: .65; }
-    .keys-mask { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; direction: ltr; unicode-bidi: isolate; color: var(--text); }
+    .keys-mask { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; direction: ltr; unicode-bidi: isolate; color: var(--text); background: none !important; padding: 0 !important; }
+    .keys-scope { display: inline-block; margin: 0 .25rem .25rem 0; padding: .1rem .5rem; border-radius: var(--radius-full); border: 1px solid var(--line); font-size: .78rem; }
     @media (max-width: 900px) { .keys-grid { grid-template-columns: minmax(0, 1fr); } }
   </style>
 </head>
@@ -39,13 +40,14 @@
   @php
     $k = fn (string $key, array $replace = []) => __('developers.keys.'.$key, $replace);
     $date = fn ($value) => $value ? \Illuminate\Support\Carbon::parse($value)->locale(app()->getLocale())->translatedFormat('j M Y') : null;
-    $isPack = ($usage['mode'] ?? 'monthly') === 'pack';
+    $isPack = $is_pack;
+    $apiEnabled = $status === \App\Support\Api\ApiPlanAccess::OK;
     $percent = (int) ($usage['chars_percent'] ?? 0);
   @endphp
 
   <main class="container dev-page">
     <section class="dev-hero">
-      <span class="dev-kicker">{{ __('developers.docs.kicker') }}</span>
+      <span class="dev-kicker">{{ $k('kicker') }}</span>
       <h1>{{ $k('title') }}</h1>
       <p>{{ $k('subtitle') }}</p>
       <div class="dev-actions">
@@ -74,13 +76,18 @@
       </section>
     @endif
 
-    @unless($apiEnabled)
+    @if($status === \App\Support\Api\ApiPlanAccess::TRIAL)
+      <section class="dev-card">
+        <h2>{{ $k('trial_title') }}</h2>
+        <p>{{ $k('trial_body') }}</p>
+      </section>
+    @elseif(! $apiEnabled)
       <section class="dev-card">
         <h2>{{ $k('not_in_plan_title') }}</h2>
-        <p>{{ $k('not_in_plan_body', ['plan' => $planName]) }}</p>
+        <p>{{ $k('not_in_plan_body', ['plan' => $plan_name]) }}</p>
         <a class="btn btn-primary" href="{{ route('pricing') }}">{{ $k('upgrade_cta') }}</a>
       </section>
-    @endunless
+    @endif
 
     <div class="keys-grid" style="margin-top: 1.25rem;">
       <section class="dev-card">
@@ -93,14 +100,17 @@
           @if($isPack)
             {{ $usage['pack_expires_at'] ? $k('usage_pack_expires', ['date' => $date($usage['pack_expires_at'])]) : '' }}
           @else
-            {{ $k('usage_resets', ['date' => $date($resetsAt)]) }}
+            {{ $k('usage_resets', ['date' => $date($resets_at)]) }}
           @endif
         </div>
         <div class="keys-row">
-          <div><span class="dev-muted">{{ $k('usage_api_requests') }}</span><strong>{{ number_format($apiRequests) }}</strong></div>
-          <div><span class="dev-muted">{{ $k('usage_api_credits') }}</span><strong>{{ number_format($apiCredits) }}</strong></div>
+          <div><span class="dev-muted">{{ $k('usage_api_requests') }}</span><strong>{{ number_format($api_requests) }}</strong></div>
+          <div><span class="dev-muted">{{ $k('usage_api_credits') }}</span><strong>{{ number_format($api_credits) }}</strong></div>
+          @if($app_credits !== null)
+            <div><span class="dev-muted">{{ $k('usage_app_credits') }}</span><strong>{{ number_format($app_credits) }}</strong></div>
+          @endif
         </div>
-        <p class="dev-muted" style="margin-top: 1rem;">{{ $k('usage_hard_cap') }}</p>
+        <p class="dev-muted" style="margin-top: 1rem;">{{ $k('usage_shared') }} {{ $k('usage_hard_cap') }}</p>
         @if($apiEnabled)
           <h3>{{ $k('limits_title') }}</h3>
           <ul>
@@ -113,7 +123,7 @@
 
       <section class="dev-card">
         <h2>{{ $k('create_title') }}</h2>
-        @if($apiEnabled && $activeKeys->count() < $maxKeys)
+        @if($apiEnabled && $active_keys->count() < $maxKeys)
           <form method="POST" action="{{ route('developers.keys.store') }}" class="keys-form">
             @csrf
             <div class="field">
@@ -124,7 +134,7 @@
               <label>{{ $k('permissions_label') }}</label>
               <div class="keys-scopes">
                 @foreach($scopes as $scope)
-                  <label><input type="checkbox" name="scopes[]" value="{{ $scope }}" @checked(old('scopes') === null || in_array($scope, (array) old('scopes'), true))> {{ __('developers.scopes.'.$scope) }} <code>{{ $scope }}</code></label>
+                  <label><input type="checkbox" name="scopes[]" value="{{ $scope }}" @checked(old('scopes') === null || in_array($scope, (array) old('scopes'), true))> {{ __('developers.scopes.'.$scope) }}</label>
                 @endforeach
               </div>
             </div>
@@ -138,7 +148,7 @@
         @elseif($apiEnabled)
           <p>{{ $k('max_keys', ['count' => $maxKeys]) }}</p>
         @else
-          <p>{{ $k('not_in_plan_body', ['plan' => $planName]) }}</p>
+          <p>{{ $status === \App\Support\Api\ApiPlanAccess::TRIAL ? $k('trial_body') : $k('not_in_plan_body', ['plan' => $plan_name]) }}</p>
         @endif
         <div class="dev-note warn" style="margin-top: 1.25rem;"><strong>{{ $k('security_title') }}.</strong> {{ $k('security_body') }}</div>
       </section>
@@ -146,7 +156,7 @@
 
     <section class="dev-card" style="margin-top: 1.25rem;">
       <h2>{{ $k('list_title') }}</h2>
-      @if($activeKeys->isEmpty())
+      @if($active_keys->isEmpty())
         <p>{{ $k('empty') }}</p>
       @else
         <div class="dev-table-wrap">
@@ -156,9 +166,9 @@
               <th>{{ $k('col_month') }}</th><th>{{ $k('col_last_used') }}</th><th>{{ $k('col_created') }}</th><th></th>
             </tr></thead>
             <tbody>
-              @foreach($activeKeys as $apiKey)
-                @php($used = (int) ($monthUsage->get($apiKey->id)?->credits ?? 0))
-                @php($requests = (int) ($monthUsage->get($apiKey->id)?->requests ?? 0))
+              @foreach($active_keys as $apiKey)
+                @php($used = (int) ($month_usage->get($apiKey->id)?->credits ?? 0))
+                @php($requests = (int) ($month_usage->get($apiKey->id)?->requests ?? 0))
                 <tr>
                   <td>
                     {{ $apiKey->name }}
@@ -175,12 +185,12 @@
                       </form>
                     </details>
                   </td>
-                  <td><span class="keys-mask">{{ $apiKey->maskedKey() }}</span></td>
+                  <td><code class="keys-mask" data-code>{{ $apiKey->maskedKey() }}</code></td>
                   <td>
                     @if($apiKey->scopes === null)
                       {{ $k('all_permissions') }}
                     @else
-                      @foreach($apiKey->scopes as $scope)<code>{{ $scope }}</code> @endforeach
+                      @foreach($apiKey->scopes as $scope)<span class="keys-scope">{{ __('developers.scopes.'.$scope) }}</span> @endforeach
                     @endif
                   </td>
                   <td>
@@ -205,15 +215,15 @@
         </div>
       @endif
 
-      @if($revokedKeys->isNotEmpty())
+      @if($revoked_keys->isNotEmpty())
         <h3>{{ $k('revoked_title') }}</h3>
         <div class="dev-table-wrap">
           <table class="dev-table">
             <tbody>
-              @foreach($revokedKeys as $apiKey)
+              @foreach($revoked_keys as $apiKey)
                 <tr class="keys-revoked">
                   <td>{{ $apiKey->name }}</td>
-                  <td><span class="keys-mask">{{ $apiKey->maskedKey() }}</span></td>
+                  <td><code class="keys-mask" data-code>{{ $apiKey->maskedKey() }}</code></td>
                   <td>{{ $k('revoked_on', ['date' => $date($apiKey->revoked_at)]) }}</td>
                 </tr>
               @endforeach

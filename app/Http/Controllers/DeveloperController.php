@@ -3,17 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
-use App\Models\ApiKeyUsage;
 use App\Models\Plan;
-use App\Models\UsageCounter;
+use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
+use App\Support\Api\ApiDocs;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiScopes;
 use App\Support\Api\ApiVoiceCatalog;
 use App\Support\PlanUsageGuard;
-use App\Support\UsageSnapshot;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -34,9 +33,11 @@ class DeveloperController extends Controller
             $plans = Plan::query()
                 ->subscriptionPlans()
                 ->where('is_active', true)
-                ->where('api_access_enabled', true)
                 ->orderBy('price_cents')
-                ->get();
+                ->get()
+                // The same rule the API applies on every request.
+                ->filter(fn (Plan $plan): bool => ApiPlanAccess::enabled($plan))
+                ->values();
         } catch (\Throwable) {
             // Code deployed before its migration: the page still opens, without the table.
             $plans = collect();
@@ -54,55 +55,44 @@ class DeveloperController extends Controller
                 : [ApiModels::STANDARD],
         ])->all();
 
-        $sampleVoice = collect(ApiVoiceCatalog::premade(VoiceTier::HD))
-            ->first(fn (array $voice): bool => $voice['name'] === 'Sumaya' && $voice['language'] === 'ar')
-            ?? collect(ApiVoiceCatalog::premade(VoiceTier::HD))->first(fn (array $voice): bool => $voice['language'] === 'ar');
-
         return view('developers.docs', [
+            'docs' => ApiDocs::build($locale, url('/v1'), $this->sampleVoice($locale)),
             'planRows' => $planRows,
             'baseUrl' => url('/v1'),
-            'sampleVoiceId' => $sampleVoice['voice_id'] ?? 'voice_12',
-            'scopes' => ApiScopes::all(),
         ]);
     }
 
-    public function keys(Request $request): View
+    /**
+     * The voice the examples use: Sumaya in Lebanese on the Arabic page, an
+     * English premium voice on the English page, so each page reads in its
+     * own language.
+     *
+     * @return array{voice_id:string, name:string, language:string, gender:?string}
+     */
+    private function sampleVoice(string $locale): array
     {
-        $user = $request->user();
-        $userId = (int) $user->id;
-        $plan = $this->planAccessService->resolveAccessPlanForUserId($userId);
-        $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $plan);
-        $period = now()->format('Y-m');
+        try {
+            $voices = collect(ApiVoiceCatalog::premade(VoiceTier::HD, false));
+        } catch (\Throwable) {
+            $voices = collect();
+        }
+        $language = $locale === 'ar' ? 'ar' : 'en';
+        $premium = $voices->filter(fn (array $voice): bool => $voice['language'] === $language && $voice['_tier'] === VoiceTier::HD);
+        $voice = ($language === 'ar' ? $premium->firstWhere('name', 'Sumaya') : null)
+            ?? $premium->firstWhere('featured', true)
+            ?? $premium->first();
 
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
-        $usage = UsageSnapshot::for($userId, $quotaPlan, $counter);
+        return [
+            'voice_id' => (string) ($voice['voice_id'] ?? 'voice_12'),
+            'name' => (string) ($voice['name'] ?? ($language === 'ar' ? 'Sumaya' : 'Olivia')),
+            'language' => $language,
+            'gender' => $voice['gender'] ?? null,
+        ];
+    }
 
-        $keys = ApiKey::query()->where('user_id', $userId)->orderByDesc('id')->get();
-        $monthUsage = ApiKeyUsage::query()
-            ->whereIn('api_key_id', $keys->pluck('id'))
-            ->where('period_ym', $period)
-            ->get()
-            ->keyBy('api_key_id');
-
-        return view('developers.keys', [
-            'plan' => $plan,
-            'planName' => $plan ? ($plan->getLocalizedName(app()->getLocale()) ?: (string) $plan->name) : __('ui.dashboard.free_plan'),
-            'apiEnabled' => ApiPlanAccess::enabled($plan),
-            'usage' => $usage,
-            'resetsAt' => now()->startOfMonth()->addMonth(),
-            'activeKeys' => $keys->whereNull('revoked_at')->values(),
-            'revokedKeys' => $keys->whereNotNull('revoked_at')->take(10)->values(),
-            'monthUsage' => $monthUsage,
-            'apiRequests' => (int) $monthUsage->sum('requests'),
-            'apiCredits' => (int) $monthUsage->sum('credits'),
-            'limits' => [
-                'rpm' => ApiPlanAccess::requestsPerMinute($plan),
-                'concurrency' => ApiPlanAccess::concurrency($plan),
-                'max_chars' => min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), ApiSpeechService::MAX_TEXT),
-            ],
+    public function keys(Request $request, ApiAccountSummary $summary): View
+    {
+        return view('developers.keys', $summary->for($request->user()) + [
             'scopes' => ApiScopes::all(),
             'newKey' => $request->session()->get('new_api_key_plain'),
             'maxKeys' => ApiKey::MAX_ACTIVE_PER_USER,
@@ -113,8 +103,11 @@ class DeveloperController extends Controller
     {
         $user = $request->user();
         $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
-        if (! ApiPlanAccess::enabled($plan)) {
-            return redirect()->route('developers.keys')->with('error', __('developers.keys.not_in_plan_title'));
+        $status = ApiPlanAccess::statusFor((int) $user->id, $plan);
+        if ($status !== ApiPlanAccess::OK) {
+            return redirect()->route('developers.keys')->with('error', $status === ApiPlanAccess::TRIAL
+                ? __('developers.keys.trial_title')
+                : __('developers.keys.not_in_plan_title'));
         }
 
         $validated = $request->validate([

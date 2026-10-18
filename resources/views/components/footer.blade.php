@@ -78,6 +78,7 @@
               <li><a href="{{ route('demo.page') }}">{{ __('ui.footer.demo') }}</a></li>
             @endif
             <li><a href="{{ route('browsers-extension.page') }}">{{ __('ui.nav.extension') }}</a></li>
+            <li><a href="{{ route('developers') }}">{{ __('developers.footer_link') }}</a></li>
             {{-- The two SEO hubs: they link every dialect, accent and solution page, which are also in the sitemap. --}}
             <li><a href="{{ route('seo.arabic-dialects') }}">{{ __('ui.nav.arabic_dialects') }}</a></li>
             <li><a href="{{ route('seo.english-accents') }}">{{ __('ui.nav.english_accents') }}</a></li>

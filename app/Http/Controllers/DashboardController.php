@@ -142,7 +142,18 @@ class DashboardController extends Controller
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
         $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);
 
+        // The developer API section, for members whose plan includes it.
+        $developerApi = null;
+        try {
+            if (\App\Support\Api\ApiPlanAccess::enabled($activePlan)) {
+                $developerApi = app(\App\Services\Api\ApiAccountSummary::class)->for($request->user());
+            }
+        } catch (\Throwable) {
+            // Before the developer API migration has run on a server.
+        }
+
         return view('dashboard', [
+            'developerApi' => $developerApi,
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
             'packOffer' => $packOffer,

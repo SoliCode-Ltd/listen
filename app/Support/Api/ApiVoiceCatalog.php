@@ -4,12 +4,15 @@ namespace App\Support\Api;
 
 use App\Models\ClonedVoice;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\Voice;
+use App\Models\VoiceSample;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceFlag;
 use App\Support\VoiceTier;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * The voices the developer API offers: the same speakers the dashboard shows
@@ -28,6 +31,34 @@ final class ApiVoiceCatalog
      * @return array<string, array<string, mixed>>
      */
     public static function premade(?string $planTier, bool $withMedia = true): array
+    {
+        // Built once and kept until a voice, a sample or the engine setting
+        // changes (the key holds their latest edits), so busy integrations do
+        // not rebuild the library on every call.
+        $version = implode('|', [
+            (string) SiteSetting::get('tts_mode', config('listen.tts.mode', 'google')),
+            (string) Voice::query()->max('updated_at'),
+            // Also changes when voices are switched on or off without a timestamp (bulk updates).
+            (string) Voice::query()->where('is_active', true)->count(),
+            (string) Voice::query()->where('is_active', true)->sum('id'),
+            (string) VoiceSample::query()->max('updated_at'),
+            (string) VoiceSample::query()->where('is_active', true)->count(),
+            url('/'),
+        ]);
+        $key = 'api-voices:'.md5($version).':'.($withMedia ? 'media' : 'plain');
+        $voices = Cache::remember($key, now()->addMinutes(30), fn (): array => self::buildPremade($withMedia));
+
+        return array_map(static function (array $voice) use ($planTier): array {
+            $voice['available_on_plan'] = $planTier !== null && ! VoiceTier::isHigherThan((string) $voice['_tier'], $planTier);
+
+            return $voice;
+        }, $voices);
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private static function buildPremade(bool $withMedia): array
     {
         $library = $withMedia ? VoiceCatalog::libraryEntries(false) : [];
         $ids = [];
@@ -53,7 +84,7 @@ final class ApiVoiceCatalog
                 continue;
             }
             $key = VoiceCatalog::keyFromId($id);
-            $voices[$key] = self::presentPremade($voice, $library[$key] ?? [], $planTier, $arabicNames[$id] ?? '');
+            $voices[$key] = self::presentPremade($voice, $library[$key] ?? [], $arabicNames[$id] ?? '');
         }
 
         return $voices;
@@ -108,7 +139,7 @@ final class ApiVoiceCatalog
      * @param  array<string, mixed>  $library  VoiceCatalog::libraryEntries() row
      * @return array<string, mixed>
      */
-    private static function presentPremade(Voice $voice, array $library, ?string $planTier, string $arabicName): array
+    private static function presentPremade(Voice $voice, array $library, string $arabicName): array
     {
         $tier = VoiceTier::normalize((string) $voice->tier);
         $displayName = (string) $voice->display_name;
@@ -124,7 +155,8 @@ final class ApiVoiceCatalog
             'accent' => $dialect !== '' ? (VoiceFlag::label($dialect, false) ?: null) : null,
             'model_id' => ApiModels::forTier($tier),
             'featured' => (bool) $voice->is_featured,
-            'available_on_plan' => $planTier !== null && ! VoiceTier::isHigherThan($tier, $planTier),
+            // Set per member by premade().
+            'available_on_plan' => false,
             'preview_url' => self::absolute($library['p'] ?? null),
             'avatar_url' => self::absolute($library['a'] ?? null),
             // Internal: used when generating, removed before the voice is shown.

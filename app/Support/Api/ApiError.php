@@ -62,6 +62,12 @@ class ApiError extends RuntimeException
             'Your current plan does not include API access. Upgrade your plan to use the API.');
     }
 
+    public static function notDuringTrial(): self
+    {
+        return new self(403, self::TYPE_PERMISSION, 'api_not_available_during_trial',
+            'The API starts once your first payment has gone through. It is not available during a free trial.');
+    }
+
     public static function missingScope(string $scope): self
     {
         return new self(403, self::TYPE_PERMISSION, 'missing_permission',
