@@ -309,6 +309,21 @@ final class PlanPricingLines
         return $lines;
     }
 
+    /**
+     * A line's label as a key for matching the same line across plans, so a label typed
+     * a little differently on each plan ("التوليدات يومياً", "التوليدات يوميا", "Daily
+     * generations ") is still one line: case, spaces, Arabic marks, the forms of alef
+     * and a final ى do not count.
+     */
+    public static function labelKey(string $label): string
+    {
+        $key = mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $label)));
+        $key = (string) preg_replace('/[\x{064B}-\x{065F}\x{0670}\x{0640}]/u', '', $key);
+        $key = strtr($key, ['أ' => 'ا', 'إ' => 'ا', 'آ' => 'ا', 'ٱ' => 'ا', 'ى' => 'ي']);
+
+        return rtrim($key, ' :.');
+    }
+
     private static function locale(string $locale): string
     {
         return in_array($locale, self::LOCALES, true) ? $locale : 'en';

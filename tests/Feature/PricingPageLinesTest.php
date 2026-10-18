@@ -266,6 +266,47 @@ class PricingPageLinesTest extends TestCase
         }
     }
 
+    public function test_a_line_spelled_a_little_differently_on_each_plan_is_one_row_in_the_table(): void
+    {
+        // As typed on the live plans: the first plan's labels differ from the others' by a
+        // tanween and a hamza, which left two half-empty rows each.
+        $this->premiumPlan(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'monthly_chars' => 225000, 'pricing_extra_lines_ar' => [
+            ['label' => 'التوليدات يومياً', 'value' => '15', 'icon' => 'activity'],
+            ['label' => 'دقائق الاستخدام الصوتي', 'value' => '20', 'icon' => 'clock'],
+        ]]);
+        foreach (['creator' => [2200, 100, 250], 'pro' => [4900, 200, 500]] as $slug => [$cents, $daily, $minutes]) {
+            $this->premiumPlan(['slug' => $slug, 'name' => ucfirst($slug), 'price_cents' => $cents, 'monthly_chars' => $cents * 500, 'pricing_extra_lines_ar' => [
+                ['label' => 'التوليدات يوميا', 'value' => (string) $daily, 'icon' => 'activity'],
+                ['label' => 'دقائق الإستخدام الصوتي ', 'value' => (string) $minutes, 'icon' => 'clock'],
+            ]]);
+        }
+
+        app()->setLocale('ar');
+        $html = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
+        $start = strpos($html, 'class="compare-table"');
+        $table = substr($html, $start, strpos($html, '</table>', $start) - $start);
+        $rows = [];
+        preg_match_all('#<tr>\s*<th scope="row">(.*?)</th>(.*?)</tr>#s', $table, $found, PREG_SET_ORDER);
+        foreach ($found as [, $label, $cells]) {
+            preg_match_all('#<td[^>]*>(.*?)</td>#s', $cells, $values);
+            $rows[trim(strip_tags($label))] = array_map(fn ($v) => trim(strip_tags($v)), $values[1]);
+        }
+
+        // Daily generations join the site's own line, in the usage group, with every plan's number.
+        $daily = __('ui.pricing.lines.label_daily_requests');
+        $this->assertSame(['15', '100', '200'], $rows[$daily] ?? [], implode(' | ', array_keys($rows)));
+        $this->assertLessThan(strpos($table, '<span>'.__('ui.pricing.compare_group_features').'</span>'), strpos($table, '>'.$daily.'<'));
+        // The admin's own line is one row, under the first plan's spelling.
+        $this->assertSame(['20', '250', '500'], $rows['دقائق الاستخدام الصوتي'] ?? []);
+        foreach (array_keys($rows) as $label) {
+            $this->assertStringNotContainsString('يومياً', $label);
+            $this->assertStringNotContainsString('الإستخدام', $label);
+        }
+
+        $this->assertSame(PlanPricingLines::labelKey('Daily generations'), PlanPricingLines::labelKey('  daily   Generations: '));
+        $this->assertNotSame(PlanPricingLines::labelKey('Daily generations'), PlanPricingLines::labelKey('Monthly generations'));
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Admin form
     // ──────────────────────────────────────────────────────────────────

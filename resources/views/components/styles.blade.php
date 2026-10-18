@@ -257,8 +257,8 @@ html[data-theme="light"] .site-logo.logo-light {
   grid-template-columns: 1fr 1fr;
   align-items: center;
   position: relative;
-  background: color-mix(in oklab, var(--text) 5%, transparent);
-  border: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius-full);
   padding: 4px;
   isolation: isolate;
@@ -276,9 +276,10 @@ html[data-theme="light"] .site-logo.logo-light {
   width: calc(50% - 4px);
   height: calc(100% - 8px);
   border-radius: var(--radius-full);
-  /* A quiet segmented control: the chosen language sits on a raised chip. */
-  background: var(--surface);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .04);
+  /* The chosen language sits on a solid violet pill. */
+  background: var(--brand-accent);
+  border: 1px solid var(--brand-accent);
+  box-shadow: 0 4px 12px var(--brand-accent-glow);
   transition: transform .25s cubic-bezier(.4, 0, .2, 1);
   z-index: 0;
   pointer-events: none;
@@ -331,12 +332,8 @@ html[data-theme="light"] .site-logo.logo-light {
 }
 
 .locale-link.active {
-  color: var(--text);
-}
-html:not([data-theme="light"]) .locale-switch .locale-indicator,
-html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
-  background: #2E2E3A;
-  box-shadow: none;
+  color: #ffffff;
+  font-weight: 800;
 }
 
 .btn {

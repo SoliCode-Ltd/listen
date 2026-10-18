@@ -775,12 +775,21 @@
       $minutesLabel = __('ui.pricing.lines.label_voice_minutes');
       $creditsLabel = __('ui.pricing.compare_credits');
       $comparePlans = array_values(array_filter($pricingPlans, fn ($p) => empty($p['is_pack'])));
+      // One row per line even when a plan spells its label a little differently
+      // ("التوليدات يومياً" / "التوليدات يوميا"): the row takes the site's own label when
+      // there is one, else the first plan's.
+      $compareLabels = [];
+      foreach (array_merge(array_map(fn ($key) => __('ui.pricing.lines.label_'.$key), array_keys(\App\Support\PlanPricingLines::LINES)), [$creditsLabel]) as $siteLabel) {
+        $compareLabels[\App\Support\PlanPricingLines::labelKey($siteLabel)] = $siteLabel;
+      }
       $compareRows = [];
       foreach ($comparePlans as $comparePlan) {
         foreach ($comparePlan['features'] as $line) {
-          $label = (string) ($line['label'] ?? '');
+          $label = trim((string) ($line['label'] ?? ''));
           if ($label !== '') {
-            $compareRows[$label][$comparePlan['slug']] = (string) ($line['value'] ?? $includedMark);
+            $label = $compareLabels[\App\Support\PlanPricingLines::labelKey($label)] ??= $label;
+            // A plan listing the same line twice keeps the first.
+            $compareRows[$label][$comparePlan['slug']] ??= (string) ($line['value'] ?? $includedMark);
           }
           if ($label === $minutesLabel && empty($comparePlan['free_try_chars'])) {
             $compareRows[$creditsLabel][$comparePlan['slug']] = number_format((int) ($comparePlan['monthly_chars'] ?? 0));
