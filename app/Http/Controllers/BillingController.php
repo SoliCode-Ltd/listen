@@ -22,11 +22,11 @@ use App\Support\DiscountTerms;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Exceptions\IncompletePayment;
-use Laravel\Cashier\Exceptions\SubscriptionUpdateFailure;
 use Stripe\Exception\ApiErrorException;
 
 class BillingController extends Controller
@@ -77,6 +77,8 @@ class BillingController extends Controller
             'countryContext' => $countryContext,
             'paymentBrandAssets' => $this->localizedPricingService->paymentBrandAssets(),
             'trialOffer' => $this->trialEligibility->offerFor($user),
+            // On a paid plan, another plan costs the difference today (the order details say how much).
+            'paidPlanChange' => $stripeReady && $subscription && $subscription->valid() && ! $subscription->onTrial(),
         ]);
     }
 
@@ -357,7 +359,10 @@ class BillingController extends Controller
             'payment_method' => ['nullable', 'string', 'max:255'],
             'save_card' => ['nullable', 'boolean'],
             'end_trial' => ['nullable', 'boolean'],
+            'proration_date' => ['nullable', 'integer'],
         ]);
+        // The moment the member's order details were worked out, so the charge matches them.
+        $prorationDate = isset($validated['proration_date']) ? (int) $validated['proration_date'] : null;
 
         // Dynamically validate plan slug exists as an active paid plan
         $planRecord = Plan::query()->subscriptionPlans()
@@ -437,32 +442,20 @@ class BillingController extends Controller
                 ], 409);
             }
 
-            if ($subscription && $subscription->valid() && $subscription->onTrial()) {
-                // Confirmed "pay now" for another plan.
+            if ($subscription && $subscription->valid() && ! $samePlan) {
+                // Another plan (or a confirmed "pay now" on a trial): the difference is charged
+                // today, and the plan changes only once it is paid.
                 if ($paymentMethod !== '') {
                     $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }
-                $notCharged = $this->endTrialAndCharge($user, $subscription, $priceId, $couponId);
+                $notCharged = $this->changePlanAndCharge($user, $subscription, $priceId, $couponId, $prorationDate, $charged);
                 if ($notCharged !== null) {
                     return $notCharged;
                 }
             } elseif ($subscription && $subscription->valid()) {
-                if (! $samePlan) {
-                    try {
-                        $subscription->swap($priceId, $couponId ? ['discounts' => [['coupon' => $couponId]]] : []);
-                        if ($paymentMethod !== '') {
-                            $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
-                        }
-                    } catch (SubscriptionUpdateFailure $exception) {
-                        // Incomplete / stale local records must be retired before recreating.
-                        $this->retireStaleSubscription($subscription);
-                        $this->createNewSubscription($user, $priceId, $paymentMethod, $couponId);
-                    }
-                } else {
-                    $charged = false;
-                    if ($paymentMethod !== '') {
-                        $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
-                    }
+                $charged = false;
+                if ($paymentMethod !== '') {
+                    $this->setSubscriptionPaymentMethod($user, $subscription, $paymentMethod);
                 }
             } else {
                 if ($subscription) {
@@ -788,27 +781,27 @@ class BillingController extends Controller
     }
 
     /**
-     * Ends a trial and charges the new plan today. The change is applied only
-     * if the payment succeeds; a declined card leaves the trial exactly as it was.
+     * Moves the subscription to another plan and charges the difference today,
+     * like this: the new plan from today, less a credit for the time left on the
+     * current one. The billing date becomes today. Ending a trial charges the new
+     * plan in full. The change is applied only if the payment succeeds; a declined
+     * card leaves the subscription exactly as it was.
      * Returns null when paid, or the response to send when it was not.
      */
-    private function endTrialAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId): ?\Illuminate\Http\JsonResponse
+    private function changePlanAndCharge(User $user, BillingSubscription $subscription, string $priceId, ?string $couponId, ?int $prorationDate, bool &$charged): ?\Illuminate\Http\JsonResponse
     {
         $stripeId = (string) $subscription->stripe_id;
         $stripe = Cashier::stripe();
         $current = $stripe->subscriptions->retrieve($stripeId, []);
         $item = $current->items->data[0] ?? null;
         $oldPrice = (string) ($item->price->id ?? $subscription->stripe_price ?? '');
+        $endTrial = $subscription->onTrial();
 
         // Before the update: the invoice.paid webhook can land first and lock the trial record.
         $this->trialOutcomes->followPrice($stripeId, $priceId);
 
-        $payload = [
-            'items' => [array_filter(['id' => (string) ($item->id ?? ''), 'price' => $priceId])],
-            'trial_end' => 'now',
-            'proration_behavior' => 'always_invoice',
+        $payload = $this->planChangeDetails($current, $priceId, $endTrial, $prorationDate) + [
             'payment_behavior' => 'pending_if_incomplete',
-            'cancel_at_period_end' => false,
             'expand' => ['latest_invoice.payments'],
         ];
         if ($couponId) {
@@ -823,10 +816,14 @@ class BillingController extends Controller
         }
 
         if (empty($updated->pending_update)) {
+            // A move to a cheaper plan can cost nothing today: its credit pays the next renewals.
+            $paid = $updated->latest_invoice->amount_paid ?? null;
+            $charged = $paid === null || (int) $paid > 0;
+
             return null;
         }
 
-        // Not paid yet: the trial and its plan stay as they were.
+        // Not paid yet: the subscription and its plan stay as they were.
         $this->trialOutcomes->followPrice($stripeId, $oldPrice);
         $invoice = $updated->latest_invoice ?? null;
         $intent = $this->invoicePaymentIntent($invoice);
@@ -848,7 +845,7 @@ class BillingController extends Controller
             try {
                 $stripe->invoices->voidInvoice($invoiceId, []);
             } catch (\Throwable $exception) {
-                Log::warning('Could not void the invoice of a declined trial upgrade.', [
+                Log::warning('Could not void the invoice of a declined plan change.', [
                     'user_id' => $user->id,
                     'invoice' => $invoiceId,
                     'error' => $exception->getMessage(),
@@ -857,12 +854,180 @@ class BillingController extends Controller
         }
         $this->billingSyncService->syncIfStale($user, true);
 
+        if ($endTrial) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_trial_upgrade_declined', [
+                    'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()),
+                ]),
+            ], 422);
+        }
+
+        $currentPlan = $this->billingSubscriptionPlan($subscription)['plan'] ?? null;
+
         return response()->json([
             'ok' => false,
-            'message' => __('ui.backend.billing_trial_upgrade_declined', [
-                'date' => $this->formatDateLabel($subscription->trial_ends_at?->toDateString()),
+            'message' => __('ui.backend.billing_plan_change_declined', [
+                'plan' => $currentPlan ? $this->planDisplayName($currentPlan) : __('ui.billing.plan'),
             ]),
         ], 422);
+    }
+
+    /**
+     * The subscription change itself, shared by the order details and the payment
+     * so both work out the same amount.
+     *
+     * @return array<string, mixed>
+     */
+    private function planChangeDetails(object $current, string $priceId, bool $endTrial, ?int $prorationDate): array
+    {
+        $item = $current->items->data[0] ?? null;
+        $details = [
+            'items' => [array_filter(['id' => (string) ($item->id ?? ''), 'price' => $priceId])],
+            'proration_behavior' => 'always_invoice',
+            'cancel_at_period_end' => false,
+        ];
+
+        if ($endTrial) {
+            $details['trial_end'] = 'now';
+
+            return $details;
+        }
+
+        $details['billing_cycle_anchor'] = 'now';
+        // Only a recent moment inside this billing period; otherwise Stripe uses now.
+        $periodStart = (int) ($item->current_period_start ?? $current->current_period_start ?? 0);
+        if ($prorationDate !== null && $prorationDate <= time() && $prorationDate >= time() - 3600 && $prorationDate >= $periodStart) {
+            $details['proration_date'] = $prorationDate;
+        }
+
+        return $details;
+    }
+
+    /**
+     * What moving to another plan costs today, shown before the member pays: the
+     * new plan, the credit for the time left on the current one, and the total.
+     */
+    public function planChangePreview(Request $request)
+    {
+        if (! $this->isStripeReady()) {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_not_configured')], 422);
+        }
+
+        $user = $request->user();
+        $validated = $request->validate([
+            'plan' => ['required', 'string', 'max:50'],
+            'billing_cycle' => ['required', 'in:monthly,yearly'],
+        ]);
+
+        $plan = Plan::query()->subscriptionPlans()
+            ->where('slug', $validated['plan'])
+            ->where('is_active', true)
+            ->where('price_cents', '>', 0)
+            ->first();
+        $cycle = (string) $validated['billing_cycle'];
+        $priceId = $plan ? $this->resolveStripePriceId((string) $plan->slug, $cycle) : '';
+        $subscription = $this->currentDefaultSubscription($user);
+
+        // Only a paid plan changes with a credit; anything else pays the plan's price as shown.
+        if ($priceId === '' || ! $subscription || ! $subscription->valid() || $subscription->onTrial()
+            || trim((string) $user->stripe_id) === ''
+            || $this->isOnPlan($subscription, $priceId, (string) $plan->slug, $cycle)) {
+            return response()->json(['ok' => true, 'change' => false]);
+        }
+
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+        $locale = app()->getLocale();
+        $prorationDate = time();
+
+        try {
+            $stripe = Cashier::stripe();
+            $current = $stripe->subscriptions->retrieve((string) $subscription->stripe_id, []);
+            $params = [
+                'customer' => (string) $user->stripe_id,
+                'subscription' => (string) $subscription->stripe_id,
+                'subscription_details' => $this->planChangeDetails($current, $priceId, false, $prorationDate),
+            ];
+            $couponId = $this->resolveCheckoutCouponId($plan, $cycle);
+            if ($couponId) {
+                $params['discounts'] = [['coupon' => $couponId]];
+            }
+            $invoice = $stripe->invoices->createPreview($params);
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to preview a plan change.', [
+                'user_id' => $user->id,
+                'plan' => $plan->slug,
+                'billing_cycle' => $cycle,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return response()->json(['ok' => false, 'change' => true], 422);
+        }
+
+        $currency = strtoupper((string) ($invoice->currency ?? 'usd'));
+        $money = fn (int $cents): string => $this->formatLocalizedInvoiceAmount(abs($cents), $currency, $countryContext, $locale);
+
+        $charge = 0;
+        $credit = 0;
+        $renews = 0;
+        foreach ($invoice->lines->data ?? [] as $line) {
+            $amount = (int) ($line->amount ?? 0);
+            if ($amount >= 0) {
+                $charge += $amount;
+                $renews = max($renews, (int) ($line->period->end ?? 0));
+            } else {
+                $credit += $amount;
+            }
+        }
+        $discount = 0;
+        foreach ($invoice->total_discount_amounts ?? [] as $row) {
+            $discount += (int) ($row->amount ?? 0);
+        }
+        $total = (int) ($invoice->total ?? ($charge + $credit - $discount));
+        $due = max(0, (int) ($invoice->amount_due ?? $total));
+        $balanceUsed = $total > 0 ? max(0, $total - $due) : 0;
+
+        $currentPlan = $this->billingSubscriptionPlan($subscription)['plan'] ?? null;
+        $currentName = $currentPlan ? $this->planDisplayName($currentPlan) : __('ui.billing.plan');
+        $cycleName = $cycle === 'yearly' ? __('ui.billing.order_yearly') : __('ui.billing.order_monthly');
+
+        $lines = [[
+            'kind' => 'plan',
+            'label' => __('ui.billing.order_plan_line', ['plan' => $this->planDisplayName($plan), 'cycle' => $cycleName]),
+            'amount' => $money($charge),
+        ]];
+        if ($credit < 0) {
+            $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_credit_line', ['plan' => $currentName]), 'amount' => $money($credit)];
+        }
+        if ($discount > 0) {
+            $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_discount_line'), 'amount' => $money($discount)];
+        }
+        if ($balanceUsed > 0) {
+            $lines[] = ['kind' => 'credit', 'label' => __('ui.billing.order_balance_line'), 'amount' => $money($balanceUsed)];
+        }
+
+        $charged = $this->formatInvoiceTotalLabel($due, $currency);
+        $shown = $money($due);
+
+        return response()->json([
+            'ok' => true,
+            'change' => true,
+            'proration_date' => $prorationDate,
+            'lines' => $lines,
+            'total' => $shown,
+            'total_cents' => $due,
+            // Shown in local money, charged in the price's currency: say what the card pays.
+            'charged' => $due > 0 && $charged !== $shown ? $charged : null,
+            'credit_left' => $total < 0 ? $money($total) : null,
+            'renews_on' => $renews > 0 ? $this->formatCarbonDate(Carbon::createFromTimestamp($renews)) : null,
+        ]);
+    }
+
+    private function planDisplayName(Plan $plan): string
+    {
+        $key = 'ui.pricing.plan_name_'.$plan->slug;
+
+        return Lang::has($key) ? (string) __($key) : (string) $plan->name;
     }
 
     private function invoicePaymentIntent(mixed $invoice): ?object
