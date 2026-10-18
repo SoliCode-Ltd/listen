@@ -7,13 +7,15 @@
  *   <span class="orb" data-orb="arabic" data-orb-colors="#..,#..,#..,#.."><canvas></canvas></span>
  *
  * One WebGL context draws every orb and copies each frame into the orb's own
- * canvas, so a page with many orbs stays light. An orb moves only while it is
- * hovered, focused (.is-live) or playing (inside a playing [data-vp-track]);
- * the rest keep a still frame. Without WebGL the CSS sphere stays as it is.
+ * canvas, so a page with many orbs stays light. Without WebGL the CSS sphere
+ * stays as it is; with reduced motion every orb keeps a still frame.
  *
- * How an orb behaves: picked, its colour keeps flowing; hovered, it flows faster
- * and brightens; playing, it lights up, flows with the voice, rings ripple out
- * with the loudness and a halo breathes around it.
+ * How an orb behaves, on every page: in view, its colour drifts gently on its
+ * own (the chosen one, .is-live, a little more); hovering or focusing it or its
+ * card ([data-orb-host]) quickens and brightens it; a voice playing in its card
+ * ([data-vp-track]), on its stage or anywhere in its section ([data-orb-follow])
+ * makes it light up, flow with the voice, ripple with the loudness and breathe
+ * a halo around it.
  */
 (function () {
   'use strict';
@@ -177,34 +179,37 @@
     // The homepage conversation plays its own lines and keeps their loudness on its stage.
     var cast = o.el.closest('[data-vs-cast]');
     if (cast && cast.classList.contains('is-voicing')) return Math.max(0, Math.min(1, cast.__vpLevel || 0));
+    // A section's orb follows whichever card in the section is playing.
+    var section = o.el.closest('[data-orb-follow]');
+    var playing = section && section.querySelector('[data-vp-track].is-playing');
+    if (playing) return Math.max(0, Math.min(1, playing.__vpLevel || 0));
     return -1;
   }
-  function isLive(o) {
-    if (!o.visible) return false;
-    return o.hover || o.el.classList.contains('is-live') || voiceLevel(o) >= 0 || !!o.el.closest('.is-playing');
-  }
 
-  var frame = 0, last = 0, idle = 0;
+  var frame = 0, last = 0, idle = 0, beat = false;
   function tick(now) {
     var dt = last ? Math.min(0.05, (now - last) / 1000) : 0.016;
     last = now;
+    beat = !beat;
     var any = false;
     orbs.forEach(function (o) {
-      var live = isLive(o);
-      var voice = live ? voiceLevel(o) : -1;
-      var playing = voice >= 0;
-      var targetLevel = playing ? voice : 0;
-      var targetLift = playing ? 0.1 + 0.22 * voice : (live && o.hover ? 0.07 : 0);
-      var targetSpeed = playing ? 2.2 + 2.6 * voice : (o.hover ? 2.1 : 1);
-      if (!live && o.level < 0.002 && o.lift < 0.002) return;
+      if (!o.visible) return;
       any = true;
+      var voice = voiceLevel(o);
+      var playing = voice >= 0;
+      var chosen = o.el.classList.contains('is-live');
+      var targetLevel = playing ? voice : 0;
+      var targetLift = playing ? 0.1 + 0.22 * voice : (o.hover ? 0.07 : 0);
+      var targetSpeed = playing ? 2.2 + 2.6 * voice : (o.hover ? 2.1 : (chosen ? 1 : 0.7));
       var k = Math.min(1, dt * 8);
       o.level += (targetLevel - o.level) * k;
       o.lift += (targetLift - o.lift) * k;
       o.speed += (targetSpeed - o.speed) * Math.min(1, dt * 4);
-      if (!reduced) o.time += dt * (live ? o.speed : 0.6);
+      o.time += dt * o.speed;
       // The halo around a playing orb breathes with it (CSS reads --orb-glow).
       o.el.style.setProperty('--orb-glow', o.level.toFixed(3));
+      // A resting orb is drawn every other frame: the same slow drift for half the work.
+      if (beat && !chosen && !playing && !o.hover && o.lift < 0.005 && o.level < 0.005) return;
       draw(o);
     });
     if (any) { idle = 0; } else { idle += dt; }
@@ -242,8 +247,12 @@
     var o = state(el);
     if (o.attached) return;
     o.attached = true;
-    el.addEventListener('pointerenter', function () { o.hover = true; wake(); });
-    el.addEventListener('pointerleave', function () { o.hover = false; });
+    // Hovering or focusing the orb's card counts as hovering the orb.
+    var host = el.closest('[data-orb-host]') || el;
+    host.addEventListener('pointerenter', function () { o.hover = true; wake(); });
+    host.addEventListener('pointerleave', function () { o.hover = false; });
+    host.addEventListener('focusin', function () { o.hover = true; wake(); });
+    host.addEventListener('focusout', function (e) { if (!host.contains(e.relatedTarget)) o.hover = false; });
     if (io) { io.observe(el); } else { o.visible = true; draw(o); }
     if (ro) ro.observe(el);
   }

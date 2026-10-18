@@ -165,6 +165,8 @@
     .stage-id strong { font-size: 1.15rem; font-weight: 700; }
     .stage-id span { display: inline-flex; align-items: center; gap: .45rem; color: var(--st-faint); font-size: .9rem; }
     .stage-id img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
+    .stage-id .stage-flag-ar { width: 18px; height: 18px; color: #FFFFFF; font-size: .6rem; }
+    .stage-id [hidden] { display: none !important; }
     .stage-controls { display: flex; align-items: center; gap: .75rem; }
     .stage-btn {
       display: grid;
@@ -309,7 +311,12 @@
               </span>
               <span class="stage-id">
                 <strong data-stage-name>{{ $stageCast[0]['name'] }}</strong>
-                <span><img data-stage-flag src="{{ $stageCast[0]['flag'] }}" alt="" width="18" height="18"><span data-stage-dialect>{{ $stageCast[0]['dialect_label'] }}</span></span>
+                {{-- The speaker's flag, or the Arabic letter for a voice with no single country (Modern Standard Arabic). --}}
+                <span>
+                  <img data-stage-flag src="{{ $stageCast[0]['flag'] ?? '' }}" alt="" width="18" height="18" @if(empty($stageCast[0]['flag'])) hidden @endif>
+                  <span class="vs-flag vs-flag-ar stage-flag-ar" data-stage-flag-ar aria-hidden="true" @if(! empty($stageCast[0]['flag'])) hidden @endif>ع</span>
+                  <span data-stage-dialect>{{ $stageCast[0]['dialect_label'] }}</span>
+                </span>
               </span>
             </div>
             <div class="stage-controls">
@@ -351,8 +358,8 @@
         ['id' => $sectionId, 'copy' => $copyKey] = $voiceSection;
         $regions = $regionsOf($voices);
       @endphp
-      <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="$sectionId === 'arabic-dialects' ? 'arabic' : 'english'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
@@ -377,8 +384,8 @@
 
     @if($moods !== [])
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
-      <section class="samples-section" id="moods" aria-labelledby="moods-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="moods" aria-labelledby="moods-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'emotions'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="moods-title">{{ __('ui.samples.moods_title') }}</h2>
@@ -399,8 +406,8 @@
     @endif
 
     @if($dialogues !== [])
-      <section class="samples-section" id="conversations" aria-labelledby="conversations-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="conversations" aria-labelledby="conversations-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'dialogue'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="conversations-title">{{ __('ui.samples.conversations_title') }}</h2>
@@ -416,8 +423,8 @@
     @endif
 
     @if($environments !== [])
-      <section class="samples-section" id="sound-environments" aria-labelledby="sound-environments-title">
-        <div class="vs-head">
+      <section class="samples-section" data-orb-follow id="sound-environments" aria-labelledby="sound-environments-title">
+        <div class="vs-head" data-orb-host>
           <x-orb :name="'places'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="sound-environments-title">{{ __('ui.samples.environments_title') }}</h2>
@@ -461,6 +468,7 @@
     var nameEl = stage.querySelector('[data-stage-name]');
     var dialectEl = stage.querySelector('[data-stage-dialect]');
     var flagEl = stage.querySelector('[data-stage-flag]');
+    var flagArEl = stage.querySelector('[data-stage-flag-ar]');
     var avatarEl = stage.querySelector('[data-stage-avatar]');
     var playBtn = stage.querySelector('[data-stage-play]');
     var progressEl = stage.querySelector('[data-stage-progress]');
@@ -557,7 +565,10 @@
       setLine(person);
       nameEl.textContent = person.name;
       dialectEl.textContent = person.dialect_label;
+      // A voice with no single country shows the Arabic letter, never the last speaker's flag.
       if (person.flag) flagEl.src = person.flag;
+      flagEl.hidden = !person.flag;
+      if (flagArEl) flagArEl.hidden = !!person.flag;
       if (person.avatar) avatarEl.src = person.avatar;
       picks.forEach(function (p, k) { p.setAttribute('aria-current', k === index ? 'true' : 'false'); });
       if (bar) { bar.cancel(); bar = null; }

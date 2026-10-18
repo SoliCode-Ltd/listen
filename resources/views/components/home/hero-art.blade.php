@@ -32,7 +32,7 @@
       @endforeach
     </svg>
 
-    <button type="button" class="vs-cast-mark" data-vs-play-all aria-label="{{ __('ui.landing.hero_play_all') }}" title="{{ __('ui.landing.hero_play_all') }}">
+    <button type="button" class="vs-cast-mark" data-orb-host data-vs-play-all aria-label="{{ __('ui.landing.hero_play_all') }}" title="{{ __('ui.landing.hero_play_all') }}">
       <span class="vs-cast-mark-ring"></span><span class="vs-cast-mark-ring"></span>
       <x-orb name="listen" class="vs-cast-orb" />
       <svg class="vs-cast-mark-logo" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">

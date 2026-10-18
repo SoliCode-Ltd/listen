@@ -9,7 +9,7 @@
       <ul class="tour-row" data-tour>
         @foreach($voiceTour as $i => $item)
           @php $tourName = __('ui.landing.tour_'.$item['key'].'_title'); @endphp
-          <li class="tour-item{{ $i === 0 ? ' is-picked' : '' }}" data-tour-item="{{ $i }}" data-vp-track @if($item['src'] !== '') data-src="{{ $item['src'] }}" @endif>
+          <li class="tour-item{{ $i === 0 ? ' is-picked' : '' }}" data-tour-item="{{ $i }}" data-orb-host data-vp-track @if($item['src'] !== '') data-src="{{ $item['src'] }}" @endif>
             <button type="button" class="tour-pick" aria-pressed="{{ $i === 0 ? 'true' : 'false' }}" aria-controls="tourCaption"
               @if($item['src'] !== '')
                 data-vp-play

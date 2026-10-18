@@ -2,7 +2,7 @@
      a title, a line and one or two buttons. The page loads components.orb-script.
      primary / secondary: ['href' => ..., 'label' => ...]. --}}
 @props(['title', 'body' => null, 'primary', 'secondary' => null])
-<section {{ $attributes->merge(['class' => 'closing-panel reveal']) }}>
+<section {{ $attributes->merge(['class' => 'closing-panel reveal']) }} data-orb-host>
   <x-orb name="listen" class="closing-orb is-live" />
   <h2>{{ $title }}</h2>
   @if($body)

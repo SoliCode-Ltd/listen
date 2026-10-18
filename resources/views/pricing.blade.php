@@ -857,8 +857,8 @@
     </section>
 
     {{-- More than the biggest plan, or a whole team: by talking to us. --}}
-    <section class="team-band reveal" data-count="{{ $planCount }}" aria-labelledby="teamTitle">
-      <x-orb name="studio_max" class="team-orb" />
+    <section class="team-band reveal" data-count="{{ $planCount }}" aria-labelledby="teamTitle" data-orb-host>
+      <x-orb name="teams" class="team-orb" />
       <div>
         <h2 id="teamTitle">{{ __('ui.pricing.team_title') }}</h2>
         <p>{{ __('ui.pricing.team_body') }}</p>
