@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\Api\ApiScopes;
+use App\Support\CreditPeriod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -123,21 +124,21 @@ class ApiKey extends Model
         return self::PREFIX.'…'.$this->last_four;
     }
 
-    /** Credits this key spent in the given month (YYYY-MM, default this month). */
+    /** Credits this key spent in a credit period (App\Support\CreditPeriod key; default: its member's current one). */
     public function creditsUsed(?string $periodYm = null): int
     {
         return (int) ApiKeyUsage::query()
             ->where('api_key_id', $this->id)
-            ->where('period_ym', $periodYm ?? now()->format('Y-m'))
+            ->where('period_ym', $periodYm ?? CreditPeriod::current((int) $this->user_id)['key'])
             ->value('credits');
     }
 
-    /** Requests this key made in the given month (YYYY-MM, default this month). */
+    /** Requests this key made in a credit period (default: its member's current one). */
     public function requestsMade(?string $periodYm = null): int
     {
         return (int) ApiKeyUsage::query()
             ->where('api_key_id', $this->id)
-            ->where('period_ym', $periodYm ?? now()->format('Y-m'))
+            ->where('period_ym', $periodYm ?? CreditPeriod::current((int) $this->user_id)['key'])
             ->value('requests');
     }
 

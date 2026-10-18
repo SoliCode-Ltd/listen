@@ -362,11 +362,24 @@ class ManualPaymentService
             }
         }
 
+        // The previous plan comes back with its own dates, so its credits carry on
+        // where they were (App\Support\CreditPeriod) instead of starting again.
+        $periodStart = null;
+        $periodStartRaw = trim((string) ($approvalContext['previous_period_start'] ?? ''));
+        if ($periodStartRaw !== '' && $periodEnd !== null) {
+            try {
+                $periodStart = Carbon::parse($periodStartRaw);
+            } catch (\Throwable) {
+                $periodStart = null;
+            }
+        }
+
         $subscription = $this->planAccessService->assignPlan(
             $request->user,
             $targetPlan,
             $targetStatus,
             $periodEnd,
+            $periodStart,
         );
 
         $subscription->forceFill([

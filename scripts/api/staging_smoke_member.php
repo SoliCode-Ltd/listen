@@ -30,6 +30,7 @@ use App\Models\User;
 use App\Models\Voice;
 use App\Services\PlanAccessService;
 use App\Support\Api\ApiFeatureGate;
+use App\Support\CreditPeriod;
 use App\Support\VoiceCatalog;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Str;
@@ -52,6 +53,10 @@ if (str_contains(strtolower((string) config('app.url')), 'listenai.studio')) {
 }
 
 $email = 'staging-api-check@example.com';
+// The member's current credit period (their plan's own month where the app has them).
+$periodKey = fn (User $user): string => class_exists(CreditPeriod::class)
+    ? CreditPeriod::current((int) $user->id)['key']
+    : now()->format('Y-m');
 $mode = (string) getenv('MODE');
 $access = app(PlanAccessService::class);
 
@@ -79,7 +84,7 @@ if ($mode === 'start') {
         echo 'VOICE_', strtoupper($language), '=', VoiceCatalog::keyFromId((int) $voice->id), "\n";
         echo 'BODY_', strtoupper($language), '=', json_encode($sample['body'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), "\n";
     }
-    $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', now()->format('Y-m'))->first();
+    $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', $periodKey($user))->first();
     echo 'Credits used this month before the test: ', (int) ($counter?->total_chars ?? 0), "\n";
     exit(0);
 }
@@ -116,11 +121,11 @@ if ($mode === 'finish') {
         echo "  none\n";
     }
 
-    $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', now()->format('Y-m'))->first();
+    $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', $periodKey($user))->first();
     echo '== Credits used this month: ', (int) ($counter?->total_chars ?? 0), ', requests: ', (int) ($counter?->total_requests ?? 0), " ==\n";
 
     $keyIds = ApiKey::query()->where('user_id', $user->id)->pluck('id');
-    foreach (ApiKeyUsage::query()->whereIn('api_key_id', $keyIds)->where('period_ym', now()->format('Y-m'))->get() as $usage) {
+    foreach (ApiKeyUsage::query()->whereIn('api_key_id', $keyIds)->where('period_ym', $periodKey($user))->get() as $usage) {
         echo "  key {$usage->api_key_id}: ", (int) $usage->requests, ' requests, ', (int) $usage->credits, " credits\n";
     }
 

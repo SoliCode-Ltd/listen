@@ -11,6 +11,7 @@ use App\Models\UsageCounter;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Support\Api\ApiError;
+use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -51,11 +52,8 @@ class ApiUsageMeter
      */
     public function reserve(int $userId, ApiKey $apiKey, ?Plan $quotaPlan, array $estimate, callable $record): array
     {
-        $period = now()->format('Y-m');
-        UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        // The member's credit period (their plan's own month), as in the studio.
+        $period = CreditPeriod::counter($userId)->period_ym;
         $billToPack = CharPackService::billsToPack($quotaPlan);
 
         $reservation = [

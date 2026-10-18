@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\CreditPeriod;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,18 +81,25 @@ class UsageCounter extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** "October 2026" for period_ym "2026-10". */
+    /**
+     * "October 2026" for a calendar month ("2026-10"), "From 14 Oct 2026" for a
+     * credit period that follows a plan's own dates ("2026-10-14 08:37").
+     */
     public function monthLabel(): string
     {
+        $key = (string) $this->period_ym;
         try {
-            return Carbon::createFromFormat('Y-m-d', $this->period_ym.'-01')->format('F Y');
+            return CreditPeriod::followsPlan($key)
+                ? 'From '.Carbon::createFromFormat('Y-m-d H:i', $key, 'UTC')->format('j M Y')
+                : Carbon::createFromFormat('Y-m-d', $key.'-01')->format('F Y');
         } catch (\Throwable) {
-            return (string) $this->period_ym;
+            return $key;
         }
     }
 
+    /** Whether this is the member's credit period now. */
     public function isCurrentMonth(): bool
     {
-        return $this->period_ym === now()->format('Y-m');
+        return $this->user_id !== null && $this->period_ym === CreditPeriod::current((int) $this->user_id)['key'];
     }
 }

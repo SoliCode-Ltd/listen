@@ -194,7 +194,7 @@
             <div class="usage-hero-chips">
               <span class="usage-chip">{{ $api['is_pack']
                 ? ($usageRow['pack_expires_at'] ? $d('pack_ends', ['date' => $date($usageRow['pack_expires_at'])]) : '')
-                : $d('renews', ['date' => $date($api['resets_at'])]) }}</span>
+                : $d(($api['plan_ends'] ?? false) ? 'plan_ends' : 'renews', ['date' => $date($api['resets_at'])]) }}</span>
             </div>
           </div>
           <a class="usage-hero-cta" href="{{ route('developers') }}">

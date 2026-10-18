@@ -6,13 +6,15 @@ use App\Models\CharGift;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Models\User;
+use App\Support\CreditPeriod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Characters Listen gives a member on top of their plan for the current
- * billing month. They raise this month's limit only and end with it, like
- * the plan's own characters.
+ * Characters Listen gives a member on top of their plan for their current
+ * credit period (App\Support\CreditPeriod: the plan's own month). They
+ * raise that period's limit only and end with it, like the plan's own
+ * characters.
  */
 class CharGiftService
 {
@@ -24,7 +26,7 @@ class CharGiftService
             throw new \InvalidArgumentException('A gift must be between 1 and '.number_format(self::MAX_GIFT).' characters.');
         }
 
-        $period = now()->format('Y-m');
+        $period = CreditPeriod::current((int) $subscription->user_id)['key'];
 
         $gift = DB::transaction(function () use ($subscription, $chars, $note, $admin, $period): CharGift {
             $counter = $this->lockedCounter((int) $subscription->user_id, $period);
@@ -53,8 +55,8 @@ class CharGiftService
     }
 
     /**
-     * Undo a gift made by mistake. Only this month's gifts can be taken back;
-     * last month's ended with that month anyway.
+     * Undo a gift made by mistake. Only gifts of the member's current credit
+     * period can be taken back; earlier ones ended with their period anyway.
      */
     public function revoke(CharGift $gift, ?User $admin = null): void
     {
@@ -62,8 +64,8 @@ class CharGiftService
             return;
         }
 
-        if ($gift->period_ym !== now()->format('Y-m')) {
-            throw new \InvalidArgumentException('Only gifts from the current month can be taken back.');
+        if ($gift->period_ym !== CreditPeriod::current((int) $gift->user_id)['key']) {
+            throw new \InvalidArgumentException('Only gifts from the current credit period can be taken back.');
         }
 
         DB::transaction(function () use ($gift, $admin): void {
@@ -76,13 +78,13 @@ class CharGiftService
     }
 
     /**
-     * Gifts still counting this month for a member.
+     * Gifts still counting in a member's current credit period.
      */
     public function activeGiftChars(int $userId): int
     {
         return (int) (UsageCounter::query()
             ->where('user_id', $userId)
-            ->where('period_ym', now()->format('Y-m'))
+            ->where('period_ym', CreditPeriod::current($userId)['key'])
             ->value('bonus_chars') ?? 0);
     }
 

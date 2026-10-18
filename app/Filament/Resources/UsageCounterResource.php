@@ -129,12 +129,19 @@ class UsageCounterResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                // By the month a period started in: calendar months ("2026-10") and
+                // periods that follow a plan's own dates ("2026-10-14 08:37") alike.
                 Tables\Filters\SelectFilter::make('period_ym')
                     ->label('Month')
                     ->options(fn (): array => UsageCounter::query()
-                        ->select('period_ym')->distinct()->orderByDesc('period_ym')->limit(24)->pluck('period_ym')
+                        ->pluck('period_ym')
+                        ->map(fn (string $key): string => substr($key, 0, 7))
+                        ->unique()->sortDesc()->take(24)
                         ->mapWithKeys(fn (string $ym): array => [$ym => (new UsageCounter(['period_ym' => $ym]))->monthLabel()])
                         ->all())
+                    ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null)
+                        ? $query->where('period_ym', 'like', $data['value'].'%')
+                        : $query)
                     ->default(now()->format('Y-m')),
                 Tables\Filters\SelectFilter::make('plan')
                     ->label('Plan now')

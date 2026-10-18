@@ -4,13 +4,15 @@ namespace App\Services\Api;
 
 use App\Models\ApiKey;
 use App\Models\ApiKeyUsage;
+use App\Models\BillingSubscription;
 use App\Models\Plan;
-use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\PlanAccessService;
 use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
+use App\Support\CreditPeriod;
 use App\Support\UsageSnapshot;
+use Illuminate\Support\Carbon;
 
 /**
  * One member's developer API at a glance, for the dashboard's Developer API
@@ -41,12 +43,11 @@ class ApiAccountSummary
         $userId = (int) $user->id;
         $plan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $plan);
-        $period = now()->format('Y-m');
+        // Credits follow the member's own plan dates (App\Support\CreditPeriod).
+        $credit = CreditPeriod::current($userId);
+        $period = $credit['key'];
 
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        $counter = CreditPeriod::counter($userId);
         $usage = UsageSnapshot::for($userId, $quotaPlan, $counter);
         $isPack = ($usage['mode'] ?? 'monthly') === 'pack';
 
@@ -67,7 +68,10 @@ class ApiAccountSummary
             'plan_name' => $plan ? ($plan->getLocalizedName(app()->getLocale()) ?: (string) $plan->name) : __('ui.dashboard.free_plan'),
             'usage' => $usage,
             'is_pack' => $isPack,
-            'resets_at' => now()->startOfMonth()->addMonth(),
+            'resets_at' => $credit['ends_at'],
+            // When this credit period ends with the plan itself and nothing renews it
+            // (a plan paid by hand or given by the team), the box says until when it runs.
+            'plan_ends' => self::planEndsWithPeriod($userId, $credit),
             'active_keys' => $keys->whereNull('revoked_at')->values(),
             'revoked_keys' => $keys->whereNotNull('revoked_at')->take(10)->values(),
             'month_usage' => $monthUsage,
@@ -90,6 +94,23 @@ class ApiAccountSummary
             // For members whose plan has no API: the plans that include it.
             'api_plan_names' => ApiFeatureGate::apiPlans()->map(fn (Plan $apiPlan): string => $apiPlan->getLocalizedName(app()->getLocale()) ?: (string) $apiPlan->name)->values()->all(),
         ];
+    }
+
+    /**
+     * @param  array{ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon}  $credit
+     */
+    private static function planEndsWithPeriod(int $userId, array $credit): bool
+    {
+        if (! $credit['follows_plan'] || $credit['plan_ends_at'] === null || ! $credit['ends_at']->equalTo($credit['plan_ends_at'])) {
+            return false;
+        }
+
+        // A card subscription renews by itself until it is cancelled.
+        return ! BillingSubscription::query()
+            ->where('user_id', $userId)
+            ->whereIn('stripe_status', ['active', 'trialing', 'past_due'])
+            ->whereNull('ends_at')
+            ->exists();
     }
 
     /**

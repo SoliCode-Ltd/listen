@@ -21,6 +21,7 @@ use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
+use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
@@ -43,12 +44,7 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $userId = (int) auth()->id();
-        $period = now()->format('Y-m');
-
-        $usage = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        $usage = CreditPeriod::counter($userId);
 
         $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
@@ -349,11 +345,7 @@ class DashboardController extends Controller
             ]);
         }
 
-        $period = now()->format('Y-m');
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        $counter = CreditPeriod::counter($userId);
 
         PlanUsageGuard::assertWithinDailyLimit($quotaPlan, $userId);
 
@@ -405,6 +397,7 @@ class DashboardController extends Controller
                         ? ['speakers' => $validated['dialogue_speakers']]
                         : null,
                     'billed_to_pack' => $billToPack,
+                    'usage_period' => $counter->period_ym,
                 ],
             );
         } catch (\Throwable $e) {
