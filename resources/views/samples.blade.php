@@ -194,6 +194,7 @@
 
     .stage-queue { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
     .stage-pick {
+      display: block;
       position: relative;
       width: 40px;
       height: 40px;
@@ -205,7 +206,8 @@
       opacity: .55;
       transition: opacity .2s ease, transform .2s ease;
     }
-    .stage-pick img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    /* A block photo, so no text baseline adds space under it: the button stays a true circle and its ring is even. */
+    .stage-pick img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
     .stage-pick:hover { opacity: .9; }
     .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--st-pick-gap), 0 0 0 4px var(--st-now); border-radius: 50%; }
     .stage-progress { height: 3px; border-radius: 3px; background: var(--st-track); overflow: hidden; }
@@ -275,12 +277,14 @@
       .samples-moods .vs-chip { flex: none; }
     }
     @media (max-width: 560px) {
-      .stage-console { grid-template-columns: 1fr; justify-items: start; }
+      .stage-console { grid-template-columns: 1fr; justify-items: center; }
       .stage-controls { justify-self: center; }
       /* Every voice in one row. */
       .stage-queue { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 46px); justify-content: center; gap: .5rem; width: 100%; }
       .stage-pick { width: 100%; height: auto; aspect-ratio: 1; }
-      .stage-who { gap: 1.6rem; padding-inline-start: 10px; }
+      /* The speaker sits centred: the avatar, then the name and dialect under it. */
+      .stage-who { flex-direction: column; gap: 1.15rem; padding-top: 14px; text-align: center; }
+      .stage-id { align-items: center; }
       .stage-avatar, .stage-avatar img { width: 60px; height: 60px; }
       .stage-avatar { --ring: 22px; }
       .samples-bar { top: 64px; }
