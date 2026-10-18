@@ -290,9 +290,7 @@
     }
     .plan-trial-chip svg { width: .85rem; height: .85rem; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
     .plans-grid.is-yearly [data-trial-monthly-only],
-    .plans-grid:not(.is-yearly) [data-trial-yearly-only],
-    .plans-side.is-yearly [data-trial-monthly-only],
-    .plans-side:not(.is-yearly) [data-trial-yearly-only] {
+    .plans-grid:not(.is-yearly) [data-trial-yearly-only] {
       display: none !important;
     }
 
@@ -412,37 +410,8 @@
     .plan-features li.is-tick .feature-label { color: var(--text); font-weight: 600; }
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
-    /* A plan to try the voices and one-time packs: the same cards, laid on their side. */
-    .plans-side { margin: 1.75rem auto 0; max-width: 1200px; }
-    .plans-side-title { margin: 0 0 1rem; text-align: center; font-size: 1.1rem; font-weight: 700; }
-    .plans-side-list {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(min(100%, 500px), 1fr));
-      gap: 1.25rem;
-    }
-    .plans-side .plan-card {
-      grid-row: auto;
-      grid-template-rows: none;
-      grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
-      grid-template-areas: "top pricing" "quota action" "features features";
-      column-gap: 1.5rem;
-      align-items: start;
-      margin: 0;
-      padding: 1.4rem 1.5rem;
-    }
-    .plans-side .plan-top { grid-area: top; }
-    .plans-side .plan-badges.is-empty { display: none; }
-    .plans-side .plan-desc { min-height: 0; }
-    .plans-side .plan-pricing { grid-area: pricing; padding: 0; align-items: flex-end; text-align: end; }
-    .plans-side .plan-quota { grid-area: quota; align-self: center; padding: 1rem 0 0; margin-top: 1rem; }
-    .plans-side .plan-action { grid-area: action; align-self: end; padding: 1rem 0 0; }
-    .plans-side .plan-features { grid-area: features; flex-direction: row; flex-wrap: wrap; gap: .45rem 1.25rem; margin-top: 1.1rem; padding-top: .9rem; }
-    .plans-side .plan-features:empty { display: none; }
-    .plans-side .plan-features li { justify-content: flex-start; }
-    .plans-side .feature-label { flex: none; }
-    .plans-side .feature-value { max-width: none; }
 
-    /* Trust line and what every plan includes, right under the cards. */
+    /* Trust line, right under the cards. */
     .plans-trust {
       display: flex;
       justify-content: center;
@@ -455,47 +424,6 @@
     .plans-trust span { display: inline-flex; align-items: center; gap: .4rem; }
     .plans-trust svg { width: 1rem; height: 1rem; fill: none; stroke: var(--ok); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
-    .plans-common {
-      margin: 2rem 0 0;
-      padding: 1.35rem 1.6rem 1.5rem;
-      border: 1px solid var(--line);
-      border-radius: 1.1rem;
-      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 4%, var(--surface)), var(--surface));
-    }
-    .plans-common-title {
-      margin: 0 0 1.1rem;
-      text-align: center;
-      font-size: .8rem;
-      font-weight: 700;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--muted);
-    }
-    html[dir="rtl"] .plans-common-title { letter-spacing: 0; font-size: .9rem; }
-    .plans-common-list {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-      gap: .9rem 1.5rem;
-    }
-    .plans-common-list li { display: flex; align-items: center; gap: .8rem; min-width: 0; }
-    .plans-common-icon {
-      display: grid;
-      place-items: center;
-      flex: none;
-      width: 2.5rem;
-      height: 2.5rem;
-      border-radius: .8rem;
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      color: var(--accent-text);
-    }
-    .plans-common-icon svg { width: 1.15rem; height: 1.15rem; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-    .plans-common-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-    .plans-common-text b { font-size: 1rem; font-weight: 700; color: var(--text); }
-    .plans-common-text small { color: var(--muted); font-size: .84rem; }
 
     /* ── Section headings ── */
     .section-title {
@@ -801,13 +729,10 @@
       .page-hero { padding: 2.25rem 0 1.5rem; }
       .plans-grid[data-count] { --cols: 1; max-width: 520px; }
       .plans-grid[data-count] > .plan-card { grid-column: auto !important; width: auto !important; }
-      .plans-side .plan-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "top" "pricing" "quota" "action" "features"; }
-      .plans-side .plan-pricing { align-items: flex-start; text-align: start; padding-top: 1rem; }
       .plan-card { padding: 1.35rem 1.15rem 1.2rem; }
       .plan-desc { min-height: 0; }
       .plan-badges.is-empty { display: none; }
       .page-hero { padding-top: 2.75rem; }
-      .plans-common { padding: 1.2rem 1.1rem 1.3rem; }
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 3.5rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
@@ -860,24 +785,14 @@
         if ($seconds >= 3600) return trans_choice('ui.pricing.offer_ends_hours', intdiv($seconds, 3600));
         return trans_choice('ui.pricing.offer_ends_minutes', max(1, (int) ceil($seconds / 60)));
       };
-      // Monthly plans share the main row; a plan to try and one-time packs sit in their own band.
-      $mainPlans = [];
-      $sidePlans = [];
-      foreach ($pricingPlans as $planIndex => $pricingPlan) {
-        $isSidePlan = !empty($pricingPlan['is_pack']) || (int) ($pricingPlan['price_monthly_cents'] ?? 0) <= 0;
-        if ($isSidePlan) {
-          $sidePlans[$planIndex] = $pricingPlan;
-        } else {
-          $mainPlans[$planIndex] = $pricingPlan;
-        }
-      }
+      // The cards are the monthly plans; the plan to try the voices and one-time packs are not shown here.
+      $mainPlans = array_filter($pricingPlans, fn ($pricingPlan) => empty($pricingPlan['is_pack']) && (int) ($pricingPlan['price_monthly_cents'] ?? 0) > 0);
       if ($mainPlans === []) {
-        $mainPlans = $sidePlans;
-        $sidePlans = [];
+        $mainPlans = $pricingPlans;
       }
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
       $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
-      // The icon drawn beside each line, on the cards and in "Every plan includes".
+      // The icon drawn beside each line, on the cards and in the comparison table.
       $lineIcon = static fn (?string $icon): string => match ($icon ?? 'check') {
         'activity' => '<path d="M22 12h-4l-3 9L9 3l-3 9H2"/>',
         'type' => '<polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/>',
@@ -920,8 +835,8 @@
           $compareRows[$creditsLabel][$comparePlan['slug']] ??= number_format((int) ($comparePlan['monthly_chars'] ?? 0));
         }
       }
-      // A line every monthly plan has with the same value is said once, under the cards.
-      // (The plans in the side band show all their own lines.)
+      // A line every monthly plan has with the same value is left off the cards, which show
+      // what sets each plan apart; the comparison table below lists every line.
       $commonLines = [];
       $mainSlugs = array_column($mainPlans, 'slug');
       if (count($mainSlugs) > 1) {
@@ -975,17 +890,6 @@
       @endforeach
     </section>
 
-    @if($sidePlans !== [])
-      {{-- A plan to try the voices and one-time packs: the same cards, laid out on their side. --}}
-      <section class="plans-side" aria-labelledby="plansSideTitle">
-        <h2 class="plans-side-title" id="plansSideTitle">{{ __('ui.pricing.other_ways_title') }}</h2>
-        <div class="plans-side-list">
-          @foreach($sidePlans as $index => $plan)
-            @include('components._plan-card', ['plan' => $plan, 'index' => $index, 'pricingHiddenLabels' => [$minutesLabel]])
-          @endforeach
-        </div>
-      </section>
-    @endif
 
     <div class="plans-trust reveal">
       <span>{!! $tick !!}{{ __('ui.pricing.badge_no_card') }}</span>
@@ -993,25 +897,6 @@
       <span>{!! $tick !!}{{ __('ui.pricing.badge_secure_billing') }}</span>
     </div>
 
-    @if($commonLines !== [])
-      <section class="plans-common reveal" aria-labelledby="plansCommonTitle">
-        <h2 class="plans-common-title" id="plansCommonTitle">{{ $sidePlans !== [] ? __('ui.pricing.every_monthly_plan_includes') : __('ui.pricing.every_plan_includes') }}</h2>
-        <ul class="plans-common-list">
-          @foreach($commonLines as $label => $value)
-            <li>
-              <span class="plans-common-icon" aria-hidden="true"><svg viewBox="0 0 24 24">{!! $lineIcon($lineIcons[$label] ?? 'check') !!}</svg></span>
-              <span class="plans-common-text">
-                @if($value !== '' && $value !== $includedMark)
-                  <b>{{ $value }}</b><small>{{ $label }}</small>
-                @else
-                  <b>{{ $label }}</b>
-                @endif
-              </span>
-            </li>
-          @endforeach
-        </ul>
-      </section>
-    @endif
 
     @if(count($comparePlans) > 1 && $compareRows !== [])
       <section class="compare" id="compare" aria-labelledby="compareTitle">
@@ -1259,7 +1144,7 @@
         monthlyBtn.setAttribute('aria-pressed', yearly ? 'false' : 'true');
         yearlyBtn.setAttribute('aria-pressed', yearly ? 'true' : 'false');
         billingToggle.classList.toggle('yearly', yearly);
-        document.querySelectorAll('.plans-grid, .plans-side').forEach(function(el) {
+        document.querySelectorAll('.plans-grid').forEach(function(el) {
           el.classList.toggle('is-yearly', yearly);
         });
         updatePrices();

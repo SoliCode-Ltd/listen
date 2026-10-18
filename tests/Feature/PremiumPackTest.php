@@ -549,34 +549,28 @@ class PremiumPackTest extends TestCase
         $this->assertSame(route('billing.pack'), session('url.intended'));
     }
 
-    public function test_the_pricing_page_shows_the_pack_as_a_one_time_card(): void
+    public function test_the_pricing_page_shows_only_the_monthly_plans_as_cards(): void
     {
-        $page = $this->getLocalizedRoute('pricing')->assertOk();
+        // The plan to try the voices and the one-time pack are not cards on the pricing page;
+        // the pack is offered on the dashboard to members who need it.
+        $this->getLocalizedRoute('pricing')->assertOk()
+            ->assertSee('data-plan-slug="starter"', false)
+            ->assertDontSee('data-plan-slug="pack"', false)
+            ->assertDontSee('data-is-pack="1"', false)
+            ->assertDontSee('data-plan-slug="free"', false)
+            ->assertDontSee(route('pack.start'), false);
 
-        $page->assertSee('data-plan-slug="pack"', false)
-            ->assertSee('data-is-pack="1"', false)
-            ->assertSee(__('ui.pack.headline', ['count' => '20,000', 'days' => 30]))
-            ->assertSee(route('pack.start'), false);
-    }
-
-    public function test_the_pricing_page_does_not_sell_the_pack_to_plan_members(): void
-    {
         $user = $this->member();
         app(PlanAccessService::class)->assignPlan($user, $this->starter);
-
-        $this->actingAs($user)->getLocalizedRoute('pricing')
-            ->assertOk()
-            ->assertSee(__('ui.pack.for_free_members'));
+        $this->actingAs($user)->getLocalizedRoute('pricing')->assertOk()
+            ->assertDontSee(__('ui.pack.for_free_members'));
     }
 
-    public function test_the_free_card_shows_the_demo_when_new_members_get_no_free_characters(): void
+    public function test_the_comparison_shows_the_demo_when_new_members_get_no_free_characters(): void
     {
-        $this->getLocalizedRoute('pricing')->assertSee(__('ui.pricing.characters_per_month'));
-
         SiteSetting::set(FreeAllowance::NEW_MEMBERS_KEY, '0');
 
         $this->getLocalizedRoute('pricing')
-            ->assertSee(__('ui.pack.free_try_headline', ['count' => number_format(\App\Support\DemoAllowance::chars())]))
             ->assertSee(__('ui.pricing.lines.label_demo'));
     }
 
