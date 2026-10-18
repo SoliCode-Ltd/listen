@@ -80,13 +80,14 @@
         <div class="docs-demo">
           @include('developers._docs-code', ['label' => \App\Support\Api\ApiCodeSamples::LABELS['curl'], 'codeLabel' => true, 'single' => $docs['hero']])
           @php
-            // The recording the request above made; else a sample of the voice.
-            $answerUrl = $hero['audio_url'] ?? $voice['preview_url'] ?? null;
-            $answerTitle = !empty($hero['dialect'])
-              ? __('developers.docs.hero_voice_dialect', ['name' => $voiceName, 'dialect' => \App\Support\VoiceFlag::label($hero['dialect'], $arabic)])
+            // The recording the request above returned (developer_docs_samples.php).
+            $answerUrl = $hero['audio_url'] ?? null;
+            $answerDialect = $hero['body']['dialect'] ?? null;
+            $answerTitle = $answerDialect
+              ? __('developers.docs.hero_voice_dialect', ['name' => $voiceName, 'dialect' => \App\Support\VoiceFlag::label($answerDialect, $arabic)])
               : __('developers.docs.hero_voice', ['name' => $voiceName]);
-            $answerNote = $hero !== null ? $plain('hero_result') : __('developers.docs.hero_sample', ['name' => $voiceName]);
-            $answerPlay = $hero !== null ? $plain('hero_play_result') : __('developers.docs.hero_play', ['name' => $voiceName]);
+            $answerNote = $plain('hero_result');
+            $answerPlay = $plain('hero_play_result');
           @endphp
           @if($answerUrl)
             <div class="docs-answer" data-sample>
@@ -94,8 +95,11 @@
                 <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
                 <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
               </button>
+              {{-- Two copies of the waveform: the played one is revealed up to the playhead, frame by frame. --}}
               <div class="docs-wave" data-sample-wave aria-hidden="true">
-                @foreach($bars as $height)<i style="height: {{ $height }}%"></i>@endforeach
+                <div class="docs-wave-bars">@foreach($bars as $height)<i style="height: {{ $height }}%"></i>@endforeach</div>
+                <div class="docs-wave-bars is-played">@foreach($bars as $height)<i style="height: {{ $height }}%"></i>@endforeach</div>
+                <span class="docs-wave-head"></span>
               </div>
               <div class="docs-answer-meta">
                 <span class="docs-answer-voice">

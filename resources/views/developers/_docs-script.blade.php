@@ -50,27 +50,61 @@
       });
     });
 
-    // The voice sample in the hero: play and pause, the waveform follows.
+    // The recording at the top: play and pause; the waveform fills up to the
+    // playhead on every animation frame, and a click on it jumps there.
     document.querySelectorAll('[data-sample]').forEach(function (sample) {
       var button = sample.querySelector('[data-sample-play]');
       var audio = sample.querySelector('[data-sample-audio]');
-      var bars = sample.querySelectorAll('[data-sample-wave] i');
-      if (!button || !audio) { return; }
+      var wave = sample.querySelector('[data-sample-wave]');
+      if (!button || !audio || !wave) { return; }
+      var frame = 0;
+      var pendingSeek = null;
       function paint() {
-        var played = audio.duration ? Math.round(bars.length * audio.currentTime / audio.duration) : 0;
-        bars.forEach(function (bar, index) { bar.classList.toggle('is-played', index < played); });
+        var ratio = audio.duration ? Math.min(1, audio.currentTime / audio.duration) : 0;
+        wave.style.setProperty('--p', (ratio * 100).toFixed(3) + '%');
+      }
+      function loop() {
+        paint();
+        if (!audio.paused && !audio.ended) { frame = requestAnimationFrame(loop); }
       }
       function state(playing) {
+        sample.classList.toggle('is-playing', playing);
         button.setAttribute('aria-pressed', playing ? 'true' : 'false');
         button.setAttribute('aria-label', button.getAttribute(playing ? 'data-label-pause' : 'data-label-play'));
       }
       button.addEventListener('click', function () {
         if (audio.paused) { audio.play().catch(function () { state(false); }); } else { audio.pause(); }
       });
-      audio.addEventListener('play', function () { state(true); });
-      audio.addEventListener('pause', function () { state(false); });
-      audio.addEventListener('timeupdate', paint);
-      audio.addEventListener('ended', function () { state(false); audio.currentTime = 0; paint(); });
+      wave.addEventListener('click', function (event) {
+        var box = wave.getBoundingClientRect();
+        var ratio = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
+        if (audio.duration) {
+          audio.currentTime = ratio * audio.duration;
+          paint();
+        } else {
+          pendingSeek = ratio;
+        }
+        if (audio.paused) { audio.play().catch(function () { state(false); }); }
+      });
+      audio.addEventListener('loadedmetadata', function () {
+        if (pendingSeek !== null) { audio.currentTime = pendingSeek * audio.duration; pendingSeek = null; }
+        paint();
+      });
+      audio.addEventListener('play', function () {
+        sample.classList.add('is-started');
+        state(true);
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(loop);
+      });
+      audio.addEventListener('pause', function () { state(false); cancelAnimationFrame(frame); paint(); });
+      audio.addEventListener('seeked', paint);
+      audio.addEventListener('ended', function () {
+        state(false);
+        cancelAnimationFrame(frame);
+        sample.classList.remove('is-started');
+        audio.currentTime = 0;
+        paint();
+      });
     });
 
     // Mark the section being read in the contents.

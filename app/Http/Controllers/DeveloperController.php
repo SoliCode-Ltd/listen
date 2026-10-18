@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
 use App\Models\Plan;
-use App\Models\Voice;
-use App\Models\VoiceSample;
 use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
@@ -16,12 +14,9 @@ use App\Support\Api\ApiScopes;
 use App\Support\Api\ApiVoiceCatalog;
 use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
-use App\Support\TtsStudioConfig;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -68,13 +63,13 @@ class DeveloperController extends Controller
     }
 
     /**
-     * The voices the examples use: Sumaya in Lebanese on the Arabic page, an
-     * English premium voice on the English page, so each page reads in its
-     * own language; and a second voice of the other gender for the dialogue.
-     * The top of the page shows a real recording of the site with the request
-     * that makes it, so the reader hears what the request returns.
+     * The voices the examples use, and the request at the top of the page
+     * with the recording it returned (database/seeders/data/
+     * developer_docs_samples.php): Sumaya in Lebanese on the Arabic page, an
+     * American voice on the English page, so each page reads in its own
+     * language; and a second voice of the other gender for the dialogue.
      *
-     * @return array{0: array<string, mixed>, 1: array{voice_id:string, name:string}, 2: array<string, mixed>|null}
+     * @return array{0: array<string, mixed>, 1: array{voice_id:string, name:string}, 2: array{voice_id:string, body:array<string, mixed>, audio_url:?string}|null}
      */
     private function sampleVoices(string $locale): array
     {
@@ -85,14 +80,24 @@ class DeveloperController extends Controller
         }
         $language = $locale === 'ar' ? 'ar' : 'en';
         $premium = $voices->filter(fn (array $voice): bool => $voice['language'] === $language);
-        $hero = $this->heroSample($language, $premium);
-        $voice = ($hero !== null ? $premium->get($hero['voice_id']) : null)
+        $sample = (require database_path('seeders/data/developer_docs_samples.php'))[$language] ?? null;
+        $voice = ($sample !== null ? $premium->firstWhere('_internal_name', $sample['voice']) : null)
             ?? ($language === 'ar' ? $premium->firstWhere('name', 'Sumaya') : null)
             ?? $premium->firstWhere('featured', true)
             ?? $premium->first();
         $partner = $premium->first(fn (array $other): bool => $other['voice_id'] !== ($voice['voice_id'] ?? null)
             && ($other['gender'] ?? null) !== ($voice['gender'] ?? null))
             ?? $premium->first(fn (array $other): bool => $other['voice_id'] !== ($voice['voice_id'] ?? null));
+
+        // The request is shown only for the voice it was made with, and plays only when its recording is here.
+        $hero = null;
+        if ($sample !== null && $voice !== null && ($voice['_internal_name'] ?? null) === $sample['voice']) {
+            $hero = [
+                'voice_id' => (string) $voice['voice_id'],
+                'body' => $sample['body'],
+                'audio_url' => is_file(public_path($sample['audio'])) ? url((string) AudioUrl::fromPath($sample['audio'])) : null,
+            ];
+        }
 
         return [
             [
@@ -101,7 +106,6 @@ class DeveloperController extends Controller
                 'name_ar' => (string) ($voice['name_ar'] ?? ''),
                 'language' => $language,
                 'gender' => $voice['gender'] ?? null,
-                'preview_url' => $voice['preview_url'] ?? null,
                 'avatar_url' => $voice['avatar_url'] ?? null,
             ],
             [
@@ -109,79 +113,6 @@ class DeveloperController extends Controller
                 'name' => (string) ($partner['name'] ?? ''),
             ],
             $hero,
-        ];
-    }
-
-    /**
-     * A recording the site already has (a voice sample, never a new
-     * generation) of a premium voice in the page's language, with its exact
-     * text, dialect and emotion: Sumaya in Lebanese first, then other
-     * Lebanese samples, featured ones, and short texts.
-     *
-     * @param  Collection<string, array<string, mixed>>  $premium  voice id => voice
-     * @return array{voice_id:string, text:string, dialect:?string, emotion:?string, audio_url:string}|null
-     */
-    private function heroSample(string $language, Collection $premium): ?array
-    {
-        $byName = $premium->keyBy('_internal_name');
-        try {
-            // Showcase recordings name the engine's voice (Callirrhoe), others the
-            // site's voice (ar-Gemini-HD-Callirrhoe): both lead to the voice.
-            $byEngineName = Voice::query()
-                ->whereIn('internal_voice_id', $byName->keys()->all())
-                ->whereNotNull('provider_voice_id')
-                ->pluck('internal_voice_id', 'provider_voice_id');
-            $samples = VoiceSample::query()
-                ->active()
-                ->whereIn('voice_name', $byName->keys()->merge($byEngineName->keys())->all())
-                ->get(['voice_name', 'audio_path', 'sample_text', 'language', 'dialect', 'emotion', 'is_featured', 'metadata']);
-        } catch (\Throwable) {
-            return null;
-        }
-        $voiceOf = fn (VoiceSample $sample): ?array => $byName[$sample->voice_name] ?? $byName[$byEngineName[$sample->voice_name] ?? ''] ?? null;
-
-        // Sumaya in Lebanese, then any Lebanese recording, then Sumaya, then featured and short ones.
-        $rank = function (VoiceSample $sample) use ($language, $voiceOf): array {
-            $sumaya = $language === 'ar' && ($voiceOf($sample)['name'] ?? '') === 'Sumaya';
-            $lebanese = $sample->dialect === 'ar-LB';
-
-            return [$sumaya && $lebanese ? 0 : 1, $lebanese ? 0 : 1, $sumaya ? 0 : 1, $sample->is_featured ? 0 : 1, mb_strlen((string) $sample->sample_text)];
-        };
-        $sample = $samples
-            ->filter(function (VoiceSample $sample) use ($language, $voiceOf): bool {
-                $text = trim((string) $sample->sample_text);
-                $path = ltrim(trim((string) $sample->audio_path), '/');
-
-                // Short texts first (see $rank); a long one still beats no recording.
-                return $voiceOf($sample) !== null
-                    && $text !== '' && mb_strlen($text) <= 600
-                    // Dialogue samples need speakers the request would have to list.
-                    && empty(($sample->metadata ?? [])['turns'])
-                    && strtolower(substr((string) ($sample->language ?: $language), 0, 2)) === $language
-                    && $path !== ''
-                    && (Storage::disk('public')->exists($path) || is_file(public_path($path)));
-            })
-            ->sort(fn (VoiceSample $a, VoiceSample $b): int => $rank($a) <=> $rank($b))
-            ->first();
-        if (! $sample instanceof VoiceSample) {
-            return null;
-        }
-
-        $dialect = trim((string) $sample->dialect);
-        $emotion = trim((string) $sample->emotion);
-        $text = trim((string) $sample->sample_text);
-        // Showcase recordings end with the site's closing line, after a long pause.
-        $signOff = trim((string) (($sample->metadata ?? [])['sign_off'] ?? ''));
-        if (! empty(($sample->metadata ?? [])['showcase']) && $signOff !== '') {
-            $text .= ' <long pause> '.$signOff;
-        }
-
-        return [
-            'voice_id' => (string) $voiceOf($sample)['voice_id'],
-            'text' => $text,
-            'dialect' => in_array($dialect, TtsStudioConfig::dialectValues($language), true) ? $dialect : null,
-            'emotion' => in_array($emotion, TtsStudioConfig::emotionValues(), true) ? $emotion : null,
-            'audio_url' => url((string) AudioUrl::fromPath((string) $sample->audio_path)),
         ];
     }
 

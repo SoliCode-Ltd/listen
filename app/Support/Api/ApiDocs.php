@@ -18,7 +18,7 @@ final class ApiDocs
     /**
      * @param  array{voice_id:string, name:string, language:string, gender?:?string}  $voice  the voice of the examples
      * @param  array{voice_id:string, name:string}|null  $partner  a second voice of the same language, for the dialogue example
-     * @param  array{text:string, dialect:?string, emotion:?string}|null  $hero  a recording's own settings, for the request at the top
+     * @param  array{voice_id:string, body:array<string, mixed>}|null  $hero  the request at the top of the page (developer_docs_samples.php)
      * @return array<string, mixed>
      */
     public static function build(string $locale, string $baseUrl, array $voice, ?array $partner = null, ?array $hero = null): array
@@ -28,6 +28,11 @@ final class ApiDocs
             ? ['text' => 'أهلين! كيفك اليوم؟ أنا هون لساعدك.', 'dialect' => 'ar-LB', 'language' => 'ar', 'title' => 'ترحيب المساعد']
             : ['text' => 'Hi there! How can I help you today?', 'dialect' => 'en-GB', 'language' => 'en', 'title' => 'Assistant greeting'];
         $voiceId = $voice['voice_id'];
+        // Every example reads the same words as the request at the top.
+        if ($hero !== null) {
+            $example['text'] = (string) $hero['body']['text'];
+            $example['dialect'] = (string) ($hero['body']['dialect'] ?? $example['dialect']);
+        }
         $historyId = 4821;
         $jsonFlags = JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | ($arabic ? JSON_UNESCAPED_UNICODE : 0);
         $json = static fn (array $value): string => (string) preg_replace_callback(
@@ -388,10 +393,8 @@ final class ApiDocs
         return [
             'languages' => ApiCodeSamples::LANGUAGES,
             'endpoints' => $endpoints,
-            // The request at the top: the settings of the recording it plays, when there is one.
-            'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $hero !== null
-                ? array_filter(['text' => $hero['text'], 'dialect' => $hero['dialect'], 'emotion' => $hero['emotion']], static fn (?string $value): bool => $value !== null)
-                : ['text' => $example['text'], 'dialect' => $example['dialect']], 'speech.mp3')['curl'], 'bash'),
+            // The request at the top, exactly as its recording was made.
+            'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.($hero['voice_id'] ?? $voiceId).'?output_format=mp3', $hero['body'] ?? $ttsBody, 'speech.mp3')['curl'], 'bash'),
             'dialogue' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $dialogueBody, 'dialogue.mp3')),
             'environment_sample' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect'], 'audio_effect' => 'phone'], 'call.mp3')),
             'environments' => array_values($environments),

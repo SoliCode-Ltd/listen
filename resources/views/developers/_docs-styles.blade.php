@@ -73,9 +73,13 @@
     .docs-play .i-pause { display: none; }
     .docs-play[aria-pressed="true"] .i-play { display: none; }
     .docs-play[aria-pressed="true"] .i-pause { display: block; }
-    .docs-wave { display: flex; align-items: center; justify-content: space-between; gap: 2px; height: 40px; min-width: 0; overflow: hidden; }
-    .docs-wave i { flex: 1 1 0; min-width: 2px; border-radius: 2px; background: rgba(255, 255, 255, .22); transition: background-color .15s ease; }
-    .docs-wave i.is-played { background: #c9b8ff; }
+    .docs-wave { --p: 0%; position: relative; height: 40px; min-width: 0; overflow: hidden; cursor: pointer; }
+    .docs-wave-bars { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; gap: 2px; pointer-events: none; }
+    .docs-wave-bars i { flex: 1 1 0; min-width: 2px; border-radius: 2px; background: rgba(255, 255, 255, .22); }
+    .docs-wave-bars.is-played { clip-path: inset(0 calc(100% - var(--p)) 0 0); }
+    .docs-wave-bars.is-played i { background: #c9b8ff; }
+    .docs-wave-head { position: absolute; top: 4px; bottom: 4px; left: var(--p); width: 2px; margin-left: -1px; border-radius: 1px; background: #fff; opacity: 0; transition: opacity .2s ease; pointer-events: none; }
+    .docs-answer.is-playing .docs-wave-head, .docs-answer.is-started .docs-wave-head { opacity: .85; }
     .docs-answer-meta { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; font-size: .82rem; color: var(--code-muted); }
     .docs-answer-voice { display: inline-flex; align-items: center; gap: .55rem; color: var(--code-text); font-weight: 600; }
     html[dir="rtl"] .docs-answer-voice { direction: rtl; }
