@@ -16,21 +16,13 @@
                 data-label-play="{{ __('ui.landing.tour_play', ['name' => $tourName]) }}"
                 data-label-pause="{{ __('ui.landing.tour_pause', ['name' => $tourName]) }}"
                 aria-label="{{ __('ui.landing.tour_play', ['name' => $tourName]) }}"
-              @elseif($item['key'] === 'cloning')
-                data-tour-listen
-                aria-label="{{ __('ui.landing.tour_listen') }}"
               @else
                 aria-label="{{ $tourName }}"
               @endif
             >
               {{-- The picked orb keeps flowing. --}}
               <x-orb :name="$item['key']" @class(['tour-orb', 'is-live' => $i === 0]) />
-              @if($item['key'] === 'cloning')
-                {{-- Voice cloning listens: a microphone, and rings that flow inwards. --}}
-                <span class="tour-play" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
-                </span>
-              @elseif($item['src'] !== '')
+              @if($item['src'] !== '')
                 <span class="tour-play" aria-hidden="true">
                   <svg class="tour-icon-play" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>
                   <svg class="tour-icon-pause" viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1.5"/><rect x="13.5" y="5" width="4" height="14" rx="1.5"/></svg>
@@ -47,7 +39,7 @@
           <div class="tour-copy" data-tour-copy="{{ $i }}" @if($i !== 0) hidden @endif>
             <h3>{{ __('ui.landing.tour_'.$item['key'].'_title') }}</h3>
             <p>{{ __('ui.landing.tour_'.$item['key'].'_body') }}</p>
-            <a class="btn tour-more" href="{{ $item['more'] }}">{{ $item['key'] === 'cloning' ? __('ui.landing.tour_cloning_cta') : __('ui.landing.tour_more') }}</a>
+            <a class="btn tour-more" href="{{ $item['more'] }}">{{ __('ui.landing.tour_more') }}</a>
           </div>
         @endforeach
       </div>
@@ -58,7 +50,6 @@
   (function () {
     var row = document.querySelector('[data-tour]');
     if (!row) return;
-    var listenTimer = 0;
     // Picking an orb lifts it and shows what it is; its sample plays through the shared player.
     row.addEventListener('click', function (event) {
       var pick = event.target.closest('.tour-pick');
@@ -70,15 +61,7 @@
         el.classList.toggle('is-picked', on);
         el.querySelector('.tour-pick').setAttribute('aria-pressed', on ? 'true' : 'false');
         el.querySelector('.tour-orb').classList.toggle('is-live', on);
-        if (!on) el.classList.remove('is-listening');
       });
-      // Voice cloning has nothing to play: the voice stops, and the orb listens hard for a few seconds.
-      if (pick.hasAttribute('data-tour-listen')) {
-        document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: null } }));
-        item.classList.add('is-listening');
-        clearTimeout(listenTimer);
-        listenTimer = setTimeout(function () { item.classList.remove('is-listening'); }, 4500);
-      }
       document.querySelectorAll('[data-tour-copy]').forEach(function (el) { el.hidden = el.getAttribute('data-tour-copy') !== index; });
       // On a phone the row scrolls: bring the picked orb to the middle.
       if (row.scrollWidth > row.clientWidth + 4 && item.scrollIntoView) {

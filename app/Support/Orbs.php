@@ -22,8 +22,6 @@ class Orbs
         'dialogue' => ['#15606B', '#2DB7A6', '#A294FF', '#EEF0FF'],
         // Sound environments: a deep space lit by one warm light.
         'places' => ['#14295E', '#2672B4', '#46C6CC', '#F6D38A'],
-        // Voice cloning: a pearl that mirrors your own voice.
-        'cloning' => ['#5A5282', '#9C93CC', '#DFDAF5', '#FFFFFF'],
         // Plans, from the lightest to the deepest.
         'starter' => ['#124456', '#46B0A2', '#BDEBDA', '#F5FFFA'],
         'creator' => ['#24138A', '#7659FA', '#C9BEFF', '#FFE3D3'],

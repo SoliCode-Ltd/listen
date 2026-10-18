@@ -13,8 +13,7 @@
  *
  * How an orb behaves: picked, its colour keeps flowing; hovered, it flows faster
  * and brightens; playing, it lights up, flows with the voice, rings ripple out
- * with the loudness and a halo breathes around it. The voice cloning orb listens
- * instead: its rings flow inwards.
+ * with the loudness and a halo breathes around it.
  */
 (function () {
   'use strict';
@@ -26,7 +25,7 @@
   var VERT = 'attribute vec2 p; void main(){ gl_Position = vec4(p, 0.0, 1.0); }';
   var FRAG = [
     'precision highp float;',
-    'uniform vec2 uRes; uniform float uSize; uniform float uTime; uniform float uLevel; uniform float uSeed; uniform float uDir; uniform float uLift;',
+    'uniform vec2 uRes; uniform float uSize; uniform float uTime; uniform float uLevel; uniform float uSeed; uniform float uLift;',
     'uniform vec3 uC0; uniform vec3 uC1; uniform vec3 uC2; uniform vec3 uC3;',
     'float hash(vec3 p){ p = fract(p * 0.1031); p += dot(p, p.zyx + 31.32); return fract((p.x + p.y) * p.z); }',
     'float noise(vec3 x){',
@@ -46,8 +45,8 @@
     '  vec3 s = q * 0.7 + uSeed;',
     '  vec3 w = vec3(fbm(s + vec3(0.0, 0.0, uTime * 0.11)), fbm(s + vec3(5.2, 1.3, 2.8 + uTime * 0.05)), fbm(s + vec3(1.7, 9.2, uTime * 0.08)));',
     '  float v = fbm(s * 0.8 + 1.7 * w);',
-    // Listen's mark: rings that ripple out from the centre with the voice (inwards when it listens).
-    '  float ring = sin(r * 17.0 + (w.x - 0.5) * 7.0 - uTime * 5.0 * uDir);',
+    // Listen's mark: rings that ripple out from the centre with the voice.
+    '  float ring = sin(r * 17.0 + (w.x - 0.5) * 7.0 - uTime * 5.0);',
     '  v += ring * 0.1 * uLevel * smoothstep(0.08, 0.4, r) * (1.0 - r * 0.6);',
     '  v = clamp((v - 0.26) / 0.42, 0.0, 1.0);',
     '  vec3 col = mix(uC0, uC1, smoothstep(0.0, 0.38, v));',
@@ -103,7 +102,7 @@
     var pos = gl.getAttribLocation(prog, 'p');
     gl.enableVertexAttribArray(pos);
     gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
-    ['uRes', 'uSize', 'uTime', 'uLevel', 'uSeed', 'uDir', 'uLift', 'uC0', 'uC1', 'uC2', 'uC3'].forEach(function (k) { loc[k] = gl.getUniformLocation(prog, k); });
+    ['uRes', 'uSize', 'uTime', 'uLevel', 'uSeed', 'uLift', 'uC0', 'uC1', 'uC2', 'uC3'].forEach(function (k) { loc[k] = gl.getUniformLocation(prog, k); });
     gl.clearColor(0, 0, 0, 0);
     return true;
   }
@@ -132,8 +131,6 @@
       level: 0,
       lift: 0,
       speed: 1,
-      // The voice cloning orb listens: its rings flow inwards.
-      inward: name === 'cloning',
       size: 0,
       visible: false,
       hover: false,
@@ -159,7 +156,6 @@
     gl.uniform1f(loc.uTime, o.time);
     gl.uniform1f(loc.uLevel, o.level);
     gl.uniform1f(loc.uSeed, o.seed);
-    gl.uniform1f(loc.uDir, o.inward ? -1 : 1);
     gl.uniform1f(loc.uLift, o.lift);
     gl.uniform3fv(loc.uC0, o.colors[0]);
     gl.uniform3fv(loc.uC1, o.colors[1]);
@@ -186,11 +182,6 @@
     if (!o.visible) return false;
     return o.hover || o.el.classList.contains('is-live') || voiceLevel(o) >= 0 || !!o.el.closest('.is-playing');
   }
-  // How hard the cloning orb listens: gently while picked, more when pressed.
-  function listenLevel(o) {
-    if (o.el.closest('.is-listening')) return 0.55 + 0.3 * Math.abs(Math.sin(o.time * 3.1));
-    return 0.2 + 0.12 * Math.abs(Math.sin(o.time * 1.7));
-  }
 
   var frame = 0, last = 0, idle = 0;
   function tick(now) {
@@ -201,9 +192,8 @@
       var live = isLive(o);
       var voice = live ? voiceLevel(o) : -1;
       var playing = voice >= 0;
-      var listening = live && o.inward && !playing;
-      var targetLevel = playing ? voice : (listening ? listenLevel(o) : 0);
-      var targetLift = playing ? 0.1 + 0.22 * voice : (live && o.hover ? 0.07 : 0) + (listening ? 0.04 : 0);
+      var targetLevel = playing ? voice : 0;
+      var targetLift = playing ? 0.1 + 0.22 * voice : (live && o.hover ? 0.07 : 0);
       var targetSpeed = playing ? 2.2 + 2.6 * voice : (o.hover ? 2.1 : 1);
       if (!live && o.level < 0.002 && o.lift < 0.002) return;
       any = true;
@@ -212,7 +202,7 @@
       o.lift += (targetLift - o.lift) * k;
       o.speed += (targetSpeed - o.speed) * Math.min(1, dt * 4);
       if (!reduced) o.time += dt * (live ? o.speed : 0.6);
-      // The halo around a playing or listening orb breathes with it (CSS reads --orb-glow).
+      // The halo around a playing orb breathes with it (CSS reads --orb-glow).
       o.el.style.setProperty('--orb-glow', o.level.toFixed(3));
       draw(o);
     });

@@ -1,7 +1,7 @@
 {{--
   A small drawing above each figure in the homepage facts strip, showing what the
   number means: real dialect greetings, the countries' accents, the places a voice
-  can be heard in, and the style picker with one style chosen. Decorative only.
+  can be heard in, and one greeting said three ways. Decorative only.
 --}}
 @props(['kind'])
 <div class="fact-art fact-art-{{ $kind }}" aria-hidden="true">
@@ -32,17 +32,19 @@
       <span class="fa-tile" style="--i: 3"><svg viewBox="0 0 32 32"><path d="M2 27 11 12l5 7 4-5 10 13z"/><path d="M22 6a5 5 0 0 1 0 7m3-10a9 9 0 0 1 0 13"/></svg></span>
       @break
     @case('styles')
-      {{-- The style picker as it looks in the studio: three real styles, one chosen. --}}
-      <span class="fa-menu">
-        @foreach(['calm', 'excited', 'news'] as $i => $style)
-          <span class="fa-option{{ $style === 'excited' ? ' is-on' : '' }}" style="--i: {{ $i }}">
-            <span>{{ __('ui.samples.moods.'.$style) }}</span>
-            @if($style === 'excited')
-              <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
-            @endif
-          </span>
-        @endforeach
-      </span>
+      {{-- The same greeting whispered, said and called out, each over the voice it makes:
+           one text, many deliveries. In the page's own language. --}}
+      @php $greeting = app()->getLocale() === 'ar' ? 'أهلاً' : 'Hello'; @endphp
+      @foreach([[3, 4, 3, 5, 3], [5, 8, 6, 10, 7, 5, 8], [7, 13, 10, 18, 12, 16, 9, 14, 7]] as $level => $bars)
+        <span class="fa-say fa-say-{{ $level + 1 }}" style="--i: {{ $level }}">
+          <span class="fa-say-word">{{ $greeting }}{{ $level === 2 ? '!' : '' }}</span>
+          <svg class="fa-say-wave" viewBox="0 0 {{ count($bars) * 5 }} 18" width="{{ count($bars) * 5 }}" height="18">
+            @foreach($bars as $b => $h)
+              <rect x="{{ $b * 5 + .8 }}" y="{{ (18 - $h) / 2 }}" width="3.2" height="{{ $h }}" rx="1.6" style="--i: {{ $level * 4 + $b }}"/>
+            @endforeach
+          </svg>
+        </span>
+      @endforeach
       @break
   @endswitch
 </div>

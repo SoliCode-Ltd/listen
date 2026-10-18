@@ -574,42 +574,29 @@
     .fa-tile:nth-child(even) { transform: translateY(7px); }
     .fa-tile.is-on { background: var(--brand-accent); border-color: transparent; color: #fff; box-shadow: 0 10px 20px -10px color-mix(in oklab, var(--a) 80%, transparent); }
     .fa-tile svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
-    .fact-art-styles { display: grid; place-items: center; }
-    .fa-menu {
-      display: grid;
-      gap: 2px;
-      width: min(80%, 200px);
-      padding: 4px;
-      border-radius: 12px;
-      background: var(--surface);
-      border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
-      box-shadow: 0 10px 22px -14px color-mix(in oklab, var(--a) 70%, transparent);
-    }
-    .fa-option {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: .5rem;
-      padding: .14rem .65rem;
-      border-radius: 8px;
-      color: var(--muted);
-      font-size: .78rem;
-      font-weight: 600;
-      line-height: 1.4;
-      white-space: nowrap;
-    }
-    .fa-option.is-on { background: var(--brand-accent); color: #fff; }
-    .fa-option svg { width: 14px; height: 14px; flex: none; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+    /* One greeting, three deliveries: each louder word sits over a bigger voice. */
+    .fact-art-styles { display: flex; align-items: flex-end; justify-content: center; gap: 1.1rem; padding-bottom: 1rem; }
+    .fa-say { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
+    .fa-say-word { line-height: 1; white-space: nowrap; }
+    .fa-say-1 .fa-say-word { color: var(--muted); font-size: .8rem; font-weight: 400; letter-spacing: .04em; }
+    .fa-say-2 .fa-say-word { color: var(--text); font-size: 1.05rem; font-weight: 600; }
+    .fa-say-3 .fa-say-word { color: var(--accent-text); font-size: 1.55rem; font-weight: 800; letter-spacing: -.01em; }
+    html[dir="rtl"] .fa-say-word { letter-spacing: 0; }
+    .fa-say-wave { display: block; height: 18px; width: auto; }
+    .fa-say-1 .fa-say-wave { fill: color-mix(in oklab, var(--a) 30%, var(--surface)); }
+    .fa-say-2 .fa-say-wave { fill: color-mix(in oklab, var(--a) 55%, var(--surface)); }
+    .fa-say-3 .fa-say-wave { fill: var(--brand-accent); }
     @media (prefers-reduced-motion: no-preference) {
       .facts.reveal:not(.show) .fa-bubble,
       .facts.reveal:not(.show) .fa-flags img,
       .facts.reveal:not(.show) .fa-tile,
-      .facts.reveal:not(.show) .fa-option { opacity: 0; }
+      .facts.reveal:not(.show) .fa-say { opacity: 0; }
       .facts.show .fa-bubble { animation: faPop .5s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 90ms); }
       .facts.show .fa-flags img { animation: faSlide .45s ease-out both; animation-delay: calc(.15s + var(--i) * 60ms); }
       .facts.show .fa-tile,
-      .facts.show .fa-option { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 80ms); }
-      .facts.show .fa-wave rect { transform-box: fill-box; transform-origin: center; animation: faGrow .6s ease-out both; animation-delay: calc(.2s + var(--i) * 25ms); }
+      .facts.show .fa-say { animation: faPop .45s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(.15s + var(--i) * 120ms); }
+      .facts.show .fa-wave rect,
+      .facts.show .fa-say-wave rect { transform-box: fill-box; transform-origin: center; animation: faGrow .6s ease-out both; animation-delay: calc(.2s + var(--i) * 25ms); }
     }
     @keyframes faPop { from { opacity: 0; transform: scale(.7); } }
     @keyframes faSlide { from { opacity: 0; transform: translateX(-10px); } }
@@ -637,8 +624,10 @@
       .fa-tile svg { width: 21px; height: 21px; }
       .fact-art-places { gap: .35rem; }
       .fa-flags img { width: 28px; height: 28px; }
-      .fa-menu { width: min(86%, 200px); }
-      .fa-option { font-size: .74rem; padding: .1rem .55rem; }
+      .fact-art-styles { gap: .8rem; padding-bottom: .85rem; }
+      .fa-say-1 .fa-say-word { font-size: .72rem; }
+      .fa-say-2 .fa-say-word { font-size: .92rem; }
+      .fa-say-3 .fa-say-word { font-size: 1.3rem; }
     }
     /* Small phones: one flag and one place fewer and tighter greetings, so nothing spills over. */
     @media (max-width: 420px) {
@@ -650,6 +639,11 @@
       .fa-flags img:nth-child(6), .fa-tile:nth-child(4) { display: none; }
       .fa-tile { width: 33px; height: 33px; border-radius: 9px; }
       .fa-tile svg { width: 19px; height: 19px; }
+      .fact-art-styles { gap: .45rem; }
+      .fa-say-1 .fa-say-word { font-size: .6rem; letter-spacing: 0; }
+      .fa-say-2 .fa-say-word { font-size: .78rem; }
+      .fa-say-3 .fa-say-word { font-size: 1.02rem; }
+      .fa-say-wave { height: 14px; }
     }
 
     .reveal {

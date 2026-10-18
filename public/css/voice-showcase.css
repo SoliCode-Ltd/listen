@@ -963,7 +963,6 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
 .tour-pick:hover .tour-play,
 .tour-pick:focus-visible .tour-play { opacity: 1; transform: none; }
 .tour-play svg { width: 22px; height: 22px; }
-.tour-item.is-listening .tour-play { color: var(--brand-accent); transform: scale(1.08); }
 .tour-icon-pause { display: none; }
 .tour-item.is-playing .tour-icon-play { display: none; }
 .tour-item.is-playing .tour-icon-pause { display: block; }

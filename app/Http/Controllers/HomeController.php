@@ -126,7 +126,6 @@ class HomeController extends Controller
             ['key' => 'emotions', 'src' => $pick($language, 'hero', ['excited', 'dramatic', 'happy', 'playful']), 'more' => $samplesPage.'#moods'],
             ['key' => 'dialogue', 'src' => $pick($language, 'dialogue', ['comedy', 'conversational', 'friendly']), 'more' => $samplesPage.'#conversations'],
             ['key' => 'places', 'src' => $this->environmentMorph($language) ?: (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],
-            ['key' => 'cloning', 'src' => '', 'more' => route('pricing')],
         ];
     }
 
