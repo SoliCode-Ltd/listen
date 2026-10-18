@@ -21,6 +21,13 @@ on:
         type: choice
         options: [staging, live]
         default: staging
+  # Until this file is on main (manual runs need that), a change to it on the
+  # API branch runs it on staging.
+  push:
+    branches: [main-vtswl7]
+    paths:
+      - .github/workflows/developer-api-check.yml
+      - scripts/api/readiness_check.php
 
 permissions:
   contents: read
