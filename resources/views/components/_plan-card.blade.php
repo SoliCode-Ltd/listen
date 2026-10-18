@@ -43,8 +43,9 @@
 
   {{-- 1. Name and who it is for --}}
   <div class="plan-top">
-    {{-- On every card, empty or not, so the names line up across the row. --}}
-    <div class="plan-badges {{ $isPopular ? '' : 'is-empty' }}">
+    {{-- Each plan's orb, and the badge on the recommended one; the popular orb moves gently. --}}
+    <div class="plan-badges">
+      <x-orb :name="\App\Support\Orbs::forPlan((string) $plan['slug'])" @class(['plan-orb', 'is-live' => $isPopular]) />
       @if($isPopular)
         <span class="popular-badge">{{ __('ui.pricing.most_popular') }}</span>
       @endif

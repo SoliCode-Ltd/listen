@@ -1502,4 +1502,33 @@ html[dir="rtl"] .pagination-btn,
 html[dir="rtl"] .pagination-info {
   font-variant-numeric: tabular-nums;
 }
+
+/* ===== VOICE ORBS =====
+   Spheres of soft, grainy colour, one palette per part of the product (App\Support\Orbs).
+   public/js/listen-orbs.js draws them; until then, or without it, this lit sphere shows. */
+.orb {
+  --orb-size: 160px;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--o3) 85%, transparent), transparent 46%),
+    radial-gradient(circle at 62% 68%, var(--o1), var(--o0) 78%);
+  box-shadow: 0 24px 48px -28px color-mix(in srgb, var(--o0) 70%, transparent);
+}
+.orb canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+.orb.is-drawn canvas { opacity: 1; }
+/* Drawn: the canvas is the whole sphere, so the stand-in's edge never shows around it. */
+.orb.is-drawn { background: none; }
 </style>

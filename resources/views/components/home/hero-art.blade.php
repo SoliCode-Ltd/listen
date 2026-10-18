@@ -34,6 +34,7 @@
 
     <button type="button" class="vs-cast-mark" data-vs-play-all aria-label="{{ __('ui.landing.hero_play_all') }}" title="{{ __('ui.landing.hero_play_all') }}">
       <span class="vs-cast-mark-ring"></span><span class="vs-cast-mark-ring"></span>
+      <x-orb name="listen" class="vs-cast-orb" />
       <svg class="vs-cast-mark-logo" viewBox="0 0 48 48" fill="currentColor" aria-hidden="true">
         <rect x="6" y="19" width="4" height="10" rx="2"/><rect x="14" y="13" width="4" height="22" rx="2"/>
         <rect x="22" y="7" width="4" height="34" rx="2"/><rect x="30" y="13" width="4" height="22" rx="2"/>

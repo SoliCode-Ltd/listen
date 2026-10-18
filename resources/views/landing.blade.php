@@ -1024,6 +1024,9 @@
       </div>
     </section>
 
+    {{-- Every kind of voice, one orb each --}}
+    @include('components.home.voice-tour')
+
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')
     @include('components.home.dialogues')
@@ -1123,6 +1126,7 @@
   @include('components.footer')
   @include('components.scripts')
   @include('components.voice-player-script')
+  @include('components.orb-script')
   <script>
     // "Hear the voices" plays the hero conversation, and shows when it is playing.
     (function () {

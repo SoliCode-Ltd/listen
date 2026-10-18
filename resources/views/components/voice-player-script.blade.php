@@ -75,15 +75,16 @@
   // Levels are eased frame to frame so the motion stays smooth.
   function liftBars(track, ratio, t) {
     var info = infoOf(track);
-    var groups = track.querySelectorAll('.vs-wave-bars');
-    if (!groups.length) return;
     var playing = track.classList.contains('is-playing');
     var target = 0;
     if (playing && info) {
       var frame = Math.min(info.rms.length - 1, Math.max(0, Math.round(t * 100)));
       target = Math.min(1, Math.sqrt((info.rms[frame] || 0) / info.loud));
     }
+    // The live loudness is kept on the card too: a voice orb in it ripples with the voice.
     track.__vpLevel = (track.__vpLevel || 0) + (target - (track.__vpLevel || 0)) * 0.25;
+    var groups = track.querySelectorAll('.vs-wave-bars');
+    if (!groups.length) return;
     var level = track.__vpLevel, count = groups[0].children.length, head = ratio * count;
     groups.forEach(function (g) {
       for (var i = 0; i < count; i++) {

@@ -388,6 +388,7 @@
       @endphp
       <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
         <div class="vs-head">
+          <x-orb :name="$sectionId === 'arabic-dialects' ? 'arabic' : 'english'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.'.$copyKey.'_lead') }}</p>
@@ -413,6 +414,7 @@
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
       <section class="samples-section" id="moods" aria-labelledby="moods-title">
         <div class="vs-head">
+          <x-orb :name="'emotions'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="moods-title">{{ __('ui.samples.moods_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.moods_lead') }}</p>
@@ -434,6 +436,7 @@
     @if($dialogues !== [])
       <section class="samples-section" id="conversations" aria-labelledby="conversations-title">
         <div class="vs-head">
+          <x-orb :name="'dialogue'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="conversations-title">{{ __('ui.samples.conversations_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.conversations_lead') }}</p>
@@ -450,6 +453,7 @@
     @if($environments !== [])
       <section class="samples-section" id="sound-environments" aria-labelledby="sound-environments-title">
         <div class="vs-head">
+          <x-orb :name="'places'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="sound-environments-title">{{ __('ui.samples.environments_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.environments_lead') }}</p>
@@ -483,6 +487,7 @@
   @include('components.footer')
   @include('components.scripts')
   @include('components.voice-player-script')
+  @include('components.orb-script')
   <script>
   /* ── The stage: one voice after another, each word filling in as it is spoken ── */
   (function () {
