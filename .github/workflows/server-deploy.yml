@@ -1,10 +1,11 @@
 name: Server deploy
 
 # The servers are plain uploads, not git checkouts. This copies the files
-# tracked on main onto the server. It never deletes, and never touches .env,
+# tracked on main onto the server (staging: on the branch the run was started
+# from, so a branch can be tried there before it is merged; live: always main). It never deletes, and never touches .env,
 # storage/, vendor/, node_modules/, uploads, or the per-server extension
 # config (public/extensions/*/config.js).
-#   inspect: lists the files that differ from main (nothing changes).
+#   inspect: lists the files that differ from what would be deployed (nothing changes).
 #   deploy:  copies main over the app, then clears and rebuilds caches.
 #   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
 #            environments and download formats) when the host has none.
@@ -53,7 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          # Live always gets main. Staging gets the branch this run was started from
+          # (main when started from main), to try work there before it is merged.
+          ref: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
           fetch-depth: 1
       - name: Build the bundle and its checksums
         run: |
@@ -62,7 +65,7 @@ jobs:
             | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' > files.txt
           tar -czf bundle.tgz -T files.txt
           xargs -d '\n' md5sum < files.txt > manifest.md5
-          echo "main: $(git log -1 --format='%h %s')"; wc -l < files.txt
+          echo "${{ inputs.target == 'live' && 'main' || github.ref_name }}: $(git log -1 --format='%h %s')"; wc -l < files.txt
       - name: Run over SSH
         env:
           TARGET: ${{ inputs.target }}
@@ -88,7 +91,7 @@ jobs:
           FIND="for d in ${P:+'$P'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done"
           $S "$FIND; mkdir -p storage/app/listen-deploy"
           $S "$FIND; cat > storage/app/listen-deploy/manifest.md5" < manifest.md5
-          echo "== Files that differ from main (or are missing) =="
+          echo "== Files that differ from ${{ inputs.target == 'live' && 'main' || github.ref_name }} (or are missing) =="
           $S "$FIND; md5sum -c --quiet storage/app/listen-deploy/manifest.md5 2>/dev/null | sed 's/: FAILED open or read/  (missing)/; s/: FAILED$/  (changed)/' | grep -v '^md5sum' | sort" | tee diff.txt || true
           echo "== $(wc -l < diff.txt) file(s) =="
           echo "New or changed migrations:"; grep '^database/migrations/' diff.txt || echo "  none"
@@ -232,7 +235,7 @@ jobs:
             php artisan optimize:clear | tail -6; \
             [ \$c = 1 ] && php artisan config:cache | tail -1; [ \$r = 1 ] && php artisan route:cache | tail -1; \
             php artisan view:cache | tail -1; php artisan queue:restart | tail -1 || true; \
-            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches main' || echo 'WARNING: some files still differ'; \
+            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'; \
             rm -f storage/app/listen-deploy/bundle.tgz"
           rm -f ~/.ssh/id_deploy
       - name: Check the public footer

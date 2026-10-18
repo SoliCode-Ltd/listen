@@ -65,12 +65,9 @@
       isolation: isolate;
       overflow: hidden;
       color: var(--st-text);
-      background:
-        radial-gradient(60% 80% at 85% 10%, rgba(118, 89, 250, .42), transparent 60%),
-        radial-gradient(50% 70% at 5% 100%, rgba(61, 139, 255, .22), transparent 60%),
-        var(--stage-ink);
+      background: var(--stage-ink);
     }
-    /* Light theme: the launch video's look, dark words on warm light with soft colour glows. */
+    /* Light theme: dark words straight on the site's warm background. */
     html[data-theme="light"] .stage {
       --st-text: #15151C;
       --st-soft: #4B4F5C;
@@ -90,13 +87,11 @@
       --st-bar-to: #6247EE;
       --st-focus: #6247EE;
       --st-avatar-ring: #FFFFFF;
-      --st-pick-gap: #F7F5F1;
+      --st-pick-gap: #FFFFFF;
       --st-bars: rgba(118, 89, 250, .035);
       --st-ring: 118, 89, 250;
-      background:
-        radial-gradient(40% 75% at 6% 8%, rgba(255, 214, 194, .8), transparent 70%),
-        radial-gradient(42% 80% at 96% 18%, rgba(206, 196, 255, .9), transparent 70%),
-        radial-gradient(45% 70% at 22% 100%, rgba(196, 228, 255, .7), transparent 70%);
+      /* The site's own warm paper and colour light show through. */
+      background: transparent;
     }
     /* A faint field of sound bars behind the words. */
     .stage::before {
@@ -185,7 +180,7 @@
     }
     .stage-btn:hover { background: var(--st-btn-hover); }
     .stage-btn svg { width: 18px; height: 18px; fill: currentColor; }
-    .stage-btn.is-main { width: 68px; height: 68px; border: 0; background: var(--st-main-bg); color: var(--st-main-fg); box-shadow: 0 14px 30px -12px rgba(118, 89, 250, .9); }
+    .stage-btn.is-main { width: 68px; height: 68px; border: 0; background: var(--st-main-bg); color: var(--st-main-fg); box-shadow: var(--lift); }
     .stage-btn.is-main:hover { background: var(--st-main-hover); }
     .stage-btn.is-main svg { width: 24px; height: 24px; }
     .stage-btn .i-pause { display: none; }
@@ -270,9 +265,7 @@
       gap: 1.5rem 2.5rem;
       border-radius: 1.5rem;
       color: #FFFFFF;
-      background:
-        radial-gradient(70% 120% at 100% 0%, rgba(255, 255, 255, .12), transparent 60%),
-        linear-gradient(135deg, #4A30D9 0%, #6145F2 55%, #7254F7 100%);
+      background: #6145F2;
     }
     .samples-cta h2 { margin: 0 0 .4rem; color: #FFFFFF; font-size: clamp(1.5rem, 3vw, 2.1rem); }
     .samples-cta p { margin: 0; color: rgba(255, 255, 255, .9); max-width: 52ch; }
@@ -395,6 +388,7 @@
       @endphp
       <section class="samples-section" id="{{ $sectionId }}" aria-labelledby="{{ $sectionId }}-title">
         <div class="vs-head">
+          <x-orb :name="$sectionId === 'arabic-dialects' ? 'arabic' : 'english'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="{{ $sectionId }}-title">{{ __('ui.samples.'.$copyKey.'_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.'.$copyKey.'_lead') }}</p>
@@ -420,6 +414,7 @@
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
       <section class="samples-section" id="moods" aria-labelledby="moods-title">
         <div class="vs-head">
+          <x-orb :name="'emotions'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="moods-title">{{ __('ui.samples.moods_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.moods_lead') }}</p>
@@ -441,6 +436,7 @@
     @if($dialogues !== [])
       <section class="samples-section" id="conversations" aria-labelledby="conversations-title">
         <div class="vs-head">
+          <x-orb :name="'dialogue'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="conversations-title">{{ __('ui.samples.conversations_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.conversations_lead') }}</p>
@@ -457,6 +453,7 @@
     @if($environments !== [])
       <section class="samples-section" id="sound-environments" aria-labelledby="sound-environments-title">
         <div class="vs-head">
+          <x-orb :name="'places'" class="vs-head-orb" />
           <div>
             <h2 class="vs-title" id="sound-environments-title">{{ __('ui.samples.environments_title') }}</h2>
             <p class="vs-lead">{{ __('ui.samples.environments_lead') }}</p>
@@ -490,6 +487,7 @@
   @include('components.footer')
   @include('components.scripts')
   @include('components.voice-player-script')
+  @include('components.orb-script')
   <script>
   /* ── The stage: one voice after another, each word filling in as it is spoken ── */
   (function () {

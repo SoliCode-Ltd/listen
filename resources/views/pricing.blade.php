@@ -81,7 +81,7 @@
       width: calc(50% - .25rem);
       border-radius: var(--radius-full);
       background: var(--brand-accent);
-      box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 30%, transparent);
+      box-shadow: var(--lift);
       transition: transform .2s ease;
       z-index: 0;
     }
@@ -164,34 +164,24 @@
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
       box-shadow: 0 24px 48px -32px rgba(30, 20, 80, .35);
     }
-    /* The recommended plan, filled with the brand colour: everything inside follows its colours. */
+    /* The recommended plan: the same white card, held in a violet ring, with its orb alive. */
     .plan-card.popular {
-      --text: #FFFFFF;
-      --muted: rgba(255, 255, 255, .78);
-      --line: rgba(255, 255, 255, .2);
-      --accent-text: #E6E0FF;
-      --surface2: rgba(255, 255, 255, .1);
-      --ok: #86EFC4;
-      color: #FFFFFF;
       border-color: transparent;
-      background:
-        radial-gradient(120% 70% at 100% 0%, rgba(255, 255, 255, .16), transparent 55%),
-        linear-gradient(165deg, #3A22C4 0%, #5638EA 48%, #7254F7 100%);
-      box-shadow: 0 30px 60px -30px rgba(74, 48, 217, .75);
+      box-shadow: 0 0 0 2px var(--brand-accent), 0 30px 60px -36px rgba(76, 45, 235, .5);
     }
-    .plan-card.popular:hover { box-shadow: 0 34px 64px -30px rgba(74, 48, 217, .85); }
+    .plan-card.popular:hover { border-color: transparent; box-shadow: 0 0 0 2px var(--brand-accent), 0 34px 64px -34px rgba(76, 45, 235, .55); }
     .plan-top { display: flex; flex-direction: column; align-items: flex-start; }
-    /* Every card keeps the badge row, so the plan names line up. */
-    .plan-badges { display: flex; align-items: center; min-height: 1.65rem; margin-bottom: .75rem; }
+    /* Every card opens with its orb, so the plan names line up. */
+    .plan-badges { display: flex; align-items: center; justify-content: space-between; align-self: stretch; gap: .75rem; margin-bottom: 1rem; }
+    .plan-orb { --orb-size: 48px; box-shadow: 0 10px 20px -12px color-mix(in srgb, var(--o0) 70%, transparent); }
     .popular-badge {
       display: inline-flex;
       align-items: center;
-      padding: .25rem .7rem;
+      padding: .3rem .75rem;
       border-radius: var(--radius-full);
-      background: rgba(255, 255, 255, .16);
-      border: 1px solid rgba(255, 255, 255, .32);
-      color: #FFFFFF;
-      font-size: .76rem;
+      background: color-mix(in oklab, var(--brand-accent) 12%, transparent);
+      color: var(--accent-text);
+      font-size: .78rem;
       font-weight: 700;
     }
     .plan-name {
@@ -231,7 +221,6 @@
       font-size: .76rem;
       font-weight: 700;
     }
-    .plan-card.popular .price-off { background: rgba(255, 255, 255, .18); color: #FFFFFF; }
     .price-row { display: flex; align-items: baseline; gap: .35rem; }
     .price-amount {
       font-size: clamp(2.2rem, 2.9vw, 2.8rem);
@@ -257,7 +246,6 @@
       background: color-mix(in oklab, var(--a) 7%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--a) 20%, var(--line));
     }
-    .plan-card.popular .discount-terms { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .22); }
     .discount-terms-offer { color: var(--accent-text); font-size: .88rem; font-weight: 700; line-height: 1.45; }
     .discount-terms-then { color: var(--muted); font-size: .82rem; line-height: 1.45; }
     .discount-terms-then[hidden] { display: none; }
@@ -272,7 +260,6 @@
       font-size: .82rem;
       font-weight: 600;
     }
-    .plan-card.popular .offer-ends { border-top-color: rgba(255, 255, 255, .25); }
     .offer-ends[hidden] { display: none; }
     .offer-ends svg { flex: none; width: 15px; height: 15px; fill: none; stroke: var(--accent-text); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
@@ -311,8 +298,6 @@
     }
     .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; }
     .plan-btn.btn-primary:hover { background: var(--brand-hover); }
-    .plan-card.popular .plan-btn.btn-primary { background: #FFFFFF; color: #3F27C4; }
-    .plan-card.popular .plan-btn.btn-primary:hover { background: #F1EEFF; }
     .plan-btn.btn-outline {
       background: transparent;
       color: var(--text);
@@ -320,7 +305,6 @@
     }
     .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in oklab, var(--a) 7%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
-    .plan-card.popular .plan-btn:focus-visible { outline-color: #FFFFFF; }
     .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
     .plan-btn.btn-disabled {
       background: var(--surface2);
@@ -543,7 +527,7 @@
     }
     .feature-card:hover {
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 20px 40px -28px color-mix(in oklab, var(--a) 55%, transparent);
+      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
       transform: translateY(-2px);
     }
     .feature-icon {
@@ -591,7 +575,7 @@
     }
     .faq-item[open] {
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 16px 34px -26px color-mix(in oklab, var(--a) 55%, transparent);
+      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
     }
     .faq-item summary {
       display: flex;
@@ -621,10 +605,8 @@
       border-radius: 1.5rem;
       text-align: center;
       color: #fff;
-      background:
-        radial-gradient(70% 120% at 100% 0%, rgba(255, 255, 255, .12), transparent 60%),
-        linear-gradient(135deg, #4A30D9 0%, #6145F2 55%, #7254F7 100%);
-      box-shadow: 0 34px 70px -36px rgba(74, 48, 217, .7);
+      background: #6145F2;
+      box-shadow: 0 34px 70px -40px rgba(74, 48, 217, .55);
     }
     .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.02em; text-wrap: balance; }
     html[dir="rtl"] .cta-section h2 { letter-spacing: 0; }
@@ -731,7 +713,6 @@
       .plans-grid[data-count] > .plan-card { grid-column: auto !important; width: auto !important; }
       .plan-card { padding: 1.35rem 1.15rem 1.2rem; }
       .plan-desc { min-height: 0; }
-      .plan-badges.is-empty { display: none; }
       .page-hero { padding-top: 2.75rem; }
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 3.5rem; }
@@ -1023,6 +1004,7 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.orb-script')
   @php
     $pricingI18n = [
       'free_forever' => __('ui.pricing.free_forever'),

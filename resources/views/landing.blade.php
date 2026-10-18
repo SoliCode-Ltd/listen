@@ -49,8 +49,8 @@
     .hero h1 {
       margin: 0 0 1rem;
       font-size: clamp(2.4rem, 6vw, 4.5rem);
-      /* Bold, not black: the site font's heaviest weight looks like another typeface. */
-      font-weight: 700;
+      /* Medium, like every big title on the site: confident without shouting. */
+      font-weight: 600;
       line-height: 1.05;
       letter-spacing: -.03em;
       text-wrap: balance;
@@ -212,7 +212,7 @@
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.6rem 1.5rem;
-      background: var(--surface2);
+      background: var(--surface);
       display: flex;
       flex-direction: column;
       gap: 1rem;
@@ -382,10 +382,8 @@
     .cta-section {
       text-align: center;
       padding: clamp(2.25rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem);
-      background:
-        radial-gradient(120% 140% at 50% 0%, color-mix(in oklab, var(--a) 14%, transparent), transparent 60%),
-        var(--surface);
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      background: var(--surface);
+      border: 1px solid var(--line);
       border-radius: 1.25rem;
       margin: 0;
     }
@@ -435,7 +433,7 @@
       place-items: center;
       color: #fff;
       background: var(--brand-accent);
-      box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 35%, transparent);
+      box-shadow: var(--lift);
     }
     .hero-listen-icon svg {
       width: .95rem;
@@ -522,9 +520,7 @@
       position: relative;
       height: 88px;
       border-radius: .9rem;
-      background:
-        radial-gradient(120% 120% at 0% 0%, color-mix(in oklab, var(--a) 10%, transparent), transparent 60%),
-        color-mix(in oklab, var(--a) 4%, var(--surface));
+      background: color-mix(in oklab, var(--a) 4%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
       overflow: hidden;
     }
@@ -874,7 +870,6 @@
       margin-left: 6px;
       vertical-align: text-bottom;
       animation: blinkCaret 0.9s step-end infinite;
-      box-shadow: 0 0 8px color-mix(in oklab, var(--a) 60%, var(--b) 40%);
       border-radius: 1px;
       opacity: 1;
       transition: opacity 0.18s ease;
@@ -982,9 +977,11 @@
     @php
       // Real counts, rounded down to the ten so each claim stays true as more are added.
       $factPlaces = (int) (floor(count(array_filter(\App\Support\AudioEffects::ALL, fn ($row) => $row[1] !== 'clean')) / 10) * 10);
+      $factDialects = ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'];
+      $factAccents = ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'];
       $facts = [
-        ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'],
-        ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'],
+        // The page's own language comes first.
+        ...(app()->getLocale() === 'ar' ? [$factDialects, $factAccents] : [$factAccents, $factDialects]),
         ['value' => $factPlaces, 'label' => __('ui.landing.fact_places'), 'art' => 'places'],
         ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles'), 'art' => 'styles'],
       ];
@@ -1028,6 +1025,9 @@
         </a>
       </div>
     </section>
+
+    {{-- Every kind of voice, one orb each --}}
+    @include('components.home.voice-tour')
 
     {{-- Voice gallery and dialogues --}}
     @include('components.home.voice-gallery')
@@ -1128,6 +1128,7 @@
   @include('components.footer')
   @include('components.scripts')
   @include('components.voice-player-script')
+  @include('components.orb-script')
   <script>
     // "Hear the voices" plays the hero conversation, and shows when it is playing.
     (function () {

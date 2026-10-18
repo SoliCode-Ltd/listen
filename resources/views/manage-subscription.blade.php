@@ -22,7 +22,7 @@
       margin-bottom: 1rem;
     }
     .status-item {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1rem;
@@ -71,7 +71,7 @@
       margin-bottom: 1rem;
     }
     .card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.5rem;

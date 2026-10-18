@@ -11,7 +11,7 @@
     .vc-hero p{margin:0;color:var(--muted);font-size:1.05rem}
 
     /* Upgrade state */
-    .vc-upgrade{max-width:580px;margin:2rem auto;text-align:center;padding:2.5rem 2rem;background:linear-gradient(170deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+    .vc-upgrade{max-width:580px;margin:2rem auto;text-align:center;padding:2.5rem 2rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
     .vc-upgrade .icon-lock{width:56px;height:56px;margin:0 auto 1rem;color:color-mix(in oklab,var(--a) 70%,var(--muted));opacity:.7}
     .vc-upgrade h2{margin:0 0 .5rem;font-size:1.5rem}
     .vc-upgrade p{color:var(--muted);margin:0 0 1.2rem}
@@ -21,7 +21,7 @@
 
     /* Cards grid */
     .vc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-bottom:2rem}
-    .vc-card{position:relative;background:linear-gradient(170deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:var(--radius-lg);padding:1.3rem;box-shadow:var(--shadow);transition:border-color .2s}
+    .vc-card{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:1.3rem;box-shadow:var(--shadow);transition:border-color .2s}
     .vc-card:hover{border-color:color-mix(in oklab,var(--a) 40%,var(--line))}
     .vc-card-header{display:flex;justify-content:space-between;align-items:start;gap:.5rem;margin-bottom:.8rem}
     .vc-card-name{font-size:1.1rem;font-weight:700;margin:0}
@@ -36,7 +36,7 @@
     .vc-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse-dot 1.5s ease infinite}
 
     /* Create form panel */
-    .vc-create-panel{max-width:680px;margin:0 auto;background:linear-gradient(170deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:var(--radius-lg);padding:1.8rem;box-shadow:var(--shadow)}
+    .vc-create-panel{max-width:680px;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);padding:1.8rem;box-shadow:var(--shadow)}
     .vc-create-panel h2{margin:0 0 1.2rem;font-size:1.3rem}
     .vc-form-group{margin-bottom:1.2rem}
     .vc-form-group label{display:block;font-weight:600;font-size:.9rem;margin-bottom:.4rem}
@@ -89,7 +89,7 @@
     .vc-count{font-size:.88rem;color:var(--muted);margin-bottom:1rem}
 
     /* Empty state */
-    .vc-empty{text-align:center;padding:3rem 1.5rem;background:linear-gradient(170deg,var(--surface2),var(--surface));border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
+    .vc-empty{text-align:center;padding:3rem 1.5rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow)}
     .vc-empty .empty-icon{width:64px;height:64px;margin:0 auto 1rem;color:var(--muted);opacity:.35}
     .vc-empty h3{margin:0 0 .5rem}
     .vc-empty p{color:var(--muted);margin:0 0 1.2rem;font-size:.93rem}

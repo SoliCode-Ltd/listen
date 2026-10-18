@@ -67,12 +67,67 @@ class HomeController extends Controller
     public function index()
     {
         $isArabicLocale = $this->sampleLanguageForLocale(app()->getLocale()) === 'ar';
+        $environmentSamples = $this->environmentSamples($isArabicLocale ? 'ar' : 'en');
 
         return view('landing', [
             'countryContext' => $this->localizedPricingService->resolveCountryContext(request()),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor(request()->user()),
-            'environmentSamples' => $this->environmentSamples($isArabicLocale ? 'ar' : 'en'),
+            'environmentSamples' => $environmentSamples,
+            'voiceTour' => $this->voiceTour($isArabicLocale ? 'ar' : 'en', $environmentSamples),
         ] + $this->homeShowcase($isArabicLocale));
+    }
+
+    /**
+     * The homepage tour: one orb for each kind of voice Listen makes, each with
+     * a real sample to hear, all in the page language: Arabic dialects on Arabic
+     * pages, English accents on English pages.
+     *
+     * @param  array<int, array<string, string>>  $environments
+     * @return array<int, array{key: string, src: string, more: string}>
+     */
+    private function voiceTour(string $language, array $environments): array
+    {
+        $samples = Cache::remember('home_voice_tour:v1', 300, fn (): array => VoiceSample::query()
+            ->active()
+            ->whereIn('category', ['hero', 'dialogue'])
+            ->where('provider', 'gemini')
+            ->orderByDesc('is_featured')
+            ->ordered()
+            ->get()
+            ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '')
+            ->map(fn (VoiceSample $sample): array => [
+                'language' => (string) $sample->language,
+                'category' => (string) $sample->category,
+                'emotion' => strtolower(trim((string) $sample->emotion)),
+                'url' => $this->resolveSampleAudioUrl($sample->audio_path, (string) $sample->language),
+            ])
+            ->values()
+            ->all());
+        // The first sample that fits, trying the preferred deliveries in order, then any.
+        $pick = function (string $lang, string $category, array $emotions) use ($samples): string {
+            $fits = array_values(array_filter($samples, fn (array $s): bool => $s['language'] === $lang && $s['category'] === $category));
+            foreach ($emotions as $emotion) {
+                foreach ($fits as $sample) {
+                    if ($sample['emotion'] === $emotion) {
+                        return (string) $sample['url'];
+                    }
+                }
+            }
+
+            return (string) ($fits[0]['url'] ?? '');
+        };
+        $samplesPage = route('samples');
+        $everyday = ['friendly', 'warm', 'conversational', 'confident'];
+
+        return [
+            $language === 'ar'
+                ? ['key' => 'arabic', 'src' => $pick('ar', 'hero', $everyday), 'more' => $samplesPage.'#arabic-dialects']
+                : ['key' => 'english', 'src' => $pick('en', 'hero', $everyday), 'more' => $samplesPage.'#english-accents'],
+            ['key' => 'emotions', 'src' => $pick($language, 'hero', ['excited', 'dramatic', 'happy', 'playful']), 'more' => $samplesPage.'#moods'],
+            ['key' => 'dialogue', 'src' => $pick($language, 'dialogue', ['comedy', 'conversational', 'friendly']), 'more' => $samplesPage.'#conversations'],
+            ['key' => 'places', 'src' => (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],
+            ['key' => 'cloning', 'src' => '', 'more' => route('pricing')],
+        ];
     }
 
     /**

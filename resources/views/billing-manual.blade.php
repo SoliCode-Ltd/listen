@@ -9,7 +9,7 @@
       gap: 1.25rem;
     }
     .manual-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.5rem;
@@ -51,7 +51,7 @@
       padding: 1.15rem 1.25rem;
       border-radius: var(--radius-lg);
       border: 1px solid color-mix(in oklab, var(--brand-accent) 36%, var(--line));
-      background: linear-gradient(135deg, color-mix(in oklab, var(--brand-accent) 10%, var(--surface)), var(--surface));
+      background: color-mix(in oklab, var(--brand-accent) 6%, var(--surface));
     }
     .manual-amount small {
       display: block;

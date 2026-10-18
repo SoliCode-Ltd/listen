@@ -630,7 +630,7 @@
       padding: 1.25rem 1rem;
       border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
       border-radius: var(--radius);
-      background: linear-gradient(145deg, color-mix(in oklab, var(--a) 6%, var(--surface)), var(--surface));
+      background: color-mix(in oklab, var(--a) 4%, var(--surface));
     }
     .quote-highlight small {
       display: block;

@@ -17,7 +17,7 @@
       margin-bottom: 1.5rem;
     }
     .seo-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       box-shadow: var(--shadow);

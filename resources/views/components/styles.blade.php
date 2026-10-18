@@ -7,7 +7,8 @@
   --font-display-ar: var(--site-font, sans-serif);
   --font-body-ar: var(--site-font, sans-serif);
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  --btn-radius: 8px;
+  /* Buttons are pills everywhere, like the chips and toggles. */
+  --btn-radius: 999px;
   --bg: #0B0B0F;
   --surface: #1A1A22;
   --surface2: #121218;
@@ -27,6 +28,8 @@
   --danger: #ee4a77;
   --shadow: 0 4px 16px rgba(0,0,0,.15);
   --shadow-sm: 0 2px 8px rgba(0,0,0,.10);
+  /* The one lift a violet control gets: small and close, never a glow. */
+  --lift: 0 4px 12px -6px rgba(76, 45, 235, .55);
   --radius: .5rem;
   --radius-lg: .75rem;
   --radius-full: 9999px;
@@ -112,17 +115,21 @@ img, svg, video, canvas, iframe {
 
 h1, h2, h3, h4, h5, h6, .font-display {
   font-family: var(--font-display);
-  font-weight: 800;
+  font-weight: 700;
   /* letter-spacing: -0.04em; */
   line-height: 1.1;
 }
 
+/* Big titles in a medium weight: confident without shouting. */
 h1 {
   font-size: clamp(2.5rem, 5vw, 4rem);
-  font-weight: 900;
-  letter-spacing: -0.05em;
+  font-weight: 600;
+  letter-spacing: -0.035em;
   line-height: 1.05;
 }
+
+/* Section titles share the same medium weight. */
+h2 { font-weight: 600; }
 
 html[dir="rtl"] h1,
 html[dir="rtl"] h2,
@@ -223,13 +230,11 @@ html[data-theme="light"] .site-logo.logo-light {
 
 .nav-link:hover {
   color: var(--text);
-  background: color-mix(in oklab, var(--surface) 70%, transparent);
 }
 
+/* The page you are on reads in full colour; no box around it. */
 .nav-link.active {
   color: var(--text);
-  background: var(--surface);
-  box-shadow: var(--shadow-sm);
 }
 
 /* Header Actions */
@@ -246,8 +251,8 @@ html[data-theme="light"] .site-logo.logo-light {
   grid-template-columns: 1fr 1fr;
   align-items: center;
   position: relative;
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: color-mix(in oklab, var(--text) 5%, transparent);
+  border: 0;
   border-radius: var(--radius-full);
   padding: 4px;
   isolation: isolate;
@@ -265,9 +270,9 @@ html[data-theme="light"] .site-logo.logo-light {
   width: calc(50% - 4px);
   height: calc(100% - 8px);
   border-radius: var(--radius-full);
-  background: var(--brand-accent);
-  border: 1px solid var(--brand-accent);
-  box-shadow: 0 4px 12px var(--brand-accent-glow);
+  /* A quiet segmented control: the chosen language sits on a raised chip. */
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .04);
   transition: transform .25s cubic-bezier(.4, 0, .2, 1);
   z-index: 0;
   pointer-events: none;
@@ -320,8 +325,12 @@ html[data-theme="light"] .site-logo.logo-light {
 }
 
 .locale-link.active {
-  color: #ffffff;
-  font-weight: 800;
+  color: var(--text);
+}
+html:not([data-theme="light"]) .locale-switch .locale-indicator,
+html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
+  background: #2E2E3A;
+  box-shadow: none;
 }
 
 .btn {
@@ -601,7 +610,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
   height: 2.5rem;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border-radius: var(--radius-full);
   background: var(--surface);
   cursor: pointer;
   position: relative;
@@ -1214,7 +1223,7 @@ html[data-theme="light"] .app-footer {
 }
 .custom-audio-play:hover {
   transform: scale(1.1);
-  box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 50%, transparent), 0 0 0 3px color-mix(in oklab, var(--b) 20%, transparent);
+  box-shadow: var(--lift);
 }
 .custom-audio-play:active {
   transform: scale(0.95);
@@ -1290,7 +1299,7 @@ html[data-theme="light"] .app-footer {
 }
 .custom-audio-progress-container:hover .custom-audio-thumb {
   transform: translate(-50%, -50%) scale(1.15);
-  box-shadow: 0 3px 8px color-mix(in oklab, var(--a) 40%, transparent);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, .25);
 }
 .custom-audio-progress-container:active .custom-audio-thumb {
   transform: translate(-50%, -50%) scale(1.3);
@@ -1493,4 +1502,33 @@ html[dir="rtl"] .pagination-btn,
 html[dir="rtl"] .pagination-info {
   font-variant-numeric: tabular-nums;
 }
+
+/* ===== VOICE ORBS =====
+   Spheres of soft, grainy colour, one palette per part of the product (App\Support\Orbs).
+   public/js/listen-orbs.js draws them; until then, or without it, this lit sphere shows. */
+.orb {
+  --orb-size: 160px;
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: var(--orb-size);
+  height: var(--orb-size);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--o3) 85%, transparent), transparent 46%),
+    radial-gradient(circle at 62% 68%, var(--o1), var(--o0) 78%);
+  box-shadow: 0 24px 48px -28px color-mix(in srgb, var(--o0) 70%, transparent);
+}
+.orb canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+.orb.is-drawn canvas { opacity: 1; }
+/* Drawn: the canvas is the whole sphere, so the stand-in's edge never shows around it. */
+.orb.is-drawn { background: none; }
 </style>
