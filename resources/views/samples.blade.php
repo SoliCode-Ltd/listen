@@ -194,6 +194,7 @@
 
     .stage-queue { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; margin: 0; padding: 0; list-style: none; }
     .stage-pick {
+      display: block;
       position: relative;
       width: 40px;
       height: 40px;
@@ -205,13 +206,10 @@
       opacity: .55;
       transition: opacity .2s ease, transform .2s ease;
     }
-    .stage-pick img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+    /* A block photo, so no text baseline adds space under it: the button stays a true circle and its ring is even. */
+    .stage-pick img { display: block; width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
     .stage-pick:hover { opacity: .9; }
-    /* The chosen voice: a ring inside its own circle (the photo shrinks a little), so the
-       ring stays centred and never spills onto the voices beside it. */
-    .stage-pick img { transition: transform .2s ease; }
-    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: inset 0 0 0 2px var(--st-now); }
-    .stage-pick[aria-current="true"] img { transform: scale(.8); }
+    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--st-pick-gap), 0 0 0 4px var(--st-now); border-radius: 50%; }
     .stage-progress { height: 3px; border-radius: 3px; background: var(--st-track); overflow: hidden; }
     .stage-progress span { display: block; height: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, var(--st-bar-from), var(--st-bar-to)); will-change: transform; }
     html[dir="rtl"] .stage-progress span { transform-origin: right center; background: linear-gradient(270deg, var(--st-bar-from), var(--st-bar-to)); }
@@ -287,7 +285,7 @@
       /* The speaker sits centred: the avatar, then the name and dialect under it. */
       .stage-who { flex-direction: column; gap: 1.15rem; padding-top: 14px; text-align: center; }
       .stage-id { align-items: center; }
-      .stage-avatar, .stage-avatar img { width: 72px; height: 72px; }
+      .stage-avatar, .stage-avatar img { width: 60px; height: 60px; }
       .stage-avatar { --ring: 22px; }
       .samples-bar { top: 64px; }
     }
