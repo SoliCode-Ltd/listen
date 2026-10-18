@@ -35,8 +35,9 @@
   --radius-full: 9999px;
 }
 html[data-theme="light"] {
-  /* One calm, neutral ground: white cards on hairlines, the colour left to the voice orbs. */
-  --bg: #FAFAFB;
+  /* One calm, neutral ground a step below white, so the white header, cards and footer
+     stand on it; the colour is left to the voice orbs. */
+  --bg: #F4F4F7;
   --surface: #FFFFFF;
   --surface2: #F5F6FB;
   --line: #E6E8F0;
@@ -137,6 +138,12 @@ html[dir="rtl"] h6 {
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent);
+}
+/* Light: the menu is its own white bar on the grey ground, with a hairline under it. */
+html[data-theme="light"] .app-header {
+  background: rgba(255, 255, 255, .9);
+  border-bottom-color: var(--line);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
 }
 
 .header-inner {
@@ -1129,6 +1136,7 @@ html[data-theme="light"] .app-footer {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+  html[data-theme="light"] .app-header { background: var(--surface); }
 }
 
 @media (max-width: 640px) {
