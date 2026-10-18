@@ -88,7 +88,7 @@ jobs:
           php -r '$s = json_decode(file_get_contents("tts-settings.json"), true); if (! is_array($s["settings"] ?? null)) { fwrite(STDERR, "Could not read the staging speech settings\n"); exit(1); } foreach ($s["settings"] as $row) { if (in_array($row["key"], ["tts_mode", "gemini_tts_model", "tts_fallback_enabled"], true)) { echo $row["key"], " = ", $row["value"], "\n"; } } echo "dialect rewrite = ", $s["dialect_rewrite"] ? "on" : "off", "\n";'
           sed -i '/^GEMINI_TTS_DIALECT_REWRITE=/d' .env
           php -r 'echo "GEMINI_TTS_DIALECT_REWRITE=", json_decode(file_get_contents("tts-settings.json"), true)["dialect_rewrite"] ? "true" : "false", "\n";' >> .env
-          echo "Using staging key 1: ${KEY:0:6}...${KEY: -4}"
+          echo "Using staging key 1."
           sed -i '/^GEMINI_TTS_API_KEY=/d' .env
           printf 'GEMINI_TTS_API_KEY=%s\n' "$KEY" >> .env
           php artisan config:clear > /dev/null

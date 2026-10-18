@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -21,16 +22,11 @@ class ApiKey extends Model
     /** Active keys one member may hold at once. */
     public const MAX_ACTIVE_PER_USER = 10;
 
+    /** What a member may change; the owner, the hash and the dates are set by the code only. */
     protected $fillable = [
-        'user_id',
         'name',
-        'key_hash',
-        'last_four',
         'scopes',
         'monthly_credit_limit',
-        'last_used_at',
-        'last_used_ip',
-        'revoked_at',
     ];
 
     protected $hidden = [
@@ -77,14 +73,16 @@ class ApiKey extends Model
     {
         $plain = self::PREFIX.Str::random(40);
 
-        $key = self::create([
-            'user_id' => $user->id,
+        $key = new self([
             'name' => trim($name),
-            'key_hash' => self::hash($plain),
-            'last_four' => substr($plain, -4),
             'scopes' => $scopes === null ? null : ApiScopes::normalize($scopes),
             'monthly_credit_limit' => $monthlyCreditLimit !== null && $monthlyCreditLimit > 0 ? $monthlyCreditLimit : null,
         ]);
+        $key->forceFill([
+            'user_id' => $user->id,
+            'key_hash' => self::hash($plain),
+            'last_four' => substr($plain, -4),
+        ])->save();
 
         return ['key' => $key, 'plain' => $plain];
     }
@@ -144,12 +142,15 @@ class ApiKey extends Model
     }
 
     /**
-     * Notes when the key was last used, at most once a minute so busy keys do
-     * not write on every request.
+     * Notes when the key was last used, at most once a minute (whatever the
+     * address), so busy keys and parallel requests do not write every time.
      */
     public function touchLastUsed(?string $ip): void
     {
-        if ($this->last_used_at !== null && $this->last_used_at->gt(now()->subMinute()) && $this->last_used_ip === $ip) {
+        if ($this->last_used_at !== null && $this->last_used_at->gt(now()->subMinute())) {
+            return;
+        }
+        if (! Cache::add('api-key-touched:'.$this->id, 1, 60)) {
             return;
         }
 

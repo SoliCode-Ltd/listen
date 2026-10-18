@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
 use App\Models\Plan;
+use App\Models\User;
 use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
@@ -17,6 +18,7 @@ use App\Support\PlanUsageGuard;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -38,10 +40,15 @@ class DeveloperController extends Controller
             'name' => $plan->getLocalizedName($locale) ?: (string) $plan->name,
             'credits' => PlanUsageGuard::planChars($plan),
             'is_pack' => $plan->isPack(),
+            // 0: no monthly request limit (a pack has none).
+            'monthly_requests' => $plan->isPack() ? 0 : PlanUsageGuard::planRequests($plan),
             'daily_requests' => PlanUsageGuard::dailyRequests($plan),
             'rpm' => ApiPlanAccess::requestsPerMinute($plan),
+            'reads' => ApiPlanAccess::readsPerMinute($plan),
             'concurrency' => ApiPlanAccess::concurrency($plan),
+            'queue' => ApiSpeechService::queueLimit($plan),
             'max_chars' => ApiFeatureGate::maxChars($plan),
+            'max_chars_async' => ApiFeatureGate::maxChars($plan, true),
             'formats' => ApiSpeechService::formatsFor($plan),
             'features' => [
                 ApiFeatureGate::CUSTOM_DIRECTION => ApiFeatureGate::planOffers($plan, ApiFeatureGate::CUSTOM_DIRECTION),
@@ -163,24 +170,29 @@ class DeveloperController extends Controller
         }
         $validated = $validator->validated();
 
-        $active = ApiKey::query()->where('user_id', $user->id)->active()->count();
-        if ($active >= ApiKey::MAX_ACTIVE_PER_USER) {
+        // The member's row is locked while counting, so parallel requests cannot pass the cap.
+        $issued = DB::transaction(function () use ($user, $validated): ?array {
+            User::query()->whereKey($user->id)->lockForUpdate()->first();
+            if (ApiKey::query()->where('user_id', $user->id)->active()->count() >= ApiKey::MAX_ACTIVE_PER_USER) {
+                return null;
+            }
+
+            return ApiKey::issue(
+                $user,
+                (string) $validated['name'],
+                // Exactly the permissions ticked: a permission added to the API later is never given to an existing key.
+                ApiScopes::normalize((array) ($validated['scopes'] ?? [])),
+                isset($validated['monthly_credit_limit']) ? (int) $validated['monthly_credit_limit'] : null,
+            );
+        });
+        if ($issued === null) {
             return redirect()->to(self::section())->with('api_error', __('developers.keys.max_keys', ['count' => ApiKey::MAX_ACTIVE_PER_USER]));
         }
 
-        $scopes = ApiScopes::normalize((array) ($validated['scopes'] ?? []));
-        $issued = ApiKey::issue(
-            $user,
-            (string) $validated['name'],
-            // Every box ticked means every permission, including ones added later.
-            count($scopes) === count(ApiScopes::all()) ? null : $scopes,
-            isset($validated['monthly_credit_limit']) ? (int) $validated['monthly_credit_limit'] : null,
-        );
-
         return redirect()->to(self::section())
             ->with('api_ok', __('developers.keys.flash_created'))
-            // Flashed for the next page only: shown once, never stored in plain text.
-            ->with('new_api_key_plain', $issued['plain']);
+            // Flashed for the next page only, encrypted (sessions are stored), and shown once.
+            ->with('new_api_key_plain', encrypt($issued['plain']));
     }
 
     public function update(Request $request, ApiKey $apiKey): RedirectResponse

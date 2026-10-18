@@ -20,7 +20,12 @@
   $leftCredits = max(0, (int) $usageRow['remaining_chars']);
   $share = $planCredits > 0 ? fn (int $part) => max(0, min(100, $part / $planCredits * 100)) : fn (int $part) => 0;
   $ring = (int) $api['api_share_percent'];
-  $newKey = session('new_api_key_plain');
+  // Flashed encrypted by DeveloperController::store, for this page only.
+  try {
+    $newKey = session()->has('new_api_key_plain') ? decrypt(session('new_api_key_plain')) : null;
+  } catch (\Throwable) {
+    $newKey = null;
+  }
   $keyErrors = $errors->getBag('apiKeys');
   $activeKeys = $api['active_keys'];
   $maxKeys = \App\Models\ApiKey::MAX_ACTIVE_PER_USER;
@@ -222,7 +227,7 @@
               <small>{{ $d('tile_chars') }}</small>
             </div>
             <b>{{ number_format($api['limits']['max_chars']) }}</b>
-            <small class="usage-tile-foot dapi-formats">{{ $d('tile_chars_foot') }} @foreach($api['limits']['formats'] as $format)<code>{{ $format }}</code>@endforeach</small>
+            <small class="usage-tile-foot dapi-formats">{{ $d('tile_chars_foot', ['count' => number_format($api['limits']['max_chars_async'])]) }} @foreach($api['limits']['formats'] as $format)<code>{{ $format }}</code>@endforeach</small>
           </div>
         </div>
 
