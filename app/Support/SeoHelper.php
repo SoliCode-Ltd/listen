@@ -98,7 +98,7 @@ class SeoHelper
                 'label' => 'Developer API',
                 'title' => 'Text to Speech API for Arabic and English',
                 'title_key' => 'developers.docs.seo_title',
-                'description' => 'The Listen text to speech API: Arabic dialects, English accents, studio and cloned voices, metered on your plan credits.',
+                'description' => 'The Listen text to speech API: Arabic dialects, English accents and the studio voices, metered on your plan credits.',
                 'description_key' => 'developers.docs.seo_description',
                 'robots' => self::DEFAULT_META_ROBOTS,
                 'path' => '/developers',

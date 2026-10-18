@@ -58,6 +58,11 @@ final class OpenApiSpec
         }
         if (! $offered[ApiFeatureGate::CLONED_VOICES]) {
             $spec['paths']['/voices']['get']['description'] = 'The studio voices. Requires the voices_read permission.';
+            array_walk_recursive($spec['paths'], static function (mixed &$value, string|int $key): void {
+                if ($key === 'description' && $value === 'A voice id from GET /v1/voices, such as voice_12 or cloned_3.') {
+                    $value = 'A voice id from GET /v1/voices, such as voice_12.';
+                }
+            });
         }
 
         return $spec;
@@ -318,7 +323,7 @@ final class OpenApiSpec
                     'type' => 'object',
                     'required' => ['text'],
                     'properties' => [
-                        'text' => ['type' => 'string', 'maxLength' => ApiSpeechService::MAX_TEXT, 'description' => 'The text to read. Your plan sets the most characters per request (see GET /v1/user/subscription). Inline sound tags such as <laugh> and <short pause> are read as sounds. In a dialogue, each line starts with a speaker\'s name and a colon.'],
+                        'text' => ['type' => 'string', 'maxLength' => ApiSpeechService::ASYNC_MAX_TEXT, 'description' => 'The text to read: up to '.ApiSpeechService::SYNC_MAX_TEXT.' characters when you wait for the file, up to '.ApiSpeechService::ASYNC_MAX_TEXT.' in the background (/async), and up to '.ApiSpeechService::DIALOGUE_MAX_TEXT.' for a dialogue. Your plan may set less (limits in GET /v1/user/subscription). Inline sound tags such as <laugh> and <short pause> are read as sounds. In a dialogue, each line starts with a speaker\'s name and a colon.'],
                         'model_id' => ['type' => 'string', 'enum' => ApiModels::ids(), 'description' => 'Optional; the only model.'],
                         'language_code' => ['type' => 'string', 'enum' => SpeechLanguages::codes(), 'description' => 'Language to speak. Defaults to the voice\'s language.'],
                         'dialect' => ['type' => 'string', 'description' => 'An Arabic dialect such as ar-EG, ar-SA or ar-LB, or an English accent such as en-US or en-GB. See GET /v1/voice-options.', 'examples' => ['ar-LB']],
@@ -417,7 +422,8 @@ final class OpenApiSpec
                         'description' => ['type' => 'string'],
                         'languages' => ['type' => 'array', 'items' => ['type' => 'string']],
                         'available_on_plan' => ['type' => 'boolean'],
-                        'max_characters_per_request' => ['type' => 'integer'],
+                        'max_characters_per_request' => ['type' => 'integer', 'description' => 'Waiting for the file.'],
+                        'max_characters_per_async_request' => ['type' => 'integer', 'description' => 'In the background (/async).'],
                         'supports' => ['type' => 'object', 'additionalProperties' => ['type' => 'boolean']],
                     ],
                 ],
@@ -483,8 +489,30 @@ final class OpenApiSpec
                             ],
                         ],
                         'voice_seconds' => ['type' => 'object'],
-                        'requests' => ['type' => 'object'],
-                        'limits' => ['type' => 'object'],
+                        'requests' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'used_this_month' => ['type' => 'integer'],
+                                'monthly_limit' => ['type' => ['integer', 'null']],
+                                'daily_limit' => ['type' => ['integer', 'null']],
+                                'used_today' => ['type' => ['integer', 'null']],
+                                'daily_resets_at' => ['type' => 'string', 'format' => 'date-time', 'description' => 'When the daily count starts again.'],
+                            ],
+                        ],
+                        'limits' => [
+                            'type' => 'object',
+                            'description' => 'For the whole account (all its keys together), read from the plan on every request.',
+                            'properties' => [
+                                'max_characters_per_request' => ['type' => 'integer', 'description' => 'Waiting for the file.'],
+                                'max_characters_per_async_request' => ['type' => 'integer', 'description' => 'In the background (/async).'],
+                                'max_characters_per_dialogue' => ['type' => 'integer'],
+                                'requests_per_minute' => ['type' => 'integer', 'description' => 'Generation requests.'],
+                                'other_requests_per_minute' => ['type' => 'integer', 'description' => 'Status checks, voices, history and account.'],
+                                'concurrent_generations' => ['type' => 'integer', 'description' => 'Waiting for the file, at the same time.'],
+                                'background_generations' => ['type' => 'integer', 'description' => 'Waiting or running in the background.'],
+                                'output_formats' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ],
+                        ],
                         'api_key' => ['type' => 'object'],
                     ],
                 ],
@@ -547,9 +575,9 @@ final class OpenApiSpec
             '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',
             '410' => 'The audio is no longer stored.',
             '422' => 'A parameter is not valid, or the Idempotency-Key was used for a different request.',
-            '429' => 'Rate, concurrency, background-queue or daily limit reached; see Retry-After.',
+            '429' => 'Rate, concurrency, background-queue or daily limit reached, for the whole account; see Retry-After.',
             '502' => 'The generation failed; no credits were charged.',
-            '503' => 'An option (a sound environment or an audio format) is briefly unavailable.',
+            '503' => 'Briefly unavailable: an option (a sound environment or an audio format), the background queue (queue_unavailable, nothing charged), the service for everyone (server_busy), today\'s speech capacity (capacity_reached), or the whole API while paused (api_paused). See Retry-After.',
         ];
 
         $responses = [];

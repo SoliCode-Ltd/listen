@@ -12,6 +12,7 @@ use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Credits;
+use App\Support\PlanUsageGuard;
 use App\Support\UsageSnapshot;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -73,7 +74,8 @@ class UserController extends Controller
         return [
             'plan' => [
                 'slug' => (string) ($plan?->slug ?? 'free'),
-                'name' => (string) ($plan?->name ?? 'Free'),
+                // The name members see (Admin → Plans → English name), as in the docs and the dashboard.
+                'name' => $plan ? ($plan->getLocalizedName('en') ?: (string) $plan->name) : 'Free',
                 'models' => [ApiModels::PREMIUM],
                 // The studio options only some plans include; the rest are refused with feature_not_in_plan.
                 'features' => ApiFeatureGate::availableTo($user, $plan),
@@ -106,11 +108,19 @@ class UserController extends Controller
                 'monthly_limit' => $usage['plan_requests'],
                 'daily_limit' => $usage['daily_requests_limit'] > 0 ? (int) $usage['daily_requests_limit'] : null,
                 'used_today' => $usage['daily_requests_used'],
+                // When the daily count starts again (the member's day, as in the dashboard).
+                'daily_resets_at' => PlanUsageGuard::startOfMemberDay()->addDay()->toIso8601String(),
             ],
             'limits' => [
+                // Waiting for the file, and in the background (/async).
                 'max_characters_per_request' => ApiFeatureGate::maxChars($quotaPlan),
+                'max_characters_per_async_request' => ApiFeatureGate::maxChars($quotaPlan, true),
+                'max_characters_per_dialogue' => ApiSpeechService::maxCharsFor($quotaPlan, true, true),
+                // For the whole account, all keys together.
                 'requests_per_minute' => ApiPlanAccess::requestsPerMinute($plan),
+                'other_requests_per_minute' => ApiPlanAccess::readsPerMinute($plan),
                 'concurrent_generations' => ApiPlanAccess::concurrency($plan),
+                'background_generations' => ApiSpeechService::queueLimit($plan),
                 'output_formats' => ApiSpeechService::formatsFor($plan),
             ],
             'api_key' => [

@@ -5,9 +5,8 @@ namespace App\Support\Api;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Api\ApiSpeechService;
-use App\Support\AudioFormats;
+use App\Services\VoiceCloningService;
 use App\Support\PlanFeatures;
-use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Support\Collection;
 
@@ -62,7 +61,7 @@ final class ApiFeatureGate
     }
 
     /**
-     * The plans on sale that include the developer API, cheapest first.
+     * The plans and packs on sale that include the developer API, cheapest first.
      *
      * @return Collection<int, Plan>
      */
@@ -71,7 +70,6 @@ final class ApiFeatureGate
         try {
             // Read fresh each time (a handful of rows), so a plan edited in the admin shows at once.
             return Plan::query()
-                ->subscriptionPlans()
                 ->where('is_active', true)
                 ->orderBy('price_cents')
                 ->get()
@@ -89,7 +87,9 @@ final class ApiFeatureGate
             self::CUSTOM_DIRECTION => PlanFeatures::planOffers($plan, PlanFeatures::PROMPT),
             self::SOUND_ENVIRONMENTS => PlanFeatures::planOffers($plan, PlanFeatures::EFFECTS),
             self::DIALOGUE => PlanFeatures::planOffers($plan, PlanFeatures::DIALOGUE),
-            self::CLONED_VOICES => (bool) ($plan?->voice_cloning_enabled ?? false),
+            // As the pricing card says it: the plan's switch, cloning switched on for the
+            // site and open to every customer (not only the private preview).
+            self::CLONED_VOICES => VoiceCloningService::planAllows($plan) && ! VoiceCloningAccess::isPreviewOnly(),
             default => false,
         };
     }
@@ -127,7 +127,7 @@ final class ApiFeatureGate
      */
     public static function plansWithFormat(string $format): Collection
     {
-        return self::apiPlans()->filter(fn (Plan $plan): bool => $format === 'mp3' || in_array($format, AudioFormats::chosenFor($plan), true))->values();
+        return self::apiPlans()->filter(fn (Plan $plan): bool => in_array($format, ApiSpeechService::formatsFor($plan), true))->values();
     }
 
     /** The refusal for a feature the member's plan does not include. */
@@ -174,9 +174,9 @@ final class ApiFeatureGate
         return $rows;
     }
 
-    /** Most characters one request may carry on a plan (as the dashboard allows). */
-    public static function maxChars(?Plan $plan): int
+    /** Most characters one request may carry on a plan: waiting for the file, or in the background. */
+    public static function maxChars(?Plan $plan, bool $async = false): int
     {
-        return min(PlanUsageGuard::maxCharsPerRequest($plan), ApiSpeechService::MAX_TEXT);
+        return ApiSpeechService::maxCharsFor($plan, $async);
     }
 }

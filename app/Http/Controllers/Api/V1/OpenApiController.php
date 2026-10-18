@@ -15,7 +15,8 @@ class OpenApiController extends Controller
     {
         return response()->json(OpenApiSpec::build(), 200, [
             'Access-Control-Allow-Origin' => '*',
-            'Cache-Control' => 'public, max-age=3600',
+            // It follows the plans (options no plan includes are left out), so it is never kept stale.
+            'Cache-Control' => 'public, no-cache',
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     }
 }

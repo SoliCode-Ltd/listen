@@ -2,9 +2,12 @@
 
 namespace App\Support\Api;
 
+use App\Models\Plan;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
 use App\Support\AudioEffects;
+use App\Support\Credits;
+use App\Support\PlanUsageGuard;
 
 /**
  * The developer documentation's reference: every endpoint with its
@@ -98,54 +101,79 @@ final class ApiDocs
             unset($historyItem['dialogue']);
         }
 
+        // The sample answers use a real plan with the API (the featured one, else
+        // the cheapest), so editing that plan in the admin changes them too.
+        $apiPlans = ApiFeatureGate::apiPlans();
+        $samplePlan = $apiPlans->firstWhere('is_featured', true) ?? $apiPlans->first();
         $features = [];
         foreach (ApiFeatureGate::FIELDS as $feature => $field) {
             if ($offered[$feature]) {
-                $features[$field] = true;
+                $features[$field] = $samplePlan === null || ApiFeatureGate::planOffers($samplePlan, $feature);
             }
         }
+        $isPack = (bool) $samplePlan?->isPack();
+        $creditLimit = $samplePlan !== null ? PlanUsageGuard::planChars($samplePlan) : 1500000;
+        $creditsUsed = (int) round($creditLimit * 0.12);
+        $monthlyRequests = $samplePlan !== null && ! $isPack ? PlanUsageGuard::planRequests($samplePlan) : 0;
+        $dailyRequests = $samplePlan !== null ? PlanUsageGuard::dailyRequests($samplePlan) : 0;
+        $rpm = ApiPlanAccess::requestsPerMinute($samplePlan);
+        $maxChars = ApiFeatureGate::maxChars($samplePlan);
+        $sampleFormats = $samplePlan !== null ? ApiSpeechService::formatsFor($samplePlan) : ['mp3'];
 
         $subscription = [
             'plan' => [
-                'slug' => 'creator',
-                'name' => 'Creator',
+                'slug' => (string) ($samplePlan?->slug ?? 'creator'),
+                'name' => $samplePlan !== null ? ($samplePlan->getLocalizedName('en') ?: (string) $samplePlan->name) : 'Creator',
                 'models' => [ApiModels::PREMIUM],
                 'features' => $features,
                 'commercial_use_allowed' => true,
-                'processing_priority' => 'high',
+                'processing_priority' => (string) ($samplePlan?->processing_priority ?: 'standard'),
             ],
             'status' => 'active',
             'trial' => false,
-            'current_period_end' => '2026-11-02T10:00:00+00:00',
-            'billing_mode' => 'monthly',
+            'current_period_end' => $isPack ? null : '2026-11-02T10:00:00+00:00',
+            'billing_mode' => $isPack ? 'pack' : 'monthly',
             'credits' => [
-                'used' => 182340,
-                'limit' => 1500000,
-                'remaining' => 1317660,
+                'used' => $creditsUsed,
+                'limit' => $creditLimit,
+                'remaining' => $creditLimit - $creditsUsed,
                 'gift' => 0,
-                'credits_per_second' => 15,
+                'credits_per_second' => Credits::PER_SECOND,
                 'overage_allowed' => false,
-                'period' => '2026-10',
-                'resets_at' => '2026-11-01T00:00:00+00:00',
-                'resets_at_unix' => 1793491200,
-                'expires_at' => null,
+                'period' => $isPack ? null : '2026-10',
+                'resets_at' => $isPack ? null : '2026-11-01T00:00:00+00:00',
+                'resets_at_unix' => $isPack ? null : 1793491200,
+                'expires_at' => $isPack ? '2026-11-17T09:30:12+00:00' : null,
             ],
-            'voice_seconds' => ['used' => 12156, 'limit' => 100000],
-            'requests' => ['used_this_month' => 911, 'monthly_limit' => null, 'daily_limit' => null, 'used_today' => null],
+            'voice_seconds' => ['used' => Credits::secondsFor($creditsUsed), 'limit' => Credits::secondsFor($creditLimit)],
+            'requests' => [
+                'used_this_month' => 911,
+                'monthly_limit' => $monthlyRequests > 0 ? $monthlyRequests : null,
+                'daily_limit' => $dailyRequests > 0 ? $dailyRequests : null,
+                'used_today' => $dailyRequests > 0 ? 12 : null,
+                'daily_resets_at' => '2026-10-19T00:00:00+03:00',
+            ],
             'limits' => [
-                'max_characters_per_request' => 20000,
-                'requests_per_minute' => 120,
-                'concurrent_generations' => 5,
-                'output_formats' => ['mp3', 'wav'],
+                'max_characters_per_request' => $maxChars,
+                'max_characters_per_async_request' => ApiFeatureGate::maxChars($samplePlan, true),
+                'max_characters_per_dialogue' => ApiSpeechService::maxCharsFor($samplePlan, true, true),
+                'requests_per_minute' => $rpm,
+                'other_requests_per_minute' => ApiPlanAccess::readsPerMinute($samplePlan),
+                'concurrent_generations' => ApiPlanAccess::concurrency($samplePlan),
+                'background_generations' => ApiSpeechService::queueLimit($samplePlan),
+                'output_formats' => $sampleFormats,
             ],
             'api_key' => [
                 'api_key_id' => 7,
                 'name' => $arabic ? 'المساعد الذكي' : 'Production assistant',
-                'monthly_credit_limit' => 500000,
-                'credits_used_this_month' => 98210,
+                'monthly_credit_limit' => (int) (round($creditLimit / 3 / 1000) * 1000) ?: null,
+                'credits_used_this_month' => (int) round($creditsUsed * 0.54),
                 'requests_this_month' => 640,
             ],
         ];
+        if (! $offered[ApiFeatureGate::DIALOGUE]) {
+            unset($subscription['limits']['max_characters_per_dialogue']);
+        }
 
         $voiceOptions = [
             'model_id' => ApiModels::PREMIUM,
@@ -164,8 +192,8 @@ final class ApiDocs
                 ['value' => 'hall', 'name' => 'Concert hall', 'name_ar' => 'قاعة كبيرة'],
                 ['value' => 'phone', 'name' => 'Phone call', 'name_ar' => 'مكالمة هاتفية'],
             ],
-            'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
-            'output_formats' => ['mp3', 'wav'],
+            'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6, 'max_characters' => ApiSpeechService::maxCharsFor($samplePlan, true, true)],
+            'output_formats' => $sampleFormats,
             'features' => $subscription['plan']['features'],
         ];
         if (! $offered[ApiFeatureGate::SOUND_ENVIRONMENTS]) {
@@ -185,8 +213,8 @@ final class ApiDocs
             'X-Audio-Duration-Seconds: 3',
             'X-Output-Format: mp3',
             'X-Request-Id: req_8f2kq0x7m3c9w1v5b6n4z2a1',
-            'X-RateLimit-Limit: 120',
-            'X-RateLimit-Remaining: 119',
+            'X-RateLimit-Limit: '.$rpm,
+            'X-RateLimit-Remaining: '.max(0, $rpm - 1),
             '',
             '<audio/mpeg>',
         ]);
@@ -292,7 +320,8 @@ final class ApiDocs
                     'name' => ApiModels::NAME,
                     'languages' => ['ar', 'en'],
                     'available_on_plan' => true,
-                    'max_characters_per_request' => 20000,
+                    'max_characters_per_request' => $maxChars,
+                    'max_characters_per_async_request' => ApiFeatureGate::maxChars($samplePlan, true),
                     'supports' => ['dialect' => true, 'style' => true, 'emotion' => true, 'voice_settings' => true, 'inline_tags' => true] + $subscription['plan']['features'],
                 ]]])],
             ],
@@ -452,6 +481,14 @@ final class ApiDocs
             ),
             'error_example' => CodeHighlighter::html("HTTP/1.1 402 Payment Required\nContent-Type: application/json\nX-Request-Id: req_8f2kq0x7m3c9w1v5b6n4z2a1\n\n".$json($errorBody), 'http'),
             'max_text' => ApiSpeechService::MAX_TEXT,
+            // The longest texts some plan allows (the API's own ceilings when there is none).
+            'long_limits' => [
+                'sync' => number_format((int) ($apiPlans->max(fn (Plan $plan): int => ApiSpeechService::maxCharsFor($plan)) ?? ApiSpeechService::SYNC_MAX_TEXT)),
+                'async' => number_format((int) ($apiPlans->max(fn (Plan $plan): int => ApiSpeechService::maxCharsFor($plan, true)) ?? ApiSpeechService::ASYNC_MAX_TEXT)),
+                'dialogue' => number_format((int) ($apiPlans->max(fn (Plan $plan): int => ApiSpeechService::maxCharsFor($plan, true, true)) ?? ApiSpeechService::DIALOGUE_MAX_TEXT)),
+            ],
+            // The formats besides mp3 some plan includes, as code, in the page's language.
+            'formats_offered' => self::series(array_map(fn (string $format): string => '`'.$format.'`', ApiSpeechService::formatsOffered()), $arabic),
         ];
     }
 

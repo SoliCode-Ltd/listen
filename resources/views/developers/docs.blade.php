@@ -127,9 +127,11 @@
             @php
               $introFeatures = $listed('intro_features');
             @endphp
+            {{-- The formats and options some plan includes, then the rest. --}}
+            <li>{!! $tx(__('developers.docs.intro.'.($docs['formats_offered'] === '' ? 'point_formats_mp3_only' : 'point_formats'), ['formats' => $docs['formats_offered']])) !!}</li>
             @foreach(__('developers.docs.intro.points') as $index => $point)
               <li>{!! $tx($point) !!}</li>
-              @if($index === 1 && $introFeatures !== '')
+              @if($index === 0 && $introFeatures !== '')
                 <li>{!! $tx(__('developers.docs.intro.points_features', ['options' => \Illuminate\Support\Str::ucfirst($introFeatures)])) !!}</li>
               @endif
             @endforeach
@@ -198,20 +200,36 @@
                     @endforeach
                   </tr>
                   <tr>
+                    <th scope="row">{{ $plain('plans.row_monthly_requests') }}</th>
+                    @foreach($planRows as $row)<td>{{ $row['monthly_requests'] > 0 ? number_format($row['monthly_requests']) : $plain('plans.row_monthly_none') }}</td>@endforeach
+                  </tr>
+                  <tr>
+                    <th scope="row">{{ $plain('plans.row_daily') }}</th>
+                    @foreach($planRows as $row)<td>{{ $row['daily_requests'] > 0 ? number_format($row['daily_requests']) : $plain('plans.row_daily_none') }}</td>@endforeach
+                  </tr>
+                  <tr>
                     <th scope="row">{{ $plain('plans.row_rpm') }}</th>
                     @foreach($planRows as $row)<td>{{ number_format($row['rpm']) }}</td>@endforeach
+                  </tr>
+                  <tr>
+                    <th scope="row">{{ $plain('plans.row_reads') }}</th>
+                    @foreach($planRows as $row)<td>{{ number_format($row['reads']) }}</td>@endforeach
                   </tr>
                   <tr>
                     <th scope="row">{{ $plain('plans.row_concurrency') }}</th>
                     @foreach($planRows as $row)<td>{{ number_format($row['concurrency']) }}</td>@endforeach
                   </tr>
                   <tr>
+                    <th scope="row">{{ $plain('plans.row_queue') }}</th>
+                    @foreach($planRows as $row)<td>{{ number_format($row['queue']) }}</td>@endforeach
+                  </tr>
+                  <tr>
                     <th scope="row">{{ $plain('plans.row_max_chars') }}</th>
                     @foreach($planRows as $row)<td>{{ number_format($row['max_chars']) }}</td>@endforeach
                   </tr>
                   <tr>
-                    <th scope="row">{{ $plain('plans.row_daily') }}</th>
-                    @foreach($planRows as $row)<td>{{ $row['daily_requests'] > 0 ? number_format($row['daily_requests']) : $plain('plans.row_daily_none') }}</td>@endforeach
+                    <th scope="row">{{ $plain('plans.row_max_chars_async') }}</th>
+                    @foreach($planRows as $row)<td>{{ number_format($row['max_chars_async']) }}</td>@endforeach
                   </tr>
                   <tr>
                     <th scope="row">{{ $plain('plans.row_formats') }}</th>
@@ -312,14 +330,19 @@
         </div>
       </section>
 
-      @foreach([['long-texts', 'long'], ['formats', 'formats']] as [$id, $key])
-        <section class="docs-section" id="{{ $id }}" data-section>
-          <div class="docs-text">
-            <h2>{{ $plain($key.'.title') }}<a class="docs-anchor" href="#{{ $id }}" aria-hidden="true" tabindex="-1">#</a></h2>
-            <p>{!! $t($key.'.body') !!}</p>
-          </div>
-        </section>
-      @endforeach
+      <section class="docs-section" id="long-texts" data-section>
+        <div class="docs-text">
+          <h2>{{ $plain('long.title') }}<a class="docs-anchor" href="#long-texts" aria-hidden="true" tabindex="-1">#</a></h2>
+          <p>{!! $t('long.body', [], $docs['long_limits']) !!}@if($offered['dialogue']) {!! $t('long.dialogue', [], $docs['long_limits']) !!}@endif</p>
+        </div>
+      </section>
+
+      <section class="docs-section" id="formats" data-section>
+        <div class="docs-text">
+          <h2>{{ $plain('formats.title') }}<a class="docs-anchor" href="#formats" aria-hidden="true" tabindex="-1">#</a></h2>
+          <p>{!! $docs['formats_offered'] === '' ? $t('formats.body_mp3_only') : $t('formats.body', [], ['formats' => $docs['formats_offered']]) !!}</p>
+        </div>
+      </section>
 
       <section class="docs-section" id="safe-retries" data-section>
         <div class="docs-row">

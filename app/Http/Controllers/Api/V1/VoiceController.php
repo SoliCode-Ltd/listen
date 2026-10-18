@@ -82,6 +82,17 @@ class VoiceController extends Controller
             $dialects[$language] = array_map($row, TtsStudioConfig::dialectCatalogForLanguage($language));
         }
 
+        $plan = $request->attributes->get('api_plan');
+        $features = ApiFeatureGate::availableTo($request->user(), $plan);
+        // An option no plan includes is left out, unless this account has it anyway.
+        $offered = ApiFeatureGate::offered();
+        $optional = array_filter([
+            'audio_effects' => $offered[ApiFeatureGate::SOUND_ENVIRONMENTS] || $features['audio_effect']
+                ? array_map($row, AudioEffects::options()) : null,
+            'dialogue' => $offered[ApiFeatureGate::DIALOGUE] || $features['dialogue']
+                ? ['min_speakers' => 2, 'max_speakers' => 6, 'max_characters' => ApiSpeechService::maxCharsFor($request->attributes->get('api_quota_plan'), true, true)] : null,
+        ], fn ($value): bool => $value !== null);
+
         return response()->json([
             'model_id' => ApiModels::PREMIUM,
             'dialects' => $dialects,
@@ -103,11 +114,10 @@ class VoiceController extends Controller
                 'speed' => ['min' => 0.5, 'max' => 2.0, 'default' => 1.0],
                 'pitch' => ['min' => -10, 'max' => 10, 'default' => 0],
             ],
-            'audio_effects' => array_map($row, AudioEffects::options()),
-            'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
-            'output_formats' => ApiSpeechService::formatsFor($request->attributes->get('api_plan')),
+        ] + $optional + [
+            'output_formats' => ApiSpeechService::formatsFor($plan),
             // The options only some plans include, and whether this account has them.
-            'features' => ApiFeatureGate::availableTo($request->user(), $request->attributes->get('api_plan')),
+            'features' => $features,
         ]);
     }
 }

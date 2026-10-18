@@ -95,13 +95,20 @@ class PlanResource extends Resource
                     ]),
                 Forms\Components\Section::make('المحتوى المترجم (العربية)')
                     ->description('الأسماء والأوصاف العربية المعروضة على صفحات الأسعار.')
-                    ->collapsed()
                     ->schema([
+                        // The Arabic pages (pricing, dashboard, developer docs) show only Arabic.
                         Forms\Components\TextInput::make('name_ar')
                             ->label('اسم الخطة (العربية)')
                             ->maxLength(255)
                             ->placeholder('مثل: المبدع، الاحترافي')
-                            ->helperText('اتركه فارغاً لاستخدام ملف الترجمة'),
+                            ->afterStateHydrated(function (Forms\Components\TextInput $component, $state, ?Plan $record): void {
+                                // Prefilled from the site's own translation, when the plan has one.
+                                $key = 'ui.pricing.plan_name_'.($record?->slug ?? '');
+                                if (blank($state) && $record && __($key, [], 'ar') !== $key) {
+                                    $component->state(__($key, [], 'ar'));
+                                }
+                            })
+                            ->helperText('املأه دائمًا: تعرض الصفحات العربية (الأسعار ولوحة التحكم وتوثيق المطورين) الاسم العربي فقط، وإن تُرك فارغًا ظهر الاسم الإنجليزي فيها.'),
                         Forms\Components\Textarea::make('description_ar')
                             ->label('وصف الخطة (العربية)')
                             ->rows(2)
@@ -220,10 +227,14 @@ class PlanResource extends Resource
                         Forms\Components\Select::make('processing_priority')
                             ->options([
                                 'standard' => 'Standard',
+                                'standard_plus' => 'Standard plus',
                                 'high' => 'High',
+                                'priority' => 'Priority',
+                                'highest' => 'Highest',
                             ])
                             ->required()
-                            ->default('standard'),
+                            ->default('standard')
+                            ->helperText('Sets the developer API\'s default limits when the plan sets none (see Developer API below). High, priority and highest show "priority processing" on the pricing card; only High also uses the faster queue for background generations.'),
                         Forms\Components\Toggle::make('commercial_use_allowed')
                             ->label('Commercial Use Allowed')
                             ->helperText('Whether users can use generated audio commercially'),
@@ -267,11 +278,15 @@ class PlanResource extends Resource
                             ->minValue(0)
                             ->default(0)
                             ->required()
-                            ->helperText('Most generations a member on this plan can make in one day, in the dashboard and the browser extension together. Failed ones do not count. 0 = no daily limit. The day restarts at midnight UTC.'),
+                            ->helperText('Most generations a member on this plan can make in one day, in the dashboard, the browser extension and the developer API together. Failed ones do not count. 0 = no daily limit. The day restarts at midnight '.config('listen.billing.daily_limit_timezone', 'Africa/Cairo').' time.'),
                         Forms\Components\TextInput::make('max_chars_per_request')
                             ->label('Max Characters Per Request')
                             ->numeric()
-                            ->required(),
+                            ->integer()
+                            ->minValue(200)
+                            ->maxValue(\App\Services\Api\ApiSpeechService::MAX_TEXT)
+                            ->required()
+                            ->helperText('Up to '.number_format(\App\Services\Api\ApiSpeechService::MAX_TEXT).' (the longest text the studio takes). The developer API also caps one request at '.number_format(\App\Services\Api\ApiSpeechService::SYNC_MAX_TEXT).' when the client waits for the file and '.number_format(\App\Services\Api\ApiSpeechService::ASYNC_MAX_TEXT).' in the background, whatever is set here.'),
                         Forms\Components\TextInput::make('recent_voices_days')
                             ->label('Recent Voices Retention (days)')
                             ->numeric()
@@ -389,20 +404,24 @@ class PlanResource extends Resource
                     ->schema([
                         Forms\Components\Toggle::make('api_access_enabled')
                             ->label('Include the developer API')
-                            ->helperText('On by default. The API only works on a paid plan (or pack) that also allows commercial use, never on a free plan or during an unpaid trial. Turning it off, or turning commercial use off, stops this plan\'s keys at once (the keys are kept). Limits, credits and voices always follow this plan\'s current settings.')
+                            ->helperText('On by default. The API only works on a paid plan (or pack) on the Premium voices that also allows commercial use: never on a free plan, a Standard-voices plan or during an unpaid trial. Turning it off, or turning commercial use off, stops this plan\'s keys at once (the keys are kept). Limits, credits, voices and the developer docs always follow this plan\'s current settings.')
                             ->default(true)
                             ->columnSpan(3),
                         Forms\Components\TextInput::make('api_requests_per_minute')
-                            ->label('Requests a minute (per key)')
+                            ->label('Generation requests a minute (whole account)')
                             ->numeric()
+                            ->integer()
                             ->minValue(1)
-                            ->maxValue(100000)
+                            ->maxValue(10000)
+                            ->helperText('For all of a member\'s keys together. Status checks and other reads get three times this, at least 300 a minute.')
                             ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.requests_per_minute')[(string) ($get('processing_priority') ?: 'standard')] ?? 60)),
                         Forms\Components\TextInput::make('api_concurrency')
                             ->label('Generations at the same time')
                             ->numeric()
+                            ->integer()
                             ->minValue(1)
-                            ->maxValue(1000)
+                            ->maxValue(\App\Services\Api\ApiConcurrency::MAX_MEMBER_SLOTS)
+                            ->helperText('While the client waits for the file. Background generations waiting or running: five times this, at least 10.')
                             ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.concurrency')[(string) ($get('processing_priority') ?: 'standard')] ?? 2)),
                     ]),
                 Forms\Components\Section::make('Voice Cloning')

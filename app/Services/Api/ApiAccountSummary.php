@@ -81,6 +81,7 @@ class ApiAccountSummary
                 'rpm' => ApiPlanAccess::requestsPerMinute($plan),
                 'concurrency' => ApiPlanAccess::concurrency($plan),
                 'max_chars' => ApiFeatureGate::maxChars($quotaPlan),
+                'max_chars_async' => ApiFeatureGate::maxChars($quotaPlan, true),
                 'formats' => ApiSpeechService::formatsFor($plan),
             ],
             // The studio options only some plans include, and whether this member has them;
