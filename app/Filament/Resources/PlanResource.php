@@ -283,10 +283,9 @@ class PlanResource extends Resource
                             ->label('Max Characters Per Request')
                             ->numeric()
                             ->integer()
-                            ->minValue(200)
-                            ->maxValue(\App\Services\Api\ApiSpeechService::MAX_TEXT)
+                            ->minValue(0)
                             ->required()
-                            ->helperText('Up to '.number_format(\App\Services\Api\ApiSpeechService::MAX_TEXT).' (the longest text the studio takes). The developer API also caps one request at '.number_format(\App\Services\Api\ApiSpeechService::SYNC_MAX_TEXT).' when the client waits for the file and '.number_format(\App\Services\Api\ApiSpeechService::ASYNC_MAX_TEXT).' in the background, whatever is set here.'),
+                            ->helperText('The studio and the browser extension take at most '.number_format(\App\Services\Api\ApiSpeechService::MAX_TEXT).' characters in one request, whatever is set here; under 200 counts as 200, and 0 hides this line on the pricing card. The developer API also caps one request at '.number_format(\App\Services\Api\ApiSpeechService::SYNC_MAX_TEXT).' when the client waits for the file and '.number_format(\App\Services\Api\ApiSpeechService::ASYNC_MAX_TEXT).' in the background.'),
                         Forms\Components\TextInput::make('recent_voices_days')
                             ->label('Recent Voices Retention (days)')
                             ->numeric()
@@ -411,17 +410,17 @@ class PlanResource extends Resource
                             ->label('Generation requests a minute (whole account)')
                             ->numeric()
                             ->integer()
-                            ->minValue(1)
+                            ->minValue(0)
                             ->maxValue(10000)
-                            ->helperText('For all of a member\'s keys together. Status checks and other reads get three times this, at least 300 a minute.')
+                            ->helperText('For all of a member\'s keys together. Status checks and other reads get three times this, at least 300 a minute. Empty or 0: the default for the plan\'s priority.')
                             ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.requests_per_minute')[(string) ($get('processing_priority') ?: 'standard')] ?? 60)),
                         Forms\Components\TextInput::make('api_concurrency')
                             ->label('Generations at the same time')
                             ->numeric()
                             ->integer()
-                            ->minValue(1)
+                            ->minValue(0)
                             ->maxValue(\App\Services\Api\ApiConcurrency::MAX_MEMBER_SLOTS)
-                            ->helperText('While the client waits for the file. Background generations waiting or running: five times this, at least 10.')
+                            ->helperText('While the client waits for the file. Background generations waiting or running: five times this, at least 10. Empty or 0: the default for the plan\'s priority.')
                             ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.concurrency')[(string) ($get('processing_priority') ?: 'standard')] ?? 2)),
                     ]),
                 Forms\Components\Section::make('Voice Cloning')

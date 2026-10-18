@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AudioGeneration;
 use App\Services\Api\ApiUsageMeter;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Fails, and gives the credits back for, developer API generations that got
@@ -25,6 +26,11 @@ class ExpireStuckApiGenerationsCommand extends Command
 
     public function handle(ApiUsageMeter $meter): int
     {
+        // Between a deploy and its migrations there are no API generations to look at.
+        if (! Schema::hasColumn('audio_generations', 'api_key_id')) {
+            return self::SUCCESS;
+        }
+
         $rules = [
             'processing' => now()->subMinutes(max(10, (int) config('listen.api.stuck_processing_minutes', 30))),
             'queued' => now()->subMinutes(max(10, (int) config('listen.api.stuck_queued_minutes', 60))),
