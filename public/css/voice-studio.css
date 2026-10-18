@@ -257,13 +257,6 @@ html[dir="rtl"] .vs-editor-foot { padding: .7rem 1.2rem .7rem .9rem; }
 @media (prefers-reduced-motion: reduce) {
 }
 
-/* Demo page: the editor sits inside the demo's own card */
-.demo-tag-editor {
-  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-  border-radius: 14px;
-  background: color-mix(in oklab, var(--surface2) 35%, var(--surface));
-}
-.demo-tag-editor textarea { min-height: 220px; }
 .vs-panel .ctrl-group { min-width: 0; }
 .vs-panel .ctrl-group label { display: block; margin-bottom: .45rem; font-size: .88rem; font-weight: 600; color: var(--text); }
 
@@ -819,12 +812,6 @@ html.vs-modal-open { overflow: hidden; }
   border-bottom: 1px solid color-mix(in oklab, var(--line) 70%, transparent);
   border-radius: 0;
   background: color-mix(in oklab, var(--surface2) 45%, var(--surface));
-}
-/* Demo page: the toolbar sits on its own above the demo's text box. */
-.vs-toolbar:has(+ .demo-tag-editor) {
-  margin-bottom: .6rem;
-  border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-  border-radius: 14px;
 }
 .vs-toolbar[hidden] { display: none; }
 .vs-tb-item { position: relative; }

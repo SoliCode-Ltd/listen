@@ -114,16 +114,16 @@
           <div class="vs-editor-card reveal">
             <x-voice-studio.setbar studio-id="studioPanel" :styles="$studioPerformanceStyles ?? []" :emotions="$studioEmotions ?? []">
               <div>
-                <label class="vs-field-label" for="target_language">{{ __('ui.demo.voice_language') }}</label>
+                <label class="vs-field-label" for="target_language">{{ __('ui.dashboard.voice_language') }}</label>
                 <select id="target_language" name="target_language">
-                  <option value="ar">{{ __('ui.demo.arabic') }}</option>
-                  <option value="en">{{ __('ui.demo.english') }}</option>
+                  <option value="ar">{{ __('ui.dashboard.arabic') }}</option>
+                  <option value="en">{{ __('ui.dashboard.english') }}</option>
                 </select>
               </div>
             </x-voice-studio.setbar>
-            <div class="tag-editor demo-tag-editor" data-vs-editor>
-              <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="auto"></div>
-              <textarea id="text" name="text" dir="auto" placeholder="{{ __('ui.demo.text_placeholder') }}" required></textarea>
+            <div class="tag-editor" data-vs-editor>
+              <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
+              <textarea id="text" name="text" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" required></textarea>
             </div>
             <div class="demo-samples">
               <div class="sample-chips">
