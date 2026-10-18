@@ -21,6 +21,20 @@ class ContactPageTest extends TestCase
         $response->assertSee('Message');
     }
 
+    public function test_a_link_can_pick_the_topic(): void
+    {
+        $get = fn (string $query) => $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($this->localizedRoute('contact').$query);
+
+        // The pricing page's "Contact us" opens the form about plans and billing.
+        $get('?topic=billing')->assertOk()->assertSee('name="subject" value="'.e(__('ui.contact.topic_billing')).'"', false);
+        // Anything else leaves the subject empty.
+        $get('?topic=%3Cb%3E')->assertOk()->assertSee('name="subject" value=""', false);
+    }
+
     public function test_legacy_contact_url_redirects_to_contact_us(): void
     {
         $contactUrl = $this->localizedRoute('contact');

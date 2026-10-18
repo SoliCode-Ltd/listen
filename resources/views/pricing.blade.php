@@ -11,38 +11,18 @@
       margin: 0 auto;
     }
 
+    /* The title on the page's own background: no extra light or texture behind it. */
     .page-hero {
-      position: relative;
-      isolation: isolate;
       text-align: center;
-      padding: 4.25rem 1rem 2.5rem;
-    }
-    /* A soft violet light and a faint dot grid behind the title. */
-    .page-hero::before,
-    .page-hero::after {
-      content: "";
-      position: absolute;
-      inset: -1.5rem 0 auto;
-      height: 460px;
-      z-index: -1;
-      pointer-events: none;
-    }
-    .page-hero::before {
-      background: radial-gradient(46% 58% at 50% 34%, color-mix(in oklab, var(--a) 17%, transparent), transparent 72%);
-    }
-    .page-hero::after {
-      background-image: radial-gradient(color-mix(in oklab, var(--a) 30%, transparent) 1px, transparent 1.3px);
-      background-size: 22px 22px;
-      -webkit-mask-image: radial-gradient(ellipse 48% 62% at 50% 38%, #000 25%, transparent 75%);
-      mask-image: radial-gradient(ellipse 48% 62% at 50% 38%, #000 25%, transparent 75%);
-      opacity: .5;
+      padding: 4.75rem 1rem 3rem;
     }
     .page-hero h1 {
-      margin: 0 auto .9rem;
-      max-width: 18ch;
-      font-size: clamp(2.2rem, 4.6vw, 3.4rem);
-      line-height: 1.08;
-      letter-spacing: -.035em;
+      margin: 0 auto 1rem;
+      max-width: 17ch;
+      font-size: clamp(2.4rem, 5vw, 3.75rem);
+      font-weight: 600;
+      line-height: 1.05;
+      letter-spacing: -.04em;
       text-wrap: balance;
     }
     html[dir="rtl"] .page-hero h1 {
@@ -58,7 +38,8 @@
       text-wrap: pretty;
     }
 
-    /* Monthly / yearly switch: two equal halves, the saving on the yearly one. */
+    /* Monthly / yearly switch: a quiet segmented control like the language switch,
+       the chosen half on a raised chip, the saving on the yearly one. */
     .billing-wrapper {
       display: flex;
       justify-content: center;
@@ -66,27 +47,27 @@
     .billing-toggle {
       display: inline-grid;
       grid-template-columns: 1fr 1fr;
-      background: var(--surface);
-      border: 1px solid var(--line);
+      background: color-mix(in oklab, var(--text) 6%, transparent);
       border-radius: var(--radius-full);
-      padding: .25rem;
+      padding: 4px;
       position: relative;
       isolation: isolate;
     }
     .billing-indicator {
       position: absolute;
-      top: .25rem;
-      bottom: .25rem;
-      left: .25rem;
-      width: calc(50% - .25rem);
+      top: 4px;
+      bottom: 4px;
+      left: 4px;
+      width: calc(50% - 4px);
       border-radius: var(--radius-full);
-      background: var(--brand-accent);
-      box-shadow: var(--lift);
-      transition: transform .2s ease;
+      background: var(--surface);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .14), 0 0 0 1px rgba(15, 23, 42, .04);
+      transition: transform .25s cubic-bezier(.4, 0, .2, 1);
       z-index: 0;
     }
+    html:not([data-theme="light"]) .billing-indicator { background: #2E2E3A; box-shadow: none; }
     .billing-toggle.yearly .billing-indicator { transform: translateX(100%); }
-    html[dir="rtl"] .billing-indicator { left: auto; right: .25rem; }
+    html[dir="rtl"] .billing-indicator { left: auto; right: 4px; }
     html[dir="rtl"] .billing-toggle.yearly .billing-indicator { transform: translateX(-100%); }
     .billing-toggle button {
       position: relative;
@@ -109,7 +90,7 @@
       transition: color .2s ease;
     }
     .billing-toggle button:hover { color: var(--text); }
-    .billing-toggle button.active { color: #fff; }
+    .billing-toggle button.active { color: var(--text); }
     .billing-toggle button:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .toggle-save {
       padding: .12rem .45rem;
@@ -118,10 +99,6 @@
       color: color-mix(in oklab, var(--ok) 50%, var(--text));
       font-size: .74rem;
       font-weight: 700;
-    }
-    .billing-toggle button.active .toggle-save {
-      background: rgba(255, 255, 255, .22);
-      color: #fff;
     }
 
     /* ── Plan cards ──
@@ -154,15 +131,16 @@
       grid-template-rows: subgrid;
       row-gap: 0;
       margin-bottom: 1.25rem;
-      padding: 1.6rem 1.6rem 1.5rem;
+      padding: 1.75rem 1.6rem 1.6rem;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 1.35rem;
+      border-radius: 1.25rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
       transition: border-color .2s ease, box-shadow .2s ease;
     }
     .plan-card:hover {
-      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 24px 48px -32px rgba(30, 20, 80, .35);
+      border-color: color-mix(in oklab, var(--text) 18%, var(--line));
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 18px 40px -30px rgba(15, 23, 42, .3);
     }
     /* The recommended plan: the same white card, held in a violet ring, with its orb alive. */
     .plan-card.popular {
@@ -186,9 +164,9 @@
     }
     .plan-name {
       margin: 0;
-      font-size: 1.3rem;
-      font-weight: 700;
-      letter-spacing: -.01em;
+      font-size: 1.35rem;
+      font-weight: 600;
+      letter-spacing: -.02em;
     }
     html[dir="rtl"] .plan-name { letter-spacing: 0; }
     .plan-desc {
@@ -223,10 +201,10 @@
     }
     .price-row { display: flex; align-items: baseline; gap: .35rem; }
     .price-amount {
-      font-size: clamp(2.2rem, 2.9vw, 2.8rem);
-      font-weight: 800;
+      font-size: clamp(2.5rem, 3.2vw, 3.1rem);
+      font-weight: 600;
       line-height: 1;
-      letter-spacing: -.035em;
+      letter-spacing: -.045em;
       font-variant-numeric: tabular-nums;
     }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
@@ -291,19 +269,19 @@
       padding: .6rem 1rem;
       border-radius: var(--btn-radius);
       font-size: .95rem;
-      font-weight: 700;
+      font-weight: 600;
       text-align: center;
       text-decoration: none;
       transition: background-color .2s ease, border-color .2s ease, color .2s ease;
     }
-    .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; }
+    .plan-btn.btn-primary { background: var(--brand-accent); color: #fff; border: 1px solid transparent; box-shadow: var(--lift); }
     .plan-btn.btn-primary:hover { background: var(--brand-hover); }
     .plan-btn.btn-outline {
       background: transparent;
       color: var(--text);
-      border: 1px solid color-mix(in oklab, var(--a) 40%, var(--line));
+      border: 1px solid color-mix(in oklab, var(--text) 16%, transparent);
     }
-    .plan-btn.btn-outline:hover { border-color: var(--brand-accent); background: color-mix(in oklab, var(--a) 7%, transparent); }
+    .plan-btn.btn-outline:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .plan-btn.plan-btn-sm { min-height: 38px; padding: .4rem .75rem; font-size: .84rem; }
     .plan-btn.btn-disabled {
@@ -326,7 +304,7 @@
     .plan-minutes { display: flex; align-items: baseline; flex-wrap: wrap; gap: .1rem .45rem; }
     .plan-minutes-number {
       font-size: 1.6rem;
-      font-weight: 800;
+      font-weight: 600;
       line-height: 1.1;
       letter-spacing: -.02em;
       font-variant-numeric: tabular-nums;
@@ -395,26 +373,54 @@
     .plan-features li.is-tick .feature-label svg { color: var(--ok); stroke-width: 2.6; }
 
 
-    /* Trust line, right under the cards. */
-    .plans-trust {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: .6rem 1.75rem;
-      margin: .5rem 0 0;
-      color: var(--muted);
-      font-size: .88rem;
+    /* Under the cards, as wide as their row: more minutes or a whole team, by talking to us. */
+    .team-band {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 1.25rem 1.5rem;
+      margin: .25rem auto 0;
+      padding: 1.35rem 1.6rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 1.25rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
-    .plans-trust span { display: inline-flex; align-items: center; gap: .4rem; }
-    .plans-trust svg { width: 1rem; height: 1rem; fill: none; stroke: var(--ok); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+    .team-band[data-count="1"] { max-width: 440px; }
+    .team-band[data-count="2"] { max-width: 900px; }
+    .team-band[data-count="3"],
+    .team-band[data-count="5"],
+    .team-band[data-count="6"] { max-width: 1200px; }
+    .team-orb { --orb-size: 52px; }
+    .team-band h2 { margin: 0 0 .2rem; font-size: 1.15rem; font-weight: 600; letter-spacing: -.01em; }
+    html[dir="rtl"] .team-band h2 { letter-spacing: 0; }
+    .team-band p { margin: 0; color: var(--muted); font-size: .93rem; line-height: 1.55; }
+    .team-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 46px;
+      padding: 0 1.4rem;
+      border-radius: var(--btn-radius);
+      border: 1px solid color-mix(in oklab, var(--text) 16%, transparent);
+      color: var(--text);
+      font-size: .95rem;
+      font-weight: 600;
+      text-decoration: none;
+      white-space: nowrap;
+      transition: border-color .2s ease, background-color .2s ease;
+    }
+    .team-btn:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
+    .team-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
 
 
     /* ── Section headings ── */
     .section-title {
       text-align: center;
       margin: 0 0 .55rem;
-      font-size: clamp(1.5rem, 3vw, 2.1rem);
-      letter-spacing: -.02em;
+      font-size: clamp(1.7rem, 3.2vw, 2.4rem);
+      font-weight: 600;
+      letter-spacing: -.03em;
     }
     html[dir="rtl"] .section-title { letter-spacing: 0; }
     .section-subtitle {
@@ -425,13 +431,13 @@
     }
 
     /* ── Comparison table: each plan's name, price and button on top ── */
-    .compare { padding: 5.5rem 0 1rem; }
+    .compare { padding: 6.5rem 0 1rem; }
     .compare-scroll {
       overflow-x: auto;
       border: 1px solid var(--line);
       border-radius: 1.1rem;
       background: var(--surface);
-      box-shadow: 0 24px 48px -36px rgba(20, 16, 50, .35);
+      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
     }
     .compare-scroll:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .compare-table {
@@ -466,20 +472,33 @@
       display: block;
       min-height: 1.3rem;
       color: var(--accent-text);
-      font-size: .7rem;
-      font-weight: 700;
-      letter-spacing: .06em;
-      text-transform: uppercase;
+      font-size: .76rem;
+      font-weight: 600;
     }
-    html[dir="rtl"] .compare-plan-badge { letter-spacing: 0; font-size: .78rem; }
-    .compare-plan-name { display: block; font-size: 1rem; font-weight: 700; color: var(--text); }
+    .compare-plan-name { display: block; font-size: 1rem; font-weight: 600; color: var(--text); }
     .compare-plan-price { display: flex; justify-content: center; align-items: baseline; gap: .2rem; margin: .2rem 0 .8rem; }
-    .compare-plan-price b { font-size: 1.55rem; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text); }
+    .compare-plan-price b { font-size: 1.6rem; font-weight: 600; letter-spacing: -.035em; font-variant-numeric: tabular-nums; color: var(--text); }
     .compare-plan-price small { color: var(--muted); font-size: .8rem; font-weight: 500; }
     .compare-table thead th.is-popular {
-      background: color-mix(in oklab, var(--a) 7%, var(--surface));
-      box-shadow: inset 0 3px 0 var(--brand-accent);
+      background: color-mix(in oklab, var(--a) 5%, var(--surface));
+      box-shadow: inset 0 2px 0 var(--brand-accent);
     }
+    /* Rows in two groups: how much you get, then what the voices can do. */
+    .compare-table tbody th.compare-group {
+      position: static;
+      padding: 1.6rem 1rem .6rem;
+      background: transparent;
+      color: var(--text);
+      font-size: .95rem;
+      font-weight: 600;
+      text-align: start;
+      border-top: 0;
+    }
+    .compare-table tbody:not(:first-of-type) th.compare-group { border-top: 1px solid var(--line); }
+    .compare-group span { display: inline-block; position: sticky; inset-inline-start: 1rem; }
+    .compare-table tbody tr.compare-group-row:hover th { background: transparent; }
+    .compare-table tbody tr.compare-group-row + tr th,
+    .compare-table tbody tr.compare-group-row + tr td { border-top: 0; }
     .compare-table th[scope="row"],
     .compare-table thead th:first-child {
       text-align: start;
@@ -491,14 +510,13 @@
       z-index: 1;
       min-width: 210px;
     }
-    .compare-table thead th:first-child { z-index: 3; color: var(--text); font-size: .85rem; font-weight: 700; }
+    .compare-table thead th:first-child { z-index: 3; color: var(--muted); font-size: .85rem; font-weight: 500; }
     .compare-row-label { display: inline-flex; align-items: center; gap: .6rem; }
-    .compare-row-label svg { width: 1rem; height: 1rem; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: .85; }
-    .compare-table td { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
-    .compare-table td.is-popular { background: color-mix(in oklab, var(--a) 5%, var(--surface)); }
-    .compare-table tbody tr:hover th,
-    .compare-table tbody tr:hover td { background: color-mix(in oklab, var(--a) 3%, var(--surface)); }
-    .compare-table tbody tr:hover td.is-popular { background: color-mix(in oklab, var(--a) 8%, var(--surface)); }
+    .compare-table td { font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+    .compare-table td.is-popular { background: color-mix(in oklab, var(--a) 4%, var(--surface)); }
+    .compare-table tbody tr:not(.compare-group-row):hover th,
+    .compare-table tbody tr:not(.compare-group-row):hover td { background: color-mix(in oklab, var(--text) 2.5%, var(--surface)); }
+    .compare-table tbody tr:not(.compare-group-row):hover td.is-popular { background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
     .compare-tick { width: 1.15rem; height: 1.15rem; fill: none; stroke: var(--ok); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
     .compare-no { color: color-mix(in oklab, var(--muted) 70%, transparent); font-weight: 500; }
     /* Wide screens: the plan names, prices and buttons stay in view while you read down. */
@@ -507,41 +525,31 @@
       .compare-table thead th { top: 64px; }
       .compare-table thead th:first-child { border-start-start-radius: 1.1rem; }
       .compare-table thead th:last-child { border-start-end-radius: 1.1rem; }
-      .compare-table tbody tr:last-child th { border-end-start-radius: 1.1rem; }
-      .compare-table tbody tr:last-child td:last-child { border-end-end-radius: 1.1rem; }
+      .compare-table tbody:last-of-type tr:last-child th { border-end-start-radius: 1.1rem; }
+      .compare-table tbody:last-of-type tr:last-child td:last-child { border-end-end-radius: 1.1rem; }
     }
 
     /* ── Included in every plan ── */
-    .features-section { padding: 5.5rem 0 1rem; }
+    /* Three columns on a hairline, not three boxes. */
+    .features-section { padding: 6.5rem 0 1rem; }
     .features-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 1rem;
+      border-top: 1px solid var(--line);
     }
-    .feature-card {
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 1.1rem;
-      padding: 1.6rem;
-      transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
-    }
-    .feature-card:hover {
-      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
-      transform: translateY(-2px);
-    }
+    .feature-card { padding: 1.9rem 2rem .5rem 0; }
+    .feature-card + .feature-card { padding-inline-start: 2rem; border-inline-start: 1px solid var(--line); }
     .feature-icon {
-      width: 2.6rem;
-      height: 2.6rem;
+      width: 2.5rem;
+      height: 2.5rem;
       padding: .6rem;
-      margin-bottom: 1rem;
-      border-radius: .8rem;
+      margin-bottom: 1.1rem;
+      border-radius: .75rem;
       color: var(--accent-text);
-      background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      background: color-mix(in oklab, var(--a) 10%, transparent);
     }
-    .feature-card h3 { font-size: 1.05rem; margin: 0 0 .5rem; }
-    .feature-card p { color: var(--muted); font-size: .93rem; margin: 0; line-height: 1.6; }
+    .feature-card h3 { font-size: 1.08rem; font-weight: 600; margin: 0 0 .5rem; }
+    .feature-card p { color: var(--muted); font-size: .94rem; margin: 0; line-height: 1.65; max-width: 40ch; }
 
     /* ── FAQ: the heading on one side, questions that open on the other ── */
     .faq-section {
@@ -549,7 +557,7 @@
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.7fr);
       gap: 3rem;
       align-items: start;
-      padding: 5.5rem 0 1rem;
+      padding: 6.5rem 0 1rem;
     }
     .faq-intro { position: sticky; top: 6rem; }
     .faq-intro .section-title { text-align: start; }
@@ -566,51 +574,62 @@
     .faq-contact:hover { text-decoration: underline; }
     .faq-contact svg { width: 1rem; height: 1rem; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
     html[dir="rtl"] .faq-contact svg { transform: scaleX(-1); }
-    .faq-list { display: flex; flex-direction: column; gap: .65rem; }
-    .faq-item {
-      border: 1px solid var(--line);
-      border-radius: 1rem;
-      background: var(--surface);
-      transition: border-color .2s ease, box-shadow .2s ease;
-    }
-    .faq-item[open] {
-      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
-    }
+    /* Questions on hairlines: no boxes, the answer opens under its question. */
+    .faq-list { border-top: 1px solid var(--line); }
+    .faq-item { border-bottom: 1px solid var(--line); }
     .faq-item summary {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 1rem;
+      gap: 1.5rem;
       min-height: 44px;
-      padding: 1.05rem 1.3rem;
-      font-size: 1rem;
-      font-weight: 700;
+      padding: 1.35rem 0;
+      font-size: 1.05rem;
+      font-weight: 600;
       cursor: pointer;
       list-style: none;
     }
     .faq-item summary::-webkit-details-marker { display: none; }
-    .faq-item summary:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: -2px; border-radius: 1rem; }
-    .faq-toggle { flex: none; width: 1.1rem; height: 1.1rem; fill: none; stroke: var(--accent-text); stroke-width: 2.2; stroke-linecap: round; transition: transform .2s ease; }
-    .faq-item[open] .faq-toggle { transform: rotate(45deg); }
-    .faq-item p { margin: 0; padding: 0 1.3rem 1.2rem; color: var(--muted); font-size: .95rem; line-height: 1.65; }
+    .faq-item summary:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: .5rem; }
+    .faq-toggle {
+      flex: none;
+      width: 2rem;
+      height: 2rem;
+      padding: .5rem;
+      border-radius: 50%;
+      border: 1px solid var(--line);
+      fill: none;
+      stroke: var(--text);
+      stroke-width: 2;
+      stroke-linecap: round;
+      transition: transform .2s ease, background-color .2s ease, border-color .2s ease;
+    }
+    .faq-item summary:hover .faq-toggle { border-color: color-mix(in oklab, var(--text) 35%, var(--line)); }
+    .faq-item[open] .faq-toggle { transform: rotate(45deg); background: color-mix(in oklab, var(--text) 5%, transparent); }
+    .faq-item p { margin: 0; padding: 0 0 1.5rem; padding-inline-end: 3.5rem; color: var(--muted); font-size: .97rem; line-height: 1.7; max-width: 68ch; }
 
-    /* ── Closing panel, in the brand colour with a sound wave along the bottom ── */
+    /* ── Closing panel: deep ink, and the Listen orb alive in the middle ── */
     .cta-section {
       position: relative;
       isolation: isolate;
       overflow: hidden;
-      margin: 5.5rem 0 3.5rem;
-      padding: clamp(2.75rem, 6vw, 4.25rem) clamp(1.25rem, 4vw, 3rem) clamp(3.5rem, 7vw, 5rem);
+      margin: 6.5rem 0 3.5rem;
+      padding: clamp(2.75rem, 6vw, 4.5rem) clamp(1.25rem, 4vw, 3rem);
       border-radius: 1.5rem;
       text-align: center;
       color: #fff;
-      background: #6145F2;
-      box-shadow: 0 34px 70px -40px rgba(74, 48, 217, .55);
+      background: #17133A;
+      border: 1px solid rgba(255, 255, 255, .06);
     }
-    .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.02em; text-wrap: balance; }
+    .cta-orb {
+      --orb-size: clamp(96px, 11vw, 132px);
+      display: block;
+      margin: 0 auto 1.6rem;
+      box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 70px -12px color-mix(in srgb, var(--o1) 70%, transparent);
+    }
+    .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.8rem, 3.6vw, 2.6rem); font-weight: 600; letter-spacing: -.03em; text-wrap: balance; }
     html[dir="rtl"] .cta-section h2 { letter-spacing: 0; }
-    .cta-section p { margin: 0 0 1.75rem; color: rgba(255, 255, 255, .92); font-size: 1.05rem; }
+    .cta-section p { margin: 0 auto 1.9rem; max-width: 46ch; color: rgba(255, 255, 255, .74); font-size: 1.05rem; line-height: 1.6; }
     .cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; }
     .cta-btn {
       display: inline-flex;
@@ -620,32 +639,15 @@
       padding: 0 1.6rem;
       border-radius: var(--btn-radius);
       font-size: .95rem;
-      font-weight: 700;
+      font-weight: 600;
       text-decoration: none;
-      transition: background-color .2s ease, border-color .2s ease, transform .2s ease;
+      transition: background-color .2s ease, border-color .2s ease;
     }
-    .cta-btn:hover { transform: translateY(-1px); }
     .cta-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-    .cta-btn-solid { background: #fff; color: #3F27C4; }
-    .cta-btn-solid:hover { background: #F1EEFF; }
-    .cta-btn-ghost { border: 1.5px solid rgba(255, 255, 255, .6); color: #fff; }
-    .cta-btn-ghost:hover { border-color: #fff; background: rgba(255, 255, 255, .12); }
-    .cta-wave {
-      position: absolute;
-      inset: auto 0 0;
-      z-index: -1;
-      display: flex;
-      justify-content: center;
-      align-items: flex-end;
-      gap: 9px;
-      height: 64px;
-      opacity: .16;
-      pointer-events: none;
-    }
-    .cta-wave i { flex: none; width: 6px; height: var(--h); border-radius: 3px 3px 0 0; background: #fff; }
-    @media (prefers-reduced-motion: reduce) {
-      .cta-btn:hover, .feature-card:hover { transform: none; }
-    }
+    .cta-btn-solid { background: #fff; color: #17133A; }
+    .cta-btn-solid:hover { background: #ECE8FF; }
+    .cta-btn-ghost { border: 1px solid rgba(255, 255, 255, .28); color: #fff; }
+    .cta-btn-ghost:hover { border-color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .08); }
 
     .trial-pill {
       display: inline-flex;
@@ -700,8 +702,18 @@
     @media (min-width: 1001px) {
       .plans-grid[data-count="3"] > .plan-card:last-child { grid-column: auto; width: auto; }
     }
+    @media (max-width: 1240px) {
+      .team-band[data-count="4"],
+      .team-band[data-count="5"],
+      .team-band[data-count="6"] { max-width: 900px; }
+    }
+    @media (max-width: 1000px) {
+      .team-band[data-count="3"] { max-width: 900px; }
+    }
     @media (max-width: 860px) {
       .features-grid { grid-template-columns: 1fr; }
+      .feature-card, .feature-card + .feature-card { padding: 1.6rem 0; border-inline-start: 0; }
+      .feature-card + .feature-card { border-top: 1px solid var(--line); }
       .faq-section { grid-template-columns: 1fr; gap: 1.25rem; }
       .faq-intro { position: static; }
       .faq-intro .section-title, .faq-intro { text-align: center; }
@@ -715,9 +727,12 @@
       .plan-desc { min-height: 0; }
       .page-hero { padding-top: 2.75rem; }
       .billing-toggle button { padding: 0 .9rem; }
-      .compare, .features-section, .faq-section { padding-top: 3.5rem; }
+      .compare, .features-section, .faq-section { padding-top: 4rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
-      .cta-section { margin-top: 3.5rem; border-radius: 1.2rem; }
+      .cta-section { margin-top: 4rem; border-radius: 1.2rem; }
+      .team-band[data-count] { max-width: 520px; grid-template-columns: auto minmax(0, 1fr); padding: 1.25rem; }
+      .team-btn { grid-column: 1 / -1; }
+      .faq-item p { padding-inline-end: 0; }
     }
   </style>
 </head>
@@ -799,13 +814,11 @@
       $creditsLabel = __('ui.pricing.compare_credits');
       $comparePlans = array_values(array_filter($pricingPlans, fn ($p) => empty($p['is_pack'])));
       $compareRows = [];
-      $lineIcons = [];
       foreach ($comparePlans as $comparePlan) {
         foreach ($comparePlan['features'] as $line) {
           $label = (string) ($line['label'] ?? '');
           if ($label !== '') {
             $compareRows[$label][$comparePlan['slug']] = (string) ($line['value'] ?? $includedMark);
-            $lineIcons[$label] ??= (string) ($line['icon'] ?? 'check');
           }
           if ($label === $minutesLabel && empty($comparePlan['free_try_chars'])) {
             $compareRows[$creditsLabel][$comparePlan['slug']] = number_format((int) ($comparePlan['monthly_chars'] ?? 0));
@@ -816,6 +829,16 @@
           $compareRows[$creditsLabel][$comparePlan['slug']] ??= number_format((int) ($comparePlan['monthly_chars'] ?? 0));
         }
       }
+      // The table in two groups: how much each plan gives, then what its voices can do
+      // (the admin's own extra lines go with the voices).
+      $usageLabels = [$minutesLabel, $creditsLabel];
+      foreach (['max_chars_per_request', 'monthly_requests', 'daily_requests', 'processing_priority', 'audio_kept', 'topup'] as $usageKey) {
+        $usageLabels[] = __('ui.pricing.lines.label_'.$usageKey);
+      }
+      $compareGroups = array_filter([
+        __('ui.pricing.compare_group_usage') => array_intersect_key($compareRows, array_flip($usageLabels)),
+        __('ui.pricing.compare_group_features') => array_diff_key($compareRows, array_flip($usageLabels)),
+      ]);
       // A line every monthly plan has with the same value is left off the cards, which show
       // what sets each plan apart; the comparison table below lists every line.
       $commonLines = [];
@@ -835,7 +858,6 @@
       }
       // The cards show the minutes on their own, above the lines.
       $pricingHiddenLabels = array_merge(array_keys($commonLines), [__('ui.pricing.lines.label_voice_minutes')]);
-      $tick = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
     @endphp
     <section class="page-hero reveal">
       @if(!empty($trialPromo['show']))
@@ -865,19 +887,22 @@
       </div>
     </section>
 
-    <section class="plans-grid" data-count="{{ min(6, max(1, count($mainPlans))) }}">
+    @php $planCount = min(6, max(1, count($mainPlans))); @endphp
+    <section class="plans-grid" data-count="{{ $planCount }}">
       @foreach($mainPlans as $index => $plan)
         @include('components._plan-card', ['plan' => $plan, 'index' => $index])
       @endforeach
     </section>
 
-
-    <div class="plans-trust reveal">
-      <span>{!! $tick !!}{{ __('ui.pricing.badge_no_card') }}</span>
-      <span>{!! $tick !!}{{ __('ui.pricing.badge_cancel_anytime') }}</span>
-      <span>{!! $tick !!}{{ __('ui.pricing.badge_secure_billing') }}</span>
-    </div>
-
+    {{-- More than the biggest plan, or a whole team: by talking to us. --}}
+    <section class="team-band reveal" data-count="{{ $planCount }}" aria-labelledby="teamTitle">
+      <x-orb name="studio_max" class="team-orb" />
+      <div>
+        <h2 id="teamTitle">{{ __('ui.pricing.team_title') }}</h2>
+        <p>{{ __('ui.pricing.team_body') }}</p>
+      </div>
+      <a class="team-btn" href="{{ route('contact', ['topic' => 'billing']) }}">{{ __('ui.pricing.team_cta') }}</a>
+    </section>
 
     @if(count($comparePlans) > 1 && $compareRows !== [])
       <section class="compare" id="compare" aria-labelledby="compareTitle">
@@ -907,30 +932,30 @@
                 @endforeach
               </tr>
             </thead>
-            <tbody>
-              @foreach($compareRows as $label => $values)
-                <tr>
-                  <th scope="row">
-                    <span class="compare-row-label">
-                      <svg viewBox="0 0 24 24" aria-hidden="true">{!! $label === $creditsLabel ? '<circle cx="12" cy="12" r="9"/><path d="M14.8 9.2a3 3 0 0 0-2.8-1.7c-1.7 0-3 1-3 2.3 0 3.2 6 1.6 6 4.6 0 1.3-1.3 2.3-3 2.3a3.2 3.2 0 0 1-3-1.8M12 6v1.5M12 16.5V18"/>' : $lineIcon($lineIcons[$label] ?? 'check') !!}</svg>
-                      {{ $label }}
-                    </span>
-                  </th>
-                  @foreach($comparePlans as $comparePlan)
-                    @php $cell = $values[$comparePlan['slug']] ?? null; @endphp
-                    <td class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}">
-                      @if($cell === null)
-                        <span class="compare-no" aria-label="{{ __('ui.pricing.compare_not_included') }}">—</span>
-                      @elseif($cell === '' || $cell === $includedMark)
-                        <svg class="compare-tick" viewBox="0 0 24 24" role="img" aria-label="{{ $includedMark }}"><path d="M20 6 9 17l-5-5"/></svg>
-                      @else
-                        {{ $cell }}
-                      @endif
-                    </td>
-                  @endforeach
+            @foreach($compareGroups as $groupTitle => $groupRows)
+              <tbody>
+                <tr class="compare-group-row">
+                  <th scope="rowgroup" class="compare-group" colspan="{{ count($comparePlans) + 1 }}"><span>{{ $groupTitle }}</span></th>
                 </tr>
-              @endforeach
-            </tbody>
+                @foreach($groupRows as $label => $values)
+                  <tr>
+                    <th scope="row"><span class="compare-row-label">{{ $label }}</span></th>
+                    @foreach($comparePlans as $comparePlan)
+                      @php $cell = $values[$comparePlan['slug']] ?? null; @endphp
+                      <td class="{{ !empty($comparePlan['is_popular']) ? 'is-popular' : '' }}">
+                        @if($cell === null)
+                          <span class="compare-no" aria-label="{{ __('ui.pricing.compare_not_included') }}">—</span>
+                        @elseif($cell === '' || $cell === $includedMark)
+                          <svg class="compare-tick" viewBox="0 0 24 24" role="img" aria-label="{{ $includedMark }}"><path d="M20 6 9 17l-5-5"/></svg>
+                        @else
+                          {{ $cell }}
+                        @endif
+                      </td>
+                    @endforeach
+                  </tr>
+                @endforeach
+              </tbody>
+            @endforeach
           </table>
         </div>
       </section>
@@ -984,11 +1009,7 @@
     </section>
 
     <section class="cta-section reveal">
-      <span class="cta-wave" aria-hidden="true">
-        @for($bar = 0; $bar < 64; $bar++)
-          <i style="--h: {{ 14 + (int) round(46 * abs(sin($bar * .55)) * (.45 + .55 * abs(cos($bar * .17)))) }}px"></i>
-        @endfor
-      </span>
+      <x-orb name="listen" class="cta-orb is-live" />
       <h2>{{ __('ui.pricing.cta_title') }}</h2>
       <p>{{ __('ui.pricing.cta_subtitle') }}</p>
       <div class="cta-actions">

@@ -3,6 +3,8 @@
   $contactWhatsappUrl = 'https://wa.me/'.$contactWhatsapp.'?text='.rawurlencode(__('ui.contact.whatsapp_message'));
   $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
   $contactTopics = ['billing', 'voices', 'account', 'other'];
+  // A link can pick the topic for the visitor (the pricing page's "Contact us" picks plans and billing).
+  $contactTopic = in_array(request()->query('topic'), $contactTopics, true) ? __('ui.contact.topic_'.request()->query('topic')) : '';
   // The wave's resting shape: tall in the middle, like the Listen mark, with some life in it.
   $contactBars = [];
   for ($i = 0; $i < 44; $i++) {
@@ -250,7 +252,7 @@
 
             <div class="contact-field">
               <label for="subject">{{ __('ui.contact.subject') }}</label>
-              <input type="text" id="subject" name="subject" value="{{ old('subject') }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
+              <input type="text" id="subject" name="subject" value="{{ old('subject', $contactTopic) }}" required placeholder="{{ __('ui.contact.subject_placeholder') }}">
               <span class="text-danger" data-error-for="subject" @unless($errors->has('subject')) style="display: none;" @endunless>{{ $errors->first('subject') }}</span>
             </div>
 
@@ -370,6 +372,7 @@
         });
       });
       subject.addEventListener('input', mark);
+      mark();
     })();
 
     (function () {

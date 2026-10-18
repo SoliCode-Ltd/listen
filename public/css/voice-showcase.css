@@ -933,8 +933,13 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   -webkit-tap-highlight-color: transparent;
 }
 .tour-pick:focus-visible { outline: 3px solid var(--brand-subtle); outline-offset: 6px; }
-.tour-orb {
+.tour-pick .tour-orb {
   --orb-size: clamp(96px, 9vw, 128px);
+  --orb-glow: 0;
+  /* A halo that breathes with the voice while it plays (or listens). */
+  box-shadow:
+    0 24px 48px -28px color-mix(in srgb, var(--o0) 70%, transparent),
+    0 0 calc(var(--orb-glow) * 64px) calc(var(--orb-glow) * 10px) color-mix(in srgb, var(--o2) 45%, transparent);
   transition: width .55s cubic-bezier(.2, .8, .2, 1), height .55s cubic-bezier(.2, .8, .2, 1), transform .3s ease;
 }
 .tour-pick:hover .tour-orb { transform: scale(1.04); }
@@ -958,6 +963,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
 .tour-pick:hover .tour-play,
 .tour-pick:focus-visible .tour-play { opacity: 1; transform: none; }
 .tour-play svg { width: 22px; height: 22px; }
+.tour-item.is-listening .tour-play { color: var(--brand-accent); transform: scale(1.08); }
 .tour-icon-pause { display: none; }
 .tour-item.is-playing .tour-icon-play { display: none; }
 .tour-item.is-playing .tour-icon-pause { display: block; }
@@ -976,10 +982,14 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
 /* The picked orb's name is the caption's title below. */
 .tour-item.is-picked .tour-name { opacity: 0; }
 .tour-caption {
-  max-width: 46ch;
+  max-width: 62rem;
   margin: 1.75rem auto 0;
   text-align: center;
-  min-height: 9.5rem;
+  min-height: 8.5rem;
+}
+/* On a wide screen each line of the caption stays on one line. */
+@media (min-width: 900px) {
+  .tour-copy p { white-space: nowrap; }
 }
 .tour-copy h3 { margin: 0 0 .4rem; font-size: 1.3rem; font-weight: 600; }
 .tour-copy p { margin: 0 0 1.1rem; color: var(--muted); line-height: 1.65; }
@@ -1001,7 +1011,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   }
   .tour-row::-webkit-scrollbar { display: none; }
   .tour-item { scroll-snap-align: center; }
-  .tour-orb { --orb-size: 104px; }
+  .tour-pick .tour-orb { --orb-size: 104px; }
   .tour-item.is-picked .tour-orb { --orb-size: 176px; }
   .tour-caption { min-height: 10.5rem; padding: 0 4vw; }
 }

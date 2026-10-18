@@ -237,6 +237,35 @@ class PricingPageLinesTest extends TestCase
         $this->getLocalizedRoute('pricing')->assertSee('<span class="feature-value">'.e($changed).'</span>', false);
     }
 
+    public function test_the_table_lists_usage_first_then_the_voices_and_the_page_ends_with_a_way_to_ask_for_more(): void
+    {
+        $this->premiumPlan(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900]);
+        $this->premiumPlan(['slug' => 'creator', 'name' => 'Creator', 'price_cents' => 2200]);
+
+        foreach (['en', 'ar'] as $locale) {
+            app()->setLocale($locale);
+            $page = $this->getLocalizedRoute('pricing')->assertOk();
+            $html = $page->getContent();
+
+            // Two groups: how much each plan gives, then what its voices can do.
+            $usage = strpos($html, '<span>'.__('ui.pricing.compare_group_usage').'</span>');
+            $voices = strpos($html, '<span>'.__('ui.pricing.compare_group_features').'</span>');
+            $this->assertNotFalse($usage, $locale);
+            $this->assertNotFalse($voices, $locale);
+            $minutes = strpos($html, __('ui.pricing.lines.label_voice_minutes'), $usage);
+            $quality = strpos($html, __('ui.pricing.lines.label_voice_quality'), $voices);
+            $this->assertTrue($usage < $minutes && $minutes < $voices && $voices < $quality, $locale);
+            $this->assertSame(2, substr_count($html, 'class="compare-group"'), $locale);
+
+            // The trust line under the cards is gone; a quiet band offers more minutes or a team plan instead.
+            $page->assertDontSee('plans-trust', false);
+            $page->assertSee(__('ui.pricing.team_title'));
+            $page->assertSee('contact-us?topic=billing', false);
+            // The closing panel carries the Listen orb.
+            $page->assertSee('class="orb cta-orb is-live"', false);
+        }
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Admin form
     // ──────────────────────────────────────────────────────────────────
