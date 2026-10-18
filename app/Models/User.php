@@ -128,6 +128,12 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasMany(ClonedVoice::class)->ready();
     }
 
+    /** Keys for the developer API (/v1), separate from the extension key above. */
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(ApiKey::class);
+    }
+
     /**
      * Get the attributes that should be cast.
      *

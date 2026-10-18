@@ -383,6 +383,28 @@ class PlanResource extends Resource
                                     ? '. Ready on this server: '.(implode(', ', array_filter(['m4a', 'ogg', 'flac'], fn (string $f): bool => \App\Support\AudioFormats::serverSupports($f))) ?: 'none').'. A type the server cannot make stays hidden from members.'
                                     : '; this server has no ffmpeg yet, so they stay hidden from members until it does.')),
                     ]),
+                Forms\Components\Section::make('Developer API')
+                    ->description('Whether members on this plan can create API keys and call the developer API (/v1), and how fast. API generations use the plan\'s credits exactly like the dashboard. Leave the limits empty to use the defaults for the plan\'s processing priority.')
+                    ->columns(3)
+                    ->schema([
+                        Forms\Components\Toggle::make('api_access_enabled')
+                            ->label('Include the developer API')
+                            ->helperText('Members on this plan can create keys at /dashboard/api-keys. Turning it off stops their keys at once (the keys are kept).')
+                            ->default(false)
+                            ->columnSpan(3),
+                        Forms\Components\TextInput::make('api_requests_per_minute')
+                            ->label('Requests a minute (per key)')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(100000)
+                            ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.requests_per_minute')[(string) ($get('processing_priority') ?: 'standard')] ?? 60)),
+                        Forms\Components\TextInput::make('api_concurrency')
+                            ->label('Generations at the same time')
+                            ->numeric()
+                            ->minValue(1)
+                            ->maxValue(1000)
+                            ->placeholder(fn (Forms\Get $get): string => 'Default: '.(config('listen.api.concurrency')[(string) ($get('processing_priority') ?: 'standard')] ?? 2)),
+                    ]),
                 Forms\Components\Section::make('Voice Cloning')
                     ->description('Turn cloning on for this plan, then set how many cloned voices each subscriber can keep. 0 uses the site-wide default.')
                     ->columns(2)

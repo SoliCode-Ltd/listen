@@ -92,6 +92,10 @@ class Plan extends Model
         'pricing_extra_lines_en',
         'pricing_extra_lines_ar',
         'pricing_use_custom_text',
+        // Developer API
+        'api_access_enabled',
+        'api_requests_per_minute',
+        'api_concurrency',
     ];
 
     protected $casts = [
@@ -118,6 +122,9 @@ class Plan extends Model
         'pricing_use_custom_text' => 'boolean',
         'pack_days' => 'integer',
         'daily_requests' => 'integer',
+        'api_access_enabled' => 'boolean',
+        'api_requests_per_minute' => 'integer',
+        'api_concurrency' => 'integer',
     ];
 
     public function subscriptions(): HasMany

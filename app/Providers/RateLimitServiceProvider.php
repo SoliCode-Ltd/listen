@@ -56,6 +56,18 @@ class RateLimitServiceProvider extends ServiceProvider
                 Limit::perMinute(600)->by('ext-ip-all:'.$request->ip()),
             ];
         });
+
+        // Developer API (/v1): per key, at the member's plan's rate. Runs after
+        // the key is checked, so api_key and api_plan are on the request.
+        RateLimiter::for('public-api', function (Request $request) {
+            $apiKey = $request->attributes->get('api_key');
+            if (! $apiKey instanceof \App\Models\ApiKey) {
+                return Limit::perMinute(60)->by('v1-ip:'.$request->ip());
+            }
+
+            return Limit::perMinute(\App\Support\Api\ApiPlanAccess::requestsPerMinute($request->attributes->get('api_plan')))
+                ->by('v1-key:'.$apiKey->id);
+        });
     }
 
     private function formResponse(): \Closure

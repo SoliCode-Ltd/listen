@@ -174,6 +174,9 @@ class GenerationErrorRecorder
             if ($type === 'message') {
                 return GenerationError::SOURCE_EXTENSION;
             }
+            if ($type === 'api') {
+                return GenerationError::SOURCE_API;
+            }
         }
 
         return GenerationError::SOURCE_DASHBOARD;

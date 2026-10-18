@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Exceptions\TranslationFailedException;
+use App\Models\ApiKeyUsage;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\Plan;
@@ -386,6 +387,11 @@ class GenerateAudioJob implements ShouldQueue
 
         $userId = (int) $generation->user_id;
         $periodYm = $this->usagePeriod($generation);
+
+        // A developer API generation also counts against its key's own monthly budget.
+        if ($generation->api_key_id) {
+            ApiKeyUsage::apply((int) $generation->api_key_id, $periodYm, $requestsDelta, $charsDelta);
+        }
 
         // Pack characters were spent from the pack, so the correction goes there too.
         if ($generation->billed_to_pack) {

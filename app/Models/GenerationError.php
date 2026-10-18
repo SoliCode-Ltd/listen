@@ -17,6 +17,7 @@ class GenerationError extends Model
     public const SOURCE_DEMO = 'demo';
     public const SOURCE_VOICE_CLONING = 'voice_cloning';
     public const SOURCE_FALLBACK = 'fallback';
+    public const SOURCE_API = 'api';
 
     public const SEVERITY_ERROR = 'error';
     public const SEVERITY_WARNING = 'warning';
@@ -59,6 +60,7 @@ class GenerationError extends Model
             self::SOURCE_DEMO => 'Demo',
             self::SOURCE_VOICE_CLONING => 'Voice cloning',
             self::SOURCE_FALLBACK => 'Backup voice used',
+            self::SOURCE_API => 'Developer API',
         ];
     }
 

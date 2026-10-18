@@ -1,0 +1,125 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\ApiKey;
+use App\Models\Subscription;
+use App\Models\UsageCounter;
+use App\Services\Api\ApiSpeechService;
+use App\Services\PlanAccessService;
+use App\Support\Api\ApiModels;
+use App\Support\Api\ApiPlanAccess;
+use App\Support\Credits;
+use App\Support\PlanUsageGuard;
+use App\Support\UsageSnapshot;
+use App\Support\VoiceTier;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+
+/**
+ * GET /v1/user, GET /v1/user/subscription
+ */
+class UserController extends Controller
+{
+    public function __construct(private readonly PlanAccessService $planAccessService) {}
+
+    public function show(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'user_id' => (int) $user->id,
+            'name' => (string) $user->name,
+            'email' => $user->email !== null ? (string) $user->email : null,
+            'created_at' => $user->created_at?->toIso8601String(),
+            'subscription' => $this->subscriptionBody($request),
+        ]);
+    }
+
+    public function subscription(Request $request): JsonResponse
+    {
+        return response()->json($this->subscriptionBody($request));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function subscriptionBody(Request $request): array
+    {
+        $user = $request->user();
+        /** @var ApiKey $apiKey */
+        $apiKey = $request->attributes->get('api_key');
+        $plan = $request->attributes->get('api_plan');
+        $quotaPlan = $request->attributes->get('api_quota_plan');
+        $userId = (int) $user->id;
+
+        $period = now()->format('Y-m');
+        $counter = UsageCounter::firstOrCreate(
+            ['user_id' => $userId, 'period_ym' => $period],
+            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
+        );
+        $usage = UsageSnapshot::for($userId, $quotaPlan, $counter);
+        $planTier = $this->planAccessService->resolveTierForPlan($plan);
+
+        $subscription = Subscription::query()
+            ->where('user_id', $userId)
+            ->where('plan_id', $plan?->id)
+            ->whereIn('status', ['active', 'trialing', 'past_due'])
+            ->latest('id')
+            ->first();
+
+        $isPack = $usage['mode'] === 'pack';
+        $resetsAt = now()->startOfMonth()->addMonth();
+
+        return [
+            'plan' => [
+                'slug' => (string) ($plan?->slug ?? 'free'),
+                'name' => (string) ($plan?->name ?? 'Free'),
+                'models' => VoiceTier::isHigherThan(VoiceTier::HD, $planTier) ? [ApiModels::STANDARD] : [ApiModels::STANDARD, ApiModels::PREMIUM],
+                'commercial_use_allowed' => (bool) ($plan?->commercial_use_allowed ?? false),
+                'processing_priority' => (string) ($plan?->processing_priority ?: 'standard'),
+            ],
+            'status' => $subscription?->status ?? 'active',
+            'trial' => $this->planAccessService->userHasUnpaidTrialWindow($userId),
+            'current_period_end' => $subscription?->current_period_end?->toIso8601String(),
+            'billing_mode' => $isPack ? 'pack' : 'monthly',
+            'credits' => [
+                'used' => (int) $usage['total_chars'],
+                'limit' => (int) $usage['plan_chars'],
+                'remaining' => (int) $usage['remaining_chars'],
+                'gift' => (int) $usage['gift_chars'],
+                'credits_per_second' => Credits::PER_SECOND,
+                // Usage stops at the limit: requests that would go over it are refused (402), never billed as overage.
+                'overage_allowed' => false,
+                'period' => $isPack ? null : $period,
+                'resets_at' => $isPack ? null : $resetsAt->toIso8601String(),
+                'resets_at_unix' => $isPack ? null : $resetsAt->getTimestamp(),
+                'expires_at' => $usage['pack_expires_at'],
+            ],
+            'voice_seconds' => [
+                'used' => (int) $usage['seconds_used'],
+                'limit' => Credits::secondsFor((int) $usage['plan_chars']),
+            ],
+            'requests' => [
+                'used_this_month' => (int) $usage['total_requests'],
+                'monthly_limit' => $usage['plan_requests'],
+                'daily_limit' => $usage['daily_requests_limit'] > 0 ? (int) $usage['daily_requests_limit'] : null,
+                'used_today' => $usage['daily_requests_used'],
+            ],
+            'limits' => [
+                'max_characters_per_request' => min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), ApiSpeechService::MAX_TEXT),
+                'requests_per_minute' => ApiPlanAccess::requestsPerMinute($plan),
+                'concurrent_generations' => ApiPlanAccess::concurrency($plan),
+                'output_formats' => ApiSpeechService::formatsFor($plan),
+            ],
+            'api_key' => [
+                'api_key_id' => (int) $apiKey->id,
+                'name' => (string) $apiKey->name,
+                'monthly_credit_limit' => $apiKey->monthly_credit_limit,
+                'credits_used_this_month' => $apiKey->creditsUsed($period),
+                'requests_this_month' => $apiKey->requestsMade($period),
+            ],
+        ];
+    }
+}

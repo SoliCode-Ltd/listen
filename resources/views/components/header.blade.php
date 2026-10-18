@@ -145,6 +145,10 @@
               <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
               {{ __('ui.nav.extension') }}
             </a>
+            <a href="{{ route('developers.keys') }}" class="dropdown-item">
+              <svg viewBox="0 0 24 24"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg>
+              {{ __('developers.nav') }}
+            </a>
             <a href="{{ route('billing.page') }}" class="dropdown-item">
               <svg viewBox="0 0 24 24"><path d="M3 7h18v10H3zM3 10h18"/></svg>
               {{ __('ui.nav.billing') }}
