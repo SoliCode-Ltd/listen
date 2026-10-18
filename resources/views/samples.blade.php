@@ -38,14 +38,65 @@
 
     /* The stage */
     .stage {
+      /* Dark theme: an ink stage with light words. */
+      --st-text: #FFFFFF;
+      --st-soft: rgba(255, 255, 255, .78);
+      --st-faint: rgba(255, 255, 255, .62);
+      --st-title: var(--stage-lilac);
+      --st-lit: #FFFFFF;
+      --st-now: var(--stage-lilac);
+      --st-dim: rgba(255, 255, 255, .3);
+      --st-btn-line: rgba(255, 255, 255, .22);
+      --st-btn-bg: rgba(255, 255, 255, .06);
+      --st-btn-hover: rgba(255, 255, 255, .14);
+      --st-main-bg: #FFFFFF;
+      --st-main-fg: #3F27C4;
+      --st-main-hover: #F1EEFF;
+      --st-track: rgba(255, 255, 255, .12);
+      --st-bar-from: var(--stage-lilac);
+      --st-bar-to: #FFFFFF;
+      --st-focus: #FFFFFF;
+      --st-avatar-ring: rgba(255, 255, 255, .14);
+      --st-pick-gap: var(--stage-ink);
+      --st-bars: rgba(255, 255, 255, .055);
+      /* The ring's colour, as r, g, b for the canvas. */
+      --st-ring: 201, 190, 255;
       position: relative;
       isolation: isolate;
       overflow: hidden;
-      color: #FFFFFF;
+      color: var(--st-text);
       background:
         radial-gradient(60% 80% at 85% 10%, rgba(118, 89, 250, .42), transparent 60%),
         radial-gradient(50% 70% at 5% 100%, rgba(61, 139, 255, .22), transparent 60%),
         var(--stage-ink);
+    }
+    /* Light theme: the launch video's look, dark words on warm light with soft colour glows. */
+    html[data-theme="light"] .stage {
+      --st-text: #15151C;
+      --st-soft: #4B4F5C;
+      --st-faint: #5F6673;
+      --st-title: #6247EE;
+      --st-lit: #15151C;
+      --st-now: #6247EE;
+      --st-dim: rgba(40, 32, 90, .28);
+      --st-btn-line: rgba(21, 21, 28, .14);
+      --st-btn-bg: rgba(255, 255, 255, .7);
+      --st-btn-hover: #FFFFFF;
+      --st-main-bg: #7659FA;
+      --st-main-fg: #FFFFFF;
+      --st-main-hover: #6247EE;
+      --st-track: rgba(21, 21, 28, .1);
+      --st-bar-from: #B4A3FF;
+      --st-bar-to: #6247EE;
+      --st-focus: #6247EE;
+      --st-avatar-ring: #FFFFFF;
+      --st-pick-gap: #F7F5F1;
+      --st-bars: rgba(118, 89, 250, .035);
+      --st-ring: 118, 89, 250;
+      background:
+        radial-gradient(40% 75% at 6% 8%, rgba(255, 214, 194, .8), transparent 70%),
+        radial-gradient(42% 80% at 96% 18%, rgba(206, 196, 255, .9), transparent 70%),
+        radial-gradient(45% 70% at 22% 100%, rgba(196, 228, 255, .7), transparent 70%);
     }
     /* A faint field of sound bars behind the words. */
     .stage::before {
@@ -54,7 +105,7 @@
       inset: auto 0 0 0;
       height: 55%;
       z-index: -1;
-      background: repeating-linear-gradient(90deg, rgba(255, 255, 255, .055) 0 3px, transparent 3px 14px);
+      background: repeating-linear-gradient(90deg, var(--st-bars) 0 3px, transparent 3px 14px);
       -webkit-mask-image: linear-gradient(to top, #000, transparent);
       mask-image: linear-gradient(to top, #000, transparent);
     }
@@ -68,12 +119,12 @@
     .stage-head { text-align: center; }
     .stage-head h1 {
       margin: 0 0 .5rem;
-      color: var(--stage-lilac);
+      color: var(--st-title);
       font-size: clamp(1.15rem, 2vw, 1.35rem);
       font-weight: 700;
       letter-spacing: 0;
     }
-    .stage-head p { margin: 0 auto; max-width: 56ch; color: rgba(255, 255, 255, .78); font-size: 1rem; line-height: 1.6; text-wrap: balance; }
+    .stage-head p { margin: 0 auto; max-width: 56ch; color: var(--st-soft); font-size: 1rem; line-height: 1.6; text-wrap: balance; }
     .stage-line { margin: 0; min-height: clamp(9rem, 16vw, 14.5rem); display: grid; align-items: center; font-size: clamp(1.75rem, 3.6vw, 3.1rem); }
     .stage-line[data-size="m"] { font-size: clamp(1.45rem, 2.7vw, 2.35rem); }
     .stage-line[data-size="l"] { font-size: clamp(1.3rem, 2.3vw, 2rem); }
@@ -87,14 +138,15 @@
       letter-spacing: -.01em;
       text-wrap: balance;
     }
-    /* Before the first play the line reads in full; once a voice speaks, words light as they are said. */
-    /* Once a voice plays, each word fills in from the side it is read from, in step with the voice. */
+    /* Before the first play the line reads in full. Once a voice plays, the word being said fills in
+       from the side it is read from, in the accent colour; words already said settle to full colour. */
     .stage.is-live .stage-text .w {
       color: transparent;
       -webkit-background-clip: text;
       background-clip: text;
-      background-image: linear-gradient(var(--sweep, to right), #FFFFFF calc(var(--f, 0) * 118% - 18%), rgba(255, 255, 255, .3) calc(var(--f, 0) * 118%));
+      background-image: linear-gradient(var(--sweep, to right), var(--st-now) calc(var(--f, 0) * 118% - 18%), var(--st-dim) calc(var(--f, 0) * 118%));
     }
+    .stage.is-live .stage-text .w.is-said { color: var(--st-lit); background-image: none; }
     .stage-text[dir="rtl"] .w { --sweep: to left; }
     /* Room inside each word's box for dots and strokes that reach past the line, so the fill never cuts them. */
     .stage-text .w { padding: .3em .08em; margin: 0 -.08em; }
@@ -113,10 +165,10 @@
     /* The ring round the avatar is drawn on a canvas reaching --ring past its edge. */
     .stage-avatar { --ring: 26px; position: relative; flex: none; width: 76px; height: 76px; }
     .stage-avatar canvas { position: absolute; inset: calc(var(--ring) * -1); width: calc(100% + var(--ring) * 2); max-width: none; height: calc(100% + var(--ring) * 2); pointer-events: none; }
-    .stage-avatar img { position: relative; width: 76px; height: 76px; border-radius: 50%; object-fit: cover; background: #2A2160; box-shadow: 0 0 0 3px rgba(255, 255, 255, .14); }
+    .stage-avatar img { position: relative; width: 76px; height: 76px; border-radius: 50%; object-fit: cover; background: #2A2160; box-shadow: 0 0 0 3px var(--st-avatar-ring); }
     .stage-id { display: flex; flex-direction: column; min-width: 0; gap: .2rem; }
     .stage-id strong { font-size: 1.15rem; font-weight: 700; }
-    .stage-id span { display: inline-flex; align-items: center; gap: .45rem; color: rgba(255, 255, 255, .72); font-size: .9rem; }
+    .stage-id span { display: inline-flex; align-items: center; gap: .45rem; color: var(--st-faint); font-size: .9rem; }
     .stage-id img { width: 18px; height: 18px; border-radius: 50%; object-fit: cover; }
     .stage-controls { display: flex; align-items: center; gap: .75rem; }
     .stage-btn {
@@ -124,22 +176,22 @@
       place-items: center;
       width: 48px;
       height: 48px;
-      border: 1px solid rgba(255, 255, 255, .22);
+      border: 1px solid var(--st-btn-line);
       border-radius: 50%;
-      background: rgba(255, 255, 255, .06);
-      color: #FFFFFF;
+      background: var(--st-btn-bg);
+      color: var(--st-text);
       cursor: pointer;
       transition: background-color .2s ease, border-color .2s ease;
     }
-    .stage-btn:hover { background: rgba(255, 255, 255, .14); border-color: rgba(255, 255, 255, .4); }
+    .stage-btn:hover { background: var(--st-btn-hover); }
     .stage-btn svg { width: 18px; height: 18px; fill: currentColor; }
-    .stage-btn.is-main { width: 68px; height: 68px; border: 0; background: #FFFFFF; color: #3F27C4; box-shadow: 0 14px 30px -12px rgba(118, 89, 250, .9); }
-    .stage-btn.is-main:hover { background: #F1EEFF; }
+    .stage-btn.is-main { width: 68px; height: 68px; border: 0; background: var(--st-main-bg); color: var(--st-main-fg); box-shadow: 0 14px 30px -12px rgba(118, 89, 250, .9); }
+    .stage-btn.is-main:hover { background: var(--st-main-hover); }
     .stage-btn.is-main svg { width: 24px; height: 24px; }
     .stage-btn .i-pause { display: none; }
     .stage.is-playing .stage-btn.is-main .i-play { display: none; }
     .stage.is-playing .stage-btn.is-main .i-pause { display: block; }
-    .stage-btn:focus-visible, .stage-pick:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
+    .stage-btn:focus-visible, .stage-pick:focus-visible { outline: 2px solid var(--st-focus); outline-offset: 3px; }
     /* Arrows for previous and next follow the reading direction; the play arrow never turns. */
     html[dir="rtl"] .stage-btn .i-step { transform: scaleX(-1); }
 
@@ -158,11 +210,11 @@
     }
     .stage-pick img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
     .stage-pick:hover { opacity: .9; }
-    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--stage-ink), 0 0 0 4px var(--stage-lilac); border-radius: 50%; }
-    .stage-progress { height: 3px; border-radius: 3px; background: rgba(255, 255, 255, .12); overflow: hidden; }
-    .stage-progress span { display: block; height: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, var(--stage-lilac), #FFFFFF); will-change: transform; }
-    html[dir="rtl"] .stage-progress span { transform-origin: right center; background: linear-gradient(270deg, var(--stage-lilac), #FFFFFF); }
-    .stage-hint { margin: -.75rem 0 0; color: rgba(255, 255, 255, .6); font-size: .86rem; text-align: center; }
+    .stage-pick[aria-current="true"] { opacity: 1; box-shadow: 0 0 0 2px var(--st-pick-gap), 0 0 0 4px var(--st-now); border-radius: 50%; }
+    .stage-progress { height: 3px; border-radius: 3px; background: var(--st-track); overflow: hidden; }
+    .stage-progress span { display: block; height: 100%; transform: scaleX(0); transform-origin: left center; background: linear-gradient(90deg, var(--st-bar-from), var(--st-bar-to)); will-change: transform; }
+    html[dir="rtl"] .stage-progress span { transform-origin: right center; background: linear-gradient(270deg, var(--st-bar-from), var(--st-bar-to)); }
+    .stage-hint { margin: -.75rem 0 0; color: var(--st-faint); font-size: .86rem; text-align: center; }
 
     /* The section bar: jump to a section */
     .samples-bar {
@@ -533,7 +585,11 @@
         if (!t.el) return;
         var f = t.end > t.start ? (v - t.start) / (t.end - t.start) : (v >= t.end ? 1 : 0);
         f = f < 0 ? 0 : (f > 1 ? 1 : f);
-        if (f !== t.f && (Math.abs(f - t.f) > .003 || f === 0 || f === 1)) { t.f = f; t.el.style.setProperty('--f', f.toFixed(3)); }
+        if (f !== t.f && (Math.abs(f - t.f) > .003 || f === 0 || f === 1)) {
+          t.f = f;
+          t.el.style.setProperty('--f', f.toFixed(3));
+          t.el.classList.toggle('is-said', f === 1);
+        }
       });
     }
     function show(i) {
@@ -564,7 +620,16 @@
     }
 
     // The ring: bars all the way round the avatar, rising with the voice.
-    var BARS = 72, levels = new Float32Array(BARS), level = 0, ringSize = 0;
+    var BARS = 72, levels = new Float32Array(BARS), level = 0, ringSize = 0, ringRgb = '201, 190, 255';
+    // The ring takes the theme's colour, and changes with it.
+    function readRingColour() {
+      ringRgb = (getComputedStyle(stage).getPropertyValue('--st-ring') || '').trim() || ringRgb;
+    }
+    readRingColour();
+    if (window.MutationObserver) {
+      new MutationObserver(function () { readRingColour(); drawRing(0, !audio.paused); })
+        .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    }
     function sizeRing() {
       if (!ctx2d) return;
       var box = canvas.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -585,8 +650,8 @@
       ctx2d.clearRect(0, 0, ringSize, ringSize);
       if (level > .02) {
         var glow = ctx2d.createRadialGradient(c, c, inner - 6, c, c, c);
-        glow.addColorStop(0, 'rgba(118, 89, 250,' + (.38 * level).toFixed(3) + ')');
-        glow.addColorStop(1, 'rgba(118, 89, 250, 0)');
+        glow.addColorStop(0, 'rgba(' + ringRgb + ',' + (.38 * level).toFixed(3) + ')');
+        glow.addColorStop(1, 'rgba(' + ringRgb + ', 0)');
         ctx2d.fillStyle = glow;
         ctx2d.beginPath();
         ctx2d.arc(c, c, c, 0, Math.PI * 2);
@@ -594,7 +659,7 @@
       }
       ctx2d.lineCap = 'round';
       ctx2d.lineWidth = 2.2;
-      ctx2d.strokeStyle = 'rgba(201, 190, 255,' + (.45 + .5 * level).toFixed(3) + ')';
+      ctx2d.strokeStyle = 'rgba(' + ringRgb + ',' + (.45 + .5 * level).toFixed(3) + ')';
       // Every bar in one path, drawn in one stroke.
       ctx2d.beginPath();
       for (var b = 0; b < BARS; b++) {
