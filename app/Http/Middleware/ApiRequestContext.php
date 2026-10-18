@@ -3,9 +3,11 @@
 namespace App\Http\Middleware;
 
 use App\Models\ApiRequestLog;
+use App\Support\Api\ApiError;
 use App\Support\Api\ApiErrorRenderer;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -16,6 +18,13 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ApiRequestContext
 {
+    /**
+     * Requests one address may send to /v1 a minute, whatever they are (keys
+     * or not, any path): far above any plan's own limits, it only stops floods
+     * before they reach the database.
+     */
+    public const PER_ADDRESS_PER_MINUTE = 2000;
+
     public function handle(Request $request, Closure $next): Response
     {
         $startedAt = microtime(true);
@@ -23,6 +32,15 @@ class ApiRequestContext
         app()->setLocale('en');
         // Framework errors (validation, 404) are rendered as JSON for the API.
         $request->headers->set('Accept', 'application/json');
+
+        $addressKey = 'v1-address:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($addressKey, self::PER_ADDRESS_PER_MINUTE)) {
+            // Answered at once and not logged: a flood never fills the request log.
+            return ApiErrorRenderer::respond(new ApiError(429, ApiError::TYPE_RATE_LIMIT, 'too_many_requests',
+                'Too many requests from this address. Try again in a minute.', null,
+                ['Retry-After' => (string) max(1, RateLimiter::availableIn($addressKey))]), $request);
+        }
+        RateLimiter::hit($addressKey, 60);
 
         $response = $next($request);
 

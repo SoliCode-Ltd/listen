@@ -9,6 +9,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Routing\Route;
 
 /**
  * Every developer API request (kept 90 days): who sent it, which endpoint,
@@ -83,7 +84,11 @@ class ApiRequestLogResource extends Resource
                         default => $query,
                     }),
                 Tables\Filters\SelectFilter::make('endpoint')
-                    ->options(fn (): array => ApiRequestLog::query()->whereNotNull('endpoint')->distinct()->orderBy('endpoint')->pluck('endpoint', 'endpoint')->all()),
+                    // From the API's routes, not a DISTINCT over the whole log (which grows large).
+                    ->options(fn (): array => collect(\Illuminate\Support\Facades\Route::getRoutes()->getRoutes())
+                        ->map(fn (Route $route): ?string => $route->getName())
+                        ->filter(fn (?string $name): bool => is_string($name) && str_starts_with($name, 'v1.'))
+                        ->unique()->sort()->mapWithKeys(fn (string $name): array => [$name => $name])->all()),
                 Tables\Filters\SelectFilter::make('error_code')->label('Error')
                     ->options(fn (): array => ApiRequestLog::query()->whereNotNull('error_code')->distinct()->orderBy('error_code')->pluck('error_code', 'error_code')->all()),
                 Tables\Filters\Filter::make('today')->label('Today')

@@ -36,28 +36,30 @@ class AuthenticateApiKey
 
     public function handle(Request $request, Closure $next): Response
     {
+        // The admin's switch for the whole API (Admin → API keys → Pause the API).
+        if (! ApiPlanAccess::siteEnabled()) {
+            throw new ApiError(503, ApiError::TYPE_API, 'api_paused',
+                'The API is paused for maintenance. Please try again later.', null, ['Retry-After' => '300']);
+        }
+
         $plain = self::providedKey($request);
         if ($plain === '') {
+            $this->refused($request);
+
             throw ApiError::missingKey();
         }
 
         $apiKey = ApiKey::findActiveByPlain($plain);
         $user = $apiKey?->user;
         if (! $apiKey || ! $user instanceof User) {
-            // Only wrong keys are slowed down: a valid key from the same server
-            // keeps working while an old, revoked key is still being sent.
-            $failedKey = 'api-auth-failed:'.$request->ip();
-            if (RateLimiter::tooManyAttempts($failedKey, self::FAILED_ATTEMPTS_PER_MINUTE)) {
-                throw new ApiError(429, ApiError::TYPE_RATE_LIMIT, 'too_many_failed_attempts',
-                    'Too many requests with a wrong API key from this address. Try again in a minute.', null,
-                    ['Retry-After' => (string) max(1, RateLimiter::availableIn($failedKey))]);
-            }
-            RateLimiter::hit($failedKey, 60);
+            $this->refused($request);
 
             throw ApiError::invalidKey();
         }
 
         if ($this->blockedUserService->isBlocked($user)) {
+            $this->refused($request);
+
             throw ApiError::accountBlocked();
         }
 
@@ -70,11 +72,10 @@ class AuthenticateApiKey
 
         $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
         $status = ApiPlanAccess::statusFor((int) $user->id, $plan);
-        if ($status === ApiPlanAccess::TRIAL) {
-            throw ApiError::notDuringTrial();
-        }
         if ($status !== ApiPlanAccess::OK) {
-            throw ApiError::notInPlan();
+            $this->refused($request);
+
+            throw $status === ApiPlanAccess::TRIAL ? ApiError::notDuringTrial() : ApiError::notInPlan();
         }
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $plan);
 
@@ -87,6 +88,23 @@ class AuthenticateApiKey
         $request->setUserResolver(static fn () => $user);
 
         return $next($request);
+    }
+
+    /**
+     * Counts a refused request (no key, a wrong or revoked key, or a key the
+     * API will not serve) against its address, and answers 429 once there are
+     * too many in a minute. Only refused requests count: a valid key from the
+     * same server keeps working while an old one is still being sent.
+     */
+    private function refused(Request $request): void
+    {
+        $failedKey = 'api-auth-failed:'.$request->ip();
+        if (RateLimiter::tooManyAttempts($failedKey, self::FAILED_ATTEMPTS_PER_MINUTE)) {
+            throw new ApiError(429, ApiError::TYPE_RATE_LIMIT, 'too_many_failed_attempts',
+                'Too many refused requests from this address (no key, a wrong key, or a key the API cannot serve). Try again in a minute.', null,
+                ['Retry-After' => (string) max(1, RateLimiter::availableIn($failedKey))]);
+        }
+        RateLimiter::hit($failedKey, 60);
     }
 
     public static function providedKey(Request $request): string

@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Models\ApiKey;
 use App\Models\User;
+use App\Support\Api\ApiPlanAccess;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -57,16 +59,22 @@ class RateLimitServiceProvider extends ServiceProvider
             ];
         });
 
-        // Developer API (/v1): per key, at the member's plan's rate. Runs after
-        // the key is checked, so api_key and api_plan are on the request.
+        // Developer API (/v1): for the member's whole account (all their keys
+        // together, so more keys never mean more requests), at their plan's rate.
+        // Generations and everything else (status checks, voices, history) have
+        // separate allowances, so polling never uses up the generations. Runs
+        // after the key is checked, so api_key and api_plan are on the request.
         RateLimiter::for('public-api', function (Request $request) {
             $apiKey = $request->attributes->get('api_key');
-            if (! $apiKey instanceof \App\Models\ApiKey) {
+            if (! $apiKey instanceof ApiKey) {
                 return Limit::perMinute(60)->by('v1-ip:'.$request->ip());
             }
 
-            return Limit::perMinute(\App\Support\Api\ApiPlanAccess::requestsPerMinute($request->attributes->get('api_plan')))
-                ->by('v1-key:'.$apiKey->id);
+            $plan = $request->attributes->get('api_plan');
+
+            return in_array($request->route()?->getName(), ['v1.tts', 'v1.tts.async'], true)
+                ? Limit::perMinute(ApiPlanAccess::requestsPerMinute($plan))->by('v1-generate:'.$apiKey->user_id)
+                : Limit::perMinute(ApiPlanAccess::readsPerMinute($plan))->by('v1-read:'.$apiKey->user_id);
         });
     }
 

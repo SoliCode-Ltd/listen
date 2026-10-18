@@ -3,6 +3,7 @@
 namespace App\Support\Api;
 
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Services\PlanAccessService;
 use App\Support\VoiceTier;
 
@@ -20,6 +21,19 @@ final class ApiPlanAccess
 
     /** On an unpaid trial: the API starts once the first payment has gone through. */
     public const TRIAL = 'trial';
+
+    /** The site setting behind the admin's pause switch ('0' pauses the whole API). */
+    public const SITE_SWITCH = 'developer_api_enabled';
+
+    /** The admin's switch for the whole API (on unless paused in Admin → API keys). */
+    public static function siteEnabled(): bool
+    {
+        try {
+            return (string) SiteSetting::get(self::SITE_SWITCH, '1') !== '0';
+        } catch (\Throwable) {
+            return true;
+        }
+    }
 
     /**
      * The API is for paying clients only: a paid plan (or pack) on the premium
@@ -51,7 +65,7 @@ final class ApiPlanAccess
         return app(PlanAccessService::class)->userHasUnpaidTrialWindow($userId) ? self::TRIAL : self::OK;
     }
 
-    /** Requests a minute for each of the member's keys. */
+    /** Generation requests a minute, for the member's whole account (all their keys together). */
     public static function requestsPerMinute(?Plan $plan): int
     {
         $own = (int) ($plan?->api_requests_per_minute ?? 0);
@@ -60,6 +74,16 @@ final class ApiPlanAccess
         }
 
         return max(1, (int) (config('listen.api.requests_per_minute')[self::priority($plan)] ?? 60));
+    }
+
+    /**
+     * Every other request a minute (status checks, voices, history, account),
+     * for the whole account: enough to check on every background generation
+     * the member may have waiting every few seconds.
+     */
+    public static function readsPerMinute(?Plan $plan): int
+    {
+        return max(300, self::requestsPerMinute($plan) * 3);
     }
 
     /** Generations the member may run through the API at the same time. */

@@ -93,7 +93,7 @@ final class ApiErrorRenderer
             $headers = array_map(static fn ($value): string => (string) $value, $e->getHeaders());
 
             return new ApiError(429, ApiError::TYPE_RATE_LIMIT, 'rate_limit_exceeded',
-                'Too many requests for this API key. Wait for the time in the Retry-After header, then try again.', null, $headers);
+                'Too many requests a minute for your account. Wait for the time in the Retry-After header, then try again.', null, $headers);
         }
 
         if ($e instanceof ModelNotFoundException || $e instanceof NotFoundHttpException) {
