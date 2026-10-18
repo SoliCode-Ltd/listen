@@ -18,9 +18,10 @@ final class ApiDocs
     /**
      * @param  array{voice_id:string, name:string, language:string, gender?:?string}  $voice  the voice of the examples
      * @param  array{voice_id:string, name:string}|null  $partner  a second voice of the same language, for the dialogue example
+     * @param  array{text:string, dialect:?string, emotion:?string}|null  $hero  a recording's own settings, for the request at the top
      * @return array<string, mixed>
      */
-    public static function build(string $locale, string $baseUrl, array $voice, ?array $partner = null): array
+    public static function build(string $locale, string $baseUrl, array $voice, ?array $partner = null, ?array $hero = null): array
     {
         $arabic = $locale === 'ar';
         $example = $arabic
@@ -387,8 +388,10 @@ final class ApiDocs
         return [
             'languages' => ApiCodeSamples::LANGUAGES,
             'endpoints' => $endpoints,
-            'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect']], 'speech.mp3')['curl'], 'bash'),
-            'hero_text' => $example['text'],
+            // The request at the top: the settings of the recording it plays, when there is one.
+            'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $hero !== null
+                ? array_filter(['text' => $hero['text'], 'dialect' => $hero['dialect'], 'emotion' => $hero['emotion']], static fn (?string $value): bool => $value !== null)
+                : ['text' => $example['text'], 'dialect' => $example['dialect']], 'speech.mp3')['curl'], 'bash'),
             'dialogue' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $dialogueBody, 'dialogue.mp3')),
             'environment_sample' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect'], 'audio_effect' => 'phone'], 'call.mp3')),
             'environments' => array_values($environments),

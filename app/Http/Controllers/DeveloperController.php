@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
 use App\Models\Plan;
+use App\Models\VoiceSample;
 use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
@@ -12,10 +13,14 @@ use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiScopes;
 use App\Support\Api\ApiVoiceCatalog;
+use App\Support\AudioUrl;
 use App\Support\PlanUsageGuard;
+use App\Support\TtsStudioConfig;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
@@ -50,11 +55,12 @@ class DeveloperController extends Controller
             ],
         ])->all();
 
-        [$voice, $partner] = $this->sampleVoices($locale);
+        [$voice, $partner, $hero] = $this->sampleVoices($locale);
 
         return view('developers.docs', [
-            'docs' => ApiDocs::build($locale, url('/v1'), $voice, $partner),
+            'docs' => ApiDocs::build($locale, url('/v1'), $voice, $partner, $hero),
             'voice' => $voice,
+            'hero' => $hero,
             'planRows' => $planRows,
             'baseUrl' => url('/v1'),
         ]);
@@ -64,8 +70,10 @@ class DeveloperController extends Controller
      * The voices the examples use: Sumaya in Lebanese on the Arabic page, an
      * English premium voice on the English page, so each page reads in its
      * own language; and a second voice of the other gender for the dialogue.
+     * The top of the page shows a real recording of the site with the request
+     * that makes it, so the reader hears what the request returns.
      *
-     * @return array{0: array{voice_id:string, name:string, language:string, gender:?string, preview_url:?string, avatar_url:?string}, 1: array{voice_id:string, name:string}}
+     * @return array{0: array<string, mixed>, 1: array{voice_id:string, name:string}, 2: array<string, mixed>|null}
      */
     private function sampleVoices(string $locale): array
     {
@@ -76,7 +84,9 @@ class DeveloperController extends Controller
         }
         $language = $locale === 'ar' ? 'ar' : 'en';
         $premium = $voices->filter(fn (array $voice): bool => $voice['language'] === $language);
-        $voice = ($language === 'ar' ? $premium->firstWhere('name', 'Sumaya') : null)
+        $hero = $this->heroSample($language, $premium);
+        $voice = ($hero !== null ? $premium->get($hero['voice_id']) : null)
+            ?? ($language === 'ar' ? $premium->firstWhere('name', 'Sumaya') : null)
             ?? $premium->firstWhere('featured', true)
             ?? $premium->first();
         $partner = $premium->first(fn (array $other): bool => $other['voice_id'] !== ($voice['voice_id'] ?? null)
@@ -97,6 +107,65 @@ class DeveloperController extends Controller
                 'voice_id' => (string) ($partner['voice_id'] ?? ($language === 'ar' ? 'voice_14' : 'voice_31')),
                 'name' => (string) ($partner['name'] ?? ''),
             ],
+            $hero,
+        ];
+    }
+
+    /**
+     * A recording the site already has (a voice sample, never a new
+     * generation) of a premium voice in the page's language, with its exact
+     * text, dialect and emotion: Sumaya in Lebanese first, then other
+     * Lebanese samples, featured ones, and short texts.
+     *
+     * @param  Collection<string, array<string, mixed>>  $premium  voice id => voice
+     * @return array{voice_id:string, text:string, dialect:?string, emotion:?string, audio_url:string}|null
+     */
+    private function heroSample(string $language, Collection $premium): ?array
+    {
+        $byName = $premium->keyBy('_internal_name');
+        try {
+            $samples = VoiceSample::query()
+                ->active()
+                ->whereIn('voice_name', $byName->keys()->all())
+                ->get(['voice_name', 'audio_path', 'sample_text', 'language', 'dialect', 'emotion', 'is_featured', 'metadata']);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $rank = fn (VoiceSample $sample): array => [
+            $language === 'ar' && ($byName[$sample->voice_name]['name'] ?? '') === 'Sumaya' ? 0 : 1,
+            $sample->dialect === 'ar-LB' ? 0 : 1,
+            $sample->is_featured ? 0 : 1,
+            mb_strlen((string) $sample->sample_text),
+        ];
+        $sample = $samples
+            ->filter(function (VoiceSample $sample) use ($language): bool {
+                $text = trim((string) $sample->sample_text);
+                $path = ltrim(trim((string) $sample->audio_path), '/');
+
+                // Short texts first (see $rank); a long one still beats no recording.
+                return $text !== '' && mb_strlen($text) <= 600
+                    // Dialogue samples need speakers the request would have to list.
+                    && empty(($sample->metadata ?? [])['turns'])
+                    && in_array(strtolower(substr((string) ($sample->language ?: $language), 0, 2)), [$language], true)
+                    && $path !== ''
+                    && (Storage::disk('public')->exists($path) || is_file(public_path($path)));
+            })
+            ->sort(fn (VoiceSample $a, VoiceSample $b): int => $rank($a) <=> $rank($b))
+            ->first();
+        if (! $sample instanceof VoiceSample) {
+            return null;
+        }
+
+        $dialect = trim((string) $sample->dialect);
+        $emotion = trim((string) $sample->emotion);
+
+        return [
+            'voice_id' => (string) $byName[$sample->voice_name]['voice_id'],
+            'text' => trim((string) $sample->sample_text),
+            'dialect' => in_array($dialect, TtsStudioConfig::dialectValues($language), true) ? $dialect : null,
+            'emotion' => in_array($emotion, TtsStudioConfig::emotionValues(), true) ? $emotion : null,
+            'audio_url' => url((string) AudioUrl::fromPath((string) $sample->audio_path)),
         ];
     }
 

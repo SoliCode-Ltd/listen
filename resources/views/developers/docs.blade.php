@@ -79,9 +79,18 @@
         {{-- A real request, and the voice it asks for. --}}
         <div class="docs-demo">
           @include('developers._docs-code', ['label' => \App\Support\Api\ApiCodeSamples::LABELS['curl'], 'codeLabel' => true, 'single' => $docs['hero']])
-          @if(!empty($voice['preview_url']))
+          @php
+            // The recording the request above made; else a sample of the voice.
+            $answerUrl = $hero['audio_url'] ?? $voice['preview_url'] ?? null;
+            $answerTitle = !empty($hero['dialect'])
+              ? __('developers.docs.hero_voice_dialect', ['name' => $voiceName, 'dialect' => \App\Support\VoiceFlag::label($hero['dialect'], $arabic)])
+              : __('developers.docs.hero_voice', ['name' => $voiceName]);
+            $answerNote = $hero !== null ? $plain('hero_result') : __('developers.docs.hero_sample', ['name' => $voiceName]);
+            $answerPlay = $hero !== null ? $plain('hero_play_result') : __('developers.docs.hero_play', ['name' => $voiceName]);
+          @endphp
+          @if($answerUrl)
             <div class="docs-answer" data-sample>
-              <button type="button" class="docs-play" aria-pressed="false" data-sample-play aria-label="{{ __('developers.docs.hero_play', ['name' => $voiceName]) }}" data-label-play="{{ __('developers.docs.hero_play', ['name' => $voiceName]) }}" data-label-pause="{{ $plain('hero_pause') }}">
+              <button type="button" class="docs-play" aria-pressed="false" data-sample-play aria-label="{{ $answerPlay }}" data-label-play="{{ $answerPlay }}" data-label-pause="{{ $plain('hero_pause') }}">
                 <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
                 <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
               </button>
@@ -91,12 +100,12 @@
               <div class="docs-answer-meta">
                 <span class="docs-answer-voice">
                   @if(!empty($voice['avatar_url']))<img src="{{ $voice['avatar_url'] }}" alt="" width="26" height="26" loading="lazy" onerror="this.remove()">@endif
-                  <span>{{ __('developers.docs.hero_voice', ['name' => $voiceName]) }}<small>{{ __('developers.docs.hero_sample', ['name' => $voiceName]) }}</small></span>
+                  <span>{{ $answerTitle }}<small>{{ $answerNote }}</small></span>
                 </span>
                 <span class="docs-answer-status mono" data-code>200 OK  audio/mpeg</span>
               </div>
               {{-- "initialized": the site's player script leaves it alone; this one has its own controls. --}}
-              <audio class="initialized" preload="none" src="{{ $voice['preview_url'] }}" data-sample-audio></audio>
+              <audio class="initialized" preload="none" src="{{ $answerUrl }}" data-sample-audio></audio>
             </div>
           @endif
         </div>

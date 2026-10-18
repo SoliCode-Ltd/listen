@@ -39,7 +39,7 @@
 
     /* ── Hero: the request, and what it sounds like ── */
     .docs-main { min-width: 0; }
-    .docs-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 3rem; align-items: center; padding: 2.25rem 0 3.25rem; border-bottom: 1px solid var(--line); }
+    .docs-hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 3rem; align-items: center; padding: 2.25rem 0 3.25rem; border-bottom: 1px solid var(--line); }
     .docs-hero h1 { margin: 0 0 1rem; font-size: clamp(2.5rem, 5vw, 3.9rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.02; color: var(--text); }
     html[dir="rtl"] .docs-hero h1 { letter-spacing: 0; line-height: 1.2; }
     .docs-lede { margin: 0; max-width: 34em; color: var(--muted); font-size: 1.1rem; line-height: 1.7; }
@@ -216,5 +216,41 @@
     }
     @media (prefers-reduced-motion: reduce) {
       .docs-play, .docs-btn, .docs-anchor { transition: none; }
+    }
+
+    /* Desktop: a larger reading size for the prose, the lists and the code. */
+    @media (min-width: 961px) {
+      .docs-nav { font-size: .95rem; }
+      .docs-nav-group > span { font-size: .86rem; }
+      .docs-search input { height: 40px; font-size: .93rem; }
+      .docs-lede { font-size: 1.22rem; }
+      .docs-base { font-size: .95rem; }
+      .docs-base code { font-size: .9rem; }
+      .docs-section h2 { font-size: 1.9rem; }
+      .docs-section h3 { font-size: 1.55rem; }
+      .docs-section h4 { font-size: 1.1rem; }
+      .docs-section p, .docs-section li { font-size: 1.09rem; line-height: 1.8; }
+      .docs-meta { font-size: .97rem !important; }
+      .docs-note { font-size: 1.03rem !important; }
+      .docs-route code { font-size: .97rem; }
+      .docs-method { font-size: .74rem; }
+      .docs-param dt code { font-size: 1rem; }
+      .docs-type { font-size: .88rem; }
+      .docs-flag { font-size: .82rem; }
+      .docs-param dd { font-size: 1.03rem; }
+      .docs-table { font-size: 1rem; }
+      .docs-table thead th { font-size: .9rem; }
+      .docs-env b { font-size: 1rem; }
+      .docs-env span { font-size: .92rem; }
+      .code-body { font-size: .87rem; }
+      .docs-demo .code-body { font-size: .86rem; }
+      .code-tab, .code-label { font-size: .85rem; }
+      .code-copy { font-size: .82rem; }
+      .docs-answer-meta { font-size: .88rem; }
+      /* Arabic letters read smaller than Latin ones at the same size. */
+      html[dir="rtl"] .docs-section p, html[dir="rtl"] .docs-section li { font-size: 1.14rem; }
+      html[dir="rtl"] .docs-param dd { font-size: 1.08rem; }
+      html[dir="rtl"] .docs-nav { font-size: 1rem; }
+      html[dir="rtl"] .docs-lede { font-size: 1.28rem; }
     }
   </style>

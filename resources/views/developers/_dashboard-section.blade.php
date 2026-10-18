@@ -74,17 +74,18 @@
 
   .dapi-form[hidden] { display: none; }
   .dapi-form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem 1.25rem; margin-top: .8rem; }
-  .dapi-field label, .dapi-field legend { display: block; margin: 0 0 .4rem; padding: 0; font-size: .88rem; font-weight: 650; color: var(--text); }
+  #developerApiSection .dapi-field label, #developerApiSection .dapi-field legend { display: block; width: 100%; margin: 0 0 .45rem; padding: 0; font-size: .88rem; font-weight: 650; color: var(--text); }
   .dapi-field fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
   .dapi-field input[type="text"], .dapi-field input[type="number"] { width: 100%; height: 42px; margin: 0; padding: 0 .8rem; border-radius: 10px; border: 1px solid color-mix(in oklab, var(--line) 90%, transparent); background: var(--surface); color: var(--text); font: inherit; font-size: .92rem; box-shadow: none; }
   .dapi-field input:focus { outline: none; border-color: var(--a); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a) 18%, transparent); }
   .dapi-field small { display: block; margin-top: .35rem; color: var(--muted); font-size: .82rem; line-height: 1.5; }
   .dapi-scopes { grid-column: 1 / -1; }
   .dapi-scope-list { display: flex; flex-wrap: wrap; gap: .45rem; }
-  .dapi-scope { position: relative; display: inline-flex; align-items: center; gap: .45rem; min-height: 36px; padding: 0 .8rem; border-radius: 999px; border: 1px solid var(--line); font-size: .87rem; color: var(--muted); cursor: pointer; user-select: none; }
-  .dapi-scope input { width: 15px; height: 15px; margin: 0; accent-color: var(--brand-accent); }
-  .dapi-scope:has(input:checked) { color: var(--text); border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
-  .dapi-scope:has(input:focus-visible) { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
+  /* The dashboard styles every label and input for its forms; the chips set their own. */
+  #developerApiSection .dapi-scope-list label.dapi-scope { position: relative; display: inline-flex; align-items: center; gap: .5rem; width: auto; min-height: 38px; margin: 0; padding: 0 .85rem; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); font-size: .87rem; font-weight: 500; line-height: 1.2; color: var(--muted); cursor: pointer; user-select: none; white-space: nowrap; }
+  #developerApiSection .dapi-scope input[type="checkbox"] { flex: none; width: 16px; height: 16px; min-width: 16px; margin: 0; padding: 0; border: 0; border-radius: 4px; background: none; box-shadow: none; transition: none; accent-color: var(--brand-accent); cursor: pointer; }
+  #developerApiSection .dapi-scope-list label.dapi-scope:has(input:checked) { color: var(--text); border-color: color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 7%, var(--surface)); }
+  #developerApiSection .dapi-scope-list label.dapi-scope:has(input:focus-visible) { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
   .dapi-form-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1.1rem; }
 
   .dapi-list { display: grid; gap: 0; border-radius: 16px; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); background: var(--surface); overflow: hidden; }
