@@ -74,7 +74,10 @@
       letter-spacing: 0;
     }
     .stage-head p { margin: 0 auto; max-width: 56ch; color: rgba(255, 255, 255, .78); font-size: 1rem; line-height: 1.6; text-wrap: balance; }
-    .stage-line { margin: 0; min-height: calc(3 * 1.45em); display: grid; align-items: center; font-size: clamp(1.75rem, 3.6vw, 3.1rem); }
+    .stage-line { margin: 0; min-height: clamp(9rem, 16vw, 14.5rem); display: grid; align-items: center; font-size: clamp(1.75rem, 3.6vw, 3.1rem); }
+    .stage-line[data-size="m"] { font-size: clamp(1.45rem, 2.7vw, 2.35rem); }
+    .stage-line[data-size="l"] { font-size: clamp(1.3rem, 2.3vw, 2rem); }
+    .stage-line[data-size="m"] .stage-text, .stage-line[data-size="l"] .stage-text { max-width: 36ch; }
     .stage-text {
       margin: 0 auto;
       max-width: 28ch;
@@ -284,7 +287,8 @@
             <h1 id="samplesTitle">{{ __('ui.samples.title') }}</h1>
             <p>{{ __('ui.samples.lead') }}</p>
           </header>
-          <figure class="stage-line">
+          @php $stageLength = mb_strlen($stageCast[0]['line']); @endphp
+          <figure class="stage-line" data-size="{{ $stageLength > 120 ? 'l' : ($stageLength > 70 ? 'm' : 's') }}">
             <blockquote class="stage-text" data-stage-text dir="{{ $stageCast[0]['language'] === 'ar' ? 'rtl' : 'ltr' }}" lang="{{ $stageCast[0]['language'] }}">{{ $stageCast[0]['line'] }}</blockquote>
           </figure>
           <div class="stage-console">
@@ -457,10 +461,8 @@
     audio.preload = 'none';
     var index = 0, tokens = [], frame = 0, swapTimer = 0, smooth = 0, lastTs = 0, bar = null;
     var clips = {};
-    // Delivery cues like <laugh> are heard, not shown: roughly how long each one takes.
-    var CUE_SECONDS = { laugh: .9, chuckle: .6, gasp: .45, sigh: .7 };
 
-    // When the clip has voice in it, 10 ms at a time: the words fill in only while someone is speaking.
+    // The clip's loudness, 10 ms at a time, so the ring moves with the voice.
     function analyse(src) {
       if (!src || clips[src] || !window.fetch || !(window.OfflineAudioContext || window.webkitOfflineAudioContext)) return;
       clips[src] = { pending: true };
@@ -468,65 +470,28 @@
         var Ctx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         return new Promise(function (ok, fail) { new Ctx(1, 2, 44100).decodeAudioData(buf, ok, fail); });
       }).then(function (decoded) {
-        var data = decoded.getChannelData(0), hop = Math.round(decoded.sampleRate * .01), rms = [], peak = 0, i, j;
-        for (i = 0; i < data.length; i += hop) {
+        var data = decoded.getChannelData(0), hop = Math.round(decoded.sampleRate * .01), rms = [], peak = 0;
+        for (var i = 0; i < data.length; i += hop) {
           var sum = 0, n = Math.min(hop, data.length - i);
-          for (j = 0; j < n; j++) sum += data[i + j] * data[i + j];
+          for (var j = 0; j < n; j++) sum += data[i + j] * data[i + j];
           var v = Math.sqrt(sum / Math.max(1, n)); rms.push(v); if (v > peak) peak = v;
         }
-        // Voice is where the level is above a share of the loudest moment; dips under 90 ms are inside a word.
-        var floor = (peak || 1) * .1, on = rms.map(function (v) { return v > floor; }), last = -1;
-        for (i = 0; i < on.length; i++) {
-          if (!on[i]) continue;
-          if (last >= 0 && i - last - 1 <= 9) for (j = last + 1; j < i; j++) on[j] = true;
-          last = i;
-        }
-        var cum = [0];
-        for (i = 0; i < on.length; i++) cum.push(cum[i] + (on[i] ? .01 : 0));
-        clips[src] = { rms: rms, peak: peak || 1, cum: cum, voiced: Math.max(.01, cum[cum.length - 1]) };
-        if (cast[index].audio === src) schedule();
+        clips[src] = { rms: rms, peak: peak || 1 };
       }).catch(function () { clips[src] = null; });
     }
 
-    // The script as words and cues, in order: words are shown, cues only take time.
-    function parse(script) {
-      var out = [];
-      String(script).split(/(<[^<>]+>)/).forEach(function (part) {
-        if (!part) return;
-        var cue = part.match(/^<\s*([a-z]+)/i);
-        if (cue) { out.push({ cue: cue[1].toLowerCase() }); return; }
-        part.split(/(\s+)/).forEach(function (piece) {
-          if (!piece) return;
-          out.push(/^\s+$/.test(piece) ? { space: piece } : { word: piece, weight: piece.replace(/[^\p{L}\p{N}]/gu, '').length + 1 });
-        });
+    // The line as words, each with when it is said in the clip (measured by scripts/tts/word_timing.py).
+    function parse(line, times) {
+      var out = [], k = 0;
+      String(line).split(/(\s+)/).forEach(function (piece) {
+        if (!piece) return;
+        if (/^\s+$/.test(piece)) { out.push({ space: piece }); return; }
+        var at = times[k++] || [0, 0];
+        out.push({ word: piece, start: at[0], end: at[1] });
       });
       return out;
     }
-    // Shares the clip's speaking time out between the cues and the words, each word by its length.
-    function schedule() {
-      var info = clips[cast[index].audio];
-      var total = info && info.cum ? info.voiced : 1, cueRaw = 0, weight = 0;
-      tokens.forEach(function (t) { if (t.cue) cueRaw += CUE_SECONDS[t.cue] || .5; if (t.word) weight += t.weight; });
-      // Without the clip's timing yet, the cues get a share of the line instead of seconds.
-      var cueTotal = info && info.cum ? Math.min(cueRaw, total * .45) : Math.min(.3, cueRaw / 4);
-      var cueScale = cueRaw > 0 ? cueTotal / cueRaw : 0, perWeight = (total - cueTotal) / Math.max(1, weight), at = 0;
-      tokens.forEach(function (t) {
-        if (t.cue) at += (CUE_SECONDS[t.cue] || .5) * cueScale;
-        if (t.word) { t.start = at; at += t.weight * perWeight; t.end = at; }
-      });
-    }
-    // Seconds of voice heard by time t.
-    function voicedAt(t) {
-      var info = clips[cast[index].audio];
-      if (info && info.cum) {
-        var f = t * 100, i = Math.floor(f);
-        if (i >= info.cum.length - 1) return info.voiced;
-        return i < 0 ? 0 : info.cum[i] + (info.cum[i + 1] - info.cum[i]) * (f - i);
-      }
-      // Until the timing is known: a short breath in, then even pacing.
-      var d = audio.duration || 0;
-      return d > 0 ? Math.max(0, Math.min(1, (t / d - .04) / .9)) : 0;
-    }
+
     // The player's clock, run on the screen's frames and eased towards the audio's own time,
     // so it never steps or slips backwards between the browser's coarse time updates.
     function clock(ts) {
@@ -542,8 +507,14 @@
       return smooth;
     }
 
+    // Longer lines get a smaller size so every line fits the stage.
+    function sizeFor(line) {
+      var n = String(line).length;
+      return n > 120 ? 'l' : (n > 70 ? 'm' : 's');
+    }
     function setLine(person) {
-      tokens = parse(person.script || person.line);
+      tokens = parse(person.line, person.times || []);
+      textEl.parentNode.setAttribute('data-size', sizeFor(person.line));
       textEl.textContent = '';
       textEl.setAttribute('dir', person.language === 'ar' ? 'rtl' : 'ltr');
       textEl.setAttribute('lang', person.language);
@@ -556,7 +527,6 @@
         t.f = -1;
         textEl.appendChild(t.el);
       });
-      schedule();
     }
     function paintWords(v) {
       tokens.forEach(function (t) {
@@ -659,7 +629,7 @@
       var t = clock(ts), d = audio.duration || 0;
       if (!progressEl.animate) progressEl.style.transform = 'scaleX(' + (d > 0 ? Math.min(1, t / d) : 0).toFixed(4) + ')';
       else if (!audio.paused && d > 0 && Math.abs(barAt() - t / d) > .02) runBar();
-      paintWords(voicedAt(t));
+      paintWords(t);
       var live = !audio.paused && !reduced;
       drawRing(t, live);
       // Keeps drawing while the voice plays and while the ring settles after it stops.

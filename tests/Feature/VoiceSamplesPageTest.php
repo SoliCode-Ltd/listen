@@ -25,7 +25,7 @@ class VoiceSamplesPageTest extends TestCase
         $this->assertCount(6, $en->viewData('dialogues'));
         $this->assertNotEmpty($en->viewData('moodVoices'));
         $this->assertCount(6, $en->viewData('environments'));
-        $this->assertCount(5, $en->viewData('stageCast'));
+        $this->assertStageCast($en->viewData('stageCast'), 'en');
         // English only: voices, moods, conversations, places and the stage.
         foreach (['voices', 'moodVoices', 'dialogues', 'environments', 'stageCast'] as $key) {
             $this->assertSame(['en'], array_values(array_unique(array_column($en->viewData($key), 'language'))), $key);
@@ -46,7 +46,7 @@ class VoiceSamplesPageTest extends TestCase
         $this->assertCount(38, $ar->viewData('voices'));
         $this->assertCount(8, $ar->viewData('dialogues'));
         $this->assertCount(6, $ar->viewData('environments'));
-        $this->assertCount(5, $ar->viewData('stageCast'));
+        $this->assertStageCast($ar->viewData('stageCast'), 'ar');
         foreach (['voices', 'moodVoices', 'dialogues', 'environments', 'stageCast'] as $key) {
             $this->assertSame(['ar'], array_values(array_unique(array_column($ar->viewData($key), 'language'))), $key);
         }
@@ -56,6 +56,35 @@ class VoiceSamplesPageTest extends TestCase
         $ar->assertSee('سعودي (نجدي)');
         $ar->assertSee('data-vp-region="maghreb"', false);
         $ar->assertDontSee('images/speakers/en-', false);
+    }
+
+    /**
+     * The stage plays other voices than the homepage hero, each once, each with a time for every word.
+     *
+     * @param  array<int, array<string, mixed>>  $cast
+     */
+    private function assertStageCast(array $cast, string $language): void
+    {
+        $this->assertCount(8, $cast);
+        $hero = [];
+        foreach (\App\Support\HeroCast::CAST[$language] as $person) {
+            $hero[] = $person['name'];
+            $hero[] = $person['name_ar'] ?? $person['name'];
+        }
+        $names = array_column($cast, 'name');
+        $this->assertSame([], array_values(array_intersect($names, $hero)));
+        $this->assertSame($names, array_values(array_unique($names)));
+        foreach ($cast as $person) {
+            $this->assertCount(count(preg_split('/\s+/u', trim($person['line']))), $person['times'], $person['name']);
+            $previous = 0.0;
+            foreach ($person['times'] as [$start, $end]) {
+                $this->assertGreaterThanOrEqual($previous, $start, $person['name']);
+                $this->assertGreaterThan($start, $end, $person['name']);
+                $previous = $end;
+            }
+        }
+        // More than one region in the run.
+        $this->assertGreaterThan(3, count(array_unique(array_column($cast, 'dialect_label'))));
     }
 
     public function test_the_menu_footer_and_home_link_to_the_page(): void
