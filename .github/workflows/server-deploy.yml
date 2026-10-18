@@ -247,3 +247,8 @@ jobs:
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
             echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
           done
+          # Text the server could not find shows as its key ("ui.pricing.team_title"); list any.
+          for path in /ar /en /ar/pricing /en/pricing; do
+            keys="$(curl -s --max-time 30 -L "$BASE$path" | grep -oE '>[[:space:]]*ui\.[a-z0-9_]+\.[a-z0-9_.]+' | sed 's/^>[[:space:]]*//' | sort -u | tr '\n' ' ' || true)"
+            echo "$path: untranslated keys: ${keys:-none}"
+          done
