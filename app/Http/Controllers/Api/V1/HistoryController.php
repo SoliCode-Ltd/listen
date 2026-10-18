@@ -75,9 +75,13 @@ class HistoryController extends Controller
         }
 
         $format = strtolower((string) $request->query('output_format', 'mp3'));
-        app(ApiSpeechService::class)->assertOutputFormat($format, $request->attributes->get('api_plan'));
+        $plan = $request->attributes->get('api_plan');
+        app(ApiSpeechService::class)->assertOutputFormat($format, $plan);
 
-        $audio = TextToSpeechController::audioBytes($generation, $format);
+        // Turning the file into another type runs inside a slot, so downloads cannot pile up on the server.
+        $audio = TextToSpeechController::needsConversion($generation, $format)
+            ? app(TextToSpeechController::class)->withSlot($request, $plan, fn () => TextToSpeechController::audioBytes($generation, $format))
+            : TextToSpeechController::audioBytes($generation, $format);
         if ($audio === null) {
             throw new ApiError(410, ApiError::TYPE_INVALID_REQUEST, 'audio_expired', 'The audio file for this history item is no longer stored.', 'history_item_id');
         }

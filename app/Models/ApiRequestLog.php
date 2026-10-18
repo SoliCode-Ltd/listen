@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -17,6 +18,12 @@ class ApiRequestLog extends Model
 
     /** Days a request stays in the log. */
     public const KEEP_DAYS = 90;
+
+    /**
+     * Requests without a valid key one address may add to the log a minute:
+     * enough to see a member's broken integration, never a flood of junk.
+     */
+    public const ANONYMOUS_PER_ADDRESS_PER_MINUTE = 30;
 
     protected $fillable = [
         'request_id',
@@ -63,6 +70,13 @@ class ApiRequestLog extends Model
     {
         try {
             $apiKey = $request->attributes->get('api_key');
+            if (! $apiKey instanceof ApiKey) {
+                $anonymous = 'v1-log-anonymous:'.$request->ip();
+                if (RateLimiter::tooManyAttempts($anonymous, self::ANONYMOUS_PER_ADDRESS_PER_MINUTE)) {
+                    return;
+                }
+                RateLimiter::hit($anonymous, 60);
+            }
             $error = null;
             $historyItemId = $response->headers->get('X-History-Item-Id');
             if ($response->getStatusCode() >= 400 || $historyItemId === null) {
@@ -93,5 +107,16 @@ class ApiRequestLog extends Model
         } catch (\Throwable $e) {
             Log::warning('Could not log a developer API request.', ['request_id' => $requestId, 'error' => $e->getMessage()]);
         }
+    }
+
+    /** Removes rows older than $before, a batch at a time, so the table is never locked for long. */
+    public static function pruneOlderThan(\DateTimeInterface $before): void
+    {
+        do {
+            $ids = self::query()->where('created_at', '<', $before)->orderBy('id')->limit(2000)->pluck('id');
+            if ($ids->isNotEmpty()) {
+                self::query()->whereKey($ids->all())->delete();
+            }
+        } while ($ids->count() === 2000);
     }
 }

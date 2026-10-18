@@ -152,7 +152,7 @@ class DashboardController extends Controller
             // Before the developer API migration has run on a server.
         }
 
-        return view('dashboard', [
+        $page = view('dashboard', [
             'developerApi' => $developerApi,
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
@@ -225,6 +225,11 @@ class DashboardController extends Controller
             'voiceCloningConsentScripts' => VoiceCloningService::consentScriptsByLocale(),
             'voiceCloningMaxUploadMb' => VoiceCloningService::maxUploadSizeMb(),
         ]);
+
+        // A new developer API key is on this page once: the browser must not keep a copy.
+        return session()->has('new_api_key_plain')
+            ? response($page)->header('Cache-Control', 'no-store, private')
+            : $page;
     }
 
     public function queue(Request $request)
@@ -479,6 +484,17 @@ class DashboardController extends Controller
         $userId = (int) auth()->id();
         if ((int) $job->user_id !== $userId) {
             abort(404);
+        }
+
+        // Still being made: its credits are only given back once it finishes or fails, so
+        // deleting it now would lose them. One stuck for long can go (not a developer API
+        // one: those are failed and refunded on their own).
+        if (in_array($job->status, ['queued', 'processing'], true) && ($job->api_key_id || $job->updated_at?->gt(now()->subMinutes(30)))) {
+            $message = __('ui.backend.dashboard_voice_delete_in_progress');
+
+            return $request->expectsJson()
+                ? response()->json(['ok' => false, 'message' => $message], 409)
+                : redirect()->route('dashboard')->with('error', $message);
         }
 
         $deletedId = (int) $job->id;

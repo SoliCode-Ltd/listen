@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Models\TtsLog;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Services\Api\ApiUsageMeter;
 use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
 use App\Services\PlanAccessService;
@@ -85,15 +86,27 @@ class GenerateAudioJob implements ShouldQueue
 
     public function handle(TranslationService $translationService, TtsService $ttsService): void
     {
-        $generation = AudioGeneration::find($this->audioGenerationId);
-        if (! $generation || $generation->status === 'done') {
+        // Locked, so the stuck-generation sweep (developer API) cannot fail it while it starts.
+        $generation = DB::transaction(function (): ?AudioGeneration {
+            $generation = AudioGeneration::query()->whereKey($this->audioGenerationId)->lockForUpdate()->first();
+            // A developer API generation that failed has had its credits given back
+            // (perhaps by the sweep): it is never made again.
+            if (! $generation || $generation->status === 'done' || ($generation->api_key_id && $generation->status === 'failed')) {
+                return null;
+            }
+
+            // Touched even when it was left "processing" by a try that died, so the
+            // sweep's clock starts again with each try.
+            $generation->fill([
+                'status' => 'processing',
+                'error_message' => null,
+            ])->touch();
+
+            return $generation;
+        });
+        if (! $generation) {
             return;
         }
-
-        $generation->update([
-            'status' => 'processing',
-            'error_message' => null,
-        ]);
 
         try {
             $reserved = $this->reservedUsage($generation);
@@ -209,39 +222,82 @@ class GenerateAudioJob implements ShouldQueue
             // Members pay for the audio they got: 15 credits a second.
             $actualCredits = Credits::forSeconds($actualSeconds);
 
-            $generation->update([
-                'audio_path' => $audio['audio_path'],
-                'duration_seconds' => $actualSeconds,
-                'duration_measured' => $measuredSeconds !== null,
-                'status' => 'done',
-                'error_message' => null,
-                // TTS telemetry
-                'tts_provider' => $audio['provider'] ?? null,
-                'tts_model' => $audio['model'] ?? null,
-                'tts_latency_ms' => $audio['latency_ms'] ?? null,
-                'tts_fallback_used' => $audio['fallback_used'] ?? false,
-                'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
-                'billable_chars' => $actualChars,
-            ]);
+            // Done and charged together: a failure in between leaves neither, so a retry
+            // never charges twice. A generation failed meanwhile (swept as stuck, its
+            // credits already given back) is not delivered or charged.
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved): bool {
+                $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
+                if (! $locked || $locked->status !== 'processing') {
+                    return false;
+                }
+
+                $locked->update([
+                    'audio_path' => $audio['audio_path'],
+                    'duration_seconds' => $actualSeconds,
+                    'duration_measured' => $measuredSeconds !== null,
+                    'status' => 'done',
+                    'error_message' => null,
+                    // TTS telemetry
+                    'tts_provider' => $audio['provider'] ?? null,
+                    'tts_model' => $audio['model'] ?? null,
+                    'tts_latency_ms' => $audio['latency_ms'] ?? null,
+                    'tts_fallback_used' => $audio['fallback_used'] ?? false,
+                    'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
+                    'billable_chars' => $actualChars,
+                ]);
+
+                $this->applyUsageDelta(
+                    $locked,
+                    0,
+                    $actualCredits - $reserved['credits'],
+                    $actualSeconds - $reserved['seconds'],
+                );
+
+                return true;
+            });
+            if (! $settled) {
+                Log::info('A generation finished after it was failed; its audio was not delivered.', ['generation_id' => $generation->id]);
+
+                return;
+            }
+            $generation->refresh();
 
             // Write TTS log entry
             $this->writeTtsLog($generation, $audio, 'success');
-
-            $this->applyUsageDelta(
-                $generation,
-                0,
-                $actualCredits - $reserved['credits'],
-                $actualSeconds - $reserved['seconds'],
-            );
 
             if ($generation->text_item_id) {
                 TextItem::whereKey($generation->text_item_id)->update(['status' => 'done']);
             }
         } catch (\Throwable $e) {
-            $generation->update([
-                'status' => 'failed',
-                'error_message' => $this->failureMessage($generation, $e),
-            ]);
+            $sync = $this->connection === 'sync';
+            // Its last try: made inline (the dashboard), called directly, or out of tries on the queue.
+            $final = $sync || $this->job === null || $this->attempts() >= $this->tries;
+            $message = $this->failureMessage($generation, $e);
+
+            if ($sync && $generation->api_key_id) {
+                // A developer API request waiting for the file: failed now, and its credits
+                // given back here, exactly once (the request does not refund it again).
+                app(ApiUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
+            } else {
+                // A queued job that will be tried again is not failed yet: it waits for the
+                // next try. A developer API one always waits for failed(), which ends it and
+                // gives its credits back in one locked step.
+                $failNow = $final && ! $generation->api_key_id;
+                DB::transaction(function () use ($generation, $failNow, $message): void {
+                    $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
+                    if (! $locked || $locked->status !== 'processing') {
+                        return;
+                    }
+                    $locked->update($failNow
+                        ? ['status' => 'failed', 'error_message' => $message]
+                        : ['status' => 'queued', 'error_message' => null]);
+                });
+
+                if ($failNow && $generation->text_item_id) {
+                    TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
+                }
+            }
+            $generation->refresh();
 
             // Log TTS failure telemetry
             $this->writeTtsLog($generation, [], 'failed', $e);
@@ -251,13 +307,9 @@ class GenerateAudioJob implements ShouldQueue
                 $generation,
                 $e,
                 $this->attempts(),
-                $this->connection === 'sync' ? 1 : $this->tries,
-                $generation->error_message,
+                $sync || $this->job === null ? 1 : $this->tries,
+                $message,
             );
-
-            if ($generation->text_item_id) {
-                TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
-            }
 
             throw $e;
         }
@@ -322,9 +374,30 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
+        $message = $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.';
+
+        // A developer API generation is failed and refunded in one locked step, so
+        // a request, this hook and the stuck-generation sweep never all refund it.
+        if ($generation->api_key_id) {
+            if ($this->connection !== 'sync') {
+                app(ApiUsageMeter::class)->failAndRefund((int) $generation->id, $message);
+            }
+            if (! $e || $e instanceof MaxAttemptsExceededException || $e instanceof TimeoutExceededException) {
+                app(GenerationErrorRecorder::class)->audioGenerationFailed(
+                    $generation->refresh(),
+                    $e ?? new \RuntimeException('The generation job failed without an error.'),
+                    $this->tries,
+                    $this->tries,
+                    $message,
+                );
+            }
+
+            return;
+        }
+
         $generation->update([
             'status' => 'failed',
-            'error_message' => $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.',
+            'error_message' => $message,
         ]);
 
         // Failures thrown from handle() are recorded there; a timeout or a
@@ -366,6 +439,12 @@ class GenerateAudioJob implements ShouldQueue
      */
     private function reservedUsage(AudioGeneration $generation): array
     {
+        // The developer API stores what it reserved (it allows for a slower speed).
+        $stored = ApiUsageMeter::reservationOf($generation);
+        if ($stored !== null) {
+            return ['credits' => $stored['credits'], 'seconds' => $stored['seconds']];
+        }
+
         $estimate = UsageEstimator::estimate((string) $generation->input_text);
 
         return [
@@ -376,7 +455,9 @@ class GenerateAudioJob implements ShouldQueue
 
     private function usagePeriod(AudioGeneration $generation): string
     {
-        return $generation->created_at?->format('Y-m') ?? now()->format('Y-m');
+        return ApiUsageMeter::reservationOf($generation)['period']
+            ?? $generation->created_at?->format('Y-m')
+            ?? now()->format('Y-m');
     }
 
     private function applyUsageDelta(AudioGeneration $generation, int $requestsDelta, int $charsDelta, int $secondsDelta): void

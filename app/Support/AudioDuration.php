@@ -123,6 +123,13 @@ final class AudioDuration
         $tagAt = $offset + 4 + $sideInfo;
         $tag = substr($bytes, $tagAt, 4);
         if (($tag === 'Xing' || $tag === 'Info') && $tagAt + 12 <= $length) {
+            // But pieces joined end to end each carry their own header, and the
+            // first one counts only its own piece: so every frame is counted.
+            $counted = self::countedMp3Seconds($bytes, $offset);
+            if ($counted !== null) {
+                return $counted;
+            }
+
             $flags = unpack('N', substr($bytes, $tagAt + 4, 4))[1];
             if ($flags & 0x1) {
                 $frames = unpack('N', substr($bytes, $tagAt + 8, 4))[1];
@@ -140,6 +147,74 @@ final class AudioDuration
         }
 
         return $audioBytes * 8 / ($kbps * 1000);
+    }
+
+    /**
+     * The length of an MP3 stream from its frames, from the first frame at
+     * $offset; null when the bytes are not a clean run of frames.
+     */
+    private static function countedMp3Seconds(string $bytes, int $offset): ?float
+    {
+        $length = strlen($bytes);
+        $seconds = 0.0;
+        $frames = 0;
+        $skipped = 0;
+
+        while ($offset + 4 <= $length) {
+            if (ord($bytes[$offset]) !== 0xFF || (ord($bytes[$offset + 1]) & 0xE0) !== 0xE0) {
+                // An ID3 tag at the start of a joined piece.
+                if ($offset + 10 <= $length && substr($bytes, $offset, 3) === 'ID3') {
+                    $size = array_values(unpack('C4', substr($bytes, $offset + 6, 4)));
+                    $offset += 10 + (($size[0] << 21) | ($size[1] << 14) | ($size[2] << 7) | $size[3]);
+
+                    continue;
+                }
+                if (substr($bytes, $offset, 3) === 'TAG') {
+                    break;
+                }
+                if (++$skipped > 4096) {
+                    return null;
+                }
+                $offset++;
+
+                continue;
+            }
+
+            $header = unpack('N', substr($bytes, $offset, 4))[1];
+            $version = ($header >> 19) & 0x3;
+            $layer = ($header >> 17) & 0x3;
+            $bitrateIndex = ($header >> 12) & 0xF;
+            $rateIndex = ($header >> 10) & 0x3;
+            if ($version === 1 || $layer !== 1 || $bitrateIndex === 0 || $bitrateIndex === 15 || $rateIndex === 3) {
+                if (++$skipped > 4096) {
+                    return null;
+                }
+                $offset++;
+
+                continue;
+            }
+
+            $sampleRate = [44100, 48000, 32000][$rateIndex] / match ($version) {
+                3 => 1,
+                2 => 2,
+                default => 4,
+            };
+            $samples = $version === 3 ? 1152 : 576;
+            $kbps = ($version === 3 ? self::MPEG1_BITRATES : self::MPEG2_BITRATES)[$bitrateIndex];
+            $frameLength = (int) floor(($samples / 8) * $kbps * 1000 / $sampleRate) + (($header >> 9) & 0x1);
+
+            // An Info or Xing frame describes the stream; it carries no sound.
+            $mono = (($header >> 6) & 0x3) === 3;
+            $sideInfo = $version === 3 ? ($mono ? 17 : 32) : ($mono ? 9 : 17);
+            $tag = substr($bytes, $offset + 4 + $sideInfo, 4);
+            if ($tag !== 'Xing' && $tag !== 'Info') {
+                $seconds += $samples / $sampleRate;
+                $frames++;
+            }
+            $offset += max(1, $frameLength);
+        }
+
+        return $frames > 0 ? $seconds : null;
     }
 
     /**

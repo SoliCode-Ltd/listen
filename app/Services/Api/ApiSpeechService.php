@@ -18,6 +18,7 @@ use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiVoiceCatalog;
 use App\Support\AudioEffects;
 use App\Support\AudioFormats;
+use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\GeminiVocalTags;
 use App\Support\PlanFeatures;
@@ -41,8 +42,21 @@ use Illuminate\Validation\ValidationException;
  */
 class ApiSpeechService
 {
-    /** Longest text one request may carry, whatever the plan (as the dashboard and extension). */
+    /** Longest text the API accepts at all (as the dashboard and extension). */
     public const MAX_TEXT = 50000;
+
+    /**
+     * Longest text for a request that waits for the file: it is made while the
+     * connection stays open, so it must finish well inside the server's time
+     * and memory limits.
+     */
+    public const SYNC_MAX_TEXT = 5000;
+
+    /** Longest text for a background request (/async): what one generation finishes inside the job's time limit. */
+    public const ASYNC_MAX_TEXT = 10000;
+
+    /** Longest dialogue: a dialogue is made in one piece, not split like a single voice. */
+    public const DIALOGUE_MAX_TEXT = 2500;
 
     /** File types the API can return. */
     public const OUTPUT_FORMATS = ['mp3', 'wav', 'm4a', 'ogg', 'flac'];
@@ -61,7 +75,7 @@ class ApiSpeechService
      *
      * @return array<string, mixed>
      */
-    public function prepare(Request $request, User $user, ?Plan $plan, ?Plan $quotaPlan, string $voiceId): array
+    public function prepare(Request $request, User $user, ?Plan $plan, ?Plan $quotaPlan, string $voiceId, bool $async = false): array
     {
         if ($request->isJson() && trim((string) $request->getContent()) !== '' && ! is_array(json_decode((string) $request->getContent(), true))) {
             throw ApiError::invalid('invalid_json', 'The request body is not valid JSON.', null, 400);
@@ -118,13 +132,9 @@ class ApiSpeechService
         $audioEffect = $this->audioEffect($validated, $user, $plan);
         $dialogue = $this->dialogue($validated, $user, $plan, $planTier, $language, $text);
 
-        $estimate = UsageEstimator::estimate($text);
-        $maxChars = min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), self::MAX_TEXT);
-        if ($estimate['chars'] > $maxChars) {
-            throw new ApiError(422, ApiError::TYPE_INVALID_REQUEST, 'text_too_long',
-                "The text is {$estimate['chars']} characters; your plan allows up to {$maxChars} per request. Split it into shorter requests.",
-                'text', [], ['max_characters' => $maxChars]);
-        }
+        $estimate = self::estimate($text, (float) $studio['speed']);
+        $this->assertLength($estimate['chars'], $quotaPlan, $async, $dialogue !== null);
+        ApiCapacity::assertRoom($estimate['chars']);
 
         $format = strtolower((string) ($validated['output_format'] ?? $request->query('output_format', 'mp3')));
         $this->assertOutputFormat($format, $plan);
@@ -148,12 +158,67 @@ class ApiSpeechService
     }
 
     /**
+     * What the request reserves: the dashboard's estimate from the text, made
+     * longer for a slower speed (speed 0.5 makes audio about twice as long), so
+     * the plan's limit holds for the audio the request really makes.
+     *
+     * @return array{chars:int,words:int,seconds:int,minutes:int,credits:int}
+     */
+    public static function estimate(string $text, float $speed = 1.0): array
+    {
+        $estimate = UsageEstimator::estimate($text);
+        if ($speed > 0 && $speed < 1) {
+            $estimate['seconds'] = (int) ceil($estimate['seconds'] / $speed);
+            $estimate['minutes'] = max(1, (int) ceil($estimate['seconds'] / 60));
+            $estimate['credits'] = Credits::forSeconds($estimate['seconds']);
+        }
+
+        return $estimate;
+    }
+
+    /**
+     * Most characters one request may carry on a plan: the plan's own limit,
+     * and never more than the API can reliably make in one request.
+     */
+    public static function maxCharsFor(?Plan $quotaPlan, bool $async = false, bool $dialogue = false): int
+    {
+        $max = min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), $async ? self::ASYNC_MAX_TEXT : self::SYNC_MAX_TEXT);
+
+        return $dialogue ? min($max, self::DIALOGUE_MAX_TEXT) : $max;
+    }
+
+    private function assertLength(int $chars, ?Plan $quotaPlan, bool $async, bool $dialogue): void
+    {
+        $max = self::maxCharsFor($quotaPlan, $async, $dialogue);
+        if ($chars <= $max) {
+            return;
+        }
+
+        $extra = ['max_characters' => $max];
+        if ($dialogue && $max === self::DIALOGUE_MAX_TEXT) {
+            $message = "The dialogue is {$chars} characters; one dialogue request can carry up to {$max}. Split it into shorter requests.";
+        } elseif (! $async && $chars <= self::maxCharsFor($quotaPlan, true, $dialogue)) {
+            $asyncMax = self::maxCharsFor($quotaPlan, true, $dialogue);
+            $extra['max_characters_async'] = $asyncMax;
+            $message = "The text is {$chars} characters; a request that waits for the file can carry up to {$max}. Send it to POST /v1/text-to-speech/{voice_id}/async (up to {$asyncMax} characters), or split it into shorter requests.";
+        } else {
+            $message = "The text is {$chars} characters; one request can carry up to {$max} on your plan. Split it into shorter requests.";
+        }
+
+        throw new ApiError(422, ApiError::TYPE_INVALID_REQUEST, 'text_too_long', $message, 'text', [], $extra);
+    }
+
+    /**
      * Reserves the credits, records the generation and runs it: now, or on
-     * the queue when $async. A synchronous run that fails gives the credits back.
+     * the queue when $async. A generation that fails gives the credits back,
+     * exactly once (ApiUsageMeter::failAndRefund). $onRecorded runs inside the
+     * reservation, as soon as the generation exists (the Idempotency-Key is
+     * tied to it there).
      *
      * @param  array<string, mixed>  $spec  from prepare()
+     * @param  (callable(AudioGeneration): void)|null  $onRecorded
      */
-    public function generate(User $user, ApiKey $apiKey, ?Plan $plan, ?Plan $quotaPlan, array $spec, bool $async): AudioGeneration
+    public function generate(User $user, ApiKey $apiKey, ?Plan $plan, ?Plan $quotaPlan, array $spec, bool $async, ?callable $onRecorded = null): AudioGeneration
     {
         $userId = (int) $user->id;
         $estimate = $spec['estimate'];
@@ -169,10 +234,10 @@ class ApiSpeechService
                 'The text contains words that are not allowed. Change the text and try again.', 'text');
         }
 
-        [$reservation, $recorded] = $this->meter->reserve($userId, $apiKey, $quotaPlan, $estimate, function (array $reservation) use ($userId, $apiKey, $plan, $async, $spec, $estimate, $status, $studio): array {
+        [, $recorded] = $this->meter->reserve($userId, $apiKey, $quotaPlan, $estimate, function (array $reservation) use ($userId, $apiKey, $plan, $async, $spec, $estimate, $status, $studio, $onRecorded): array {
             $this->assertQueueRoom($userId, $plan, $async);
 
-            return $this->audioGenerationRecorder->createForUser(
+            $recorded = $this->audioGenerationRecorder->createForUser(
                 $userId,
                 [
                     'source_type' => 'api',
@@ -205,16 +270,36 @@ class ApiSpeechService
                     'api_key_id' => (int) $apiKey->id,
                 ],
             );
+
+            // What was reserved, kept on the generation: the job corrects and refunds exactly this.
+            $job = $recorded['job'];
+            $job->forceFill(['settings_snapshot' => array_merge((array) ($job->settings_snapshot ?? []), ['reservation' => $reservation])])->save();
+            if ($onRecorded !== null) {
+                $onRecorded($job);
+            }
+
+            return $recorded;
         });
 
         $job = $recorded['job'];
+        ApiCapacity::record((int) $spec['estimate']['chars']);
 
         if ($async) {
-            $queue = in_array(strtolower((string) ($plan?->processing_priority ?? 'standard')), ['high', 'priority', 'highest'], true) ? 'high' : 'default';
+            // The same queues as the browser extension's background generations.
+            $queue = strtolower((string) ($plan?->processing_priority ?? 'standard')) === 'high' ? 'high' : 'default';
             try {
                 GenerateAudioJob::dispatch($job->id)->onQueue($queue);
-            } catch (\Throwable) {
-                // With a synchronous queue the job ran here; its failed() hook gave the credits back.
+            } catch (\Throwable $e) {
+                // With a synchronous queue the job ran here, and its failed() hook gave the
+                // credits back. Otherwise it never reached the queue: give them back now.
+                if ($job->refresh()->status === 'queued') {
+                    report($e);
+                    $this->meter->failAndRefund((int) $job->id, 'Voice generation could not be started. Please try again.', ['queued']);
+
+                    throw new ApiError(503, ApiError::TYPE_API, 'queue_unavailable',
+                        'Background generation is temporarily unavailable. No credits were charged; please try again shortly.',
+                        null, ['Retry-After' => '30']);
+                }
             }
 
             return $job->refresh();
@@ -223,20 +308,23 @@ class ApiSpeechService
         try {
             GenerateAudioJob::dispatchSync($job->id);
         } catch (\Throwable) {
-            // The status says what happened.
+            // The status says what happened; a failed run has given the credits back itself.
         }
 
-        $job->refresh();
-        if ($job->status === 'failed') {
-            // A synchronous run is not refunded by the job itself (GenerateAudioJob::failed).
-            $this->meter->release($userId, $apiKey, $estimate, $reservation);
-        }
+        // A run that never reached the job's own error handling still gives the credits back.
+        $this->meter->failAndRefund((int) $job->id, 'Voice generation failed. Please try again.', ['processing']);
 
-        return $job;
+        return $job->refresh();
     }
 
     /** Most background generations one member may have waiting or running, for each generation they may run at once. */
     public const QUEUED_PER_SLOT = 5;
+
+    /** Background generations one member may have waiting or running at once. */
+    public static function queueLimit(?Plan $plan): int
+    {
+        return max(10, ApiPlanAccess::concurrency($plan) * self::QUEUED_PER_SLOT);
+    }
 
     /**
      * Background generations share the queue with the extension, so one
@@ -250,13 +338,13 @@ class ApiSpeechService
             return;
         }
 
-        $limit = max(10, ApiPlanAccess::concurrency($plan) * self::QUEUED_PER_SLOT);
+        $limit = self::queueLimit($plan);
+        // A generation that got stuck is failed and refunded by the sweep
+        // (api:expire-stuck-generations), which frees its place.
         $waiting = AudioGeneration::query()
             ->where('user_id', $userId)
             ->whereNotNull('api_key_id')
             ->whereIn('status', ['queued', 'processing'])
-            // A generation stuck far longer than any job may run no longer holds a place.
-            ->where('created_at', '>=', now()->subMinutes(30))
             ->count();
 
         if ($waiting >= $limit) {
@@ -406,7 +494,8 @@ class ApiSpeechService
     }
 
     /**
-     * MP3 always; other types when the plan includes them and the server can make them.
+     * MP3 always; other types when the plan includes them and this server can
+     * make them (WAV needs ffmpeg; M4A, OGG and FLAC also need its encoder).
      *
      * @return array<int, string>
      */
@@ -414,7 +503,24 @@ class ApiSpeechService
     {
         $formats = array_values(array_unique(array_merge(['mp3'], AudioFormats::chosenFor($plan))));
 
-        return array_values(array_filter($formats, static fn (string $format): bool => $format === 'mp3' || AudioFormats::serverCanConvert()));
+        return array_values(array_filter($formats, static fn (string $format): bool => match ($format) {
+            'mp3' => true,
+            'wav' => AudioFormats::serverCanConvert(),
+            default => AudioFormats::serverSupports($format),
+        }));
+    }
+
+    /**
+     * The formats besides MP3 that at least one plan with the API can ask for,
+     * in a fixed order (for the documentation).
+     *
+     * @return array<int, string>
+     */
+    public static function formatsOffered(): array
+    {
+        $offered = ApiFeatureGate::apiPlans()->flatMap(fn (Plan $plan): array => self::formatsFor($plan))->unique()->all();
+
+        return array_values(array_filter(array_keys(AudioFormats::ALL), fn (string $format): bool => $format !== 'mp3' && in_array($format, $offered, true)));
     }
 
     public function assertOutputFormat(string $format, ?Plan $plan): void

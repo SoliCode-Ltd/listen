@@ -37,72 +37,76 @@ class TextToSpeechController extends Controller
     public function convert(Request $request, string $voiceId): Response
     {
         [$user, $apiKey, $plan, $quotaPlan] = $this->context($request);
-        $idempotency = $this->idempotency->keyFor($request, (int) $user->id);
-        $lock = $idempotency !== null ? $this->idempotency->lock($idempotency) : null;
+        $userId = (int) $user->id;
+        $idempotency = $this->idempotency->keyFor($request, $userId);
+
+        $previous = $idempotency !== null ? $this->idempotency->begin($idempotency, $userId, false) : null;
+        if ($previous !== null) {
+            $format = strtolower((string) $request->input('output_format', 'mp3'));
+            $this->speech->assertOutputFormat($format, $plan);
+
+            return $this->audioResponse($request, $previous, $format, $quotaPlan, $plan, true);
+        }
 
         try {
-            $previous = $idempotency !== null ? $this->idempotency->replay($idempotency, (int) $user->id) : null;
-            if ($previous !== null) {
-                if ($previous->status !== 'done') {
-                    throw new ApiError(409, ApiError::TYPE_INVALID_REQUEST, 'idempotent_request_in_progress',
-                        'The request with this Idempotency-Key is still being generated. Fetch it with GET /v1/history/'.$previous->id.'.',
-                        ApiIdempotency::HEADER, ['Retry-After' => '2'], ['history_item_id' => (int) $previous->id]);
-                }
-                $format = strtolower((string) $request->input('output_format', 'mp3'));
-                $this->speech->assertOutputFormat($format, $plan);
-
-                return $this->audioResponse($request, $previous, $format, $quotaPlan, true);
-            }
-
-            $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
-            $slot = $this->concurrency->acquire((int) $user->id, ApiPlanAccess::concurrency($plan));
+            $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId, false);
+            $slot = $this->concurrency->acquire($userId, ApiPlanAccess::concurrency($plan));
             try {
-                // Long texts can take a while; never cut a paid generation short.
+                // Never cut a paid generation short: it finishes (and is charged or
+                // given back) even if the client stops waiting.
+                ignore_user_abort(true);
                 if (function_exists('set_time_limit')) {
                     @set_time_limit(max(300, (int) ini_get('max_execution_time')));
                 }
-                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false);
+                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false,
+                    $idempotency !== null ? fn (AudioGeneration $made) => $this->idempotency->attach($idempotency, $userId, $made) : null);
+
+                if ($generation->status !== 'done' || blank($generation->audio_path)) {
+                    $charged = $generation->status === 'done';
+                    throw new ApiError(502, ApiError::TYPE_API, 'generation_failed',
+                        $charged
+                            ? 'The audio was made but could not be stored. Contact support with the request_id.'
+                            : ($generation->error_message ?: 'Voice generation failed.').' No credits were charged.',
+                        null, ['X-History-Item-Id' => (string) $generation->id], ['history_item_id' => (int) $generation->id]);
+                }
+
+                // Still inside the slot: turning it into another file type takes the server's time too.
+                return $this->audioResponse($request, $generation, $spec['output_format'], $quotaPlan, $plan, false, true);
             } finally {
                 $slot->release();
             }
+        } catch (\Throwable $e) {
             if ($idempotency !== null) {
-                $this->idempotency->remember($idempotency, $generation);
+                $this->idempotency->abandon($idempotency, $userId);
             }
-        } finally {
-            $lock?->release();
-        }
 
-        if ($generation->status !== 'done' || blank($generation->audio_path)) {
-            throw new ApiError(502, ApiError::TYPE_API, 'generation_failed',
-                ($generation->error_message ?: 'Voice generation failed.').' No credits were charged.',
-                null, ['X-History-Item-Id' => (string) $generation->id], ['history_item_id' => (int) $generation->id]);
+            throw $e;
         }
-
-        return $this->audioResponse($request, $generation, $spec['output_format'], $quotaPlan);
     }
 
     public function convertAsync(Request $request, string $voiceId): JsonResponse
     {
         [$user, $apiKey, $plan, $quotaPlan] = $this->context($request);
-        $idempotency = $this->idempotency->keyFor($request, (int) $user->id);
-        $lock = $idempotency !== null ? $this->idempotency->lock($idempotency) : null;
+        $userId = (int) $user->id;
+        $idempotency = $this->idempotency->keyFor($request, $userId);
 
-        try {
-            $previous = $idempotency !== null ? $this->idempotency->replay($idempotency, (int) $user->id) : null;
-            $replayed = $previous !== null;
-            if ($replayed) {
-                $generation = $previous;
-                $chars = ApiPresenter::historyItem($generation)['character_count'];
-            } else {
-                $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
-                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, true);
+        $generation = $idempotency !== null ? $this->idempotency->begin($idempotency, $userId, true) : null;
+        $replayed = $generation !== null;
+        if ($replayed) {
+            $chars = ApiPresenter::historyItem($generation)['character_count'];
+        } else {
+            try {
+                $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId, true);
+                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, true,
+                    $idempotency !== null ? fn (AudioGeneration $made) => $this->idempotency->attach($idempotency, $userId, $made) : null);
                 $chars = $spec['estimate']['chars'];
+            } catch (\Throwable $e) {
                 if ($idempotency !== null) {
-                    $this->idempotency->remember($idempotency, $generation);
+                    $this->idempotency->abandon($idempotency, $userId);
                 }
+
+                throw $e;
             }
-        } finally {
-            $lock?->release();
         }
 
         return response()->json(ApiPresenter::historyItem($generation), 202, array_filter([
@@ -117,9 +121,11 @@ class TextToSpeechController extends Controller
      * The finished audio, in the asked-for type when it can be made (otherwise
      * as stored; Content-Type and X-Output-Format always say which).
      */
-    private function audioResponse(Request $request, AudioGeneration $generation, string $format, ?Plan $quotaPlan, bool $replayed = false): Response
+    private function audioResponse(Request $request, AudioGeneration $generation, string $format, ?Plan $quotaPlan, ?Plan $plan, bool $replayed = false, bool $holdingSlot = false): Response
     {
-        $audio = self::audioBytes($generation, $format);
+        $audio = $holdingSlot || ! self::needsConversion($generation, $format)
+            ? self::audioBytes($generation, $format)
+            : $this->withSlot($request, $plan, fn () => self::audioBytes($generation, $format));
         if ($audio === null) {
             throw new ApiError(500, ApiError::TYPE_API, 'audio_unavailable',
                 'The audio was made but could not be read. Fetch it from GET /v1/history/{history_item_id}/audio.',
@@ -148,6 +154,33 @@ class TextToSpeechController extends Controller
         }
 
         return response($audio['bytes'], 200, $headers);
+    }
+
+    /** Whether sending the audio in this format means converting the stored file. */
+    public static function needsConversion(AudioGeneration $generation, string $format): bool
+    {
+        $stored = strtolower(pathinfo((string) $generation->audio_path, PATHINFO_EXTENSION));
+
+        return $format !== (isset(AudioFormats::ALL[$stored]) ? $stored : 'mp3');
+    }
+
+    /**
+     * Runs $work (a file conversion) inside one of the member's and the site's
+     * slots, so conversions cannot pile up and take the server's processors.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $work
+     * @return T
+     */
+    public function withSlot(Request $request, ?Plan $plan, callable $work): mixed
+    {
+        $slot = $this->concurrency->acquire((int) $request->user()->id, ApiPlanAccess::concurrency($plan));
+        try {
+            return $work();
+        } finally {
+            $slot->release();
+        }
     }
 
     /**
