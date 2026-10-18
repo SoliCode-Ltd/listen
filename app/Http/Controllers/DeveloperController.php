@@ -65,7 +65,7 @@ class DeveloperController extends Controller
     /**
      * The voices the examples use, and the request at the top of the page
      * with the recording it returned (database/seeders/data/
-     * developer_docs_samples.php): Sumaya in Lebanese on the Arabic page, an
+     * developer_docs_samples.php): Othman in Egyptian on the Arabic page, an
      * American voice on the English page, so each page reads in its own
      * language; and a second voice of the other gender for the dialogue.
      *
