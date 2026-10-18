@@ -496,10 +496,6 @@ class HomeController extends Controller
             'demoQuota' => $this->demoQuotaForPageLoad($request),
             'trialAllowanceChars' => $this->demoCharAllowance($request),
             'upgradePlanSlug' => $upgradePlanSlug,
-            'demoTiers' => array_map(fn (string $tier) => [
-                'key' => $tier,
-                'label' => VoiceTier::label($tier),
-            ], VoiceTier::all()),
         ]);
 
         return $this->attachDemoDeviceCookie($request, $response);

@@ -295,8 +295,10 @@ class StandardVoiceEngineTest extends TestCase
 
         $this->actingAs(User::factory()->create());
 
-        // The demo page opens on HD.
-        $this->getLocalizedRoute('demo.page')->assertOk()->assertSee('value="hd" selected', false);
+        // The demo is premium only: no quality picker, always HD.
+        $this->getLocalizedRoute('demo.page')->assertOk()
+            ->assertSee('id="voice_tier" name="voice_tier" value="hd"', false)
+            ->assertDontSee(__('ui.demo.voice_quality'));
         $this->postJsonLocalizedRoute('demo.preview', [
             'text' => 'Hello world',
             'target_language' => 'en',
