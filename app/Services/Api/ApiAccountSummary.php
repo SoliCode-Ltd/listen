@@ -83,10 +83,23 @@ class ApiAccountSummary
                 'max_chars' => ApiFeatureGate::maxChars($quotaPlan),
                 'formats' => ApiSpeechService::formatsFor($plan),
             ],
-            // The studio options only some plans include, and whether this member has them.
-            'features' => ApiFeatureGate::availableTo($user, $plan),
+            // The studio options only some plans include, and whether this member has them;
+            // an option no plan includes is left out, unless this member has it anyway.
+            'features' => self::featuresShown(ApiFeatureGate::availableTo($user, $plan)),
             // For members whose plan has no API: the plans that include it.
             'api_plan_names' => ApiFeatureGate::apiPlans()->map(fn (Plan $apiPlan): string => $apiPlan->getLocalizedName(app()->getLocale()) ?: (string) $apiPlan->name)->values()->all(),
         ];
+    }
+
+    /**
+     * @param  array<string, bool>  $available  field => this member has it
+     * @return array<string, bool>
+     */
+    private static function featuresShown(array $available): array
+    {
+        $offered = ApiFeatureGate::offered();
+        $features = array_flip(ApiFeatureGate::FIELDS);
+
+        return array_filter($available, fn (bool $has, string $field): bool => $has || ($offered[$features[$field] ?? ''] ?? false), ARRAY_FILTER_USE_BOTH);
     }
 }

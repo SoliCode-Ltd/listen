@@ -101,10 +101,10 @@ return [
 
     'docs' => [
         'seo_title' => 'Text to Speech API for Arabic and English',
-        'seo_description' => "The Listen text to speech API: 140+ Arabic dialects, English accents, emotions, sound environments and dialogue, metered on your plan's credits with no overage.",
+        'seo_description' => "The Listen text to speech API: 140+ Arabic dialects, English accents, delivery styles and emotions, metered on your plan's credits with no overage.",
 
         'title' => 'Listen API',
-        'subtitle' => 'Natural Arabic and English speech for your apps and assistants. The studio\'s voices, 140+ Arabic dialects, English accents, emotions and sound environments, from one request.',
+        'subtitle' => 'Natural Arabic and English speech for your apps and assistants. The studio\'s voices, :options, from one request.',
         'cta_keys' => 'Get your API key',
         'cta_quickstart' => 'Read the quickstart',
         'base_url' => 'Base URL',
@@ -139,6 +139,16 @@ return [
             'array' => 'list',
         ],
 
+        // Lists joined into sentences (ApiDocs::listed). An item keyed by a
+        // feature shows only while some plan includes that feature.
+        'lists' => [
+            'subtitle' => ['140+ Arabic dialects', 'English accents', 'emotions', 'sound_environments' => 'sound environments'],
+            'intro_features' => ['sound_environments' => 'sound environments', 'dialogue' => 'dialogue with several voices'],
+            'plan_features' => ['custom_direction' => 'custom direction (`style_prompt`)', 'sound_environments' => 'sound environments (`audio_effect`)', 'dialogue' => 'dialogue (`dialogue`)', 'cloned_voices' => 'cloned voices', 'some audio formats'],
+            'options_fields' => ['`dialect`', '`style`', '`emotion`', 'sound_environments' => '`audio_effect`'],
+            'models_options' => ['dialects', 'accents', 'styles', 'emotions', 'sound tags', 'sound_environments' => 'sound environments', 'dialogue' => 'dialogue'],
+        ],
+
         'groups' => [
             'start' => 'Getting started',
             'guides' => 'Guides',
@@ -152,9 +162,10 @@ return [
             'points' => [
                 'One request turns text into an audio file (`mp3`, or `wav`, `m4a`, `ogg` and `flac` on plans that include them).',
                 'Every Arabic dialect and English accent of the studio, with delivery styles, emotions, sound tags, speed and pitch.',
-                'Sound environments and dialogue with several voices, on the plans that include them.',
                 'Usage is counted on your plan\'s credits and stops at your limit: there are no surprise bills.',
             ],
+            // After the second point, when some plan includes one of them.
+            'points_features' => ':options, on the plans that include them.',
             'code_note' => 'Field names, values and messages of the API are in English, as they are part of the code.',
         ],
 
@@ -215,7 +226,8 @@ return [
 
         'styles' => [
             'title' => 'Styles, emotions and sound tags',
-            'body' => 'Choose a delivery style (`style`, such as `news` or `assistant`) and an emotion (`emotion`, such as `warm` or `calm`). Left out, they follow the studio\'s defaults for the language. `voice_settings.speed` and `voice_settings.pitch` fine-tune the voice, and on plans with custom direction, `style_prompt` takes your own direction in words.',
+            'body' => 'Choose a delivery style (`style`, such as `news` or `assistant`) and an emotion (`emotion`, such as `warm` or `calm`). Left out, they follow the studio\'s defaults for the language. `voice_settings.speed` and `voice_settings.pitch` fine-tune the voice.',
+            'prompt' => 'On plans with custom direction, `style_prompt` takes your own direction in words.',
             'tags' => 'Sound tags in the text add a momentary sound where they stand, for example `<laugh>`, `<sigh>` or `<short pause>`. A text needs words as well as tags.',
         ],
 
@@ -233,7 +245,7 @@ return [
 
         'plan_features' => [
             'title' => 'Plan features',
-            'body' => 'Every studio option works through the API. A few are on some plans only: custom direction (`style_prompt`), sound environments (`audio_effect`), dialogue (`dialogue`), cloned voices and some audio formats.',
+            'body' => 'Every studio option works through the API. A few are on some plans only: :options.',
             'refusal' => 'A request that uses an option your plan does not include is refused before anything is charged, with `403` and `feature_not_in_plan`. The message names the plans that include it, and `available_on_plans` lists them for your code. `GET /v1/user/subscription` says in `plan.features` which options your plan has.',
         ],
 
@@ -285,6 +297,7 @@ return [
             'voices_list' => [
                 'title' => 'List voices',
                 'summary' => 'The studio voices and your own ready cloned voices. `preview_url` plays a sample.',
+                'summary_studio' => 'The studio voices. `preview_url` plays a sample.',
             ],
             'voices_get' => [
                 'title' => 'Get a voice',
@@ -292,11 +305,11 @@ return [
             ],
             'options' => [
                 'title' => 'List voice options',
-                'summary' => 'Every value `dialect`, `style`, `emotion` and `audio_effect` accept, the defaults used when they are left out, the output formats your plan can ask for, and which plan options you have.',
+                'summary' => 'Every value :fields accept, the defaults used when they are left out, the output formats your plan can ask for, and which plan options you have.',
             ],
             'models' => [
                 'title' => 'List models',
-                'summary' => 'One model: `listen_tts_premium_v1`, the studio\'s expressive voices with dialects, accents, styles, emotions, sound tags, sound environments and dialogue. `supports` says which options your plan includes. The version in its id means a future model will sit beside it and never change what this one does.',
+                'summary' => 'One model: `listen_tts_premium_v1`, the studio\'s expressive voices with :options. `supports` says which options your plan includes. The version in its id means a future model will sit beside it and never change what this one does.',
             ],
             'history_list' => [
                 'title' => 'List history',
@@ -326,6 +339,7 @@ return [
 
         'params' => [
             'voice_id' => 'A voice id from `GET /v1/voices`, such as `voice_12`, or one of your cloned voices (`cloned_3`).',
+            'voice_id_studio' => 'A voice id from `GET /v1/voices`, such as `voice_12`.',
             'idempotency_key' => 'A value of your own, unique to this request, so a retry never generates or charges twice. See Safe retries.',
             'output_format' => 'File type: `mp3` (default), `wav`, `m4a`, `ogg` or `flac`.',
             'text' => 'The text to read, up to your plan\'s characters a request.',
@@ -346,6 +360,7 @@ return [
             'filter_model' => 'Only voices of this model.',
             'filter_gender' => '`female` or `male`.',
             'filter_category' => '`premade` (studio voices) or `cloned` (yours).',
+            'filter_category_studio' => '`premade`: the studio voices.',
             'page_size' => 'Items a page, from 1 to 100 (default 30).',
             'before' => 'The `next_cursor` of the previous page.',
             'history_voice' => 'Only generations with this voice.',
@@ -392,8 +407,10 @@ return [
                 ['409', 'history_item_in_progress', 'The generation is still running, so it cannot be deleted yet.'],
                 ['409', 'idempotent_request_in_progress', 'A request with this `Idempotency-Key` is still running.'],
                 ['422', 'validation_failed', 'A parameter is missing or not valid (see `param`).'],
-                ['422', 'invalid_dialect', 'Unknown `dialect` for the language. The same goes for `invalid_style`, `invalid_emotion` and `invalid_audio_effect`.'],
-                ['422', 'invalid_dialogue', 'The speakers or the text of a dialogue do not fit together.'],
+                // A fourth value: the row shows only when some plan includes that feature.
+                ['422', 'invalid_dialect', 'Unknown `dialect` for the language. The same goes for `invalid_style` and `invalid_emotion`.'],
+                ['422', 'invalid_audio_effect', 'Unknown `audio_effect`.', 'sound_environments'],
+                ['422', 'invalid_dialogue', 'The speakers or the text of a dialogue do not fit together.', 'dialogue'],
                 ['422', 'language_mismatch', 'The voice does not speak the `language_code` asked for.'],
                 ['422', 'text_too_long', 'The text is over your plan\'s characters a request.'],
                 ['422', 'text_has_no_words', 'The text has only tags or sounds, nothing to read.'],
@@ -405,7 +422,8 @@ return [
                 ['429', 'daily_limit_exceeded', 'Your plan\'s daily generation limit is reached.'],
                 ['429', 'too_many_failed_attempts', 'Too many requests with a wrong key from your address. Wait a minute.'],
                 ['502', 'generation_failed', 'The voice could not be made. No credits were charged; try again.'],
-                ['503', 'feature_unavailable', 'Sound environments are briefly unavailable (`output_format_unavailable` is the same for an audio format).'],
+                ['503', 'feature_unavailable', 'Sound environments are briefly unavailable.', 'sound_environments'],
+                ['503', 'output_format_unavailable', 'An audio format other than `mp3` is briefly unavailable.'],
                 ['500', 'internal_error', 'Something went wrong on our side. Try again; if it persists, contact support with the `request_id`.'],
             ],
         ],

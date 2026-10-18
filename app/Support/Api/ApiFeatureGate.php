@@ -35,6 +35,32 @@ final class ApiFeatureGate
         self::CLONED_VOICES => 'Cloned voices',
     ];
 
+    /** @var array<string, string> feature => its field in requests and in `plan.features` */
+    public const FIELDS = [
+        self::CUSTOM_DIRECTION => 'style_prompt',
+        self::SOUND_ENVIRONMENTS => 'audio_effect',
+        self::DIALOGUE => 'dialogue',
+        self::CLONED_VOICES => 'cloned_voices',
+    ];
+
+    /**
+     * Whether at least one plan with the API includes each feature. The
+     * documentation and the dashboard leave out a feature no plan includes,
+     * and show it again by themselves once a plan includes it.
+     *
+     * @return array<string, bool> feature => offered on some plan
+     */
+    public static function offered(): array
+    {
+        $plans = self::apiPlans();
+        $offered = [];
+        foreach (array_keys(self::NAMES) as $feature) {
+            $offered[$feature] = $plans->contains(fn (Plan $plan): bool => self::planOffers($plan, $feature));
+        }
+
+        return $offered;
+    }
+
     /**
      * The plans on sale that include the developer API, cheapest first.
      *

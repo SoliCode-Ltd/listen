@@ -21,12 +21,20 @@ final class OpenApiSpec
      */
     public static function build(): array
     {
-        return [
+        // Options no plan includes are left out, as on the /developers page.
+        $offered = ApiFeatureGate::offered();
+        $extras = array_keys(array_filter([
+            'sound environments' => $offered[ApiFeatureGate::SOUND_ENVIRONMENTS],
+            'dialogue' => $offered[ApiFeatureGate::DIALOGUE],
+            'your own cloned voices' => $offered[ApiFeatureGate::CLONED_VOICES],
+        ]));
+
+        $spec = [
             'openapi' => '3.1.0',
             'info' => [
                 'title' => 'Listen API',
                 'version' => self::VERSION,
-                'summary' => 'Arabic and English text to speech: studio voices, Arabic dialects, English accents, emotions, sound environments, dialogue and your own cloned voices.',
+                'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'.',
                 'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Full guide: '.url('/developers'),
                 'contact' => ['name' => 'Listen support', 'email' => 'support@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
@@ -42,6 +50,17 @@ final class OpenApiSpec
             'paths' => self::paths(),
             'components' => self::components(),
         ];
+
+        foreach ([ApiFeatureGate::CUSTOM_DIRECTION, ApiFeatureGate::SOUND_ENVIRONMENTS, ApiFeatureGate::DIALOGUE] as $feature) {
+            if (! $offered[$feature]) {
+                unset($spec['components']['schemas']['TextToSpeechRequest']['properties'][ApiFeatureGate::FIELDS[$feature]]);
+            }
+        }
+        if (! $offered[ApiFeatureGate::CLONED_VOICES]) {
+            $spec['paths']['/voices']['get']['description'] = 'The studio voices. Requires the voices_read permission.';
+        }
+
+        return $spec;
     }
 
     /**

@@ -230,6 +230,7 @@
         @php
           $missing = in_array(false, $api['features'], true);
         @endphp
+        @if($api['features'] !== [])
         <div class="usage-health dapi-features">
           <span class="usage-health-title">{{ $d('features_title') }}</span>
           <div class="usage-health-row">
@@ -242,6 +243,7 @@
           </div>
           @if($missing)<a href="{{ route('pricing') }}">{{ $k('upgrade_cta') }}</a>@endif
         </div>
+        @endif
         <p class="mini-message" style="color: var(--muted); font-size: .88rem; margin-top: .8rem;">{{ $d('shared_note') }}</p>
       @else
         {{-- No API on this plan yet: what changes that. --}}

@@ -5,10 +5,13 @@
   @include('components.header')
 
   @php
-    $t = fn (string $key, array $html = []) => \App\Support\Api\ApiDocs::rich('developers.docs.'.$key, $html);
+    $t = fn (string $key, array $html = [], array $replace = []) => \App\Support\Api\ApiDocs::rich('developers.docs.'.$key, $html, $replace);
     $tx = fn (string $text) => \App\Support\Api\ApiDocs::richText($text);
     $plain = fn (string $key) => __('developers.docs.'.$key);
     $arabic = app()->getLocale() === 'ar';
+    // Options no plan includes are left out of the page (ApiFeatureGate::offered).
+    $offered = $docs['offered'];
+    $listed = fn (string $list) => \App\Support\Api\ApiDocs::listed($list, $offered, $arabic);
     $keysUrl = route('developers.keys');
     $voiceName = $arabic && ($voice['name_ar'] ?? '') !== '' ? $voice['name_ar'] : $voice['name'];
     $supportEmail = '<a href="mailto:support@listenai.studio" dir="ltr">support@listenai.studio</a>';
@@ -25,8 +28,8 @@
       'guides' => [
         ['dialects', $plain('dialects.title')],
         ['styles', $plain('styles.title')],
-        ['sound-environments', $plain('environments.title')],
-        ['dialogue', $plain('dialogue.title')],
+        ...($offered['sound_environments'] ? [['sound-environments', $plain('environments.title')]] : []),
+        ...($offered['dialogue'] ? [['dialogue', $plain('dialogue.title')]] : []),
         ['plan-features', $plain('plan_features.title')],
         ['long-texts', $plain('long.title')],
         ['formats', $plain('formats.title')],
@@ -65,7 +68,7 @@
       <header class="docs-hero">
         <div>
           <h1>{{ $plain('title') }}</h1>
-          <p class="docs-lede">{{ $plain('subtitle') }}</p>
+          <p class="docs-lede">{{ __('developers.docs.subtitle', ['options' => $listed('subtitle')]) }}</p>
           <div class="docs-hero-actions">
             <a class="docs-btn primary" href="{{ $keysUrl }}">{{ $plain('cta_keys') }}</a>
             <a class="docs-btn" href="#quickstart">{{ $plain('cta_quickstart') }}</a>
@@ -121,8 +124,14 @@
           <h2>{{ $plain('intro.title') }}<a class="docs-anchor" href="#intro" aria-hidden="true" tabindex="-1">#</a></h2>
           <p>{!! $t('intro.body') !!}</p>
           <ul>
-            @foreach(__('developers.docs.intro.points') as $point)
+            @php
+              $introFeatures = $listed('intro_features');
+            @endphp
+            @foreach(__('developers.docs.intro.points') as $index => $point)
               <li>{!! $tx($point) !!}</li>
+              @if($index === 1 && $introFeatures !== '')
+                <li>{!! $tx(__('developers.docs.intro.points_features', ['options' => \Illuminate\Support\Str::ucfirst($introFeatures)])) !!}</li>
+              @endif
             @endforeach
           </ul>
           <p class="docs-note">{{ $plain('intro.code_note') }}</p>
@@ -208,8 +217,10 @@
                     <th scope="row">{{ $plain('plans.row_formats') }}</th>
                     @foreach($planRows as $row)<td class="docs-formats">@foreach($row['formats'] as $format)<code dir="ltr">{{ $format }}</code>@endforeach</td>@endforeach
                   </tr>
-                  <tr class="docs-plans-group"><th scope="rowgroup" colspan="{{ count($planRows) + 1 }}">{{ $plain('plans.features_heading') }}</th></tr>
-                  @foreach(['custom_direction', 'sound_environments', 'dialogue', 'cloned_voices'] as $feature)
+                  @if(in_array(true, $offered, true))
+                    <tr class="docs-plans-group"><th scope="rowgroup" colspan="{{ count($planRows) + 1 }}">{{ $plain('plans.features_heading') }}</th></tr>
+                  @endif
+                  @foreach(array_keys(array_filter($offered)) as $feature)
                     <tr>
                       <th scope="row">{{ $plain('plans.features.'.$feature) }}</th>
                       @foreach($planRows as $row)<td>{!! $row['features'][$feature] ? $check : $dash !!}</td>@endforeach
@@ -244,11 +255,12 @@
       <section class="docs-section" id="styles" data-section>
         <div class="docs-text">
           <h2>{{ $plain('styles.title') }}<a class="docs-anchor" href="#styles" aria-hidden="true" tabindex="-1">#</a></h2>
-          <p>{!! $t('styles.body') !!}</p>
+          <p>{!! $t('styles.body') !!}@if($offered['custom_direction']) {!! $t('styles.prompt') !!}@endif</p>
           <p>{!! $t('styles.tags') !!}</p>
         </div>
       </section>
 
+      @if($offered['sound_environments'])
       <section class="docs-section" id="sound-environments" data-section>
         <div class="docs-row">
           <div class="docs-text">
@@ -271,7 +283,9 @@
           </div>
         </div>
       </section>
+      @endif
 
+      @if($offered['dialogue'])
       <section class="docs-section" id="dialogue" data-section>
         <div class="docs-row">
           <div class="docs-text">
@@ -283,12 +297,13 @@
           </div>
         </div>
       </section>
+      @endif
 
       <section class="docs-section" id="plan-features" data-section>
         <div class="docs-row">
           <div class="docs-text">
             <h2>{{ $plain('plan_features.title') }}<a class="docs-anchor" href="#plan-features" aria-hidden="true" tabindex="-1">#</a></h2>
-            <p>{!! $t('plan_features.body') !!}</p>
+            <p>{!! $t('plan_features.body', [], ['options' => $listed('plan_features')]) !!}</p>
             <p>{!! $t('plan_features.refusal') !!}</p>
           </div>
           <div class="docs-code">
@@ -351,7 +366,7 @@
                 <span class="docs-method mono m-{{ strtolower($endpoint['method']) }}">{{ $endpoint['method'] }}</span>
                 <code>{{ $endpoint['path'] }}</code>
               </div>
-              <p>{!! $t('endpoints.'.$endpoint['key'].'.summary') !!}</p>
+              <p>{!! $t('endpoints.'.$endpoint['key'].'.'.($endpoint['summary'] ?? 'summary'), [], $endpoint['summary_replace'] ?? []) !!}</p>
               <p class="docs-meta">{{ $plain('permission') }}: <code dir="ltr">{{ $endpoint['scope'] }}</code></p>
 
               @foreach(['header_params', 'path_params', 'query_params', 'body_params'] as $group)
@@ -387,7 +402,11 @@
               <table class="docs-table">
                 <thead><tr><th scope="col">{{ $plain('errors.col_status') }}</th><th scope="col">{{ $plain('errors.col_code') }}</th><th scope="col">{{ $plain('errors.col_meaning') }}</th></tr></thead>
                 <tbody>
-                  @foreach(__('developers.docs.errors.rows') as [$status, $code, $meaning])
+                  @foreach(__('developers.docs.errors.rows') as $error)
+                    @php
+                      [$status, $code, $meaning] = $error;
+                    @endphp
+                    @continue(isset($error[3]) && ! ($offered[$error[3]] ?? false))
                     <tr><td><span class="docs-status mono {{ str_starts_with($status, '5') ? 's5' : '' }}">{{ $status }}</span></td><td><code dir="ltr">{{ $code }}</code></td><td>{!! $tx($meaning) !!}</td></tr>
                   @endforeach
                 </tbody>

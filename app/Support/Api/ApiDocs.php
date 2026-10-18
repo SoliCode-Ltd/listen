@@ -16,7 +16,7 @@ use App\Support\AudioEffects;
 final class ApiDocs
 {
     /**
-     * @param  array{voice_id:string, name:string, language:string, gender?:?string}  $voice  the voice of the examples
+     * @param  array{voice_id:string, name:string, name_ar?:string, language:string, gender?:?string}  $voice  the voice of the examples
      * @param  array{voice_id:string, name:string}|null  $partner  a second voice of the same language, for the dialogue example
      * @param  array{voice_id:string, body:array<string, mixed>}|null  $hero  the request at the top of the page (developer_docs_samples.php)
      * @return array<string, mixed>
@@ -24,6 +24,8 @@ final class ApiDocs
     public static function build(string $locale, string $baseUrl, array $voice, ?array $partner = null, ?array $hero = null): array
     {
         $arabic = $locale === 'ar';
+        // Options no plan includes are left out of every example and list.
+        $offered = ApiFeatureGate::offered();
         $example = $arabic
             ? ['text' => 'أهلين! كيفك اليوم؟ أنا هون لساعدك.', 'dialect' => 'ar-LB', 'language' => 'ar', 'title' => 'ترحيب المساعد']
             : ['text' => 'Hi there! How can I help you today?', 'dialect' => 'en-GB', 'language' => 'en', 'title' => 'Assistant greeting'];
@@ -52,7 +54,7 @@ final class ApiDocs
         $voiceExample = [
             'voice_id' => $voiceId,
             'name' => $voice['name'],
-            'name_ar' => $voice['name'] === 'Sumaya' ? 'سمية' : $voice['name'],
+            'name_ar' => ($voice['name_ar'] ?? '') !== '' ? $voice['name_ar'] : $voice['name'],
             'category' => 'premade',
             'language' => $voice['language'],
             'gender' => $voice['gender'] ?? 'female',
@@ -89,13 +91,26 @@ final class ApiDocs
             'created_at' => '2026-10-18T09:30:12+00:00',
             'created_at_unix' => 1792315812,
         ];
+        if (! $offered[ApiFeatureGate::SOUND_ENVIRONMENTS]) {
+            unset($historyItem['audio_effect']);
+        }
+        if (! $offered[ApiFeatureGate::DIALOGUE]) {
+            unset($historyItem['dialogue']);
+        }
+
+        $features = [];
+        foreach (ApiFeatureGate::FIELDS as $feature => $field) {
+            if ($offered[$feature]) {
+                $features[$field] = true;
+            }
+        }
 
         $subscription = [
             'plan' => [
                 'slug' => 'creator',
                 'name' => 'Creator',
                 'models' => [ApiModels::PREMIUM],
-                'features' => ['style_prompt' => true, 'audio_effect' => true, 'dialogue' => true, 'cloned_voices' => true],
+                'features' => $features,
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'high',
             ],
@@ -132,6 +147,34 @@ final class ApiDocs
             ],
         ];
 
+        $voiceOptions = [
+            'model_id' => ApiModels::PREMIUM,
+            'dialects' => [
+                'ar' => [
+                    ['value' => 'ar-EG', 'name' => 'Egyptian', 'name_ar' => 'مصري'],
+                    ['value' => 'ar-LB', 'name' => 'Lebanese', 'name_ar' => 'لبناني'],
+                ],
+                'en' => [['value' => 'en-GB', 'name' => 'British', 'name_ar' => 'بريطاني']],
+            ],
+            'styles' => [['value' => 'assistant', 'name' => 'Assistant', 'name_ar' => 'مساعد']],
+            'emotions' => [['value' => 'warm', 'name' => 'Warm', 'name_ar' => 'دافئ']],
+            'defaults' => ['ar' => ['dialect' => 'ar-EG', 'style' => 'promo', 'emotion' => 'confident']],
+            'voice_settings' => ['speed' => ['min' => 0.5, 'max' => 2.0, 'default' => 1.0], 'pitch' => ['min' => -10, 'max' => 10, 'default' => 0]],
+            'audio_effects' => [
+                ['value' => 'hall', 'name' => 'Concert hall', 'name_ar' => 'قاعة كبيرة'],
+                ['value' => 'phone', 'name' => 'Phone call', 'name_ar' => 'مكالمة هاتفية'],
+            ],
+            'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
+            'output_formats' => ['mp3', 'wav'],
+            'features' => $subscription['plan']['features'],
+        ];
+        if (! $offered[ApiFeatureGate::SOUND_ENVIRONMENTS]) {
+            unset($voiceOptions['audio_effects']);
+        }
+        if (! $offered[ApiFeatureGate::DIALOGUE]) {
+            unset($voiceOptions['dialogue']);
+        }
+
         $audioResponse = static fn (int $credits): string => implode("\n", [
             'HTTP/1.1 200 OK',
             'Content-Type: audio/mpeg',
@@ -148,14 +191,16 @@ final class ApiDocs
             '<audio/mpeg>',
         ]);
 
-        // $gated: only some plans include it (see the plan features guide).
-        $p = static fn (string $name, string $type, bool $required, string $descriptionKey, bool $gated = false): array => [
+        // $feature: only the plans with that feature include it (see the plan features guide).
+        $p = static fn (string $name, string $type, bool $required, string $descriptionKey, ?string $feature = null): array => [
             'name' => $name,
             'type' => $type,
             'required' => $required,
             'description' => 'developers.docs.params.'.$descriptionKey,
-            'gated' => $gated,
+            'gated' => $feature !== null,
+            'feature' => $feature,
         ];
+        $cloned = $offered[ApiFeatureGate::CLONED_VOICES];
 
         $endpoints = [
             [
@@ -164,10 +209,10 @@ final class ApiDocs
                 'method' => 'POST',
                 'path' => '/v1/text-to-speech/{voice_id}',
                 'scope' => ApiScopes::TEXT_TO_SPEECH,
-                'path_params' => [$p('voice_id', 'string', true, 'voice_id')],
+                'path_params' => [$p('voice_id', 'string', true, $cloned ? 'voice_id' : 'voice_id_studio')],
                 'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
                 'query_params' => [$p('output_format', 'string', false, 'output_format')],
-                'body_params' => $ttsParams = [
+                'body_params' => [
                     $p('text', 'string', true, 'text'),
                     $p('model_id', 'string', false, 'model_id'),
                     $p('language_code', 'string', false, 'language_code'),
@@ -176,9 +221,9 @@ final class ApiDocs
                     $p('emotion', 'string', false, 'emotion'),
                     $p('voice_settings.speed', 'number', false, 'speed'),
                     $p('voice_settings.pitch', 'number', false, 'pitch'),
-                    $p('style_prompt', 'string', false, 'style_prompt', true),
-                    $p('audio_effect', 'string', false, 'audio_effect', true),
-                    $p('dialogue.speakers', 'array', false, 'dialogue', true),
+                    $p('style_prompt', 'string', false, 'style_prompt', ApiFeatureGate::CUSTOM_DIRECTION),
+                    $p('audio_effect', 'string', false, 'audio_effect', ApiFeatureGate::SOUND_ENVIRONMENTS),
+                    $p('dialogue.speakers', 'array', false, 'dialogue', ApiFeatureGate::DIALOGUE),
                     $p('translate', 'boolean', false, 'translate'),
                     $p('title', 'string', false, 'title'),
                 ],
@@ -192,7 +237,7 @@ final class ApiDocs
                 'method' => 'POST',
                 'path' => '/v1/text-to-speech/{voice_id}/async',
                 'scope' => ApiScopes::TEXT_TO_SPEECH,
-                'path_params' => [$p('voice_id', 'string', true, 'voice_id')],
+                'path_params' => [$p('voice_id', 'string', true, $cloned ? 'voice_id' : 'voice_id_studio')],
                 'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
                 'body_params' => [$p('text', 'string', true, 'text'), $p('title', 'string', false, 'title'), $p('*', 'string', false, 'same_body')],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'/async', ['text' => $example['text'], 'dialect' => $example['dialect'], 'title' => $example['title']], null],
@@ -201,6 +246,7 @@ final class ApiDocs
             [
                 'id' => 'list-voices',
                 'key' => 'voices_list',
+                'summary' => $cloned ? 'summary' : 'summary_studio',
                 'method' => 'GET',
                 'path' => '/v1/voices',
                 'scope' => ApiScopes::VOICES_READ,
@@ -208,7 +254,7 @@ final class ApiDocs
                     $p('language', 'string', false, 'filter_language'),
                     $p('model_id', 'string', false, 'filter_model'),
                     $p('gender', 'string', false, 'filter_gender'),
-                    $p('category', 'string', false, 'filter_category'),
+                    $p('category', 'string', false, $cloned ? 'filter_category' : 'filter_category_studio'),
                 ],
                 'request' => ['GET', $baseUrl.'/voices?language='.$example['language'].'&model_id='.ApiModels::PREMIUM, null, null],
                 'response' => ['json', $json(['voices' => [$voiceExample], 'total_count' => 1])],
@@ -219,42 +265,24 @@ final class ApiDocs
                 'method' => 'GET',
                 'path' => '/v1/voices/{voice_id}',
                 'scope' => ApiScopes::VOICES_READ,
-                'path_params' => [$p('voice_id', 'string', true, 'voice_id')],
+                'path_params' => [$p('voice_id', 'string', true, $cloned ? 'voice_id' : 'voice_id_studio')],
                 'request' => ['GET', $baseUrl.'/voices/'.$voiceId, null, null],
                 'response' => ['json', $json($voiceExample)],
             ],
             [
                 'id' => 'voice-options',
                 'key' => 'options',
+                'summary_replace' => ['fields' => self::listed('options_fields', $offered, $arabic)],
                 'method' => 'GET',
                 'path' => '/v1/voice-options',
                 'scope' => ApiScopes::VOICES_READ,
                 'request' => ['GET', $baseUrl.'/voice-options', null, null],
-                'response' => ['json', $json([
-                    'model_id' => ApiModels::PREMIUM,
-                    'dialects' => [
-                        'ar' => [
-                            ['value' => 'ar-EG', 'name' => 'Egyptian', 'name_ar' => 'مصري'],
-                            ['value' => 'ar-LB', 'name' => 'Lebanese', 'name_ar' => 'لبناني'],
-                        ],
-                        'en' => [['value' => 'en-GB', 'name' => 'British', 'name_ar' => 'بريطاني']],
-                    ],
-                    'styles' => [['value' => 'assistant', 'name' => 'Assistant', 'name_ar' => 'مساعد']],
-                    'emotions' => [['value' => 'warm', 'name' => 'Warm', 'name_ar' => 'دافئ']],
-                    'defaults' => ['ar' => ['dialect' => 'ar-EG', 'style' => 'promo', 'emotion' => 'confident']],
-                    'voice_settings' => ['speed' => ['min' => 0.5, 'max' => 2.0, 'default' => 1.0], 'pitch' => ['min' => -10, 'max' => 10, 'default' => 0]],
-                    'audio_effects' => [
-                        ['value' => 'hall', 'name' => 'Concert hall', 'name_ar' => 'قاعة كبيرة'],
-                        ['value' => 'phone', 'name' => 'Phone call', 'name_ar' => 'مكالمة هاتفية'],
-                    ],
-                    'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
-                    'output_formats' => ['mp3', 'wav'],
-                    'features' => $subscription['plan']['features'],
-                ])],
+                'response' => ['json', $json($voiceOptions)],
             ],
             [
                 'id' => 'list-models',
                 'key' => 'models',
+                'summary_replace' => ['options' => self::listed('models_options', $offered, $arabic)],
                 'method' => 'GET',
                 'path' => '/v1/models',
                 'scope' => ApiScopes::VOICES_READ,
@@ -342,6 +370,11 @@ final class ApiDocs
         ];
 
         foreach ($endpoints as &$endpoint) {
+            foreach (['header_params', 'path_params', 'query_params', 'body_params'] as $group) {
+                if (isset($endpoint[$group])) {
+                    $endpoint[$group] = array_values(array_filter($endpoint[$group], fn (array $param): bool => $param['feature'] === null || $offered[$param['feature']]));
+                }
+            }
             [$method, $url, $body, $saveAs] = $endpoint['request'];
             $endpoint['samples'] = self::highlighted(ApiCodeSamples::all($method, $url, $body, $saveAs));
             [$grammar, $answer] = $endpoint['response'];
@@ -374,8 +407,15 @@ final class ApiDocs
             ]],
         ];
 
-        // The refusal a plan without dialogue gets, with the plans that include it today.
-        $refusal = ApiFeatureGate::refusal(ApiFeatureGate::DIALOGUE, 'dialogue');
+        // The refusal a plan without an option gets, with the plans that include it today:
+        // dialogue, or another option some plan has, or else an audio format.
+        $shown = collect([ApiFeatureGate::DIALOGUE, ApiFeatureGate::SOUND_ENVIRONMENTS, ApiFeatureGate::CLONED_VOICES, ApiFeatureGate::CUSTOM_DIRECTION])
+            ->first(fn (string $feature): bool => $offered[$feature]);
+        $refusal = match ($shown) {
+            null => ApiFeatureGate::formatRefusal('wav'),
+            ApiFeatureGate::CLONED_VOICES => ApiFeatureGate::refusal($shown, 'voice_id'),
+            default => ApiFeatureGate::refusal($shown, ApiFeatureGate::FIELDS[$shown]),
+        };
         $refusalBody = ['error' => [
             'type' => $refusal->type,
             'code' => $refusal->errorCode,
@@ -391,6 +431,7 @@ final class ApiDocs
         }
 
         return [
+            'offered' => $offered,
             'languages' => ApiCodeSamples::LANGUAGES,
             'endpoints' => $endpoints,
             // The request at the top, exactly as its recording was made.
@@ -429,19 +470,59 @@ final class ApiDocs
     }
 
     /**
+     * The items of a list in lang/{en,ar}/developers.php (docs.lists), joined
+     * as a sentence in the page's language. Items with a feature as their key
+     * are left out when no plan includes that feature.
+     *
+     * @param  array<string, bool>  $offered  ApiFeatureGate::offered()
+     */
+    public static function listed(string $list, array $offered, bool $arabic): string
+    {
+        $items = [];
+        foreach ((array) __('developers.docs.lists.'.$list) as $feature => $item) {
+            if (is_int($feature) || ($offered[$feature] ?? false)) {
+                $items[] = (string) $item;
+            }
+        }
+
+        return self::series($items, $arabic);
+    }
+
+    /**
+     * "a, b and c" in English; "أ، وب، وج" (or "أ وب" for two) in Arabic.
+     *
+     * @param  array<int, string>  $items
+     */
+    public static function series(array $items, bool $arabic): string
+    {
+        $items = array_values($items);
+        if (count($items) < 2) {
+            return $items[0] ?? '';
+        }
+        if ($arabic) {
+            return count($items) === 2 ? $items[0].' و'.$items[1] : $items[0].'، و'.implode('، و', array_slice($items, 1));
+        }
+        $last = array_pop($items);
+
+        return implode(', ', $items).' and '.$last;
+    }
+
+    /**
      * Translated text with `code` spans: everything is escaped, and text
      * between backticks becomes inline code (left to right in both languages).
-     * $html values are trusted markup put in place of :placeholders.
+     * $html values are trusted markup put in place of :placeholders; $replace
+     * values are plain text (with backticks) put in place before escaping.
      *
      * @param  array<string, string>  $html
+     * @param  array<string, string>  $replace
      */
-    public static function rich(string $key, array $html = []): string
+    public static function rich(string $key, array $html = [], array $replace = []): string
     {
         $tokens = [];
         foreach ($html as $name => $markup) {
             $tokens[$name] = '__HTML_'.strtoupper($name).'__';
         }
-        $text = self::richText((string) __($key, $tokens));
+        $text = self::richText((string) __($key, $tokens + $replace));
 
         foreach ($html as $name => $markup) {
             $text = str_replace($tokens[$name], $markup, $text);
