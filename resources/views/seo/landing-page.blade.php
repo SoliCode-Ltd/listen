@@ -19,8 +19,8 @@
     .seo-card {
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
     }
     .seo-copy {
       padding: 2rem;
@@ -33,9 +33,8 @@
       border-radius: var(--radius-full);
       border: 1px solid var(--line);
       color: var(--muted);
-      font-size: .78rem;
-      letter-spacing: .08em;
-      text-transform: uppercase;
+      font-size: .8rem;
+      font-weight: 600;
       margin-bottom: 1rem;
     }
     .seo-eyebrow::before {
@@ -47,12 +46,13 @@
     }
     .seo-copy h1 {
       margin: 0 0 1rem;
-      font-size: clamp(2.2rem, 4vw, 3.7rem);
-      line-height: 1.05;
+      font-size: var(--page-title-size);
+      font-weight: 600;
+      line-height: 1.12;
       letter-spacing: -.03em;
     }
     html[dir="rtl"] .seo-copy h1 {
-      line-height: 1.22;
+      line-height: 1.35;
       letter-spacing: 0;
     }
     .seo-copy p {
@@ -84,14 +84,13 @@
       text-decoration: none;
       color: var(--text);
       padding: .9rem 1rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius);
-      background: color-mix(in oklab, var(--surface) 84%, transparent);
-      transition: transform .2s ease, border-color .2s ease;
+      border: 1px solid transparent;
+      border-radius: .75rem;
+      background: var(--surface2);
+      transition: border-color .2s ease;
     }
     .seo-link-item:hover {
-      transform: translateY(-2px);
-      border-color: var(--brand-accent);
+      border-color: var(--line-strong);
     }
     .seo-link-item span:last-child {
       color: var(--muted);
@@ -194,9 +193,8 @@
     .seo-sample {
       margin-top: 1.4rem;
       padding: 1rem 1.1rem;
-      border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
-      background: var(--surface);
+      border-radius: .75rem;
+      background: var(--surface2);
     }
     .seo-sample-label {
       display: block;
@@ -225,7 +223,7 @@
     .seo-chips li {
       padding: .45rem .85rem;
       border-radius: var(--radius-full);
-      border: 1px solid var(--line);
+      border: 1px solid var(--line-strong);
       background: var(--surface);
       font-size: 1rem;
     }

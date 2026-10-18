@@ -253,46 +253,11 @@
     .samples-section { width: min(1200px, 92%); margin: 0 auto; padding: clamp(3rem, 7vw, 5rem) 0 0; scroll-margin-top: 130px; }
     .samples-section .vs-head { margin-bottom: 1.25rem; }
     .samples-moods { margin-bottom: 1.25rem; }
-
-    /* The way out */
-    .samples-cta {
-      width: min(1200px, 92%);
-      margin: clamp(3.5rem, 8vw, 5.5rem) auto clamp(3rem, 6vw, 4rem);
-      padding: clamp(2.25rem, 5vw, 3.25rem) clamp(1.25rem, 4vw, 3rem);
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) auto;
-      align-items: center;
-      gap: 1.5rem 2.5rem;
-      border-radius: 1.5rem;
-      color: #FFFFFF;
-      background: #6145F2;
-    }
-    .samples-cta h2 { margin: 0 0 .4rem; color: #FFFFFF; font-size: clamp(1.5rem, 3vw, 2.1rem); }
-    .samples-cta p { margin: 0; color: rgba(255, 255, 255, .9); max-width: 52ch; }
-    .samples-cta-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
-    .samples-cta a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 48px;
-      padding: 0 1.5rem;
-      border-radius: var(--btn-radius);
-      font-weight: 700;
-      text-decoration: none;
-    }
-    .samples-cta .is-solid { background: #FFFFFF; color: #3F27C4; }
-    .samples-cta .is-solid:hover { background: #F1EEFF; }
-    .samples-cta .is-ghost { border: 1.5px solid rgba(255, 255, 255, .6); color: #FFFFFF; }
-    .samples-cta .is-ghost:hover { border-color: #FFFFFF; background: rgba(255, 255, 255, .12); }
-    .samples-cta a:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
+    .samples-closing { width: min(1200px, 92%); margin: 0 auto; }
 
     @media (max-width: 900px) {
       .stage-console { grid-template-columns: minmax(0, 1fr) auto; }
       .stage-queue { grid-column: 1 / -1; justify-content: flex-start; }
-      .samples-cta { grid-template-columns: 1fr; }
-      /* The two buttons side by side, the same size. */
-      .samples-cta-actions { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
-      .samples-cta a { padding: .5rem .6rem; text-align: center; line-height: 1.3; }
     }
     @media (max-width: 640px) {
       /* Long chip rows scroll sideways on phones instead of stacking five deep. */
@@ -467,21 +432,17 @@
       </section>
     @endif
 
-    <section class="samples-cta" aria-labelledby="samplesCtaTitle">
-      <div>
-        <h2 id="samplesCtaTitle">{{ __('ui.samples.cta_title') }}</h2>
-        <p>{{ __('ui.samples.cta_body') }}</p>
-      </div>
-      <div class="samples-cta-actions">
-        @auth
-          <a class="is-solid" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
-          <a class="is-ghost" href="{{ route('pricing') }}">{{ __('ui.nav.pricing') }}</a>
-        @else
-          <a class="is-solid" href="{{ route('demo.page') }}">{{ __('ui.samples.cta_try') }}</a>
-          <a class="is-ghost" href="{{ route('register') }}">{{ __('ui.samples.cta_signup') }}</a>
-        @endauth
-      </div>
-    </section>
+    <div class="samples-closing">
+      @auth
+        <x-closing-panel :title="__('ui.samples.cta_title')" :body="__('ui.samples.cta_body')"
+          :primary="['href' => route('dashboard'), 'label' => __('ui.pricing.go_to_dashboard')]"
+          :secondary="['href' => route('pricing'), 'label' => __('ui.nav.pricing')]" />
+      @else
+        <x-closing-panel :title="__('ui.samples.cta_title')" :body="__('ui.samples.cta_body')"
+          :primary="['href' => route('demo.page'), 'label' => __('ui.samples.cta_try')]"
+          :secondary="['href' => route('register'), 'label' => __('ui.samples.cta_signup')]" />
+      @endauth
+    </div>
   </main>
 
   @include('components.footer')

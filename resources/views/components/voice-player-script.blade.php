@@ -47,6 +47,8 @@
       .catch(function () { return null; });
     return analyses[src];
   }
+  // Shared with the hero conversation, which plays its own lines: its orb ripples with them too.
+  window.ListenVoiceAnalyse = analyse;
   function infoOf(track) {
     return track && track.__vpInfo && track.__vpInfo.src === track.getAttribute('data-src') ? track.__vpInfo.data : null;
   }

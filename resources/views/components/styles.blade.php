@@ -33,14 +33,26 @@
   --radius: .5rem;
   --radius-lg: .75rem;
   --radius-full: 9999px;
+  /* The surface system, the same on every page: the page (--bg), a card on it (--surface,
+     --line hairline, --card-shadow, --card-radius), an inset inside a card such as a player,
+     a toggle track or a field (--surface2), and a firmer line around controls (--line-strong),
+     so outline buttons, chips and fields are always clearly drawn. Violet only marks what is
+     chosen or what to press. */
+  --line-strong: #3B3B4A;
+  --card-radius: 20px;
+  --card-shadow: none;
+  /* Every inner page opens with a title this size (the homepage hero is bigger). */
+  --page-title-size: clamp(2.1rem, 3.6vw, 3rem);
 }
 html[data-theme="light"] {
   /* One calm, neutral ground a step below white, so the white header, cards and footer
      stand on it; the colour is left to the voice orbs. */
   --bg: #F4F4F7;
   --surface: #FFFFFF;
-  --surface2: #F5F6FB;
-  --line: #E6E8F0;
+  --surface2: #F4F4F6;
+  --line: #E6E6EB;
+  --line-strong: #D0D0D9;
+  --card-shadow: 0 1px 2px rgba(16, 24, 40, .05);
   --text: #0F172A;
   /* Grey text stays readable on the light grey cards too. */
   --muted: #5F6673;
@@ -328,20 +340,19 @@ html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
   font-size: 0.95rem;
   padding: 0.85rem 1.8rem;
   border-radius: var(--btn-radius);
-  border: 1px solid var(--line);
-  background: color-mix(in oklab, var(--surface) 80%, transparent);
+  /* The secondary button: a white pill with a firm, clearly drawn border. */
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
   color: var(--text);
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, box-shadow .2s ease;
   text-decoration: none;
   line-height: 1.2;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
 }
 
 .btn:hover {
-  transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
+  border-color: color-mix(in oklab, var(--text) 45%, var(--line-strong));
+  background: color-mix(in oklab, var(--text) 3%, var(--surface));
 }
 
 .btn:focus-visible {
@@ -351,22 +362,20 @@ html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
 
 .btn-primary {
   background: var(--brand-accent);
-  border: none;
+  border: 1px solid transparent;
   color: #fff;
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--lift);
 }
 
 .btn.btn-primary:hover,
 .btn-primary:hover {
   background: var(--brand-hover);
-  transform: translateY(-2px);
-  box-shadow: var(--shadow);
+  border-color: transparent;
 }
 
 .btn.btn-primary:active,
 .btn-primary:active {
   background: var(--brand-active);
-  transform: translateY(0);
 }
 
 .btn-ghost {
@@ -376,7 +385,8 @@ html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
 }
 
 .btn-ghost:hover {
-  box-shadow: 0 12px 24px color-mix(in oklab, var(--line) 40%, transparent);
+  background: color-mix(in oklab, var(--text) 5%, transparent);
+  border-color: transparent;
 }
 
 .btn-icon {
@@ -387,7 +397,7 @@ html:not([data-theme="light"]) .mobile-locale-switch .locale-indicator {
   height: 2.35rem;
   padding: 0;
   border-radius: var(--btn-radius);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -456,6 +466,7 @@ html[data-theme="light"] .theme-toggle .moon { display: none; }
 .user-name {
   font-size: .85rem;
   font-weight: 600;
+  line-height: 1.5;
   max-width: 200px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -902,7 +913,7 @@ html[data-theme="light"] .app-footer {
   justify-content: center;
   width: 2.25rem;
   height: 2.25rem;
-  border-radius: var(--radius);
+  border-radius: var(--btn-radius);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--muted);
@@ -1518,4 +1529,64 @@ html[dir="rtl"] .pagination-info {
 .orb.is-drawn canvas { opacity: 1; }
 /* Drawn: the canvas is the whole sphere, so the stand-in's edge never shows around it. */
 .orb.is-drawn { background: none; }
+
+/* ===== CLOSING PANEL: how every marketing page ends (components/closing-panel) ===== */
+.closing-panel {
+  position: relative;
+  overflow: hidden;
+  margin: clamp(4rem, 8vw, 6.5rem) 0 3.5rem;
+  padding: clamp(2.75rem, 6vw, 4.5rem) clamp(1.25rem, 4vw, 3rem);
+  border-radius: var(--card-radius);
+  text-align: center;
+  color: #FFFFFF;
+  background: #17133A;
+  border: 1px solid rgba(255, 255, 255, .06);
+}
+.closing-orb {
+  --orb-size: clamp(96px, 11vw, 132px);
+  display: block;
+  margin: 0 auto 1.6rem;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 70px -12px color-mix(in srgb, var(--o1) 70%, transparent);
+}
+.closing-panel h2 {
+  margin: 0 0 .65rem;
+  color: #FFFFFF;
+  font-size: clamp(1.8rem, 3.6vw, 2.6rem);
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  text-wrap: balance;
+}
+html[dir="rtl"] .closing-panel h2 { letter-spacing: 0; line-height: 1.35; }
+.closing-panel p {
+  margin: 0 auto 1.9rem;
+  max-width: 46ch;
+  color: rgba(255, 255, 255, .74);
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+.closing-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; }
+.closing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 1.6rem;
+  border-radius: var(--btn-radius);
+  font-size: .95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color .2s ease, border-color .2s ease;
+}
+.closing-btn:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
+.closing-btn.is-solid { background: #FFFFFF; color: #17133A; }
+.closing-btn.is-solid:hover { background: #ECE8FF; }
+.closing-btn.is-ghost { border: 1px solid rgba(255, 255, 255, .28); color: #FFFFFF; }
+.closing-btn.is-ghost:hover { border-color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .08); }
+@media (max-width: 600px) {
+  .closing-panel { border-radius: 16px; }
+  /* Two buttons side by side, the same size. */
+  .closing-actions:has(.is-ghost) { display: grid; grid-template-columns: 1fr 1fr; gap: .6rem; }
+  .closing-btn { padding: .5rem .6rem; text-align: center; line-height: 1.3; }
+}
 </style>

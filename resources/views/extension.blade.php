@@ -6,8 +6,11 @@
     }
     .hero h1 {
       margin: 0 0 .75rem;
-      font-size: clamp(2rem, 4.5vw, 3rem);
+      font-size: var(--page-title-size);
+      font-weight: 600;
+      letter-spacing: -.03em;
     }
+    html[dir="rtl"] .hero h1 { letter-spacing: 0; }
     .hero p {
       color: var(--muted);
       font-size: 1.05rem;
@@ -22,27 +25,21 @@
       margin-top: 2.5rem;
     }
     .browser-card {
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
       padding: 2rem 1.5rem;
       text-align: center;
-      box-shadow: var(--shadow);
-      transition: transform .28s ease, border-color .28s ease;
+      box-shadow: var(--card-shadow);
+      transition: border-color .2s ease;
       position: relative;
       overflow: hidden;
     }
-    .browser-card:hover {
-      transform: translateY(-4px);
-    }
     .browser-card.available:hover {
-      border-color: color-mix(in oklab, var(--a) 50%, var(--line));
+      border-color: color-mix(in oklab, var(--text) 18%, var(--line));
     }
     .browser-card.coming-soon {
       opacity: .65;
-    }
-    .browser-card.coming-soon:hover {
-      transform: none;
     }
 
     .browser-icon {
@@ -90,26 +87,24 @@
       color: var(--muted);
       font-size: .78rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .05em;
     }
     .download-btn {
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      padding: .65rem 1.2rem;
-      border-radius: var(--radius);
+      min-height: 44px;
+      padding: 0 1.25rem;
+      border-radius: var(--btn-radius);
       background: var(--brand-accent);
+      box-shadow: var(--lift);
       color: #fff;
       font-weight: 600;
       font-size: .92rem;
       text-decoration: none;
-      transition: all .2s ease;
+      transition: background-color .2s ease;
       white-space: nowrap;
     }
     .download-btn:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow);
       background: var(--brand-hover);
     }
     .download-actions {
@@ -138,11 +133,11 @@
       gap: 1.5rem;
     }
     .page-card {
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
       padding: 1.75rem;
-      box-shadow: var(--shadow);
+      box-shadow: var(--card-shadow);
     }
     .page-card h2 {
       margin: 0 0 .7rem;
@@ -163,7 +158,7 @@
     .steps code {
       padding: .18rem .45rem;
       border-radius: .4rem;
-      background: var(--surface);
+      background: var(--surface2);
       font-size: .85rem;
       color: var(--text);
       direction: ltr;
@@ -176,11 +171,11 @@
       margin-bottom: 3rem;
     }
     .api-card {
-      background: var(--surface2);
+      background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
       padding: 2rem;
-      box-shadow: var(--shadow);
+      box-shadow: var(--card-shadow);
     }
     .api-header {
       display: flex;
@@ -238,8 +233,7 @@
     .key-display {
       margin-top: 1.25rem;
       padding: 1rem 1.25rem;
-      border-radius: var(--radius);
-      border: 1px solid var(--line);
+      border-radius: .75rem;
       background: var(--surface2);
     }
     .key-display-label {
@@ -311,9 +305,10 @@
     }
     .feature-card {
       padding: 1.25rem;
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
       border: 1px solid var(--line);
       background: var(--surface);
+      box-shadow: var(--card-shadow);
       text-align: center;
     }
     .feature-icon {

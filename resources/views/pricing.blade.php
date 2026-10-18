@@ -16,18 +16,19 @@
       text-align: center;
       padding: 4.75rem 1rem 3rem;
     }
+    /* One calm line on wide screens, the size every inner page's title uses. */
     .page-hero h1 {
-      margin: 0 auto 1rem;
-      max-width: 17ch;
-      font-size: clamp(2.4rem, 5vw, 3.75rem);
+      margin: 0 auto .9rem;
+      max-width: 26ch;
+      font-size: var(--page-title-size);
       font-weight: 600;
-      line-height: 1.05;
-      letter-spacing: -.04em;
+      line-height: 1.12;
+      letter-spacing: -.03em;
       text-wrap: balance;
     }
     html[dir="rtl"] .page-hero h1 {
       letter-spacing: 0;
-      line-height: 1.3;
+      line-height: 1.35;
     }
     .page-hero .lead {
       color: var(--muted);
@@ -47,7 +48,7 @@
     .billing-toggle {
       display: inline-grid;
       grid-template-columns: 1fr 1fr;
-      background: color-mix(in oklab, var(--text) 6%, transparent);
+      background: color-mix(in oklab, var(--text) 5%, transparent);
       border-radius: var(--radius-full);
       padding: 4px;
       position: relative;
@@ -134,13 +135,12 @@
       padding: 1.75rem 1.6rem 1.6rem;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 1.25rem;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
-      transition: border-color .2s ease, box-shadow .2s ease;
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+      transition: border-color .2s ease;
     }
     .plan-card:hover {
       border-color: color-mix(in oklab, var(--text) 18%, var(--line));
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 18px 40px -30px rgba(15, 23, 42, .3);
     }
     /* The recommended plan: the same white card, held in a violet ring, with its orb alive. */
     .plan-card.popular {
@@ -220,9 +220,8 @@
       align-self: stretch;
       margin-top: .55rem;
       padding: .75rem .9rem .8rem;
-      border-radius: .9rem;
-      background: color-mix(in oklab, var(--a) 7%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 20%, var(--line));
+      border-radius: .75rem;
+      background: var(--surface2);
     }
     .discount-terms-offer { color: var(--accent-text); font-size: .88rem; font-weight: 700; line-height: 1.45; }
     .discount-terms-then { color: var(--muted); font-size: .82rem; line-height: 1.45; }
@@ -233,7 +232,7 @@
       gap: .4rem;
       margin-top: .45rem;
       padding-top: .5rem;
-      border-top: 1px dashed color-mix(in oklab, var(--a) 22%, var(--line));
+      border-top: 1px dashed var(--line-strong);
       color: var(--text);
       font-size: .82rem;
       font-weight: 600;
@@ -279,7 +278,7 @@
     .plan-btn.btn-outline {
       background: transparent;
       color: var(--text);
-      border: 1px solid color-mix(in oklab, var(--text) 16%, transparent);
+      border: 1px solid var(--line-strong);
     }
     .plan-btn.btn-outline:hover { border-color: color-mix(in oklab, var(--text) 45%, transparent); background: color-mix(in oklab, var(--text) 4%, transparent); }
     .plan-btn:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
@@ -383,8 +382,8 @@
       padding: 1.35rem 1.6rem;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: 1.25rem;
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
     }
     .team-band[data-count="1"] { max-width: 440px; }
     .team-band[data-count="2"] { max-width: 900px; }
@@ -399,10 +398,11 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      min-height: 46px;
+      min-height: 48px;
       padding: 0 1.4rem;
       border-radius: var(--btn-radius);
-      border: 1px solid color-mix(in oklab, var(--text) 16%, transparent);
+      border: 1px solid var(--line-strong);
+      background: var(--surface);
       color: var(--text);
       font-size: .95rem;
       font-weight: 600;
@@ -435,9 +435,9 @@
     .compare-scroll {
       overflow-x: auto;
       border: 1px solid var(--line);
-      border-radius: 1.1rem;
+      border-radius: var(--card-radius);
       background: var(--surface);
-      box-shadow: 0 1px 2px rgba(15, 23, 42, .04);
+      box-shadow: var(--card-shadow);
     }
     .compare-scroll:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; }
     .compare-table {
@@ -523,22 +523,27 @@
     @media (min-width: 1100px) {
       .compare-scroll { overflow: visible; }
       .compare-table thead th { top: 64px; }
-      .compare-table thead th:first-child { border-start-start-radius: 1.1rem; }
-      .compare-table thead th:last-child { border-start-end-radius: 1.1rem; }
-      .compare-table tbody:last-of-type tr:last-child th { border-end-start-radius: 1.1rem; }
-      .compare-table tbody:last-of-type tr:last-child td:last-child { border-end-end-radius: 1.1rem; }
+      .compare-table thead th:first-child { border-start-start-radius: var(--card-radius); }
+      .compare-table thead th:last-child { border-start-end-radius: var(--card-radius); }
+      .compare-table tbody:last-of-type tr:last-child th { border-end-start-radius: var(--card-radius); }
+      .compare-table tbody:last-of-type tr:last-child td:last-child { border-end-end-radius: var(--card-radius); }
     }
 
     /* ── Included in every plan ── */
-    /* Three columns on a hairline, not three boxes. */
+    /* The same cards as the homepage's. */
     .features-section { padding: 6.5rem 0 1rem; }
     .features-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
-      border-top: 1px solid var(--line);
+      gap: 1rem;
     }
-    .feature-card { padding: 1.9rem 2rem .5rem 0; }
-    .feature-card + .feature-card { padding-inline-start: 2rem; border-inline-start: 1px solid var(--line); }
+    .feature-card {
+      padding: 1.6rem 1.5rem;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
+    }
     .feature-icon {
       width: 2.5rem;
       height: 2.5rem;
@@ -597,7 +602,7 @@
       height: 2rem;
       padding: .5rem;
       border-radius: 50%;
-      border: 1px solid var(--line);
+      border: 1px solid var(--line-strong);
       fill: none;
       stroke: var(--text);
       stroke-width: 2;
@@ -608,47 +613,6 @@
     .faq-item[open] .faq-toggle { transform: rotate(45deg); background: color-mix(in oklab, var(--text) 5%, transparent); }
     .faq-item p { margin: 0; padding: 0 0 1.5rem; padding-inline-end: 3.5rem; color: var(--muted); font-size: .97rem; line-height: 1.7; max-width: 68ch; }
 
-    /* ── Closing panel: deep ink, and the Listen orb alive in the middle ── */
-    .cta-section {
-      position: relative;
-      isolation: isolate;
-      overflow: hidden;
-      margin: 6.5rem 0 3.5rem;
-      padding: clamp(2.75rem, 6vw, 4.5rem) clamp(1.25rem, 4vw, 3rem);
-      border-radius: 1.5rem;
-      text-align: center;
-      color: #fff;
-      background: #17133A;
-      border: 1px solid rgba(255, 255, 255, .06);
-    }
-    .cta-orb {
-      --orb-size: clamp(96px, 11vw, 132px);
-      display: block;
-      margin: 0 auto 1.6rem;
-      box-shadow: 0 0 0 1px rgba(255, 255, 255, .06), 0 24px 70px -12px color-mix(in srgb, var(--o1) 70%, transparent);
-    }
-    .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.8rem, 3.6vw, 2.6rem); font-weight: 600; letter-spacing: -.03em; text-wrap: balance; }
-    html[dir="rtl"] .cta-section h2 { letter-spacing: 0; }
-    .cta-section p { margin: 0 auto 1.9rem; max-width: 46ch; color: rgba(255, 255, 255, .74); font-size: 1.05rem; line-height: 1.6; }
-    .cta-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: .75rem; }
-    .cta-btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 48px;
-      padding: 0 1.6rem;
-      border-radius: var(--btn-radius);
-      font-size: .95rem;
-      font-weight: 600;
-      text-decoration: none;
-      transition: background-color .2s ease, border-color .2s ease;
-    }
-    .cta-btn:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
-    .cta-btn-solid { background: #fff; color: #17133A; }
-    .cta-btn-solid:hover { background: #ECE8FF; }
-    .cta-btn-ghost { border: 1px solid rgba(255, 255, 255, .28); color: #fff; }
-    .cta-btn-ghost:hover { border-color: rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .08); }
-
     .trial-pill {
       display: inline-flex;
       align-items: center;
@@ -656,8 +620,9 @@
       margin: 0 auto 1.1rem;
       padding: .35rem 1.05rem .35rem .35rem;
       border-radius: 999px;
-      border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
-      background: color-mix(in oklab, var(--a) 8%, var(--surface));
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--card-shadow);
       font-size: .92rem;
       line-height: 1.3;
     }
@@ -712,8 +677,6 @@
     }
     @media (max-width: 860px) {
       .features-grid { grid-template-columns: 1fr; }
-      .feature-card, .feature-card + .feature-card { padding: 1.6rem 0; border-inline-start: 0; }
-      .feature-card + .feature-card { border-top: 1px solid var(--line); }
       .faq-section { grid-template-columns: 1fr; gap: 1.25rem; }
       .faq-intro { position: static; }
       .faq-intro .section-title, .faq-intro { text-align: center; }
@@ -729,7 +692,6 @@
       .billing-toggle button { padding: 0 .9rem; }
       .compare, .features-section, .faq-section { padding-top: 4rem; }
       .compare-table th[scope="row"], .compare-table thead th:first-child { min-width: 150px; }
-      .cta-section { margin-top: 4rem; border-radius: 1.2rem; }
       .team-band[data-count] { max-width: 520px; grid-template-columns: auto minmax(0, 1fr); padding: 1.25rem; }
       .team-btn { grid-column: 1 / -1; }
       .faq-item p { padding-inline-end: 0; }
@@ -1008,19 +970,14 @@
       </div>
     </section>
 
-    <section class="cta-section reveal">
-      <x-orb name="listen" class="cta-orb is-live" />
-      <h2>{{ __('ui.pricing.cta_title') }}</h2>
-      <p>{{ __('ui.pricing.cta_subtitle') }}</p>
-      <div class="cta-actions">
-        @auth
-          <a class="cta-btn cta-btn-solid" href="{{ route('dashboard') }}">{{ __('ui.pricing.go_to_dashboard') }}</a>
-        @else
-          <a class="cta-btn cta-btn-solid" href="{{ route('demo.page') }}">{{ __('ui.landing.try_demo') }}</a>
-          <a class="cta-btn cta-btn-ghost" href="{{ route('register') }}">{{ __('ui.pricing.create_free_account') }}</a>
-        @endauth
-      </div>
-    </section>
+    @auth
+      <x-closing-panel :title="__('ui.pricing.cta_title')" :body="__('ui.pricing.cta_subtitle')"
+        :primary="['href' => route('dashboard'), 'label' => __('ui.pricing.go_to_dashboard')]" />
+    @else
+      <x-closing-panel :title="__('ui.pricing.cta_title')" :body="__('ui.pricing.cta_subtitle')"
+        :primary="['href' => route('demo.page'), 'label' => __('ui.landing.try_demo')]"
+        :secondary="['href' => route('register'), 'label' => __('ui.pricing.create_free_account')]" />
+    @endauth
   </main>
 
   @include('components.footer')

@@ -262,7 +262,7 @@ class PricingPageLinesTest extends TestCase
             $page->assertSee(__('ui.pricing.team_title'));
             $page->assertSee('contact-us?topic=billing', false);
             // The closing panel carries the Listen orb.
-            $page->assertSee('class="orb cta-orb is-live"', false);
+            $page->assertSee('class="orb closing-orb is-live"', false);
         }
     }
 

@@ -174,8 +174,9 @@
   function voiceLevel(o) {
     var track = o.el.closest('[data-vp-track]');
     if (track && track.classList.contains('is-playing')) return Math.max(0, Math.min(1, track.__vpLevel || 0));
-    // The homepage conversation has its own player: a steady, breathing ripple while it plays.
-    if (o.el.closest('.is-playing-all')) return 0.3 + 0.18 * Math.abs(Math.sin(o.time * 2.2));
+    // The homepage conversation plays its own lines and keeps their loudness on its stage.
+    var cast = o.el.closest('[data-vs-cast]');
+    if (cast && cast.classList.contains('is-voicing')) return Math.max(0, Math.min(1, cast.__vpLevel || 0));
     return -1;
   }
   function isLive(o) {

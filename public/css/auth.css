@@ -13,7 +13,7 @@ html body.auth-split-body {
   --au-bg: #0B0B0F;
   --au-surface: #1A1A22;
   --au-hover: #20202A;
-  --au-line: #2A2A35;
+  --au-line: #3B3B4A;
   --au-input: #121218;
   --au-text: #FFFFFF;
   --au-muted: #A1A1AA;
@@ -24,8 +24,9 @@ html body.auth-split-body {
   --au-on-accent: #FFFFFF;
   --au-link: #A99CFF;
   --au-ring: rgba(118, 89, 250, .35);
-  --au-radius: 8px;
-  --au-radius-lg: 12px;
+  /* Fields and notices; buttons are pills like the rest of the site. */
+  --au-radius: 12px;
+  --au-radius-lg: 16px;
   --au-danger: #ee4a77;
   --au-danger-soft: rgba(238, 74, 119, .10);
   --au-ok: #32c58d;
@@ -45,11 +46,11 @@ html body.auth-split-body {
 html[data-theme="light"] body.auth-split-body {
   --au-bg: #FFFFFF;
   --au-surface: #FFFFFF;
-  --au-hover: #F5F6FB;
-  --au-line: #E6E8F0;
+  --au-hover: #F4F4F6;
+  --au-line: #D0D0D9;
   --au-input: #FFFFFF;
   --au-text: #0F172A;
-  --au-muted: #6B7280;
+  --au-muted: #5F6673;
   --au-link: #5B3DF5;
   --au-ring: rgba(118, 89, 250, .25);
   --au-danger: #d12f5c;
@@ -109,7 +110,7 @@ html body.auth-split-body .auth-lang {
   align-items: center;
   min-height: 36px;
   padding: 0 12px;
-  border-radius: var(--au-radius);
+  border-radius: 999px;
   color: var(--au-muted);
   font-size: 14px;
   font-weight: 500;
@@ -131,7 +132,7 @@ html body.auth-split-body .auth-icon-btn {
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: var(--au-radius);
+  border-radius: 999px;
   background: transparent;
   color: var(--au-muted);
   cursor: pointer;
@@ -208,7 +209,7 @@ html body.auth-split-body .google-btn {
   padding: 0 16px;
   box-sizing: border-box;
   border: 1px solid var(--au-line);
-  border-radius: var(--au-radius);
+  border-radius: 999px;
   background: var(--au-surface);
   color: var(--au-text);
   font-family: inherit;
@@ -320,7 +321,7 @@ html body.auth-split-body .auth-card button[type="submit"] {
   margin: 4px 0 0;
   padding: 0 16px;
   border: 0;
-  border-radius: var(--au-radius);
+  border-radius: 999px;
   background: var(--au-accent);
   color: var(--au-on-accent);
   font-family: inherit;
@@ -359,7 +360,7 @@ html body.auth-split-body .auth-card .phone-btn {
   min-height: 44px;
   padding: 0 14px;
   border: 1px solid var(--au-line);
-  border-radius: var(--au-radius);
+  border-radius: 999px;
   background: var(--au-surface);
   color: var(--au-text);
   font-family: inherit;

@@ -210,13 +210,14 @@
       position: relative;
       overflow: hidden;
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
       padding: 1.6rem 1.5rem;
       background: var(--surface);
+      box-shadow: var(--card-shadow);
       display: flex;
       flex-direction: column;
       gap: 1rem;
-      transition: transform .28s cubic-bezier(.22,1,.36,1), border-color .28s ease, box-shadow .28s ease;
+      transition: border-color .2s ease;
     }
     .app-card::before {
       content: "";
@@ -226,8 +227,7 @@
       display: none;
     }
     .app-card:hover {
-      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: var(--shadow);
+      border-color: color-mix(in oklab, var(--text) 18%, var(--line));
     }
     .app-card-head {
       display: flex;
@@ -245,10 +245,12 @@
       flex-shrink: 0;
       box-shadow: 0 4px 10px rgba(0,0,0,.08);
     }
+    /* Icon tiles are the same everywhere: a soft violet square, no border. */
     .app-icon {
       color: var(--accent-text);
       background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      border-color: color-mix(in oklab, var(--a) 22%, var(--line));
+      border-color: transparent;
+      border-radius: .75rem;
       box-shadow: none;
     }
     .app-icon svg {
@@ -310,8 +312,9 @@
       background: var(--brand-accent);
       color: #fff;
       font-size: .92rem;
-      font-weight: 700;
+      font-weight: 600;
       text-decoration: none;
+      box-shadow: var(--lift);
       transition: background-color .2s ease;
       white-space: nowrap;
     }
@@ -333,24 +336,19 @@
       flex-direction: column;
       background: var(--surface);
       border: 1px solid var(--line);
-      border-radius: var(--radius-lg);
+      border-radius: var(--card-radius);
+      box-shadow: var(--card-shadow);
       padding: 1.5rem 1.35rem;
-      transition: border-color .25s ease, box-shadow .25s ease;
-    }
-    .premium-card:hover {
-      border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: var(--shadow);
     }
     .premium-icon {
       width: 2.6rem;
       height: 2.6rem;
-      border-radius: .8rem;
+      border-radius: .75rem;
       display: grid;
       place-items: center;
       margin-bottom: 1rem;
       color: var(--accent-text);
       background: color-mix(in oklab, var(--a) 10%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
     }
     .premium-icon svg {
       width: 1.25rem;
@@ -377,25 +375,6 @@
       font-size: .82rem;
       font-weight: 700;
       color: var(--accent-text);
-    }
-
-    .cta-section {
-      text-align: center;
-      padding: clamp(2.25rem, 5vw, 3.5rem) clamp(1.25rem, 4vw, 3rem);
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 1.25rem;
-      margin: 0;
-    }
-    .cta-section h2 {
-      text-wrap: balance;
-    }
-    .cta-section h2 {
-      margin: 0 0 .65rem;
-    }
-    .cta-section p {
-      color: var(--muted);
-      margin: 0 0 1.25rem;
     }
 
     .hero-listen {
@@ -488,8 +467,9 @@
       padding: 0;
       list-style: none;
       border: 1px solid var(--line);
-      border-radius: 1.25rem;
+      border-radius: var(--card-radius);
       background: var(--surface);
+      box-shadow: var(--card-shadow);
       overflow: hidden;
     }
     .fact {
@@ -504,9 +484,9 @@
     .fact-value {
       margin-top: 1rem;
       font-size: clamp(2.1rem, 3.6vw, 2.9rem);
-      font-weight: 800;
+      font-weight: 600;
       line-height: 1.1;
-      letter-spacing: -.02em;
+      letter-spacing: -.03em;
       font-variant-numeric: tabular-nums;
     }
     .fact-label {
@@ -515,13 +495,13 @@
       font-weight: 500;
     }
 
-    /* The drawings: one shared stage, quiet colours, one entrance when the strip appears. */
+    /* The drawings: one shared inset (the same grey as every player and toggle), one
+       entrance when the strip appears. */
     .fact-art {
       position: relative;
       height: 88px;
-      border-radius: .9rem;
-      background: color-mix(in oklab, var(--a) 4%, var(--surface));
-      border: 1px solid color-mix(in oklab, var(--a) 12%, var(--line));
+      border-radius: .75rem;
+      background: var(--surface2);
       overflow: hidden;
     }
     .fact-art-dialects {
@@ -536,13 +516,13 @@
       padding: .26rem .7rem .32rem;
       border-radius: 14px 14px 14px 5px;
       background: var(--surface);
-      border: 1px solid color-mix(in oklab, var(--a) 22%, var(--line));
+      border: 1px solid var(--line);
       color: var(--accent-text);
       font-size: .86rem;
       font-weight: 700;
       line-height: 1.3;
       white-space: nowrap;
-      box-shadow: 0 6px 14px -10px color-mix(in oklab, var(--a) 60%, transparent);
+      box-shadow: var(--card-shadow);
     }
     /* A loose, staggered cluster, like messages arriving. */
     .fa-bubble:nth-child(odd) { transform: translateY(-4px); }
@@ -567,7 +547,7 @@
       height: 42px;
       border-radius: 12px;
       background: var(--surface);
-      border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
+      border: 1px solid var(--line);
       color: var(--accent-text);
     }
     .fa-tile:nth-child(odd) { transform: translateY(-7px); }
@@ -577,7 +557,7 @@
     /* One greeting, three deliveries: each louder word sits over a bigger voice. */
     .fact-art-styles { display: flex; align-items: flex-end; justify-content: center; gap: 1.1rem; padding-bottom: 1rem; }
     .fa-say { display: flex; flex-direction: column; align-items: center; gap: .35rem; }
-    .fa-say-word { line-height: 1; white-space: nowrap; }
+    .fa-say-word { line-height: 1.3; white-space: nowrap; }
     .fa-say-1 .fa-say-word { color: var(--muted); font-size: .8rem; font-weight: 400; letter-spacing: .04em; }
     .fa-say-2 .fa-say-word { color: var(--text); font-size: 1.05rem; font-weight: 600; }
     .fa-say-3 .fa-say-word { color: var(--accent-text); font-size: 1.55rem; font-weight: 800; letter-spacing: -.01em; }
@@ -735,9 +715,10 @@
       align-items: center;
       gap: 1rem;
       padding: .85rem 1rem .85rem .85rem;
-      border-radius: 1rem;
-      border: 1px solid color-mix(in oklab, var(--a) 26%, var(--line));
-      background: color-mix(in oklab, var(--a) 6%, var(--surface));
+      border-radius: var(--card-radius);
+      border: 1px solid var(--line);
+      background: var(--surface);
+      box-shadow: var(--card-shadow);
     }
     html[dir="rtl"] .clone-announce-card {
       padding: .85rem .85rem .85rem 1rem;
@@ -840,7 +821,7 @@
         grid-column: 1 / -1;
         justify-content: center;
         min-height: 46px;
-        border: 1.5px solid color-mix(in oklab, var(--a) 40%, var(--line));
+        border: 1px solid var(--line-strong);
         background: var(--surface);
       }
     }
@@ -1106,17 +1087,14 @@
       </div>
     </section>
 
-    <section class="section reveal">
-      <div class="cta-section">
-        <h2>{{ __('ui.landing.cta_title') }}</h2>
-        <p>{{ __('ui.landing.cta_subtitle') }}</p>
-        @auth
-          <a class="btn btn-primary" href="{{ route('dashboard') }}">{{ __('ui.landing.go_to_dashboard') }}</a>
-        @else
-          <a class="btn btn-primary" href="{{ route('register') }}">{{ __('ui.landing.get_started_free') }}</a>
-        @endauth
-      </div>
-    </section>
+    @auth
+      <x-closing-panel :title="__('ui.landing.cta_title')" :body="__('ui.landing.cta_subtitle')"
+        :primary="['href' => route('dashboard'), 'label' => __('ui.landing.go_to_dashboard')]" />
+    @else
+      <x-closing-panel :title="__('ui.landing.cta_title')" :body="__('ui.landing.cta_subtitle')"
+        :primary="['href' => route('register'), 'label' => __('ui.landing.get_started_free')]"
+        :secondary="['href' => route('pricing'), 'label' => __('ui.nav.pricing')]" />
+    @endauth
   </main>
 
   @include('components.footer')
