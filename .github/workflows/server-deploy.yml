@@ -1,7 +1,8 @@
 name: Server deploy
 
 # The servers are plain uploads, not git checkouts. This copies the files
-# tracked on main onto the server. It never deletes, and never touches .env,
+# tracked on main onto the server (staging: on the branch the run was started
+# from, so a branch can be tried there before it is merged; live: always main). It never deletes, and never touches .env,
 # storage/, vendor/, node_modules/, uploads, or the per-server extension
 # config (public/extensions/*/config.js).
 #   inspect: lists the files that differ from main (nothing changes).
@@ -53,7 +54,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: main
+          # Live always gets main. Staging gets the branch this run was started from
+          # (main when started from main), to try work there before it is merged.
+          ref: ${{ inputs.target == 'live' && 'main' || github.ref_name }}
           fetch-depth: 1
       - name: Build the bundle and its checksums
         run: |
@@ -62,7 +65,7 @@ jobs:
             | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' > files.txt
           tar -czf bundle.tgz -T files.txt
           xargs -d '\n' md5sum < files.txt > manifest.md5
-          echo "main: $(git log -1 --format='%h %s')"; wc -l < files.txt
+          echo "${{ inputs.target == 'live' && 'main' || github.ref_name }}: $(git log -1 --format='%h %s')"; wc -l < files.txt
       - name: Run over SSH
         env:
           TARGET: ${{ inputs.target }}

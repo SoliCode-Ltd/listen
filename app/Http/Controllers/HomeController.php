@@ -79,8 +79,8 @@ class HomeController extends Controller
 
     /**
      * The homepage tour: one orb for each kind of voice Listen makes, each with
-     * a real sample to hear, in the page language where there is one. Arabic
-     * dialects and English accents link to the samples page in their language.
+     * a real sample to hear, all in the page language: Arabic dialects on Arabic
+     * pages, English accents on English pages.
      *
      * @param  array<int, array<string, string>>  $environments
      * @return array<int, array{key: string, src: string, more: string}>
@@ -117,17 +117,12 @@ class HomeController extends Controller
             return (string) ($fits[0]['url'] ?? '');
         };
         $samplesPage = route('samples');
-        $samplesIn = fn (string $lang): string => $lang === $language
-            ? $samplesPage
-            : (string) \Mcamara\LaravelLocalization\Facades\LaravelLocalization::getLocalizedURL($lang, $samplesPage, [], true);
         $everyday = ['friendly', 'warm', 'conversational', 'confident'];
 
-        $arabic = ['key' => 'arabic', 'src' => $pick('ar', 'hero', $everyday), 'more' => $samplesIn('ar').'#arabic-dialects'];
-        $english = ['key' => 'english', 'src' => $pick('en', 'hero', $everyday), 'more' => $samplesIn('en').'#english-accents'];
-
         return [
-            // The page's own language comes first.
-            ...($language === 'ar' ? [$arabic, $english] : [$english, $arabic]),
+            $language === 'ar'
+                ? ['key' => 'arabic', 'src' => $pick('ar', 'hero', $everyday), 'more' => $samplesPage.'#arabic-dialects']
+                : ['key' => 'english', 'src' => $pick('en', 'hero', $everyday), 'more' => $samplesPage.'#english-accents'],
             ['key' => 'emotions', 'src' => $pick($language, 'hero', ['excited', 'dramatic', 'happy', 'playful']), 'more' => $samplesPage.'#moods'],
             ['key' => 'dialogue', 'src' => $pick($language, 'dialogue', ['comedy', 'conversational', 'friendly']), 'more' => $samplesPage.'#conversations'],
             ['key' => 'places', 'src' => (string) ($environments[0]['place_url'] ?? ''), 'more' => $samplesPage.'#sound-environments'],

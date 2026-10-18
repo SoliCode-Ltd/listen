@@ -977,9 +977,11 @@
     @php
       // Real counts, rounded down to the ten so each claim stays true as more are added.
       $factPlaces = (int) (floor(count(array_filter(\App\Support\AudioEffects::ALL, fn ($row) => $row[1] !== 'clean')) / 10) * 10);
+      $factDialects = ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'];
+      $factAccents = ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'];
       $facts = [
-        ['value' => \App\Support\DialectCounts::arabic(), 'label' => __('ui.landing.fact_dialects'), 'art' => 'dialects'],
-        ['value' => \App\Support\DialectCounts::english(), 'label' => __('ui.landing.fact_accents'), 'art' => 'accents'],
+        // The page's own language comes first.
+        ...(app()->getLocale() === 'ar' ? [$factDialects, $factAccents] : [$factAccents, $factDialects]),
         ['value' => $factPlaces, 'label' => __('ui.landing.fact_places'), 'art' => 'places'],
         ['value' => (int) (floor(count(\App\Support\StudioChoices::STYLES) / 10) * 10), 'label' => __('ui.landing.fact_styles'), 'art' => 'styles'],
       ];

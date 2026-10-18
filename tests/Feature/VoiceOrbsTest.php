@@ -18,14 +18,15 @@ class VoiceOrbsTest extends TestCase
         app()->setLocale('en');
         $en = $this->getLocalizedRoute('home')->assertOk();
         $tour = $en->viewData('voiceTour');
-        $this->assertSame(['english', 'arabic', 'emotions', 'dialogue', 'places', 'cloning'], array_column($tour, 'key'));
+        // English on the English page only.
+        $this->assertSame(['english', 'emotions', 'dialogue', 'places', 'cloning'], array_column($tour, 'key'));
         // Every kind but cloning plays a real sample; cloning leads to the plans that include it.
         foreach ($tour as $item) {
             $this->assertSame($item['key'] !== 'cloning', $item['src'] !== '', $item['key']);
         }
-        $this->assertSame(route('pricing'), $tour[5]['more']);
+        $this->assertSame(route('pricing'), $tour[4]['more']);
         $this->assertStringEndsWith('#english-accents', $tour[0]['more']);
-        $this->assertStringContainsString('/ar/', $tour[1]['more']);
+        $en->assertDontSee('data-orb="arabic"', false);
         $en->assertSee('Every kind of voice, in one studio');
         $en->assertSee('data-orb="places"', false);
         $en->assertSee('js/listen-orbs.js', false);
@@ -34,7 +35,9 @@ class VoiceOrbsTest extends TestCase
 
         app()->setLocale('ar');
         $ar = $this->getLocalizedRoute('home')->assertOk();
-        $this->assertSame('arabic', $ar->viewData('voiceTour')[0]['key']);
+        // Arabic on the Arabic page only.
+        $this->assertSame(['arabic', 'emotions', 'dialogue', 'places', 'cloning'], array_column($ar->viewData('voiceTour'), 'key'));
+        $ar->assertDontSee('data-orb="english"', false);
         $ar->assertSee('كل أنواع الأصوات في استوديو واحد');
     }
 
