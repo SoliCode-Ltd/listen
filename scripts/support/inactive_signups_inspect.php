@@ -285,6 +285,116 @@ if ($has('audio_generations')) {
 }
 krsort($daily);
 $out['daily'] = $daily;
-$out['never_made_a_voice_accounts'] = array_slice($rows, 0, 60);
+// Per sign-up day: how many of that day's new members ever made a voice.
+$cohort = [];
+foreach ($users as $u) {
+    $uid = (int) $u->id;
+    $d = Carbon::parse($u->created_at)->toDateString();
+    $made = ($demo[$uid] ?? 0) + ($gens[$uid] ?? 0) + ($tts[$uid] ?? 0) > 0;
+    $cohort[$d]['signups'] = ($cohort[$d]['signups'] ?? 0) + 1;
+    $cohort[$d]['made_a_voice'] = ($cohort[$d]['made_a_voice'] ?? 0) + ($made ? 1 : 0);
+    $cohort[$d]['used_demo'] = ($cohort[$d]['used_demo'] ?? 0) + (($demo[$uid] ?? 0) > 0 ? 1 : 0);
+    $cohort[$d]['used_dashboard'] = ($cohort[$d]['used_dashboard'] ?? 0) + (($gens[$uid] ?? 0) > 0 ? 1 : 0);
+}
+krsort($cohort);
+foreach ($cohort as &$c) {
+    $c['pct_made_a_voice'] = round(100 * $c['made_a_voice'] / max(1, $c['signups']));
+}
+unset($c);
+$out['by_signup_day'] = $cohort;
+
+// The switches that decide what a new member can do, and when they last changed.
+if ($has('site_settings')) {
+    $out['switches'] = DB::table('site_settings')
+        ->whereIn('key', [\App\Support\FreeAllowance::NEW_MEMBERS_KEY, \App\Support\DemoAllowance::SETTING_KEY])
+        ->get(['key', 'value', 'updated_at']);
+}
+$out['free_plan_updated_at'] = $free?->updated_at?->toDateTimeString();
+$out['free_plan_gives_monthly_chars'] = \App\Support\FreeAllowance::freePlanGivesMonthlyChars();
+
+// What the demo gives each recent member who never made a voice: the demo
+// is shared with accounts linked by IP, device or browser fingerprint.
+try {
+    $home = app(\App\Http\Controllers\HomeController::class);
+    $linked = new \ReflectionMethod($home, 'demoLinkedUserIds');
+    $linked->setAccessible(true);
+    $access = app(\App\Services\PlanAccessService::class);
+    $limit = \App\Support\DemoAllowance::chars();
+    $demoLeft = ['full' => 0, 'partly used by linked accounts' => 0, 'none left (linked accounts used it)' => 0];
+    $sample = [];
+    foreach (array_slice(array_filter($rows, fn ($r) => ! $r['blocked']), 0, 80) as $r) {
+        $ids = $linked->invoke($home, (int) $r['id'], null);
+        $used = (int) DB::table('demo_voice_generations')->whereIn('user_id', $ids)->sum('billable_chars');
+        $left = max(0, $limit - $used);
+        $demoLeft[$left >= $limit ? 'full' : ($left > 0 ? 'partly used by linked accounts' : 'none left (linked accounts used it)')]++;
+        if (count($sample) < 25) {
+            $sample[] = [
+                'id' => $r['id'], 'joined_utc' => $r['joined_utc'],
+                'plan' => $access->resolveQuotaPlanForUserId((int) $r['id'])?->slug,
+                'linked_accounts' => count($ids) - 1, 'demo_left' => $left,
+            ];
+        }
+    }
+    $out['demo_left_for_recent_inactive'] = ['limit' => $limit, 'counts' => $demoLeft, 'sample' => $sample];
+} catch (\Throwable $e) {
+    $out['demo_left_for_recent_inactive'] = 'n/a: '.get_class($e).': '.mb_substr($e->getMessage(), 0, 160);
+}
+
+// File sessions: the last page each signed-in member opened, and when.
+if (config('session.driver') === 'file') {
+    $dir = (string) config('session.files');
+    $seen = [];
+    $files = 0;
+    foreach (is_dir($dir) ? new \DirectoryIterator($dir) : [] as $f) {
+        if (! $f->isFile() || $f->getMTime() < $since->getTimestamp() || ++$files > 60000) {
+            continue;
+        }
+        $raw = @file_get_contents($f->getPathname());
+        if (! $raw) {
+            continue;
+        }
+        if (config('session.encrypt')) {
+            try {
+                $raw = decrypt($raw, false);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        $data = @unserialize($raw, ['allowed_classes' => false]);
+        if (! is_array($data)) {
+            continue;
+        }
+        foreach ($data as $k => $v) {
+            if (str_starts_with((string) $k, 'login_web_') && is_scalar($v)) {
+                $uid = (int) $v;
+                if (! isset($seen[$uid]) || $seen[$uid]['t'] < $f->getMTime()) {
+                    $seen[$uid] = ['t' => $f->getMTime(), 'url' => $data['_previous']['url'] ?? null];
+                }
+            }
+        }
+    }
+    $pagesF = [];
+    $staysF = ['no session file' => 0, 'under 1 min' => 0, '1-10 min' => 0, '10-60 min' => 0, 'over 1 hour' => 0];
+    foreach ($rows as &$r) {
+        $hit = $seen[$r['id']] ?? null;
+        if (! $hit) {
+            $staysF['no session file']++;
+
+            continue;
+        }
+        $u = $users->firstWhere('id', $r['id']);
+        $secs = $hit['t'] - Carbon::parse($u->created_at)->getTimestamp();
+        $staysF[match (true) { $secs < 60 => 'under 1 min', $secs < 600 => '1-10 min', $secs < 3600 => '10-60 min', default => 'over 1 hour' }]++;
+        $r['last_page'] = $path($hit['url']);
+        $r['stayed_after_signup'] = $ago($u->created_at, Carbon::createFromTimestamp($hit['t']));
+        $p = preg_replace('#^/(en|ar)(?=/|$)#', '', strtok($r['last_page'], '?')) ?: '/';
+        $pagesF[$p] = ($pagesF[$p] ?? 0) + 1;
+    }
+    unset($r);
+    arsort($pagesF);
+    $out['never_made_a_voice_from_session_files'] = ['files_read' => $files, 'members_found' => count($seen), 'last_page' => array_slice($pagesF, 0, 15, true), 'last_seen_after_signup' => $staysF];
+}
+
+$out['never_made_a_voice_accounts'] = array_slice($rows, 0, 40);
 
 echo json_encode($out, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE), "\n";
