@@ -4,16 +4,17 @@ namespace App\Services\Api;
 
 use App\Models\ApiKey;
 use App\Models\ApiKeyUsage;
+use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\PlanAccessService;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
-use App\Support\PlanUsageGuard;
 use App\Support\UsageSnapshot;
 
 /**
- * One member's developer API at a glance, for the dashboard and the keys
- * page. The figures come from the same rows the meter writes: the month's
+ * One member's developer API at a glance, for the dashboard's Developer API
+ * section. The figures come from the same rows the meter writes: the month's
  * usage counter (the plan's credits, shared by the dashboard, the extension
  * and the API) and each key's monthly row, so the API's share and the
  * rest always add up to what the dashboard shows.
@@ -21,6 +22,16 @@ use App\Support\UsageSnapshot;
 class ApiAccountSummary
 {
     public function __construct(private readonly PlanAccessService $planAccessService) {}
+
+    /**
+     * Whether the dashboard shows the Developer API section: to members whose
+     * plan includes the API, and to other paying members, who see which
+     * plans include it.
+     */
+    public static function shownFor(?Plan $plan): bool
+    {
+        return $plan !== null && (ApiPlanAccess::enabled($plan) || (int) $plan->price_cents > 0 || $plan->isPack());
+    }
 
     /**
      * @return array<string, mixed>
@@ -69,8 +80,13 @@ class ApiAccountSummary
             'limits' => [
                 'rpm' => ApiPlanAccess::requestsPerMinute($plan),
                 'concurrency' => ApiPlanAccess::concurrency($plan),
-                'max_chars' => min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), ApiSpeechService::MAX_TEXT),
+                'max_chars' => ApiFeatureGate::maxChars($quotaPlan),
+                'formats' => ApiSpeechService::formatsFor($plan),
             ],
+            // The studio options only some plans include, and whether this member has them.
+            'features' => ApiFeatureGate::availableTo($user, $plan),
+            // For members whose plan has no API: the plans that include it.
+            'api_plan_names' => ApiFeatureGate::apiPlans()->map(fn (Plan $apiPlan): string => $apiPlan->getLocalizedName(app()->getLocale()) ?: (string) $apiPlan->name)->values()->all(),
         ];
     }
 }

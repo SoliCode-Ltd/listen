@@ -66,6 +66,9 @@ final class ApiPresenter
                 'speed' => (float) ($generation->speed ?? 1.0),
                 'pitch' => (float) ($generation->pitch ?? 0.0),
             ],
+            // The effect is kept in the settings, as GenerateAudioJob reads it.
+            'audio_effect' => (($generation->settings_snapshot ?? [])['audio_effect'] ?? null) ?: null,
+            'dialogue' => (bool) $generation->is_dialogue,
             'title' => $title !== null && $title !== '' ? (string) $title : null,
             'text' => (string) $generation->input_text,
             'character_count' => (int) ($generation->billable_chars ?? UsageEstimator::billableChars((string) $generation->input_text)),

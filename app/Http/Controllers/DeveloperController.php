@@ -8,7 +8,7 @@ use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
 use App\Support\Api\ApiDocs;
-use App\Support\Api\ApiModels;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiScopes;
 use App\Support\Api\ApiVoiceCatalog;
@@ -16,12 +16,13 @@ use App\Support\PlanUsageGuard;
 use App\Support\VoiceTier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
- * The developer pages: the public API documentation (/developers) and the
- * member's API keys (/dashboard/api-keys).
+ * The developer pages: the public API documentation (/developers), and the
+ * member's API keys, managed in the dashboard's Developer API section.
  */
 class DeveloperController extends Controller
 {
@@ -29,74 +30,94 @@ class DeveloperController extends Controller
 
     public function docs(): View
     {
-        try {
-            $plans = Plan::query()
-                ->subscriptionPlans()
-                ->where('is_active', true)
-                ->orderBy('price_cents')
-                ->get()
-                // The same rule the API applies on every request.
-                ->filter(fn (Plan $plan): bool => ApiPlanAccess::enabled($plan))
-                ->values();
-        } catch (\Throwable) {
-            // Code deployed before its migration: the page still opens, without the table.
-            $plans = collect();
-        }
-
         $locale = app()->getLocale();
-        $planRows = $plans->map(fn (Plan $plan): array => [
+        // Read from the plans on every visit, so editing a plan in the admin
+        // changes this table at once (the same rules the API applies).
+        $planRows = ApiFeatureGate::apiPlans()->map(fn (Plan $plan): array => [
             'name' => $plan->getLocalizedName($locale) ?: (string) $plan->name,
             'credits' => PlanUsageGuard::planChars($plan),
+            'is_pack' => $plan->isPack(),
+            'daily_requests' => PlanUsageGuard::dailyRequests($plan),
             'rpm' => ApiPlanAccess::requestsPerMinute($plan),
             'concurrency' => ApiPlanAccess::concurrency($plan),
-            'max_chars' => min(PlanUsageGuard::maxCharsPerRequest($plan), ApiSpeechService::MAX_TEXT),
-            'models' => VoiceTier::normalize((string) $plan->voice_tier) === VoiceTier::HD
-                ? [ApiModels::STANDARD, ApiModels::PREMIUM]
-                : [ApiModels::STANDARD],
+            'max_chars' => ApiFeatureGate::maxChars($plan),
+            'formats' => ApiSpeechService::formatsFor($plan),
+            'features' => [
+                ApiFeatureGate::CUSTOM_DIRECTION => ApiFeatureGate::planOffers($plan, ApiFeatureGate::CUSTOM_DIRECTION),
+                ApiFeatureGate::SOUND_ENVIRONMENTS => ApiFeatureGate::planOffers($plan, ApiFeatureGate::SOUND_ENVIRONMENTS),
+                ApiFeatureGate::DIALOGUE => ApiFeatureGate::planOffers($plan, ApiFeatureGate::DIALOGUE),
+                ApiFeatureGate::CLONED_VOICES => ApiFeatureGate::planOffers($plan, ApiFeatureGate::CLONED_VOICES),
+            ],
         ])->all();
 
+        [$voice, $partner] = $this->sampleVoices($locale);
+
         return view('developers.docs', [
-            'docs' => ApiDocs::build($locale, url('/v1'), $this->sampleVoice($locale)),
+            'docs' => ApiDocs::build($locale, url('/v1'), $voice, $partner),
+            'voice' => $voice,
             'planRows' => $planRows,
             'baseUrl' => url('/v1'),
         ]);
     }
 
     /**
-     * The voice the examples use: Sumaya in Lebanese on the Arabic page, an
+     * The voices the examples use: Sumaya in Lebanese on the Arabic page, an
      * English premium voice on the English page, so each page reads in its
-     * own language.
+     * own language; and a second voice of the other gender for the dialogue.
      *
-     * @return array{voice_id:string, name:string, language:string, gender:?string}
+     * @return array{0: array{voice_id:string, name:string, language:string, gender:?string, preview_url:?string, avatar_url:?string}, 1: array{voice_id:string, name:string}}
      */
-    private function sampleVoice(string $locale): array
+    private function sampleVoices(string $locale): array
     {
         try {
-            $voices = collect(ApiVoiceCatalog::premade(VoiceTier::HD, false));
+            $voices = collect(ApiVoiceCatalog::premade(VoiceTier::HD));
         } catch (\Throwable) {
             $voices = collect();
         }
         $language = $locale === 'ar' ? 'ar' : 'en';
-        $premium = $voices->filter(fn (array $voice): bool => $voice['language'] === $language && $voice['_tier'] === VoiceTier::HD);
+        $premium = $voices->filter(fn (array $voice): bool => $voice['language'] === $language);
         $voice = ($language === 'ar' ? $premium->firstWhere('name', 'Sumaya') : null)
             ?? $premium->firstWhere('featured', true)
             ?? $premium->first();
+        $partner = $premium->first(fn (array $other): bool => $other['voice_id'] !== ($voice['voice_id'] ?? null)
+            && ($other['gender'] ?? null) !== ($voice['gender'] ?? null))
+            ?? $premium->first(fn (array $other): bool => $other['voice_id'] !== ($voice['voice_id'] ?? null));
 
         return [
-            'voice_id' => (string) ($voice['voice_id'] ?? 'voice_12'),
-            'name' => (string) ($voice['name'] ?? ($language === 'ar' ? 'Sumaya' : 'Olivia')),
-            'language' => $language,
-            'gender' => $voice['gender'] ?? null,
+            [
+                'voice_id' => (string) ($voice['voice_id'] ?? 'voice_12'),
+                'name' => (string) ($voice['name'] ?? ($language === 'ar' ? 'Sumaya' : 'Olivia')),
+                'name_ar' => (string) ($voice['name_ar'] ?? ''),
+                'language' => $language,
+                'gender' => $voice['gender'] ?? null,
+                'preview_url' => $voice['preview_url'] ?? null,
+                'avatar_url' => $voice['avatar_url'] ?? null,
+            ],
+            [
+                'voice_id' => (string) ($partner['voice_id'] ?? ($language === 'ar' ? 'voice_14' : 'voice_31')),
+                'name' => (string) ($partner['name'] ?? ''),
+            ],
         ];
     }
 
-    public function keys(Request $request, ApiAccountSummary $summary): View
+    /**
+     * Keys are managed in the dashboard (Developer API section); the old
+     * address takes members there, or to the documentation when their plan
+     * has no API section.
+     */
+    public function keys(Request $request): RedirectResponse
     {
-        return view('developers.keys', $summary->for($request->user()) + [
-            'scopes' => ApiScopes::all(),
-            'newKey' => $request->session()->get('new_api_key_plain'),
-            'maxKeys' => ApiKey::MAX_ACTIVE_PER_USER,
-        ]);
+        $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $request->user()->id);
+
+        return ApiAccountSummary::shownFor($plan)
+            ? redirect()->to(self::section())
+            : redirect()->route('developers');
+    }
+
+    /** The dashboard's Developer API section. */
+    public static function section(): string
+    {
+        return route('dashboard').'#developerApiSection';
     }
 
     public function store(Request $request): RedirectResponse
@@ -105,12 +126,12 @@ class DeveloperController extends Controller
         $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
         $status = ApiPlanAccess::statusFor((int) $user->id, $plan);
         if ($status !== ApiPlanAccess::OK) {
-            return redirect()->route('developers.keys')->with('error', $status === ApiPlanAccess::TRIAL
+            return redirect()->to(self::section())->with('api_error', $status === ApiPlanAccess::TRIAL
                 ? __('developers.keys.trial_title')
                 : __('developers.keys.not_in_plan_title'));
         }
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:80'],
             'scopes' => ['required', 'array', 'min:1'],
             'scopes.*' => ['string', Rule::in(ApiScopes::all())],
@@ -121,10 +142,14 @@ class DeveloperController extends Controller
             'scopes.min' => __('developers.keys.scopes_required'),
             'monthly_credit_limit.*' => __('developers.keys.limit_invalid'),
         ]);
+        if ($validator->fails()) {
+            return redirect()->to(self::section())->withErrors($validator, 'apiKeys')->withInput();
+        }
+        $validated = $validator->validated();
 
         $active = ApiKey::query()->where('user_id', $user->id)->active()->count();
         if ($active >= ApiKey::MAX_ACTIVE_PER_USER) {
-            return redirect()->route('developers.keys')->with('error', __('developers.keys.max_keys', ['count' => ApiKey::MAX_ACTIVE_PER_USER]));
+            return redirect()->to(self::section())->with('api_error', __('developers.keys.max_keys', ['count' => ApiKey::MAX_ACTIVE_PER_USER]));
         }
 
         $scopes = ApiScopes::normalize((array) ($validated['scopes'] ?? []));
@@ -136,8 +161,8 @@ class DeveloperController extends Controller
             isset($validated['monthly_credit_limit']) ? (int) $validated['monthly_credit_limit'] : null,
         );
 
-        return redirect()->route('developers.keys')
-            ->with('ok', __('developers.keys.flash_created'))
+        return redirect()->to(self::section())
+            ->with('api_ok', __('developers.keys.flash_created'))
             // Flashed for the next page only: shown once, never stored in plain text.
             ->with('new_api_key_plain', $issued['plain']);
     }
@@ -146,20 +171,24 @@ class DeveloperController extends Controller
     {
         $this->authorizeKey($request, $apiKey);
 
-        $validated = $request->validate([
+        $validator = Validator::make($request->all(), [
             'name' => ['required', 'string', 'max:80'],
             'monthly_credit_limit' => ['nullable', 'integer', 'min:1', 'max:1000000000'],
         ], [
             'name.required' => __('developers.keys.name_required'),
             'monthly_credit_limit.*' => __('developers.keys.limit_invalid'),
         ]);
+        if ($validator->fails()) {
+            return redirect()->to(self::section())->withErrors($validator, 'apiKeys');
+        }
+        $validated = $validator->validated();
 
         $apiKey->update([
             'name' => trim((string) $validated['name']),
             'monthly_credit_limit' => isset($validated['monthly_credit_limit']) ? (int) $validated['monthly_credit_limit'] : null,
         ]);
 
-        return redirect()->route('developers.keys')->with('ok', __('developers.keys.flash_updated'));
+        return redirect()->to(self::section())->with('api_ok', __('developers.keys.flash_updated'));
     }
 
     public function revoke(Request $request, ApiKey $apiKey): RedirectResponse
@@ -167,7 +196,7 @@ class DeveloperController extends Controller
         $this->authorizeKey($request, $apiKey);
         $apiKey->revoke();
 
-        return redirect()->route('developers.keys')->with('ok', __('developers.keys.flash_revoked'));
+        return redirect()->to(self::section())->with('api_ok', __('developers.keys.flash_revoked'));
     }
 
     private function authorizeKey(Request $request, ApiKey $apiKey): void

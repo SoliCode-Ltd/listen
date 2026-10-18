@@ -12,10 +12,13 @@ use App\Services\BlockedGenerationLogger;
 use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
 use App\Support\Api\ApiError;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiVoiceCatalog;
+use App\Support\AudioEffects;
 use App\Support\AudioFormats;
+use App\Support\DialogueSpeakers;
 use App\Support\GeminiVocalTags;
 use App\Support\PlanFeatures;
 use App\Support\PlanUsageGuard;
@@ -23,9 +26,11 @@ use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
+use App\Support\VoiceCloningAccess;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Text to speech for the developer API. Validates a request against the
@@ -51,6 +56,8 @@ class ApiSpeechService
 
     /**
      * Checks the request and works out everything the generation needs.
+     * Every studio option of the dashboard is available, and the ones only
+     * some plans include are refused with the plans that include them.
      *
      * @return array<string, mixed>
      */
@@ -71,31 +78,35 @@ class ApiSpeechService
             'voice_settings' => ['nullable', 'array'],
             'voice_settings.speed' => ['nullable', 'numeric', 'min:0.5', 'max:2'],
             'voice_settings.pitch' => ['nullable', 'numeric', 'min:-10', 'max:10'],
+            'audio_effect' => ['nullable', 'string', 'max:40'],
+            'dialogue' => ['nullable', 'array'],
+            'dialogue.speakers' => ['required_with:dialogue', 'array', 'min:2', 'max:6'],
+            'dialogue.speakers.*.name' => ['required', 'string', 'max:50'],
+            'dialogue.speakers.*.voice_id' => ['required', 'string', 'max:40'],
+            'dialogue.speakers.*.dialect' => ['nullable', 'string', 'max:20'],
             'translate' => ['nullable', 'boolean'],
             'title' => ['nullable', 'string', 'max:255'],
             'output_format' => ['nullable', 'string', 'in:'.implode(',', self::OUTPUT_FORMATS)],
         ], [
             'text.required' => 'The text field is required.',
-            'model_id.in' => 'model_id must be one of: '.implode(', ', ApiModels::ids()).'.',
+            'model_id.in' => 'model_id must be '.ApiModels::PREMIUM.'.',
             'language_code.in' => 'language_code must be one of: '.implode(', ', SpeechLanguages::codes()).'.',
             'output_format.in' => 'output_format must be one of: '.implode(', ', self::OUTPUT_FORMATS).'.',
+            'dialogue.speakers.required_with' => 'dialogue.speakers needs from 2 to 6 speakers.',
+            'dialogue.speakers.min' => 'dialogue.speakers needs from 2 to 6 speakers.',
+            'dialogue.speakers.max' => 'dialogue.speakers needs from 2 to 6 speakers.',
         ]);
         $validated = $validator->validate();
 
         $planTier = app(PlanAccessService::class)->resolveTierForPlan($plan);
+        if (str_starts_with($voiceId, 'cloned_') && ! VoiceCloningAccess::allows($user, $plan)) {
+            throw ApiFeatureGate::refusal(ApiFeatureGate::CLONED_VOICES, 'voice_id');
+        }
         $voice = ApiVoiceCatalog::find($user, $plan, $planTier, $voiceId, false);
         if ($voice === null) {
             throw ApiError::notFound('voice', 'voice_id');
         }
-        $tier = (string) $voice['_tier'];
-        if (VoiceTier::isHigherThan($tier, $planTier)) {
-            throw ApiError::featureNotInPlan('This voice uses the '.ApiModels::PREMIUM.' model, which your plan does not include. Upgrade your plan or choose a '.ApiModels::STANDARD.' voice.', 'voice_id');
-        }
-
-        $modelId = ApiModels::forTier($tier);
-        if (isset($validated['model_id']) && $validated['model_id'] !== $modelId) {
-            throw ApiError::invalid('model_voice_mismatch', "This voice belongs to the {$modelId} model. Leave model_id out or send \"{$modelId}\".", 'model_id');
-        }
+        $tier = VoiceTier::HD;
 
         $text = trim((string) $validated['text']);
         if (! GeminiVocalTags::hasWords($text)) {
@@ -103,11 +114,9 @@ class ApiSpeechService
         }
 
         $language = $this->language($validated, $voice, $text);
-        if (SpeechLanguages::premiumOnly($language) && $tier !== VoiceTier::HD) {
-            throw ApiError::invalid('language_not_supported_by_model', "This language is only spoken by {$modelId} voices.", 'language_code');
-        }
-
-        $studio = $this->studioOptions($validated, $tier, $language, $plan);
+        $studio = $this->studioOptions($validated, $language, $plan);
+        $audioEffect = $this->audioEffect($validated, $user, $plan);
+        $dialogue = $this->dialogue($validated, $user, $plan, $planTier, $language, $text);
 
         $estimate = UsageEstimator::estimate($text);
         $maxChars = min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), self::MAX_TEXT);
@@ -124,13 +133,15 @@ class ApiSpeechService
             'voice' => $voice,
             'voice_name' => (string) $voice['_internal_name'],
             'tier' => $tier,
-            'model_id' => $modelId,
+            'model_id' => ApiModels::PREMIUM,
             'language' => $language,
             'source_language' => SpeechLanguages::detect($text),
             'text' => $text,
             'title' => $validated['title'] ?? null,
             'translate' => (bool) ($validated['translate'] ?? false),
             'studio' => $studio,
+            'audio_effect' => $audioEffect,
+            'dialogue_speakers' => $dialogue,
             'estimate' => $estimate,
             'output_format' => $format,
         ];
@@ -187,8 +198,9 @@ class ApiSpeechService
                     'emotion' => $studio['emotion'],
                     'speed' => $studio['speed'],
                     'pitch' => $studio['pitch'],
-                    'is_dialogue' => false,
-                    'dialogue_metadata' => null,
+                    'audio_effect' => $spec['audio_effect'],
+                    'is_dialogue' => $spec['dialogue_speakers'] !== null,
+                    'dialogue_metadata' => $spec['dialogue_speakers'] !== null ? ['speakers' => $spec['dialogue_speakers']] : null,
                     'billed_to_pack' => $reservation['billed_to_pack'],
                     'api_key_id' => (int) $apiKey->id,
                 ],
@@ -283,32 +295,10 @@ class ApiSpeechService
      * @param  array<string, mixed>  $validated
      * @return array{dialect:?string, performance_style:string, emotion:string, style_prompt:?string, speed:float, pitch:float}
      */
-    private function studioOptions(array $validated, string $tier, string $language, ?Plan $plan): array
+    private function studioOptions(array $validated, string $language, ?Plan $plan): array
     {
         $speed = $validated['voice_settings']['speed'] ?? null;
         $pitch = $validated['voice_settings']['pitch'] ?? null;
-
-        if ($tier !== VoiceTier::HD) {
-            foreach (['dialect', 'style', 'emotion', 'style_prompt'] as $param) {
-                if (filled($validated[$param] ?? null)) {
-                    throw ApiError::invalid('parameter_not_supported', "{$param} is only available on ".ApiModels::PREMIUM.' voices.', $param);
-                }
-            }
-            foreach (['speed' => $speed, 'pitch' => $pitch] as $param => $value) {
-                if ($value !== null) {
-                    throw ApiError::invalid('parameter_not_supported', "voice_settings.{$param} is only available on ".ApiModels::PREMIUM.' voices.', "voice_settings.{$param}");
-                }
-            }
-
-            return [
-                'dialect' => null,
-                'performance_style' => 'neutral',
-                'emotion' => 'neutral',
-                'style_prompt' => null,
-                'speed' => 1.0,
-                'pitch' => 0.0,
-            ];
-        }
 
         $dialect = trim((string) ($validated['dialect'] ?? ''));
         if ($dialect !== '' && ! in_array($dialect, TtsStudioConfig::dialectValues($language), true)) {
@@ -330,8 +320,8 @@ class ApiSpeechService
         $defaults = TtsStudioConfig::withDefaultChoices(['performance_style' => $style, 'emotion' => $emotion], $language);
 
         $stylePrompt = trim((string) ($validated['style_prompt'] ?? ''));
-        if ($stylePrompt !== '' && ! PlanFeatures::planOffers($plan, PlanFeatures::PROMPT)) {
-            throw ApiError::featureNotInPlan('Custom voice direction (style_prompt) is not included in your plan.', 'style_prompt');
+        if ($stylePrompt !== '' && ! ApiFeatureGate::planOffers($plan, ApiFeatureGate::CUSTOM_DIRECTION)) {
+            throw ApiFeatureGate::refusal(ApiFeatureGate::CUSTOM_DIRECTION, 'style_prompt');
         }
 
         return [
@@ -342,6 +332,77 @@ class ApiSpeechService
             'speed' => $speed !== null ? (float) $speed : 1.0,
             'pitch' => $pitch !== null ? (float) $pitch : 0.0,
         ];
+    }
+
+    /**
+     * A sound environment for the whole recording, on plans (or members) that have them.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function audioEffect(array $validated, User $user, ?Plan $plan): ?string
+    {
+        $effect = trim((string) ($validated['audio_effect'] ?? ''));
+        if ($effect === '') {
+            return null;
+        }
+        if (! AudioEffects::isValid($effect)) {
+            throw ApiError::invalid('invalid_audio_effect', "Unknown audio_effect \"{$effect}\". GET /v1/voice-options lists them.", 'audio_effect');
+        }
+        if (! PlanFeatures::userHas($user, $plan, PlanFeatures::EFFECTS)) {
+            throw ApiFeatureGate::refusal(ApiFeatureGate::SOUND_ENVIRONMENTS, 'audio_effect');
+        }
+        if (! AudioEffects::available()) {
+            throw new ApiError(503, ApiError::TYPE_API, 'feature_unavailable', 'Sound environments are temporarily unavailable. Try again later, or leave audio_effect out.', 'audio_effect');
+        }
+
+        return $effect;
+    }
+
+    /**
+     * Dialogue with several voices: each speaker's name starts their lines in
+     * the text ("Sara: …"), as in the studio's dialogue mode.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<int, array{name:string, voice:string, dialect?:string}>|null
+     */
+    private function dialogue(array $validated, User $user, ?Plan $plan, string $planTier, string $language, string $text): ?array
+    {
+        if (empty($validated['dialogue'])) {
+            return null;
+        }
+        if (! PlanFeatures::userHas($user, $plan, PlanFeatures::DIALOGUE)) {
+            throw ApiFeatureGate::refusal(ApiFeatureGate::DIALOGUE, 'dialogue');
+        }
+
+        $speakers = [];
+        foreach ((array) $validated['dialogue']['speakers'] as $index => $speaker) {
+            $voiceId = trim((string) $speaker['voice_id']);
+            $voice = ApiVoiceCatalog::find($user, $plan, $planTier, $voiceId, false);
+            if ($voice === null || ($voice['category'] ?? '') !== 'premade') {
+                throw ApiError::invalid('invalid_dialogue', "dialogue.speakers.{$index}.voice_id must be a studio voice id from GET /v1/voices.", "dialogue.speakers.{$index}.voice_id");
+            }
+            if (($voice['language'] ?? null) !== SpeechLanguages::voiceLanguage($language)) {
+                throw ApiError::invalid('invalid_dialogue', "dialogue.speakers.{$index}.voice_id speaks \"{$voice['language']}\"; every speaker must speak \"{$language}\".", "dialogue.speakers.{$index}.voice_id");
+            }
+            $entry = ['name' => trim((string) $speaker['name']), 'voice' => $voiceId];
+            $dialect = trim((string) ($speaker['dialect'] ?? ''));
+            if ($dialect !== '') {
+                if (! in_array($dialect, TtsStudioConfig::dialectValues($language), true)) {
+                    throw ApiError::invalid('invalid_dialect', "Unknown dialect \"{$dialect}\" for language \"{$language}\".", "dialogue.speakers.{$index}.dialect");
+                }
+                $entry['dialect'] = $dialect;
+            }
+            $speakers[] = $entry;
+        }
+
+        try {
+            DialogueSpeakers::ensureUsable(VoiceTier::HD, $speakers, $text, 'text');
+        } catch (ValidationException $e) {
+            $field = (string) array_key_first($e->errors());
+            throw ApiError::invalid('invalid_dialogue', (string) ($e->errors()[$field][0] ?? 'The dialogue is not valid.'), $field === 'text' ? 'text' : 'dialogue.speakers');
+        }
+
+        return $speakers;
     }
 
     /**
@@ -362,7 +423,7 @@ class ApiSpeechService
             throw ApiError::invalid('invalid_output_format', 'output_format must be one of: '.implode(', ', self::OUTPUT_FORMATS).'.', 'output_format');
         }
         if ($format !== 'mp3' && ! in_array($format, AudioFormats::chosenFor($plan), true)) {
-            throw ApiError::featureNotInPlan("The {$format} output format is not included in your plan.", 'output_format');
+            throw ApiFeatureGate::formatRefusal($format);
         }
         if (! in_array($format, self::formatsFor($plan), true)) {
             throw new ApiError(503, ApiError::TYPE_API, 'output_format_unavailable', "The {$format} output format is temporarily unavailable. Use mp3.", 'output_format');

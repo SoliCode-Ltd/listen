@@ -3,12 +3,8 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Services\Api\ApiSpeechService;
-use App\Services\PlanAccessService;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
-use App\Support\PlanFeatures;
-use App\Support\PlanUsageGuard;
-use App\Support\VoiceTier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -17,48 +13,29 @@ use Illuminate\Http\Request;
  */
 class ModelController extends Controller
 {
-    public function index(Request $request, PlanAccessService $planAccessService): JsonResponse
+    public function index(Request $request): JsonResponse
     {
+        $user = $request->user();
         $plan = $request->attributes->get('api_plan');
         $quotaPlan = $request->attributes->get('api_quota_plan');
-        $planTier = $planAccessService->resolveTierForPlan($plan);
-        $maxChars = min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), ApiSpeechService::MAX_TEXT);
 
         return response()->json([
             'models' => [
                 [
-                    'model_id' => ApiModels::STANDARD,
-                    'name' => 'Listen Standard',
-                    'description' => 'Clear, fast neural voices for Arabic and English. Best for high-volume reading, notifications and accessibility.',
+                    'model_id' => ApiModels::PREMIUM,
+                    'name' => ApiModels::NAME,
+                    'description' => 'Expressive studio voices for Arabic and English, with Arabic dialects, English accents, delivery styles, emotions, inline sound tags such as <laugh> or <short pause>, sound environments and dialogue.',
                     'languages' => ['ar', 'en'],
                     'available_on_plan' => true,
-                    'max_characters_per_request' => $maxChars,
-                    'supports' => [
-                        'dialect' => false,
-                        'style' => false,
-                        'emotion' => false,
-                        'style_prompt' => false,
-                        'voice_settings' => false,
-                        'inline_tags' => false,
-                        'cloned_voices' => false,
-                    ],
-                ],
-                [
-                    'model_id' => ApiModels::PREMIUM,
-                    'name' => 'Listen Premium',
-                    'description' => 'Expressive studio voices with Arabic dialects, English accents, delivery styles, emotions and inline sound tags such as <laugh> or <short pause>.',
-                    'languages' => ['ar', 'en'],
-                    'available_on_plan' => ! VoiceTier::isHigherThan(VoiceTier::HD, $planTier),
-                    'max_characters_per_request' => $maxChars,
+                    'max_characters_per_request' => ApiFeatureGate::maxChars($quotaPlan),
+                    // What this account's plan can use; the rest is refused with feature_not_in_plan.
                     'supports' => [
                         'dialect' => true,
                         'style' => true,
                         'emotion' => true,
-                        'style_prompt' => PlanFeatures::planOffers($plan, PlanFeatures::PROMPT),
                         'voice_settings' => true,
                         'inline_tags' => true,
-                        'cloned_voices' => true,
-                    ],
+                    ] + ApiFeatureGate::availableTo($user, $plan),
                 ],
             ],
         ]);

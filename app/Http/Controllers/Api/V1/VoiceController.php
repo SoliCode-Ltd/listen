@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
 use App\Support\Api\ApiError;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiVoiceCatalog;
+use App\Support\AudioEffects;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
 use Illuminate\Http\JsonResponse;
@@ -64,8 +66,8 @@ class VoiceController extends Controller
     }
 
     /**
-     * Dialects, delivery styles and emotions the premium voices take, with the
-     * site's defaults, and the output formats this account can ask for.
+     * Dialects, delivery styles, emotions and sound environments, with the
+     * site's defaults, and the output formats and options this account can use.
      */
     public function options(Request $request): JsonResponse
     {
@@ -101,7 +103,11 @@ class VoiceController extends Controller
                 'speed' => ['min' => 0.5, 'max' => 2.0, 'default' => 1.0],
                 'pitch' => ['min' => -10, 'max' => 10, 'default' => 0],
             ],
+            'audio_effects' => array_map($row, AudioEffects::options()),
+            'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
             'output_formats' => ApiSpeechService::formatsFor($request->attributes->get('api_plan')),
+            // The options only some plans include, and whether this account has them.
+            'features' => ApiFeatureGate::availableTo($request->user(), $request->attributes->get('api_plan')),
         ]);
     }
 }

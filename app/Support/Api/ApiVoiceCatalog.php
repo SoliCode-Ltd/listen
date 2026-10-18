@@ -15,16 +15,16 @@ use App\Support\VoiceTier;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * The voices the developer API offers: the same speakers the dashboard shows
- * (for each tier, the voices of the engine the site currently prefers), plus
- * the member's own ready cloned voices when their plan includes cloning.
+ * The voices the developer API offers: the dashboard's premium speakers (the
+ * voices of the engine the site currently prefers for them), plus the
+ * member's own ready cloned voices when their plan includes cloning.
  * Voice ids are the dashboard's public keys (voice_{id}, cloned_{id}); the
  * engine's own voice names are never exposed.
  */
 final class ApiVoiceCatalog
 {
     /**
-     * Every studio voice, keyed by voice id, in the dashboard's order.
+     * Every premium studio voice, keyed by voice id, in the dashboard's order.
      * $withMedia adds preview and avatar links (it looks for each preview file,
      * so generating leaves it out).
      *
@@ -45,7 +45,7 @@ final class ApiVoiceCatalog
             (string) VoiceSample::query()->where('is_active', true)->count(),
             url('/'),
         ]);
-        $key = 'api-voices:'.md5($version).':'.($withMedia ? 'media' : 'plain');
+        $key = 'api-voices:v2:'.md5($version).':'.($withMedia ? 'media' : 'plain');
         $voices = Cache::remember($key, now()->addMinutes(30), fn (): array => self::buildPremade($withMedia));
 
         return array_map(static function (array $voice) use ($planTier): array {
@@ -63,7 +63,8 @@ final class ApiVoiceCatalog
         $library = $withMedia ? VoiceCatalog::libraryEntries(false) : [];
         $ids = [];
         $arabicNames = [];
-        foreach (VoiceCatalog::publicCatalogByTier() as $voicesByLanguage) {
+        // The API offers the premium studio voices only (one model).
+        foreach ([VoiceCatalog::publicCatalogByTier()[VoiceTier::HD] ?? []] as $voicesByLanguage) {
             foreach ($voicesByLanguage as $voices) {
                 foreach ($voices as $voice) {
                     $id = (int) substr((string) $voice['key'], strlen('voice_'));
@@ -80,7 +81,7 @@ final class ApiVoiceCatalog
         $voices = [];
         foreach ($ids as $id) {
             $voice = $rows->get($id);
-            if (! $voice instanceof Voice) {
+            if (! $voice instanceof Voice || VoiceTier::normalize((string) $voice->tier) !== VoiceTier::HD) {
                 continue;
             }
             $key = VoiceCatalog::keyFromId($id);

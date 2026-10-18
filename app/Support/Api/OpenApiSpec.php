@@ -2,7 +2,9 @@
 
 namespace App\Support\Api;
 
+use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Support\AudioEffects;
 use App\Support\SpeechLanguages;
 
 /**
@@ -24,8 +26,8 @@ final class OpenApiSpec
             'info' => [
                 'title' => 'Listen API',
                 'version' => self::VERSION,
-                'summary' => 'Arabic and English text to speech: studio voices, Arabic dialects, English accents and your own cloned voices.',
-                'description' => 'Turn text into natural Arabic and English speech. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Available on paid plans that allow commercial use. Full guide: '.url('/developers'),
+                'summary' => 'Arabic and English text to speech: studio voices, Arabic dialects, English accents, emotions, sound environments, dialogue and your own cloned voices.',
+                'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Full guide: '.url('/developers'),
                 'contact' => ['name' => 'Listen support', 'email' => 'support@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
@@ -62,6 +64,12 @@ final class OpenApiSpec
             'schema' => ['type' => 'string', 'enum' => ApiSpeechService::OUTPUT_FORMATS, 'default' => 'mp3'],
         ];
 
+        $idempotencyParam = [
+            'name' => ApiIdempotency::HEADER, 'in' => 'header', 'required' => false,
+            'description' => 'A value of your own, unique to this request (up to 255 characters). Sent again within 24 hours with the same body, the first result is returned (Idempotent-Replayed: true) and nothing is charged again.',
+            'schema' => ['type' => 'string', 'maxLength' => 255],
+        ];
+
         $ttsBody = [
             'required' => true,
             'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/TextToSpeechRequest']]],
@@ -74,7 +82,7 @@ final class OpenApiSpec
                     'operationId' => 'textToSpeech',
                     'summary' => 'Convert text to speech',
                     'description' => 'Generates speech and returns the audio file in the response body. Requires the text_to_speech permission.',
-                    'parameters' => [$voiceIdParam, $formatParam],
+                    'parameters' => [$voiceIdParam, $idempotencyParam, $formatParam],
                     'requestBody' => $ttsBody,
                     'responses' => [
                         '200' => [
@@ -86,6 +94,7 @@ final class OpenApiSpec
                                 'X-Credits-Remaining' => self::header('integer', 'Credits left this period.'),
                                 'X-Audio-Duration-Seconds' => self::header('integer', 'Length of the audio.'),
                                 'X-Output-Format' => self::header('string', 'File type of the body.'),
+                                'Idempotent-Replayed' => self::header('string', 'true when this is the saved result of an earlier request with the same Idempotency-Key.'),
                                 'X-Request-Id' => self::header('string', 'Id of this request, for support.'),
                                 'X-RateLimit-Limit' => self::header('integer', 'Requests allowed a minute.'),
                                 'X-RateLimit-Remaining' => self::header('integer', 'Requests left this minute.'),
@@ -98,7 +107,7 @@ final class OpenApiSpec
                                 'audio/flac' => ['schema' => ['type' => 'string', 'format' => 'binary']],
                             ],
                         ],
-                    ] + self::errorResponses(['400', '401', '402', '403', '404', '422', '429', '502']),
+                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '422', '429', '502', '503']),
                 ],
             ],
             '/text-to-speech/{voice_id}/async' => [
@@ -107,7 +116,7 @@ final class OpenApiSpec
                     'operationId' => 'textToSpeechAsync',
                     'summary' => 'Convert text to speech in the background',
                     'description' => 'Queues the generation and answers at once with a history item. Poll GET /v1/history/{history_item_id} until its status is completed or failed, then download the audio. Best for long texts. Credits are reserved now and given back if the generation fails. Each account may have a few background generations waiting at once (429 queue_limit_exceeded).',
-                    'parameters' => [$voiceIdParam],
+                    'parameters' => [$voiceIdParam, $idempotencyParam],
                     'requestBody' => $ttsBody,
                     'responses' => [
                         '202' => [
@@ -115,7 +124,7 @@ final class OpenApiSpec
                             'headers' => ['Location' => self::header('string', 'URL of the history item.')],
                             'content' => ['application/json' => ['schema' => ['$ref' => '#/components/schemas/HistoryItem']]],
                         ],
-                    ] + self::errorResponses(['400', '401', '402', '403', '404', '422', '429']),
+                    ] + self::errorResponses(['400', '401', '402', '403', '404', '409', '422', '429', '503']),
                 ],
             ],
             '/voices' => [
@@ -156,8 +165,8 @@ final class OpenApiSpec
                 'get' => [
                     'tags' => ['Voices'],
                     'operationId' => 'getVoiceOptions',
-                    'summary' => 'List dialects, styles and emotions',
-                    'description' => 'Values accepted by dialect, style and emotion on listen_premium voices, the defaults used when they are left out, and the output formats your plan can request.',
+                    'summary' => 'List voice options',
+                    'description' => 'Values accepted by dialect, style, emotion and audio_effect, the defaults used when they are left out, the output formats your plan can request, and which plan options you have.',
                     'responses' => [
                         '200' => self::json('The options.', ['$ref' => '#/components/schemas/VoiceOptions']),
                     ] + self::errorResponses(['401', '403', '429']),
@@ -168,6 +177,7 @@ final class OpenApiSpec
                     'tags' => ['Voices'],
                     'operationId' => 'listModels',
                     'summary' => 'List models',
+                    'description' => 'One model, '.ApiModels::PREMIUM.'. supports says which options your plan includes.',
                     'responses' => [
                         '200' => self::json('The models.', [
                             'type' => 'object',
@@ -289,16 +299,35 @@ final class OpenApiSpec
                     'type' => 'object',
                     'required' => ['text'],
                     'properties' => [
-                        'text' => ['type' => 'string', 'maxLength' => ApiSpeechService::MAX_TEXT, 'description' => 'The text to read. Your plan sets the most characters per request (see GET /v1/user/subscription). listen_premium voices also read inline sound tags such as <laugh> and <short pause>.'],
-                        'model_id' => ['type' => 'string', 'enum' => ApiModels::ids(), 'description' => 'Optional. Each voice belongs to one model; if sent, it must match the voice.'],
+                        'text' => ['type' => 'string', 'maxLength' => ApiSpeechService::MAX_TEXT, 'description' => 'The text to read. Your plan sets the most characters per request (see GET /v1/user/subscription). Inline sound tags such as <laugh> and <short pause> are read as sounds. In a dialogue, each line starts with a speaker\'s name and a colon.'],
+                        'model_id' => ['type' => 'string', 'enum' => ApiModels::ids(), 'description' => 'Optional; the only model.'],
                         'language_code' => ['type' => 'string', 'enum' => SpeechLanguages::codes(), 'description' => 'Language to speak. Defaults to the voice\'s language.'],
-                        'dialect' => ['type' => 'string', 'description' => 'listen_premium only. An Arabic dialect such as ar-EG, ar-SA or ar-LB, or an English accent such as en-US or en-GB. See GET /v1/voice-options.', 'examples' => ['ar-LB']],
-                        'style' => ['type' => 'string', 'description' => 'listen_premium only. Delivery style, such as narrative, news or assistant.'],
-                        'emotion' => ['type' => 'string', 'description' => 'listen_premium only. Emotion, such as warm, calm or excited.'],
-                        'style_prompt' => ['type' => 'string', 'maxLength' => 2000, 'description' => 'listen_premium only, on plans with custom direction. Free-text direction for the delivery.'],
+                        'dialect' => ['type' => 'string', 'description' => 'An Arabic dialect such as ar-EG, ar-SA or ar-LB, or an English accent such as en-US or en-GB. See GET /v1/voice-options.', 'examples' => ['ar-LB']],
+                        'style' => ['type' => 'string', 'description' => 'Delivery style, such as narrative, news or assistant.'],
+                        'emotion' => ['type' => 'string', 'description' => 'Emotion, such as warm, calm or excited.'],
+                        'style_prompt' => ['type' => 'string', 'maxLength' => 2000, 'description' => 'On plans with custom direction. Free-text direction for the delivery.'],
+                        'audio_effect' => ['type' => 'string', 'enum' => AudioEffects::keys(), 'description' => 'On plans with sound environments. A sound environment for the whole recording.'],
+                        'dialogue' => [
+                            'type' => 'object',
+                            'description' => 'On plans with dialogue. Several voices in one recording.',
+                            'required' => ['speakers'],
+                            'properties' => [
+                                'speakers' => [
+                                    'type' => 'array', 'minItems' => 2, 'maxItems' => 6,
+                                    'items' => [
+                                        'type' => 'object',
+                                        'required' => ['name', 'voice_id'],
+                                        'properties' => [
+                                            'name' => ['type' => 'string', 'maxLength' => 50, 'description' => 'The name that starts this speaker\'s lines in the text.'],
+                                            'voice_id' => ['type' => 'string', 'description' => 'A studio voice of the text\'s language.'],
+                                            'dialect' => ['type' => 'string', 'description' => 'This speaker\'s own dialect or accent.'],
+                                        ],
+                                    ],
+                                ],
+                            ],
+                        ],
                         'voice_settings' => [
                             'type' => 'object',
-                            'description' => 'listen_premium only.',
                             'properties' => [
                                 'speed' => ['type' => 'number', 'minimum' => 0.5, 'maximum' => 2, 'default' => 1],
                                 'pitch' => ['type' => 'number', 'minimum' => -10, 'maximum' => 10, 'default' => 0],
@@ -306,6 +335,7 @@ final class OpenApiSpec
                         ],
                         'translate' => ['type' => 'boolean', 'default' => false, 'description' => 'Translate the text into language_code before reading it.'],
                         'title' => ['type' => 'string', 'maxLength' => 255, 'description' => 'A label for the history item.'],
+                        'output_format' => ['type' => 'string', 'enum' => ApiSpeechService::OUTPUT_FORMATS, 'description' => 'Same as the output_format query parameter.'],
                     ],
                 ],
                 'Voice' => [
@@ -344,7 +374,20 @@ final class OpenApiSpec
                         'emotions' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/Option']],
                         'defaults' => ['type' => 'object'],
                         'voice_settings' => ['type' => 'object'],
+                        'audio_effects' => ['type' => 'array', 'items' => ['$ref' => '#/components/schemas/Option']],
+                        'dialogue' => ['type' => 'object', 'properties' => ['min_speakers' => ['type' => 'integer'], 'max_speakers' => ['type' => 'integer']]],
                         'output_formats' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'features' => ['$ref' => '#/components/schemas/PlanFeatures'],
+                    ],
+                ],
+                'PlanFeatures' => [
+                    'type' => 'object',
+                    'description' => 'The options only some plans include, and whether this account has them.',
+                    'properties' => [
+                        'style_prompt' => ['type' => 'boolean'],
+                        'audio_effect' => ['type' => 'boolean'],
+                        'dialogue' => ['type' => 'boolean'],
+                        'cloned_voices' => ['type' => 'boolean'],
                     ],
                 ],
                 'Model' => [
@@ -374,6 +417,8 @@ final class OpenApiSpec
                         'style' => $nullableString,
                         'emotion' => $nullableString,
                         'voice_settings' => ['type' => 'object', 'properties' => ['speed' => ['type' => 'number'], 'pitch' => ['type' => 'number']]],
+                        'audio_effect' => $nullableString,
+                        'dialogue' => ['type' => 'boolean', 'description' => 'Whether several voices speak in it.'],
                         'title' => $nullableString,
                         'text' => ['type' => 'string'],
                         'character_count' => ['type' => 'integer'],
@@ -388,7 +433,17 @@ final class OpenApiSpec
                 'Subscription' => [
                     'type' => 'object',
                     'properties' => [
-                        'plan' => ['type' => 'object'],
+                        'plan' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'slug' => ['type' => 'string'],
+                                'name' => ['type' => 'string'],
+                                'models' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ApiModels::ids()]],
+                                'features' => ['$ref' => '#/components/schemas/PlanFeatures'],
+                                'commercial_use_allowed' => ['type' => 'boolean'],
+                                'processing_priority' => ['type' => 'string'],
+                            ],
+                        ],
                         'status' => ['type' => 'string'],
                         'trial' => ['type' => 'boolean'],
                         'current_period_end' => ['type' => ['string', 'null'], 'format' => 'date-time'],
@@ -430,6 +485,9 @@ final class OpenApiSpec
                                 'message' => ['type' => 'string'],
                                 'param' => $nullableString,
                                 'request_id' => ['type' => 'string'],
+                                'required_feature' => ['type' => 'string', 'description' => 'With feature_not_in_plan: the option asked for.'],
+                                'available_on_plans' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'With feature_not_in_plan: slugs of the plans that include it.'],
+                                'upgrade_url' => ['type' => 'string', 'format' => 'uri'],
                             ],
                         ],
                     ],
@@ -462,16 +520,17 @@ final class OpenApiSpec
     private static function errorResponses(array $codes): array
     {
         $descriptions = [
-            '400' => 'The body is not valid JSON.',
+            '400' => 'The body is not valid JSON, or the Idempotency-Key is too long.',
             '401' => 'Missing or invalid API key.',
             '402' => 'Not enough credits on the plan or on the key\'s monthly limit.',
-            '403' => 'Your plan or key does not allow this (the API needs a paid plan with commercial use, and starts after the first payment, not during a free trial).',
+            '403' => 'Your plan or key does not allow this: the API is not in your plan or starts after the first payment, the key lacks a permission, or an option is not in your plan (feature_not_in_plan, with the plans that include it).',
             '404' => 'Not found.',
-            '409' => 'Not possible in the item\'s current state.',
+            '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',
             '410' => 'The audio is no longer stored.',
-            '422' => 'A parameter is not valid.',
+            '422' => 'A parameter is not valid, or the Idempotency-Key was used for a different request.',
             '429' => 'Rate, concurrency, background-queue or daily limit reached; see Retry-After.',
             '502' => 'The generation failed; no credits were charged.',
+            '503' => 'An option (a sound environment or an audio format) is briefly unavailable.',
         ];
 
         $responses = [];

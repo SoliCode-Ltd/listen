@@ -4,6 +4,7 @@ namespace App\Support\Api;
 
 use App\Models\Plan;
 use App\Services\PlanAccessService;
+use App\Support\VoiceTier;
 
 /**
  * What a plan allows on the developer API: whether it is included at all,
@@ -21,13 +22,17 @@ final class ApiPlanAccess
     public const TRIAL = 'trial';
 
     /**
-     * The API is for paying clients only: a paid plan (or pack) that allows
-     * commercial use and has the API switched on. A free plan never gets it,
-     * whatever its switch says.
+     * The API is for paying clients only: a paid plan (or pack) on the premium
+     * voices that allows commercial use and has the API switched on. A free
+     * plan never gets it, whatever its switch says.
      */
     public static function enabled(?Plan $plan): bool
     {
         if (! $plan || ! (bool) ($plan->api_access_enabled ?? false) || ! (bool) ($plan->commercial_use_allowed ?? false)) {
+            return false;
+        }
+        // The API's one model is the premium voices.
+        if (VoiceTier::normalize((string) ($plan->voice_tier ?: VoiceTier::STANDARD)) !== VoiceTier::HD) {
             return false;
         }
 

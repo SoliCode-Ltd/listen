@@ -2,6 +2,7 @@
 
 namespace App\Support\Api;
 
+use App\Models\ApiRequestLog;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
@@ -39,8 +40,14 @@ final class ApiErrorRenderer
     public static function render(Throwable $e, Request $request): JsonResponse
     {
         $error = self::toApiError($e);
+        $response = self::respond($error, $request);
 
-        return self::respond($error, $request);
+        // A path that matches no route never reaches ApiRequestContext: logged here.
+        if ($request->route() === null) {
+            ApiRequestLog::record($request, $response, self::requestId($request), (float) $request->server('REQUEST_TIME_FLOAT', microtime(true)));
+        }
+
+        return $response;
     }
 
     public static function respond(ApiError $error, Request $request): JsonResponse

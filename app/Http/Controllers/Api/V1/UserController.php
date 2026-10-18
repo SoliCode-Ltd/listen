@@ -8,12 +8,11 @@ use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
+use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Credits;
-use App\Support\PlanUsageGuard;
 use App\Support\UsageSnapshot;
-use App\Support\VoiceTier;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,7 +59,6 @@ class UserController extends Controller
             ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
         );
         $usage = UsageSnapshot::for($userId, $quotaPlan, $counter);
-        $planTier = $this->planAccessService->resolveTierForPlan($plan);
 
         $subscription = Subscription::query()
             ->where('user_id', $userId)
@@ -76,7 +74,9 @@ class UserController extends Controller
             'plan' => [
                 'slug' => (string) ($plan?->slug ?? 'free'),
                 'name' => (string) ($plan?->name ?? 'Free'),
-                'models' => VoiceTier::isHigherThan(VoiceTier::HD, $planTier) ? [ApiModels::STANDARD] : [ApiModels::STANDARD, ApiModels::PREMIUM],
+                'models' => [ApiModels::PREMIUM],
+                // The studio options only some plans include; the rest are refused with feature_not_in_plan.
+                'features' => ApiFeatureGate::availableTo($user, $plan),
                 'commercial_use_allowed' => (bool) ($plan?->commercial_use_allowed ?? false),
                 'processing_priority' => (string) ($plan?->processing_priority ?: 'standard'),
             ],
@@ -108,7 +108,7 @@ class UserController extends Controller
                 'used_today' => $usage['daily_requests_used'],
             ],
             'limits' => [
-                'max_characters_per_request' => min(PlanUsageGuard::maxCharsPerRequest($quotaPlan), ApiSpeechService::MAX_TEXT),
+                'max_characters_per_request' => ApiFeatureGate::maxChars($quotaPlan),
                 'requests_per_minute' => ApiPlanAccess::requestsPerMinute($plan),
                 'concurrent_generations' => ApiPlanAccess::concurrency($plan),
                 'output_formats' => ApiSpeechService::formatsFor($plan),

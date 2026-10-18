@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Services\Api\ApiConcurrency;
+use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
 use App\Support\Api\ApiError;
 use App\Support\Api\ApiPlanAccess;
@@ -30,22 +31,45 @@ class TextToSpeechController extends Controller
     public function __construct(
         private readonly ApiSpeechService $speech,
         private readonly ApiConcurrency $concurrency,
+        private readonly ApiIdempotency $idempotency,
     ) {}
 
     public function convert(Request $request, string $voiceId): Response
     {
         [$user, $apiKey, $plan, $quotaPlan] = $this->context($request);
-        $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
+        $idempotency = $this->idempotency->keyFor($request, (int) $user->id);
+        $lock = $idempotency !== null ? $this->idempotency->lock($idempotency) : null;
 
-        $slot = $this->concurrency->acquire((int) $user->id, ApiPlanAccess::concurrency($plan));
         try {
-            // Long texts can take a while; never cut a paid generation short.
-            if (function_exists('set_time_limit')) {
-                @set_time_limit(max(300, (int) ini_get('max_execution_time')));
+            $previous = $idempotency !== null ? $this->idempotency->replay($idempotency, (int) $user->id) : null;
+            if ($previous !== null) {
+                if ($previous->status !== 'done') {
+                    throw new ApiError(409, ApiError::TYPE_INVALID_REQUEST, 'idempotent_request_in_progress',
+                        'The request with this Idempotency-Key is still being generated. Fetch it with GET /v1/history/'.$previous->id.'.',
+                        ApiIdempotency::HEADER, ['Retry-After' => '2'], ['history_item_id' => (int) $previous->id]);
+                }
+                $format = strtolower((string) $request->input('output_format', 'mp3'));
+                $this->speech->assertOutputFormat($format, $plan);
+
+                return $this->audioResponse($request, $previous, $format, $quotaPlan, true);
             }
-            $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false);
+
+            $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
+            $slot = $this->concurrency->acquire((int) $user->id, ApiPlanAccess::concurrency($plan));
+            try {
+                // Long texts can take a while; never cut a paid generation short.
+                if (function_exists('set_time_limit')) {
+                    @set_time_limit(max(300, (int) ini_get('max_execution_time')));
+                }
+                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, false);
+            } finally {
+                $slot->release();
+            }
+            if ($idempotency !== null) {
+                $this->idempotency->remember($idempotency, $generation);
+            }
         } finally {
-            $slot->release();
+            $lock?->release();
         }
 
         if ($generation->status !== 'done' || blank($generation->audio_path)) {
@@ -60,21 +84,40 @@ class TextToSpeechController extends Controller
     public function convertAsync(Request $request, string $voiceId): JsonResponse
     {
         [$user, $apiKey, $plan, $quotaPlan] = $this->context($request);
-        $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
-        $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, true);
+        $idempotency = $this->idempotency->keyFor($request, (int) $user->id);
+        $lock = $idempotency !== null ? $this->idempotency->lock($idempotency) : null;
 
-        return response()->json(ApiPresenter::historyItem($generation), 202, [
+        try {
+            $previous = $idempotency !== null ? $this->idempotency->replay($idempotency, (int) $user->id) : null;
+            $replayed = $previous !== null;
+            if ($replayed) {
+                $generation = $previous;
+                $chars = ApiPresenter::historyItem($generation)['character_count'];
+            } else {
+                $spec = $this->speech->prepare($request, $user, $plan, $quotaPlan, $voiceId);
+                $generation = $this->speech->generate($user, $apiKey, $plan, $quotaPlan, $spec, true);
+                $chars = $spec['estimate']['chars'];
+                if ($idempotency !== null) {
+                    $this->idempotency->remember($idempotency, $generation);
+                }
+            }
+        } finally {
+            $lock?->release();
+        }
+
+        return response()->json(ApiPresenter::historyItem($generation), 202, array_filter([
             'Location' => url('/v1/history/'.$generation->id),
             'X-History-Item-Id' => (string) $generation->id,
-            'X-Character-Count' => (string) $spec['estimate']['chars'],
-        ]);
+            'X-Character-Count' => (string) $chars,
+            'Idempotent-Replayed' => $replayed ? 'true' : null,
+        ]));
     }
 
     /**
      * The finished audio, in the asked-for type when it can be made (otherwise
      * as stored; Content-Type and X-Output-Format always say which).
      */
-    private function audioResponse(Request $request, AudioGeneration $generation, string $format, ?Plan $quotaPlan): Response
+    private function audioResponse(Request $request, AudioGeneration $generation, string $format, ?Plan $quotaPlan, bool $replayed = false): Response
     {
         $audio = self::audioBytes($generation, $format);
         if ($audio === null) {
@@ -98,6 +141,10 @@ class TextToSpeechController extends Controller
         ];
         if ($remaining !== null) {
             $headers['X-Credits-Remaining'] = (string) $remaining;
+        }
+        if ($replayed) {
+            // The first request's result again: nothing new was generated or charged.
+            $headers['Idempotent-Replayed'] = 'true';
         }
 
         return response($audio['bytes'], 200, $headers);

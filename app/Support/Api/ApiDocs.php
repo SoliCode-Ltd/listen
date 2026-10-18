@@ -2,7 +2,9 @@
 
 namespace App\Support\Api;
 
+use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
+use App\Support\AudioEffects;
 
 /**
  * The developer documentation's reference: every endpoint with its
@@ -14,10 +16,11 @@ use App\Services\Api\ApiSpeechService;
 final class ApiDocs
 {
     /**
-     * @param  array{voice_id:string, name:string, language:string, gender?:?string}  $voice
+     * @param  array{voice_id:string, name:string, language:string, gender?:?string}  $voice  the voice of the examples
+     * @param  array{voice_id:string, name:string}|null  $partner  a second voice of the same language, for the dialogue example
      * @return array<string, mixed>
      */
-    public static function build(string $locale, string $baseUrl, array $voice): array
+    public static function build(string $locale, string $baseUrl, array $voice, ?array $partner = null): array
     {
         $arabic = $locale === 'ar';
         $example = $arabic
@@ -68,6 +71,8 @@ final class ApiDocs
             'style' => 'assistant',
             'emotion' => 'warm',
             'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
+            'audio_effect' => null,
+            'dialogue' => false,
             'title' => $example['title'],
             'text' => $example['text'],
             'character_count' => mb_strlen($example['text']),
@@ -83,7 +88,8 @@ final class ApiDocs
             'plan' => [
                 'slug' => 'creator',
                 'name' => 'Creator',
-                'models' => [ApiModels::STANDARD, ApiModels::PREMIUM],
+                'models' => [ApiModels::PREMIUM],
+                'features' => ['style_prompt' => true, 'audio_effect' => true, 'dialogue' => true, 'cloned_voices' => true],
                 'commercial_use_allowed' => true,
                 'processing_priority' => 'high',
             ],
@@ -136,12 +142,13 @@ final class ApiDocs
             '<audio/mpeg>',
         ]);
 
-        $p = static fn (string $name, string $type, bool $required, string $descriptionKey, bool $premium = false): array => [
+        // $gated: only some plans include it (see the plan features guide).
+        $p = static fn (string $name, string $type, bool $required, string $descriptionKey, bool $gated = false): array => [
             'name' => $name,
             'type' => $type,
             'required' => $required,
             'description' => 'developers.docs.params.'.$descriptionKey,
-            'premium' => $premium,
+            'gated' => $gated,
         ];
 
         $endpoints = [
@@ -152,21 +159,24 @@ final class ApiDocs
                 'path' => '/v1/text-to-speech/{voice_id}',
                 'scope' => ApiScopes::TEXT_TO_SPEECH,
                 'path_params' => [$p('voice_id', 'string', true, 'voice_id')],
+                'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
                 'query_params' => [$p('output_format', 'string', false, 'output_format')],
-                'body_params' => [
+                'body_params' => $ttsParams = [
                     $p('text', 'string', true, 'text'),
                     $p('model_id', 'string', false, 'model_id'),
                     $p('language_code', 'string', false, 'language_code'),
-                    $p('dialect', 'string', false, 'dialect', true),
-                    $p('style', 'string', false, 'style', true),
-                    $p('emotion', 'string', false, 'emotion', true),
+                    $p('dialect', 'string', false, 'dialect'),
+                    $p('style', 'string', false, 'style'),
+                    $p('emotion', 'string', false, 'emotion'),
+                    $p('voice_settings.speed', 'number', false, 'speed'),
+                    $p('voice_settings.pitch', 'number', false, 'pitch'),
                     $p('style_prompt', 'string', false, 'style_prompt', true),
-                    $p('voice_settings.speed', 'number', false, 'speed', true),
-                    $p('voice_settings.pitch', 'number', false, 'pitch', true),
+                    $p('audio_effect', 'string', false, 'audio_effect', true),
+                    $p('dialogue.speakers', 'array', false, 'dialogue', true),
                     $p('translate', 'boolean', false, 'translate'),
                     $p('title', 'string', false, 'title'),
                 ],
-                'headers' => ['X-History-Item-Id', 'X-Character-Count', 'X-Credits-Used', 'X-Credits-Remaining', 'X-Audio-Duration-Seconds', 'X-Output-Format', 'X-Request-Id'],
+                'headers' => ['X-History-Item-Id', 'X-Character-Count', 'X-Credits-Used', 'X-Credits-Remaining', 'X-Audio-Duration-Seconds', 'X-Output-Format', 'Idempotent-Replayed', 'X-Request-Id'],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'?output_format=mp3', $ttsBody, 'speech.mp3'],
                 'response' => ['http', $audioResponse(45)],
             ],
@@ -177,10 +187,8 @@ final class ApiDocs
                 'path' => '/v1/text-to-speech/{voice_id}/async',
                 'scope' => ApiScopes::TEXT_TO_SPEECH,
                 'path_params' => [$p('voice_id', 'string', true, 'voice_id')],
-                'body_params' => [
-                    $p('text', 'string', true, 'text'),
-                    $p('title', 'string', false, 'title'),
-                ],
+                'header_params' => [$p(ApiIdempotency::HEADER, 'string', false, 'idempotency_key')],
+                'body_params' => [$p('text', 'string', true, 'text'), $p('title', 'string', false, 'title'), $p('*', 'string', false, 'same_body')],
                 'request' => ['POST', $baseUrl.'/text-to-speech/'.$voiceId.'/async', ['text' => $example['text'], 'dialect' => $example['dialect'], 'title' => $example['title']], null],
                 'response' => ['json', $json(['status' => 'queued', 'credits_used' => 45, 'duration_seconds' => null, 'audio_url' => null] + $historyItem)],
             ],
@@ -229,7 +237,13 @@ final class ApiDocs
                     'emotions' => [['value' => 'warm', 'name' => 'Warm', 'name_ar' => 'دافئ']],
                     'defaults' => ['ar' => ['dialect' => 'ar-EG', 'style' => 'promo', 'emotion' => 'confident']],
                     'voice_settings' => ['speed' => ['min' => 0.5, 'max' => 2.0, 'default' => 1.0], 'pitch' => ['min' => -10, 'max' => 10, 'default' => 0]],
+                    'audio_effects' => [
+                        ['value' => 'hall', 'name' => 'Concert hall', 'name_ar' => 'قاعة كبيرة'],
+                        ['value' => 'phone', 'name' => 'Phone call', 'name_ar' => 'مكالمة هاتفية'],
+                    ],
+                    'dialogue' => ['min_speakers' => 2, 'max_speakers' => 6],
                     'output_formats' => ['mp3', 'wav'],
+                    'features' => $subscription['plan']['features'],
                 ])],
             ],
             [
@@ -239,10 +253,14 @@ final class ApiDocs
                 'path' => '/v1/models',
                 'scope' => ApiScopes::VOICES_READ,
                 'request' => ['GET', $baseUrl.'/models', null, null],
-                'response' => ['json', $json(['models' => [
-                    ['model_id' => ApiModels::STANDARD, 'name' => 'Listen Standard', 'languages' => ['ar', 'en'], 'available_on_plan' => true, 'max_characters_per_request' => 20000],
-                    ['model_id' => ApiModels::PREMIUM, 'name' => 'Listen Premium', 'languages' => ['ar', 'en'], 'available_on_plan' => true, 'max_characters_per_request' => 20000],
-                ]])],
+                'response' => ['json', $json(['models' => [[
+                    'model_id' => ApiModels::PREMIUM,
+                    'name' => ApiModels::NAME,
+                    'languages' => ['ar', 'en'],
+                    'available_on_plan' => true,
+                    'max_characters_per_request' => 20000,
+                    'supports' => ['dialect' => true, 'style' => true, 'emotion' => true, 'voice_settings' => true, 'inline_tags' => true] + $subscription['plan']['features'],
+                ]]])],
             ],
             [
                 'id' => 'list-history',
@@ -336,9 +354,49 @@ final class ApiDocs
             ],
         ];
 
+        // Dialogue: two speakers of the page's language, each line starting with a speaker's name.
+        $partner ??= ['voice_id' => $arabic ? 'voice_14' : 'voice_31', 'name' => $arabic ? 'Omar' : 'James'];
+        $speakers = $arabic ? ['سارة', 'عمر'] : ['Sara', 'Omar'];
+        $dialogueBody = [
+            'text' => $arabic
+                ? "{$speakers[0]}: أهلا فيك من جديد عالبرنامج!\n{$speakers[1]}: شكرًا، مبسوط كتير إني هون."
+                : "{$speakers[0]}: Welcome back to the show!\n{$speakers[1]}: Thanks, it's great to be here.",
+            'dialect' => $example['dialect'],
+            'dialogue' => ['speakers' => [
+                ['name' => $speakers[0], 'voice_id' => $voiceId],
+                ['name' => $speakers[1], 'voice_id' => (string) $partner['voice_id']],
+            ]],
+        ];
+
+        // The refusal a plan without dialogue gets, with the plans that include it today.
+        $refusal = ApiFeatureGate::refusal(ApiFeatureGate::DIALOGUE, 'dialogue');
+        $refusalBody = ['error' => [
+            'type' => $refusal->type,
+            'code' => $refusal->errorCode,
+            'message' => $refusal->getMessage(),
+            'param' => $refusal->param,
+        ] + $refusal->extra + ['request_id' => 'req_3c9w1v5b6n4z2a1f8k0x7m2q']];
+
+        // Sound environments by group, named in the page's language.
+        $environments = [];
+        foreach (AudioEffects::ALL as $value => $row) {
+            $environments[$row[1]]['name'] ??= AudioEffects::GROUPS[$row[1]][$arabic ? 'ar' : 'en'] ?? $row[1];
+            $environments[$row[1]]['items'][] = ['value' => $value, 'name' => $arabic ? $row[3] : $row[2], 'description' => $arabic ? $row[5] : $row[4]];
+        }
+
         return [
             'languages' => ApiCodeSamples::LANGUAGES,
             'endpoints' => $endpoints,
+            'hero' => CodeHighlighter::html(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect']], 'speech.mp3')['curl'], 'bash'),
+            'hero_text' => $example['text'],
+            'dialogue' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, $dialogueBody, 'dialogue.mp3')),
+            'environment_sample' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId, ['text' => $example['text'], 'dialect' => $example['dialect'], 'audio_effect' => 'phone'], 'call.mp3')),
+            'environments' => array_values($environments),
+            'feature_error' => CodeHighlighter::html("HTTP/1.1 403 Forbidden\nContent-Type: application/json\n\n".$json($refusalBody), 'http'),
+            'idempotency' => CodeHighlighter::html(
+                "curl -X POST \"{$baseUrl}/text-to-speech/{$voiceId}\" \\\n  -H \"X-Listen-Api-Key: \$LISTEN_API_KEY\" \\\n  -H \"Idempotency-Key: 7f3e9c2a-58b1-4d0e-9a61-2c4f8b7d1e05\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"text\": \"".($arabic ? $example['text'] : $example['text'])."\"}' \\\n  --output speech.mp3\n\n# Sent again with the same key: the first result, not charged again.\n# HTTP/1.1 200 OK\n# Idempotent-Replayed: true",
+                'bash',
+            ),
             'quickstart' => self::highlighted(ApiCodeSamples::all('POST', $baseUrl.'/text-to-speech/'.$voiceId.'?output_format=mp3', $ttsBody, 'speech.mp3')),
             'env' => CodeHighlighter::html('export LISTEN_API_KEY="lsk_live_..."', 'bash'),
             'auth' => CodeHighlighter::html(

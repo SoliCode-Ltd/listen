@@ -12,6 +12,18 @@ final class ApiCodeSamples
     /** Languages in the order the documentation offers them. */
     public const LANGUAGES = ['curl', 'python', 'javascript', 'php', 'go', 'java', 'csharp', 'ruby'];
 
+    /** Each language's name on its tab: the same on every page, as these are names of code. */
+    public const LABELS = [
+        'curl' => 'cURL',
+        'python' => 'Python',
+        'javascript' => 'JavaScript',
+        'php' => 'PHP',
+        'go' => 'Go',
+        'java' => 'Java',
+        'csharp' => 'C#',
+        'ruby' => 'Ruby',
+    ];
+
     /** The highlighter's grammar for each language. */
     public const GRAMMAR = [
         'curl' => 'bash',
@@ -48,7 +60,8 @@ final class ApiCodeSamples
         $lines[] = '  -H "X-Listen-Api-Key: $LISTEN_API_KEY"';
         if ($body !== null) {
             $lines[] = '  -H "Content-Type: application/json"';
-            $lines[] = "  -d '".self::indentTail(self::json($body), '  ')."'";
+            // A single quote ends the shell's quoted text, so it is written as '\''.
+            $lines[] = "  -d '".str_replace("'", "'\\''", self::indentTail(self::json($body), '  '))."'";
         }
         if ($saveAs !== null) {
             $lines[] = '  --output '.$saveAs;
@@ -184,7 +197,8 @@ final class ApiCodeSamples
         }
         $code .= "\npublic class ListenExample {\n    public static void main(String[] args) throws Exception {\n";
         if ($body !== null) {
-            $code .= "        String body = \"\"\"\n".self::json($body, '            ')."\n            \"\"\";\n\n";
+            // A text block reads escapes, so the JSON's own (such as \n) keep their backslash.
+            $code .= "        String body = \"\"\"\n".str_replace('\\', '\\\\', self::json($body, '            '))."\n            \"\"\";\n\n";
         }
         $code .= '        HttpRequest request = HttpRequest.newBuilder(URI.create("'.$url."\"))\n";
         $code .= "            .header(\"X-Listen-Api-Key\", System.getenv(\"LISTEN_API_KEY\"))\n";

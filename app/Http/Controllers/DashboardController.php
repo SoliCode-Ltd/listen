@@ -142,10 +142,10 @@ class DashboardController extends Controller
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
         $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);
 
-        // The developer API section, for members whose plan includes it.
+        // The Developer API section: keys and usage for plans with the API, which plans have it for other paying members.
         $developerApi = null;
         try {
-            if (\App\Support\Api\ApiPlanAccess::enabled($activePlan)) {
+            if (\App\Services\Api\ApiAccountSummary::shownFor($activePlan)) {
                 $developerApi = app(\App\Services\Api\ApiAccountSummary::class)->for($request->user());
             }
         } catch (\Throwable) {

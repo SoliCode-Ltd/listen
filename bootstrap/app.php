@@ -79,6 +79,12 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \Illuminate\Routing\Middleware\ThrottleRequests::class,
             prepend: \App\Http\Middleware\AuthenticateApiKey::class,
         );
+        // And the request id and the admin's request log come first of all,
+        // so refused keys are logged too.
+        $middleware->prependToPriorityList(
+            before: \App\Http\Middleware\AuthenticateApiKey::class,
+            prepend: \App\Http\Middleware\ApiRequestContext::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Developer API (/v1): every error in one JSON shape, never an HTML page.
