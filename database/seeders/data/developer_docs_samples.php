@@ -25,6 +25,48 @@ return [
             'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
         ],
     ],
+    // Candidates for the Arabic sample, for the owner to listen to and choose
+    // from; the chosen one becomes 'ar' and the others are removed. The page
+    // reads only 'ar' and 'en'.
+    'ar-candidate-1' => [
+        'voice' => 'ar-Gemini-HD-Puck', // Othman
+        'audio' => 'audio/developers/candidates/ar-1-othman-conversational.mp3',
+        'body' => [
+            'model_id' => 'listen_tts_premium_v1',
+            'text' => 'أهلاً بيك تاني! اسألني أي حاجة إنت عايزها، وأنا هساعدك على طول.',
+            'language_code' => 'ar',
+            'dialect' => 'ar-EG',
+            'style' => 'conversational',
+            'emotion' => 'warm',
+            'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
+        ],
+    ],
+    'ar-candidate-2' => [
+        'voice' => 'ar-Gemini-HD-Puck', // Othman
+        'audio' => 'audio/developers/candidates/ar-2-othman-customer-service.mp3',
+        'body' => [
+            'model_id' => 'listen_tts_premium_v1',
+            'text' => 'أهلاً بيك تاني! اسألني أي حاجة إنت عايزها، وأنا هساعدك على طول.',
+            'language_code' => 'ar',
+            'dialect' => 'ar-EG',
+            'style' => 'customer_service',
+            'emotion' => 'warm',
+            'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
+        ],
+    ],
+    'ar-candidate-3' => [
+        'voice' => 'ar-Gemini-HD-Zubenelgenubi', // Yasser
+        'audio' => 'audio/developers/candidates/ar-3-yasser-conversational.mp3',
+        'body' => [
+            'model_id' => 'listen_tts_premium_v1',
+            'text' => 'أهلاً بيك تاني! اسألني أي حاجة إنت عايزها، وأنا هساعدك على طول.',
+            'language_code' => 'ar',
+            'dialect' => 'ar-EG',
+            'style' => 'conversational',
+            'emotion' => 'warm',
+            'voice_settings' => ['speed' => 1.0, 'pitch' => 0.0],
+        ],
+    ],
     'en' => [
         // Maya, in American English.
         'voice' => 'en-Gemini-HD-Callirrhoe',
