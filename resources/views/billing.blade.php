@@ -685,6 +685,61 @@
     .quote-row.is-hidden {
       display: none;
     }
+    /* A paid plan changing: what today's amount is made of. */
+    .order-details {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: .9rem 1rem .8rem;
+    }
+    .order-details h3 {
+      margin: 0 0 .55rem;
+      font-size: .95rem;
+      font-weight: 700;
+    }
+    .order-lines {
+      margin: 0;
+      display: grid;
+      gap: .5rem;
+    }
+    .order-line,
+    .order-total {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 1rem;
+      margin: 0;
+    }
+    .order-line dt {
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.45;
+    }
+    .order-line dd,
+    .order-total dd {
+      margin: 0;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      unicode-bidi: isolate;
+    }
+    .order-line dd {
+      font-size: .92rem;
+      font-weight: 600;
+    }
+    .order-line.is-credit dd {
+      color: color-mix(in oklab, var(--ok) 80%, var(--text));
+    }
+    .order-total {
+      margin-top: .7rem;
+      padding-top: .7rem;
+      border-top: 1px solid var(--line);
+    }
+    .order-total dt {
+      font-weight: 700;
+    }
+    .order-total dd {
+      font-weight: 800;
+      font-size: 1.05rem;
+    }
     .quick-links {
       margin-top: .35rem;
       display: flex;
@@ -1101,6 +1156,15 @@
           <p class="hint" id="quoteHint">{{ __('ui.billing.select_plan_for_preview') }}</p>
         </div>
 
+        <section class="order-details" id="orderDetails" aria-labelledby="orderDetailsTitle" hidden>
+          <h3 id="orderDetailsTitle">{{ __('ui.billing.order_details') }}</h3>
+          <dl class="order-lines" id="orderLines"></dl>
+          <div class="order-total">
+            <dt>{{ __('ui.billing.order_total') }}</dt>
+            <dd id="orderTotal" dir="ltr">-</dd>
+          </div>
+        </section>
+
         <div class="quote-details">
           <div class="quote-row">
             <dt>{{ __('ui.billing.plan') }}</dt>
@@ -1166,6 +1230,13 @@
       'pay_choice_sub' => __('ui.billing.pay_choice_sub'),
       'due_today' => __('ui.billing.due_today'),
       'trial_quote_hint' => __('ui.billing.trial_quote_hint'),
+      'order_renews_month' => __('ui.billing.order_renews_month'),
+      'order_renews_year' => __('ui.billing.order_renews_year'),
+      'order_credit_left' => __('ui.billing.order_credit_left'),
+      'order_charged_as' => __('ui.billing.order_charged_as'),
+      'order_loading' => __('ui.billing.order_loading'),
+      'order_fallback_label' => __('ui.billing.order_fallback_label'),
+      'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
     ];
   @endphp
   <script>
@@ -1214,6 +1285,16 @@
     const quotePlan = document.getElementById('quotePlan');
     const quoteCycle = document.getElementById('quoteCycle');
     const quoteMethod = document.getElementById('quoteMethod');
+    const orderDetails = document.getElementById('orderDetails');
+    const orderLines = document.getElementById('orderLines');
+    const orderTotal = document.getElementById('orderTotal');
+    // A member on a paid plan pays the difference today: the order details come from the server.
+    const planChange = {
+      enabled: @json((bool) ($paidPlanChange ?? false)),
+      url: '{{ route('billing.plan-change.preview') }}',
+      cache: {},
+      seq: 0,
+    };
     const i18n = @json($billingI18n);
     const localeCode = String(document.documentElement.lang || '').toLowerCase();
     const isArabicLocale = localeCode.startsWith('ar');
@@ -1530,6 +1611,7 @@
         quoteCycle.textContent = '-';
         quoteHint.textContent = currentPlan() ? i18n.payment_method_unavailable : i18n.no_upgrade_plans_available;
         renderManualPanel(null);
+        renderPlanChange(null, '');
         return;
       }
 
@@ -1564,6 +1646,94 @@
       }
       renderManualPanel(selected);
       syncManualFields();
+      renderPlanChange(selected, discountHint);
+    }
+
+    function planChangeKey(selected) {
+      return `${String(selected.plan.slug || '')}|${String(selected.cycle || 'monthly')}`;
+    }
+
+    function planChangeApplies(selected) {
+      return planChange.enabled && Boolean(selected) && selected.method === 'stripe' && !isTrialCheckout();
+    }
+
+    // Today's order details for this plan and cycle, fresh for ten minutes.
+    async function loadPlanChange(selected) {
+      const key = planChangeKey(selected);
+      const cached = planChange.cache[key];
+      if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached.data;
+      const response = await post(planChange.url, { plan: selected.plan.slug, billing_cycle: selected.cycle });
+      const data = response.ok && response.data?.ok ? response.data : null;
+      if (data) planChange.cache[key] = { at: Date.now(), data: data };
+      return data;
+    }
+
+    function planChangeProrationDate(selected) {
+      if (!planChangeApplies(selected)) return null;
+      const data = planChange.cache[planChangeKey(selected)]?.data;
+      return data && data.change ? Number(data.proration_date || 0) || null : null;
+    }
+
+    function renderPlanChange(selected, discountHint) {
+      if (!orderDetails) return;
+      const seq = ++planChange.seq;
+      if (!planChangeApplies(selected)) {
+        orderDetails.hidden = true;
+        return;
+      }
+      if (!planChange.cache[planChangeKey(selected)]) {
+        quoteAmountLabel.textContent = i18n.due_today;
+        quoteAmount.textContent = '\u2026';
+        quoteHint.textContent = i18n.order_loading;
+      }
+
+      loadPlanChange(selected).then(function(data) {
+        if (seq !== planChange.seq) return;
+        if (data && !data.change) {
+          orderDetails.hidden = true;
+          return;
+        }
+        if (!data) throw new Error('preview');
+        paintPlanChange(selected, data, discountHint);
+      }).catch(function() {
+        if (seq !== planChange.seq) return;
+        // No preview: the most it can be is the new plan's price, less the credit.
+        orderDetails.hidden = true;
+        quoteAmountLabel.textContent = i18n.order_fallback_label;
+        quoteAmount.textContent = String(selected.meta.amount_formatted || '-');
+        quoteHint.textContent = i18n.order_fallback_hint;
+      });
+    }
+
+    function paintPlanChange(selected, data, discountHint) {
+      const isolate = (text) => `\u2066${String(text || '')}\u2069`;
+      orderLines.replaceChildren(...(data.lines || []).map(function(line) {
+        const row = document.createElement('div');
+        row.className = 'order-line' + (line.kind === 'credit' ? ' is-credit' : '');
+        const label = document.createElement('dt');
+        label.textContent = String(line.label || '');
+        const amount = document.createElement('dd');
+        amount.dir = 'ltr';
+        amount.textContent = (line.kind === 'credit' ? '\u2212' : '') + String(line.amount || '');
+        row.append(label, amount);
+        return row;
+      }));
+      orderTotal.textContent = String(data.total || '-');
+      orderDetails.hidden = false;
+
+      quoteAmountLabel.textContent = i18n.due_today;
+      quoteAmount.textContent = String(data.total || '-');
+      const notes = [];
+      if (discountHint) {
+        notes.push(discountHint);
+      } else if (data.renews_on) {
+        notes.push(String(selected.cycle === 'yearly' ? i18n.order_renews_year : i18n.order_renews_month)
+          .replace(':amount', isolate(selected.meta.amount_formatted))
+          .replace(':date', String(data.renews_on)));
+      }
+      if (data.credit_left) notes.push(String(i18n.order_credit_left).replace(':amount', isolate(data.credit_left)));
+      if (data.charged) notes.push(String(i18n.order_charged_as).replace(':amount', isolate(data.charged)));
+      quoteHint.textContent = notes.join(' ');
     }
 
     function setSubscribeButtonBusy(isBusy, text) {
@@ -1826,6 +1996,8 @@
           payment_method: paymentMethod || null,
           save_card: saveCardCheckbox ? saveCardCheckbox.checked : true,
         };
+        const prorationDate = planChangeProrationDate(selected);
+        if (prorationDate) subscribeBody.proration_date = prorationDate;
         let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
 
         // On a free trial: the same plan charges nothing; another plan ends the trial only if the member agrees.

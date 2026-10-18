@@ -225,6 +225,7 @@ Route::group([
         Route::post('/billing/manual/confirm', [ManualPaymentController::class, 'confirm'])->name('billing.manual.confirm');
         Route::get('/manage-subscription', [BillingController::class, 'manage'])->name('manage-subscription.page');
         Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+        Route::post('/billing/plan-change/preview', [BillingController::class, 'planChangePreview'])->middleware('throttle:30,1')->name('billing.plan-change.preview');
         Route::post('/billing/trial/setup', [\App\Http\Controllers\TrialBillingController::class, 'setup'])->name('billing.trial.setup');
         Route::post('/billing/trial/confirm', [\App\Http\Controllers\TrialBillingController::class, 'confirm'])->name('billing.trial.confirm');
         Route::post('/billing/payment-method/intent', [BillingController::class, 'paymentMethodIntent'])->name('billing.payment-method.intent');

@@ -66,6 +66,28 @@ body {
   overflow-x: hidden;
 }
 
+/* Light theme: the page sits on the warm paper and soft colour light of the launch video.
+   The glows stay put while the page scrolls over them. */
+html[data-theme="light"] {
+  --paper: #F7F5F1;
+  background-color: var(--paper);
+}
+html[data-theme="light"] body {
+  background: transparent;
+}
+html[data-theme="light"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(52vmax 52vmax at 6% 2%, rgba(255, 214, 194, .78), transparent 64%),
+    radial-gradient(52vmax 52vmax at 100% 24%, rgba(206, 196, 255, .82), transparent 64%),
+    radial-gradient(58vmax 58vmax at 12% 96%, rgba(196, 228, 255, .72), transparent 64%),
+    radial-gradient(48vmax 48vmax at 96% 100%, rgba(205, 239, 224, .66), transparent 64%);
+}
+
 html[dir="rtl"] body {
   direction: rtl;
   font-family: var(--font-body-ar);
@@ -771,6 +793,9 @@ form:has(button.mobile-nav-link) {
   background: var(--bg);
   border-top: 1px solid var(--line);
   margin-top: auto;
+}
+html[data-theme="light"] .app-footer {
+  background: color-mix(in oklab, #FFFFFF 55%, transparent);
 }
 
 .footer-container {

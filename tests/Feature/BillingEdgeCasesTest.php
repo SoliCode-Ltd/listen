@@ -211,6 +211,188 @@ class BillingEdgeCasesTest extends TestCase
         $this->assertNotNull($this->stripe->last('delete', '/v1/subscriptions/sub_edge'), 'The past due subscription was not canceled.');
         $this->assertNotNull($this->stripe->last('post', '/v1/invoices/in_old/void'), 'Its open invoice could still be paid.');
     }
+
+    /** Moving from Starter to Creator: the plan shows as Creator once Stripe has it. */
+    private function planFollowsStripe(User $user): void
+    {
+        $creator = $this->creator;
+        $this->mock(BillingSyncService::class, function ($mock) use ($user, $creator) {
+            $mock->shouldReceive('syncIfStale')->andReturnUsing(function () use ($user, $creator) {
+                if ($this->stripe->last('post', '/v1/subscriptions/sub_edge') !== null && ! $this->stripe->pendingAfterUpdate) {
+                    app(PlanAccessService::class)->assignPlan($user, $creator, 'active', now()->addMonth());
+                }
+            });
+        });
+    }
+
+    public function test_a_paid_plan_change_charges_the_difference_today_and_applies_only_when_paid(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->planFollowsStripe($user);
+        $previewedAt = time() - 60;
+
+        $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $previewedAt])
+            ->assertOk()
+            ->assertJsonPath('charged', true)
+            ->assertJsonPath('plan.slug', 'creator');
+
+        $update = $this->stripe->last('post', '/v1/subscriptions/sub_edge');
+        $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $update['items']);
+        // Charged now, not added to the next renewal, and applied only if the payment goes through.
+        $this->assertSame('always_invoice', $update['proration_behavior']);
+        $this->assertSame('pending_if_incomplete', $update['payment_behavior']);
+        $this->assertSame('now', $update['billing_cycle_anchor']);
+        $this->assertSame($previewedAt, (int) $update['proration_date']);
+        $this->assertArrayNotHasKey('trial_end', $update);
+    }
+
+    public function test_a_declined_paid_plan_change_keeps_the_plan_and_voids_the_invoice(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->stripe->pendingAfterUpdate = true;
+        $this->stripe->intentStatus = 'requires_payment_method';
+
+        $this->subscribe($user, ['plan' => 'creator'])
+            ->assertStatus(422)
+            ->assertJsonMissingPath('requires_action')
+            ->assertJsonPath('message', "Your card was declined, so nothing was charged and you're still on Starter. Please try another card.");
+
+        $this->assertNotNull($this->stripe->last('post', '/v1/invoices/in_edge/void'), 'The unpaid plan change could still go through.');
+        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id)?->slug);
+    }
+
+    public function test_a_paid_plan_change_that_needs_3d_secure_hands_the_secret_to_the_browser(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->stripe->pendingAfterUpdate = true;
+        $this->stripe->intentStatus = 'requires_action';
+
+        $this->subscribe($user, ['plan' => 'creator'])
+            ->assertStatus(402)
+            ->assertJsonPath('requires_action', true)
+            ->assertJsonPath('client_secret', 'pi_edge_secret');
+
+        $this->assertNull($this->stripe->last('post', '/v1/invoices/in_edge/void'));
+    }
+
+    public function test_a_move_to_a_cheaper_plan_paid_by_its_credit_is_not_counted_as_a_charge(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_creator_m');
+        $this->stripe->amountPaid = 0;
+        $starter = $this->starter;
+        $this->mock(BillingSyncService::class, fn ($mock) => $mock->shouldReceive('syncIfStale')->andReturnUsing(
+            fn () => app(PlanAccessService::class)->assignPlan($user, $starter, 'active', now()->addMonth())
+        ));
+
+        $this->subscribe($user, ['plan' => 'starter'])
+            ->assertOk()
+            ->assertJsonPath('charged', false);
+    }
+
+    public function test_only_a_recent_proration_date_inside_the_period_is_used(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+
+        foreach ([time() + 600, time() - 7200] as $date) {
+            $this->subscribe($user, ['plan' => 'creator', 'proration_date' => $date]);
+            $this->assertArrayNotHasKey('proration_date', $this->stripe->last('post', '/v1/subscriptions/sub_edge'));
+        }
+    }
+
+    private function preview(User $user, string $plan, string $cycle = 'monthly')
+    {
+        return $this->actingAs($user)
+            ->withoutMiddleware([
+                ValidateCsrfToken::class,
+                \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+                \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            ])
+            ->postJson($this->localizedRoute('billing.plan-change.preview'), ['plan' => $plan, 'billing_cycle' => $cycle]);
+    }
+
+    public function test_order_details_show_the_new_plan_the_credit_and_the_total_due_today(): void
+    {
+        \App\Models\SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $renews = strtotime('2026-11-18 10:00:00 UTC');
+        $this->stripe->preview = [
+            'total' => 1750, 'amount_due' => 1750,
+            'lines' => ['object' => 'list', 'data' => [
+                ['object' => 'line_item', 'amount' => -450, 'period' => ['start' => time(), 'end' => strtotime('2026-11-02 UTC')]],
+                ['object' => 'line_item', 'amount' => 2200, 'period' => ['start' => time(), 'end' => $renews]],
+            ]],
+        ];
+
+        $response = $this->preview($user, 'creator')->assertOk()
+            ->assertJsonPath('change', true)
+            ->assertJsonPath('lines.0.kind', 'plan')
+            ->assertJsonPath('lines.0.label', 'Creator, monthly')
+            ->assertJsonPath('lines.1.kind', 'credit')
+            ->assertJsonPath('lines.1.label', 'Credit for the unused time on Starter')
+            ->assertJsonPath('total_cents', 1750)
+            ->assertJsonPath('credit_left', null)
+            ->assertJsonPath('renews_on', '18 Nov 2026')
+            ->assertJsonPath('lines.0.amount', '$22.00')
+            ->assertJsonPath('lines.1.amount', '$4.50')
+            ->assertJsonPath('total', '$17.50')
+            ->assertJsonPath('charged', null);
+
+        // The same change the payment makes, at the same moment.
+        $request = $this->stripe->last('post', '/v1/invoices/create_preview');
+        $this->assertSame('sub_edge', $request['subscription']);
+        $this->assertSame([['id' => 'si_edge', 'price' => 'price_creator_m']], $request['subscription_details']['items']);
+        $this->assertSame('always_invoice', $request['subscription_details']['proration_behavior']);
+        $this->assertSame('now', $request['subscription_details']['billing_cycle_anchor']);
+        $this->assertSame($response->json('proration_date'), (int) $request['subscription_details']['proration_date']);
+        $this->assertNull($this->stripe->last('post', '/v1/subscriptions/sub_edge'), 'A preview changed the subscription.');
+    }
+
+    public function test_order_details_in_local_money_say_what_the_card_is_charged(): void
+    {
+        \App\Models\SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->stripe->preview = [
+            'total' => 1750, 'amount_due' => 1750,
+            'lines' => ['object' => 'list', 'data' => [
+                ['object' => 'line_item', 'amount' => 2200, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+                ['object' => 'line_item', 'amount' => -450, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+            ]],
+        ];
+
+        $response = $this->preview($user, 'creator')->assertOk()->assertJsonPath('charged', '$17.50');
+        $this->assertStringContainsString('EGP', $response->json('total'));
+    }
+
+    public function test_order_details_for_a_cheaper_plan_say_the_credit_pays_the_next_renewals(): void
+    {
+        \App\Models\SiteSetting::set('pricing_forced_country_code', 'US', 'billing');
+        $user = $this->userWithSubscription('active', 'price_creator_m');
+        $this->stripe->preview = [
+            'total' => -1300, 'amount_due' => 0,
+            'lines' => ['object' => 'list', 'data' => [
+                ['object' => 'line_item', 'amount' => -2200, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+                ['object' => 'line_item', 'amount' => 900, 'period' => ['start' => time(), 'end' => time() + 86400 * 30]],
+            ]],
+        ];
+
+        $this->preview($user, 'starter')->assertOk()
+            ->assertJsonPath('total_cents', 0)
+            ->assertJsonPath('total', '$0.00')
+            ->assertJsonPath('credit_left', '$13.00')
+            ->assertJsonPath('charged', null);
+    }
+
+    public function test_no_order_details_on_a_trial_or_the_same_plan(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+        $this->preview($user, 'starter')->assertOk()->assertJsonPath('change', false);
+
+        BillingSubscription::query()->where('stripe_id', 'sub_edge')->update(['stripe_status' => 'trialing', 'trial_ends_at' => now()->addDays(7)]);
+        $this->preview($user, 'creator')->assertOk()->assertJsonPath('change', false);
+
+        $this->assertNull($this->stripe->last('post', '/v1/invoices/create_preview'));
+    }
 }
 
 class ScriptedStripeClient implements ClientInterface
@@ -228,6 +410,12 @@ class ScriptedStripeClient implements ClientInterface
 
     /** Subscriptions Stripe lists for the customer. */
     public array $listedSubscriptions = [];
+
+    /** What the plan change invoice took from the card. */
+    public int $amountPaid = 1750;
+
+    /** The invoice Stripe previews for a plan change. */
+    public array $preview = [];
 
     public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
     {
@@ -249,10 +437,14 @@ class ScriptedStripeClient implements ClientInterface
                     'price' => ['id' => $price, 'object' => 'price', 'product' => 'prod_x', 'recurring' => ['interval' => 'month', 'usage_type' => 'licensed']],
                 ]]],
                 'latest_invoice' => [
-                    'id' => 'in_edge', 'object' => 'invoice',
+                    'id' => 'in_edge', 'object' => 'invoice', 'amount_paid' => $this->pendingAfterUpdate ? 0 : $this->amountPaid,
                     'payments' => ['object' => 'list', 'data' => [['object' => 'invoice_payment', 'payment' => ['payment_intent' => 'pi_edge']]]],
                 ],
             ]);
+        }
+
+        if ($path === '/v1/invoices/create_preview' && $method === 'post') {
+            return $this->json(['object' => 'invoice', 'currency' => 'usd', 'total_discount_amounts' => []] + $this->preview);
         }
 
         if ($path === '/v1/payment_intents/pi_edge') {

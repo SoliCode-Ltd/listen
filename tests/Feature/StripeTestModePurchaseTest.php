@@ -24,7 +24,11 @@ class StripeTestModePurchaseTest extends TestCase
 
     private const PRICE_CENTS = 2200;
 
+    private const STARTER_CENTS = 900;
+
     private static ?string $stripePriceId = null;
+
+    private static ?string $starterPriceId = null;
 
     /** @var list<string> */
     private array $customerIds = [];
@@ -49,7 +53,7 @@ class StripeTestModePurchaseTest extends TestCase
             'services.stripe.key' => $key,
         ]);
 
-        $this->seedPlans($this->ensureStripePrice());
+        $this->seedPlans($this->ensureStripePrice(), $this->ensureStarterPrice());
     }
 
     protected function tearDown(): void
@@ -340,6 +344,70 @@ class StripeTestModePurchaseTest extends TestCase
         ]);
     }
 
+    public function test_changing_a_paid_plan_charges_the_difference_shown_in_the_order_details(): void
+    {
+        $user = $this->makeUser('plan-change');
+        $this->actingAs($user);
+        $subscriptionId = $this->payNowFor($user, 'starter');
+
+        $preview = $this->postJsonLocalizedRoute('billing.plan-change.preview', [
+            'plan' => 'creator',
+            'billing_cycle' => 'monthly',
+        ]);
+        $preview->assertOk();
+        $this->assertTrue($preview->json('change') === true, (string) $preview->getContent());
+        $due = (int) $preview->json('total_cents');
+        // Creator in full, less a credit for almost all of the Starter month just paid.
+        $this->assertGreaterThan(self::PRICE_CENTS - self::STARTER_CENTS - 50, $due);
+        $this->assertLessThan(self::PRICE_CENTS, $due);
+
+        $response = $this->postJsonLocalizedRoute('billing.subscribe', [
+            'plan' => 'creator',
+            'billing_cycle' => 'monthly',
+            'proration_date' => $preview->json('proration_date'),
+        ]);
+        $this->assertTrue($response->json('ok') === true, (string) $response->getContent());
+        $this->assertTrue($response->json('charged') === true);
+
+        $live = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
+        $this->assertSame(self::$stripePriceId, (string) $live->items->data[0]->price->id);
+        $this->assertEmpty($live->pending_update);
+        $this->assertSame('paid', (string) $live->latest_invoice->status);
+        $this->assertSame($due, (int) $live->latest_invoice->amount_paid, 'The card was charged a different amount from the order details.');
+        $this->assertSame('creator', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
+
+        $this->recordResult('plan_change', [
+            'subscription' => $subscriptionId,
+            'previewed_cents' => $due,
+            'amount_paid' => (int) $live->latest_invoice->amount_paid,
+            'invoice' => (string) $live->latest_invoice->id,
+        ]);
+    }
+
+    public function test_a_declined_plan_change_keeps_the_plan_and_leaves_nothing_owed(): void
+    {
+        $user = $this->makeUser('plan-change-declined');
+        $this->actingAs($user);
+        $subscriptionId = $this->payNowFor($user, 'starter');
+
+        // A card that saves but whose charges fail.
+        $failing = Cashier::stripe()->paymentMethods->attach('pm_card_chargeCustomerFail', ['customer' => $user->stripe_id]);
+        Cashier::stripe()->customers->update((string) $user->stripe_id, ['invoice_settings' => ['default_payment_method' => $failing->id]]);
+        Cashier::stripe()->subscriptions->update($subscriptionId, ['default_payment_method' => $failing->id]);
+
+        $response = $this->postJsonLocalizedRoute('billing.subscribe', [
+            'plan' => 'creator',
+            'billing_cycle' => 'monthly',
+        ]);
+        $response->assertStatus(422);
+
+        $live = Cashier::stripe()->subscriptions->retrieve($subscriptionId, ['expand' => ['latest_invoice']]);
+        $this->assertSame(self::$starterPriceId, (string) $live->items->data[0]->price->id);
+        $this->assertEmpty($live->pending_update);
+        $this->assertSame('void', (string) $live->latest_invoice->status);
+        $this->assertSame('starter', app(PlanAccessService::class)->resolveActivePlanForUserId($user->id)?->slug);
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
@@ -358,7 +426,7 @@ class StripeTestModePurchaseTest extends TestCase
         return $user;
     }
 
-    private function seedPlans(string $priceId): void
+    private function seedPlans(string $priceId, string $starterPriceId): void
     {
         Plan::create([
             'slug' => 'free',
@@ -375,7 +443,8 @@ class StripeTestModePurchaseTest extends TestCase
         Plan::create([
             'slug' => 'starter',
             'name' => 'Starter',
-            'price_cents' => 900,
+            'price_cents' => self::STARTER_CENTS,
+            'stripe_price_monthly' => $starterPriceId,
             'monthly_chars' => 500000,
             'monthly_minutes' => 120,
             'premium_voice_minutes' => 60,
@@ -419,6 +488,44 @@ class StripeTestModePurchaseTest extends TestCase
         self::$stripePriceId = (string) $price->id;
 
         return self::$stripePriceId;
+    }
+
+    private function ensureStarterPrice(): string
+    {
+        if (self::$starterPriceId !== null) {
+            return self::$starterPriceId;
+        }
+
+        $product = Cashier::stripe()->products->create([
+            'name' => 'Listen Starter PHPUnit plan change',
+        ]);
+        $price = Cashier::stripe()->prices->create([
+            'product' => $product->id,
+            'unit_amount' => self::STARTER_CENTS,
+            'currency' => 'usd',
+            'recurring' => ['interval' => 'month'],
+        ]);
+
+        self::$starterPriceId = (string) $price->id;
+
+        return self::$starterPriceId;
+    }
+
+    /** Pays for a plan by card, as the checkout does, and returns the Stripe subscription id. */
+    private function payNowFor(User $user, string $plan): string
+    {
+        $response = $this->postJsonLocalizedRoute('billing.subscribe', [
+            'plan' => $plan,
+            'billing_cycle' => 'monthly',
+            'payment_method' => 'pm_card_visa',
+            'save_card' => true,
+        ]);
+        $this->assertTrue($response->json('ok') === true, (string) $response->getContent());
+
+        $user->refresh();
+        $this->customerIds[] = (string) $user->stripe_id;
+
+        return (string) BillingSubscription::query()->where('user_id', $user->id)->value('stripe_id');
     }
 
     /**

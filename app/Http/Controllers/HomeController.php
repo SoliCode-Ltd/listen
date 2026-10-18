@@ -159,7 +159,7 @@ class HomeController extends Controller
 
         // Each page holds its own language: Arabic samples on the Arabic page, English on the English one.
         // The key names the data's shape, so a deploy never reads a copy cached by older code.
-        $data = Cache::remember('samples_page:v2:'.$language, 300, function () use ($isArabicLocale, $language): array {
+        $data = Cache::remember('samples_page:v3:'.$language, 300, function () use ($isArabicLocale, $language): array {
             $cards = VoiceSample::query()
                 ->active()
                 ->whereIn('category', ['hero', 'dialogue'])
@@ -171,19 +171,96 @@ class HomeController extends Controller
                 ->get()
                 ->filter(fn (VoiceSample $sample): bool => trim((string) $sample->audio_path) !== '')
                 ->map(fn (VoiceSample $sample): array => $this->showcaseCard($sample, $isArabicLocale));
-            $singles = $cards->where('kind', 'single');
+            $singles = $cards->where('kind', 'single')->values()->all();
 
             return [
-                'voices' => $singles->values()->all(),
-                'moodVoices' => $singles->filter(fn (array $card): bool => $card['emotion'] !== '')->values()->all(),
+                'voices' => $singles,
+                'moodVoices' => array_values(array_filter($singles, fn (array $card): bool => $card['emotion'] !== '')),
                 'dialogues' => $cards->where('kind', 'dialogue')->values()->all(),
+                'stageCast' => $this->samplesStageCast($singles, $language),
             ];
         });
 
         return view('samples', $data + [
-            'stageCast' => array_values(array_filter(HeroCast::for($language), fn (array $person): bool => $person['audio'] !== null)),
             'environments' => $this->environmentSamples($language),
         ]);
+    }
+
+    /**
+     * The voices the samples page plays one after another: other speakers than the homepage
+     * hero's, one region at a time so the run moves around the map, each with when its
+     * words are spoken (made by scripts/tts/word_timing.py). A voice without measured
+     * times is left out.
+     *
+     * @param  array<int, array<string, mixed>>  $voices
+     * @return array<int, array<string, mixed>>
+     */
+    private function samplesStageCast(array $voices, string $language, int $limit = 8): array
+    {
+        $heroNames = [];
+        foreach (HeroCast::CAST[$language] ?? [] as $person) {
+            $heroNames[] = mb_strtolower($person['name']);
+            $heroNames[] = mb_strtolower($person['name_ar'] ?? $person['name']);
+        }
+        $file = database_path('seeders/data/showcase_word_times.json');
+        $times = is_file($file) ? (array) json_decode((string) file_get_contents($file), true) : [];
+
+        $byRegion = [];
+        foreach ($voices as $voice) {
+            $words = preg_split('/\s+/u', trim($voice['text'])) ?: [];
+            $voiceTimes = $times[$voice['slug']] ?? null;
+            if (! $voice['avatar'] || in_array(mb_strtolower($voice['speaker']), $heroNames, true)
+                || ! is_array($voiceTimes) || count($voiceTimes) !== count($words)) {
+                continue;
+            }
+            $byRegion[$voice['region']][] = [
+                'name' => $voice['speaker'],
+                'language' => $voice['language'],
+                'avatar' => $voice['avatar'],
+                'flag' => $voice['flag'],
+                'dialect_label' => $voice['dialect_label'],
+                'line' => $voice['text'],
+                'audio' => $voice['audio_url'],
+                'times' => $voiceTimes,
+            ];
+        }
+
+        // Each region opens with its shortest line, and the formal Modern Standard Arabic
+        // narrations come last, so the run starts lively.
+        foreach ($byRegion as $region => $list) {
+            usort($list, fn (array $a, array $b): int => mb_strlen($a['line']) <=> mb_strlen($b['line']));
+            $byRegion[$region] = $list;
+        }
+        if (isset($byRegion['fusha'])) {
+            $fusha = $byRegion['fusha'];
+            unset($byRegion['fusha']);
+            $byRegion['fusha'] = $fusha;
+        }
+
+        // One clip per speaker: two speakers with the same name share an avatar.
+        $cast = [];
+        $named = [];
+        while (count($cast) < $limit && $byRegion !== []) {
+            foreach ($byRegion as $region => $list) {
+                while ($list !== [] && isset($named[mb_strtolower($list[0]['name'])])) {
+                    array_shift($list);
+                }
+                if ($list !== []) {
+                    $person = array_shift($list);
+                    $named[mb_strtolower($person['name'])] = true;
+                    $cast[] = $person;
+                }
+                $byRegion[$region] = $list;
+                if ($list === []) {
+                    unset($byRegion[$region]);
+                }
+                if (count($cast) >= $limit) {
+                    break;
+                }
+            }
+        }
+
+        return $cast;
     }
 
     public function pricingPage(Request $request)
@@ -1757,6 +1834,7 @@ class HomeController extends Controller
 
         return [
             'id' => (int) $sample->id,
+            'slug' => pathinfo((string) $sample->audio_path, PATHINFO_FILENAME),
             'kind' => $sample->category === 'dialogue' ? 'dialogue' : 'single',
             'emotion' => strtolower(trim((string) $sample->emotion)),
             'title' => trim((string) ($isArabicLocale ? ($sample->title_ar ?: $sample->title) : $sample->title)),
