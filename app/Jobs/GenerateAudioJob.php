@@ -19,6 +19,7 @@ use App\Services\TtsService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioDuration;
 use App\Support\AudioEffects;
+use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\UsageEstimator;
@@ -455,9 +456,7 @@ class GenerateAudioJob implements ShouldQueue
 
     private function usagePeriod(AudioGeneration $generation): string
     {
-        return ApiUsageMeter::reservationOf($generation)['period']
-            ?? $generation->created_at?->format('Y-m')
-            ?? now()->format('Y-m');
+        return CreditPeriod::ofGeneration($generation);
     }
 
     private function applyUsageDelta(AudioGeneration $generation, int $requestsDelta, int $charsDelta, int $secondsDelta): void

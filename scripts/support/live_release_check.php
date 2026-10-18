@@ -190,7 +190,9 @@ $section('Paying members this month', function () use ($mask, $problem) {
         }
         $active = $access->resolveActivePlanForUserId((int) $user->id);
         $quota = $access->resolveQuotaPlanForUserId((int) $user->id, $active);
-        $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', $ym)->first();
+        // The member's own credit period (their plan's month) where the app has them.
+        $key = class_exists(\App\Support\CreditPeriod::class) ? \App\Support\CreditPeriod::current((int) $user->id)['key'] : $ym;
+        $counter = UsageCounter::query()->where('user_id', $user->id)->where('period_ym', $key)->first();
         $limit = PlanUsageGuard::charsLimit($quota, $counter);
         $used = (int) ($counter->total_chars ?? 0);
         $seconds = (int) ($counter->total_seconds ?? 0);
@@ -244,7 +246,10 @@ $section('Every member (free, trial, pack and paid): anything made past a limit 
     $access = app(\App\Services\PlanAccessService::class);
     $rulesSince = max(now()->startOfMonth(), \Carbon\Carbon::parse('2026-10-14 06:00:00'));
     $line('Checked from (UTC)', $rulesSince->toDateTimeString());
-    $counters = UsageCounter::query()->where('period_ym', now()->format('Y-m'))->get()->keyBy('user_id');
+    // Each member's current credit period (their plan's own month where the app has them).
+    $periodOf = fn (int $userId): array => class_exists(\App\Support\CreditPeriod::class)
+        ? \App\Support\CreditPeriod::current($userId)
+        : ['key' => now()->format('Y-m'), 'starts_at' => now()->startOfMonth()];
     $gens = AudioGeneration::query()->where('created_at', '>=', $rulesSince)->whereNotNull('user_id')->where('status', '!=', 'failed')
         ->get(['id', 'user_id', 'status', 'duration_seconds', 'billed_to_pack', 'input_text', 'voice_tier', 'created_at']);
     $line('Generations since then / members', $gens->count().' / '.$gens->pluck('user_id')->unique()->count());
@@ -252,9 +257,12 @@ $section('Every member (free, trial, pack and paid): anything made past a limit 
     foreach ($gens->groupBy('user_id') as $userId => $mine) {
         $user = User::query()->find($userId);
         $quota = $access->resolveQuotaPlanForUserId((int) $userId);
-        $counter = $counters->get($userId);
+        $period = $periodOf((int) $userId);
+        $counter = UsageCounter::query()->where('user_id', $userId)->where('period_ym', $period['key'])->first();
         $limit = PlanUsageGuard::charsLimit($quota, $counter);
         $used = (int) ($counter->total_chars ?? 0);
+        // Only what the current period's counter holds: made since it started.
+        $mine = $mine->filter(fn ($g) => $g->created_at === null || $g->created_at->gte($period['starts_at']));
         $monthly = $mine->where('billed_to_pack', '!=', true);
         $tag = sprintf('user %d %s (%s)', $userId, $mask($user?->email), $quota->slug ?? '-');
         $earned = class_exists(Credits::class) ? Credits::forSeconds((int) $monthly->where('status', 'done')->sum('duration_seconds')) : 0;
@@ -266,7 +274,7 @@ $section('Every member (free, trial, pack and paid): anything made past a limit 
             $issues[] = "{$used} credits used of {$limit}";
         }
         if ($earned > $used + 450) {
-            $issues[] = "audio since then is worth {$earned} credits but the month's counter holds {$used}";
+            $issues[] = "audio since then is worth {$earned} credits but the period's counter holds {$used}";
         }
         if (! PlanUsageGuard::hasUnlimitedRequests($quota) && (int) ($counter->total_requests ?? 0) > PlanUsageGuard::planRequests($quota)) {
             $issues[] = (int) $counter->total_requests.' generations of '.PlanUsageGuard::planRequests($quota).' a month';

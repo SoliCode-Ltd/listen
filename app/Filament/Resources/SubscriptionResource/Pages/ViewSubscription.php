@@ -6,6 +6,7 @@ use App\Filament\Resources\SubscriptionResource;
 use App\Models\CharGift;
 use App\Models\Subscription;
 use App\Services\Billing\CharGiftService;
+use App\Support\CreditPeriod;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -57,7 +58,7 @@ class ViewSubscription extends ViewRecord
     {
         return rescue(fn () => CharGift::query()
             ->where('user_id', $record->user_id)
-            ->where('period_ym', now()->format('Y-m'))
+            ->where('period_ym', CreditPeriod::current((int) $record->user_id)['key'])
             ->whereNull('revoked_at')
             ->latest('id')
             ->get()

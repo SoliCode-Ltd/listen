@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Models\AudioGeneration;
 use App\Models\UsageCounter;
 use App\Support\AudioDuration;
+use App\Support\CreditPeriod;
 use Illuminate\Console\Command;
 
 /**
@@ -68,8 +69,8 @@ class MeasureAudioLengthsCommand extends Command
     }
 
     /**
-     * Each member's monthly audio seconds, added up again from their finished
-     * generations (pack generations are counted in the pack, not here).
+     * Each member's audio seconds per credit period, added up again from their
+     * finished generations (pack generations are counted in the pack, not here).
      */
     private function recountMonthlySeconds(): int
     {
@@ -78,13 +79,12 @@ class MeasureAudioLengthsCommand extends Command
             ->where('status', 'done')
             ->where(fn ($q) => $q->whereNull('billed_to_pack')->orWhere('billed_to_pack', false))
             ->whereNotNull('user_id')
-            ->select(['id', 'user_id', 'created_at', 'duration_seconds'])
+            ->select(['id', 'user_id', 'created_at', 'duration_seconds', 'settings_snapshot'])
             ->chunkById(1000, function ($rows) use (&$totals): void {
                 foreach ($rows as $row) {
-                    $ym = $row->created_at?->format('Y-m');
-                    if ($ym !== null) {
-                        $totals[$row->user_id][$ym] = ($totals[$row->user_id][$ym] ?? 0) + max(0, (int) $row->duration_seconds);
-                    }
+                    // The period it was charged to (its plan's own month, or the calendar month).
+                    $ym = CreditPeriod::ofGeneration($row);
+                    $totals[$row->user_id][$ym] = ($totals[$row->user_id][$ym] ?? 0) + max(0, (int) $row->duration_seconds);
                 }
             });
 

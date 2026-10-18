@@ -15,6 +15,7 @@ use App\Support\Api\ApiError;
 use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiPresenter;
 use App\Support\AudioFormats;
+use App\Support\CreditPeriod;
 use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use Illuminate\Http\JsonResponse;
@@ -132,7 +133,7 @@ class TextToSpeechController extends Controller
                 null, ['X-History-Item-Id' => (string) $generation->id], ['history_item_id' => (int) $generation->id]);
         }
 
-        $counter = UsageCounter::query()->where('user_id', $generation->user_id)->where('period_ym', $generation->created_at?->format('Y-m') ?? now()->format('Y-m'))->first();
+        $counter = UsageCounter::query()->where('user_id', $generation->user_id)->where('period_ym', CreditPeriod::ofGeneration($generation))->first();
         $remaining = $counter ? UsageSnapshot::for((int) $generation->user_id, $quotaPlan, $counter)['remaining_chars'] : null;
 
         $headers = [

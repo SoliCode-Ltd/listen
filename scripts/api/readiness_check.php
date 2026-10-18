@@ -8,16 +8,20 @@
  * address this SSH session comes from (the per-address limits count by it;
  * addresses themselves are never printed), the queue and cache settings in
  * use, the daily speech ceiling, the plans and packs that include the API,
- * and counts of API keys and running API generations. It only reads (as a
- * page view does); nothing is changed.
+ * counts of API keys and running API generations, and whether monthly
+ * credits follow each plan's own dates, with each paid member's current
+ * credit period (member ids only). It only reads (as a page view does);
+ * nothing is changed.
  *
  *   ssh user@host 'cd ~/public_html && REQUEST_ID=req_… php' < scripts/api/readiness_check.php
  */
 
+use App\Models\Subscription;
 use App\Services\Api\ApiCapacity;
 use App\Services\Api\ApiSpeechService;
 use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiPlanAccess;
+use App\Support\CreditPeriod;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -95,5 +99,37 @@ foreach ($plans as $plan) {
     if ((int) $plan->max_chars_per_request > ApiSpeechService::MAX_TEXT) {
         $shown = number_format((int) $plan->max_chars_per_request);
         echo "    its pricing card shows {$shown} characters a request, but the studio and the extension take at most ", number_format(ApiSpeechService::MAX_TEXT), " in one request\n";
+    }
+}
+
+echo "== Monthly credits ==\n";
+if (! class_exists(CreditPeriod::class)) {
+    $say('credits follow each plan\'s own dates', 'not in this code yet (calendar months)');
+} else {
+    $switchedAt = CreditPeriod::switchedAt();
+    $say('credits follow each plan\'s own dates', $switchedAt
+        ? 'yes, since '.$switchedAt->toDateTimeString().' UTC'
+        : 'NO: calendar months until the migration credits_follow_plan_dates runs');
+    $paid = Subscription::query()
+        ->where('status', 'active')
+        ->where(fn ($query) => $query->whereNull('current_period_end')->orWhere('current_period_end', '>=', now()))
+        ->with('plan')
+        ->orderBy('user_id')
+        ->get()
+        ->filter(fn (Subscription $subscription): bool => $subscription->plan && (int) $subscription->plan->price_cents > 0 && ! $subscription->plan->isPack())
+        ->unique('user_id');
+    $say('members on a paid plan now', $paid->count());
+    foreach ($paid->take(40) as $subscription) {
+        $period = CreditPeriod::current((int) $subscription->user_id);
+        $note = match (true) {
+            ! $period['follows_plan'] => ' (calendar month)',
+            ! CreditPeriod::followsPlan($period['key']) => ' (began before the switch: keeps the count it had)',
+            default => '',
+        };
+        $dates = $period['starts_at']->format('Y-m-d H:i').' to '.$period['ends_at']->format('Y-m-d H:i');
+        echo '    member ', $subscription->user_id, ' (', $subscription->plan->slug, '): credits ', $dates, ' UTC', $note, "\n";
+    }
+    if ($paid->count() > 40) {
+        echo '    … and ', $paid->count() - 40, " more\n";
     }
 }

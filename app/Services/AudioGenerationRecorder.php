@@ -53,8 +53,13 @@ class AudioGenerationRecorder
             ]);
 
             $attributes['settings_snapshot'] = $this->buildSettingsSnapshot($attributes);
+            // The credit period it was charged to (App\Support\CreditPeriod), so the
+            // correction or refund after it is made goes to the same period.
+            if (is_string($attributes['usage_period'] ?? null) && $attributes['usage_period'] !== '') {
+                $attributes['settings_snapshot'] = ($attributes['settings_snapshot'] ?? []) + ['usage_period' => $attributes['usage_period']];
+            }
             // Kept in the settings only: the effect is added after the speech (GenerateAudioJob).
-            unset($attributes['audio_effect']);
+            unset($attributes['audio_effect'], $attributes['usage_period']);
 
             $job = AudioGeneration::create($attributes);
 

@@ -318,11 +318,12 @@ class ApiUsageStats
             return [];
         }
 
+        // By the month each credit period started ("2026-10" or "2026-10-14 08:37").
         return DB::table('usage_counters')
             ->where('period_ym', '>=', $this->since->format('Y-m'))
-            ->selectRaw('period_ym as k, sum(total_chars) as chars, count(*) as members, sum(total_requests) as requests')
-            ->groupBy('period_ym')
-            ->orderBy('period_ym')
+            ->selectRaw('substr(period_ym, 1, 7) as k, sum(total_chars) as chars, count(distinct user_id) as members, sum(total_requests) as requests')
+            ->groupByRaw('substr(period_ym, 1, 7)')
+            ->orderBy('k')
             ->get()
             ->map(fn ($r) => [
                 'month' => $r->k,

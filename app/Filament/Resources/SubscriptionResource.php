@@ -11,6 +11,7 @@ use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Services\Billing\CharGiftService;
 use App\Support\Countries;
+use App\Support\CreditPeriod;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -142,13 +143,13 @@ class SubscriptionResource extends Resource
                                     return 'No usage data recorded yet.';
                                 }
 
-                                $currentYm = now()->format('Y-m');
+                                $currentYm = CreditPeriod::current((int) $record->user_id)['key'];
 
                                 $rows = $counters->map(function (UsageCounter $c) use ($currentYm): string {
                                     $isCurrent = $c->period_ym === $currentYm;
                                     $label = $isCurrent
-                                        ? e($c->period_ym) . ' <span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:9999px;font-size:11px;margin-left:6px;">Current</span>'
-                                        : e($c->period_ym);
+                                        ? e($c->monthLabel()) . ' <span style="background:#22c55e;color:#fff;padding:1px 8px;border-radius:9999px;font-size:11px;margin-left:6px;">Current</span>'
+                                        : e($c->monthLabel());
                                     $bg = $isCurrent ? 'background:rgba(34,197,94,0.06);' : '';
 
                                     return '<tr style="' . $bg . '">'
@@ -209,7 +210,7 @@ class SubscriptionResource extends Resource
         $cell = 'padding:8px 12px;border-bottom:1px solid rgba(0,0,0,0.06);';
         $rows = $gifts->map(function (CharGift $gift) use ($cell): string {
             $status = $gift->isActive()
-                ? ($gift->period_ym === now()->format('Y-m') ? 'Active this month' : 'Ended with its month')
+                ? ($gift->period_ym === CreditPeriod::current((int) $gift->user_id)['key'] ? 'Active this period' : 'Ended with its period')
                 : 'Taken back '.$gift->revoked_at?->format('Y-m-d');
 
             return '<tr>'

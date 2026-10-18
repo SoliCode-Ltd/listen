@@ -14,6 +14,7 @@ use App\Services\PlanAccessService;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\CreditPeriod;
 use App\Support\GeminiTtsModel;
 use App\Support\PlanUsageGuard;
 use Illuminate\Console\Command;
@@ -76,8 +77,9 @@ class DiagnoseUserGenerationsCommand extends Command
             $this->line("Latest trial: {$trial->status}, ends ".$this->when($trial->trial_ends_at).', paid '.$this->when($trial->paid_at));
         }
 
-        $this->section('Usage this month vs limits');
-        $counter = UsageCounter::where('user_id', $user->id)->where('period_ym', now()->format('Y-m'))->first();
+        $period = CreditPeriod::current((int) $user->id);
+        $this->section('Usage this credit period vs limits ('.$period['starts_at']->format('Y-m-d H:i').' to '.$period['ends_at']->format('Y-m-d H:i').' UTC)');
+        $counter = UsageCounter::where('user_id', $user->id)->where('period_ym', $period['key'])->first();
         $planChars = PlanUsageGuard::charsLimit($quota, $counter);
         $planRequests = PlanUsageGuard::planRequests($quota);
         $this->table(['metric', 'used', 'limit'], [

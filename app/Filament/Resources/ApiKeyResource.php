@@ -45,8 +45,6 @@ class ApiKeyResource extends Resource
 
     public static function table(Table $table): Table
     {
-        $period = now()->format('Y-m');
-
         return $table
             ->defaultSort('id', 'desc')
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('user:id,name,email'))
@@ -64,12 +62,13 @@ class ApiKeyResource extends Resource
                     ->placeholder('All')
                     ->wrap(),
                 Tables\Columns\TextColumn::make('month_credits')
-                    ->label('Credits this month')
-                    ->state(fn (ApiKey $record): int => $record->creditsUsed($period))
+                    // The member's current credit period (their plan's own month).
+                    ->label('Credits this period')
+                    ->state(fn (ApiKey $record): int => $record->creditsUsed())
                     ->formatStateUsing(fn (int $state, ApiKey $record): string => number_format($state).($record->monthly_credit_limit ? ' / '.number_format($record->monthly_credit_limit) : '')),
                 Tables\Columns\TextColumn::make('month_requests')
-                    ->label('Requests this month')
-                    ->state(fn (ApiKey $record): int => $record->requestsMade($period))
+                    ->label('Requests this period')
+                    ->state(fn (ApiKey $record): int => $record->requestsMade())
                     ->numeric(),
                 Tables\Columns\TextColumn::make('last_used_at')->label('Last used')->since()->sortable()->placeholder('Never'),
                 Tables\Columns\TextColumn::make('last_used_ip')->label('Last IP')->toggleable(isToggledHiddenByDefault: true),
@@ -110,11 +109,12 @@ class ApiKeyResource extends Resource
         ];
     }
 
-    /** Total credits all keys used this month, for a quick look in the navigation. */
+    /** Total credits all keys used in periods that started this month, for a quick look in the navigation. */
     public static function getNavigationBadge(): ?string
     {
         try {
-            $credits = (int) ApiKeyUsage::query()->where('period_ym', now()->format('Y-m'))->sum('credits');
+            // Periods that started this month (a plan's own month starts with its date).
+            $credits = (int) ApiKeyUsage::query()->where('period_ym', 'like', now()->format('Y-m').'%')->sum('credits');
         } catch (\Throwable) {
             // Before the migration has run.
             return null;

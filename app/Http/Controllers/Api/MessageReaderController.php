@@ -17,6 +17,7 @@ use App\Services\PlanAccessService;
 use App\Models\ClonedVoice;
 use App\Support\AudioFormats;
 use App\Support\AudioUrl;
+use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\PlanUsageGuard;
@@ -49,11 +50,7 @@ class MessageReaderController extends Controller
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId((int) $user->id, $activePlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
 
-        $period = now()->format('Y-m');
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $user->id, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        $counter = CreditPeriod::counter((int) $user->id);
 
         $usage = UsageSnapshot::for((int) $user->id, $quotaPlan, $counter);
         $requestsUnlimited = $usage['requests_unlimited'];
@@ -94,7 +91,7 @@ class MessageReaderController extends Controller
                     'dialogue_enabled' => (bool) ($activePlan?->dialogue_enabled ?? false),
                     'voice_cloning_enabled' => VoiceCloningAccess::allows($user, $activePlan),
                 ],
-                'usage' => ['period' => $period] + $usage,
+                'usage' => ['period' => $counter->period_ym] + $usage,
                 'links' => [
                     'dashboard' => $this->localizedUrl('dashboard', $locale),
                     'pricing' => $this->localizedUrl('pricing', $locale),
@@ -230,11 +227,7 @@ class MessageReaderController extends Controller
             );
         $initialStatus = $runAsync ? 'queued' : 'processing';
 
-        $period = now()->format('Y-m');
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $user->id, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        $counter = CreditPeriod::counter((int) $user->id);
 
         $billToPack = CharPackService::billsToPack($quotaPlan);
         PlanUsageGuard::assertWithinDailyLimit($quotaPlan, (int) $user->id);
@@ -283,6 +276,7 @@ class MessageReaderController extends Controller
                         ? ['speakers' => $validated['dialogue_speakers']]
                         : null,
                     'billed_to_pack' => $billToPack,
+                    'usage_period' => $counter->period_ym,
                 ],
             );
         } catch (\Throwable $e) {

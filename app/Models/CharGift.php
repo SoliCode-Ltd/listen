@@ -6,8 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * Characters an admin gave a member on top of their plan, for one month
- * (period_ym). The usable total lives on usage_counters.bonus_chars.
+ * Characters an admin gave a member on top of their plan, for one credit
+ * period (period_ym, App\Support\CreditPeriod). The usable total lives on
+ * usage_counters.bonus_chars.
  */
 class CharGift extends Model
 {

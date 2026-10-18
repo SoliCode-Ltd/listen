@@ -16,7 +16,8 @@ class MonthlyUsageStats extends BaseWidget
 
     protected function getStats(): array
     {
-        $month = UsageCounter::query()->where('period_ym', now()->format('Y-m'));
+        // Periods that started this month: calendar months and plans' own months alike.
+        $month = UsageCounter::query()->where('period_ym', 'like', now()->format('Y-m').'%');
         $members = (clone $month)->where('total_requests', '>', 0)->count();
         $chars = (int) (clone $month)->sum('total_chars');
         $generations = (int) (clone $month)->sum('total_requests');

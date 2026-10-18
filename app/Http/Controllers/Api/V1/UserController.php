@@ -5,12 +5,12 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\ApiKey;
 use App\Models\Subscription;
-use App\Models\UsageCounter;
 use App\Services\Api\ApiSpeechService;
 use App\Services\PlanAccessService;
 use App\Support\Api\ApiFeatureGate;
 use App\Support\Api\ApiModels;
 use App\Support\Api\ApiPlanAccess;
+use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageSnapshot;
@@ -54,11 +54,9 @@ class UserController extends Controller
         $quotaPlan = $request->attributes->get('api_quota_plan');
         $userId = (int) $user->id;
 
-        $period = now()->format('Y-m');
-        $counter = UsageCounter::firstOrCreate(
-            ['user_id' => $userId, 'period_ym' => $period],
-            ['total_minutes' => 0, 'total_chars' => 0, 'total_requests' => 0]
-        );
+        // Credits follow the member's own plan dates (App\Support\CreditPeriod).
+        $period = CreditPeriod::current($userId);
+        $counter = CreditPeriod::counter($userId);
         $usage = UsageSnapshot::for($userId, $quotaPlan, $counter);
 
         $subscription = Subscription::query()
@@ -69,7 +67,7 @@ class UserController extends Controller
             ->first();
 
         $isPack = $usage['mode'] === 'pack';
-        $resetsAt = now()->startOfMonth()->addMonth();
+        $resetsAt = $period['ends_at'];
 
         return [
             'plan' => [
@@ -94,7 +92,9 @@ class UserController extends Controller
                 'credits_per_second' => Credits::PER_SECOND,
                 // Usage stops at the limit: requests that would go over it are refused (402), never billed as overage.
                 'overage_allowed' => false,
-                'period' => $isPack ? null : $period,
+                // The credit period: from the plan's own start day (calendar months on the free plan).
+                'period' => $isPack ? null : $period['starts_at']->format('Y-m-d'),
+                'period_starts_at' => $isPack ? null : $period['starts_at']->toIso8601String(),
                 'resets_at' => $isPack ? null : $resetsAt->toIso8601String(),
                 'resets_at_unix' => $isPack ? null : $resetsAt->getTimestamp(),
                 'expires_at' => $usage['pack_expires_at'],
@@ -127,8 +127,8 @@ class UserController extends Controller
                 'api_key_id' => (int) $apiKey->id,
                 'name' => (string) $apiKey->name,
                 'monthly_credit_limit' => $apiKey->monthly_credit_limit,
-                'credits_used_this_month' => $apiKey->creditsUsed($period),
-                'requests_this_month' => $apiKey->requestsMade($period),
+                'credits_used_this_month' => $apiKey->creditsUsed($period['key']),
+                'requests_this_month' => $apiKey->requestsMade($period['key']),
             ],
         ];
     }
