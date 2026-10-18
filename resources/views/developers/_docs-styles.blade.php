@@ -40,8 +40,8 @@
     /* ── Hero: the request, and what it sounds like ── */
     .docs-main { min-width: 0; }
     .docs-hero { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: 3rem; align-items: center; padding: 2.25rem 0 3.25rem; border-bottom: 1px solid var(--line); }
-    .docs-hero h1 { margin: 0 0 1rem; font-size: clamp(2.5rem, 5vw, 3.9rem); font-weight: 750; letter-spacing: -.045em; line-height: 1.02; color: var(--text); }
-    html[dir="rtl"] .docs-hero h1 { letter-spacing: 0; line-height: 1.2; }
+    .docs-hero h1 { margin: 0 0 1rem; font-size: clamp(2.1rem, 3.4vw, 3rem); font-weight: 750; letter-spacing: -.04em; line-height: 1.1; color: var(--text); }
+    html[dir="rtl"] .docs-hero h1 { letter-spacing: 0; line-height: 1.3; }
     .docs-lede { margin: 0; max-width: 34em; color: var(--muted); font-size: 1.1rem; line-height: 1.7; }
     .docs-hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 1.75rem; }
     .docs-btn {
@@ -220,6 +220,8 @@
 
     /* Desktop: a larger reading size for the prose, the lists and the code. */
     @media (min-width: 961px) {
+      /* The page title stays on one line. */
+      .docs-hero h1 { white-space: nowrap; font-size: clamp(2.1rem, 2.9vw, 3rem); }
       .docs-nav { font-size: .95rem; }
       .docs-nav-group > span { font-size: .86rem; }
       .docs-search input { height: 40px; font-size: .93rem; }

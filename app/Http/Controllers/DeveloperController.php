@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ApiKey;
 use App\Models\Plan;
+use App\Models\Voice;
 use App\Models\VoiceSample;
 use App\Services\Api\ApiAccountSummary;
 use App\Services\Api\ApiSpeechService;
@@ -124,30 +125,39 @@ class DeveloperController extends Controller
     {
         $byName = $premium->keyBy('_internal_name');
         try {
+            // Showcase recordings name the engine's voice (Callirrhoe), others the
+            // site's voice (ar-Gemini-HD-Callirrhoe): both lead to the voice.
+            $byEngineName = Voice::query()
+                ->whereIn('internal_voice_id', $byName->keys()->all())
+                ->whereNotNull('provider_voice_id')
+                ->pluck('internal_voice_id', 'provider_voice_id');
             $samples = VoiceSample::query()
                 ->active()
-                ->whereIn('voice_name', $byName->keys()->all())
+                ->whereIn('voice_name', $byName->keys()->merge($byEngineName->keys())->all())
                 ->get(['voice_name', 'audio_path', 'sample_text', 'language', 'dialect', 'emotion', 'is_featured', 'metadata']);
         } catch (\Throwable) {
             return null;
         }
+        $voiceOf = fn (VoiceSample $sample): ?array => $byName[$sample->voice_name] ?? $byName[$byEngineName[$sample->voice_name] ?? ''] ?? null;
 
-        $rank = fn (VoiceSample $sample): array => [
-            $language === 'ar' && ($byName[$sample->voice_name]['name'] ?? '') === 'Sumaya' ? 0 : 1,
-            $sample->dialect === 'ar-LB' ? 0 : 1,
-            $sample->is_featured ? 0 : 1,
-            mb_strlen((string) $sample->sample_text),
-        ];
+        // Sumaya in Lebanese, then any Lebanese recording, then Sumaya, then featured and short ones.
+        $rank = function (VoiceSample $sample) use ($language, $voiceOf): array {
+            $sumaya = $language === 'ar' && ($voiceOf($sample)['name'] ?? '') === 'Sumaya';
+            $lebanese = $sample->dialect === 'ar-LB';
+
+            return [$sumaya && $lebanese ? 0 : 1, $lebanese ? 0 : 1, $sumaya ? 0 : 1, $sample->is_featured ? 0 : 1, mb_strlen((string) $sample->sample_text)];
+        };
         $sample = $samples
-            ->filter(function (VoiceSample $sample) use ($language): bool {
+            ->filter(function (VoiceSample $sample) use ($language, $voiceOf): bool {
                 $text = trim((string) $sample->sample_text);
                 $path = ltrim(trim((string) $sample->audio_path), '/');
 
                 // Short texts first (see $rank); a long one still beats no recording.
-                return $text !== '' && mb_strlen($text) <= 600
+                return $voiceOf($sample) !== null
+                    && $text !== '' && mb_strlen($text) <= 600
                     // Dialogue samples need speakers the request would have to list.
                     && empty(($sample->metadata ?? [])['turns'])
-                    && in_array(strtolower(substr((string) ($sample->language ?: $language), 0, 2)), [$language], true)
+                    && strtolower(substr((string) ($sample->language ?: $language), 0, 2)) === $language
                     && $path !== ''
                     && (Storage::disk('public')->exists($path) || is_file(public_path($path)));
             })
@@ -159,10 +169,16 @@ class DeveloperController extends Controller
 
         $dialect = trim((string) $sample->dialect);
         $emotion = trim((string) $sample->emotion);
+        $text = trim((string) $sample->sample_text);
+        // Showcase recordings end with the site's closing line, after a long pause.
+        $signOff = trim((string) (($sample->metadata ?? [])['sign_off'] ?? ''));
+        if (! empty(($sample->metadata ?? [])['showcase']) && $signOff !== '') {
+            $text .= ' <long pause> '.$signOff;
+        }
 
         return [
-            'voice_id' => (string) $byName[$sample->voice_name]['voice_id'],
-            'text' => trim((string) $sample->sample_text),
+            'voice_id' => (string) $voiceOf($sample)['voice_id'],
+            'text' => $text,
             'dialect' => in_array($dialect, TtsStudioConfig::dialectValues($language), true) ? $dialect : null,
             'emotion' => in_array($emotion, TtsStudioConfig::emotionValues(), true) ? $emotion : null,
             'audio_url' => url((string) AudioUrl::fromPath((string) $sample->audio_path)),
