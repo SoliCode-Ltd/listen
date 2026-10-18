@@ -57,6 +57,41 @@ class AuthController extends Controller
         }
     }
 
+    /**
+     * Where a member lands after signing in or up: the page they were heading
+     * to, else the dashboard. A member without a paid plan has no credits
+     * there, so they start on the free demo instead.
+     */
+    private function landingAfterSignIn(Request $request, User $user): string
+    {
+        $dashboard = route('dashboard');
+        $intended = (string) $request->session()->pull('url.intended', $dashboard);
+        if (str_contains($intended, '/admin') && ! $user->is_admin) {
+            $intended = $dashboard;
+        }
+
+        if ($this->isDashboardUrl($intended) && ! $user->is_admin && ! $this->hasPaidPlan($user)) {
+            return route('demo.page');
+        }
+
+        return $intended;
+    }
+
+    private function isDashboardUrl(string $url): bool
+    {
+        $path = rtrim((string) parse_url($url, PHP_URL_PATH), '/');
+        $path = (string) preg_replace('#^/[a-z]{2}(?=/|$)#', '', $path);
+
+        return $path === '/dashboard';
+    }
+
+    private function hasPaidPlan(User $user): bool
+    {
+        $plan = $this->planAccessService->resolveAccessPlanForUserId((int) $user->id);
+
+        return $plan !== null && ($plan->isPack() || (int) $plan->price_cents > 0);
+    }
+
     public function showLogin()
     {
         $request = request();
@@ -115,10 +150,7 @@ class AuthController extends Controller
 
         $request->session()->regenerate();
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
-        if (str_contains($intended, '/admin') && ! Auth::user()->is_admin) {
-            $intended = route('dashboard');
-        }
+        $intended = $this->landingAfterSignIn($request, Auth::user());
 
         return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
@@ -182,7 +214,7 @@ class AuthController extends Controller
             );
         }
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
+        $intended = $this->landingAfterSignIn($request, $user);
 
         return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
@@ -307,10 +339,7 @@ class AuthController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
-        if (str_contains($intended, '/admin') && ! $user->is_admin) {
-            $intended = route('dashboard');
-        }
+        $intended = $this->landingAfterSignIn($request, $user);
 
         return $this->attachDeviceCookie($request, redirect()->to($intended));
     }
@@ -363,10 +392,7 @@ class AuthController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
-        if (str_contains($intended, '/admin') && ! $user->is_admin) {
-            $intended = route('dashboard');
-        }
+        $intended = $this->landingAfterSignIn($request, $user);
 
         return $this->attachDeviceCookie($request, response()->json([
             'ok' => true,
@@ -423,10 +449,7 @@ class AuthController extends Controller
         Auth::login($user, true);
         $request->session()->regenerate();
 
-        $intended = $request->session()->pull('url.intended', route('dashboard'));
-        if (str_contains($intended, '/admin') && ! $user->is_admin) {
-            $intended = route('dashboard');
-        }
+        $intended = $this->landingAfterSignIn($request, $user);
 
         return $this->attachDeviceCookie($request, response()->json([
             'ok' => true,
