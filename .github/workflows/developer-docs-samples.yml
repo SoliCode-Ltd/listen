@@ -7,9 +7,13 @@ name: Developer docs samples
 # branch (only the missing ones). Owner-approved (developer docs, 2026-10-18).
 # The key is read over SSH, masked in the log and never stored or committed.
 # Each recording is one speech request against that key's quota, which
-# staging shares with live: run it only when the owner asks.
+# staging shares with live: run it only when the owner asks. To remake one,
+# change its request, delete its MP3 and run this workflow (Actions tab, or a
+# push that changes this file on the branch below); recordings already there
+# are never made again.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main-vtswl7]
     paths:
