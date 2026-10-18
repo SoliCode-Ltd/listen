@@ -33,7 +33,7 @@
     }
     .auth-card {
       width: min(480px, 100%);
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 2rem;
@@ -351,7 +351,7 @@
       align-items: center;
       gap: .5rem;
       padding: 1.1rem 1.15rem .9rem;
-      background: linear-gradient(135deg, color-mix(in oklab, var(--danger) 10%, var(--surface2)), var(--surface2));
+      background: color-mix(in oklab, var(--danger) 7%, var(--surface2));
       border-bottom: 1px solid color-mix(in oklab, var(--danger) 12%, var(--line));
     }
     .blocked-notice-icon {

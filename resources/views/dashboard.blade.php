@@ -160,10 +160,8 @@
       border-radius: 1.25rem;
       text-align: center;
       border: 1px solid color-mix(in oklab, var(--a) 30%, var(--line));
-      background:
-        radial-gradient(70% 80% at 50% 0%, color-mix(in oklab, var(--a) 14%, transparent), transparent 64%),
-        var(--surface);
-      box-shadow: 0 16px 36px color-mix(in oklab, var(--a) 8%, transparent);
+      background: var(--surface);
+      box-shadow: 0 16px 36px -24px color-mix(in oklab, var(--a) 30%, transparent);
     }
     .vc-upgrade-mark {
       width: 3.4rem;
@@ -451,7 +449,7 @@
       border-radius: 1rem;
       padding: 1rem 1.05rem 1.05rem;
       margin-bottom: .9rem;
-      background: linear-gradient(180deg, color-mix(in oklab, var(--a) 12%, var(--surface)), color-mix(in oklab, var(--surface) 92%, transparent));
+      background: color-mix(in oklab, var(--a) 6%, var(--surface));
       border: 1px solid color-mix(in oklab, var(--a) 28%, var(--line));
     }
     .vc-script-toolbar { display: flex; justify-content: space-between; align-items: center; gap: .6rem; }
@@ -1461,17 +1459,6 @@
       overflow: visible;
       border-radius: calc(var(--radius-lg) + .2rem);
     }
-    .page-card::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 40%, var(--a)), transparent);
-      opacity: .7;
-      pointer-events: none;
-      border-top-left-radius: inherit;
-      border-top-right-radius: inherit;
-    }
     .command-card {
       /* Padding inherited uniformly from .page-card */
     }
@@ -1745,15 +1732,6 @@
       box-shadow: 0 8px 32px rgba(0, 0, 0, .18);
       transition: border-color .25s, box-shadow .25s;
     }
-    .s-card::before {
-      content: "";
-      position: absolute;
-      inset: 0 0 auto 0;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, color-mix(in oklab, white 22%, var(--a)), transparent);
-      opacity: .5;
-      pointer-events: none;
-    }
     .s-card:hover {
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
     }
@@ -1975,7 +1953,7 @@
     .plan-showcase-note { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; padding: .9rem 1rem; border: 1px solid var(--brand-accent); border-radius: var(--radius, 12px); background: color-mix(in oklab, var(--brand-accent) 8%, transparent); }
     .plan-showcase-note p { margin: 0; font-weight: 600; }
     .plan-offer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
-    .plan-offer-card { display: flex; flex-direction: column; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: linear-gradient(180deg, var(--surface2), var(--surface)); }
+    .plan-offer-card { display: flex; flex-direction: column; padding: 1.25rem; border: 1px solid var(--line); border-radius: var(--radius-lg, 16px); background: var(--surface); }
     .plan-offer-card.is-highlighted { border-color: var(--brand-accent); box-shadow: 0 8px 28px color-mix(in oklab, var(--brand-accent) 18%, transparent); }
     .plan-offer-card h3 { margin: 0; font-size: 1.15rem; }
     .plan-offer-desc { margin: .3rem 0 0; color: var(--muted); font-size: .85rem; line-height: 1.5; }
@@ -2000,9 +1978,7 @@
       margin-top: 1.2rem;
       border-radius: 20px;
       border: 1px solid color-mix(in oklab, var(--a, #6A45F2) 22%, var(--line));
-      background:
-        radial-gradient(120% 140% at 0% 0%, color-mix(in oklab, #3D8BFF 8%, transparent), transparent 55%),
-        linear-gradient(135deg, color-mix(in oklab, var(--a, #6A45F2) 9%, var(--surface)), var(--surface) 65%);
+      background: var(--surface);
     }
     .usage-hero-head { display: flex; align-items: center; gap: .7rem; }
     .usage-hero-coin { font-size: 2.3rem; }
@@ -2091,7 +2067,7 @@
       padding: .45rem .95rem .45rem .55rem;
       border-radius: 14px;
       border: 1px solid color-mix(in oklab, #8B6CFF 30%, var(--line));
-      background: linear-gradient(135deg, color-mix(in oklab, #8B6CFF 9%, var(--surface)), color-mix(in oklab, #3D8BFF 4%, var(--surface)));
+      background: color-mix(in oklab, #8B6CFF 6%, var(--surface));
       transition: border-color .2s ease, background .2s ease;
     }
     html[dir="rtl"] .credit-live { padding: .45rem .55rem .45rem .95rem; }

@@ -33,7 +33,7 @@
       padding: 1.5rem;
       border-radius: var(--radius-lg);
       border: 1px solid var(--line);
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       box-shadow: var(--shadow);
     }
     .legal-kicker {

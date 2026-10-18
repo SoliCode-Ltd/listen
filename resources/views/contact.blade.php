@@ -13,21 +13,9 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.contact_title'), 'page' => 'contact', 'theme' => (\App\Support\SeoHelper::defaultTheme() ?? 'dark')])
   <style>
     /* ── Contact ────────────────────────────────────────────────────
-       A dark brand panel beside the form. Its voice wave breathes while the page
-       rests and moves with every letter typed, the way Listen turns text into voice. */
-    .contact-page { --ink: #120D2E; --lilac: #C9BEFF; }
-    .contact-shell { position: relative; isolation: isolate; }
-    /* The ink band behind both columns, full width. */
-    .contact-shell::before {
-      content: "";
-      position: absolute;
-      inset: 0;
-      z-index: -1;
-      background:
-        radial-gradient(55% 75% at 92% 0%, rgba(118, 89, 250, .45), transparent 62%),
-        radial-gradient(45% 65% at 0% 100%, rgba(61, 139, 255, .2), transparent 60%),
-        var(--ink);
-    }
+       On the site's own background, beside the form: a voice wave in the brand
+       violet that breathes while the page rests and moves with every letter typed,
+       the way Listen turns text into voice. */
     .contact-grid {
       width: min(1200px, 92%);
       margin: 0 auto;
@@ -39,16 +27,16 @@
       gap: 0 clamp(2rem, 5vw, 4.5rem);
     }
 
-    .contact-intro { grid-area: intro; color: #FFFFFF; }
+    .contact-intro { grid-area: intro; color: var(--text); }
     .contact-intro h1 {
       margin: 0 0 1rem;
-      color: #FFFFFF;
+      color: var(--text);
       font-size: clamp(2.4rem, 4.6vw, 3.6rem);
-      font-weight: 800;
+      font-weight: 700;
       line-height: 1.1;
       letter-spacing: -.02em;
     }
-    .contact-intro p { margin: 0; max-width: 40ch; color: rgba(255, 255, 255, .8); font-size: 1.08rem; line-height: 1.7; }
+    .contact-intro p { margin: 0; max-width: 40ch; color: var(--muted); font-size: 1.08rem; line-height: 1.7; }
 
     /* The wave */
     .cw-wave {
@@ -64,10 +52,12 @@
       height: calc(var(--h) * 100%);
       min-height: 4px;
       border-radius: 99px;
-      background: linear-gradient(180deg, var(--lilac), #7659FA 55%, var(--lilac));
+      background: var(--brand-accent);
+      opacity: calc(.3 + var(--h) * .7);
       transform-origin: center;
       transition: height .14s ease-out;
     }
+    html:not([data-theme="light"]) .cw-wave i { background: var(--accent-text); }
     @media (prefers-reduced-motion: no-preference) {
       .cw-wave i { animation: cw-breathe 2.8s ease-in-out infinite; animation-delay: calc(var(--i) * -110ms); }
       .cw-wave.is-voicing i { animation: none; }
@@ -81,27 +71,27 @@
 
     /* Other ways to reach the team */
     .contact-ways { grid-area: ways; align-self: end; margin-top: clamp(2rem, 4vw, 3rem); }
-    .contact-ways h2 { margin: 0 0 .9rem; color: rgba(255, 255, 255, .7); font-size: .95rem; font-weight: 600; }
+    .contact-ways h2 { margin: 0 0 .9rem; color: var(--muted); font-size: .95rem; font-weight: 600; }
     .contact-ways ul { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
     .contact-way {
       display: flex;
       align-items: center;
       gap: .9rem;
       padding: .85rem 1rem;
-      border: 1px solid rgba(255, 255, 255, .12);
+      border: 1px solid var(--line);
       border-radius: 1rem;
-      background: rgba(255, 255, 255, .04);
-      color: #FFFFFF;
+      background: var(--surface);
+      color: var(--text);
       text-decoration: none;
-      transition: background-color .2s ease, border-color .2s ease;
+      transition: border-color .2s ease;
     }
-    .contact-way:hover { background: rgba(255, 255, 255, .09); border-color: rgba(255, 255, 255, .26); }
-    .contact-way:focus-visible { outline: 2px solid #FFFFFF; outline-offset: 3px; }
-    .contact-way-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: .8rem; background: rgba(201, 190, 255, .14); color: var(--lilac); }
+    .contact-way:hover { border-color: color-mix(in oklab, var(--brand-accent) 45%, var(--line)); }
+    .contact-way:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 3px; }
+    .contact-way-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: .8rem; background: color-mix(in oklab, var(--brand-accent) 12%, transparent); color: var(--accent-text); }
     .contact-way-icon svg { width: 20px; height: 20px; }
     .contact-way-text { display: flex; flex-direction: column; min-width: 0; gap: .1rem; }
     .contact-way-text strong { font-size: .98rem; font-weight: 700; }
-    .contact-way-text span { color: rgba(255, 255, 255, .7); font-size: .88rem; overflow-wrap: anywhere; }
+    .contact-way-text span { color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
 
     /* The form */
     .contact-card {
@@ -111,8 +101,9 @@
       border: 1px solid var(--line);
       border-radius: 1.5rem;
       background: var(--surface);
-      box-shadow: 0 40px 80px -40px rgba(18, 13, 46, .55), 0 2px 6px rgba(18, 13, 46, .06);
+      box-shadow: var(--shadow);
     }
+    html[data-theme="light"] .contact-card { box-shadow: 0 1px 2px rgba(15, 23, 42, .04), 0 24px 48px -32px rgba(15, 23, 42, .22); }
     .contact-topics { margin: 0 0 1.5rem; padding: 0; border: 0; }
     .contact-topics legend { margin-bottom: .7rem; padding: 0; color: var(--text); font-size: .95rem; font-weight: 700; }
     .contact-topic-list { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -184,31 +175,16 @@
     #contactAlertContainer .alert { margin-bottom: 1.25rem; }
 
     @media (max-width: 960px) {
-      .contact-shell::before { display: none; }
       .contact-grid {
-        width: 100%;
-        padding: 0 0 clamp(2.5rem, 8vw, 3.5rem);
+        padding: clamp(2rem, 6vw, 2.75rem) 0 clamp(2.5rem, 8vw, 3.5rem);
         grid-template-columns: minmax(0, 1fr);
         grid-template-areas: "intro" "card" "ways";
         grid-template-rows: auto;
       }
-      .contact-intro {
-        padding: clamp(2.25rem, 7vw, 3rem) 4vw 4.5rem;
-        background:
-          radial-gradient(70% 80% at 100% 0%, rgba(118, 89, 250, .45), transparent 62%),
-          var(--ink);
-      }
       .contact-intro p { max-width: 52ch; }
-      .cw-wave { height: 96px; margin-top: 2rem; }
-      .contact-card { margin: -3rem 4vw 0; }
-      /* Below the form, on the page: the same links in page colours. */
-      .contact-ways { margin: 2rem 4vw 0; }
-      .contact-ways h2 { color: var(--muted); }
-      .contact-way { border-color: var(--line); background: var(--surface); color: var(--text); }
-      .contact-way:hover { background: var(--surface2); border-color: var(--line); }
-      .contact-way:focus-visible { outline-color: var(--brand-accent); }
-      .contact-way-icon { background: color-mix(in oklab, var(--brand-accent) 12%, transparent); color: var(--accent-text); }
-      .contact-way-text span { color: var(--muted); }
+      .cw-wave { height: 80px; margin: 1.5rem 0 1.75rem; }
+      /* Below the form: the other ways to reach the team. */
+      .contact-ways { margin-top: 2rem; }
     }
     @media (max-width: 560px) {
       .contact-row { grid-template-columns: minmax(0, 1fr); }

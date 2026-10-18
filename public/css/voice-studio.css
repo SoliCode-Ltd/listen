@@ -1067,7 +1067,7 @@ html[lang="ar"] .vs-tb-group { letter-spacing: 0; font-size: .8rem; }
 .vs-voice:focus-visible { outline: none; border-color: var(--a, #7659FA); box-shadow: 0 0 0 3px color-mix(in oklab, var(--a, #7659FA) 24%, transparent); }
 .vs-voice.is-selected {
   border-color: var(--a, #7659FA);
-  background: linear-gradient(180deg, color-mix(in oklab, var(--a, #7659FA) 12%, var(--surface)), var(--surface));
+  background: color-mix(in oklab, var(--a, #7659FA) 7%, var(--surface));
 }
 .vs-voice[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
 .vs-voice-avatar { position: relative; display: block; width: 62px; height: 62px; }

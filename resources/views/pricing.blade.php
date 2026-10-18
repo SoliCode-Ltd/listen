@@ -81,7 +81,7 @@
       width: calc(50% - .25rem);
       border-radius: var(--radius-full);
       background: var(--brand-accent);
-      box-shadow: 0 6px 16px color-mix(in oklab, var(--a) 30%, transparent);
+      box-shadow: var(--lift);
       transition: transform .2s ease;
       z-index: 0;
     }
@@ -174,12 +174,10 @@
       --ok: #86EFC4;
       color: #FFFFFF;
       border-color: transparent;
-      background:
-        radial-gradient(120% 70% at 100% 0%, rgba(255, 255, 255, .16), transparent 55%),
-        linear-gradient(165deg, #3A22C4 0%, #5638EA 48%, #7254F7 100%);
-      box-shadow: 0 30px 60px -30px rgba(74, 48, 217, .75);
+      background: #6145F2;
+      box-shadow: 0 30px 60px -34px rgba(74, 48, 217, .6);
     }
-    .plan-card.popular:hover { box-shadow: 0 34px 64px -30px rgba(74, 48, 217, .85); }
+    .plan-card.popular:hover { box-shadow: 0 34px 64px -34px rgba(74, 48, 217, .7); }
     .plan-top { display: flex; flex-direction: column; align-items: flex-start; }
     /* Every card keeps the badge row, so the plan names line up. */
     .plan-badges { display: flex; align-items: center; min-height: 1.65rem; margin-bottom: .75rem; }
@@ -543,7 +541,7 @@
     }
     .feature-card:hover {
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 20px 40px -28px color-mix(in oklab, var(--a) 55%, transparent);
+      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
       transform: translateY(-2px);
     }
     .feature-icon {
@@ -591,7 +589,7 @@
     }
     .faq-item[open] {
       border-color: color-mix(in oklab, var(--a) 30%, var(--line));
-      box-shadow: 0 16px 34px -26px color-mix(in oklab, var(--a) 55%, transparent);
+      box-shadow: 0 16px 32px -24px rgba(15, 23, 42, .18);
     }
     .faq-item summary {
       display: flex;
@@ -621,10 +619,8 @@
       border-radius: 1.5rem;
       text-align: center;
       color: #fff;
-      background:
-        radial-gradient(70% 120% at 100% 0%, rgba(255, 255, 255, .12), transparent 60%),
-        linear-gradient(135deg, #4A30D9 0%, #6145F2 55%, #7254F7 100%);
-      box-shadow: 0 34px 70px -36px rgba(74, 48, 217, .7);
+      background: #6145F2;
+      box-shadow: 0 34px 70px -40px rgba(74, 48, 217, .55);
     }
     .cta-section h2 { margin: 0 0 .65rem; color: #fff; font-size: clamp(1.7rem, 3.4vw, 2.4rem); letter-spacing: -.02em; text-wrap: balance; }
     html[dir="rtl"] .cta-section h2 { letter-spacing: 0; }

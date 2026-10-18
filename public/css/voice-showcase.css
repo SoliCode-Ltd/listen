@@ -116,12 +116,12 @@ html[data-theme="light"] .vs-art-glow { opacity: .55; }
   border-radius: 50%;
   color: #FFFFFF;
   background: radial-gradient(circle at 30% 25%, #9C86FF, #7659FA 45%, #4C2DEB 100%);
-  box-shadow: 0 0 0 8px rgba(118, 89, 250, .14), 0 18px 44px rgba(118, 89, 250, .45);
+  box-shadow: 0 0 0 8px rgba(118, 89, 250, .10), 0 14px 30px -14px rgba(76, 45, 235, .6);
   cursor: pointer;
   z-index: 1;
   transition: box-shadow .2s ease;
 }
-.vs-cast-mark:hover { box-shadow: 0 0 0 10px rgba(118, 89, 250, .22), 0 18px 44px rgba(118, 89, 250, .55); }
+.vs-cast-mark:hover { box-shadow: 0 0 0 10px rgba(118, 89, 250, .16), 0 14px 30px -14px rgba(76, 45, 235, .7); }
 .vs-cast-mark:focus-visible, .vs-speaker-photo:focus-visible { outline: 3px solid var(--brand-subtle); outline-offset: 4px; }
 .vs-cast-mark-logo { width: 44%; height: auto; position: relative; }
 .vs-cast-mark-stop { display: none; width: 34%; height: auto; position: relative; }
@@ -172,10 +172,10 @@ html[data-theme="light"] .vs-speaker-photo { box-shadow: 0 0 0 4px #FFFFFF, 0 14
 .vs-speaker-initial { color: #FFFFFF; font-weight: 700; font-size: 1.6rem; }
 .vs-speaker.is-speaking .vs-speaker-photo {
   filter: none;
-  box-shadow: 0 0 0 4px var(--vs-card), 0 0 0 7px var(--brand-accent), 0 0 34px rgba(118, 89, 250, .65);
+  box-shadow: 0 0 0 4px var(--vs-card), 0 0 0 7px var(--brand-accent);
 }
 html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
-  box-shadow: 0 0 0 4px #FFFFFF, 0 0 0 7px var(--brand-accent), 0 0 30px rgba(118, 89, 250, .45);
+  box-shadow: 0 0 0 4px #FFFFFF, 0 0 0 7px var(--brand-accent);
 }
 /* A play badge appears on hover, and a pause badge while that speaker plays. */
 .vs-speaker-play {
@@ -206,7 +206,7 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
   padding: 14px 18px 12px;
   border-radius: 18px;
   color: #15141B;
-  background: linear-gradient(140deg, rgba(255, 255, 255, .72) 0%, rgba(255, 255, 255, .38) 55%, rgba(244, 241, 255, .5) 100%);
+  background: rgba(255, 255, 255, .62);
   border: 1px solid rgba(255, 255, 255, .85);
   -webkit-backdrop-filter: blur(22px) saturate(1.8);
   backdrop-filter: blur(22px) saturate(1.8);
@@ -219,25 +219,13 @@ html[data-theme="light"] .vs-speaker.is-speaking .vs-speaker-photo {
 }
 html:not([data-theme="light"]) .vs-speech, html:not([data-theme="light"]) .vs-caption {
   color: #F5F4F8;
-  background: linear-gradient(140deg, rgba(255, 255, 255, .14) 0%, rgba(255, 255, 255, .05) 55%, rgba(169, 156, 255, .09) 100%);
+  background: rgba(255, 255, 255, .08);
   border-color: rgba(255, 255, 255, .14);
   box-shadow:
     0 0 0 1px rgba(0, 0, 0, .25),
     inset 0 1px 0 rgba(255, 255, 255, .18),
     inset 0 -1px 0 rgba(169, 156, 255, .08),
     0 20px 44px -16px rgba(0, 0, 0, .6);
-}
-/* The sheen: light catching the top of the glass. */
-.vs-speech::before, .vs-caption::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(180deg, rgba(255, 255, 255, .35) 0%, rgba(255, 255, 255, 0) 42%);
-  pointer-events: none;
-}
-html:not([data-theme="light"]) .vs-speech::before, html:not([data-theme="light"]) .vs-caption::before {
-  background: linear-gradient(180deg, rgba(255, 255, 255, .08) 0%, rgba(255, 255, 255, 0) 42%);
 }
 .vs-speech-line {
   position: relative;
@@ -450,7 +438,7 @@ html:not([data-theme="light"]) .vs-speech::after {
   background: var(--brand-accent);
   color: #FFFFFF;
   cursor: pointer;
-  box-shadow: 0 8px 22px var(--brand-accent-glow);
+  box-shadow: var(--lift);
   transition: background-color .15s ease, transform .15s ease, box-shadow .15s ease;
 }
 .vs-play:hover { background: var(--brand-hover); transform: scale(1.05); }
@@ -525,7 +513,7 @@ html:not([data-theme="light"]) .vs-speech::after {
 html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 42, .08); }
 .vs-card.is-playing {
   border-color: var(--brand-accent);
-  box-shadow: 0 0 0 3px var(--vs-soft), 0 16px 36px rgba(118, 89, 250, .18);
+  box-shadow: 0 0 0 3px var(--vs-soft);
 }
 .vs-card-head { display: flex; align-items: center; gap: 12px; }
 .vs-card-id { display: flex; flex-direction: column; min-width: 0; }
@@ -781,23 +769,16 @@ html[data-theme="light"] .vs-card:hover { box-shadow: 0 16px 36px rgba(15, 23, 4
   padding: 20px;
   border-radius: 22px;
   border: 1px solid var(--line);
-  background:
-    radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--env-a) 14%, transparent), transparent 60%),
-    var(--vs-card);
+  background: var(--vs-card);
   cursor: pointer;
   overflow: hidden;
   transition: border-color .2s ease, transform .2s ease, box-shadow .2s ease;
-}
-[dir="rtl"] .vs-env {
-  background:
-    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--env-a) 14%, transparent), transparent 60%),
-    var(--vs-card);
 }
 .vs-env:hover { border-color: var(--vs-soft-line); transform: translateY(-3px); box-shadow: 0 16px 36px rgba(0, 0, 0, .18); }
 html[data-theme="light"] .vs-env:hover { box-shadow: 0 16px 36px rgba(15, 23, 42, .08); }
 .vs-env.is-playing {
   border-color: var(--env-a);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--env-a) 22%, transparent), 0 16px 36px color-mix(in srgb, var(--env-a) 20%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--env-a) 22%, transparent);
 }
 /* Every place in the brand purple. */
 
@@ -810,9 +791,8 @@ html[data-theme="light"] .vs-env:hover { box-shadow: 0 16px 36px rgba(15, 23, 42
   width: 52px;
   height: 52px;
   border-radius: 16px;
-  color: #FFFFFF;
-  background: linear-gradient(135deg, var(--env-a), color-mix(in srgb, var(--env-a) 55%, var(--env-b)));
-  box-shadow: 0 10px 24px color-mix(in srgb, var(--env-a) 35%, transparent);
+  color: var(--vs-brand-text);
+  background: var(--vs-soft);
 }
 .vs-env-icon svg { position: relative; z-index: 1; }
 /* While it plays, rings spread from the icon like sound filling the place. */
@@ -880,7 +860,7 @@ html[data-theme="light"] .vs-env:hover { box-shadow: 0 16px 36px rgba(15, 23, 42
 .vs-env-switch button[data-vp-mode="place"][aria-pressed="true"] { color: var(--env-a); }
 html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-pressed="true"] { color: var(--env-b); }
 .vs-env-switch button:focus-visible { outline: 2px solid var(--brand-subtle); outline-offset: 2px; }
-.vs-env .vs-play { background: var(--env-a); box-shadow: 0 8px 22px color-mix(in srgb, var(--env-a) 40%, transparent); }
+.vs-env .vs-play { background: var(--env-a); box-shadow: var(--lift); }
 .vs-env .vs-play:hover { background: color-mix(in srgb, var(--env-a) 85%, #000); }
 .vs-env.is-playing .vs-play::after { border-color: var(--env-a); }
 .vs-env .vs-wave-fill i { background: linear-gradient(180deg, var(--env-b), var(--env-a)); }
@@ -897,7 +877,7 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   font-weight: 700;
   font-size: 1rem;
   text-decoration: none;
-  box-shadow: 0 10px 26px var(--brand-accent-glow, rgba(118, 89, 250, .35));
+  box-shadow: var(--lift);
   transition: background-color .15s ease, transform .15s ease;
 }
 .vs-env-cta:hover { background: var(--brand-hover); transform: translateY(-1px); color: #FFFFFF; }

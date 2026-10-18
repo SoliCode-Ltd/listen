@@ -6,7 +6,7 @@
     .pack-main { padding: 1.5rem 0 3rem; }
     .pack-shell { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: start; }
     .pack-card {
-      background: linear-gradient(180deg, var(--surface2), var(--surface));
+      background: var(--surface);
       border: 1px solid var(--line);
       border-radius: var(--radius-lg);
       padding: 1.5rem;

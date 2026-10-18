@@ -5,7 +5,7 @@
     .hero h1 { margin: 0 0 .5rem; font-size: clamp(2rem, 4vw, 3rem); }
     .hero p { margin: 0; color: var(--muted); }
     .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
-    .plan { position: relative; background: linear-gradient(170deg, var(--surface2), var(--surface)); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 1.3rem; box-shadow: var(--shadow); }
+    .plan { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-lg); padding: 1.3rem; box-shadow: var(--shadow); }
     .plan.popular { border-color: color-mix(in oklab, var(--a) 50%, var(--line)); }
     .badge { position: absolute; top: .8rem; right: .8rem; padding: .25rem .6rem; border-radius: var(--radius-full); font-size: .74rem; border: 1px solid color-mix(in oklab, var(--a) 45%, var(--line)); background: color-mix(in oklab, var(--a) 14%, var(--surface)); color: var(--text); }
     .plan h2 { margin: 0 0 .3rem; }
