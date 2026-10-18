@@ -93,6 +93,7 @@ foreach ($plans as $plan) {
     }
     echo '  ', $line, "\n";
     if ((int) $plan->max_chars_per_request > ApiSpeechService::MAX_TEXT) {
-        echo '    its "max characters a request" is above ', number_format(ApiSpeechService::MAX_TEXT), ": lower it in the admin\n";
+        $shown = number_format((int) $plan->max_chars_per_request);
+        echo "    its pricing card shows {$shown} characters a request, but the studio and the extension take at most ", number_format(ApiSpeechService::MAX_TEXT), " in one request\n";
     }
 }

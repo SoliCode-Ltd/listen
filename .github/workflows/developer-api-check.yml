@@ -96,6 +96,8 @@ jobs:
           done
           [ "$found" = 1 ] || echo "  none running right now"
           echo "  (background API jobs go to 'high' for high-priority plans and to 'default' otherwise: the workers must take both)"
+          echo "== Cron lines that start the app (folders left out) =="
+          crontab -l 2>/dev/null | grep -E 'artisan' | sed -E 's#(/[^ /]+)+/##g; s/^/  /' || echo "  none in this user's crontab"
           echo "== Scheduler =="
           if crontab -l 2>/dev/null | grep -q 'schedule:run'; then
             echo "  schedule:run is in this user's crontab"
