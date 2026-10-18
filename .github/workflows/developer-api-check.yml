@@ -1,0 +1,124 @@
+name: Developer API check
+
+# Read-only: is a server ready for the developer API? Changes nothing (it only
+# reads, as a page view does) and makes no voice, so no speech quota is used. Staging by default; run it on live
+# before the API is announced.
+#  1. From the outside: /v1 answers in JSON with no-store, the OpenAPI file is
+#     served, a request with no key is refused, and the docs page is not kept
+#     by a proxy cache (plan edits must show at once).
+#  2. Over SSH (scripts/api/readiness_check.php): whether the app records each
+#     caller's own address (the per-address limits count by it; addresses are
+#     compared, never printed), the queue retry setting, the cache store, the
+#     daily speech ceiling and the plans with the API; then which queues the
+#     workers take, whether the scheduler runs, the API's scheduled tasks and
+#     pending migrations.
+# Uses the same secrets as the "Server deploy" workflow.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [staging, live]
+        default: staging
+  # Until this file is on main (manual runs need that), a change to it on the
+  # API branch runs it on staging.
+  push:
+    branches: [main-vtswl7]
+    paths:
+      - .github/workflows/developer-api-check.yml
+      - scripts/api/readiness_check.php
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: From the outside
+        id: outside
+        env:
+          BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
+        run: |
+          set -uo pipefail
+          show() {
+            grep -iE '^(HTTP/|content-type|cache-control|age|x-cache|via|x-varnish|cf-cache-status|server):' "$1" | tr -d '\r' | sed 's/^/    /'
+            echo "    set-cookie headers: $(grep -ic '^set-cookie:' "$1")"
+          }
+          echo "GET /v1/openapi.json"
+          curl -4 -s -D h1.txt -o spec.json --max-time 30 "$BASE/v1/openapi.json" || true
+          show h1.txt
+          echo "    $(jq -r '"OpenAPI \(.openapi), \(.paths | length) paths"' spec.json 2>/dev/null || echo 'not the OpenAPI file')"
+          echo "GET /v1/user with no key (refused with 401; nothing is charged)"
+          curl -4 -s -D h2.txt -o user.json --max-time 30 -A 'listen-developer-api-check' "$BASE/v1/user" || true
+          show h2.txt
+          echo "    error code: $(jq -r '.error.code // "none"' user.json 2>/dev/null || echo 'not JSON')"
+          rid="$(grep -i '^x-request-id:' h2.txt | head -1 | cut -d' ' -f2 | tr -d '\r')"
+          [[ "$rid" =~ ^req_[a-z0-9]{24}$ ]] || rid=""
+          echo "request_id=$rid" >> "$GITHUB_OUTPUT"
+          for i in 1 2; do
+            echo "GET /en/developers, try $i (a proxy cache shows as an Age or a cache hit)"
+            curl -4 -s -L -D h3.txt -o /dev/null --max-time 30 "$BASE/en/developers" || true
+            show h3.txt
+          done
+
+      - name: Over SSH
+        env:
+          REQUEST_ID: ${{ steps.outside.outputs.request_id }}
+          SSH_HOST: ${{ inputs.target == 'live' && secrets.LIVE_SSH_HOST || secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ inputs.target == 'live' && secrets.LIVE_SSH_USER || secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ inputs.target == 'live' && secrets.LIVE_SSH_KEY || secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ inputs.target == 'live' && secrets.LIVE_APP_PATH || secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_check
+          chmod 600 ~/.ssh/id_check
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          # IPv4, as the request above, so the two addresses can be compared.
+          S="ssh -4 -i $HOME/.ssh/id_check -o BatchMode=yes -o ConnectTimeout=20 $SSH_USER@$SSH_HOST"
+          FIND="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done"
+          $S "$FIND; REQUEST_ID='$REQUEST_ID' php" < scripts/api/readiness_check.php
+          $S "$FIND; bash -s" <<'REMOTE'
+          echo "== Queue workers =="
+          here="$(pwd -P)"; found=0
+          for pid in $(pgrep -f 'artisan (queue:(work|listen)|horizon)' 2>/dev/null || true); do
+            cwd="$(readlink "/proc/$pid/cwd" 2>/dev/null || true)"
+            if [ -n "$cwd" ] && [ "$cwd" != "$here" ]; then continue; fi
+            echo "  $(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | sed -E 's#^.*artisan #artisan #')${cwd:+ (this app)}"
+            found=1
+          done
+          [ "$found" = 1 ] || echo "  none running right now"
+          echo "  (background API jobs go to 'high' for high-priority plans and to 'default' otherwise: the workers must take both)"
+          echo "== Cron lines that start the app (folders left out) =="
+          crontab -l 2>/dev/null | grep -E 'artisan' | sed -E 's#(/[^ /]+)+/##g; s/^/  /' || echo "  none in this user's crontab"
+          echo "== Scheduler =="
+          if crontab -l 2>/dev/null | grep -q 'schedule:run'; then
+            echo "  schedule:run is in this user's crontab"
+          else
+            echo "  schedule:run is NOT in this user's crontab: check the host's cron settings (stuck-generation refunds and log pruning need it)"
+          fi
+          if php artisan list --raw 2>/dev/null | grep -q '^api:expire-stuck-generations'; then
+            echo "  the stuck-generation refund task is installed (it runs every five minutes)"
+          else
+            echo "  the stuck-generation refund task is not installed (deploy first)"
+          fi
+          echo "== Pending migrations =="
+          out="$(php artisan migrate:status 2>&1 || true)"
+          if ! printf '%s\n' "$out" | grep -qE '[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_'; then
+            echo "  could not read them"
+          else
+            names="$(printf '%s\n' "$out" | grep -i 'pending' | grep -oE '[0-9]{4}_[0-9]{2}_[0-9]{2}_[0-9]{6}_[a-z0-9_]+' || true)"
+            if [ -n "$names" ]; then printf '%s\n' "$names" | sed 's/^/  /'; else echo "  none"; fi
+          fi
+          REMOTE
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/id_check

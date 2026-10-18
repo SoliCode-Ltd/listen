@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\Plan;
 use App\Services\VoiceCloningService;
+use App\Support\Api\ApiPlanAccess;
 
 /**
  * The feature lines on a plan's pricing card, written from the plan's own
@@ -32,6 +33,8 @@ final class PlanPricingLines
         'custom_prompt' => ['sliders', true],
         'voice_cloning' => ['star', true],
         'download_formats' => ['download', true],
+        // Shown on every plan that includes the developer API (Plans → Developer API).
+        'developer_api' => ['globe', true],
         // Off by default: members cannot buy top-ups yet.
         'topup' => ['download', false],
     ];
@@ -223,7 +226,8 @@ final class PlanPricingLines
                 ? self::t('kept_no_limit', $locale)
                 : trans_choice('ui.pricing.lines.kept_days', (int) ($plan->recent_voices_days ?? 7), [], $locale),
             'dialogue' => $plan->dialogue_enabled ? self::t('included', $locale) : null,
-            'custom_prompt' => $premium && $plan->custom_prompt_enabled ? self::t('included', $locale) : null,
+            // The same rule as the studio and the developer API (Plan::allowsCustomPrompt).
+            'custom_prompt' => $premium && $plan->allowsCustomPrompt() ? self::t('included', $locale) : null,
             'voice_cloning' => self::cloningOpen($plan)
                 ? trans_choice('ui.pricing.lines.cloning_voices', VoiceCloningService::maxVoicesForPlan($plan), [], $locale)
                 : null,
@@ -231,6 +235,7 @@ final class PlanPricingLines
                 fn (string $format): string => explode(' ', AudioFormats::ALL[$format]['label'])[0],
                 AudioFormats::availableFor($plan),
             )),
+            'developer_api' => ApiPlanAccess::enabled($plan) ? self::t('included', $locale) : null,
             'topup' => ! $plan->isPack() && self::topupCents($plan) > 0
                 ? self::t('topup_price', $locale, ['price' => '$'.number_format(self::topupCents($plan) / 100, 0)])
                 : null,

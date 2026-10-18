@@ -1,0 +1,124 @@
+name: Developer docs samples
+
+# Makes the two recordings at the top of the developer docs
+# (database/seeders/data/developer_docs_samples.php): runs this app here with
+# Gemini key 1 from STAGING's .env, sends each request to its own API
+# (scripts/api/make_docs_samples.php), and commits the MP3s back to this
+# branch (only the missing ones). Owner-approved (developer docs, 2026-10-18).
+# The key is read over SSH, masked in the log and never stored or committed.
+# Each recording is one speech request against that key's quota, which
+# staging shares with live: run it only when the owner asks. To remake one,
+# change its request, delete its MP3 and run this workflow (Actions tab, or a
+# push that changes this file on the branch below); recordings already there
+# are never made again.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main-vtswl7]
+    paths:
+      - .github/workflows/developer-docs-samples.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: developer-docs-samples
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, intl, mbstring, pdo_sqlite, sqlite3, gd, zip
+          coverage: none
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Set up the app
+        run: |
+          set -euo pipefail
+          composer install --no-interaction --no-progress --prefer-dist
+          cp .env.example .env
+          set_env() { sed -i "/^$1=/d" .env; printf '%s=%s\n' "$1" "$2" >> .env; }
+          set_env APP_URL http://127.0.0.1:8000
+          set_env DB_CONNECTION sqlite
+          set_env DB_DATABASE "$PWD/database/docs-samples.sqlite"
+          set_env QUEUE_CONNECTION sync
+          touch database/docs-samples.sqlite
+          php artisan key:generate --no-interaction
+          php artisan migrate --force --no-interaction > /dev/null
+          # The plans and the voices are all this copy needs.
+          php artisan db:seed --class=PlanSeeder --force --no-interaction > /dev/null
+          php artisan db:seed --class=VoiceSeeder --force --no-interaction > /dev/null
+
+      - name: Make the recordings with staging key 1
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_gen
+          chmod 600 ~/.ssh/id_gen
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; grep -E '^GEMINI_TTS_API_KEY(_1)?=' .env | head -n 1 | cut -d= -f2-"
+          KEY="$(ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$remote" | tr -d "\"' \r\n")"
+          if [ -z "$KEY" ]; then rm -f ~/.ssh/id_gen; echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
+          echo "::add-mask::$KEY"
+          # Staging's speech settings (mode, model, fallback; no secrets), read-only, so the
+          # recordings come out as the live API makes them.
+          app="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_gen -o BatchMode=yes -o ConnectTimeout=20 "$SSH_USER@$SSH_HOST" "$app" < scripts/api/print_tts_settings.php > tts-settings.json
+          rm -f ~/.ssh/id_gen
+          php -r '$s = json_decode(file_get_contents("tts-settings.json"), true); if (! is_array($s["settings"] ?? null)) { fwrite(STDERR, "Could not read the staging speech settings\n"); exit(1); } foreach ($s["settings"] as $row) { if (in_array($row["key"], ["tts_mode", "gemini_tts_model", "tts_fallback_enabled"], true)) { echo $row["key"], " = ", $row["value"], "\n"; } } echo "dialect rewrite = ", $s["dialect_rewrite"] ? "on" : "off", "\n";'
+          sed -i '/^GEMINI_TTS_DIALECT_REWRITE=/d' .env
+          php -r 'echo "GEMINI_TTS_DIALECT_REWRITE=", json_decode(file_get_contents("tts-settings.json"), true)["dialect_rewrite"] ? "true" : "false", "\n";' >> .env
+          echo "Using staging key 1."
+          sed -i '/^GEMINI_TTS_API_KEY=/d' .env
+          printf 'GEMINI_TTS_API_KEY=%s\n' "$KEY" >> .env
+          php artisan config:clear > /dev/null
+          php artisan serve --host=127.0.0.1 --port=8000 > serve.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:8000/up && break; sleep 1; done
+          status=0
+          php scripts/api/make_docs_samples.php http://127.0.0.1:8000 tts-settings.json || status=$?
+          sed -i '/^GEMINI_TTS_API_KEY=/d' .env
+          rm -f tts-settings.json
+          if [ "$status" -ne 0 ]; then tail -n 40 storage/logs/laravel.log 2>/dev/null | cut -c1-300 | grep -v -F "$KEY" || true; exit "$status"; fi
+
+      # Kept with the run as well, so a recording is never lost if the commit below fails.
+      - name: Keep the recordings with the run
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-docs-recordings
+          path: public/audio/developers/*.mp3
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Commit the recordings
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/audio/developers
+          if git diff --cached --quiet; then echo "No new recordings"; exit 0; fi
+          git diff --cached --stat
+          git commit -m "Developer docs: the recordings their requests returned, made with staging key 1"
+          # The app writes some tracked files as it runs (the extension's config): not ours to commit.
+          git reset --hard HEAD
+          git pull --rebase origin "${GITHUB_REF#refs/heads/}"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}

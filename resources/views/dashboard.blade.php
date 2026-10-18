@@ -2419,6 +2419,13 @@
             <span class="dm-label">{{ __('ui.dashboard.plan_and_defaults') }}</span>
             <span class="dm-short">{{ __('ui.dashboard.tab_plan') }}</span>
           </a>
+          @if(!empty($developerApi))
+          <a class="dashboard-menu-link" href="#developerApiSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 9l-4 3 4 3M16 9l4 3-4 3M14 5l-4 14"/></svg>
+            <span class="dm-label">{{ __('developers.dashboard.menu') }}</span>
+            <span class="dm-short">{{ __('developers.dashboard.menu_short') }}</span>
+          </a>
+          @endif
         </nav>
         {{-- Help and the legal pages, here instead of a website footer. --}}
         <div class="dashboard-menu-foot">
@@ -2427,6 +2434,7 @@
             {{ __('ui.dashboard.help_link') }}
           </a>
           <div class="dashboard-legal">
+            <a href="{{ route('developers') }}">{{ __('developers.footer_link') }}</a>
             <a href="{{ route('legal.privacy') }}">{{ __('ui.footer.privacy') }}</a>
             <a href="{{ route('legal.terms') }}">{{ __('ui.footer.terms') }}</a>
           </div>
@@ -2816,6 +2824,10 @@
         </div>
       </article>
     </section>
+
+    @if(!empty($developerApi))
+      @include('developers._dashboard-section')
+    @endif
 
     <section id="recentVoicesSection" class="dashboard-panel" data-dashboard-section>
       <div class="page-card table-card reveal jobs-shell">

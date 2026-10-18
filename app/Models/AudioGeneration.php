@@ -49,6 +49,8 @@ class AudioGeneration extends Model
         // Paid from pack characters rather than the monthly allowance
         'billed_to_pack',
         'duration_measured',
+        // The developer API key that asked for it (null: dashboard or extension)
+        'api_key_id',
     ];
 
     protected $casts = [
@@ -66,6 +68,7 @@ class AudioGeneration extends Model
         'billable_chars' => 'integer',
         'user_sequence_number' => 'integer',
         'settings_snapshot' => 'array',
+        'api_key_id' => 'integer',
     ];
 
     public function textItem(): BelongsTo

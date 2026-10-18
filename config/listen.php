@@ -99,4 +99,44 @@ return [
         'daily_total_char_limit' => (int) env('LISTEN_DAILY_TOTAL_CHAR_LIMIT', 20_000_000),
         'daily_gemini_request_limit' => (int) env('LISTEN_DAILY_GEMINI_REQUEST_LIMIT', 10_000),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Developer API (/v1)
+    |--------------------------------------------------------------------------
+    |
+    | Limits for the public API when a plan sets none of its own (Plans →
+    | Developer API in the admin). Keyed by the plan's processing priority.
+    | Requests a minute per key; generations running at once per member.
+    |
+    */
+    'api' => [
+        'requests_per_minute' => [
+            'standard' => 60,
+            'standard_plus' => 60,
+            'high' => 120,
+            'priority' => 180,
+            'highest' => 300,
+        ],
+        'concurrency' => [
+            'standard' => 2,
+            'standard_plus' => 3,
+            'high' => 5,
+            'priority' => 8,
+            'highest' => 10,
+        ],
+        // How long one synchronous generation may hold a concurrency slot.
+        'slot_seconds' => (int) env('LISTEN_API_SLOT_SECONDS', 300),
+        // Generations that wait for the file, at once, for the whole site: each one
+        // holds a web worker, so the studio and the rest of the site keep the others.
+        'site_slots' => (int) env('LISTEN_API_SITE_SLOTS', 8),
+        // Share of the site's daily speech ceiling (cost_guardrails above) the API
+        // may use, so the studio and the extension always keep the rest. 0 or 1: no share.
+        'daily_share' => (float) env('LISTEN_API_DAILY_SHARE', 0.6),
+        // Minutes after which a generation still queued or running is failed and its
+        // credits given back (api:expire-stuck-generations). Well above the longest a
+        // job may take with its retries (3 tries of 150 s, 180 s apart).
+        'stuck_processing_minutes' => (int) env('LISTEN_API_STUCK_PROCESSING_MINUTES', 30),
+        'stuck_queued_minutes' => (int) env('LISTEN_API_STUCK_QUEUED_MINUTES', 60),
+    ],
 ];

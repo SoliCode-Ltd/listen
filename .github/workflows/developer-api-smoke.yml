@@ -1,0 +1,138 @@
+name: Developer API smoke test
+
+# Makes TWO real voices on STAGING through the developer API, the way a
+# customer would: the docs' English sample while waiting for the file, and
+# the docs' Arabic sample in the background (made by the queue worker).
+# They use the speech quota staging shares with live: run it only when the
+# owner has said yes. It never runs on live.
+#
+# Over SSH (scripts/api/staging_smoke_member.php) it sets up a test member
+# (staging-api-check@example.com: no Stripe customer, no email sent) on the
+# cheapest plan with the API, with one new key. It sends the two requests to
+# staging, checks the audio and the credits, and keeps the two MP3s with the
+# run. At the end it revokes the key and puts the member back on the free
+# plan, even when a step failed.
+
+on:
+  workflow_dispatch:
+  # Until this file is on main (manual runs need that), a change to it on the
+  # API branch runs it.
+  push:
+    branches: [main-vtswl7]
+    paths:
+      - .github/workflows/developer-api-smoke.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: developer-api-smoke
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: https://phplaravel-1516130-6707450.cloudwaysapps.com
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Set up SSH to staging
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_smoke
+          chmod 600 ~/.ssh/id_smoke
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          echo "SSH_TARGET=$SSH_USER@$SSH_HOST" >> "$GITHUB_ENV"
+          echo "APP_FIND=for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done" >> "$GITHUB_ENV"
+
+      - name: Two requests, as a customer
+        run: |
+          set -uo pipefail
+          ssh_app() { ssh -4 -i ~/.ssh/id_smoke -o BatchMode=yes -o ConnectTimeout=20 "$SSH_TARGET" "$APP_FIND; $1"; }
+          fail() { echo "  FAILED: $1"; echo "SMOKE_FAILED=1" >> "$GITHUB_ENV"; }
+          out="$(ssh_app 'MODE=start php' < scripts/api/staging_smoke_member.php)"
+          KEY="$(printf '%s\n' "$out" | sed -n 's/^KEY=//p')"
+          printf '%s\n' "$out" | grep -vE '^(KEY|BODY_[A-Z]+)='
+          if [ -z "$KEY" ]; then fail "no test key"; exit 0; fi
+          echo "::add-mask::$KEY"
+          field() { printf '%s\n' "$out" | sed -n "s/^$1=//p"; }
+          field BODY_EN > en.json
+          field BODY_AR > ar.json
+          seconds() { ffprobe -v error -show_entries format=duration -of csv=p=0 "$1" 2>/dev/null || echo '?'; }
+
+          echo "== 1. Waiting for the file: the English docs sample =="
+          t0=$(date +%s)
+          code="$(curl -4 -s -D en-headers.txt -o en.mp3 -w '%{http_code}' --max-time 300 -H "X-Listen-Api-Key: $KEY" -H 'Content-Type: application/json' --data @en.json "$BASE/v1/text-to-speech/$(field VOICE_EN)?output_format=mp3" || echo 000)"
+          echo "  HTTP $code after $(( $(date +%s) - t0 )) s"
+          grep -iE '^(content-type|x-credits-used|x-character-count|x-audio-duration-seconds|x-history-item-id|x-request-id):' en-headers.txt | tr -d '\r' | sed 's/^/  /'
+          if [ "$code" = 200 ]; then
+            echo "  measured here: $(seconds en.mp3) s, $(stat -c %s en.mp3) bytes"
+          else
+            head -c 600 en.mp3; echo; rm -f en.mp3; fail "the request waiting for the file"
+          fi
+
+          echo "== 2. In the background: the Arabic docs sample =="
+          code="$(curl -4 -s -o ar-start.json -w '%{http_code}' --max-time 60 -H "X-Listen-Api-Key: $KEY" -H 'Content-Type: application/json' --data @ar.json "$BASE/v1/text-to-speech/$(field VOICE_AR)/async" || echo 000)"
+          echo "  HTTP $code: $(jq -c '{history_item_id, status, credits_used}' ar-start.json 2>/dev/null || head -c 300 ar-start.json)"
+          id="$(jq -r '.history_item_id // empty' ar-start.json 2>/dev/null || true)"
+          if [ "$code" = 202 ] && [ -n "$id" ]; then
+            t0=$(date +%s); status=queued
+            while [ $(( $(date +%s) - t0 )) -lt 300 ]; do
+              sleep 5
+              status="$(curl -4 -s --max-time 30 -H "X-Listen-Api-Key: $KEY" "$BASE/v1/history/$id" | jq -r '.status // "unknown"' 2>/dev/null || echo unknown)"
+              case "$status" in completed|failed) break ;; esac
+            done
+            echo "  $status after $(( $(date +%s) - t0 )) s"
+            curl -4 -s --max-time 30 -H "X-Listen-Api-Key: $KEY" "$BASE/v1/history/$id" | jq -c '{status, duration_seconds, credits_used, character_count, error}' 2>/dev/null | sed 's/^/  /'
+            if [ "$status" = completed ]; then
+              code="$(curl -4 -s -o ar.mp3 -w '%{http_code}' --max-time 60 -H "X-Listen-Api-Key: $KEY" "$BASE/v1/history/$id/audio?output_format=mp3" || echo 000)"
+              echo "  audio: HTTP $code, measured here: $(seconds ar.mp3) s, $(stat -c %s ar.mp3 2>/dev/null || echo 0) bytes"
+              [ "$code" = 200 ] || { rm -f ar.mp3; fail "the background audio download"; }
+            else
+              fail "the background request ended $status"
+            fi
+          else
+            fail "the background request"
+          fi
+
+          echo "== The account after both, as the API reports it =="
+          curl -4 -s --max-time 30 -H "X-Listen-Api-Key: $KEY" "$BASE/v1/user/subscription" \
+            | jq -c '{plan: .plan.slug, credits_used: .credits.used, requests_this_month: .requests.used_this_month, key_credits: .api_key.credits_used_this_month}' 2>/dev/null | sed 's/^/  /'
+
+      - name: Put the test member back
+        if: always()
+        run: |
+          if [ -f ~/.ssh/id_smoke ]; then
+            ssh -4 -i ~/.ssh/id_smoke -o BatchMode=yes -o ConnectTimeout=20 "$SSH_TARGET" "$APP_FIND; MODE=finish php" < scripts/api/staging_smoke_member.php
+          fi
+          rm -f ~/.ssh/id_smoke
+
+      - name: Keep the two recordings with the run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: developer-api-smoke-recordings
+          path: |
+            en.mp3
+            ar.mp3
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Result
+        if: always()
+        run: |
+          if [ "${SMOKE_FAILED:-0}" = 1 ]; then echo "The smoke test failed (see above)."; exit 1; fi
+          echo "Both voices were made and charged as expected."

@@ -24,6 +24,12 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
+        then: function (): void {
+            // Developer API: https://<site>/v1/... (see routes/v1.php).
+            \Illuminate\Support\Facades\Route::middleware(['api', \App\Http\Middleware\ApiRequestContext::class])
+                ->prefix('v1')
+                ->group(base_path('routes/v1.php'));
+        },
     )
     ->withCommands([
         DiagnoseVoiceCloningCommand::class,
@@ -63,9 +69,32 @@ return Application::configure(basePath: dirname(__DIR__))
             'localeSessionRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
             'localeCookieRedirect' => \Mcamara\LaravelLocalization\Middleware\LocaleCookieRedirect::class,
             'localeViewPath' => \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+            'api.key' => \App\Http\Middleware\AuthenticateApiKey::class,
+            'api.scope' => \App\Http\Middleware\RequireApiScope::class,
         ]);
+
+        // The developer API's rate limit is per key and per plan, so the key
+        // must be known before the limiter runs.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Routing\Middleware\ThrottleRequests::class,
+            prepend: \App\Http\Middleware\AuthenticateApiKey::class,
+        );
+        // And the request id and the admin's request log come first of all,
+        // so refused keys are logged too.
+        $middleware->prependToPriorityList(
+            before: \App\Http\Middleware\AuthenticateApiKey::class,
+            prepend: \App\Http\Middleware\ApiRequestContext::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Developer API (/v1): every error in one JSON shape, never an HTML page.
+        $exceptions->dontReport(\App\Support\Api\ApiError::class);
+        $exceptions->render(function (\Throwable $e, Request $request) {
+            return \App\Support\Api\ApiErrorRenderer::appliesTo($request)
+                ? \App\Support\Api\ApiErrorRenderer::render($e, $request)
+                : null;
+        });
+
         // Stale CSRF tokens (mobile tab restored, back button, idle page) get a
         // retry instead of the bare "419 Page Expired" screen.
         $exceptions->render(function (HttpException $e, Request $request) {

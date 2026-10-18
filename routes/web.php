@@ -152,6 +152,7 @@ Route::group([
     Route::view('/terms-of-service', 'legal.terms')->name('legal.terms');
     Route::view('/cookie-policy', 'legal.cookies')->name('legal.cookies');
     Route::get('/browsers-extension', [ExtensionController::class, 'show'])->name('browsers-extension.page');
+    Route::get('/developers', [\App\Http\Controllers\DeveloperController::class, 'docs'])->name('developers');
 
     Route::get('/contact-us', [\App\Http\Controllers\ContactController::class, 'show'])->name('contact');
     Route::post('/contact-us', [\App\Http\Controllers\ContactController::class, 'submit'])->middleware('throttle:contact')->name('contact.submit');
@@ -239,6 +240,12 @@ Route::group([
         Route::post('/browsers-extension/api-key/regenerate', [ExtensionController::class, 'regenerateApiKey'])->name('browsers-extension.key.regenerate');
         Route::post('/browsers-extension/api-key/revoke', [ExtensionController::class, 'revokeApiKey'])->name('browsers-extension.key.revoke');
         Route::get('/browsers-extension/download', [ExtensionController::class, 'download'])->name('browsers-extension.download');
+
+        // Developer API keys (the API itself is routes/v1.php).
+        Route::get('/dashboard/api-keys', [\App\Http\Controllers\DeveloperController::class, 'keys'])->name('developers.keys');
+        Route::post('/dashboard/api-keys', [\App\Http\Controllers\DeveloperController::class, 'store'])->middleware('throttle:20,1')->name('developers.keys.store');
+        Route::put('/dashboard/api-keys/{apiKey}', [\App\Http\Controllers\DeveloperController::class, 'update'])->middleware('throttle:30,1')->name('developers.keys.update');
+        Route::delete('/dashboard/api-keys/{apiKey}', [\App\Http\Controllers\DeveloperController::class, 'revoke'])->middleware('throttle:30,1')->name('developers.keys.revoke');
 
         // Voice Cloning lives under dashboard for signed-in users.
         Route::prefix('dashboard/voice-cloning')->group(function (): void {

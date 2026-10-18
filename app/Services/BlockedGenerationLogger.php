@@ -70,7 +70,12 @@ class BlockedGenerationLogger
                 ],
             ]);
 
-            $this->autoBlockUserAfterRepeatedAttempts($userId);
+            // A developer API request carries text from the member's own users (a
+            // chatbot, a site's visitors), so it never blocks the member's account by
+            // itself; it is still logged here for the admin to review.
+            if (! self::isApiRoute($routeName)) {
+                $this->autoBlockUserAfterRepeatedAttempts($userId);
+            }
         } catch (\Throwable $exception) {
             Log::warning('Failed to log blocked generation attempt.', [
                 'route_name' => $routeName,
@@ -79,6 +84,11 @@ class BlockedGenerationLogger
                 'exception_message' => $exception->getMessage(),
             ]);
         }
+    }
+
+    private static function isApiRoute(?string $routeName): bool
+    {
+        return is_string($routeName) && str_starts_with($routeName, 'v1.');
     }
 
     private function resolveActorUserId(Request $request): ?int
@@ -108,8 +118,10 @@ class BlockedGenerationLogger
                 return;
             }
 
+            // Texts sent through the developer API do not count towards the block.
             $attemptCount = (int) BlockedGeneration::query()
                 ->where('user_id', $userId)
+                ->where(fn ($query) => $query->whereNull('route_name')->orWhere('route_name', 'not like', 'v1.%'))
                 ->count();
 
             if ($attemptCount < 2) {
