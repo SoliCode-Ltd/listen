@@ -84,7 +84,7 @@ final class OpenApiSpec
         ];
         $formatParam = [
             'name' => 'output_format', 'in' => 'query', 'required' => false,
-            'description' => 'File type of the audio. mp3 is always available; the others when your plan includes them.',
+            'description' => 'File type of the audio. mp3 is always accepted; the others when your plan includes them. If the server\'s audio converter is unavailable, the audio may come back as WAV; Content-Type and X-Output-Format always say what the body is.',
             'schema' => ['type' => 'string', 'enum' => ApiSpeechService::OUTPUT_FORMATS, 'default' => 'mp3'],
         ];
 
@@ -120,7 +120,7 @@ final class OpenApiSpec
                                 'X-Output-Format' => self::header('string', 'File type of the body.'),
                                 'Idempotent-Replayed' => self::header('string', 'true when this is the saved result of an earlier request with the same Idempotency-Key.'),
                                 'X-Request-Id' => self::header('string', 'Id of this request, for support.'),
-                                'X-RateLimit-Limit' => self::header('integer', 'Requests allowed a minute.'),
+                                'X-RateLimit-Limit' => self::header('integer', 'Requests your account may send a minute, all its keys together (generations and other requests are counted separately).'),
                                 'X-RateLimit-Remaining' => self::header('integer', 'Requests left this minute.'),
                             ],
                             'content' => [

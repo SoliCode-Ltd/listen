@@ -96,4 +96,14 @@ class DeveloperDocsWordingTest extends TestCase
         $response->assertHeader('X-Output-Format', 'wav')->assertHeader('Content-Type', 'audio/wav');
         $this->assertStringStartsWith('RIFF', $response->getContent());
     }
+
+    public function test_the_machine_readable_spec_says_the_same(): void
+    {
+        $spec = (string) json_encode($this->getJson('/v1/openapi.json')->assertOk()->json());
+
+        $this->assertStringContainsString('Requests your account may send a minute, all its keys together', $spec);
+        $this->assertStringNotContainsString('Requests allowed a minute.', $spec);
+        $this->assertStringContainsString('the audio may come back as WAV', $spec);
+        $this->assertStringNotContainsString('mp3 is always available', $spec);
+    }
 }
