@@ -797,6 +797,84 @@ class RenewalGraceTest extends TestCase
         $this->assertSame(self::PAID_KEY, $this->creditKey());
     }
 
+    public function test_stripe_ending_the_subscription_during_the_grace_keeps_the_plan_until_the_date_the_member_was_told(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->assertSame(['Payment failed - action required'], $this->sentSubjects());
+        $this->assertStringContainsString('Your plan stays on until Oct 21, 2026', $this->lastBody());
+
+        // Day 3 of the 7 grace days: Stripe's own retry settings gave up and it cancelled the subscription.
+        $this->travelTo(Carbon::parse('2026-10-17 09:00:00'));
+        $this->stripeEndedIt();
+
+        $this->assertKeptOnThePaidMonth(4000);
+        $this->assertSame([], $this->sentSubjects(), 'Told when the plan ends, not before.');
+
+        // Billing syncs and the grace job meanwhile change nothing.
+        $this->travelTo(Carbon::parse('2026-10-21 10:00:00'));
+        $this->sync();
+        $this->assertKeptOnThePaidMonth(4000);
+        $this->assertSame(0, $this->runGraceJob());
+
+        // On the date told: Free, and one email that says so.
+        $this->travelTo(Carbon::parse('2026-10-21 11:06:00'));
+        $this->assertSame('free', $this->activePlanSlug());
+        $this->assertSame(1, $this->runGraceJob());
+
+        $this->assertFalse($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'), 'Nothing was left to cancel.');
+        $plan = $this->plan();
+        $this->assertSame((int) $this->free->id, (int) $plan->plan_id);
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNotNull($plan->billing_downgraded_at);
+        $this->assertSame('free', $this->activePlanSlug());
+        $this->assertSame(['Your subscription was canceled'], $this->sentSubjects());
+        $this->assertStringContainsString('Your account is on the free plan now.', $this->lastBody());
+        $this->assertStringContainsString('- Grace Period Ended: Oct 21, 2026', $this->lastBody());
+
+        // Done once.
+        $this->assertSame(0, $this->runGraceJob());
+        $this->assertSame([], $this->sentSubjects());
+    }
+
+    public function test_once_stripe_has_ended_it_the_page_says_the_plan_stays_on_and_checkout_is_open_again(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->travelTo(Carbon::parse('2026-10-17 09:00:00'));
+        $this->stripeEndedIt();
+
+        // A card update would pay nothing now: the page says the plan stays on, then ends.
+        $this->travelTo(Carbon::parse('2026-10-18 09:00:00'));
+        $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.payment_grace_ended_notice', ['plan' => 'Starter', 'date' => '21 Oct 2026']))
+            ->assertDontSee(__('ui.manage_subscription.payment_grace_notice', ['plan' => 'Starter', 'date' => '21 Oct 2026']))
+            ->assertDontSee('id="cancelBtn"', false);
+        // Nothing is left to pay first, so checkout no longer sends the member to pay it.
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')
+            ->assertOk()
+            ->assertDontSee(__('ui.billing.pay_overdue_first', ['date' => '21 Oct 2026']));
+
+        app()->setLocale('ar');
+        $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.payment_grace_ended_notice', [
+                'plan' => $this->starter->getLocalizedName('ar') ?: 'Starter',
+                'date' => Carbon::parse('2026-10-21 11:05:00')->locale('ar')->translatedFormat('j M Y'),
+            ], 'ar'));
+    }
+
+    /** Stripe cancels the subscription now, and says so (customer.subscription.deleted). */
+    private function stripeEndedIt(): void
+    {
+        $ended = ['ended_at' => now()->getTimestamp(), 'canceled_at' => now()->getTimestamp()];
+        $this->stripeHas('canceled', extra: $ended);
+        $this->webhook('evt_sub_deleted', 'customer.subscription.deleted', $ended + $this->stripeSubscription('canceled'))->assertOk();
+    }
+
     /**
      * The renewal day: Stripe has started the new month (still active, the
      * invoice is charged about an hour later) and a billing sync took its

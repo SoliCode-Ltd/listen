@@ -90,12 +90,14 @@ class BillingController extends Controller
      * is made from Manage Subscription (a card update pays the unpaid invoice).
      * Checkout never replaces that subscription: it would cancel it and void the
      * invoice before charging the new card, so one more decline would end the
-     * plan before its grace days run out. What the member is told, or null.
+     * plan before its grace days run out. Once Stripe has ended the subscription
+     * there is nothing left to pay, and a new plan can be bought. What the member
+     * is told, or null.
      */
     private function overdueRenewalNotice(User $user): ?string
     {
         $plan = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
-        if (! RenewalGrace::keeps($plan)) {
+        if (! RenewalGrace::keeps($plan) || ! $this->renewalStillOwed($this->currentDefaultSubscription($user))) {
             return null;
         }
 
@@ -136,8 +138,7 @@ class BillingController extends Controller
         $inGrace = RenewalGrace::keeps($local);
         $cardPaymentMissing = $local !== null
             && (string) $local->billing_payment_state === 'past_due'
-            && $subscription !== null && ! $subscription->ended()
-            && in_array(strtolower((string) $subscription->stripe_status), ['past_due', 'unpaid'], true);
+            && $this->renewalStillOwed($subscription);
         $manual = $stripeValid || $inGrace || $cardPaymentMissing ? null : $this->manualSubscriptionState($user);
         $hasStripeCustomer = $user->hasStripeId();
 
@@ -182,7 +183,9 @@ class BillingController extends Controller
             'subscriptionRenewsAt' => $periodEnd ? $this->formatCarbonDate($periodEnd) : null,
             'upcomingCharge' => $upcomingCharge,
             'trialNotice' => $this->trialNotice($user, $locale),
-            'paymentGraceNotice' => $inGrace ? __('ui.manage_subscription.payment_grace_notice', [
+            // Once Stripe has ended the subscription, a card update pays nothing: the
+            // plan still stays on until the date the member was told.
+            'paymentGraceNotice' => $inGrace ? __($cardPaymentMissing ? 'ui.manage_subscription.payment_grace_notice' : 'ui.manage_subscription.payment_grace_ended_notice', [
                 'plan' => $local->plan->getLocalizedName($locale) ?: (string) $local->plan->name,
                 'date' => $this->formatCarbonDate($local->billing_grace_ends_at),
             ]) : null,
@@ -1146,6 +1149,17 @@ class BillingController extends Controller
             ->where('type', 'default')
             ->latest('id')
             ->first();
+    }
+
+    /**
+     * Whether the card subscription is still behind on payment, as our copy of it
+     * says: Stripe goes on retrying the card, and paying the open invoice keeps
+     * the plan. Not once it has ended (Stripe's own retries can end it first).
+     */
+    private function renewalStillOwed(?BillingSubscription $subscription): bool
+    {
+        return $subscription !== null && ! $subscription->ended()
+            && in_array(strtolower((string) $subscription->stripe_status), ['past_due', 'unpaid'], true);
     }
 
     /**

@@ -234,6 +234,14 @@ class BillingSyncService
             $stripeSaysPaid = false;
         }
 
+        // A failed renewal's grace keeps the plan as it is until the date the member
+        // was told, whatever Stripe says meanwhile: its own retry settings can end the
+        // subscription first. The grace job ends the plan on that date.
+        if (! $keepPlanAsIs && ! $stripeSaysPaid
+            && RenewalGrace::keeps(Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first())) {
+            $keepPlanAsIs = true;
+        }
+
         if (! $keepPlanAsIs) {
             $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
         }

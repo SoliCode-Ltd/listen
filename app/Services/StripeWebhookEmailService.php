@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\RenewalGrace;
 use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -449,6 +450,13 @@ class StripeWebhookEmailService
             ->first();
 
         if ($localSubscription?->billing_downgraded_at && $localSubscription->billing_downgraded_at->gt(now()->subHours(6))) {
+            return;
+        }
+
+        // A failed renewal's grace keeps the plan on until the date the member was
+        // told, though Stripe ended the subscription first: the grace job tells them
+        // when the plan ends, on that date.
+        if (RenewalGrace::keeps($localSubscription)) {
             return;
         }
 

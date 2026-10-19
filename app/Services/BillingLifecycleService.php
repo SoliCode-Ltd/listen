@@ -260,13 +260,12 @@ class BillingLifecycleService
                     }
 
                     if (! $billingSubscription || ! in_array($stripeStatus, ['past_due', 'unpaid'], true)) {
-                        // Nothing live in Stripe to cancel (it ended, or never started):
-                        // the flag is settled and the sync decides the plan.
-                        $subscription->forceFill([
-                            'billing_payment_state' => 'ok',
-                            'billing_grace_ends_at' => null,
-                        ])->save();
-                        $this->billingSyncService->syncIfStale($user, true);
+                        // Nothing live in Stripe to cancel: it ended meanwhile (Stripe's own
+                        // retries can cancel it before the grace runs out), or never started.
+                        // The plan was kept on until now, as the member was told; it ends
+                        // now, and they are told, as when it is cancelled below.
+                        $this->endUnpaidPlan($user, $subscription);
+                        $count++;
 
                         continue;
                     }
@@ -289,43 +288,52 @@ class BillingLifecycleService
                         continue;
                     }
 
-                    $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
-                    $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
-                    $subscription->forceFill([
-                        'billing_payment_state' => 'ok',
-                        'billing_grace_ends_at' => null,
-                        'billing_downgraded_at' => now(),
-                    ])->save();
-                    // On Free now, also when the billing sync below cannot read Stripe.
-                    $this->moveToFreePlan($user);
-
-                    $this->mail->send(
-                        $user,
-                        'Your subscription was canceled',
-                        $this->mail->compose(
-                            $user,
-                            [
-                                'Your grace period ended without a successful payment, so the subscription was canceled.',
-                                'Your account is on the free plan now.',
-                            ],
-                            [
-                                'Plan' => $planName,
-                                'Grace Period Ended' => $graceEndedAt,
-                                'Canceled At' => now()->format('M j, Y g:i A'),
-                                'Payment State' => 'Canceled',
-                            ],
-                            'You can upgrade again any time from '.$this->mail->manageBillingUrl()
-                        ),
-                        "grace-cancel:{$user->id}:{$graceEndedAt}",
-                        24 * 30
-                    );
-
-                    $this->billingSyncService->syncIfStale($user, true);
+                    $this->endUnpaidPlan($user, $subscription);
                     $count++;
                 }
             });
 
         return $count;
+    }
+
+    /**
+     * Moves a card plan whose renewal was never paid to Free once its grace days
+     * ran out, and tells the member (once: the email's dedupe key).
+     */
+    private function endUnpaidPlan(User $user, Subscription $subscription): void
+    {
+        $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
+        $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
+        $subscription->forceFill([
+            'billing_payment_state' => 'ok',
+            'billing_grace_ends_at' => null,
+            'billing_downgraded_at' => now(),
+        ])->save();
+        // On Free now, also when the billing sync below cannot read Stripe.
+        $this->moveToFreePlan($user);
+
+        $this->mail->send(
+            $user,
+            'Your subscription was canceled',
+            $this->mail->compose(
+                $user,
+                [
+                    'Your grace period ended without a successful payment, so the subscription was canceled.',
+                    'Your account is on the free plan now.',
+                ],
+                [
+                    'Plan' => $planName,
+                    'Grace Period Ended' => $graceEndedAt,
+                    'Canceled At' => now()->format('M j, Y g:i A'),
+                    'Payment State' => 'Canceled',
+                ],
+                'You can upgrade again any time from '.$this->mail->manageBillingUrl()
+            ),
+            "grace-cancel:{$user->id}:{$graceEndedAt}",
+            24 * 30
+        );
+
+        $this->billingSyncService->syncIfStale($user, true);
     }
 
     public function syncUserByStripeCustomerId(?string $stripeCustomerId): void
