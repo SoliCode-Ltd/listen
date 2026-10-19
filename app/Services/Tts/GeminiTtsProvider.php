@@ -732,7 +732,11 @@ class GeminiTtsProvider implements TtsProviderInterface
                 yield $index => $part;
                 $part = null;
             }
+            // The client's pooled requests hold themselves in reference cycles: without
+            // this, every batch's replies (3-4 MB of base64 each) stay in memory until
+            // the whole text is read, and an hour of them is too much for live.
             unset($responses);
+            gc_collect_cycles();
         }
 
         // One request for each piece, counted on the key that answered it; synthesize()

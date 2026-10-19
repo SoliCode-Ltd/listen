@@ -506,7 +506,10 @@ class VoiceCloningService
                 yield $index => $audio;
                 $audio = null;
             }
+            // The client's pooled requests hold themselves in reference cycles: without
+            // this, every batch's replies stay in memory until the whole script is read.
             unset($responses);
+            gc_collect_cycles();
         }
     }
 
