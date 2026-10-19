@@ -585,6 +585,10 @@ return [
         'admin_request_already_reviewed' => 'تمت مراجعة طلب الدفع اليدوي هذا بالفعل.',
         'admin_request_missing_relation' => 'طلب الدفع لا يحتوي على المستخدم أو الخطة بشكل صحيح.',
         'manual_locked_to_egypt' => 'طرق الدفع اليدوي متاحة حالياً لمصر فقط.',
+
+        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        'card_form_unavailable' => 'تعذّر تحميل نموذج الدفع بالبطاقة. تحقّق من اتصالك، ثم أعد تحميل الصفحة وحاول مرة أخرى.',
+        'card_local_about' => 'يُخصم بالدولار الأمريكي، أي نحو :amount',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -1835,7 +1839,7 @@ return [
         'manual_note' => 'حوّل المبلغ وارفع إيصال التحويل، وسنضيف باقتك فور تأكيده.',
         'card_working' => 'جارٍ الدفع…',
         'card_failed' => 'لم يتم الدفع. حاول مرة أخرى أو استخدم بطاقة أخرى.',
-        'card_declined' => 'رُفضت بطاقتك: :reason',
+        'card_declined' => 'رُفضت بطاقتك، لذلك لم يُخصم أي مبلغ. جرّب بطاقة أخرى.',
         'card_incomplete' => 'من فضلك أكمل بيانات البطاقة.',
         'card_processing' => 'ما زال البنك يعالج الدفع، وستُضاف باقتك فور إتمامه.',
         'added' => 'أُضيف :count حرف متميز إلى حسابك.',
@@ -1867,6 +1871,9 @@ return [
         'meter_text' => 'تبقّى :remaining من :total رصيد',
         'meter_ends' => 'تنتهي في :date',
         'free_try_headline' => ':count حرف متميز للتجربة',
+
+        // The pay button while the bank is still processing a card payment.
+        'card_processing_button' => 'الدفع قيد المعالجة…',
     ],
     'samples' => [
         'title' => 'نماذج الأصوات',

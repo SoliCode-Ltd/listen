@@ -658,6 +658,10 @@
       color: var(--muted);
       font-size: .95rem;
     }
+    .quote-highlight .amount-about {
+      margin-top: .1rem;
+      font-size: .85rem;
+    }
     .quote-details {
 
       overflow: hidden;
@@ -1153,6 +1157,8 @@
         <div class="quote-highlight">
           <small id="quoteAmountLabel">{{ __('ui.billing.amount_to_be_charged') }}</small>
           <p class="amount" id="quoteAmount" dir="ltr">-</p>
+          {{-- The card is charged in US dollars: the price in the visitor's own currency, for reference. --}}
+          <p class="hint amount-about" id="quoteAmountAbout" hidden></p>
           <p class="hint" id="quoteHint">{{ __('ui.billing.select_plan_for_preview') }}</p>
         </div>
 
@@ -1237,6 +1243,8 @@
       'order_loading' => __('ui.billing.order_loading'),
       'order_fallback_label' => __('ui.billing.order_fallback_label'),
       'order_fallback_hint' => __('ui.billing.order_fallback_hint', ['plan' => $activePlanName]),
+      'card_form_unavailable' => __('ui.billing.card_form_unavailable'),
+      'card_local_about' => __('ui.billing.card_local_about'),
     ];
   @endphp
   <script>
@@ -1280,6 +1288,7 @@
     const paymentMethodInputs = Array.from(document.querySelectorAll('input[name="payment_method_choice"]'));
 
     const quoteAmount = document.getElementById('quoteAmount');
+    const quoteAmountAbout = document.getElementById('quoteAmountAbout');
     const quoteAmountLabel = document.getElementById('quoteAmountLabel');
     const quoteHint = document.getElementById('quoteHint');
     const quotePlan = document.getElementById('quotePlan');
@@ -1299,6 +1308,9 @@
     const localeCode = String(document.documentElement.lang || '').toLowerCase();
     const isArabicLocale = localeCode.startsWith('ar');
     const subscribeBtnDefaultText = subscribeBtn ? subscribeBtn.textContent.trim() : i18n.confirm_and_pay;
+    // True from the moment a payment (or a trial) is sent until its answer is in:
+    // choosing another plan, cycle or method meanwhile never turns Pay back on.
+    let paymentInFlight = false;
     const LIGHT_CARD_STYLE = {
       base: {
         color: '#13213d',
@@ -1430,6 +1442,23 @@
       return intervalCount > 1 ? `${i18n.every} ${intervalCount} ${unit}` : `${i18n.every} ${unit}`;
     }
 
+    // The card is charged in US dollars (the plan's Stripe price). Where prices show
+    // in the visitor's own currency, the card's amount is the dollar price it is
+    // really charged, and the local price is shown beside it as "about".
+    function cardCharge(meta) {
+      const inDollars = String(meta?.charge_currency || 'USD').toUpperCase() === 'USD';
+      if (meta?.is_converted && inDollars && meta?.base_usd_formatted) {
+        return { amount: String(meta.base_usd_formatted), local: String(meta.amount_formatted || '') };
+      }
+      return { amount: String(meta?.amount_formatted || ''), local: '' };
+    }
+
+    function showCardAbout(local) {
+      if (!quoteAmountAbout) return;
+      quoteAmountAbout.textContent = local ? String(i18n.card_local_about || '').replace(':amount', `⁦${local}⁩`) : '';
+      quoteAmountAbout.hidden = !local;
+    }
+
     function syncPaymentMethods() {
       const plan = currentPlan();
       const preferred = preferredMethodForPlan(plan);
@@ -1479,7 +1508,7 @@
       stripeContainer?.classList.toggle('hidden', !usingStripe);
       manualPanel?.classList.toggle('show', !usingStripe);
 
-      if (subscribeBtn) {
+      if (subscribeBtn && !paymentInFlight) {
         subscribeBtn.textContent = usingStripe ? subscribeBtnDefaultText : i18n.manual_submit;
         const hasPlan = Boolean(currentPlan());
         subscribeBtn.disabled = !hasPlan || (usingStripe ? !stripe : false);
@@ -1531,7 +1560,8 @@
       const ready = Boolean(trialBtn && trialOffer.enabled && trialOffer.available)
         && selectedMethod() === 'stripe'
         && planCycles.indexOf(cycle) !== -1;
-      const amount = String((cycle === 'yearly' ? plan?.yearly?.amount_formatted : plan?.monthly?.amount_formatted) || '');
+      // A trial is followed by a card payment, in US dollars.
+      const amount = cardCharge(cycle === 'yearly' ? plan?.yearly : plan?.monthly).amount;
       const end = new Date();
       end.setDate(end.getDate() + Number(trialOffer.days || 7));
 
@@ -1607,6 +1637,7 @@
       const selected = selectedMeta();
       if (!selected) {
         quoteAmount.textContent = '-';
+        showCardAbout('');
         quoteAmountLabel.textContent = i18n.amount_to_be_charged;
         quotePlan.textContent = '-';
         quoteMethod.textContent = '-';
@@ -1617,9 +1648,11 @@
         return;
       }
 
-      let amountText = String(selected.meta.amount_formatted || '-');
+      const charge = selected.method === 'stripe' ? cardCharge(selected.meta) : { amount: String(selected.meta.amount_formatted || ''), local: '' };
+      let amountText = charge.amount || '-';
       const amountBidi = `\u2066${amountText}\u2069`;
       quoteAmount.textContent = amountText;
+      showCardAbout(charge.local);
       quoteAmountLabel.textContent = selected.method === 'stripe'
         ? i18n.amount_to_be_charged
         : i18n.manual_exact_amount;
@@ -1641,6 +1674,7 @@
       if (isTrialCheckout()) {
         const trial = trialState();
         quoteAmount.textContent = trial.zeroPlain;
+        showCardAbout('');
         quoteAmountLabel.textContent = i18n.due_today;
         quoteHint.textContent = String(i18n.trial_quote_hint || '')
           .replace(':amount', trial.amount)
@@ -1686,6 +1720,7 @@
       if (!planChange.cache[planChangeKey(selected)]) {
         quoteAmountLabel.textContent = i18n.due_today;
         quoteAmount.textContent = '\u2026';
+        showCardAbout('');
         quoteHint.textContent = i18n.order_loading;
       }
 
@@ -1701,8 +1736,10 @@
         if (seq !== planChange.seq) return;
         // No preview: the most it can be is the new plan's price, less the credit.
         orderDetails.hidden = true;
+        const charge = cardCharge(selected.meta);
         quoteAmountLabel.textContent = i18n.order_fallback_label;
-        quoteAmount.textContent = String(selected.meta.amount_formatted || '-');
+        quoteAmount.textContent = charge.amount || '-';
+        showCardAbout(charge.local);
         quoteHint.textContent = i18n.order_fallback_hint;
       });
     }
@@ -1724,7 +1761,9 @@
       orderDetails.hidden = false;
 
       quoteAmountLabel.textContent = i18n.due_today;
+      // The order is shown in local money; the note below says what the card pays.
       quoteAmount.textContent = String(data.total || '-');
+      showCardAbout('');
       const notes = [];
       if (discountHint) {
         notes.push(discountHint);
@@ -1739,6 +1778,7 @@
     }
 
     function setSubscribeButtonBusy(isBusy, text) {
+      paymentInFlight = Boolean(isBusy);
       if (!subscribeBtn) return;
       const usingStripe = selectedMethod() === 'stripe';
       subscribeBtn.disabled = Boolean(isBusy) || (usingStripe && !stripe);
@@ -1793,7 +1833,17 @@
       return fallback;
     }
 
-    const stripe = stripeKey ? Stripe(stripeKey) : null;
+    // Stripe.js loads from Stripe's own servers. When it is blocked or did not load,
+    // the card form says so and the rest of the page keeps working: InstaPay and
+    // Vodafone Cash need nothing from it.
+    let stripe = null;
+    try {
+      stripe = stripeKey && typeof Stripe === 'function' ? Stripe(stripeKey) : null;
+    } catch (_error) {
+      stripe = null;
+    }
+    const cardFormMissing = Boolean(stripeKey) && !stripe;
+    const cardUnavailableText = cardFormMissing ? i18n.card_form_unavailable : i18n.stripe_not_configured;
     const elements = stripe ? stripe.elements() : null;
     const card = elements
       ? elements.create('card', {
@@ -1804,6 +1854,7 @@
 
     let cardComplete = false;
     card?.mount('#card-element');
+    if (cardFormMissing && cardError) cardError.textContent = cardUnavailableText;
     card?.on('change', (event) => {
       cardComplete = Boolean(event.complete);
       cardError.textContent = event.error
@@ -1826,7 +1877,7 @@
     }
 
     async function collectCardPaymentMethod() {
-      if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
+      if (!stripe || !card) throw new Error(cardUnavailableText);
 
       const result = await stripe.createPaymentMethod({
         type: 'card',
@@ -1879,11 +1930,14 @@
     }
 
     trialBtn?.addEventListener('click', async () => {
+      if (paymentInFlight) return;
       setMessage('', '');
+      let leaving = false;
       try {
-        if (!stripe || !card) throw new Error(i18n.stripe_not_configured);
+        if (!stripe || !card) throw new Error(cardUnavailableText);
         if (!cardComplete) throw new Error(i18n.enter_card_details);
 
+        paymentInFlight = true;
         if (trialBtn) {
           trialBtn.disabled = true;
           trialBtn.classList.add('is-loading');
@@ -1925,25 +1979,32 @@
           trialPlan ? trialPlan[String(cycleSelect?.value || 'monthly')] : null,
           String(confirmed.setupIntent?.id || '')
         );
+        leaving = true;
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
         setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
       } finally {
-        if (trialBtn) {
-          trialBtn.disabled = false;
-          trialBtn.classList.remove('is-loading');
-          trialBtn.textContent = trialBtnDefaultText;
+        // On the way to the next page the button stays off.
+        if (!leaving) {
+          paymentInFlight = false;
+          if (trialBtn) {
+            trialBtn.disabled = false;
+            trialBtn.classList.remove('is-loading');
+            trialBtn.textContent = trialBtnDefaultText;
+          }
         }
       }
     });
 
     document.getElementById('billingForm')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (paymentInFlight) return;
       if (isTrialCheckout()) {
         trialBtn?.click();
         return;
       }
       setMessage('', '');
+      let leaving = false;
 
       try {
         const selected = selectedMeta();
@@ -2027,6 +2088,7 @@
 
           await trackPurchaseConversion(selected.meta);
           setMessage('ok', i18n.payment_confirmed_redirecting);
+          leaving = true;
           window.location.href = '{{ route('manage-subscription.page') }}';
           return;
         }
@@ -2040,11 +2102,14 @@
           await trackPurchaseConversion(selected.meta);
         }
         setMessage('ok', response.data?.message || i18n.subscription_updated_redirecting);
+        leaving = true;
         window.location.href = '{{ route('manage-subscription.page') }}';
       } catch (error) {
+        // Includes the server's 409 while another payment of this member is going through.
         setMessage('error', normalizeStripeMessage(error?.message, i18n.upgrade_failed));
       } finally {
-        setSubscribeButtonBusy(false);
+        // On the way to the next page Pay stays off; otherwise it comes back.
+        if (!leaving) setSubscribeButtonBusy(false);
       }
     });
 

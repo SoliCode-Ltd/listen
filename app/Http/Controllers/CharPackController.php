@@ -126,7 +126,7 @@ class CharPackController extends Controller
     }
 
     /**
-     * @param  array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string}  $result
+     * @param  array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}  $result
      */
     private function respond(array $result): JsonResponse
     {
@@ -146,10 +146,11 @@ class CharPackController extends Controller
                 'processing' => true,
                 'message' => $result['message'] ?? __('ui.pack.card_processing'),
             ], 202),
-            default => response()->json([
+            // Stripe's own reason (English) goes beside the message, for the page to keep aside.
+            default => response()->json(array_merge([
                 'ok' => false,
                 'message' => $result['message'] ?? __('ui.pack.card_failed'),
-            ], 422),
+            ], ($result['reason'] ?? '') !== '' ? ['reason' => $result['reason']] : []), 422),
         };
     }
 

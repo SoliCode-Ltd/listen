@@ -31,6 +31,7 @@
     .pack-amount { font-weight: 800; font-size: 1.15rem; }
     #pack-card-element { padding: .8rem .9rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
     .pack-error { color: #ff7a9a; min-height: 1.2em; font-size: .9rem; }
+    .pack-error.is-info { color: var(--muted); }
     .pack-small { font-size: .85rem; color: var(--muted); }
     .pack-manual-links { display: grid; gap: .6rem; }
     @media (max-width: 900px) { .pack-shell { grid-template-columns: 1fr; } }
@@ -134,7 +135,11 @@
         working: @json(__('ui.pack.card_working')),
         failed: @json(__('ui.pack.card_failed')),
         incomplete: @json(__('ui.pack.card_incomplete')),
+        processing: @json(__('ui.pack.card_processing')),
+        processingButton: @json(__('ui.pack.card_processing_button')),
+        formMissing: @json(__('ui.billing.card_form_unavailable')),
       };
+      const isArabicPage = String(document.documentElement.lang || '').toLowerCase().startsWith('ar');
       const conversionSendTo = @json(\App\Support\SeoHelper::googleAdsConversionSendTo());
       const conversionValue = {{ round(((int) $pack->getEffectivePriceCents()) / 100, 2) }};
       const isLight = () => document.documentElement.getAttribute('data-theme') === 'light';
@@ -142,13 +147,42 @@
         ? { base: { color: '#13213d', iconColor: '#2e4f8f', fontSize: '15px', '::placeholder': { color: '#7a8da8' } }, invalid: { color: '#c1244f', iconColor: '#c1244f' } }
         : { base: { color: '#f5f7ff', iconColor: '#9fb0d4', fontSize: '15px', '::placeholder': { color: '#8f9bbb' } }, invalid: { color: '#ff7a9a', iconColor: '#ff7a9a' } };
 
-      const stripe = Stripe(@json($stripeKey));
+      // A reason from Stripe (in English) is kept on hover and in the console, never in the text.
+      function setNotice(text, reason, info) {
+        errorBox.classList.toggle('is-info', Boolean(info));
+        errorBox.textContent = text || '';
+        errorBox.title = reason || '';
+        if (reason) console.info('Card payment:', reason);
+      }
+
+      // Stripe's own words read well on English pages; Arabic pages get ours.
+      function stripeText(error, fallback) {
+        const raw = String(error?.message || '').trim();
+        return isArabicPage && !/[؀-ۿ]/.test(raw) ? [fallback, raw] : [raw || fallback, ''];
+      }
+
+      // Stripe.js loads from Stripe's own servers: when it is blocked or did not load,
+      // say so instead of a card form that does nothing (the local payment links work).
+      let stripe = null;
+      try {
+        stripe = typeof Stripe === 'function' ? Stripe(@json($stripeKey)) : null;
+      } catch (_error) {
+        stripe = null;
+      }
+      if (!stripe) {
+        setNotice(i18n.formMissing, '');
+        button.disabled = true;
+        form.addEventListener('submit', (event) => event.preventDefault());
+        return;
+      }
+
       const card = stripe.elements().create('card', { hidePostalCode: true, style: cardStyle() });
       let cardComplete = false;
       card.mount('#pack-card-element');
       card.on('change', (event) => {
         cardComplete = Boolean(event.complete);
-        errorBox.textContent = event.error ? event.error.message : '';
+        const [text, reason] = event.error ? stripeText(event.error, i18n.incomplete) : ['', ''];
+        setNotice(text, reason);
       });
       new MutationObserver(() => card.update({ style: cardStyle() }))
         .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
@@ -185,34 +219,46 @@
         return false;
       }
 
+      function failed(text, reason) {
+        setNotice(text || i18n.failed, reason);
+        button.disabled = false;
+        button.textContent = buttonText;
+      }
+
       form.addEventListener('submit', async (event) => {
         event.preventDefault();
         if (button.disabled) return;
-        if (!cardComplete) { errorBox.textContent = i18n.incomplete; return; }
+        if (!cardComplete) { setNotice(i18n.incomplete, ''); return; }
 
         button.disabled = true;
         button.textContent = i18n.working;
-        errorBox.textContent = '';
+        setNotice('', '');
 
         try {
           const method = await stripe.createPaymentMethod({ type: 'card', card });
-          if (method.error) throw new Error(method.error.message);
+          if (method.error) return failed(...stripeText(method.error, i18n.failed));
 
           let response = await post(@json(route('billing.pack.card')), { payment_method: method.paymentMethod.id });
           if (await finish(response)) return;
 
           if (response.status === 402 && response.data.requires_action) {
             const check = await stripe.confirmCardPayment(response.data.client_secret);
-            if (check.error) throw new Error(check.error.message);
+            if (check.error) return failed(...stripeText(check.error, i18n.failed));
             response = await post(@json(route('billing.pack.card.confirm')), { purchase: response.data.purchase });
             if (await finish(response)) return;
           }
 
-          throw new Error(firstError(response.data));
-        } catch (error) {
-          errorBox.textContent = error.message || i18n.failed;
-          button.disabled = false;
-          button.textContent = buttonText;
+          // The bank is still on it and the pack is added once it goes through:
+          // Pay stays off, so a second click never pays twice.
+          if (response.status === 202 && response.data.processing) {
+            button.textContent = i18n.processingButton;
+            setNotice(response.data.message || i18n.processing, '', true);
+            return;
+          }
+
+          failed(firstError(response.data), response.data && response.data.reason);
+        } catch (_error) {
+          failed(i18n.failed, '');
         }
       });
     })();

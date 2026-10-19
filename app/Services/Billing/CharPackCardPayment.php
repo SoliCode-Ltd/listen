@@ -22,7 +22,7 @@ class CharPackCardPayment
     ) {}
 
     /**
-     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string}
+     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
      */
     public function start(User $user, Plan $pack, string $paymentMethodId): array
     {
@@ -66,7 +66,7 @@ class CharPackCardPayment
     /**
      * The browser finished the bank's check: look the payment up and settle it.
      *
-     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string}
+     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
      */
     public function confirm(CharPackPurchase $purchase): array
     {
@@ -123,7 +123,7 @@ class CharPackCardPayment
 
     /**
      * @param  array{id:string,status:string,client_secret:?string,amount:int,currency:string,customer:?string,metadata:array<string, string>,error:?string}  $intent
-     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string}
+     * @return array{status:string, purchase:CharPackPurchase, client_secret?:?string, message?:string, reason?:string}
      */
     private function settle(CharPackPurchase $purchase, array $intent): array
     {
@@ -145,10 +145,13 @@ class CharPackCardPayment
 
         $this->packs->markFailed($purchase, (string) ($intent['error'] ?? $intent['status']));
 
+        // Stripe's reason is in English: the member reads our words in their own
+        // language, and the reason goes along on its own for the page to keep aside.
         return [
             'status' => 'failed',
             'purchase' => $purchase->fresh(),
-            'message' => $intent['error'] ? __('ui.pack.card_declined', ['reason' => $intent['error']]) : __('ui.pack.card_failed'),
+            'message' => $intent['error'] ? __('ui.pack.card_declined') : __('ui.pack.card_failed'),
+            'reason' => (string) ($intent['error'] ?? ''),
         ];
     }
 

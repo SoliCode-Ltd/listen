@@ -584,6 +584,10 @@ return [
         'admin_request_already_reviewed' => 'This manual payment request has already been reviewed.',
         'admin_request_missing_relation' => 'The payment request is missing its user or plan relationship.',
         'manual_locked_to_egypt' => 'Manual payment methods are currently available only for Egypt.',
+
+        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        'card_form_unavailable' => "The card payment form couldn't load. Check your connection, then reload the page to try again.",
+        'card_local_about' => 'Charged in US dollars, about :amount',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -1829,7 +1833,7 @@ return [
         'manual_note' => 'Send the amount, upload the receipt, and we add your pack once we confirm it.',
         'card_working' => 'Processing…',
         'card_failed' => 'The payment did not go through. Please try again or use another card.',
-        'card_declined' => 'Your card was declined: :reason',
+        'card_declined' => 'Your card was declined, so nothing was charged. Please try another card.',
         'card_incomplete' => 'Please complete your card details.',
         'card_processing' => 'Your bank is still processing the payment. Your pack will be added as soon as it goes through.',
         'added' => ':count premium characters were added to your account.',
@@ -1861,6 +1865,9 @@ return [
         'meter_text' => ':remaining of :total credits left',
         'meter_ends' => 'Ends :date',
         'free_try_headline' => ':count premium characters to try',
+
+        // The pay button while the bank is still processing a card payment.
+        'card_processing_button' => 'Payment processing…',
     ],
     'samples' => [
         'title' => 'Voice samples',
