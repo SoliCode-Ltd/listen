@@ -212,13 +212,14 @@ final class AudioEffects
         }, $graph);
 
         $head = '[0:a]aresample=44100,aformat=channel_layouts=mono'.($tail > 0 ? ',apad=pad_dur='.$tail : '').'[in];';
-        $end = $total > 0.6 ? ',afade=t=out:st='.round($total - 0.5, 3).':d=0.5' : '';
+        $fade = $tail > 0 ? 0.5 : 0.05;
+        $end = $total > $fade + 0.1 ? ',afade=t=out:st='.round($total - $fade, 3).':d='.$fade : '';
 
         // Loudness: measured on a first run, then one fixed gain for the whole
         // file (so a background never swells when the voice stops), with a
         // peak limiter. Without a measurement, a single-pass normaliser.
         $level = match (true) {
-            $measure => self::LOUDNESS.':print_format=json',
+            $measure => 'ebur128=framelog=quiet',
             $gainDb !== null => 'volume='.round(max(-24.0, min(30.0, $gainDb)), 2).'dB,alimiter=limit=0.89:level=disabled',
             default => self::LOUDNESS.',aresample=44100,alimiter=limit=0.89:level=disabled',
         };
@@ -300,7 +301,9 @@ final class AudioEffects
             $process = new Process(array_merge($source, ['-loglevel', 'info', '-nostats'], $extra, ['-filter_complex', $filter, '-map', '[final]', '-f', 'null', '-']));
             $process->setTimeout(300);
             $process->run();
-            if (! $process->isSuccessful() || preg_match('/"input_i"\s*:\s*"(-?[\d.]+)"/', $process->getErrorOutput(), $m) !== 1) {
+            $log = $process->getErrorOutput();
+            $log = (string) substr($log, (int) strrpos($log, 'Summary:'));
+            if (! $process->isSuccessful() || preg_match('/I:\s+(-?[\d.]+) LUFS/', $log, $m) !== 1) {
                 return null;
             }
             $measured = (float) $m[1];
@@ -335,7 +338,7 @@ final class AudioEffects
             mkdir(dirname($absoluteTarget), 0775, true);
         }
         [, , , , , , $graph, $tail] = self::ALL[$effect];
-        $seconds = (float) (AudioDuration::ofStoredFile($relativePath) ?? 0.0);
+        $seconds = (float) (AudioDuration::ofStoredFile($relativePath) ?? 0.0) + ($effect === 'walkie' ? 0.34 : 0.0);
         $inputs = [];
         $filter = self::graph($graph, $tail, $inputs, $seconds);
         $extra = [];
