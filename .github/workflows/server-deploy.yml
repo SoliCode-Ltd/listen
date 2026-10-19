@@ -68,6 +68,11 @@ name: Server deploy
 #            use, and every account sharing a browser, a demo fingerprint or an
 #            address with them, and whether the demo's linking rules count it.
 #            Addresses, cookies and fingerprints only as short hashes.
+#   join-check: read-only (READ ONLY database session). Whether the newest
+#            long premium voices, read in pieces and joined, keep one voice:
+#            each piece's pace, pitch and level against the voice's others
+#            and against the halves of one piece (scripts/support/join_check.php).
+#            Numbers and voice ids only, never a text.
 #   speech-rates: read-only (READ ONLY database session). How long the voices
 #            really take to say a text, from the finished voices whose audio
 #            was measured: how far the studio's estimate is from the real
@@ -96,7 +101,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -362,6 +367,11 @@ jobs:
           fi
           if [ "$MODE" = promises ]; then
             tool promises_inspect.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = join-check ]; then
+            tool join_check.php | $S "$FIND; LIMIT=40 nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
