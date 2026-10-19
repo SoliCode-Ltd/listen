@@ -886,6 +886,12 @@
       <h1>{{ __('ui.billing.title') }}</h1>
       <p>{{ __('ui.billing.subtitle') }}</p>
     </div>
+    @if(!empty($paymentOverdueNotice ?? null))
+      <div class="message error" id="paymentOverdueNotice" role="status" style="margin-top:0;margin-bottom:1.25rem;">
+        {{ $paymentOverdueNotice }}
+        <a href="{{ route('manage-subscription.page') }}" style="color:inherit;font-weight:600;text-decoration:underline;">{{ __('ui.billing.manage_subscription') }}</a>
+      </div>
+    @endif
 
     <div class="status-grid" style="margin-bottom: 1.25rem;">
       <div class="status-item">
@@ -2062,6 +2068,16 @@
         const prorationDate = planChangeProrationDate(selected);
         if (prorationDate) subscribeBody.proration_date = prorationDate;
         let response = await post('{{ route('billing.subscribe') }}', subscribeBody);
+
+        // A payment still overdue in its grace days is paid from Manage Subscription, never replaced here.
+        if (response.status === 409 && response.data?.payment_overdue) {
+          setMessage('error', String(response.data.message || ''));
+          leaving = true;
+          window.setTimeout(function() {
+            window.location.href = String(response.data.manage_url || '{{ route('manage-subscription.page') }}');
+          }, 2500);
+          return;
+        }
 
         // On a free trial: the same plan charges nothing; another plan ends the trial only if the member agrees.
         if (response.status === 409 && response.data?.already_on_trial) {

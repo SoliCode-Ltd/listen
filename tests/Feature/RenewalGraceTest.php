@@ -630,6 +630,47 @@ class RenewalGraceTest extends TestCase
             ->assertDontSee('id="paymentGraceNotice"', false);
     }
 
+    public function test_checkout_during_the_grace_never_replaces_the_subscription_and_sends_the_member_to_pay_it(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->sync();
+        $graceEnds = $this->plan()->billing_grace_ends_at;
+        // What checkout would use to replace the subscription: a new card, and the open renewal invoice to void.
+        $this->stripe->answer('get', '/v1/payment_methods/pm_new', ['id' => 'pm_new', 'object' => 'payment_method', 'type' => 'card', 'customer' => 'cus_grace', 'card' => ['brand' => 'visa', 'last4' => '4242']]);
+        $this->stripe->answer('delete', '/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'canceled']);
+        $this->stripe->answer('get', '/v1/invoices', ['object' => 'list', 'has_more' => false, 'url' => '/v1/invoices', 'data' => [$this->renewalInvoice()]]);
+        $this->stripe->answer('post', '/v1/invoices/in_renewal/void', ['status' => 'void'] + $this->renewalInvoice());
+        $this->stripe->requests = [];
+
+        $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
+        $notice = __('ui.billing.pay_overdue_first', ['date' => '21 Oct 2026']);
+        // The checkout page says so before any card is typed in.
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee($notice);
+
+        $response = $this->actingAs($this->member)->postJsonLocalizedRoute('billing.subscribe', [
+            'plan' => 'starter', 'billing_cycle' => 'monthly', 'payment_method' => 'pm_new', 'save_card' => false,
+        ]);
+
+        $response->assertStatus(409)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('payment_overdue', true)
+            ->assertJsonPath('message', $notice);
+        $this->assertStringEndsWith('/manage-subscription', (string) $response->json('manage_url'));
+        // Nothing was cancelled, voided or charged: the subscription and its open invoice are as they were.
+        $this->assertSame([], array_values(array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] !== 'get')));
+        $this->assertSame('past_due', BillingSubscription::query()->where('stripe_id', 'sub_grace')->value('stripe_status'));
+        $this->assertEquals($graceEnds, $this->plan()->billing_grace_ends_at);
+        $this->assertKeptOnThePaidMonth(4000);
+
+        // In Arabic too.
+        app()->setLocale('ar');
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee(__('ui.billing.pay_overdue_first', [
+            'date' => Carbon::parse('2026-10-21 11:05:00')->locale('ar')->translatedFormat('j M Y'),
+        ], 'ar'));
+    }
+
     public function test_newsletters_count_a_member_in_their_grace_days_as_paid(): void
     {
         $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));

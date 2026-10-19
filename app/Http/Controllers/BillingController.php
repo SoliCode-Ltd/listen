@@ -81,7 +81,25 @@ class BillingController extends Controller
             'trialOffer' => $this->trialEligibility->offerFor($user),
             // On a paid plan, another plan costs the difference today (the order details say how much).
             'paidPlanChange' => $stripeReady && $subscription && $subscription->valid() && ! $subscription->onTrial(),
+            'paymentOverdueNotice' => $this->overdueRenewalNotice($user),
         ]);
+    }
+
+    /**
+     * While a failed renewal's grace days keep the member's plan on, its payment
+     * is made from Manage Subscription (a card update pays the unpaid invoice).
+     * Checkout never replaces that subscription: it would cancel it and void the
+     * invoice before charging the new card, so one more decline would end the
+     * plan before its grace days run out. What the member is told, or null.
+     */
+    private function overdueRenewalNotice(User $user): ?string
+    {
+        $plan = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
+        if (! RenewalGrace::keeps($plan)) {
+            return null;
+        }
+
+        return __('ui.billing.pay_overdue_first', ['date' => $this->formatCarbonDate($plan->billing_grace_ends_at)]);
     }
 
     public function manage(Request $request)
@@ -377,6 +395,17 @@ class BillingController extends Controller
         ]);
         // The moment the member's order details were worked out, so the charge matches them.
         $prorationDate = isset($validated['proration_date']) ? (int) $validated['proration_date'] : null;
+
+        // A renewal payment still overdue in its grace days: paid from Manage Subscription.
+        $overdue = $this->overdueRenewalNotice($user);
+        if ($overdue !== null) {
+            return response()->json([
+                'ok' => false,
+                'payment_overdue' => true,
+                'manage_url' => route('manage-subscription.page'),
+                'message' => $overdue,
+            ], 409);
+        }
 
         // Dynamically validate plan slug exists as an active paid plan
         $planRecord = Plan::query()->subscriptionPlans()
