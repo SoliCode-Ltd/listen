@@ -97,8 +97,9 @@ class TtsRoutingService
     /**
      * An HD request, made by Gemini or not at all: when Gemini is not set up or
      * fails, this throws, so the generation fails and its credits are given back.
-     * The exception says whether the failure may pass within the minute or is a
-     * limit on our side that lasts, so the member is told which.
+     * The exception says whether the failure may pass within the minute, is a
+     * limit on our side that lasts, or is the text itself, so the member is
+     * told which.
      */
     private function synthesizePremium(string $text, string $targetLanguage, array $voiceConfig, ?int $userId): array
     {
@@ -125,13 +126,16 @@ class TtsRoutingService
 
     /**
      * The site's daily ceiling, or every key out (the day's quota, the spending
-     * cap, refused keys), lasts; anything else may pass within the minute.
+     * cap, refused keys), lasts; text the engine refused fails again as it is;
+     * anything else may pass within the minute.
      */
     private function failureReason(\Throwable $e): string
     {
-        return $e instanceof TtsCostLimitException || $e instanceof GeminiKeysOutException
-            ? PremiumVoiceUnavailableException::OUR_LIMIT
-            : PremiumVoiceUnavailableException::BUSY;
+        return match (true) {
+            $e instanceof GeminiTextRefusedException => PremiumVoiceUnavailableException::TEXT_REFUSED,
+            $e instanceof TtsCostLimitException, $e instanceof GeminiKeysOutException => PremiumVoiceUnavailableException::OUR_LIMIT,
+            default => PremiumVoiceUnavailableException::BUSY,
+        };
     }
 
     /**

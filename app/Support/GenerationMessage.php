@@ -18,6 +18,7 @@ final class GenerationMessage
         'ui.backend.premium_voices_busy',
         'ui.backend.premium_voices_our_limit',
         'ui.backend.cloned_voices_our_limit',
+        'ui.backend.premium_text_refused',
         'ui.backend.generation_stuck_refunded',
         'ui.backend.cloned_voice_daily_limit',
         'ui.backend.translation_failed',

@@ -1688,6 +1688,8 @@ return [
         // A limit on our side that lasts (a spending cap, every key out for the day, the site's daily ceiling): no wait is promised.
         'premium_voices_our_limit' => 'أصواتنا المميزة غير متاحة الآن بسبب حدٍّ من جهتنا، ولم يُخصم أي رصيد من حسابك. نعمل على حل ذلك.',
         'cloned_voices_our_limit' => 'الأصوات المستنسخة غير متاحة الآن بسبب حدٍّ من جهتنا، ولم يُخصم أي رصيد من حسابك. نعمل على حل ذلك.',
+        // The premium engine would not read the text: the same text fails again, so other wording is asked for.
+        'premium_text_refused' => 'تعذّر على أصواتنا المميزة قراءة هذا النص، ولم يُخصم أي رصيد من حسابك. جرّب تغيير صياغته ثم أعد التوليد.',
         'generation_stuck_refunded' => 'استغرق هذا الصوت وقتاً أطول من اللازم فأوقفناه، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى.',
         'generate_too_many_requests' => 'طلبات توليد كثيرة في وقت قصير. انتظر :seconds ثانية ثم حاول مرة أخرى.',
 

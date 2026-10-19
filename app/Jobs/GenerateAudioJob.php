@@ -396,7 +396,8 @@ class GenerateAudioJob implements ShouldQueue
      * (the studio and the extension show it in the member's language, with
      * GenerationMessage). Only a passing overload promises a minute: a limit
      * on our side that lasts (the spending cap, every key out for the day, the
-     * site's daily ceiling) is said plainly, with no wait promised.
+     * site's daily ceiling) is said plainly, with no wait promised, and text the
+     * engine will not read asks for other wording.
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
@@ -413,12 +414,14 @@ class GenerateAudioJob implements ShouldQueue
             }
         }
         // An HD voice is never swapped for a standard one: the member is told
-        // whether the premium engine is busy or held back by a limit on our side
-        // (and that nothing is charged).
+        // whether the premium engine is busy, held back by a limit on our side,
+        // or would not read the text (and that nothing is charged).
         if ($e instanceof PremiumVoiceUnavailableException) {
-            return GenerationMessage::stored($e->reason === PremiumVoiceUnavailableException::OUR_LIMIT
-                ? 'ui.backend.premium_voices_our_limit'
-                : 'ui.backend.premium_voices_busy');
+            return GenerationMessage::stored(match ($e->reason) {
+                PremiumVoiceUnavailableException::OUR_LIMIT => 'ui.backend.premium_voices_our_limit',
+                PremiumVoiceUnavailableException::TEXT_REFUSED => 'ui.backend.premium_text_refused',
+                default => 'ui.backend.premium_voices_busy',
+            });
         }
 
         return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');

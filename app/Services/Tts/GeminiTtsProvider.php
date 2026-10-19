@@ -1506,7 +1506,7 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $blockReason = $response['promptFeedback']['blockReason'] ?? null;
         if (is_string($blockReason) && $blockReason !== '') {
-            throw new \RuntimeException('Gemini TTS blocked the prompt: ' . $blockReason);
+            throw new GeminiTextRefusedException('Gemini TTS blocked the prompt: ' . $blockReason);
         }
 
         $candidates = $response['candidates'] ?? [];
@@ -1516,7 +1516,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $finishReason = (string) ($candidates[0]['finishReason'] ?? '');
         if (in_array($finishReason, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'], true)) {
-            throw new \RuntimeException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
+            throw new GeminiTextRefusedException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
         }
 
         // Stopped at the output limit: the audio ends mid-sentence. It is asked

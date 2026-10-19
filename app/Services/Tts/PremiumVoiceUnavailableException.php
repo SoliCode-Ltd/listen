@@ -6,8 +6,8 @@ namespace App\Services\Tts;
  * The HD (premium) voice engine could not make this recording: it is not set
  * up, or it failed. HD requests never fall back to a standard voice, so the
  * generation fails, its credits are given back and the member is told why:
- * the premium voices are busy for a moment, or a limit on our side that
- * lasts holds them back (then no wait is promised).
+ * the premium voices are busy for a moment, a limit on our side that lasts
+ * holds them back (then no wait is promised), or they will not read the text.
  */
 class PremiumVoiceUnavailableException extends \RuntimeException
 {
@@ -19,6 +19,9 @@ class PremiumVoiceUnavailableException extends \RuntimeException
      * (the day's quota, the spending cap, refused keys), or no engine set up.
      */
     public const OUR_LIMIT = 'our_limit';
+
+    /** The engine would not read this text: the same text fails again. */
+    public const TEXT_REFUSED = 'text_refused';
 
     public function __construct(
         string $message = '',

@@ -1683,6 +1683,8 @@ return [
         // A limit on our side that lasts (a spending cap, every key out for the day, the site's daily ceiling): no wait is promised.
         'premium_voices_our_limit' => "Our premium voices are unavailable right now because of a limit on our side. Nothing was charged, and we're working on it.",
         'cloned_voices_our_limit' => "Cloned voices are unavailable right now because of a limit on our side. Nothing was charged, and we're working on it.",
+        // The premium engine would not read the text: the same text fails again, so other wording is asked for.
+        'premium_text_refused' => "Our premium voices couldn't read this text, so nothing was charged. Try changing the wording, then generate again.",
         'generation_stuck_refunded' => 'This voice took too long, so we stopped it. Nothing was charged — please try again.',
         'generate_too_many_requests' => 'You are generating very quickly. Please wait :seconds seconds and try again.',
 
