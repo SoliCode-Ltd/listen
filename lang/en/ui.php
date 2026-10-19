@@ -1613,7 +1613,6 @@ return [
         'dialogue_needs_two_speakers' => 'Choose two different speakers for the dialogue.',
         'dialogue_needs_names' => 'Start each line of the dialogue with a speaker\'s name and a colon, for example ":name: Hello!".',
         'dialogue_needs_hd' => 'Dialogue mode uses premium voices, which your plan does not include.',
-        'dialogue_too_long' => 'A dialogue can be up to :max characters. Split it into shorter parts.',
         'dashboard_upgrade_for_quality' => 'Upgrade your plan for higher voice quality.',
         'generation_text_prohibited' => 'Audio could not be generated because the entered text contains inappropriate or prohibited language. Listen does not allow abusive content.',
         'account_blocked' => 'Your account is currently blocked from accessing Listen. If you would like to request access again, please contact :email.',

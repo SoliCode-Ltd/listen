@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
+use App\Support\PaceAndPitch;
 use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
@@ -210,6 +212,10 @@ class TtsService
         $stylePrompt = trim((string) ($config['style_prompt'] ?? ''));
         if ($stylePrompt !== '') {
             $parts[] = 'prompt:'.$stylePrompt;
+            // The member's own direction is now followed by the dialect and speed they picked.
+            if ($provider === 'gemini') {
+                $parts[] = 'prompt:with-choices';
+            }
         }
 
         $speakers = $config['speakers'] ?? null;
@@ -224,6 +230,11 @@ class TtsService
                 && (trim((string) ($config['dialect'] ?? '')) !== '' || (is_string($encoded) && str_contains($encoded, '"dialect"')))) {
                 $parts[] = 'script:dialect';
             }
+
+            // A mood or delivery tag in a dialogue now directs its own turn, not every line.
+            if ($provider === 'gemini' && \App\Support\GeminiVocalTags::prepare($text)['cues'] !== []) {
+                $parts[] = 'cues:own-turn';
+            }
         }
 
         // Chirp 3 HD standard voices sound different from WaveNet ones, so they
@@ -236,9 +247,20 @@ class TtsService
         }
 
         if ($provider === 'gemini') {
+            // Plain Fusha (for the script or a speaker) is now asked for as formal Arabic.
+            $fushaSpeaker = is_array($speakers) && array_filter($speakers, fn ($speaker) => is_array($speaker) && ArabicDialects::isPlainFusha($speaker['dialect'] ?? null)) !== [];
+            if (ArabicDialects::isPlainFusha($config['dialect'] ?? null) || $fushaSpeaker) {
+                $parts[] = 'fusha:formal';
+            }
             $model = GeminiTtsModel::resolve();
             if ($model !== GeminiTtsModel::CURRENT) {
                 $parts[] = 'model:'.$model;
+            }
+
+            // Every speed and pitch step but 1.0x and 0 now has its own direction
+            // (0.9x, 1.1x and 1.2x used to sound like 1.0x), so older recordings are not reused.
+            if (PaceAndPitch::speed((float) ($config['speed'] ?? 1.0)) !== '' || PaceAndPitch::pitch((float) ($config['pitch'] ?? 0.0)) !== '') {
+                $parts[] = 'pace:graded';
             }
         }
 

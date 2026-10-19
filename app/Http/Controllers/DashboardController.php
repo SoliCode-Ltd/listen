@@ -308,7 +308,6 @@ class DashboardController extends Controller
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
-            DialogueSpeakers::ensureShortEnough((string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         // Check if user selected a cloned voice (key format: cloned_{id})

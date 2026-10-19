@@ -8,7 +8,6 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\TtsRoutingService;
-use App\Support\DialogueSpeakers;
 use App\Support\GeminiTtsModel;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -166,63 +165,74 @@ class DialogueModeTest extends TestCase
     }
 
     /**
-     * A dialogue is made in one request and very long ones come back empty, so
-     * the studio takes up to 2,400 characters and says so before anything is
-     * reserved or spoken; 2,400 itself is fine.
+     * A dialogue used to be made in one request, so the studio stopped at 2,400
+     * characters (very long ones came back empty). A long dialogue is now made in
+     * pieces split at speaker turns, so the studio takes one up to the plan's
+     * per-request limit, which still applies before anything is reserved.
      */
-    public function test_a_dialogue_longer_than_the_limit_is_refused_before_anything_is_spent(): void
+    public function test_the_studio_makes_a_dialogue_longer_than_2400_characters_in_pieces(): void
     {
         $member = $this->member(dialogue: true);
         $this->actingAs($member);
         [$a, $b] = $this->twoPremiumVoices('ar');
 
         $long = $this->dialogueRequest($a['key'], $b['key']);
-        $long['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 1);
-        $this->postJsonLocalizedRoute('dashboard.generate', $long)
+        $long['content'] = $this->scriptOf(3000);
+        $this->postJsonLocalizedRoute('dashboard.generate', $long)->assertSuccessful();
+
+        $this->assertSame('done', \App\Models\AudioGeneration::latest('id')->first()->status);
+        $this->assertMadeInPiecesWithBothVoices($long['content']);
+
+        // Over the plan's own limit (10,000 characters a request) it is still refused, unspent.
+        $this->requests = [];
+        $tooLong = $this->dialogueRequest($a['key'], $b['key']);
+        $tooLong['content'] = $this->scriptOf(10001);
+        $this->postJsonLocalizedRoute('dashboard.generate', $tooLong)
             ->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.dialogue_too_long', ['max' => '2,400']));
-
+            ->assertJsonPath('errors.content.0', __('ui.backend.dashboard_request_limit', ['max' => 10000]));
         $this->assertSame([], $this->requests, 'nothing was sent for speech');
-        $this->assertSame(0, \App\Models\AudioGeneration::query()->count());
-        $this->assertSame(0, (int) \App\Support\CreditPeriod::counter((int) $member->id)->total_chars, 'nothing was reserved');
-
-        $atTheLimit = $this->dialogueRequest($a['key'], $b['key']);
-        $atTheLimit['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS);
-        $this->postJsonLocalizedRoute('dashboard.generate', $atTheLimit)->assertSuccessful();
+        $this->assertSame(1, \App\Models\AudioGeneration::query()->count());
     }
 
-    public function test_the_extension_refuses_a_dialogue_longer_than_the_limit(): void
+    public function test_the_extension_makes_a_dialogue_longer_than_2400_characters_too(): void
     {
         $member = $this->member(dialogue: true);
         $key = $member->issueApiKey();
         [$a, $b] = $this->twoPremiumVoices('ar');
         $request = $this->dialogueRequest($a['key'], $b['key']);
-        $request['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 1);
+        $request['content'] = $this->scriptOf(3000);
 
-        $this->postJson('/api/reader/queue', $request, ['X-Listen-Key' => $key])
-            ->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.dialogue_too_long', ['max' => '2,400']));
+        $this->postJson('/api/reader/queue', $request, ['X-Listen-Key' => $key])->assertSuccessful();
 
-        $this->assertSame([], $this->requests, 'nothing was sent for speech');
-        $this->assertSame(0, \App\Models\AudioGeneration::query()->count());
+        $this->assertSame('done', \App\Models\AudioGeneration::latest('id')->first()->status);
+        $this->assertMadeInPiecesWithBothVoices($request['content']);
     }
 
-    public function test_the_demo_refuses_a_dialogue_longer_than_the_limit_in_the_members_language(): void
+    public function test_the_demo_makes_a_dialogue_longer_than_2400_characters_within_its_allowance(): void
     {
         $this->freePlan();
         SiteSetting::set(\App\Support\DemoAllowance::SETTING_KEY, '5000', 'demo');
         $this->actingAs(User::factory()->create());
         [$a, $b] = $this->twoPremiumVoices('ar');
-        app()->setLocale('ar');
 
         $long = $this->demoRequest($a['key'], $b['key']);
-        $long['text'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 50);
-        $this->postJsonLocalizedRoute('demo.preview', $long)
-            ->assertStatus(422)
-            ->assertJsonPath('errors.text.0', 'يمكن أن يصل الحوار إلى 2,400 حرف. قسّمه إلى أجزاء أقصر.');
+        $long['text'] = $this->scriptOf(2600);
+        $this->postJsonLocalizedRoute('demo.preview', $long)->assertOk()->assertJson(['ok' => true]);
 
-        $this->assertSame([], $this->requests, 'nothing was sent for speech');
-        $this->assertSame(0, \App\Models\DemoVoiceGeneration::count());
+        $this->assertMadeInPiecesWithBothVoices($long['text']);
+        $this->assertSame(1, \App\Models\DemoVoiceGeneration::count());
+    }
+
+    /**
+     * The developer API keeps its own documented dialogue limit.
+     */
+    public function test_the_developer_apis_dialogue_limit_is_unchanged(): void
+    {
+        $plan = Plan::factory()->create(['max_chars_per_request' => 10000]);
+
+        $this->assertSame(2500, \App\Services\Api\ApiSpeechService::DIALOGUE_MAX_TEXT);
+        $this->assertSame(2500, \App\Services\Api\ApiSpeechService::maxCharsFor($plan, false, true));
+        $this->assertSame(2500, \App\Services\Api\ApiSpeechService::maxCharsFor($plan, true, true));
     }
 
     public function test_plans_without_dialogue_ignore_the_speakers_and_hide_the_panel(): void
@@ -303,6 +313,41 @@ class DialogueModeTest extends TestCase
             ->assertSee('id="dialogueSpeakers"', false)
             ->assertSee('name="dialogue_speakers[1][dialect]"', false)
             ->assertSee('js/dialogue-mode.js', false);
+    }
+
+    /**
+     * The script went in more than one request, split at its turns: every line once
+     * and in order, each piece with both speakers and the same voices.
+     */
+    private function assertMadeInPiecesWithBothVoices(string $script): void
+    {
+        $speech = collect($this->requests)->filter(fn ($r) => isset($r['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']))->values();
+        $this->assertGreaterThan(1, $speech->count(), 'made in pieces');
+        $casts = $speech->map(fn ($r) => array_map(
+            fn ($c) => $c['speaker'].'='.$c['voiceConfig']['prebuiltVoiceConfig']['voiceName'],
+            $r['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']['speakerVoiceConfigs'],
+        ))->unique(fn ($cast) => implode('|', $cast));
+        $this->assertCount(1, $casts, 'the same speakers and voices in every piece');
+        $this->assertCount(2, $casts->first());
+
+        $expected = [];
+        $speaker = 'سلطان';
+        foreach (preg_split("/\r\n|\n|\r/", trim($script)) ?: [] as $line) {
+            foreach (['سلطان', 'نورة'] as $name) {
+                if (str_starts_with($line, $name.':')) {
+                    [$speaker, $line] = [$name, mb_substr($line, mb_strlen($name) + 1)];
+                    break;
+                }
+            }
+            $expected[] = $speaker.': '.trim($line);
+        }
+        $spoken = [];
+        foreach ($speech as $r) {
+            foreach ($r['body']['contents'][0]['parts'] as $part) {
+                $spoken[] = $part['speech_metadata']['speaker'].': '.$part['text'];
+            }
+        }
+        $this->assertSame($expected, $spoken);
     }
 
     /**

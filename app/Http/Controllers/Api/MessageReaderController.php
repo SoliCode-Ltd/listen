@@ -176,7 +176,6 @@ class MessageReaderController extends Controller
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
-            DialogueSpeakers::ensureShortEnough((string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         $voiceKey = trim((string) ($validated['voice_key'] ?? ''));

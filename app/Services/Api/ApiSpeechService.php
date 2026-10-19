@@ -55,7 +55,7 @@ class ApiSpeechService
     /** Longest text for a background request (/async): what one generation finishes inside the job's time limit. */
     public const ASYNC_MAX_TEXT = 10000;
 
-    /** Longest dialogue: a dialogue is made in one piece, not split like a single voice. */
+    /** Longest dialogue, as documented for the API (a long dialogue is made in pieces; this stays the API's limit). */
     public const DIALOGUE_MAX_TEXT = 2500;
 
     /** File types the API can return. */

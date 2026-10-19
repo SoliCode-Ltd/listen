@@ -9,6 +9,7 @@ use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
+use App\Support\PaceAndPitch;
 use App\Support\ShareableAudio;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
@@ -531,16 +532,15 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
         // Delivery tags ([excited]) split a single voice's script into parts,
-        // each read with its own direction; in a dialogue they apply to the whole script.
+        // each read with its own direction; in a dialogue each directs its own turn.
         if (GeminiTtsModel::usesStructuredSpeech($model)) {
             if ($isDialogue) {
                 // Each line is rewritten into its speaker's dialect, as a single voice's script is.
                 if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
                     $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
                 }
-                $prepared = GeminiVocalTags::prepare($text);
-                $text = $prepared['text'];
-                $voiceConfig['vocal_cues'] = $prepared['cues'];
+                // Moods stay where they are written: structuredDialogueParts() gives each to its turn.
+                $text = GeminiVocalTags::tagSounds($text);
             } else {
                 // A dialect lives in its words as much as its accent: the script is
                 // rewritten into the chosen Arabic variety first, as for cloned voices.
@@ -597,12 +597,13 @@ class GeminiTtsProvider implements TtsProviderInterface
             isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? $voiceConfig['dialect'] : null,
         );
 
-        // Use custom style_prompt if provided, otherwise build from dialect, emotion, style, speed, and pitch
+        // The member's own style_prompt (then the dialect and speed they picked), otherwise
+        // a direction built from dialect, emotion, style, speed, and pitch.
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
         $stylePrompt = $customPrompt !== ''
-            ? $customPrompt
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -839,7 +840,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $stylePrompt = $customPrompt !== ''
-            ? $customPrompt
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -860,26 +861,176 @@ class GeminiTtsProvider implements TtsProviderInterface
                 continue;
             }
             $speakerStyle = $customPrompt !== ''
-                ? trim($customPrompt.' '.$this->buildStylePrompt('neutral', 'neutral', $targetLanguage, 1.0, $own, 0.0, $structured))
+                ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own, $structured)
                 : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch, $structured);
-            $speakerStyle = GeminiVocalTags::withCues($speakerStyle, $voiceConfig['vocal_cues'] ?? []);
             $speakerStyles[$name] = $structured ? GeminiVocalTags::forPerformance($text, $speakerStyle)['style'] : $speakerStyle;
         }
 
-        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
+        // Moods and delivery tags direct their own turn only (structuredDialogueParts()).
         if ($structured) {
             $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
             [$text, $stylePrompt] = [$performed['text'], $performed['style']];
         }
-        $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode, $speakerStyles);
+        // A long dialogue is made in pieces split at speaker turns, each with the same
+        // speakers and voices, and joined in order with a short pause (dialoguePieces()).
+        $payloads = [];
+        foreach ($this->dialoguePieces($text, $speakers) as $piece) {
+            $cast = array_map(fn (array $speaker): string => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')), $piece['speakers']);
+            $payloads[] = $this->buildDialoguePayload($model, $piece['text'], $stylePrompt, $piece['speakers'], $languageCode, array_intersect_key($speakerStyles, array_flip($cast)));
+        }
 
-        $audio = $this->requestAudio($endpoint, $payload);
+        $audio = count($payloads) === 1
+            ? $this->requestAudio($endpoint, $payloads[0])
+            : $this->joinAudioParts($this->requestAudioParts($endpoint, $payloads));
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
 
         return [
             'audio_path' => $filename,
             'duration_seconds' => $this->estimateDurationSeconds($text),
         ];
+    }
+
+    /**
+     * A dialogue is made in one request, and very long ones come back without
+     * audio. A dialogue longer than services.gemini_tts.max_dialogue_chars_per_request
+     * (1,500 characters: about 1.5 to 2 minutes of conversation, well under the
+     * 2,400 one dialogue request used to be allowed; shorter dialogues stay one
+     * request, as before) is split at speaker turns into pieces of about even length.
+     * A single turn longer than that is split at sentence ends, every part
+     * starting with its speaker's name.
+     *
+     * Every piece is made with the same speakers and voices, even a piece where only
+     * one of them talks. The engine takes at most two voices a request, so a
+     * dialogue with three or more speakers is also split where a third speaker
+     * would come in: each piece has two of them, each always with their own voice.
+     *
+     * @param  array<int, array<string, mixed>>  $speakers
+     * @return array<int, array{text: string, speakers: array<int, array<string, mixed>>}>
+     */
+    private function dialoguePieces(string $text, array $speakers): array
+    {
+        $byName = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
+            if ($name !== '' && ! isset($byName[$name])) {
+                $byName[$name] = $speaker;
+            }
+        }
+        $names = array_keys($byName);
+        $pairs = count($names) > 2;
+        $max = max(300, (int) config('services.gemini_tts.max_dialogue_chars_per_request', 1500));
+        if (! $pairs && mb_strlen($text) <= $max) {
+            return [['text' => $text, 'speakers' => $speakers]];
+        }
+
+        // The turns: a "Name:" line starts one, a line without a name goes on with it.
+        $turns = [];
+        foreach (preg_split("/\r\n|\n|\r/", $text) ?: [] as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+            $speaker = null;
+            foreach ($names as $name) {
+                if (str_starts_with($line, $name.':')) {
+                    $speaker = $name;
+                    break;
+                }
+            }
+            if ($speaker !== null || $turns === []) {
+                $turns[] = ['speaker' => $speaker ?? ($names[0] ?? 'Speaker'), 'named' => $speaker !== null, 'lines' => []];
+            }
+            $turns[array_key_last($turns)]['lines'][] = $line;
+        }
+        foreach ($turns as $i => $turn) {
+            $spoken = implode("\n", $turn['lines']);
+            $turns[$i]['words'] = GeminiVocalTags::hasWords($turn['named'] ? mb_substr($spoken, mb_strlen($turn['speaker']) + 1) : $spoken);
+        }
+
+        // The fewest pieces the size allows, then the smallest size that gives no more
+        // of them: pieces of about even length, made at the same time.
+        $pieces = $this->packDialogueTurns($turns, $max, $pairs);
+        if (count($pieces) > 1) {
+            $total = array_sum(array_map(fn (array $turn): int => mb_strlen(implode("\n", $turn['lines'])) + 1, $turns));
+            [$low, $high] = [min($max, max(200, intdiv($total, count($pieces)))), $max];
+            while ($low < $high) {
+                $size = intdiv($low + $high, 2);
+                if (count($this->packDialogueTurns($turns, $size, $pairs)) <= count($pieces)) {
+                    $high = $size;
+                } else {
+                    $low = $size + 1;
+                }
+            }
+            $pieces = $this->packDialogueTurns($turns, $low, $pairs);
+        }
+
+        return array_map(function (array $units) use ($speakers, $byName, $names, $pairs): array {
+            $cast = $speakers;
+            if ($pairs) {
+                // Its two speakers, in the dialogue's order; one who talks alone gets the
+                // next speaker as the second voice, so the request stays a dialogue.
+                $voices = array_values(array_intersect($names, array_column($units, 'speaker')));
+                if (count($voices) < 2) {
+                    $voices = array_values(array_intersect($names, [$voices[0], current(array_diff($names, $voices))]));
+                }
+                $cast = array_map(fn (string $name): array => $byName[$name], $voices);
+            }
+
+            return ['text' => implode("\n", array_merge(...array_column($units, 'lines'))), 'speakers' => $cast];
+        }, $pieces);
+    }
+
+    /**
+     * The dialogue's turns in order, in pieces of at most $limit characters (and of
+     * two speakers when $pairs). A turn of tags alone ("Omar: [scared]") goes on with
+     * the words after it, which it directs.
+     *
+     * @param  array<int, array{speaker: string, named: bool, lines: array<int, string>, words: bool}>  $turns
+     * @return array<int, array<int, array{speaker: string, named: bool, lines: array<int, string>, words: bool}>>
+     */
+    private function packDialogueTurns(array $turns, int $limit, bool $pairs): array
+    {
+        $pieces = [];
+        $current = [];
+        $size = -1;
+        foreach ($turns as $turn) {
+            $units = [$turn];
+            $text = implode("\n", $turn['lines']);
+            if (mb_strlen($text) > $limit) {
+                // One very long turn: split at sentence ends, each part with the speaker's name.
+                $label = $turn['speaker'].': ';
+                $spoken = $turn['named'] ? trim(mb_substr($text, mb_strlen($turn['speaker']) + 1)) : $text;
+                $units = array_map(
+                    fn (string $chunk): array => ['speaker' => $turn['speaker'], 'named' => true, 'lines' => [$label.$chunk], 'words' => true],
+                    TextChunker::split($spoken, max(100, $limit - mb_strlen($label)), 'mb_strlen'),
+                );
+            }
+
+            foreach ($units as $unit) {
+                $unitSize = mb_strlen(implode("\n", $unit['lines']));
+                $voices = array_unique(array_merge(array_column($current, 'speaker'), [$unit['speaker']]));
+                if ($current !== [] && ($size + 1 + $unitSize > $limit || ($pairs && count($voices) > 2))) {
+                    $carry = [];
+                    while (count($current) > 1 && ! end($current)['words']) {
+                        array_unshift($carry, array_pop($current));
+                    }
+                    if ($pairs && count(array_unique(array_merge(array_column($carry, 'speaker'), [$unit['speaker']]))) > 2) {
+                        $current = array_merge($current, $carry);
+                        $carry = [];
+                    }
+                    $pieces[] = $current;
+                    $current = $carry;
+                    $size = $carry === [] ? -1 : mb_strlen(implode("\n", array_merge(...array_column($carry, 'lines'))));
+                }
+                $current[] = $unit;
+                $size += 1 + $unitSize;
+            }
+        }
+        if ($current !== []) {
+            $pieces[] = $current;
+        }
+
+        return $pieces;
     }
 
     /**
@@ -920,7 +1071,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => trim($stylePrompt."\n\n".$text)],
+                        ['text' => $this->legacyPrompt($stylePrompt, $text)],
                     ],
                 ],
             ],
@@ -936,6 +1087,36 @@ class GeminiTtsProvider implements TtsProviderInterface
                 ],
             ],
         ];
+    }
+
+    /**
+     * The older prompt model reads the direction and the script as one block of
+     * text. The direction is written as director's notes under their own heading,
+     * set apart from the transcript, so the voice performs it instead of reading it
+     * aloud. A dialogue speaker with their own dialect gets a speaker note: never a
+     * "Name: ..." line, which the model takes for a line of the script.
+     *
+     * @param  array<string, string>  $speakerNotes  direction per speaker name
+     */
+    private function legacyPrompt(string $direction, string $transcript, array $speakerNotes = []): string
+    {
+        $direction = trim($direction);
+        if ($direction === '' && $speakerNotes === []) {
+            return trim($transcript);
+        }
+
+        $notes = "### DIRECTOR'S NOTES\nThese notes direct the performance. Never read them aloud; read aloud only the transcript below, exactly as written.";
+        if ($direction !== '') {
+            $notes .= "\n".$direction;
+        }
+        if ($speakerNotes !== []) {
+            $notes .= "\n\n### SPEAKER NOTES";
+            foreach ($speakerNotes as $name => $note) {
+                $notes .= "\n- For the lines of {$name} only, never read aloud — ".trim((string) $note);
+            }
+        }
+
+        return $notes."\n\n### TRANSCRIPT\n".trim($transcript);
     }
 
     /**
@@ -970,13 +1151,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             ];
         }
 
-        $legacyDirections = '';
-        foreach ($speakerStyles as $name => $style) {
-            $legacyDirections .= "\n{$name}: {$style}";
-        }
+        // The older model gets director's and speaker notes set apart from the script.
         $parts = GeminiTtsModel::usesStructuredSpeech($model)
             ? $this->structuredDialogueParts($text, $speakers, $stylePrompt, $speakerStyles)
-            : [['text' => trim($stylePrompt.$legacyDirections."\n\n".$text)]];
+            : [['text' => $this->legacyPrompt($stylePrompt, $text, $speakerStyles)]];
 
         $speechConfig = [
             'multiSpeakerVoiceConfig' => [
@@ -1003,6 +1181,10 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * Split a script into verbatim turns so Gemini 3.8 does not read speaker labels aloud.
+     * Every line is a part with its speaker and that speaker's direction. A mood or
+     * delivery tag ([angry]) directs its own turn only, from where it is written to
+     * the end of the turn (all of it when nothing follows the tag); a turn of tags
+     * alone directs the next turn. It never colours the rest of the dialogue.
      *
      * @param  array<int, array<string, mixed>>  $speakers
      * @param  array<string, string>  $speakerStyles  direction per speaker name, for speakers with their own dialect
@@ -1018,8 +1200,9 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
         }
 
+        // The turns: a "Name:" line starts one, a line without a name goes on with it.
         $currentSpeaker = $names[0] ?? 'Speaker';
-        $parts = [];
+        $turns = [];
         foreach (preg_split("/\r\n|\n|\r/", $text) ?: [] as $line) {
             $line = trim((string) $line);
             if ($line === '') {
@@ -1027,34 +1210,59 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
 
             $spoken = $line;
+            $named = false;
             foreach ($names as $name) {
                 $prefix = $name.':';
                 if (str_starts_with($line, $prefix)) {
                     $currentSpeaker = $name;
                     $spoken = trim(substr($line, strlen($prefix)));
+                    $named = true;
                     break;
                 }
             }
 
-            if ($spoken === '') {
-                continue;
+            if ($named || $turns === []) {
+                $turns[] = ['speaker' => $currentSpeaker, 'lines' => []];
             }
+            if ($spoken !== '') {
+                $turns[array_key_last($turns)]['lines'][] = $spoken;
+            }
+        }
 
-            $part = ['text' => $spoken];
-            $metadata = ['speaker' => $currentSpeaker];
-            $lineStyle = $speakerStyles[$currentSpeaker] ?? $stylePrompt;
-            if (trim($lineStyle) !== '') {
-                $metadata['style'] = $lineStyle;
+        $parts = [];
+        $carried = '';
+        foreach ($turns as $turn) {
+            $script = trim($carried.' '.implode("\n", $turn['lines']));
+            $pieces = GeminiVocalTags::parts($script, true);
+            $trailing = GeminiVocalTags::trailingDelivery($script);
+            $carried = $pieces === [] ? $trailing : '';
+            $turnCues = $pieces !== [] && $trailing !== '' ? GeminiVocalTags::prepare($trailing)['cues'] : [];
+            foreach ($pieces as $piece) {
+                $lineStyle = GeminiVocalTags::withCues(
+                    $speakerStyles[$turn['speaker']] ?? $stylePrompt,
+                    array_values(array_unique(array_merge($piece['cues'], $turnCues))),
+                );
+                // One part per line, as written.
+                foreach (preg_split("/\r\n|\n|\r/", $piece['text']) ?: [] as $spoken) {
+                    if (trim($spoken) === '') {
+                        continue;
+                    }
+                    $metadata = ['speaker' => $turn['speaker']];
+                    if (trim($lineStyle) !== '') {
+                        $metadata['style'] = $lineStyle;
+                    }
+                    $parts[] = ['text' => trim($spoken), 'speech_metadata' => $metadata];
+                }
             }
-            $part['speech_metadata'] = $metadata;
-            $parts[] = $part;
         }
 
         if ($parts !== []) {
             return $parts;
         }
 
-        $part = ['text' => $text, 'speech_metadata' => ['speaker' => $currentSpeaker]];
+        $prepared = GeminiVocalTags::prepare($text);
+        $part = ['text' => $prepared['text'], 'speech_metadata' => ['speaker' => $currentSpeaker]];
+        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $prepared['cues']);
         if (trim($stylePrompt) !== '') {
             $part['speech_metadata']['style'] = $stylePrompt;
         }
@@ -1459,8 +1667,10 @@ class GeminiTtsProvider implements TtsProviderInterface
      *
      * Note: Gemini TTS doesn't have explicit speed/pitch API parameters like Google Cloud TTS.
      * Instead, these are controlled via natural language instructions in the prompt.
+     *
+     * Without $withFallback, nothing picked gives an empty direction (see ownDirection()).
      */
-    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false): string
+    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false, bool $withFallback = true): string
     {
         $style = strtolower(trim($style));
         $emotion = strtolower(trim($emotion));
@@ -1471,10 +1681,14 @@ class GeminiTtsProvider implements TtsProviderInterface
         if ($isArabic && $dialect !== null && $dialect !== '') {
             $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? ArabicDialects::prompt($dialect);
             if ($dialectName !== null) {
-                $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
+                // Plain Fusha is formal Arabic, not a regional variety: it gets no regional wording.
+                $fusha = ArabicDialects::isPlainFusha($dialect);
+                $dialectInstruction = $fusha
+                    ? "Voice dialect: {$dialectName}. Speak with clear, formal Modern Standard Arabic pronunciation. "
+                    : "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
                 $markers = ArabicDialects::markers($dialect);
                 if ($markers !== null) {
-                    $dialectInstruction .= "Dialect markers to make clearly audible: {$markers} ";
+                    $dialectInstruction .= ($fusha ? 'Pronunciation' : 'Dialect markers')." to make clearly audible: {$markers} ";
                 }
             } else {
                 $dialectInstruction = "Voice dialect/language variant: {$dialect}. Keep pronunciation consistent with this dialect setting. ";
@@ -1506,30 +1720,19 @@ class GeminiTtsProvider implements TtsProviderInterface
             $prompt .= $styleDesc;
         }
 
-        // Add speed instruction (Gemini uses prompt-based control, not API parameters)
-        if ($speed <= 0.6) {
-            $prompt .= ' Speak very slowly and deliberately, taking pauses between phrases.';
-        } elseif ($speed < 0.85) {
-            $prompt .= ' Speak at a slow, measured pace.';
-        } elseif ($speed > 1.5) {
-            $prompt .= ' Speak very quickly with rapid, energetic pacing.';
-        } elseif ($speed > 1.2) {
-            $prompt .= ' Speak at a faster pace with energetic delivery.';
+        // Speed and pitch are written directions (Gemini has no such API parameters),
+        // one for every step of the studio's sliders; 1.0x and 0 send nothing.
+        $pace = PaceAndPitch::speed($speed);
+        if ($pace !== '') {
+            $prompt .= ' '.$pace;
         }
-
-        // Add pitch instruction (Gemini uses prompt-based control, not API parameters)
-        if ($pitch <= -10) {
-            $prompt .= ' Use a very deep, low-pitched voice.';
-        } elseif ($pitch < -3) {
-            $prompt .= ' Use a deeper, lower-pitched voice.';
-        } elseif ($pitch >= 10) {
-            $prompt .= ' Use a very high-pitched, bright voice.';
-        } elseif ($pitch > 3) {
-            $prompt .= ' Use a higher-pitched, brighter voice.';
+        $tone = PaceAndPitch::pitch($pitch);
+        if ($tone !== '') {
+            $prompt .= ' '.$tone;
         }
 
         // Fallback if prompt is empty
-        if (trim($prompt) === '') {
+        if ($withFallback && trim($prompt) === '') {
             $prompt = $isArabic
                 ? 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone.'
                 : 'Read the following text naturally with clear pronunciation and a balanced, professional tone.';
@@ -1563,6 +1766,18 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return trim($prompt);
+    }
+
+    /**
+     * A member's own direction leads, as they wrote it; the dialect (or accent) and
+     * the speed they picked follow it, so writing their own words no longer loses
+     * those choices. Style, emotion and pitch are left to their words.
+     */
+    private function ownDirection(string $customPrompt, string $targetLanguage, float $speed, ?string $dialect, bool $structuredSpeech): string
+    {
+        $picked = $this->buildStylePrompt('', 'neutral', $targetLanguage, $speed, $dialect, 0.0, $structuredSpeech, false);
+
+        return trim(trim($customPrompt).' '.$picked);
     }
 
     /**
