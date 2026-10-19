@@ -86,7 +86,7 @@ class StudioReservationTest extends TestCase
 
         $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])
             ->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_exceeded'));
+            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '60', 'needed' => '90']));
         $this->assertSame(0, AudioGeneration::query()->count(), 'nothing is made or reserved');
         $this->assertSame(0, (int) CreditPeriod::counter((int) $user->id)->total_chars);
 
@@ -123,7 +123,7 @@ class StudioReservationTest extends TestCase
             'voice_key' => $this->premiumKey(),
             'speed' => 0.5,
             'prefer_sync' => true,
-        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_exceeded'));
+        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '60', 'needed' => '90']));
 
         $this->assertSame(0, AudioGeneration::query()->count());
     }

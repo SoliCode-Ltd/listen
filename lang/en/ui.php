@@ -1601,6 +1601,7 @@ return [
         'demo_guest_quota_reached' => 'You have used your :allowance character demo allowance. Create a free account for :starter characters/month.',
         'daily_requests_exceeded' => 'You have reached today\'s limit of :count generations on your plan. You can generate again tomorrow.',
         'monthly_chars_exceeded' => 'Your monthly credits are used up. Please upgrade your plan to continue.',
+        'monthly_chars_not_enough' => 'You have :remaining credits left this month and this text needs about :needed. Shorten it, or upgrade your plan for more credits.',
         'monthly_requests_exceeded' => 'Monthly requests limit exceeded. Please upgrade your plan to continue.',
         'no_chars_yet' => 'You have no credits to use yet. Choose a plan to start.',
         'pack_not_enough' => 'Your pack has :remaining credits left and this text needs about :needed. Shorten it, or buy another pack.',
