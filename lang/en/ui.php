@@ -1370,13 +1370,13 @@ return [
     // ===== EMAIL CONFIRMATION (accounts made with an email and a password, before the free demo) =====
     'verify_email' => [
         'mail_subject' => 'Confirm your email for Listen',
-        'mail_greeting' => 'Hi :name,',
-        'mail_greeting_anonymous' => 'Hi there,',
-        'mail_intro' => 'Thanks for signing up to Listen. Open this link to confirm your email address and start making free voices:',
+        'mail_preheader' => 'One click confirms your email and finishes setting up your account.',
+        'mail_headline' => 'Confirm your email',
+        'mail_intro' => 'Thanks for signing up to Listen. Press the button below to confirm your email address and finish setting up your account.',
         'mail_expiry' => 'The link works for :days days. If it has run out, sign in and send yourself a new one from the demo page.',
         'mail_ignore' => "If you didn't sign up to Listen, you can ignore this email.",
-        'mail_thanks' => 'Thanks,',
-        'mail_signature' => 'Listen Studio Team',
+        'mail_button' => 'Confirm my email',
+        'mail_footer' => 'Questions? Just reply to this email — we read every message.',
         'notice_title' => 'Confirm your email to try the demo',
         'studio_notice_title' => 'Confirm your email to use your free credits',
         'notice_body' => 'We sent a confirmation link to :email. Open it to start making free voices.',

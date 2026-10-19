@@ -68,12 +68,21 @@ class EmailVerificationLinkTest extends TestCase
         $email = $this->onlyEmail();
         $this->assertSame('member@example.com', $email->getTo()[0]->getAddress());
         $this->assertSame('Confirm your email for Listen', $email->getSubject());
-        $body = (string) $email->getTextBody();
-        $this->assertStringStartsWith("Hi Sara Ahmed,\n\nThanks for signing up to Listen. Open this link to confirm your email address and start making free voices:\n\n", $body);
+        $body = rtrim((string) $email->getTextBody());
+        $this->assertStringStartsWith("Confirm your email\n\nHello Sara,\n\nThanks for signing up to Listen. Press the button below to confirm your email address and finish setting up your account.\n\n", $body);
         $this->assertStringContainsString('The link works for 3 days. If it has run out, sign in and send yourself a new one from the demo page.', $body);
         $this->assertStringContainsString("If you didn't sign up to Listen, you can ignore this email.", $body);
-        $this->assertStringEndsWith("Thanks,\nListen Studio Team", $body);
+        $this->assertStringContainsString("\n\nConfirm my email: ".$this->linkIn($email)."\n\n", $body);
+        $this->assertStringEndsWith('Questions? Just reply to this email — we read every message.', $body);
         $this->assertStringStartsWith(url('/email/verify/'.$member->id.'/'.sha1('member@example.com')).'?expires=', $this->linkIn($email));
+
+        // The site's email design, as the paid welcome email: the logo and a button that opens the link.
+        $html = (string) $email->getHtmlBody();
+        $this->assertStringContainsString('images/email-logo-en.png', $html);
+        $this->assertStringContainsString('href="'.e($this->linkIn($email)).'"', $html);
+        $this->assertStringContainsString('>Confirm my email</a>', $html);
+        $this->assertStringNotContainsString('Unsubscribe', $html, 'the member asked for this email');
+        $this->assertSame('help@listenai.studio', $email->getReplyTo()[0]->getAddress());
     }
 
     public function test_sign_up_on_an_arabic_page_sends_the_email_in_arabic(): void
@@ -85,10 +94,18 @@ class EmailVerificationLinkTest extends TestCase
         $this->assertCount(1, $this->sentEmails());
         $email = $this->onlyEmail();
         $this->assertSame('أكّد بريدك الإلكتروني في إسمع', $email->getSubject());
-        $body = (string) $email->getTextBody();
-        $this->assertStringStartsWith("مرحباً منى علي،\n\nشكراً لتسجيلك في إسمع. افتح هذا الرابط لتأكيد بريدك الإلكتروني والبدء في إنشاء أصواتك المجانية:\n\n", $body);
+        $body = rtrim((string) $email->getTextBody());
+        $this->assertStringStartsWith("أكّد بريدك الإلكتروني\n\nمرحباً منى،\n\nشكراً لتسجيلك في إسمع. اضغط الزر أدناه لتأكيد بريدك الإلكتروني وإكمال إعداد حسابك.\n\n", $body);
         $this->assertStringContainsString('يعمل الرابط لمدة 3 أيام.', $body);
-        $this->assertStringEndsWith("شكراً،\nفريق إسمع", $body);
+        $this->assertStringContainsString("\n\nتأكيد بريدي الإلكتروني: ".$this->linkIn($email)."\n\n", $body);
+        $this->assertStringEndsWith('لديك سؤال؟ ردّ على هذه الرسالة مباشرة، فنحن نقرأ كل رسالة.', $body);
+
+        // Right to left, with the Arabic logo and button.
+        $html = (string) $email->getHtmlBody();
+        $this->assertStringContainsString('<html lang="ar"', $html);
+        $this->assertStringContainsString('dir="rtl"', $html);
+        $this->assertStringContainsString('images/email-logo-ar.png', $html);
+        $this->assertStringContainsString('>تأكيد بريدي الإلكتروني</a>', $html);
         $this->assertDoesNotMatchRegularExpression('/[٠-٩]/u', $body, 'the digits the site writes everywhere');
     }
 
