@@ -68,7 +68,6 @@ $long = $db('audio_generations')->where('created_at', '>=', now()->subDays(90))-
         ELSE '40,000 or more' END AS length_band, COUNT(*) AS made, SUM(status = 'done') AS done, SUM(status = 'failed') AS failed,
         SUM(status = 'failed' AND error_message = ?) AS stopped_as_stuck, SUM(status IN ('queued', 'processing')) AS unfinished,
         MAX(CASE WHEN status = 'done' THEN duration_seconds END) AS longest_audio_s,
-        MAX(CASE WHEN status = 'done' THEN TIMESTAMPDIFF(SECOND, created_at, updated_at) END) AS longest_making_s,
         MAX(CHAR_LENGTH(input_text)) AS longest_text", [$swept])
     ->groupBy('length_band')->orderByRaw('MIN(CHAR_LENGTH(input_text))')->get();
 foreach ($long as $r) { echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; }
@@ -76,26 +75,32 @@ if ($long->isEmpty()) { echo "  none\n"; }
 $days = $db('audio_generations')->where('created_at', '>=', now()->subDays(7))->whereRaw('CHAR_LENGTH(input_text) >= 2500')
     ->selectRaw("DATE(created_at) AS on_day, COUNT(*) AS made, SUM(status = 'done') AS done, SUM(status = 'failed') AS failed,
         SUM(status = 'failed' AND error_message = ?) AS stopped_as_stuck,
-        MAX(CASE WHEN status = 'done' THEN TIMESTAMPDIFF(SECOND, created_at, updated_at) END) AS longest_making_s,
+        MAX(CASE WHEN status = 'done' THEN duration_seconds END) AS longest_audio_s,
         MAX(CHAR_LENGTH(input_text)) AS longest_text", [$swept])
     ->groupBy('on_day')->orderBy('on_day')->get();
 echo "  by day, last 7 days:\n";
 foreach ($days as $r) { echo '    ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; }
 // A process that ran out of memory or time dies without a word: the log has the line.
-echo "== PHP limit errors in the app's logs, last 14 days (counts only) ==\n";
-$found = false;
+// Only when, the limit, and the line of code it stopped on are shown (never a message's text).
+echo "== PHP limit errors in the app's logs, last 14 days ==\n";
+$found = [];
+$root = rtrim((string) realpath('.'), '/').'/';
 foreach (glob('storage/logs/*.log') ?: [] as $file) {
     if (filemtime($file) < time() - 14 * 86400) { continue; }
-    $counts = ['memory' => 0, 'time' => 0];
     $handle = fopen($file, 'r');
     while ($handle && ($line = fgets($handle)) !== false) {
-        if (str_contains($line, 'Allowed memory size of')) { $counts['memory']++; }
-        if (str_contains($line, 'Maximum execution time of')) { $counts['time']++; }
+        $memory = str_contains($line, 'Allowed memory size of');
+        if (! $memory && ! str_contains($line, 'Maximum execution time of')) { continue; }
+        preg_match('/^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]/', $line, $when);
+        preg_match('/(?:Allowed memory size of (\d+) bytes exhausted \(tried to allocate (\d+) bytes\)|Maximum execution time of (\d+) seconds? exceeded)/', $line, $what);
+        preg_match('/ at (\/[^\s"]+):(\d+)\)/', $line, $where);
+        preg_match('/"userId":(\d+)/', $line, $member);
+        $found[] = sprintf('  %s  %s, at %s%s', $when[1] ?? '(no time)',
+            $memory ? sprintf('out of memory (limit %d MB, asked for %d KB more)', (int) ($what[1] ?? 0) / 1048576, (int) ($what[2] ?? 0) / 1024)
+                : sprintf('out of time (limit %d s)', (int) ($what[3] ?? 0)),
+            isset($where[1]) ? str_replace($root, '', $where[1]).':'.$where[2] : '(no place)',
+            isset($member[1]) ? ' (member '.$member[1].')' : '');
     }
     if ($handle) { fclose($handle); }
-    if ($counts['memory'] + $counts['time'] > 0) {
-        $found = true;
-        echo '  ', basename($file), ': out of memory ', $counts['memory'], ', out of time ', $counts['time'], "\n";
-    }
 }
-if (! $found) { echo "  none\n"; }
+echo $found === [] ? "  none\n" : implode("\n", array_slice($found, -30))."\n";
