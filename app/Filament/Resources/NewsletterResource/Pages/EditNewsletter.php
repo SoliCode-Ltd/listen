@@ -228,7 +228,7 @@ class EditNewsletter extends EditRecord
                 ->visible(fn (): bool => $this->record->status === Newsletter::STATUS_SENDING)
                 ->requiresConfirmation()
                 ->modalHeading('Stop this batch')
-                ->modalDescription('People who already received this newsletter stay sent. Everyone still queued goes back to waiting. Nothing new is emailed.')
+                ->modalDescription('People who already received this newsletter stay sent. Everyone still queued goes back to waiting, and a batch going out right now stops before its next email. Nothing new is emailed.')
                 ->modalSubmitActionLabel('Stop this batch')
                 ->action(function (): void {
                     $stopped = app(NewsletterSender::class)->cancelQueued($this->record);

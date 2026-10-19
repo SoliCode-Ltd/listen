@@ -12,6 +12,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -23,7 +24,16 @@ class NewsletterSender
 
     private const SPAWN_ERROR = 'newsletter_sender_spawn_error';
 
-    private const SEND_LOCK = 'newsletter_send_now';
+    // One lock for every sender (the admin page, newsletter:work and
+    // newsletter:send-queued), so two never go through the queue at once.
+    private const DRAIN_LOCK = 'newsletter_drain_lock';
+
+    private const DRAIN_LOCK_SECONDS = 120;
+
+    // When "Stop this batch" was last pressed for a newsletter (+ its id).
+    private const STOPPED_AT = 'newsletter_stopped_at.';
+
+    private ?string $drainOwner = null;
 
     public function __construct(
         private readonly NewsletterAudience $audience,
@@ -168,8 +178,8 @@ class NewsletterSender
             throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
         }
 
-        if (! Cache::add(self::SEND_LOCK, '1', 120)) {
-            throw new RuntimeException('A batch is already going out. Wait until that page finishes, then press send again.');
+        if (! $this->takeDrainLock()) {
+            throw new RuntimeException('A batch is already going out, from another page or the background sender. Wait a minute, then press send again.');
         }
 
         try {
@@ -197,9 +207,8 @@ class NewsletterSender
                 $count = max(1, min($count, $this->pace->hourlyRemaining()));
             }
 
-            $sent = $this->drain($count, true, function (): void {
-                Cache::put(self::SEND_LOCK, '1', 120);
-            });
+            // Only this newsletter's queue: another one's leftovers wait for their own send.
+            $sent = $this->drainLocked($count, true, null, (int) $newsletter->getKey());
             $fresh = $newsletter->fresh() ?? $newsletter;
             $progress = $this->progress($fresh);
 
@@ -211,7 +220,7 @@ class NewsletterSender
                 'hold' => $this->pace->holdReason(),
             ];
         } finally {
-            Cache::forget(self::SEND_LOCK);
+            $this->releaseDrainLock();
         }
     }
 
@@ -329,15 +338,47 @@ class NewsletterSender
     }
 
     /**
-     * Send up to $limit queued messages. Mailbox-wide Titan errors pause the rest.
+     * Send up to $limit queued messages, of one newsletter or of all of them.
+     * Mailbox-wide Titan errors pause the rest. Returns 0 while another sender
+     * is going through the queue.
      */
-    public function drain(int $limit, bool $respectPace = true, ?callable $tick = null): int
+    public function drain(int $limit, bool $respectPace = true, ?callable $tick = null, ?int $newsletterId = null): int
     {
-        if ($limit < 1 || ($respectPace && $this->pace->holdReason() !== null)) {
+        if ($limit < 1 || ! $this->takeDrainLock()) {
             return 0;
         }
 
+        try {
+            return $this->drainLocked($limit, $respectPace, $tick, $newsletterId);
+        } finally {
+            $this->releaseDrainLock();
+        }
+    }
+
+    public function cancelQueued(Newsletter $newsletter): int
+    {
+        // A sender going through this batch right now stops before its next message.
+        Cache::put(self::STOPPED_AT.$newsletter->getKey(), microtime(true), now()->addDay());
+
+        $deleted = $newsletter->queuedDeliveries()->delete();
+        $this->refreshProgress($newsletter->fresh() ?? $newsletter);
+
+        return $deleted;
+    }
+
+    /**
+     * drain() once the lock is held. Each message is claimed (queued to
+     * sending) just before it goes out, and only the sender whose claim
+     * changed the row sends it, so nothing goes out twice and a message
+     * "Stop this batch" took out of the queue is never sent.
+     */
+    private function drainLocked(int $limit, bool $respectPace, ?callable $tick, ?int $newsletterId): int
+    {
         if ($respectPace) {
+            if ($this->pace->holdReason() !== null) {
+                return 0;
+            }
+
             $limit = min($limit, $this->pace->hourlyRemaining());
         }
 
@@ -345,10 +386,11 @@ class NewsletterSender
             return 0;
         }
 
+        $startedAt = microtime(true);
         $rows = NewsletterDelivery::query()
-            ->with('user')
             ->where('is_test', false)
             ->where('status', NewsletterDelivery::STATUS_QUEUED)
+            ->when($newsletterId !== null, fn ($query) => $query->where('newsletter_id', $newsletterId))
             ->orderBy('id')
             ->limit($limit)
             ->get();
@@ -359,6 +401,21 @@ class NewsletterSender
             if ($tick !== null) {
                 $tick();
             }
+            $this->refreshDrainLock();
+
+            if ($this->stoppedSince((int) $row->newsletter_id, $startedAt)) {
+                continue;
+            }
+
+            $claimed = NewsletterDelivery::query()
+                ->whereKey($row->getKey())
+                ->where('status', NewsletterDelivery::STATUS_QUEUED)
+                ->update(['status' => NewsletterDelivery::STATUS_SENDING]);
+            if ($claimed !== 1) {
+                continue;
+            }
+            $row->forceFill(['status' => NewsletterDelivery::STATUS_SENDING])->syncOriginalAttribute('status');
+
             $newsletter = $row->newsletter;
             if (! $newsletter) {
                 $row->delete();
@@ -366,7 +423,9 @@ class NewsletterSender
                 continue;
             }
 
-            if ($this->releaseIfUnsubscribed($row)) {
+            // Fresh, because an account can be blocked or deleted while its message waits.
+            $user = $row->user_id ? User::query()->find($row->user_id) : null;
+            if ($this->releaseIfNoLongerWanted($row, $newsletter, $user)) {
                 $this->refreshProgress($newsletter);
 
                 continue;
@@ -375,8 +434,8 @@ class NewsletterSender
             try {
                 $this->transmit($newsletter, [
                     'email' => strtolower((string) $row->email),
-                    'name' => (string) ($row->user->name ?? ''),
-                    'user_id' => $row->user_id ? (int) $row->user_id : null,
+                    'name' => (string) ($user->name ?? ''),
+                    'user_id' => $user ? (int) $user->id : null,
                 ], (string) ($row->locale ?: $newsletter->language));
 
                 $row->forceFill([
@@ -389,6 +448,8 @@ class NewsletterSender
                 $message = $this->pace->explainedHold($exception->getMessage());
 
                 if ($this->pace->isMailboxFailure($exception->getMessage())) {
+                    // It did not go out: back in the queue for when the mailbox accepts mail again.
+                    $row->forceFill(['status' => NewsletterDelivery::STATUS_QUEUED])->save();
                     $this->pace->hold($message, $this->pace->holdUntilFor($exception->getMessage()));
                     $this->refreshProgress($newsletter);
 
@@ -408,12 +469,34 @@ class NewsletterSender
         return $sent;
     }
 
-    public function cancelQueued(Newsletter $newsletter): int
+    /**
+     * "Stop this batch" was pressed for this newsletter after this sender started.
+     */
+    private function stoppedSince(int $newsletterId, float $startedAt): bool
     {
-        $deleted = $newsletter->queuedDeliveries()->delete();
-        $this->refreshProgress($newsletter->fresh() ?? $newsletter);
+        $stoppedAt = Cache::get(self::STOPPED_AT.$newsletterId);
 
-        return $deleted;
+        return is_numeric($stoppedAt) && (float) $stoppedAt >= $startedAt;
+    }
+
+    private function takeDrainLock(): bool
+    {
+        $this->drainOwner = Str::random(20);
+
+        return Cache::add(self::DRAIN_LOCK, $this->drainOwner, self::DRAIN_LOCK_SECONDS);
+    }
+
+    // Each message renews it, so a long batch keeps it and a dead sender's lapses.
+    private function refreshDrainLock(): void
+    {
+        Cache::put(self::DRAIN_LOCK, $this->drainOwner, self::DRAIN_LOCK_SECONDS);
+    }
+
+    private function releaseDrainLock(): void
+    {
+        if (Cache::get(self::DRAIN_LOCK) === $this->drainOwner) {
+            Cache::forget(self::DRAIN_LOCK);
+        }
     }
 
     /**
@@ -515,17 +598,34 @@ class NewsletterSender
             ->send($pending);
     }
 
-    private function releaseIfUnsubscribed(NewsletterDelivery $row): bool
+    /**
+     * Checked again just before sending, since people change while a batch
+     * waits: an address that unsubscribed, an account deleted or blocked since,
+     * or a phone sign-in's internal address is not emailed.
+     */
+    private function releaseIfNoLongerWanted(NewsletterDelivery $row, Newsletter $newsletter, ?User $user): bool
     {
         $email = strtolower((string) $row->email);
-        $suppressed = NewsletterSuppression::query()->where('email', $email)->exists();
-        if (! $suppressed) {
+        $reason = null;
+
+        if (NewsletterSuppression::query()->where('email', $email)->exists()) {
+            $reason = 'This address unsubscribed before the message was sent.';
+        } elseif (NewsletterAudience::isPhonePlaceholder($email)) {
+            $reason = 'Phone sign-in accounts have no real email address.';
+        } elseif (! $user && $newsletter->audience !== Newsletter::AUDIENCE_CUSTOM) {
+            // Only a typed address list can hold people without an account.
+            $reason = 'This account was deleted before the message was sent.';
+        } elseif ($user && $user->isBlocked() && $newsletter->exclude_blocked) {
+            $reason = 'This account was blocked before the message was sent.';
+        }
+
+        if ($reason === null) {
             return false;
         }
 
         $row->forceFill([
             'status' => NewsletterDelivery::STATUS_FAILED,
-            'error' => 'This address unsubscribed before the message was sent.',
+            'error' => $reason,
             'sent_at' => null,
         ])->save();
 

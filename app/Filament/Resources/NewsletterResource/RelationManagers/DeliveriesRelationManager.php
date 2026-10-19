@@ -45,12 +45,14 @@ class DeliveriesRelationManager extends RelationManager
                     ->formatStateUsing(fn (string $state): string => match ($state) {
                         'sent' => 'Sent',
                         'queued' => 'Queued',
+                        'sending' => 'Sending',
                         'failed' => 'Failed',
                         default => $state,
                     })
                     ->color(fn (string $state): string => match ($state) {
                         'sent' => 'success',
                         'queued' => 'warning',
+                        'sending' => 'info',
                         default => 'danger',
                     }),
                 Tables\Columns\TextColumn::make('error')

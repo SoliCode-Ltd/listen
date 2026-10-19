@@ -13,6 +13,7 @@ use App\Models\NewsletterDelivery;
 use App\Models\NewsletterSuppression;
 use App\Models\Plan;
 use App\Models\User;
+use App\Services\BlockedUserService;
 use App\Services\Newsletter\NewsletterAudience;
 use App\Services\Newsletter\NewsletterPace;
 use App\Services\Newsletter\NewsletterRenderer;
@@ -571,6 +572,9 @@ class NewsletterTest extends TestCase
         foreach (['first@example.com', 'second@example.com'] as $email) {
             NewsletterDelivery::query()->create([
                 'newsletter_id' => $newsletter->id,
+                // A members' audience is queued with each member's account (a row
+                // without one is an account deleted since, and is not emailed).
+                'user_id' => User::factory()->create(['email' => $email])->id,
                 'email' => $email,
                 'locale' => 'en',
                 'is_test' => false,
@@ -667,6 +671,188 @@ class NewsletterTest extends TestCase
         $this->assertSame(2, app(NewsletterAudience::class)->waitingCount($newsletter->fresh()));
         $this->assertNotNull($users->first());
         Mail::assertNothingSent();
+    }
+
+    public function test_stopping_while_a_batch_is_sending_stops_before_the_next_email(): void
+    {
+        Config::set('newsletter.hourly_limit', 10);
+        $users = User::factory()->count(3)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 3, true, false);
+
+        // The admin presses "Stop this batch" while the first email is going out.
+        $sentTo = [];
+        Event::listen(MessageSending::class, function (MessageSending $event) use (&$sentTo, $newsletter): void {
+            $sentTo[] = $event->message->getTo()[0]->getAddress();
+            if (count($sentTo) === 1) {
+                app(NewsletterSender::class)->cancelQueued($newsletter->fresh());
+            }
+        });
+
+        $this->assertSame(1, app(NewsletterSender::class)->drain(10, true));
+
+        $first = strtolower((string) $users->sortBy('id')->first()->email);
+        $this->assertSame([$first], $sentTo, 'only the email already going out was sent');
+        // That one is recorded, so the next batch does not mail them again.
+        $this->assertDatabaseHas('newsletter_deliveries', ['email' => $first, 'status' => NewsletterDelivery::STATUS_SENT]);
+        $this->assertSame(0, $newsletter->queuedDeliveries()->count());
+        $this->assertSame(2, app(NewsletterAudience::class)->waitingCount($newsletter->fresh()));
+
+        // A batch started after the stop goes out as usual, to the other two only.
+        app(NewsletterSender::class)->queueNextBatch($newsletter->fresh(), 10, true, false);
+        $this->assertSame(2, app(NewsletterSender::class)->drain(10, true));
+        $this->assertCount(3, $sentTo);
+        $this->assertCount(3, array_unique($sentTo));
+    }
+
+    public function test_a_second_sender_finds_the_queue_taken_and_no_email_goes_out_twice(): void
+    {
+        Config::set('newsletter.hourly_limit', 10);
+        User::factory()->count(3)->create();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 3, true, false);
+
+        // While the admin's send is on its first email, the background sender runs too.
+        $sentTo = [];
+        $started = false;
+        $second = null;
+        Event::listen(MessageSending::class, function (MessageSending $event) use (&$sentTo, &$started, &$second): void {
+            $sentTo[] = $event->message->getTo()[0]->getAddress();
+            if (! $started) {
+                $started = true;
+                $second = app(NewsletterSender::class)->drain(10, true);
+            }
+        });
+
+        $this->assertSame(3, app(NewsletterSender::class)->drain(10, true));
+        $this->assertSame(0, $second);
+        $this->assertCount(3, $sentTo);
+        $this->assertCount(3, array_unique($sentTo));
+        $this->assertSame(3, $newsletter->fresh()->sent_count);
+    }
+
+    public function test_an_email_another_sender_has_claimed_is_left_to_it(): void
+    {
+        Mail::fake();
+        $member = User::factory()->create(['email' => 'claimed@example.com']);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'user_id' => $member->id,
+            'email' => 'claimed@example.com',
+            'locale' => 'en',
+            'is_test' => false,
+            'status' => NewsletterDelivery::STATUS_SENDING,
+        ]);
+
+        $this->assertSame(0, app(NewsletterSender::class)->drain(10, false));
+        Mail::assertNothingSent();
+        $this->assertNotContains('claimed@example.com', array_column(app(NewsletterAudience::class)->pending($newsletter, 10), 'email'));
+    }
+
+    public function test_sending_a_newsletter_leaves_another_newsletters_queue_alone(): void
+    {
+        Mail::fake();
+        $earlier = Newsletter::query()->create(Newsletter::defaultAttributes());
+        $member = User::factory()->create(['email' => 'left-over@example.com']);
+        $leftOver = NewsletterDelivery::query()->create([
+            'newsletter_id' => $earlier->id,
+            'user_id' => $member->id,
+            'email' => 'left-over@example.com',
+            'locale' => 'en',
+            'is_test' => false,
+            'status' => NewsletterDelivery::STATUS_QUEUED,
+        ]);
+        User::factory()->create(['email' => 'reader@example.com']);
+        $newsletter = Newsletter::query()->create(array_merge(Newsletter::defaultAttributes(), ['name' => 'Second']));
+
+        $result = app(NewsletterSender::class)->sendNow($newsletter, 10, true);
+
+        $this->assertSame(2, $result['sent']);
+        $this->assertSame(NewsletterDelivery::STATUS_QUEUED, $leftOver->fresh()->status);
+        $this->assertSame(2, $newsletter->deliveries()->where('status', NewsletterDelivery::STATUS_SENT)->count());
+        $this->assertSame(0, $earlier->deliveries()->where('status', NewsletterDelivery::STATUS_SENT)->count());
+    }
+
+    public function test_with_skipping_turned_off_each_batch_moves_on_to_new_people(): void
+    {
+        $users = User::factory()->count(4)->create();
+        $emails = $users->sortBy('id')->pluck('email')->map(fn ($email) => strtolower((string) $email))->values()->all();
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        $sender = app(NewsletterSender::class);
+
+        Mail::fake();
+        $sender->sendNow($newsletter->fresh(), 10, true);
+        Mail::assertSentCount(4);
+
+        // Sent again to everyone, in batches of two: nobody gets it twice in this round.
+        $this->travel(5)->minutes();
+        $newsletter->update(['exclude_already_sent' => false]);
+        $batches = [];
+        foreach ([1, 2, 3] as $batch) {
+            $this->travel(1)->minutes();
+            Mail::fake();
+            $sender->sendNow($newsletter->fresh(), 2, true);
+            $batches[] = Mail::sent(NewsletterMail::class)->map(fn (NewsletterMail $mail): string => $mail->to[0]['address'])->values()->all();
+        }
+
+        $this->assertSame([array_slice($emails, 0, 2), array_slice($emails, 2, 2), []], $batches);
+        $this->assertSame(0, app(NewsletterAudience::class)->waitingCount($newsletter->fresh()));
+    }
+
+    public function test_accounts_blocked_or_deleted_after_queueing_are_not_emailed(): void
+    {
+        Mail::fake();
+        User::factory()->create(['email' => 'keep@example.com']);
+        $blocked = User::factory()->create(['email' => 'blocked-later@example.com']);
+        $deleted = User::factory()->create(['email' => 'deleted-later@example.com']);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        app(NewsletterSender::class)->queueNextBatch($newsletter, 10, true, false);
+
+        app(BlockedUserService::class)->block($blocked, 'Abuse');
+        $deleted->delete();
+
+        $this->assertSame(1, app(NewsletterSender::class)->drain(10, true));
+        Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo('keep@example.com'));
+        Mail::assertSentCount(1);
+        $this->assertDatabaseHas('newsletter_deliveries', [
+            'email' => 'blocked-later@example.com',
+            'status' => NewsletterDelivery::STATUS_FAILED,
+            'error' => 'This account was blocked before the message was sent.',
+        ]);
+        $this->assertDatabaseHas('newsletter_deliveries', [
+            'email' => 'deleted-later@example.com',
+            'status' => NewsletterDelivery::STATUS_FAILED,
+            'error' => 'This account was deleted before the message was sent.',
+        ]);
+    }
+
+    public function test_phone_sign_in_addresses_are_never_emailed(): void
+    {
+        Mail::fake();
+        $phone = User::factory()->create(['email' => 'phone+abc@users.listen.local']);
+        User::factory()->create(['email' => 'real@example.com']);
+        $newsletter = Newsletter::query()->create(array_merge(Newsletter::defaultAttributes(), [
+            'skip_phone_accounts' => false,
+        ]));
+
+        $this->assertSame(['real@example.com'], $this->audienceEmails($newsletter));
+
+        // One queued earlier is not sent either.
+        NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id,
+            'user_id' => $phone->id,
+            'email' => 'phone+abc@users.listen.local',
+            'locale' => 'en',
+            'is_test' => false,
+            'status' => NewsletterDelivery::STATUS_QUEUED,
+        ]);
+        $this->assertSame(0, app(NewsletterSender::class)->drain(10, false));
+        Mail::assertNothingSent();
+        $this->assertDatabaseHas('newsletter_deliveries', [
+            'email' => 'phone+abc@users.listen.local',
+            'status' => NewsletterDelivery::STATUS_FAILED,
+        ]);
     }
 
     /**

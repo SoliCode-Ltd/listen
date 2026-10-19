@@ -9,6 +9,9 @@ class NewsletterDelivery extends Model
 {
     public const STATUS_QUEUED = 'queued';
 
+    // Claimed by one sender and going out right now (see NewsletterSender::drain).
+    public const STATUS_SENDING = 'sending';
+
     public const STATUS_SENT = 'sent';
 
     public const STATUS_FAILED = 'failed';

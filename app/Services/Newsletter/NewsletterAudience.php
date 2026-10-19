@@ -30,10 +30,10 @@ class NewsletterAudience
         $this->userQuery($newsletter)
             ->select(['id', 'name', 'email'])
             ->orderBy('id')
-            ->chunkById(200, function ($users) use ($callback, $newsletter) {
+            ->chunkById(200, function ($users) use ($callback) {
                 foreach ($users as $user) {
                     $email = strtolower(trim((string) $user->email));
-                    if (! $this->isDeliverableEmail($email, $newsletter)) {
+                    if (! $this->isDeliverableEmail($email)) {
                         continue;
                     }
 
@@ -60,11 +60,11 @@ class NewsletterAudience
             return [];
         }
 
-        $queued = $this->queuedAddresses($newsletter);
+        $skip = $this->queuedAddresses($newsletter) + $this->sentThisRound($newsletter);
         $found = [];
 
-        $this->each($newsletter, function (array $recipient) use (&$found, $limit, $queued): bool {
-            if (isset($queued[$recipient['email']])) {
+        $this->each($newsletter, function (array $recipient) use (&$found, $limit, $skip): bool {
+            if (isset($skip[$recipient['email']])) {
                 return true;
             }
 
@@ -78,11 +78,11 @@ class NewsletterAudience
 
     public function waitingCount(Newsletter $newsletter): int
     {
-        $queued = $this->queuedAddresses($newsletter);
+        $skip = $this->queuedAddresses($newsletter) + $this->sentThisRound($newsletter);
         $count = 0;
 
-        $this->each($newsletter, function (array $recipient) use (&$count, $queued): void {
-            if (! isset($queued[$recipient['email']])) {
+        $this->each($newsletter, function (array $recipient) use (&$count, $skip): void {
+            if (! isset($skip[$recipient['email']])) {
                 $count++;
             }
         });
@@ -91,6 +91,16 @@ class NewsletterAudience
     }
 
     /**
+     * A phone sign-in's internal address (PhoneAuthBridgeService), not a real mailbox.
+     */
+    public static function isPhonePlaceholder(string $email): bool
+    {
+        return str_ends_with(strtolower(trim($email)), '@users.listen.local');
+    }
+
+    /**
+     * Addresses already in line for this newsletter: queued, or going out right now.
+     *
      * @return array<string, true>
      */
     private function queuedAddresses(Newsletter $newsletter): array
@@ -102,7 +112,35 @@ class NewsletterAudience
         return NewsletterDelivery::query()
             ->where('newsletter_id', $newsletter->getKey())
             ->where('is_test', false)
-            ->where('status', NewsletterDelivery::STATUS_QUEUED)
+            ->whereIn('status', [NewsletterDelivery::STATUS_QUEUED, NewsletterDelivery::STATUS_SENDING])
+            ->pluck('email')
+            ->map(fn ($email): string => strtolower((string) $email))
+            ->flip()
+            ->all();
+    }
+
+    /**
+     * With "skip people who already received this newsletter" off, people who
+     * had it before that was turned off can get it again, but only once: those
+     * sent it since are skipped, so each batch moves on instead of mailing the
+     * first people again. When that moment is not known, everyone sent counts.
+     * (With it on, the audience itself already leaves out everyone sent.)
+     *
+     * @return array<string, true>
+     */
+    private function sentThisRound(Newsletter $newsletter): array
+    {
+        if ($newsletter->exclude_already_sent || ! $newsletter->getKey()) {
+            return [];
+        }
+
+        $from = $newsletter->resendFrom();
+
+        return NewsletterDelivery::query()
+            ->where('newsletter_id', $newsletter->getKey())
+            ->where('is_test', false)
+            ->where('status', NewsletterDelivery::STATUS_SENT)
+            ->when($from !== null, fn ($query) => $query->where('sent_at', '>=', $from))
             ->pluck('email')
             ->map(fn ($email): string => strtolower((string) $email))
             ->flip()
@@ -159,7 +197,7 @@ class NewsletterAudience
 
         $recipients = [];
         foreach ($emails as $email) {
-            if (! $this->isDeliverableEmail($email, $newsletter)) {
+            if (! $this->isDeliverableEmail($email)) {
                 continue;
             }
             if (isset($suppressed[$email]) || isset($sent[$email])) {
@@ -217,9 +255,8 @@ class NewsletterAudience
             });
         }
 
-        if ($newsletter->skip_phone_accounts) {
-            $query->whereRaw('lower(email) not like ?', ['%@users.listen.local']);
-        }
+        // Phone sign-ins' internal addresses are never emailed (they bounce).
+        $query->whereRaw('lower(email) not like ?', ['%@users.listen.local']);
 
         if ($newsletter->exclude_admins) {
             $query->where(function (Builder $admins): void {
@@ -297,16 +334,12 @@ class NewsletterAudience
             ->groupBy('user_id');
     }
 
-    private function isDeliverableEmail(string $email, Newsletter $newsletter): bool
+    private function isDeliverableEmail(string $email): bool
     {
         if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
             return false;
         }
 
-        if ($newsletter->skip_phone_accounts && str_ends_with($email, '@users.listen.local')) {
-            return false;
-        }
-
-        return true;
+        return ! self::isPhonePlaceholder($email);
     }
 }
