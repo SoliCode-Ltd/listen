@@ -88,6 +88,9 @@ class GenerateAudioJob implements ShouldQueue
     /** Time a voice made after the reply may take: the stuck-generation sweep fails one still running after 30 minutes anyway. */
     private const AFTER_RESPONSE_SECONDS = 1800;
 
+    /** Memory a voice made after the reply may use: the longest texts are close to an hour of audio. */
+    private const AFTER_RESPONSE_MEMORY = '1024M';
+
     public function __construct(public int $audioGenerationId)
     {
     }
@@ -114,14 +117,17 @@ class GenerateAudioJob implements ShouldQueue
     public static function runAfterResponse(int $audioGenerationId): void
     {
         $seconds = self::AFTER_RESPONSE_SECONDS;
+        $memory = self::AFTER_RESPONSE_MEMORY;
 
-        dispatch(function () use ($audioGenerationId, $seconds): void {
+        dispatch(function () use ($audioGenerationId, $seconds, $memory): void {
             // Nobody waits on the request any more: a closed tab must not stop a paid generation.
             ignore_user_abort(true);
             $limit = (int) ini_get('max_execution_time');
             if ($limit > 0 && $limit < $seconds && function_exists('set_time_limit')) {
                 @set_time_limit($seconds);
             }
+            // The web server allows less memory than the queue worker (no limit).
+            GenerateAudioJob::raiseMemoryLimit($memory);
 
             try {
                 GenerateAudioJob::dispatchSync($audioGenerationId);
@@ -132,6 +138,20 @@ class GenerateAudioJob implements ShouldQueue
             // One the job's own error handling never reached is failed and refunded here, exactly once.
             app(MemberUsageMeter::class)->failAndRefund($audioGenerationId, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
         })->afterResponse();
+    }
+
+    /**
+     * Raises this process's memory limit to $limit when it is lower. It never
+     * lowers it, and leaves "no limit" (-1) alone.
+     */
+    public static function raiseMemoryLimit(string $limit): void
+    {
+        $current = @ini_parse_quantity((string) ini_get('memory_limit'));
+        if ($current === -1 || $current >= @ini_parse_quantity($limit)) {
+            return;
+        }
+
+        @ini_set('memory_limit', $limit);
     }
 
     public function handle(TranslationService $translationService, TtsService $ttsService): void

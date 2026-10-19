@@ -770,18 +770,23 @@ class GeminiTtsProvider implements TtsProviderInterface
             return ['bytes' => implode('', array_column($parts, 'bytes')), 'mime_type' => 'audio/mpeg'];
         }
 
+        // Each piece is let go once it is joined, so a long text (50,000
+        // characters is close to an hour of audio) holds its audio about once,
+        // not twice, within the web server's memory limit.
         $pcm = '';
         $sampleRate = null;
         $channels = 1;
-        foreach (array_values($parts) as $i => $part) {
-            $decoded = $this->decodePcm($part['bytes'], $part['mime_type']);
+        $joined = 0;
+        foreach (array_keys($parts) as $key) {
+            $decoded = $this->decodePcm($parts[$key]['bytes'], $parts[$key]['mime_type']);
+            unset($parts[$key]);
             $sampleRate ??= $decoded['sample_rate'];
             $channels = $decoded['channels'];
-            if ($i > 0) {
+            if ($joined++ > 0) {
                 $pcm .= str_repeat("\0", (int) round($sampleRate * 0.3) * 2 * $channels);
             }
-            $samples = $decoded['pcm'];
-            $pcm .= strlen($samples) % 2 === 0 ? $samples : substr($samples, 0, -1);
+            $pcm .= strlen($decoded['pcm']) % 2 === 0 ? $decoded['pcm'] : substr($decoded['pcm'], 0, -1);
+            unset($decoded);
         }
 
         return [
