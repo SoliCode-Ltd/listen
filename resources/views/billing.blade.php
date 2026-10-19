@@ -1455,7 +1455,7 @@
 
     function showCardAbout(local) {
       if (!quoteAmountAbout) return;
-      quoteAmountAbout.textContent = local ? String(i18n.card_local_about || '').replace(':amount', `⁦${local}⁩`) : '';
+      quoteAmountAbout.textContent = local ? String(i18n.card_local_about || '').replace(':amount', `\u2066${local}\u2069`) : '';
       quoteAmountAbout.hidden = !local;
     }
 
