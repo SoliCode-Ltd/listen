@@ -787,17 +787,34 @@ async function openSidePlayer(tabId, audioUrl, textPreview, voiceLabel = '', req
   if (!response?.ok) {
     const ready = await ensureContentScriptReady(tabId);
     if (!ready) {
-      throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
+      throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
     }
 
     response = await sendTabMessage(tabId, message).catch(() => null);
   }
 
   if (!response?.ok) {
-    throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
+    throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
   }
 
   return { skipped: false };
+}
+
+function playerPageUrl(audioUrl) {
+  return chrome.runtime.getURL(`player.html?${new URLSearchParams({ audio: audioUrl })}`);
+}
+
+// The voice is made and paid for by now: if the page does not take the side
+// player after all, the extension's own player plays it in a new tab.
+async function playVoice(tabId, audioUrl, textPreview, voiceLabel = '', requestToken = 0) {
+  try {
+    await openSidePlayer(tabId, audioUrl, textPreview, voiceLabel, requestToken);
+  } catch (_error) {
+    const opened = await chrome.tabs.create({ url: playerPageUrl(audioUrl) }).catch(() => null);
+    if (!opened) {
+      throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
+    }
+  }
 }
 
 async function fetchProfile(overrides = {}) {
@@ -861,6 +878,15 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   }
   if (!apiKey) {
     throw new Error(bgText('errSetApiKey', 'Set API Key in extension settings.'));
+  }
+
+  // The side player opens in the page, and no extension can run in Chrome's own
+  // pages or the Web Store: that is found out before the voice is made and charged.
+  const playbackTabId = settings.autoPlay
+    ? (typeof runtimeContext.tabId === 'number' ? runtimeContext.tabId : await getActiveTabId())
+    : null;
+  if (settings.autoPlay && !(await ensureContentScriptReady(playbackTabId))) {
+    throw new Error(bgText('errSidePlayerPage', 'The side player cannot open on this page, so nothing was made or charged. Try a regular website tab, or turn off "Play voice in side panel".'));
   }
 
   const selectedTargetLanguage = settings.translate !== false
@@ -942,11 +968,8 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   if (data.audio_url) {
     const absoluteAudioUrl = toAbsoluteAudioUrl(data.audio_url, apiBase);
     if (settings.autoPlay) {
-      const tabId = typeof runtimeContext.tabId === 'number'
-        ? runtimeContext.tabId
-        : await getActiveTabId();
-      await openSidePlayer(
-        tabId,
+      await playVoice(
+        playbackTabId,
         absoluteAudioUrl,
         selectedText,
         getVoiceLabel(data?.voice, uiLang),
@@ -967,11 +990,8 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     const absoluteJobAudioUrl = toAbsoluteAudioUrl(readyJob.audio_url, apiBase);
 
     if (settings.autoPlay) {
-      const tabId = typeof runtimeContext.tabId === 'number'
-        ? runtimeContext.tabId
-        : await getActiveTabId();
-      await openSidePlayer(
-        tabId,
+      await playVoice(
+        playbackTabId,
         absoluteJobAudioUrl,
         selectedText,
         getVoiceLabel(readyJob?.voice, uiLang),
