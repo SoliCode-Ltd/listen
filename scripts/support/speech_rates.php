@@ -61,6 +61,8 @@ $features = function (string $text): array {
         'joins' => max(0, count($parts) - 1),
         'delivery' => $delivery,
         'digits' => preg_match_all('/\p{N}+/u', $spoken),
+        // Vowel marks (tashkeel) are not letters, but a fully marked text may be read slower.
+        'marks' => preg_match_all('/\p{Mn}/u', $spoken),
     ];
 };
 
@@ -227,58 +229,130 @@ $solve = function (array $a, array $b): ?array {
 
     return array_map(fn ($i) => $a[$i][$n] / $a[$i][$i], range(0, $n - 1));
 };
-$fit = function (string $label, array $list, array $columns) use ($solve, $quantile, $fmt): void {
-    // Columns that never occur in these voices are left out.
-    $columns = array_values(array_filter($columns, fn ($c) => $c === 'one' || count(array_filter($list, fn ($r) => $r[$c] > 0)) >= 3));
-    if (count($list) < count($columns) * 4) {
-        return;
+// Fitted to the relative error (iteratively reweighted least squares for the
+// median of |predicted - real| / real), so long voices do not drown out the
+// short ones most members make, and a few odd voices do not pull the fit.
+$fit = function (string $label, array $list, array $columns) use ($solve, $quantile, $fmt): ?array {
+    // Columns that seldom occur in these voices are left out.
+    $columns = array_values(array_filter($columns, fn ($c) => $c === 'one' || count(array_filter($list, fn ($r) => $r[$c] > 0)) >= 8));
+    if (count($list) < max(20, count($columns) * 5)) {
+        return null;
     }
     $x = fn ($r) => array_map(fn ($c) => $c === 'one' ? 1.0 : (float) $r[$c], $columns);
     $k = count($columns);
-    $ata = array_fill(0, $k, array_fill(0, $k, 0.0));
-    $atb = array_fill(0, $k, 0.0);
-    foreach ($list as $r) {
-        $v = $x($r);
-        // The length the text would have at the normal pace.
-        $y = $r['seconds'] * $r['speed'];
-        for ($i = 0; $i < $k; $i++) {
-            $atb[$i] += $v[$i] * $y;
-            for ($j = 0; $j < $k; $j++) {
-                $ata[$i][$j] += $v[$i] * $v[$j];
+    $coef = null;
+    $residual = [];
+    for ($round = 0; $round < 25; $round++) {
+        $ata = array_fill(0, $k, array_fill(0, $k, 0.0));
+        $atb = array_fill(0, $k, 0.0);
+        foreach ($list as $n => $r) {
+            $v = $x($r);
+            $y = (float) $r['seconds'];
+            $w = 1 / ($y * $y);
+            if ($coef !== null) {
+                $w = 1 / ($y * max(abs($residual[$n]), 0.03 * $y));
+            }
+            for ($i = 0; $i < $k; $i++) {
+                $atb[$i] += $w * $v[$i] * $y;
+                for ($j = 0; $j < $k; $j++) {
+                    $ata[$i][$j] += $w * $v[$i] * $v[$j];
+                }
             }
         }
-    }
-    // A touch of ridge, so two columns that always move together still solve.
-    for ($i = 0; $i < $k; $i++) {
-        $ata[$i][$i] += $columns[$i] === 'one' ? 0.0 : 1e-3;
-    }
-    $coef = $solve($ata, $atb);
-    if ($coef === null) {
-        echo "  {$label}: no fit\n";
+        for ($i = 0; $i < $k; $i++) {
+            $ata[$i][$i] += $columns[$i] === 'one' ? 0.0 : 1e-6 * max(1e-9, $ata[$i][$i]);
+        }
+        $coef = $solve($ata, $atb);
+        if ($coef === null) {
+            echo "  {$label}: no fit\n";
 
+            return null;
+        }
+        foreach ($list as $n => $r) {
+            $residual[$n] = array_sum(array_map(fn ($a, $b) => $a * $b, $coef, $x($r))) - $r['seconds'];
+        }
+    }
+    $model = array_combine($columns, $coef);
+    printf("  %-34s %5d voices: %s\n", $label, count($list), implode(', ', array_map(fn ($c, $v) => $c.' '.number_format($v, 3), $columns, $coef)));
+
+    return $model;
+};
+$check = function (string $label, array $list, callable $predict) use ($quantile, $fmt): void {
+    if (count($list) < 5) {
         return;
     }
-    $errors = [];
-    $under = 0;
+    $ratios = [];
+    $over10 = $over1s = 0;
     foreach ($list as $r) {
-        $predicted = array_sum(array_map(fn ($a, $b) => $a * $b, $coef, $x($r))) / $r['speed'];
-        $errors[] = ($predicted - $r['seconds']) / $r['seconds'];
-        $under += $predicted < $r['seconds'] - 0.5 ? 1 : 0;
+        $p = max(1.0, $predict($r));
+        $ratios[] = $r['seconds'] / $p;
+        $over10 += $r['seconds'] > $p * 1.1 + 0.5 ? 1 : 0;
+        $over1s += $r['seconds'] > $p + 1 ? 1 : 0;
     }
-    $abs = array_map('abs', $errors);
-    printf("  %-28s %6d voices: %s\n", $label, count($list), implode(', ', array_map(fn ($c, $v) => $c.' '.number_format($v, 4), $columns, $coef)));
-    printf("  %-28s        error median %s%%, |error| median %s%% p90 %s%%, too short by over half a second: %.1f%%\n", '', $fmt(100 * $quantile($errors, .5), 1),
-        $fmt(100 * $quantile($abs, .5), 1), $fmt(100 * $quantile($abs, .9), 1), 100 * $under / count($list));
+    printf("  %-34s %5d   real/estimate p10 %s p25 %s median %s p75 %s p90 %s   real over 10%% longer %4.1f%%, over 1 s longer %4.1f%%\n", $label, count($list),
+        $fmt($quantile($ratios, .1)), $fmt($quantile($ratios, .25)), $fmt($quantile($ratios, .5)), $fmt($quantile($ratios, .75)), $fmt($quantile($ratios, .9)),
+        100 * $over10 / count($list), 100 * $over1s / count($list));
 };
-echo "\n== Fitted seconds (at the normal pace) from what the text holds ==\n";
-$cols = ['letters', 'words', 'sounds', 'short', 'long', 'sentences', 'clauses', 'lines', 'joins', 'digits', 'one'];
-foreach ($group($rows, fn ($r) => $r['engine'].' '.$r['lang']) as $k => $list) {
-    $fit($k, $list, $cols);
-    $fit($k.' letters only', $list, ['letters', 'one']);
-    $fit($k.' words only', $list, ['words', 'one']);
-    $fit($k.' small', $list, ['letters', 'sounds', 'long', 'sentences', 'lines', 'joins', 'one']);
+$apply = fn (array $model) => fn (array $r): float => array_sum(array_map(fn ($c, $v) => $v * ($c === 'one' ? 1.0 : (float) $r[$c]), array_keys($model), $model));
+$size = fn ($r) => $r['seconds'] < 10 ? 'a: < 10 s' : ($r['seconds'] < 30 ? 'b: 10-29 s' : ($r['seconds'] < 120 ? 'c: 30-119 s' : 'd: 120 s +'));
+
+echo "\n== Fitted seconds at the normal pace, by voice tier and language ==\n";
+$cols = ['letters', 'marks', 'digits', 'sounds', 'short', 'long', 'sentences', 'clauses', 'lines', 'joins', 'one'];
+$normal = array_values(array_filter($rows, fn ($r) => abs($r['speed'] - 1.0) < 0.03));
+$models = [];
+foreach ($group($normal, fn ($r) => $r['tier'].' '.$r['lang']) as $k => $list) {
+    $models[$k] = $fit($k, $list, $cols);
+    $models[$k.' few'] = $fit($k.' few', $list, ['letters', 'sounds', 'sentences', 'lines', 'joins', 'one']);
 }
-$recent = array_values(array_filter($rows, fn ($r) => $r['days'] <= 30));
-foreach ($group($recent, fn ($r) => $r['engine'].' '.$r['lang'].' 30 days') as $k => $list) {
-    $fit($k.' small', $list, ['letters', 'sounds', 'long', 'sentences', 'lines', 'joins', 'one']);
+foreach ($group(array_filter($normal, fn ($r) => $r['tier'] !== 'standard' && $r['model'] === 'gemini-3.8-flash-tts'), fn ($r) => $r['tier'].' '.$r['lang'].' 3.8') as $k => $list) {
+    $models[$k] = $fit($k, $list, $cols);
+}
+
+echo "\n== How close each fit is (normal pace) ==\n";
+foreach ($models as $k => $model) {
+    if ($model === null) {
+        continue;
+    }
+    [$tier, $lang] = explode(' ', $k);
+    $list = array_filter($normal, fn ($r) => $r['tier'] === $tier && $r['lang'] === $lang && (! str_contains($k, '3.8') || $r['model'] === 'gemini-3.8-flash-tts'));
+    $check($k, $list, $apply($model));
+    if (! str_contains($k, ' few') && ! str_contains($k, '3.8')) {
+        foreach ($group($list, $size) as $s => $part) {
+            $check('   '.$s, $part, $apply($model));
+        }
+        foreach ($group($list, fn ($r) => ($r['sounds'] + $r['short'] + $r['long'] > 0 ? 'sounds' : 'no sounds').($r['joins'] > 0 ? ', moods' : '').($r['marks'] > $r['letters'] / 3 ? ', vowel-marked' : '')) as $s => $part) {
+            $check('   '.$s, $part, $apply($model));
+        }
+    }
+}
+echo "\n== Today's estimate, same voices (normal pace) ==\n";
+foreach ($group($normal, fn ($r) => $r['tier'].' '.$r['lang']) as $k => $list) {
+    $check($k, $list, fn ($r) => (float) $r['estimate']);
+}
+
+echo "\n== The pace setting: real length against the normal-pace fit ==\n";
+foreach ($group($rows, fn ($r) => $r['tier'].' '.$r['lang']) as $k => $list) {
+    $model = $models[$k] ?? null;
+    if ($model === null) {
+        continue;
+    }
+    foreach ($group($list, fn ($r) => number_format($r['speed'], 2)) as $pace => $part) {
+        if (count($part) >= 5) {
+            $ratios = array_map(fn ($r) => $r['seconds'] / max(1.0, $apply($model)($r)), $part);
+            printf("  %-14s pace %s %5d voices: real / fit p25 %s median %s p75 %s\n", $k, $pace, count($part), $fmt($quantile($ratios, .25)), $fmt($quantile($ratios, .5)), $fmt($quantile($ratios, .75)));
+        }
+    }
+}
+
+echo "\n== Voices much shorter than their text (real under 60% of the fit), normal pace ==\n";
+foreach ($models as $k => $model) {
+    if ($model === null || str_contains($k, ' few') || str_contains($k, '3.8')) {
+        continue;
+    }
+    [$tier, $lang] = explode(' ', $k);
+    $list = array_filter($normal, fn ($r) => $r['tier'] === $tier && $r['lang'] === $lang);
+    $short = array_filter($list, fn ($r) => $r['seconds'] >= 3 && $r['seconds'] < 0.6 * $apply($model)($r));
+    $by = array_count_values(array_map(fn ($r) => $r['engine'].' '.$r['model'].' '.$size($r), $short));
+    ksort($by);
+    printf("  %-14s %d of %d%s\n", $k, count($short), count($list), $by === [] ? '' : ': '.implode(', ', array_map(fn ($a, $b) => "{$a} {$b}", array_keys($by), $by)));
 }
