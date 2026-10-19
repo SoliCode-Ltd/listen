@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\TtsCostGuardrail;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsCostLimitException;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
@@ -65,19 +66,17 @@ class TtsCostGuardrailTest extends TestCase
         $this->assertSame(11, app(TtsCostGuardrail::class)->usageToday()['total_chars']);
     }
 
-    public function test_over_the_gemini_char_limit_falls_back_to_google_without_calling_gemini(): void
+    public function test_over_the_gemini_char_limit_an_hd_request_fails_without_calling_gemini_or_google(): void
     {
         config(['listen.cost_guardrails.daily_gemini_char_limit' => 5]);
         $calls = $this->fakeSpeech();
 
-        $result = $this->speak('Hello there');
+        $this->assertRefused('Hello there', 'daily_gemini_char_limit');
 
-        $this->assertSame('google_cloud', $result['provider']);
-        $this->assertTrue($result['fallback_used']);
         $this->assertSame(0, $calls->gemini, 'Gemini must not be called once over its limit');
-        $this->assertSame(1, $calls->google);
+        $this->assertSame(0, $calls->google, 'and a paid HD request is never read by a standard voice');
         $this->assertSame(0, app(TtsCostGuardrail::class)->usageToday()['gemini_chars']);
-        $this->assertSame(11, app(TtsCostGuardrail::class)->usageToday()['total_chars']);
+        $this->assertSame(0, app(TtsCostGuardrail::class)->usageToday()['total_chars']);
     }
 
     public function test_gemini_char_limit_counts_up_across_requests(): void
@@ -88,10 +87,10 @@ class TtsCostGuardrailTest extends TestCase
         $this->assertSame('gemini', $this->speak('Hello there')['provider']);
         $this->assertSame('gemini', $this->speak('Hello again')['provider']);
         // 22 used; 11 more would pass 25.
-        $this->assertSame('google_cloud', $this->speak('Hello third')['provider']);
+        $this->assertRefused('Hello third', 'daily_gemini_char_limit');
 
         $this->assertSame(2, $calls->gemini);
-        $this->assertSame(1, $calls->google);
+        $this->assertSame(0, $calls->google);
     }
 
     public function test_gemini_request_limit_stops_gemini_after_that_many_requests(): void
@@ -100,9 +99,10 @@ class TtsCostGuardrailTest extends TestCase
         $calls = $this->fakeSpeech();
 
         $this->assertSame('gemini', $this->speak('First one')['provider']);
-        $this->assertSame('google_cloud', $this->speak('Second one')['provider']);
+        $this->assertRefused('Second one', 'daily_gemini_request_limit');
 
         $this->assertSame(1, $calls->gemini);
+        $this->assertSame(0, $calls->google);
     }
 
     public function test_total_limit_refuses_all_speech_and_calls_no_provider(): void
@@ -179,12 +179,28 @@ class TtsCostGuardrailTest extends TestCase
         $calls = $this->fakeSpeech();
 
         $this->assertSame('gemini', $this->speak('Hello there')['provider']);
-        $this->assertSame('google_cloud', $this->speak('Hello again')['provider']);
+        $this->assertRefused('Hello again', 'daily_gemini_char_limit');
 
         $this->travel(1)->days();
 
         $this->assertSame('gemini', $this->speak('Hello third')['provider']);
         $this->assertSame(2, $calls->gemini);
+        $this->assertSame(0, $calls->google);
+    }
+
+    /**
+     * Over a Gemini ceiling the HD request fails (the member's credits are given
+     * back by the job): it is never read by a standard voice instead.
+     */
+    private function assertRefused(string $text, string $limit): void
+    {
+        try {
+            $this->speak($text);
+            $this->fail('An HD request over the Gemini ceiling must fail.');
+        } catch (PremiumVoiceUnavailableException $e) {
+            $this->assertInstanceOf(TtsCostLimitException::class, $e->getPrevious());
+            $this->assertStringContainsString($limit, $e->getMessage());
+        }
     }
 
     private function speak(string $text): array

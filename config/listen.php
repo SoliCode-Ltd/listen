@@ -5,13 +5,25 @@ return [
         // `sync` runs generation inside the request for the fastest UX.
         // `queue` keeps async behavior and requires a running queue worker.
         'processing' => (string) env('LISTEN_AUDIO_PROCESSING', 'sync'),
-        // When sync mode is enabled, requests above this char count are routed async.
+        // In sync mode, texts at least this long are made after the reply, in the same
+        // process (no worker needed), and the studio and the extension check on them. 0: never.
         'force_async_chars' => (int) env('LISTEN_AUDIO_FORCE_ASYNC_CHARS', 2500),
     ],
 
     'voice' => [
         'default_tier' => env('LISTEN_DEFAULT_VOICE_TIER', 'standard'),
     ],
+
+    /*
+    | What this server may do to real customers by itself: cancel or change
+    | Stripe subscriptions and prices, and send reminder or welcome emails from
+    | scheduled jobs (App\Support\LiveServer). Staging runs the live Stripe keys
+    | on a copy of live members, so it must never do these. Unset: on only when
+    | APP_URL is the live site (live_host). LISTEN_LIVE_ACTIONS=true or false
+    | decides it outright.
+    */
+    'live_actions' => env('LISTEN_LIVE_ACTIONS'),
+    'live_host' => (string) env('LISTEN_LIVE_HOST', 'listenai.studio'),
 
     /*
     |--------------------------------------------------------------------------

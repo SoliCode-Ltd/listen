@@ -595,9 +595,11 @@ function getSettings() {
   });
 }
 
-function saveSettings(settings) {
+async function saveSettings(settings) {
+  // Merged with what is stored: the popup never sends the service address (the
+  // server may have moved it), so a save keeps it rather than resetting it.
   const payload = {
-    ...DEFAULT_SETTINGS,
+    ...(await getSettings()),
     ...settings,
   };
 
@@ -662,9 +664,25 @@ async function fetchAudioPacket(audioUrl) {
   };
 }
 
-async function pollJobUntilReady(apiBase, apiKey, jobId) {
-  for (let i = 0; i < 28; i += 1) {
-    await sleep(i < 8 ? 700 : 1300);
+// Texts this long are made after the reply, as the server does them
+// (listen.audio.force_async_chars): the extension checks on them instead of
+// waiting for the audio in the request.
+const LONG_TEXT_CHARS = 2500;
+
+// How long to keep checking on a voice: a minute, and a second more for every
+// 40 characters of text, at most 15 minutes.
+function pollTimeoutMsFor(text) {
+  const chars = Array.from(String(text || '')).length;
+  return Math.min(15 * 60 * 1000, 60 * 1000 + Math.ceil(chars / 40) * 1000);
+}
+
+async function pollJobUntilReady(apiBase, apiKey, jobId, timeoutMs = 60 * 1000) {
+  const startedAt = Date.now();
+  for (let i = 0; Date.now() - startedAt < timeoutMs; i += 1) {
+    // Quick at first, then every few seconds for a long text.
+    await sleep(i < 8 ? 700 : Math.min(5000, 1300 + (i - 8) * 250));
+    // An extension call keeps the service worker awake while it waits.
+    chrome.runtime.getPlatformInfo(() => void chrome.runtime.lastError);
 
     let response;
     try {
@@ -678,6 +696,11 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
       });
     } catch (networkError) {
       // Continue polling on network hiccups
+      continue;
+    }
+
+    // A busy or restarting server is waited out like a network hiccup.
+    if (response.status === 429 || response.status >= 500) {
       continue;
     }
 
@@ -699,7 +722,8 @@ async function pollJobUntilReady(apiBase, apiKey, jobId) {
     }
   }
 
-  throw new Error(bgText('errTooLong', 'Voice generation is taking too long. Please try again.'));
+  // Not a failure: the voice may still come, and trying again would be charged again.
+  throw new Error(bgText('errQueueTimeout', 'Request timed out. The voice may still be generating - check your history.'));
 }
 
 async function openSidePlayer(tabId, audioUrl, textPreview, voiceLabel = '', requestToken = 0) {
@@ -824,9 +848,9 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     target_language: targetLanguage,
     source_type: 'message',
     translate: shouldTranslate,
-    // Ask backend to stay synchronous for extension playback whenever possible.
-    // This avoids queue/poll delays for long selections in sync processing mode.
-    prefer_sync: true,
+    // A shorter text is waited for in the request; a long one is made after the
+    // reply and checked on below, for as long as its length needs.
+    prefer_sync: Array.from(selectedText).length < LONG_TEXT_CHARS,
   };
 
   const voiceKey = targetLanguage === selectedTargetLanguage ? selectedVoiceForTarget : '';
@@ -905,7 +929,7 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   }
 
   if (Number(data.job_id) > 0) {
-    const readyJob = await pollJobUntilReady(apiBase, apiKey, data.job_id);
+    const readyJob = await pollJobUntilReady(apiBase, apiKey, data.job_id, pollTimeoutMsFor(selectedText));
     const absoluteJobAudioUrl = toAbsoluteAudioUrl(readyJob.audio_url, apiBase);
 
     if (settings.autoPlay) {

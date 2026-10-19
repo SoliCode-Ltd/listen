@@ -265,8 +265,8 @@ return [
 
         'formats' => [
             'title' => 'Audio formats',
-            'body' => 'Ask for a file type with `output_format`. `mp3` always works; :formats work on the plans that include them (see Plans and limits). The `Content-Type` and `X-Output-Format` headers always say what the body is.',
-            'body_mp3_only' => 'Ask for a file type with `output_format`: `mp3` is available. The `Content-Type` and `X-Output-Format` headers always say what the body is.',
+            'body' => 'Ask for a file type with `output_format`. `mp3` is always accepted; :formats work on the plans that include them (see Plans and limits). If the server\'s audio converter is unavailable, the audio may come back as WAV even when you ask for `mp3`. The `Content-Type` and `X-Output-Format` headers always say what the body is.',
+            'body_mp3_only' => 'Ask for a file type with `output_format`: `mp3` is available. If the server\'s audio converter is unavailable, the audio may come back as WAV instead. The `Content-Type` and `X-Output-Format` headers always say what the body is.',
         ],
 
         'idempotency' => [
@@ -277,6 +277,7 @@ return [
                 'The same key with a different body is refused with `422` and `idempotency_key_reused`.',
                 'While the first request is still running, a retry gets `409` and `idempotent_request_in_progress`: wait, then send it again.',
                 'If the first generation failed, the key can be used again: nothing was charged for it.',
+                'If you deleted the first generation, a retry gets `410` and `idempotent_result_deleted` and nothing is made or charged: send a new key to generate it again.',
             ],
         ],
 
@@ -388,7 +389,7 @@ return [
             'X-Output-Format' => 'File type of the body.',
             'Idempotent-Replayed' => '`true` when this is the saved result of an earlier request with the same `Idempotency-Key`.',
             'X-Request-Id' => 'Id of this request. Include it when you contact support.',
-            'X-RateLimit-Limit' => 'Requests this key may send a minute.',
+            'X-RateLimit-Limit' => 'Requests your account may send a minute, all its keys together (generations and other requests are counted separately).',
             'X-RateLimit-Remaining' => 'Requests left this minute.',
             'Retry-After' => 'Seconds to wait before trying again (on `429`).',
         ],
@@ -416,11 +417,14 @@ return [
                 ['409', 'audio_not_ready', 'The generation has not finished yet.'],
                 ['409', 'history_item_in_progress', 'The generation is still running, so it cannot be deleted yet.'],
                 ['409', 'idempotent_request_in_progress', 'A request with this `Idempotency-Key` is still running.'],
+                ['410', 'audio_expired', 'The audio file of this history item is no longer stored.'],
+                ['410', 'idempotent_result_deleted', 'The generation made with this `Idempotency-Key` was deleted. Use a new key to generate it again.'],
                 ['422', 'validation_failed', 'A parameter is missing or not valid (see `param`).'],
                 // A fourth value: the row shows only when some plan includes that feature.
                 ['422', 'invalid_dialect', 'Unknown `dialect` for the language. The same goes for `invalid_style` and `invalid_emotion`.'],
                 ['422', 'invalid_audio_effect', 'Unknown `audio_effect`.', 'sound_environments'],
                 ['422', 'invalid_dialogue', 'The speakers or the text of a dialogue do not fit together.', 'dialogue'],
+                ['422', 'invalid_output_format', 'Unknown `output_format` in the address, for example on `GET /v1/history/{history_item_id}/audio`.'],
                 ['422', 'language_mismatch', 'The voice does not speak the `language_code` asked for.'],
                 ['422', 'text_too_long', 'The text is longer than one request may carry (see Plans and limits); the message says which limit.'],
                 ['422', 'text_has_no_words', 'The text has only tags or sounds, nothing to read.'],
@@ -444,7 +448,7 @@ return [
 
         'limits' => [
             'title' => 'Rate limits',
-            'body' => 'Limits depend on your plan (see Plans and limits). Every answer carries the headers below.',
+            'body' => 'Limits depend on your plan (see Plans and limits). Answers to requests that pass the key check carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`, errors included; answers refused at the key check (no key, a wrong or revoked key, a key the API cannot serve, too many refused requests, or the API paused) do not. `Retry-After` comes with `429` answers and with the `503` answers that ask you to wait, and every answer carries `X-Request-Id`.',
             'points' => [
                 'Generation requests a minute, for your whole account (all its keys together). Over it: `429` and `rate_limit_exceeded`.',
                 'Other requests a minute (status checks, voices, history, account) have their own allowance, also for the whole account, so checking on your generations never uses up the generations.',

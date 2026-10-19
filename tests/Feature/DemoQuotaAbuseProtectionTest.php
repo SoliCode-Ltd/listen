@@ -391,21 +391,24 @@ class DemoQuotaAbuseProtectionTest extends TestCase
             ->assertJsonPath('message', __('ui.backend.demo_trial_exhausted'));
     }
 
-    public function test_request_ip_links_accounts_immediately(): void
+    public function test_the_same_browser_links_accounts_immediately(): void
     {
+        // The address a request comes from no longer links accounts (strangers on
+        // one mobile network share it); the browser does, at once.
+        $browser = 'dev_linked_at_once_0123456789abcdef';
         $userA = User::factory()->create(['registration_ip' => '203.0.113.51']);
-        $userB = User::factory()->create(['registration_ip' => '198.51.100.9']);
+        $userB = User::factory()->create(['registration_ip' => '198.51.100.9', 'registration_device_id' => $browser]);
 
-        $this->actingAs($userA)
-            ->withServerVariables(['REMOTE_ADDR' => '198.51.100.9'])
-            ->postJsonLocalizedRoute('demo.quota', [])
+        // Both accounts use the demo in this browser (JSON requests send its cookie
+        // only with credentials).
+        $this->withCredentials()->withCookies(['listen_demo_device' => $browser]);
+
+        $this->actingAs($userA)->postJsonLocalizedRoute('demo.quota', [])
             ->assertJsonPath('quota.used_chars', 0);
 
         $this->actingAs($userB)->preview(str_repeat('b', 300))->assertOk();
 
-        $this->actingAs($userA)
-            ->withServerVariables(['REMOTE_ADDR' => '198.51.100.9'])
-            ->postJsonLocalizedRoute('demo.quota', [])
+        $this->actingAs($userA)->postJsonLocalizedRoute('demo.quota', [])
             ->assertJsonPath('quota.used_chars', 300);
     }
 

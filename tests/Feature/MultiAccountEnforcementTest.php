@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\CharPackPurchase;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\Auth\AuthSettingsService;
@@ -14,6 +16,7 @@ use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Mockery;
 use Tests\TestCase;
 
@@ -22,7 +25,7 @@ use Tests\TestCase;
  * - Auto-blocking users who exceed max accounts per device (browser cookie)
  * - Admin protection (admins never auto-blocked)
  * - Configurable limit via site settings
- * - VPN bypass detection (current request IP cross-check)
+ * - VPN bypass detection (the same browser cookie)
  * - All auth methods covered (email, Google OAuth, Firebase Google, phone)
  */
 class MultiAccountEnforcementTest extends TestCase
@@ -319,19 +322,21 @@ class MultiAccountEnforcementTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────────
-    //  5.  VPN bypass: current request IP catches linked accounts
+    //  5.  VPN bypass: the same browser catches linked accounts
+    //      (the request IP alone no longer links: strangers share it)
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_vpn_user_demo_quota_includes_accounts_sharing_request_ip(): void
+    public function test_vpn_user_demo_quota_includes_accounts_on_the_same_browser(): void
     {
         $this->seedVoice();
         $homeIp = '10.20.30.40';
         $vpnIp = '99.99.99.99';
 
-        // User A registered from home IP, used 260 chars
+        // User A registered from home IP on this browser, used 260 chars
         $userA = User::factory()->create([
             'registration_ip' => $homeIp,
             'last_login_ip' => $homeIp,
+            'registration_device_id' => self::SHARED_DEVICE,
         ]);
         $this->storeDemoUsage($userA, 260);
 
@@ -343,10 +348,11 @@ class MultiAccountEnforcementTest extends TestCase
 
         Cache::flush();
 
-        // User B now turns off VPN and uses demo from home IP (same as user A's registration_ip)
-        // The requestIpLinkedUserIds should catch this
+        // User B now turns off VPN and uses the demo from home, in the same browser
         $response = $this->actingAs($userB)
             ->withServerVariables(['REMOTE_ADDR' => $homeIp])
+            ->withCredentials()
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('demo.quota', []);
 
         $response->assertOk();
@@ -355,7 +361,7 @@ class MultiAccountEnforcementTest extends TestCase
         $response->assertJsonPath('quota.remaining_chars', 40);
     }
 
-    public function test_vpn_user_blocked_when_demo_limit_exceeded_via_request_ip(): void
+    public function test_vpn_user_blocked_when_demo_limit_exceeded_on_the_same_browser(): void
     {
         $voice = $this->seedVoice();
         $homeIp = '10.20.30.50';
@@ -364,6 +370,7 @@ class MultiAccountEnforcementTest extends TestCase
         $userA = User::factory()->create([
             'registration_ip' => $homeIp,
             'last_login_ip' => $homeIp,
+            'registration_device_id' => self::SHARED_DEVICE,
         ]);
         $this->storeDemoUsage($userA, 280);
 
@@ -374,9 +381,11 @@ class MultiAccountEnforcementTest extends TestCase
 
         Cache::flush();
 
-        // User B tries to use demo from home IP — should be denied
+        // User B tries to use demo from home, in the same browser — should be denied
         $response = $this->actingAs($userB)
             ->withServerVariables(['REMOTE_ADDR' => $homeIp])
+            ->withCredentials()
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('demo.run', [
                 'text' => str_repeat('x', 30), // 280+30 > 300
                 'target_language' => 'en',
@@ -559,6 +568,7 @@ class MultiAccountEnforcementTest extends TestCase
         ]);
 
         $this->artisan('listen:multi-account-backfill --dry-run')
+            ->expectsOutputToContain('Would block: 1')
             ->assertExitCode(0);
 
         $this->assertSame(0, User::query()->whereIn('id', [$u1->id, $u2->id, $u3->id])->where('is_blocked', true)->count());
@@ -566,12 +576,11 @@ class MultiAccountEnforcementTest extends TestCase
         $this->artisan('listen:multi-account-backfill')
             ->assertExitCode(0);
 
-        $blockedCount = User::query()
-            ->whereIn('id', [$u1->id, $u2->id, $u3->id])
-            ->where('is_blocked', true)
-            ->count();
-
-        $this->assertSame(3, $blockedCount);
+        // As at sign-up, the account over the limit is blocked; a blocked account no
+        // longer counts, so the first two on that browser stay.
+        $this->assertTrue($u3->fresh()->isBlocked());
+        $this->assertFalse($u1->fresh()->isBlocked());
+        $this->assertFalse($u2->fresh()->isBlocked());
     }
 
     public function test_service_skips_user_with_no_ips(): void
@@ -706,8 +715,156 @@ class MultiAccountEnforcementTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────────
+    //  11.  Paying members and shared computers
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_paying_member_is_never_blocked_for_multiple_accounts(): void
+    {
+        $this->accountsMadeOn(self::SHARED_DEVICE, 2);
+        $member = $this->accountsMadeOn(self::SHARED_DEVICE, 1)->first();
+        $starter = Plan::factory()->paid()->create(['slug' => 'starter', 'price_cents' => 900]);
+        Subscription::query()->where('user_id', $member->id)->delete();
+        Subscription::create([
+            'user_id' => $member->id, 'plan_id' => $starter->id, 'status' => 'active',
+            'current_period_end' => now()->addDays(10),
+        ]);
+        Log::spy();
+
+        app(MultiAccountEnforcementService::class)->enforceAfterAuth($member->fresh());
+
+        $this->assertFalse($member->fresh()->isBlocked());
+        Log::shouldHaveReceived('warning')->withArgs(fn (string $message): bool => str_contains($message, 'left for an admin'));
+    }
+
+    public function test_member_who_paid_before_is_never_blocked_for_multiple_accounts(): void
+    {
+        $this->accountsMadeOn(self::SHARED_DEVICE, 2);
+        $member = $this->accountsMadeOn(self::SHARED_DEVICE, 1)->first();
+        CharPackPurchase::query()->forceCreate([
+            'user_id' => $member->id, 'method' => 'card', 'status' => CharPackPurchase::STATUS_PAID,
+            'chars' => 1000, 'days' => 30, 'amount_minor' => 500, 'currency' => 'USD', 'paid_at' => now()->subMonths(3),
+        ]);
+
+        app(MultiAccountEnforcementService::class)->enforceAfterAuth($member->fresh());
+
+        $this->assertFalse($member->fresh()->isBlocked());
+    }
+
+    public function test_blocked_accounts_on_a_browser_do_not_count_against_the_others(): void
+    {
+        [$first, $second] = $this->accountsMadeOn(self::SHARED_DEVICE, 2)->all();
+        $this->travel(1)->days();
+        $third = $this->accountsMadeOn(self::SHARED_DEVICE, 1)->first();
+        $service = app(MultiAccountEnforcementService::class);
+
+        $service->enforceAfterAuth($third);
+        $this->assertTrue($third->fresh()->isBlocked(), 'the account over the limit');
+
+        // A family laptop: the first two still sign in after the third was blocked.
+        $this->travel(1)->days();
+        $service->enforceAfterAuth($first->fresh());
+        $service->enforceAfterAuth($second->fresh());
+        $this->assertFalse($first->fresh()->isBlocked());
+        $this->assertFalse($second->fresh()->isBlocked());
+    }
+
+    public function test_signing_in_on_a_shared_computer_does_not_count_the_accounts_made_there(): void
+    {
+        $familyComputer = 'dev_family_computer_0123456789abcdef';
+        $this->accountsMadeOn($familyComputer, 2);
+        // A relative made theirs on their own phone and signs in on the family computer once.
+        $relative = User::factory()->create([
+            'password' => Hash::make('Password123!'),
+            'registration_device_id' => 'dev_relatives_phone_0123456789abcdef',
+            'last_seen_device_id' => 'dev_relatives_phone_0123456789abcdef',
+        ]);
+
+        $this->withCookies(['listen_demo_device' => $familyComputer])
+            ->postLocalizedRoute('login.submit', ['email' => $relative->email, 'password' => 'Password123!']);
+
+        $this->assertAuthenticatedAs($relative);
+        $this->assertFalse($relative->fresh()->isBlocked());
+        $this->assertSame($familyComputer, $relative->fresh()->last_seen_device_id);
+    }
+
+    public function test_accounts_that_only_signed_in_on_a_computer_do_not_count_against_one_made_there(): void
+    {
+        $officeComputer = 'dev_office_computer_0123456789abcdef';
+        // Colleagues made their accounts elsewhere and have signed in on the office computer.
+        foreach (['a', 'b', 'c'] as $colleague) {
+            User::factory()->create([
+                'registration_device_id' => 'dev_colleague_'.$colleague.'_phone_0123456789',
+                'last_seen_device_id' => $officeComputer,
+            ]);
+        }
+
+        $this->withCookies(['listen_demo_device' => $officeComputer])
+            ->postLocalizedRoute('register.submit', [
+                'name' => 'New Colleague',
+                'email' => 'colleague@example.com',
+                'password' => 'Password123!',
+                'password_confirmation' => 'Password123!',
+            ]);
+
+        $this->assertFalse(User::where('email', 'colleague@example.com')->first()->isBlocked());
+    }
+
+    public function test_audit_command_keeps_only_the_account_over_the_limit_blocked(): void
+    {
+        // The old rule blocked every account on a family laptop once a third was made there.
+        [$first, $second, $third] = $this->accountsMadeOn(self::SHARED_DEVICE, 3)->all();
+        $this->travel(1)->minutes();
+        foreach ([$third, $first, $second] as $account) {
+            $this->blockForMultipleAccounts($account);
+        }
+
+        $this->artisan('listen:audit-blocked')->expectsOutputToContain('False positives:   2')->assertSuccessful();
+        $this->assertTrue($first->fresh()->isBlocked(), 'a dry run changes nothing');
+
+        $this->artisan('listen:audit-blocked --fix')->assertSuccessful();
+
+        $this->assertFalse($first->fresh()->isBlocked());
+        $this->assertFalse($second->fresh()->isBlocked());
+        $this->assertTrue($third->fresh()->isBlocked());
+    }
+
+    public function test_audit_command_frees_a_blocked_member_who_has_paid(): void
+    {
+        $this->accountsMadeOn(self::SHARED_DEVICE, 2);
+        $member = $this->accountsMadeOn(self::SHARED_DEVICE, 1)->first();
+        CharPackPurchase::query()->forceCreate([
+            'user_id' => $member->id, 'method' => 'card', 'status' => CharPackPurchase::STATUS_PAID,
+            'chars' => 1000, 'days' => 30, 'amount_minor' => 500, 'currency' => 'USD', 'paid_at' => now(),
+        ]);
+        $this->blockForMultipleAccounts($member);
+
+        $this->artisan('listen:audit-blocked --fix')->expectsOutputToContain('False positives:   1')->assertSuccessful();
+
+        $this->assertFalse($member->fresh()->isBlocked());
+    }
+
+    // ──────────────────────────────────────────────────────────────────
     //  Helpers
     // ──────────────────────────────────────────────────────────────────
+
+    private function blockForMultipleAccounts(User $user): void
+    {
+        app(\App\Services\BlockedUserService::class)->block($user, MultiAccountEnforcementService::BLOCK_REASON_EN, null, [
+            'en' => MultiAccountEnforcementService::BLOCK_REASON_EN,
+            'ar' => MultiAccountEnforcementService::BLOCK_REASON_AR,
+        ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, User>
+     */
+    private function accountsMadeOn(string $device, int $count): \Illuminate\Support\Collection
+    {
+        return User::factory()->count($count)->create([
+            'registration_device_id' => $device,
+            'last_seen_device_id' => $device,
+        ]);
+    }
 
     private function seedFreePlan(): Plan
     {

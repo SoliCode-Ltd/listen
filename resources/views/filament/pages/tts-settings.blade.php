@@ -40,13 +40,13 @@
             @if($stats['total_keys'] === 0)
                 <div class="mt-4 p-4 bg-danger-50 dark:bg-danger-900/20 rounded-lg border border-danger-200 dark:border-danger-800">
                     <p class="text-sm text-danger-800 dark:text-danger-300">
-                        ⚠️ No API keys configured. <a href="{{ route('filament.admin.pages.gemini-keys') }}" class="underline">Add your first key</a> to enable Gemini TTS.
+                        ⚠️ No API keys configured. <a href="{{ route('filament.admin.pages.gemini-keys') }}" class="underline">Add your first key</a> to enable Gemini TTS. Until then every HD generation fails and is refunded: HD voices never fall back to Google Cloud.
                     </p>
                 </div>
             @elseif($stats['available_keys'] === 0)
                 <div class="mt-4 p-4 bg-warning-50 dark:bg-warning-900/20 rounded-lg border border-warning-200 dark:border-warning-800">
                     <p class="text-sm text-warning-800 dark:text-warning-300">
-                        ⚠️ All keys exhausted. <a href="{{ route('filament.admin.pages.gemini-keys') }}" class="underline">Add more keys</a> or wait for rate limits to reset.
+                        ⚠️ All keys exhausted. <a href="{{ route('filament.admin.pages.gemini-keys') }}" class="underline">Add more keys</a> or wait for rate limits to reset. HD generations that Gemini cannot take fail and are refunded: they never fall back to Google Cloud.
                     </p>
                 </div>
             @endif

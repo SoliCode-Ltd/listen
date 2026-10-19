@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\DemoVoiceGeneration;
 use App\Models\User;
 use App\Services\BlockedUserService;
+use App\Services\UserDeletionService;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Notifications\Notification;
@@ -208,6 +209,20 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                     ->modalDescription(__('ui.admin.suspicious.delete_confirm_description'))
                     ->action(function (User $record): void {
                         $userId = $record->id;
+                        $deletion = app(UserDeletionService::class);
+
+                        // Checked before anything is removed: a member who would still be charged is kept.
+                        $refusal = $deletion->refusal($record);
+                        if ($refusal !== null) {
+                            Notification::make()
+                                ->danger()
+                                ->title(__('ui.admin.users.delete_refused_title'))
+                                ->body($refusal)
+                                ->persistent()
+                                ->send();
+
+                            return;
+                        }
 
                         DemoVoiceGeneration::where('user_id', $userId)->delete();
 
@@ -217,7 +232,7 @@ class SuspiciousUsers extends Page implements HasForms, HasTable
                                 ->delete();
                         }
 
-                        $record->delete();
+                        $deletion->delete($record, auth()->user());
 
                         Cache::forget("demo:ip_linked_users:{$userId}");
                         Cache::forget('admin:suspicious_users_count');

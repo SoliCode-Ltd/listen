@@ -2,6 +2,7 @@
 
 namespace App\Services\Tts;
 
+use App\Support\EnvFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -315,10 +316,10 @@ class GeminiKeyManager
 
         $newKeyName = $maxIndex === 1 ? 'GEMINI_TTS_API_KEY' : "GEMINI_TTS_API_KEY_{$maxIndex}";
 
-        // Append to .env
+        // Append to .env (checked, with a copy of the old file kept: see EnvFile)
         $envContent = File::get($envPath);
-        $envContent .= "\n{$newKeyName}={$apiKey}";
-        File::put($envPath, $envContent);
+        $envContent .= "\n{$newKeyName}=".EnvFile::value($apiKey);
+        EnvFile::write($envPath, $envContent);
 
         Log::info('New Gemini API key added', ['name' => $newKeyName]);
 
@@ -342,7 +343,7 @@ class GeminiKeyManager
         // Clean up double line breaks
         $newContent = preg_replace('/\n{3,}/', "\n\n", $newContent);
         
-        File::put($envPath, trim($newContent) . "\n");
+        EnvFile::write($envPath, trim($newContent) . "\n");
 
         // Clear cached stats for this key
         $this->clearKeyCache($keyName);
@@ -387,18 +388,23 @@ class GeminiKeyManager
         return (int) Cache::get($this->cacheKey('rpd_' . $today, $keyName), 0);
     }
 
+    /**
+     * A fixed one-minute window from the first request in it. Writing the count
+     * again would restart the minute on every use, so under steady traffic a
+     * key never looked free again and every request piled onto the first key.
+     */
     private function incrementRpm(string $keyName): void
     {
         $cacheKey = $this->cacheKey('rpm', $keyName);
-        $current = (int) Cache::get($cacheKey, 0);
-        Cache::put($cacheKey, $current + 1, self::CACHE_TTL_MINUTE);
+        Cache::add($cacheKey, 0, self::CACHE_TTL_MINUTE);
+        Cache::increment($cacheKey);
     }
 
     private function incrementTpm(string $keyName, int $tokens): void
     {
         $cacheKey = $this->cacheKey('tpm', $keyName);
-        $current = (int) Cache::get($cacheKey, 0);
-        Cache::put($cacheKey, $current + $tokens, self::CACHE_TTL_MINUTE);
+        Cache::add($cacheKey, 0, self::CACHE_TTL_MINUTE);
+        Cache::increment($cacheKey, $tokens);
     }
 
     private function incrementRpd(string $keyName): void

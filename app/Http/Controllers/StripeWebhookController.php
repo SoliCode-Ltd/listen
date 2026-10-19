@@ -53,11 +53,20 @@ class StripeWebhookController extends Controller
 
         $type = (string) ($event->type ?? '');
         $eventId = trim((string) ($event->id ?? ''));
+        // An event counts as handled only once it has been. While one delivery is
+        // being handled, others are turned away for a few minutes (Stripe sends them
+        // again), so a worker that dies halfway never has Stripe's retries ignored.
         $eventCacheKey = $eventId !== '' ? "stripe_webhook_event_processed:{$eventId}" : null;
+        $handlingCacheKey = $eventId !== '' ? "stripe_webhook_event_processing:{$eventId}" : null;
 
         if ($eventCacheKey !== null) {
-            $wasAdded = Cache::add($eventCacheKey, now()->timestamp, now()->addDays(14));
-            if (! $wasAdded) {
+            if (! Cache::add($handlingCacheKey, now()->timestamp, now()->addMinutes(10))) {
+                return response('Webhook is being handled', 409);
+            }
+
+            if (Cache::has($eventCacheKey)) {
+                Cache::forget($handlingCacheKey);
+
                 return response('Webhook already handled', 200);
             }
         }
@@ -67,8 +76,8 @@ class StripeWebhookController extends Controller
         try {
             match ($type) {
                 'checkout.session.completed' => $billingLifecycleService->syncUserByStripeCustomerId($customerId),
-                'invoice.payment_failed' => $billingLifecycleService->handlePaymentFailed($customerId),
-                'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($customerId),
+                'invoice.payment_failed' => $billingLifecycleService->handlePaymentFailed($event->data->object),
+                'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($event->data->object),
                 'customer.subscription.created',
                 'customer.subscription.updated',
                 'customer.subscription.deleted',
@@ -86,8 +95,8 @@ class StripeWebhookController extends Controller
             $trialOutcomeService->handleStripeEvent($event);
             $stripeWebhookEmailService->sendForEvent($event);
         } catch (\Throwable $exception) {
-            if ($eventCacheKey !== null) {
-                Cache::forget($eventCacheKey);
+            if ($handlingCacheKey !== null) {
+                Cache::forget($handlingCacheKey);
             }
 
             Log::warning('Stripe webhook business handling failed.', [
@@ -98,6 +107,11 @@ class StripeWebhookController extends Controller
             ]);
 
             return response('Webhook processing failed.', 500);
+        }
+
+        if ($eventCacheKey !== null) {
+            Cache::put($eventCacheKey, now()->timestamp, now()->addDays(14));
+            Cache::forget($handlingCacheKey);
         }
 
         return response('Webhook Handled', 200);

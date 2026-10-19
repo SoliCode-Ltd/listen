@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Support\CreditPeriod;
 use DomainException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -100,12 +101,15 @@ class ManualPaymentService
                 ? now()->addYear()
                 : now()->addMonth();
 
-            $subscription = $this->planAccessService->assignPlan(
+            // Paid in full for a period of its own: its credits start afresh, even
+            // when the member pays before the old period ends (a plan change by
+            // card carries the credits on instead, App\Support\CreditPeriod).
+            $subscription = CreditPeriod::startingAfresh(fn (): Subscription => $this->planAccessService->assignPlan(
                 $request->user,
                 $request->plan,
                 'active',
                 $periodEnd,
-            );
+            ));
 
             $subscription->forceFill([
                 'billing_payment_state' => 'manual_override',

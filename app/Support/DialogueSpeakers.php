@@ -14,6 +14,14 @@ class DialogueSpeakers
     public const DIALECT_PATTERN = '/^[a-z]{2}-[A-Za-z]{2}(-[A-Za-z]{2,3})?$/';
 
     /**
+     * Longest dialogue the studio, the demo and the extension take. A dialogue is
+     * made in one request, and very long ones come back without audio. (The
+     * developer API keeps its own documented limit, ApiSpeechService::DIALOGUE_MAX_TEXT.
+     * Not 2,500 here: older studio pages hid any message with "500" in it.)
+     */
+    public const MAX_SCRIPT_CHARS = 2400;
+
+    /**
      * @return array<string, array<int, string>>
      */
     public static function rules(): array
@@ -61,6 +69,21 @@ class DialogueSpeakers
         }
 
         throw ValidationException::withMessages([$scriptField => __('ui.backend.dialogue_needs_names', ['name' => $names[0]])]);
+    }
+
+    /**
+     * Refuses a dialogue longer than MAX_SCRIPT_CHARS, counted as it is charged,
+     * before anything is reserved or spoken.
+     */
+    public static function ensureShortEnough(string $script, string $scriptField = 'content'): void
+    {
+        if (UsageEstimator::billableChars($script) <= self::MAX_SCRIPT_CHARS) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            $scriptField => __('ui.backend.dialogue_too_long', ['max' => number_format(self::MAX_SCRIPT_CHARS)]),
+        ]);
     }
 
     /**

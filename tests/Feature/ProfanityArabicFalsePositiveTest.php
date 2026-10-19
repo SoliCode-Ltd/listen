@@ -30,6 +30,24 @@ class ProfanityArabicFalsePositiveTest extends TestCase
         $response->assertJsonPath('ok', true);
     }
 
+    public function test_demo_run_accepts_prices_numbers_and_words_the_old_list_flagged(): void
+    {
+        $voice = $this->seedFreePlanAndVoice();
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $response = $this->postJsonLocalizedRoute('demo.run', [
+            'text' => 'السعر 45$ والحرارة 455 درجة، والعقد مفسوخ، وهذا التصريح يخول حامله.',
+            'target_language' => 'ar',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('ok', true);
+        $this->assertDatabaseCount('blocked_generations', 0);
+    }
+
     public function test_demo_run_still_blocks_explicit_profanity(): void
     {
         $voice = $this->seedFreePlanAndVoice();

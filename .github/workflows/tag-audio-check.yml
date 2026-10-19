@@ -2,15 +2,11 @@ name: Tag audio check
 
 # Live check on STAGING that sound tags are performed, through the real
 # stock and cloned-voice services, with a Gemini model listening to each
-# result. Run by hand (it uses Gemini requests). Uploads the audio.
+# result. Run by hand only (it uses Gemini requests on the speech quota
+# staging shares with live), when the owner has said yes. Uploads the audio.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/tag-audio-check.yml
-      - scripts/tts/tag_audio_check.php
 
 permissions:
   contents: read

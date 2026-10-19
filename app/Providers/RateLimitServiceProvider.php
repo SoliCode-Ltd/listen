@@ -59,6 +59,21 @@ class RateLimitServiceProvider extends ServiceProvider
             ];
         });
 
+        // The studio's Generate (dashboard.queue and dashboard.generate together): far
+        // more than a person clicks in a minute, so it only stops scripts and runaway
+        // retries from piling up generations. The page counts down from the seconds
+        // in the message, as for any refusal it shows.
+        RateLimiter::for('studio-generate', fn (Request $request) => [
+            Limit::perMinute(20)->by('studio-generate:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
+                ->response(function (Request $request, array $headers) {
+                    $message = __('ui.backend.generate_too_many_requests', ['seconds' => (int) ($headers['Retry-After'] ?? 60)]);
+
+                    return $request->expectsJson()
+                        ? response()->json(['ok' => false, 'message' => $message], 429, $headers)
+                        : redirect()->route('dashboard')->with('error', $message);
+                }),
+        ]);
+
         // Developer API (/v1): for the member's whole account (all their keys
         // together, so more keys never mean more requests), at their plan's rate.
         // Generations and everything else (status checks, voices, history) have

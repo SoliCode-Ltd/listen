@@ -4,6 +4,11 @@
     'audio_download' => __('ui.scripts.audio_download'),
     'audio_download_as' => __('ui.scripts.audio_download_as'),
     'audio_download_failed' => __('ui.scripts.audio_download_failed'),
+    'audio_play_failed' => __('ui.scripts.audio_play_failed'),
+    'audio_download_unavailable' => __('ui.scripts.audio_download_unavailable'),
+    'audio_pause' => __('ui.scripts.audio_pause'),
+    'audio_seek' => __('ui.scripts.audio_seek'),
+    'audio_position' => __('ui.scripts.audio_position'),
   ];
   // The file types this member's plan offers for download (Plans → Downloads).
   $downloadFormats = rescue(fn () => \App\Support\AudioFormats::menuFor(
@@ -347,7 +352,14 @@
 
       var progContainer = document.createElement('div');
       progContainer.className = 'custom-audio-progress-container';
-      
+      // A slider for the keyboard and screen readers too (keys below).
+      progContainer.tabIndex = 0;
+      progContainer.setAttribute('role', 'slider');
+      progContainer.setAttribute('aria-label', i18n.audio_seek);
+      progContainer.setAttribute('aria-valuemin', '0');
+      progContainer.setAttribute('aria-valuemax', '0');
+      progContainer.setAttribute('aria-valuenow', '0');
+
       var progTrack = document.createElement('div');
       progTrack.className = 'custom-audio-track';
 
@@ -382,7 +394,16 @@
         wrapper.appendChild(menuBtn);
       }
 
+      // Says on the player's own row when its audio cannot be played or saved.
+      var notice = document.createElement('small');
+      notice.className = 'custom-audio-notice';
+      notice.setAttribute('role', 'status');
+      var showNotice = function(text) {
+        notice.textContent = text || '';
+      };
+
       audio.parentNode.insertBefore(wrapper, audio.nextSibling);
+      wrapper.parentNode.insertBefore(notice, wrapper.nextSibling);
 
       var formatTime = function(seconds) {
         if (!seconds || isNaN(seconds) || seconds === Infinity) return '0:00';
@@ -442,10 +463,20 @@
         } catch (e) {}
         return 0;
       };
+      // What the slider tells screen readers, e.g. "0:12 of 1:30"; written only when a whole second changes.
+      var setSliderValue = function(current, duration) {
+        var now = String(Math.floor(current || 0));
+        var max = String(Math.floor(duration || 0));
+        if (progContainer.getAttribute('aria-valuenow') === now && progContainer.getAttribute('aria-valuemax') === max) return;
+        progContainer.setAttribute('aria-valuemax', max);
+        progContainer.setAttribute('aria-valuenow', now);
+        progContainer.setAttribute('aria-valuetext', String(i18n.audio_position).replace(':current', formatTime(current)).replace(':total', formatTime(duration)));
+      };
       var updateProgress = function() {
         if (isDragging) return;
         var current = Number(audio.currentTime || 0);
         var duration = getEffectiveDuration();
+        setSliderValue(current, duration);
         if (duration <= 0) {
           currTime.textContent = formatTime(current);
           return;
@@ -460,6 +491,7 @@
         var duration = getEffectiveDuration();
         if (duration > 0) {
           durTime.textContent = formatTime(duration);
+          setSliderValue(Number(audio.currentTime || 0), duration);
         }
       };
 
@@ -502,6 +534,7 @@
       var setPlayButtonState = function(isPlaying) {
         playBtn.classList.toggle('playing', !!isPlaying);
         playBtn.innerHTML = isPlaying ? pauseIconMarkup : playIconMarkup;
+        playBtn.setAttribute('aria-label', isPlaying ? i18n.audio_pause : i18n.audio_play);
       };
       var playRequestId = 0;
       var pendingPlayPromise = null;
@@ -525,6 +558,19 @@
         progBar.style.width = '0%';
         progThumb.style.left = '0%';
         currTime.textContent = '0:00';
+        setSliderValue(0, getEffectiveDuration());
+      });
+
+      // A file that is gone or cannot be read: the row says so instead of a
+      // button that does nothing. Code 1 is a load the page itself stopped.
+      audio.addEventListener('error', function() {
+        if (!audio.getAttribute('src') || !audio.error || audio.error.code === 1) return;
+        cancelProgressLoop();
+        setPlayButtonState(false);
+        showNotice(i18n.audio_play_failed);
+      });
+      audio.addEventListener('playing', function() {
+        showNotice('');
       });
 
       playBtn.addEventListener('click', function(e) {
@@ -546,9 +592,12 @@
           for (var j = 0; j < otherBtns.length; j++) {
              otherBtns[j].classList.remove('playing');
              otherBtns[j].innerHTML = playIconMarkup;
+             otherBtns[j].setAttribute('aria-label', i18n.audio_play);
           }
 
           var requestId = ++playRequestId;
+          // After a failed load, pressing play tries the file again.
+          if (audio.error) audio.load();
           var playPromise = audio.play();
           if (playPromise !== undefined) {
              pendingPlayPromise = playPromise;
@@ -560,6 +609,7 @@
                 if (!(error && error.name === 'AbortError')) {
                   console.warn('Audio playback failed', error);
                 }
+                if (error && error.name === 'NotSupportedError') showNotice(i18n.audio_play_failed);
                 setPlayButtonState(false);
              }).finally(function() {
                 if (requestId !== playRequestId) return;
@@ -644,6 +694,26 @@
         audio.currentTime = Math.max(0, Math.min(d, percent * d));
         updateProgress();
       });
+      // On the bar: Space or Enter plays and pauses, the arrows move 5 seconds,
+      // Home and End go to the start and the end.
+      progContainer.addEventListener('keydown', function(e) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          playBtn.click();
+          return;
+        }
+        var step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
+        if (step === undefined && e.key !== 'Home' && e.key !== 'End') return;
+        e.preventDefault();
+        var d = getEffectiveDuration();
+        if (!d) {
+          audio.load();
+          return;
+        }
+        var target = e.key === 'Home' ? 0 : (e.key === 'End' ? d : Number(audio.currentTime || 0) + step);
+        audio.currentTime = Math.max(0, Math.min(d, target));
+        updateProgress();
+      });
       if (menuBtn) {
         var saveBlob = function(file) {
           var url = URL.createObjectURL(file.blob);
@@ -663,6 +733,12 @@
           a.click();
           document.body.removeChild(a);
         };
+        // Only audio is saved: an error page (a file that is gone, a session that
+        // ended) never becomes an ".mp3" on the member's computer.
+        var isAudioResponse = function(response) {
+          var type = String(response.headers.get('Content-Type') || '').toLowerCase();
+          return type === '' || /^(audio|video)\//.test(type) || /^application\/(octet-stream|ogg)/.test(type);
+        };
         // M4A, OGG and FLAC are converted on the server from the file being played.
         var fetchFromServer = function(src, format) {
           var path = '';
@@ -671,7 +747,8 @@
           var name = buildDownloadFilename(format).replace(/\.[a-z0-9]+$/i, '');
           var url = serverDownloadUrl + '?path=' + encodeURIComponent(path) + '&format=' + encodeURIComponent(format) + '&name=' + encodeURIComponent(name);
           return fetch(url, { credentials: 'same-origin' }).then(function(response) {
-            if (!response.ok) throw new Error('server');
+            // 503: this file type cannot be made right now. Anything else: the file cannot be had.
+            if (!response.ok || !isAudioResponse(response)) throw new Error(response.status === 503 ? 'format' : 'missing');
             return response.blob();
           }).then(function(blob) { return { blob: blob, extension: format }; });
         };
@@ -680,21 +757,32 @@
           if (!src || menuBtn.dataset.busy === '1') return;
           menuBtn.dataset.busy = '1';
           menuBtn.disabled = true;
+          showNotice('');
           var work;
           var match = downloadFormats.find(function(f) { return f.key === format; });
           if (match && !match.browser) {
-            work = fetchFromServer(src, format).catch(function() {
-              window.alert(i18n.audio_download_failed || 'This file type is not available right now.');
+            work = fetchFromServer(src, format).catch(function(error) {
+              showNotice(error && error.message === 'format' ? i18n.audio_download_failed : i18n.audio_download_unavailable);
               return null;
             });
           } else {
             work = fetch(src, { credentials: 'same-origin' })
               .then(function(response) {
-                if (!response.ok) throw new Error('audio');
-                return response.arrayBuffer();
+                if (!response.ok || !isAudioResponse(response)) throw new Error('missing');
+                return response.arrayBuffer()
+                  .then(function(buffer) { return format === 'wav' ? toWavAudio(buffer) : toWhatsAppAudio(buffer); })
+                  // The file is fine but this browser cannot convert it: save it as it is.
+                  .catch(function() { saveOriginal(src); return null; });
               })
-              .then(function(buffer) { return format === 'wav' ? toWavAudio(buffer) : toWhatsAppAudio(buffer); })
-              .catch(function() { saveOriginal(src); return null; });
+              .catch(function(error) {
+                if (error && error.message === 'missing') {
+                  showNotice(i18n.audio_download_unavailable);
+                } else {
+                  // No answer the page may read (offline, or another site's file): the browser tries the link itself.
+                  saveOriginal(src);
+                }
+                return null;
+              });
           }
           work.then(function(file) { if (file) saveBlob(file); })
             .finally(function() {
@@ -730,6 +818,13 @@
               downloadAs(f.key);
             });
             menu.appendChild(item);
+          });
+          // Escape closes it and gives focus back to the download button.
+          menu.addEventListener('keydown', function(ev) {
+            if (ev.key !== 'Escape') return;
+            ev.preventDefault();
+            closeFormatMenu();
+            menuBtn.focus();
           });
           document.body.appendChild(menu);
           var rect = menuBtn.getBoundingClientRect();
@@ -775,6 +870,8 @@
              progThumb.style.left = '0%';
              currTime.textContent = '0:00';
              durTime.textContent = '0:00';
+             setSliderValue(0, 0);
+             showNotice('');
           }
         });
       });

@@ -24,6 +24,7 @@
       margin-top: 1.15rem;
     }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
+    .vc-count-note { flex-basis: 100%; font-size: .85rem; color: var(--muted); margin: 0; }
     .vc-reconsent-banner {
       display: flex;
       align-items: flex-start;
@@ -85,8 +86,9 @@
       width: 100%;
       margin-top: 1.15rem;
     }
-    .vc-playback.is-ready { display: flex; }
+    .vc-playback.is-ready { display: flex; flex-wrap: wrap; }
     .vc-playback[hidden] { display: none !important; }
+    .vc-playback .custom-audio-notice:not(:empty) { flex-basis: 100%; text-align: center; }
     .vc-preview-audio {
       width: min(100%, 28rem);
       max-width: 28rem;
@@ -343,8 +345,9 @@
       font-size: .85rem;
     }
     .vc-file-info span:first-child { min-width: 0; overflow-wrap: anywhere; }
-    .vc-file-info .remove { cursor: pointer; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+    .vc-file-info .remove { cursor: pointer; font: inherit; font-weight: 700; line-height: 1; color: var(--muted); flex-shrink: 0; background: none; border: 0; padding: 0 .2rem; }
     .vc-file-info .remove:hover { color: #dc2626; }
+    .vc-file-info .remove:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 4px; }
     .vc-recorder { text-align: center; border: 1px solid color-mix(in oklab, var(--line) 60%, transparent); border-radius: .9rem; padding: 1rem; background: color-mix(in oklab, var(--surface) 78%, transparent); }
     .vc-recorder .rec-btn { width: 68px; height: 68px; border-radius: 999px; border: 3px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
     .vc-recorder .rec-btn:hover { border-color: var(--a); }
@@ -1337,7 +1340,8 @@
     th, td {
       padding: 1.1rem .85rem;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
-      text-align: left;
+      /* The reading side: left in English, right in Arabic. */
+      text-align: start;
       vertical-align: middle;
     }
     th {
@@ -1414,17 +1418,13 @@
       text-align: center;
       justify-content: center;
     }
-    .key-inline-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: .65rem;
-    }
-    .key-inline-actions .btn {
-      width: 100%;
-      justify-content: center;
-    }
     .mini-message {
       margin-top: .65rem;
+    }
+    .key-copy-hint {
+      margin-bottom: 0;
+      font-size: .85rem;
+      color: var(--muted);
     }
 
     .dashboard-shell {
@@ -2664,7 +2664,7 @@
               </x-voice-studio.setbar>
               <div class="tag-editor" id="tagEditor" data-vs-editor>
                 <div class="tag-editor-backdrop" id="tagEditorBackdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
-                <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
+                <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}" aria-label="{{ __('ui.dashboard.text_box_label') }}">{{ $prefillValue('content') }}</textarea>
               </div>
               {{-- Left empty, the history names the voice from its first words. --}}
               <div class="vs-name-row">
@@ -2694,7 +2694,7 @@
           </button>
               </div>
             </div>
-            <div id="formMessage"></div>
+            <div id="formMessage" role="status"></div>
           </div>
 
           <aside class="vs-side">
@@ -2736,7 +2736,7 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               {{ __('ui.dashboard.output_title') }}
             </div>
-            <div class="audio-meta" id="generatedAudioMeta"></div>
+            <div class="audio-meta" id="generatedAudioMeta" role="status"></div>
           </div>
           <audio id="generatedPreviewAudio" controls preload="none"></audio>
         </div>
@@ -2796,17 +2796,8 @@
             </span>
           </div>
           @if($extensionApiState['has_api_key'])
-          <div class="key-inline-actions">
-            <button
-              type="button"
-              class="btn"
-              id="copyExtensionKeyBtn"
-              data-copy-value="{{ $extensionApiState['masked_key'] }}"
-            >
-              {{ __('ui.extension.copy_to_clipboard') }}
-            </button>
-          </div>
-          <div id="extensionKeyMessage" class="mini-message"></div>
+            {{-- Only the key's last characters are kept, so it can be copied only on the extension page, right after it is made. --}}
+            <p class="mini-message key-copy-hint">{{ __('ui.dashboard.extension_key_copy_hint', ['button' => __('ui.dashboard.manage_extension_key')]) }}</p>
           @endif
         </div>
 
@@ -2835,6 +2826,8 @@
           <h1><span class="grad-text">{{ __('ui.dashboard.recent_voices') }}</span></h1>
           <span class="jobs-count" id="jobsCount"></span>
         </div>
+        {{-- What happened in the history (a delete that failed), where the member is, and read out. --}}
+        <div id="jobsMessage" aria-live="polite"></div>
         <div style="overflow-x: auto;">
           <table>
             <thead>
@@ -2858,7 +2851,7 @@
                   'translate' => $job->translate,
                   'duration_seconds' => $job->duration_seconds,
                   'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
-                  'error_message' => $job->error_message,
+                  'error_message' => \App\Support\GenerationMessage::forDisplay($job->error_message),
                   'created_human' => $job->created_at?->diffForHumans(),
                   'created_at_ts' => $job->created_at?->getTimestamp(),
                   'can_reuse_settings' => $job->hasReusablePremiumSettings(),
@@ -2882,7 +2875,7 @@
                         data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
                       ></audio>
                     @elseif($job->status === 'failed')
-	                      <small style="color: var(--danger);">{{ $job->error_message ?: __('ui.dashboard.generation_failed') }}</small>
+	                      <small style="color: var(--danger);">{{ \App\Support\GenerationMessage::forDisplay($job->error_message) ?: __('ui.dashboard.generation_failed') }}</small>
 	                    @else
 	                      <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
 	                    @endif
@@ -2936,6 +2929,7 @@
             @endif
             @if($vcStudioOpen)
             <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+            <p class="vc-count-note" id="vcDeletedNote" aria-live="polite" @if(($voiceCloningDeletedNote ?? '') === '') hidden @endif>{{ $voiceCloningDeletedNote ?? '' }}</p>
             @endif
           </div>
           @endif
@@ -3004,7 +2998,7 @@
                 <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-started-ts="{{ $voice->attemptStartedAt()?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
-                    <span class="vc-status {{ $voice->status }}">
+                    <span class="vc-status {{ $voice->status }}" role="status">
                       @if($voice->isProcessing())<span class="dot"></span>@endif
                       {{ __('ui.voice_cloning.status_' . $voice->status) }}
                     </span>
@@ -3130,13 +3124,13 @@
 
                   <div class="vc-tab-panel" id="vcUploadPanel">
                     <div class="vc-upload-zone" id="vcUploadZone">
-                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*" aria-label="{{ __('ui.voice_cloning.upload_label') }}">
                       <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
                       <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
                     </div>
                     <div class="vc-file-info" id="vcFileInfo" style="display:none">
                       <span id="vcFileName"></span>
-                      <span class="remove" id="vcFileRemove">&times;</span>
+                      <button type="button" class="remove" id="vcFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
                     </div>
                     <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
                   </div>
@@ -3222,7 +3216,7 @@
                     </div>
                     <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
                       <span id="vcConsentFileName"></span>
-                      <span class="remove" id="vcConsentFileRemove">&times;</span>
+                      <button type="button" class="remove" id="vcConsentFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
                     </div>
                   </div>
 
@@ -3301,8 +3295,6 @@
       'generate_voice_now' => __('ui.dashboard.generate_voice_now'),
       'generating' => __('ui.dashboard.generating'),
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
-      'copied' => __('ui.extension.copied'),
-      'copy_failed' => __('ui.extension.copy_failed'),
       'instant_preview' => __('ui.dashboard.instant_preview'),
       'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
       'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
@@ -3315,6 +3307,9 @@
       'preparing_next' => __('ui.dashboard.preparing_next'),
       'demo_paid_tag' => app()->getLocale() === 'ar' ? 'ديمو مجاني' : 'Free Demo',
       'demo_history_locked' => app()->getLocale() === 'ar' ? 'عنصر من الديمو' : 'Demo entry',
+      'voice_may_still_be_finishing' => __('ui.dashboard.voice_may_still_be_finishing'),
+      'page_expired' => __('ui.dashboard.page_expired'),
+      'reload_page' => __('ui.dashboard.reload_page'),
     ];
   @endphp
   <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
@@ -3340,10 +3335,15 @@
     const queueUrl = '{{ route('dashboard.queue') }}';
     const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
-    const csrfToken = '{{ csrf_token() }}';
+    const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
+    const latestJobsUrl = '{{ route('dashboard.jobs.latest') }}';
+    const csrfTokenUrl = '{{ route('dashboard.csrf-token') }}';
+    // Renewed by listenFetchWithFreshCsrf when the page's token has expired.
+    let csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
     const formMessage = document.getElementById('formMessage');
+    const jobsMessage = document.getElementById('jobsMessage');
     const generateBtn = document.getElementById('generateBtn');
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_key');
@@ -3366,8 +3366,6 @@
     const statFailed = document.getElementById('statFailed');
     const jobsCount = document.getElementById('jobsCount');
     const jobsPagination = document.getElementById('jobsPagination');
-    const copyExtensionKeyBtn = document.getElementById('copyExtensionKeyBtn');
-    const extensionKeyMessage = document.getElementById('extensionKeyMessage');
     const dashboardNavLinks = Array.from(document.querySelectorAll('[data-dashboard-nav]'));
     const dashboardSections = Array.from(document.querySelectorAll('[data-dashboard-section]'));
     const validDashboardSectionIds = dashboardSections.map(function(section) { return section.id; });
@@ -3386,11 +3384,15 @@
     const emotionSelect = document.getElementById('emotion');
     let feedbackScrollFrame = null;
     let allJobs = [];
+    // The voice whose "being made" note the form shows, cleared once it is ready.
+    let beingMadeNoteJobId = 0;
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
     let cooldownIntervalId = null;
     const COOLDOWN_SECONDS = 5; // Seconds to wait between generations
+    // One Generate request at a time: a double click or a second Enter never sends (or charges) twice.
+    let generateInFlight = false;
 
     function renderGenerateButtonContent(label, loading = false) {
       if (!generateBtn) return;
@@ -3495,8 +3497,9 @@
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
 
+    // 0-9 with commas in both languages, as the server writes numbers (number_format).
     function formatNumber(value) {
-      return new Intl.NumberFormat(pageLocale === 'ar' ? 'ar' : 'en-US').format(Number(value || 0));
+      return new Intl.NumberFormat('en-US').format(Number(value || 0));
     }
 
     function normalizeLanguage(value) {
@@ -3614,10 +3617,80 @@
 
     function showFormMessage(type, message) {
       if (!formMessage) return;
+      beingMadeNoteJobId = 0;
       if (!message) { formMessage.innerHTML = ''; return; }
       const cls = type === 'error' ? 'error' : 'note';
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
       scrollFeedbackIntoView(formMessage);
+    }
+
+    // A page left open long holds an expired form token, and every request then fails
+    // with 419. listenFetchWithFreshCsrf(url, options) sends a request with the page's
+    // token and, on a 419, gets a fresh token from the server, puts it in the page and
+    // sends the request once more; a 419 that comes back again is the caller's to show
+    // (showPageExpired offers a reload). Generate and history delete use it, and so can
+    // the page's other forms. A form's own _token field is renewed too, as the server
+    // reads it before the header.
+    function withCsrfToken(options) {
+      const headers = new Headers(options.headers || {});
+      headers.set('X-CSRF-TOKEN', csrfToken);
+      if (options.body instanceof FormData && options.body.has('_token')) options.body.set('_token', csrfToken);
+      return { ...options, headers };
+    }
+
+    async function renewCsrfToken() {
+      try {
+        const response = await fetch(csrfTokenUrl, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        const data = response.ok ? await response.json().catch(() => null) : null;
+        const token = String(data?.token || '');
+        if (!token) return false;
+        csrfToken = token;
+        document.querySelectorAll('input[name="_token"]').forEach((input) => { input.value = token; });
+        document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', token);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    async function listenFetchWithFreshCsrf(url, options = {}) {
+      const response = await fetch(url, withCsrfToken(options));
+      if (response.status !== 419 || !(await renewCsrfToken())) return response;
+      return fetch(url, withCsrfToken(options));
+    }
+    window.listenFetchWithFreshCsrf = listenFetchWithFreshCsrf;
+
+    // Still expired with a fresh token asked for (signed out meanwhile): only a reload helps.
+    function showPageExpired(target) {
+      if (!target) return;
+      if (target === formMessage) beingMadeNoteJobId = 0;
+      target.innerHTML = `<div class="error">${escapeHtml(i18n.page_expired)} <button type="button" class="pagination-btn" data-action="reload-page">${escapeHtml(i18n.reload_page)}</button></div>`;
+      scrollFeedbackIntoView(target);
+    }
+
+    // The text being written is kept for the reloaded page (this tab only).
+    const studioDraftKey = 'listen_studio_draft';
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('[data-action="reload-page"]')) return;
+      try {
+        const content = String(contentInput?.value || '');
+        if (content.trim()) {
+          sessionStorage.setItem(studioDraftKey, JSON.stringify({ content, title: String(document.getElementById('voiceTitle')?.value || '') }));
+        }
+      } catch (error) {}
+      window.location.reload();
+    });
+
+    // The history's own messages: the form's are hidden while the history is shown.
+    function showJobsMessage(type, message) {
+      if (!jobsMessage) return;
+      if (!message) { jobsMessage.innerHTML = ''; return; }
+      const cls = type === 'error' ? 'error' : 'note';
+      jobsMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+      scrollFeedbackIntoView(jobsMessage);
     }
 
     function scrollFeedbackIntoView(element) {
@@ -3639,16 +3712,6 @@
           inline: 'nearest',
         });
       });
-    }
-
-    function showExtensionKeyMessage(type, message) {
-      if (!extensionKeyMessage) return;
-      if (!message) {
-        extensionKeyMessage.innerHTML = '';
-        return;
-      }
-      const cls = type === 'error' ? 'error' : 'note';
-      extensionKeyMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
     }
 
     function hideGeneratedPreview() {
@@ -4005,7 +4068,7 @@
       });
     }
 
-    function renderJobRow(job) {
+    function renderJobRow(job, preloadAudio = false) {
       const isDemoHistory = isDemoHistoryJob(job);
       const jobKey = resolveJobKey(job);
       const status = String(job?.status || 'processing').toLowerCase();
@@ -4030,7 +4093,7 @@
         : title;
 
       let audioCell = '<small style="color: var(--muted);">' + i18n.processing_ellipsis + '</small>';
-      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
+      if (audioUrl) audioCell = '<audio controls preload="' + (preloadAudio ? 'auto' : 'none') + '" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
       else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
 
       const actions = [];
@@ -4097,8 +4160,11 @@
       if (pageJobs.length === 0) {
         jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
       } else {
+        // The newest finished voice loads ahead, so it plays at once; the others wait for a click.
+        const newestReady = allJobs.find((job) => String(job?.status || '') === 'done' && job?.audio_url);
+        const newestReadyKey = newestReady ? resolveJobKey(newestReady) : '';
         pageJobs.forEach(function(job) {
-          jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job));
+          jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job, resolveJobKey(job) === newestReadyKey));
         });
       }
 
@@ -4186,6 +4252,201 @@
       }
     }
 
+    // Voices still being made (a long text is made after the reply) are checked on
+    // until they finish: every 2 seconds at first, slowing to every 6, for at most
+    // 20 minutes, and not while the tab is hidden. A finished one plays in the
+    // docked player, as a voice made in the request does.
+    const JOB_CHECK_FIRST_MS = 2000;
+    const JOB_CHECK_SLOWEST_MS = 6000;
+    const JOB_CHECK_FOR_MS = 20 * 60 * 1000;
+    const jobChecks = new Map();
+
+    function isJobRunning(job) {
+      return ['queued', 'processing'].includes(String(job?.status || '').toLowerCase());
+    }
+
+    // options.now checks at once; options.onFinish(job) runs when the checks end (job is null when it never finished).
+    function watchJob(jobId, options = {}) {
+      const id = Number(jobId || 0);
+      if (!id) return;
+      const onFinish = typeof options.onFinish === 'function' ? options.onFinish : null;
+      const watching = jobChecks.get(id);
+      if (watching) {
+        if (onFinish) watching.onFinish = onFinish;
+        return;
+      }
+      jobChecks.set(id, {
+        delay: JOB_CHECK_FIRST_MS,
+        until: Date.now() + JOB_CHECK_FOR_MS,
+        timer: null,
+        waitingForTab: false,
+        onFinish,
+      });
+      scheduleJobCheck(id, options.now ? 0 : JOB_CHECK_FIRST_MS);
+    }
+
+    function scheduleJobCheck(id, delay) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      clearTimeout(check.timer);
+      check.timer = setTimeout(function() { checkJob(id); }, delay);
+    }
+
+    // Ends the checks; a voice that finished is shown first.
+    function stopWatchingJob(id, finished = null, data = null) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      clearTimeout(check.timer);
+      jobChecks.delete(id);
+      if (finished) finishJob(finished, data);
+      if (check.onFinish) check.onFinish(finished);
+    }
+
+    async function checkJob(id) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      // A hidden tab waits: the check runs again as soon as the tab is shown.
+      if (document.hidden) {
+        check.waitingForTab = true;
+        return;
+      }
+
+      let status = 0;
+      let data = null;
+      try {
+        const response = await fetch(jobStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(String(id))), {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        status = response.status;
+        data = response.ok ? await response.json().catch(() => null) : null;
+      } catch (error) {
+        // No connection for a moment: checked again below.
+      }
+      if (jobChecks.get(id) !== check) return;
+
+      // Deleted meanwhile, or signed out: there is nothing more to check.
+      if ([401, 403, 404].includes(status)) {
+        stopWatchingJob(id);
+        return;
+      }
+      const job = data?.job;
+      if (job && !isJobRunning(job)) {
+        stopWatchingJob(id, job, data);
+        return;
+      }
+      if (Date.now() >= check.until) {
+        stopWatchingJob(id);
+        return;
+      }
+      check.delay = Math.min(JOB_CHECK_SLOWEST_MS, Math.round(check.delay * 1.5));
+      scheduleJobCheck(id, check.delay);
+    }
+
+    // A voice that finished while the page waited is shown as one made in the request is.
+    function finishJob(job, data) {
+      upsertJobRow(job);
+      if (data?.usage) updateUsagePanel(data.usage);
+      if (data?.stats) updateStats(data.stats);
+      if (String(job.status) === 'done' && job.audio_url) {
+        if (beingMadeNoteJobId === Number(job.id)) showFormMessage(null, '');
+        showGeneratedPreview(job);
+      } else if (String(job.status) === 'failed') {
+        showFormMessage('error', job.error_message || i18n.voice_generation_failed);
+      }
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) return;
+      jobChecks.forEach(function(check, id) {
+        if (!check.waitingForTab) return;
+        check.waitingForTab = false;
+        scheduleJobCheck(id, 0);
+      });
+    });
+
+    // A Generate whose reply never came (the gateway gave up waiting, or the connection
+    // dropped) may still be made, and charged, on the server. The page looks for that
+    // voice for a few minutes and shows it when it comes, and the same text is not sent
+    // again until it knows: a retry would make and charge it twice.
+    const LOST_REPLY_CHECK_FOR_MS = 3 * 60 * 1000;
+    const LOST_REPLY_CHECK_EVERY_MS = 3000;
+    let lostReplyCheck = null;
+
+    // No reply, or a gateway or proxy that stopped waiting for one (502, 504, 520-524).
+    function replyWasLost(status) {
+      return status === 0 || status === 502 || status === 504 || (status >= 520 && status <= 524);
+    }
+
+    function newestOwnJobId() {
+      return allJobs.reduce((newest, job) => (isDemoHistoryJob(job) ? newest : Math.max(newest, Number(job?.id || 0))), 0);
+    }
+
+    // The history names a voice by its first 42 characters: enough to tell this text's
+    // voice from one made meanwhile elsewhere (the extension, another tab).
+    function jobIsForText(job, text) {
+      const squeeze = (value) => String(value || '').replace(/\s+/gu, '');
+      const excerpt = squeeze(job?.text_excerpt);
+      return excerpt !== '' && squeeze(text).startsWith(excerpt);
+    }
+
+    function startLostReplyCheck(text, afterJobId) {
+      const check = { text, afterJobId, until: Date.now() + LOST_REPLY_CHECK_FOR_MS };
+      lostReplyCheck = check;
+      showFormMessage('note', i18n.voice_may_still_be_finishing);
+      lookForLostReply(check);
+    }
+
+    async function lookForLostReply(check) {
+      if (lostReplyCheck !== check) return;
+      let jobs = [];
+      try {
+        const response = await fetch(`${latestJobsUrl}?after=${encodeURIComponent(String(check.afterJobId))}`, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        const data = response.ok ? await response.json().catch(() => null) : null;
+        jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+      } catch (error) {
+        // Still no connection: looked for again below.
+      }
+      if (lostReplyCheck !== check) return;
+
+      const job = jobs.find((candidate) => jobIsForText(candidate, check.text));
+      if (job) {
+        upsertJobRow(job);
+        // Its note gives way to the voice once it is ready.
+        if (formMessage?.textContent === i18n.voice_may_still_be_finishing) beingMadeNoteJobId = Number(job.id);
+        // Done, failed or still being made: shown as its reply would have shown it.
+        watchJob(job.id, { now: true, onFinish: () => settleLostReplyCheck(check) });
+        return;
+      }
+      if (Date.now() >= check.until) {
+        // Nothing came of it: the request never reached the server, so Generate is safe again.
+        settleLostReplyCheck(check);
+        showFormMessage('error', i18n.server_overload);
+        return;
+      }
+      setTimeout(() => lookForLostReply(check), LOST_REPLY_CHECK_EVERY_MS);
+    }
+
+    function settleLostReplyCheck(check) {
+      if (lostReplyCheck !== check) return;
+      lostReplyCheck = null;
+      if (generateBtn && !generateInFlight && getRemainingCooldown() <= 0) {
+        generateBtn.disabled = false;
+        renderGenerateButtonContent(i18n.generate_voice_now);
+      }
+    }
+
+    // While the page looks for it, Generate stays off for that text only.
+    contentInput?.addEventListener('input', function() {
+      if (!lostReplyCheck || !generateBtn || generateInFlight || getRemainingCooldown() > 0) return;
+      const sameText = String(contentInput.value || '').trim() === lostReplyCheck.text;
+      generateBtn.disabled = sameText;
+      renderGenerateButtonContent(sameText ? i18n.generating : i18n.generate_voice_now, sameText);
+    });
+
     async function deleteJob(jobId, source, triggerBtn) {
       const parsedJobId = Number(jobId || 0);
       if (!parsedJobId) return;
@@ -4200,20 +4461,25 @@
       }
 
       let data = null;
+      let replyStatus = 0;
       try {
         const baseUrl = parsedSource === 'demo' ? deleteDemoJobBaseUrl : deleteJobBaseUrl;
-        const response = await fetch(`${baseUrl}/${parsedJobId}`, {
+        const response = await listenFetchWithFreshCsrf(`${baseUrl}/${parsedJobId}`, {
           method: 'DELETE',
           headers: {
-            'X-CSRF-TOKEN': csrfToken,
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
           },
         });
 
-        data = await response.json().catch(() => ({}));
-        if (!response.ok || data?.ok === false) {
-          throw new Error(extractErrorMessage(data, i18n.unable_delete_voice));
+        replyStatus = response.status;
+        if (replyStatus === 419) {
+          showPageExpired(jobsMessage);
+          return;
+        }
+        data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok === false) {
+          throw new Error(extractErrorMessage(data, i18n.unable_delete_voice, replyStatus));
         }
 
         const deletedId = Number(data?.deleted_id || parsedJobId);
@@ -4222,9 +4488,9 @@
         const totalPages = Math.ceil(allJobs.length / jobsPerPage) || 1;
         jobsCurrentPage = Math.min(jobsCurrentPage, totalPages);
         renderJobsPage();
-        showFormMessage(null, '');
+        showJobsMessage(null, '');
       } catch (error) {
-        showFormMessage('error', extractErrorMessage(data, error?.message || i18n.unable_delete_voice));
+        showJobsMessage('error', replyStatus ? String(error?.message || i18n.unable_delete_voice) : extractErrorMessage(null, i18n.unable_delete_voice));
       } finally {
         if (triggerBtn instanceof HTMLButtonElement) {
           triggerBtn.disabled = false;
@@ -4274,30 +4540,21 @@
       deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn.getAttribute('data-job-source'), deleteBtn);
     });
 
-    function extractErrorMessage(data, fallback = i18n.voice_generation_failed) {
-      // Helper to detect technical/internal error messages
-      const isTechnicalError = (msg) => {
-        if (!msg || typeof msg !== 'string') return false;
-        const patterns = [
-          /maximum execution time/i,
-          /timeout/i,
-          /memory.*exhausted/i,
-          /fatal error/i,
-          /internal server error/i,
-          /500/,
-          /502/,
-          /503/,
-          /504/,
-          /gateway/i,
-          /service unavailable/i,
-        ];
-        return patterns.some(p => p.test(msg));
-      };
+    // What a refused request tells the member, decided by the reply and never by its
+    // wording: a refusal (a 4xx, or ok:false) in the server's own words, even with a
+    // number in them such as a 5000-character limit; the "busy" text only for a server
+    // error without a message of ours, a reply that is not JSON, or no reply at all.
+    function extractErrorMessage(data, fallback = i18n.voice_generation_failed, status = 0) {
+      const isJson = Boolean(data) && typeof data === 'object';
+      const serverTrouble = !isJson || (status >= 500 && data.ok !== false);
+      if (serverTrouble) {
+        return i18n.server_overload || fallback;
+      }
       let message = null;
-      if (data?.message) message = String(data.message);
-      else if (data?.error_message) message = String(data.error_message);
+      if (data.message) message = String(data.message);
+      else if (data.error_message) message = String(data.error_message);
       else {
-        const errors = data?.errors;
+        const errors = data.errors;
         if (errors && typeof errors === 'object') {
           const keys = Object.keys(errors);
           if (keys.length > 0 && Array.isArray(errors[keys[0]]) && errors[keys[0]][0]) {
@@ -4305,15 +4562,13 @@
           }
         }
       }
-      if (message && isTechnicalError(message)) {
-        return i18n.server_overload || fallback;
-      }
       return message || fallback;
     }
 
     async function submitVoiceForm(event) {
       event.preventDefault();
       if (!voiceForm || !generateBtn) return;
+      if (generateInFlight) return;
       // No plan and no characters: the options are shown, generating needs a plan.
       if (@json((bool) ($planShowcase ?? false))) {
         showFormMessage('error', @json(__('ui.pack.showcase_note')));
@@ -4330,32 +4585,65 @@
       if (!isTranslateEnabled()) {
         syncLanguageToCurrentTextWhenTranslationOff();
       }
+      const submittedText = String(contentInput?.value || '').trim();
+      // Its last reply was lost and the page is still finding out whether it was made:
+      // the same text is not sent (and charged) again meanwhile.
+      if (lostReplyCheck && lostReplyCheck.text === submittedText) {
+        showFormMessage('note', i18n.voice_may_still_be_finishing);
+        return;
+      }
       showFormMessage(null, '');
       const defaultText = i18n.generate_voice_now;
+      generateInFlight = true;
       generateBtn.disabled = true;
       renderGenerateButtonContent(i18n.generating, true);
+      const newestJobIdBefore = newestOwnJobId();
       let data = null;
+      let replyStatus = 0;
       let wasSuccessful = false;
       try {
-        const response = await fetch(queueUrl, {
-          method: 'POST',
-          headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          body: new FormData(voiceForm),
-        });
-        data = await response.json().catch(() => ({}));
+        let response = null;
+        try {
+          response = await listenFetchWithFreshCsrf(queueUrl, {
+            method: 'POST',
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(voiceForm),
+          });
+        } catch (networkError) {
+          // No reply at all: looked for below, as after a gateway timeout.
+        }
+        if (replyWasLost(response ? response.status : 0)) {
+          // Not called a failure: the voice may still come, so the page looks for it.
+          startLostReplyCheck(submittedText, newestJobIdBefore);
+          return;
+        }
+        replyStatus = response.status;
+        if (replyStatus === 419) {
+          // Refused before anything was made or charged.
+          showPageExpired(formMessage);
+          generateBtn.disabled = false;
+          renderGenerateButtonContent(defaultText);
+          return;
+        }
+        data = await response.json().catch(() => null);
         if (data?.job) upsertJobRow(data.job);
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
-        if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
+        if (!response.ok || !data || data.ok === false) throw new Error(extractErrorMessage(data, i18n.voice_generation_failed, replyStatus));
         wasSuccessful = true;
         if (data?.job?.audio_url) {
           // The player docks at the bottom of the screen: no jump away from the text.
           showGeneratedPreview(data.job);
+        } else if (data?.job && isJobRunning(data.job)) {
+          // A long text is made after the reply: the page checks on it and plays it when ready.
+          showFormMessage('note', data.message || i18n.status_processing);
+          beingMadeNoteJobId = Number(data.job.id);
+          watchJob(data.job.id);
         }
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
       } catch (error) {
-        const message = extractErrorMessage(data, error?.message || i18n.voice_generation_failed);
+        const message = String(error?.message || i18n.voice_generation_failed);
         showFormMessage('error', message);
         // Check if server returned a rate limit with retry seconds
         const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);
@@ -4366,6 +4654,8 @@
           generateBtn.disabled = false;
           renderGenerateButtonContent(defaultText);
         }
+      } finally {
+        generateInFlight = false;
       }
     }
 
@@ -4446,6 +4736,23 @@
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();
+    // Voices still being made when the page opened are checked on too: those from the
+    // last hour (by the server's clock), as an older one is stuck and the sweep fails it.
+    const pageOpenedAtTs = {{ now()->getTimestamp() }};
+    allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job) && pageOpenedAtTs - Number(job.created_at_ts || 0) < 3600)
+      .forEach((job) => watchJob(job.id));
+    // A text kept by "Reload page" comes back once, into an empty box.
+    (function restoreStudioDraft() {
+      let draft = null;
+      try {
+        draft = JSON.parse(sessionStorage.getItem(studioDraftKey) || 'null');
+        sessionStorage.removeItem(studioDraftKey);
+      } catch (error) {}
+      if (!draft?.content || !contentInput || contentInput.value.trim()) return;
+      contentInput.value = String(draft.content);
+      const titleInput = document.getElementById('voiceTitle');
+      if (titleInput && !titleInput.value && draft.title) titleInput.value = String(draft.title);
+    })();
 
     // Dialogue mode (js/dialogue-mode.js): two speakers, each with a premium voice
     // and their own dialect or accent.
@@ -4504,7 +4811,7 @@
       if (!contentInput || !charCountEl || !charCounter) return;
       // Every character is charged, spaces and line breaks too (as the server counts them).
       const length = Array.from(contentInput.value.trim()).length;
-      charCountEl.textContent = length.toLocaleString();
+      charCountEl.textContent = formatNumber(length);
       const fill = document.getElementById('charCounterFill');
       if (fill) fill.style.width = Math.min(100, (length / Math.max(1, maxCharsPerRequest)) * 100) + '%';
       refreshCreditLive();
@@ -4570,21 +4877,6 @@
       if (!match) return;
       window.openClonedVoiceInGenerator(match);
     })();
-
-    copyExtensionKeyBtn?.addEventListener('click', async function() {
-      const raw = String(copyExtensionKeyBtn.getAttribute('data-copy-value') || '').trim();
-      if (!raw) {
-        showExtensionKeyMessage('error', i18n.copy_failed);
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(raw);
-        showExtensionKeyMessage('ok', i18n.copied);
-      } catch (error) {
-        showExtensionKeyMessage('error', i18n.copy_failed);
-      }
-    });
   </script>
   @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
   <script>
@@ -4694,6 +4986,9 @@
       const deleteVoiceText = @json(__('ui.voice_cloning.delete_voice'));
       const deleteConfirmText = @json(__('ui.voice_cloning.delete_confirm'));
       const delayedHintText = @json(__('ui.voice_cloning.processing_delayed'));
+      const requestFailedText = @json(__('ui.voice_cloning.request_failed'));
+      const networkErrorText = @json(__('ui.voice_cloning.network_error'));
+      const deleteFailedText = @json(__('ui.voice_cloning.delete_failed'));
       const languageLabels = {
         'ar-XA': @json(__('ui.voice_cloning.language_ar')),
         'en-US': @json(__('ui.voice_cloning.language_en_us')),
@@ -4728,6 +5023,16 @@
         setTimeout(() => {
           if (alert.isConnected) alert.remove();
         }, 7000);
+      }
+
+      // The reason the server gave, when it gave one: the studio's own `error`, a
+      // `message` it wrote (beside ok/success false, such as an expired session,
+      // or with form errors) or the form errors. Anything else, such as a server
+      // error page, gets the translated fallback.
+      function failureText(data, fallback) {
+        const ownMessage = data?.ok === false || data?.success === false || data?.errors ? data?.message : '';
+        const fieldErrors = Object.values(data?.errors || {}).flat().join(' ');
+        return String(data?.error || ownMessage || fieldErrors || '').trim() || fallback;
       }
 
       function escapeHtml(value) {
@@ -5061,9 +5366,11 @@
         const isDelayed = Boolean(payload.is_delayed || (['pending', 'validating', 'processing'].includes(status) && elapsedSeconds >= 90));
 
         const statusBadge = card.querySelector('.vc-status');
-        if (statusBadge) {
+        const statusText = statusLabels[status] || status.toUpperCase();
+        // Rewritten only when the status changes, so screen readers hear it once, not on every check.
+        if (statusBadge && (statusBadge.textContent.trim() !== statusText || !statusBadge.classList.contains(status))) {
           statusBadge.className = `vc-status ${status}`;
-          statusBadge.innerHTML = `${['pending', 'validating', 'processing'].includes(status) ? '<span class="dot"></span>' : ''}${escapeHtml(statusLabels[status] || status.toUpperCase())}`;
+          statusBadge.innerHTML = `${['pending', 'validating', 'processing'].includes(status) ? '<span class="dot"></span>' : ''}${escapeHtml(statusText)}`;
         }
 
         ensureProcessingHint(card, ['pending', 'validating', 'processing'].includes(status));
@@ -5072,7 +5379,7 @@
         else if (payload.failure_detail !== undefined) ensureTechDetail(card, payload.failure_detail);
         updateProgressUI(card, status, elapsedSeconds, isDelayed, serverProgress);
         setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
-        setDeleteButton(card, status !== 'ready');
+        setDeleteButton(card, true);
         if (status !== 'failed') setRetryButton(card, payload.id || card.dataset.voiceId, false);
         else if (payload.can_retry !== undefined) setRetryButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_retry));
         if (status !== 'failed') setReconsentButton(card, payload.id || card.dataset.voiceId, false);
@@ -5130,7 +5437,8 @@
         const sourceType = String(voice?.source_type || 'upload').toLowerCase();
         const sourceLabel = sourceTypeLabels[sourceType] || sourceTypeLabels.upload;
         const createdTs = Number(voice?.created_at_ts || Math.floor(Date.now() / 1000));
-        const createdLabel = new Date(createdTs * 1000).toLocaleDateString(pageLocale.startsWith('ar') ? 'ar-EG' : 'en-US', {
+        // Arabic month names with 0-9, as the cards the server writes.
+        const createdLabel = new Date(createdTs * 1000).toLocaleDateString(pageLocale.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-US', {
           year: 'numeric',
           month: 'short',
           day: '2-digit',
@@ -5146,7 +5454,7 @@
           <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-started-ts="${Number(voice?.started_at_ts || createdTs)}" data-failure-reason="${failureReason}">
             <div class="vc-card-header">
               <h3 class="vc-card-name">${name}</h3>
-              <span class="vc-status ${escapeHtml(status)}">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
+              <span class="vc-status ${escapeHtml(status)}" role="status">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
             </div>
             <div class="vc-card-meta">
               <span>{{ __('ui.voice_cloning.created_on') }} ${escapeHtml(createdLabel)}</span>
@@ -5538,7 +5846,7 @@
 
       // The voice service wants 24 kHz mono 16-bit WAV. Converting here means the server
       // never needs ffmpeg or exec(), which many hosts disable.
-      async function toGeminiWav(blob) {
+      async function toCloningWav(blob) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         if (!blob || !AudioCtx || !OfflineCtx) return blob;
@@ -5886,7 +6194,7 @@
               consentOnly.set('consent_confirmed', '1');
               consentOnly.set('consent_duration', String(consentDuration));
               consentOnly.set('consent_language', document.getElementById('vcConsentLanguage')?.value || 'ar-XA');
-              const consentWav = await toGeminiWav(consentBlob || consentFileInput?.files?.[0]);
+              const consentWav = await toCloningWav(consentBlob || consentFileInput?.files?.[0]);
               consentOnly.set('consent_audio', consentWav, wavName('consent', consentWav));
               const response = await fetch(CONSENT_URL_TEMPLATE.replace('__VOICE_ID__', encodeURIComponent(voiceId)), {
                 method: 'POST',
@@ -5913,8 +6221,7 @@
                 startPolling(voiceId);
                 return;
               }
-              const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
-              showAlert('error', errorText);
+              showAlert('error', failureText(data, requestFailedText));
               return;
             }
 
@@ -5922,12 +6229,12 @@
               ? recordedBlob
               : (document.getElementById('vcFileInput')?.files?.[0] || null);
             if (sampleSource) {
-              const sampleWav = await toGeminiWav(sampleSource);
+              const sampleWav = await toCloningWav(sampleSource);
               formData.set('audio_file', sampleWav, wavName('sample', sampleWav));
             }
             const consentSource = consentBlob || consentFileInput?.files?.[0] || null;
             if (consentSource) {
-              const consentWav = await toGeminiWav(consentSource);
+              const consentWav = await toCloningWav(consentSource);
               formData.set('consent_audio', consentWav, wavName('consent', consentWav));
             }
 
@@ -5954,10 +6261,9 @@
               resetCreateFormUi();
               return;
             }
-            const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
-            showAlert('error', errorText);
-          } catch (error) {
-            showAlert('error', error?.message || 'Network error');
+            showAlert('error', failureText(data, requestFailedText));
+          } catch (_error) {
+            showAlert('error', networkErrorText);
           } finally {
             if (submitBtn) submitBtn.disabled = false;
             if (submitText) submitText.style.display = '';
@@ -6020,10 +6326,10 @@
               return;
             }
             retryButton.disabled = false;
-            showAlert('error', data?.error || data?.message || 'Error');
-          } catch (error) {
+            showAlert('error', failureText(data, requestFailedText));
+          } catch (_error) {
             retryButton.disabled = false;
-            showAlert('error', error?.message || 'Network error');
+            showAlert('error', networkErrorText);
           }
           return;
         }
@@ -6044,7 +6350,17 @@
             if (card) {
               const occupying = String(card.dataset.status || '') !== 'failed';
               card.remove();
-              if (occupying) {
+              // A finished voice keeps its slot for a while after it is deleted,
+              // so the server says how many slots are still in use.
+              if (typeof data.slots_in_use === 'number') {
+                currentVoiceCount = Math.max(0, data.slots_in_use);
+                const note = document.getElementById('vcDeletedNote');
+                if (note) {
+                  note.textContent = String(data.deleted_voice_note || '');
+                  note.hidden = note.textContent === '';
+                }
+                updateCountUI();
+              } else if (occupying) {
                 currentVoiceCount = Math.max(0, currentVoiceCount - 1);
                 updateCountUI();
               }
@@ -6052,9 +6368,9 @@
             }
             return;
           }
-          showAlert('error', data?.error || 'Failed');
-        } catch (error) {
-          showAlert('error', error?.message || 'Failed');
+          showAlert('error', failureText(data, deleteFailedText));
+        } catch (_error) {
+          showAlert('error', networkErrorText);
         }
       });
 

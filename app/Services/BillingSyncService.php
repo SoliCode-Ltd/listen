@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -24,11 +25,52 @@ class BillingSyncService
         $ttlMinutes = max(1, (int) config('listen.billing.subscription_sync_ttl_minutes', 10));
         $lastCheckedAt = $user->subscription_status_checked_at;
 
-        if (! $force && $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes))) {
+        if (! $force && $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes))
+            && ! self::renewalDue($user, $lastCheckedAt)) {
             return;
         }
 
         $this->syncUser($user);
+    }
+
+    /**
+     * When the member's billing should next be read from Stripe: 'now' when a
+     * paid period ended after the last check (the plan they see depends on the
+     * renewal), 'soon' when the last check is older than the sync interval,
+     * null while it is fresh.
+     */
+    public static function syncDue(User $user): ?string
+    {
+        $lastCheckedAt = $user->subscription_status_checked_at;
+        if ($lastCheckedAt && self::renewalDue($user, $lastCheckedAt)) {
+            return 'now';
+        }
+
+        $ttlMinutes = max(1, (int) config('listen.billing.subscription_sync_ttl_minutes', 10));
+
+        return $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes)) ? null : 'soon';
+    }
+
+    /**
+     * A card member's paid period ended (in the last two days) after Stripe was
+     * last asked: the renewal is looked up now, not when the check goes stale,
+     * so the member never sits on Free while it has gone through.
+     */
+    private static function renewalDue(User $user, Carbon $lastCheckedAt): bool
+    {
+        if (! $user->stripe_id) {
+            return false;
+        }
+
+        $ended = Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->whereBetween('current_period_end', [now()->subDays(2), now()])
+            ->whereHas('plan', fn ($plan) => $plan->where('price_cents', '>', 0))
+            ->latest('id')
+            ->first(['id', 'current_period_end']);
+
+        return $ended !== null && $lastCheckedAt->lt($ended->current_period_end);
     }
 
     public function syncUser(User $user): void
@@ -68,7 +110,7 @@ class BillingSyncService
                         'pm_last_four' => null,
                     ])->save();
                 } else {
-                    [$stripeSubscription, $unknownPaid] = $this->resolveRelevantStripeSubscription($user->stripe_id);
+                    [$stripeSubscription, $unknownPaid, $onlyDeclined] = $this->resolveRelevantStripeSubscription($user->stripe_id);
                     $selectedPaid = in_array((string) ($stripeSubscription->status ?? ''), ['active', 'trialing'], true);
 
                     if ($unknownPaid !== [] && ! $selectedPaid) {
@@ -98,11 +140,16 @@ class BillingSyncService
                                 ?? $stripeSubscription->items->data[0]->current_period_start
                                 ?? 0);
                             $periodStart = $periodStartTs > 0 ? Carbon::createFromTimestamp($periodStartTs) : null;
+                        } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
+                            && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
+                            // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.
+                            $keepPlanAsIs = true;
                         }
 
                         $this->persistBillingSubscription($user, $stripeSubscription);
                     } else {
                         $targetPlan = $freePlan;
+                        $keepPlanAsIs = $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined);
                         $billingSubscription = BillingSubscription::query()
                             ->where('user_id', $user->id)
                             ->where('type', 'default')
@@ -131,15 +178,14 @@ class BillingSyncService
                 }
             } catch (ApiErrorException $exception) {
                 if ($this->isMissingStripeCustomerError($exception)) {
-                    $this->resetBillingStateForMissingCustomer($user);
-                    $targetPlan = $freePlan;
-                    $periodEnd = now()->addMonth();
-
-                    $user->forceFill([
-                        'stripe_id' => null,
-                        'pm_type' => null,
-                        'pm_last_four' => null,
-                    ])->save();
+                    // What a key for the wrong Stripe account or mode says about every
+                    // member. A customer really deleted comes back marked deleted (above),
+                    // so nobody's billing links or plan are taken away here.
+                    Log::error('Stripe does not know this member\'s customer, so their plan and billing links were kept. Check the Stripe keys.', [
+                        'user_id' => $user->id,
+                        'stripe_id' => $user->stripe_id,
+                        'error' => $exception->getMessage(),
+                    ]);
                 } else {
                     Log::warning('Billing sync failed when contacting Stripe API.', [
                         'user_id' => $user->id,
@@ -147,11 +193,19 @@ class BillingSyncService
                         'error' => $exception->getMessage(),
                     ]);
                 }
+
+                // Nothing was read, so nothing changes: the plan and its dates stay as they are.
+                $this->markChecked($user);
+
+                return;
             } catch (\Throwable $exception) {
                 Log::warning('Billing sync failed unexpectedly.', [
                     'user_id' => $user->id,
                     'error' => $exception->getMessage(),
                 ]);
+                $this->markChecked($user);
+
+                return;
             }
         } elseif ($currentPlan && (int) $currentPlan->price_cents > 0) {
             // No Stripe customer, so the plan was paid by hand or given by the team:
@@ -163,6 +217,11 @@ class BillingSyncService
             $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
         }
 
+        $this->markChecked($user);
+    }
+
+    private function markChecked(User $user): void
+    {
         $user->forceFill([
             'subscription_status_checked_at' => now(),
         ])->save();
@@ -174,6 +233,37 @@ class BillingSyncService
             ->where('user_id', $user->id)
             ->where('status', 'active')
             ->where('billing_payment_state', 'manual_override')
+            ->exists();
+    }
+
+    /**
+     * Whether the member keeps their paid plan although Stripe has nothing live
+     * for them, because it was given by hand: Stripe never charged them for any
+     * plan (only declined first payments), or an approved InstaPay / Vodafone
+     * Cash payment set the plan they have now.
+     */
+    private function keepsPlanGivenByHand(User $user, ?Plan $currentPlan, bool $onlyDeclined): bool
+    {
+        if (! $currentPlan || (int) $currentPlan->price_cents <= 0 || $currentPlan->isPack()) {
+            return false;
+        }
+
+        if ($onlyDeclined) {
+            return true;
+        }
+
+        $current = Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('plan_id', $currentPlan->id)
+            ->latest('id')
+            ->first();
+
+        return $current !== null && ManualPaymentRequest::query()
+            ->where('user_id', $user->id)
+            ->where('status', ManualPaymentRequest::STATUS_APPROVED)
+            ->where('approved_subscription_id', $current->id)
+            ->where('plan_id', $current->plan_id)
             ->exists();
     }
 
@@ -202,10 +292,11 @@ class BillingSyncService
     }
 
     /**
-     * The member's subscription that decides their plan, and the ids of any live
-     * subscriptions Stripe charges for that no plan owns.
+     * The member's subscription that decides their plan, the ids of any live
+     * subscriptions Stripe charges for that no plan owns, and whether all Stripe
+     * has for them are declined first payments (or nothing at all).
      *
-     * @return array{0: ?object, 1: list<string>}
+     * @return array{0: ?object, 1: list<string>, 2: bool}
      */
     private function resolveRelevantStripeSubscription(string $stripeCustomerId): array
     {
@@ -248,7 +339,9 @@ class BillingSyncService
             })
             ->values();
 
-        return [$sorted->first(), $unknownPaid];
+        $onlyDeclined = $all->every(fn ($sub) => in_array((string) ($sub->status ?? ''), ['incomplete', 'incomplete_expired'], true));
+
+        return [$sorted->first(), $unknownPaid, $onlyDeclined];
     }
 
     public function persistBillingSubscription(User $user, object $stripeSubscription): void

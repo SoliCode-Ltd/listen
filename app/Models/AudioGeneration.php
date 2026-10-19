@@ -71,6 +71,12 @@ class AudioGeneration extends Model
         'api_key_id' => 'integer',
     ];
 
+    protected static function booted(): void
+    {
+        // A developer API retry with the key that made it must not make (and charge) it again.
+        static::deleting(fn (AudioGeneration $generation) => \App\Services\Api\ApiIdempotency::markResultDeleted($generation));
+    }
+
     public function textItem(): BelongsTo
     {
         return $this->belongsTo(TextItem::class);

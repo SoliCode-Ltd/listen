@@ -5,12 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
-use App\Models\UsageCounter;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
-use App\Services\Billing\CharPackService;
-use App\Services\Billing\TrialUsageRecorder;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
 use App\Services\PlanAccessService;
@@ -20,10 +19,10 @@ use App\Support\AudioUrl;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
-use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -177,6 +176,7 @@ class MessageReaderController extends Controller
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
+            DialogueSpeakers::ensureShortEnough((string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         $voiceKey = trim((string) ($validated['voice_key'] ?? ''));
@@ -209,122 +209,91 @@ class MessageReaderController extends Controller
             throw ValidationException::withMessages(['content' => __('ui.backend.dashboard_text_needs_words')]);
         }
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
-        $estimate = UsageEstimator::estimate($text);
+        // A slower speed makes longer audio, so the reservation allows for it, as in the dashboard.
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
             ]);
         }
 
-        $forceAsyncChars = max(0, (int) config('listen.audio.force_async_chars', 2500));
-        $preferSync = (bool) ($validated['prefer_sync'] ?? false);
-        $runAsync = $processingMode === 'queue'
-            || (
-                ! $preferSync
-                && $processingMode === 'sync'
-                && $forceAsyncChars > 0
-                && $estimate['chars'] >= $forceAsyncChars
-            );
+        $runAsync = $processingMode === 'queue';
+        // Otherwise a long text is made after the reply, whatever the extension asks (an
+        // older one asks to wait for every text): no time limit of the web server cuts it
+        // short, and it needs no queue worker. The extension checks on it.
+        $afterResponse = ! $runAsync && GenerateAudioJob::runsAfterResponse($estimate['chars']);
         $initialStatus = $runAsync ? 'queued' : 'processing';
 
-        $counter = CreditPeriod::counter((int) $user->id);
-
-        $billToPack = CharPackService::billsToPack($quotaPlan);
-        PlanUsageGuard::assertWithinDailyLimit($quotaPlan, (int) $user->id);
-
-        if ($billToPack) {
-            // Takes the pack characters now; given back if the generation fails.
-            app(CharPackService::class)->reserve((int) $user->id, $estimate['credits']);
-        } else {
-            PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
-        }
-
-        try {
-            $recorded = $this->audioGenerationRecorder->createForUser(
-                (int) $user->id,
-                [
-                    'source_type' => 'message',
-                    'title' => $validated['title'] ?? null,
-                    'content' => $text,
-                    'language' => $sourceLanguage,
-                    'status' => $initialStatus,
-                    'received_at' => now(),
-                ],
-                [
-                    'input_text' => $text,
-                    'source_language' => $sourceLanguage,
-                    'target_language' => $validated['target_language'],
-                    'voice_tier' => $requestedTier,
-                    'voice_name' => $voiceName,
-                    'tts_provider' => $voiceProvider,
-                    'translate' => (bool) ($validated['translate'] ?? false),
-                    'duration_seconds' => $estimate['seconds'],
-                    'status' => $initialStatus,
-                    'dialect' => $studioOptions['dialect'],
-                    'emotion' => $studioOptions['emotion'],
-                    'performance_style' => $studioOptions['performance_style'],
-                    'style_prompt' => $studioOptions['style_prompt'],
-                    'speed' => $studioOptions['speed'],
-                    'pitch' => $studioOptions['pitch'],
-                    'is_dialogue' => $dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false),
-                    'dialogue_metadata' => ($dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false)
-                        && ! empty($validated['dialogue_speakers']))
-                        ? ['speakers' => $validated['dialogue_speakers']]
-                        : null,
-                    'billed_to_pack' => $billToPack,
-                    'usage_period' => $counter->period_ym,
-                ],
-            );
-        } catch (\Throwable $e) {
-            if ($billToPack) {
-                app(CharPackService::class)->release((int) $user->id, $estimate['credits']);
-            }
-            throw $e;
-        }
+        // The limits are checked and the credits reserved in one locked step, with the
+        // generation saved inside it, as in the dashboard: two requests at once cannot
+        // both spend the last credits. GenerateAudioJob reconciles them, or gives them back.
+        $recorded = app(MemberUsageMeter::class)->reserve((int) $user->id, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
+            (int) $user->id,
+            [
+                'source_type' => 'message',
+                'title' => $validated['title'] ?? null,
+                'content' => $text,
+                'language' => $sourceLanguage,
+                'status' => $initialStatus,
+                'received_at' => now(),
+            ],
+            [
+                'input_text' => $text,
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'voice_tier' => $requestedTier,
+                'voice_name' => $voiceName,
+                'tts_provider' => $voiceProvider,
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'duration_seconds' => $estimate['seconds'],
+                'status' => $initialStatus,
+                'dialect' => $studioOptions['dialect'],
+                'emotion' => $studioOptions['emotion'],
+                'performance_style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+                'is_dialogue' => $dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false),
+                'dialogue_metadata' => ($dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false)
+                    && ! empty($validated['dialogue_speakers']))
+                    ? ['speakers' => $validated['dialogue_speakers']]
+                    : null,
+                'billed_to_pack' => $reservation['billed_to_pack'],
+                'usage_period' => $reservation['period'],
+            ],
+        ));
 
         $item = $recorded['item'];
         $job = $recorded['job'];
 
-        // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
-        if (! $billToPack) {
-            $counter->increment('total_requests');
-            $counter->increment('total_chars', $estimate['credits']);
-            $counter->addSeconds($estimate['seconds']);
-            app(TrialUsageRecorder::class)->add((int) $user->id, $estimate);
-        }
+        if ($runAsync) {
+            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
+                ? 'high'
+                : 'default';
 
-        if (! $runAsync) {
+            GenerateAudioJob::dispatch($job->id)->onQueue($queueName);
+        } elseif ($afterResponse) {
+            GenerateAudioJob::runAfterResponse((int) $job->id);
+        } else {
             try {
                 GenerateAudioJob::dispatchSync($job->id);
             } catch (\Throwable) {
                 // Job failed — status will be checked below.
             }
 
+            // A failed generation has given its credits back itself; one the job's own
+            // error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+
             $job->refresh();
-
-            // Always refund usage when the job actually failed,
-            // regardless of whether the exception propagated.
-            if ($job->status === 'failed') {
-                if ($billToPack) {
-                    app(CharPackService::class)->release((int) $user->id, $estimate['credits']);
-                } else {
-                    $this->releaseReservedUsage($counter, $estimate);
-                }
-            }
-        } else {
-            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
-                ? 'high'
-                : 'default';
-
-            GenerateAudioJob::dispatch($job->id)->onQueue($queueName);
         }
 
         $isFailed = $job->status === 'failed';
-        $counter->refresh();
+        $counter = CreditPeriod::counter((int) $user->id);
         $statusCode = in_array($job->status, ['queued', 'processing'], true)
             ? 202
             : ($isFailed ? 422 : 200);
@@ -338,7 +307,7 @@ class MessageReaderController extends Controller
             'voice_tier' => $requestedTier,
             'voice_tier_label' => VoiceTier::label($requestedTier),
             'audio_url' => AudioUrl::fromPath($job->audio_path),
-            'error_message' => $job->error_message,
+            'error_message' => GenerationMessage::forDisplay($job->error_message),
             'estimated_chars' => $estimate['chars'],
             'estimated_credits' => $estimate['credits'],
             'estimated_seconds' => $estimate['seconds'],
@@ -383,7 +352,7 @@ class MessageReaderController extends Controller
                     'status' => $job->status,
                     'duration_seconds' => $job->duration_seconds,
                     'audio_url' => AudioUrl::fromPath($job->audio_path),
-                    'error_message' => $job->error_message,
+                    'error_message' => GenerationMessage::forDisplay($job->error_message),
                     'created_at' => $job->created_at,
                 ];
             });
@@ -437,9 +406,12 @@ class MessageReaderController extends Controller
             return $user;
         }
 
-        // Backward-compatible emergency key for server-to-server integrations.
+        // Backward-compatible emergency key for server-to-server integrations. It
+        // acts as the owner's account, so it is taken from a header only: a key
+        // in a link ends up in browser history and server logs.
         $legacyApiKey = trim((string) env('LISTEN_API_KEY', ''));
-        if ($legacyApiKey !== '' && hash_equals($legacyApiKey, $provided)) {
+        $fromHeader = trim((string) ($request->header('X-Listen-Key') ?? $request->header('X-API-Key') ?? ''));
+        if ($legacyApiKey !== '' && $fromHeader !== '' && hash_equals($legacyApiKey, $fromHeader)) {
             $user = User::query()->findOrFail(1);
             if ($this->blockedUserService->isBlocked($user)) {
                 abort(403, $this->blockedUserService->messageFor($user));
@@ -451,21 +423,6 @@ class MessageReaderController extends Controller
         }
 
         abort(401, __('ui.backend.api_invalid_key'));
-    }
-
-    /**
-     * @param  array{chars:int,seconds:int}  $estimate
-     */
-    private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
-    {
-        $counter->refresh();
-
-        $counter->update([
-            'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
-        ]);
-        $counter->addSeconds(-(int) $estimate['seconds']);
-        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, ?string $voiceName, string $tier): string

@@ -9,11 +9,13 @@ use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
+use App\Support\EnvFile;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 class EnvEditor extends Page implements HasForms
 {
@@ -33,6 +35,12 @@ class EnvEditor extends Page implements HasForms
 
     /** Values as loaded, so saving only rewrites the lines that changed. */
     public array $originalValues = [];
+
+    /**
+     * Keys whose value runs over several lines, which a one-line field cannot
+     * show: those are shown, and saved, as written in .env (with \n and the like).
+     */
+    public array $rawKeys = [];
 
     /** Keys that are always masked and cannot be revealed. */
     protected array $sensitivePatterns = ['SECRET', 'PASSWORD', 'KEY', 'TOKEN', 'HASH'];
@@ -112,6 +120,8 @@ class EnvEditor extends Page implements HasForms
 
         $envPath = $this->envPath();
         $envContent = File::exists($envPath) ? File::get($envPath) : '';
+        $before = $envContent;
+        $changed = [];
 
         $seen = [];
         foreach ($entries as $entry) {
@@ -136,7 +146,8 @@ class EnvEditor extends Page implements HasForms
                 continue; // unchanged: leave the line exactly as it is
             }
 
-            $line = $key.'='.$this->escapeValue($value);
+            $line = $key.'='.(isset($this->rawKeys[$key]) ? $this->writtenValue($value) : $this->escapeValue($value));
+            $changed[] = $key;
 
             // Replace the line in .env, or add it at the end if it is new.
             $pattern = '/^'.preg_quote($key, '/').'=.*/m';
@@ -147,7 +158,31 @@ class EnvEditor extends Page implements HasForms
             }
         }
 
-        File::put($envPath, $envContent);
+        $backupNote = '';
+        if ($envContent !== $before) {
+            try {
+                $backup = EnvFile::write($envPath, $envContent);
+            } catch (RuntimeException $e) {
+                Notification::make()
+                    ->title('Nothing was saved')
+                    ->body($e->getMessage())
+                    ->danger()
+                    ->persistent()
+                    ->send();
+
+                return;
+            }
+
+            // Names only: the values are secrets.
+            Log::info('Env editor saved .env.', [
+                'admin_id' => auth()->id(),
+                'keys' => $changed,
+                'backup' => $backup !== null ? basename($backup) : null,
+            ]);
+            $backupNote = $backup !== null
+                ? ' The previous file was kept as storage/app/listen-deploy/'.basename($backup).'.'
+                : ' No copy of the previous file could be kept.';
+        }
 
         $cacheNote = $this->refreshConfigCache();
 
@@ -155,7 +190,7 @@ class EnvEditor extends Page implements HasForms
 
         Notification::make()
             ->title('.env file updated successfully')
-            ->body($cacheNote)
+            ->body($cacheNote.$backupNote)
             ->success()
             ->send();
     }
@@ -183,15 +218,18 @@ class EnvEditor extends Page implements HasForms
 
     protected function escapeValue(string $value): string
     {
-        // One line per variable: a pasted line break must not start a new one.
+        return EnvFile::value($value);
+    }
+
+    /**
+     * A value edited as written in .env (see $rawKeys): its \n and the like
+     * stay escapes, and only a quote that is not escaped yet gets escaped.
+     */
+    protected function writtenValue(string $value): string
+    {
         $value = str_replace(["\r", "\n"], '', $value);
 
-        // Wrap in quotes if the value contains spaces or special chars
-        if (preg_match('/[\s#=]/', $value) || $value === '') {
-            return '"'.addcslashes($value, '"').'"';
-        }
-
-        return $value;
+        return '"'.preg_replace('/(?<!\\\\)"/', '\\"', $value).'"';
     }
 
     protected function envPath(): string
@@ -207,6 +245,7 @@ class EnvEditor extends Page implements HasForms
         }
 
         $entries = [];
+        $this->rawKeys = [];
         $lines = explode("\n", File::get($envPath));
 
         foreach ($lines as $line) {
@@ -218,7 +257,16 @@ class EnvEditor extends Page implements HasForms
             if (str_contains($line, '=')) {
                 [$key, $value] = explode('=', $line, 2);
                 $key = trim($key);
-                $value = trim($value, " \t\n\r\0\x0B\"'");
+
+                // Shown as the app reads it, so saving it back changes nothing.
+                $read = EnvFile::read($line);
+                if ($read !== null && ! preg_match('/[\r\n]/', $read)) {
+                    $value = $read;
+                } else {
+                    $value = trim($value, " \t\n\r\0\x0B\"'");
+                    $this->rawKeys[$key] = true;
+                }
+
                 $entries[] = ['key' => $key, 'value' => $value, 'is_new' => false];
             }
         }

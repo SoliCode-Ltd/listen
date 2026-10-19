@@ -104,7 +104,11 @@ class ArabicVoiceMapper
      */
     public function mapToProviderConfig(string $provider, array $userIntent): array
     {
-        $dialect = $userIntent['dialect'] ?? 'ar-XA';
+        // "Auto-detect" chooses no dialect: the premium voice then speaks the text
+        // as written, with no dialect rewrite and no Fusha direction (it still
+        // reads it as Arabic, ar-XA). Fusha itself is the explicit ar-XA choice.
+        $chosenDialect = trim((string) ($userIntent['dialect'] ?? ''));
+        $dialect = $chosenDialect !== '' ? $chosenDialect : 'ar-XA';
         $hasExplicitPerformanceStyle = array_key_exists('performance_style', $userIntent)
             || array_key_exists('style', $userIntent);
         $performanceStyle = $userIntent['performance_style'] ?? ($userIntent['style'] ?? 'neutral');
@@ -138,7 +142,7 @@ class ArabicVoiceMapper
         }
 
         if ($provider === 'gemini') {
-            return $this->mapForGemini($dialect, (string) $performanceStyle, (string) $emotion, $gender, $speed, $pitch, $voiceName);
+            return $this->mapForGemini($chosenDialect, (string) $performanceStyle, (string) $emotion, $gender, $speed, $pitch, $voiceName);
         }
 
         return $this->mapForGoogleCloud($dialect, (string) $performanceStyle, (string) $emotion, $gender, $speed, $pitch, $voiceName);

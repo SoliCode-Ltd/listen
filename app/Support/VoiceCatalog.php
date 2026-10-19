@@ -10,6 +10,9 @@ use Illuminate\Support\Facades\Storage;
 
 class VoiceCatalog
 {
+    /** Where voiceMeta() keeps the voices it read, for one request or queued job. */
+    private const VOICE_META_MEMO = 'listen.voice_catalog.voice_meta';
+
     /**
      * Arabic transliterations of speaker display names.
      */
@@ -419,6 +422,34 @@ class VoiceCatalog
             return null;
         }
 
+        // A history list asks for the same few voices on every row: each one is read
+        // once per request or queued job (the worker starts each job afresh), and
+        // again after a voice is saved.
+        $memo = self::voiceMetaMemo();
+        if (! $memo->offsetExists($voiceName)) {
+            $memo[$voiceName] = self::readVoiceMeta($voiceName);
+        }
+
+        return $memo[$voiceName];
+    }
+
+    /** Forgets the voices read so far in this request (a voice was changed). */
+    public static function forgetVoiceMeta(): void
+    {
+        app()->forgetInstance(self::VOICE_META_MEMO);
+    }
+
+    private static function voiceMetaMemo(): \ArrayObject
+    {
+        if (! app()->bound(self::VOICE_META_MEMO)) {
+            app()->scoped(self::VOICE_META_MEMO, fn () => new \ArrayObject);
+        }
+
+        return app(self::VOICE_META_MEMO);
+    }
+
+    private static function readVoiceMeta(string $voiceName): ?array
+    {
         $voice = self::activeQuery()->where('internal_voice_id', $voiceName)->first();
         if (! $voice) {
             return null;

@@ -15,10 +15,13 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        User::updateOrCreate(
-            ['email' => 'test@example.com'],
-            ['name' => 'Test User', 'password' => 'password']
-        );
+        // A sign-in everyone knows: for a developer's machine and the tests only.
+        if (app()->environment(['local', 'testing'])) {
+            User::updateOrCreate(
+                ['email' => 'test@example.com'],
+                ['name' => 'Test User', 'password' => 'password']
+            );
+        }
 
         $this->call([
             AdminSeeder::class,

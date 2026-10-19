@@ -6,7 +6,9 @@ name: Server deploy
 # storage/, vendor/, node_modules/, uploads, or the per-server extension
 # config (public/extensions/*/config.js).
 #   inspect: lists the files that differ from what would be deployed (nothing changes).
-#   deploy:  copies main over the app, then clears and rebuilds caches.
+#   deploy:  copies main over the app, then clears and rebuilds caches (never
+#            the app cache; routes only with route:trans:cache). Any failing
+#            step fails the run, and so does /en or /ar not answering 200.
 #   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
 #            environments and download formats) when the host has none.
 #   migrate: lists the pending migrations, then runs them (php artisan
@@ -26,6 +28,23 @@ name: Server deploy
 #            subscription: how the plan is saved, whether anything was paid
 #            for it, and whether it needs a look. Writes nothing; prints
 #            member ids only.
+#   settings: the server's own switches in .env (the old .env is kept in
+#            storage/app/listen-deploy): LISTEN_LIVE_ACTIONS true on live and
+#            false on staging, the extension's old shared LISTEN_API_KEY
+#            removed, and on live a local/testing APP_ENV set to production and
+#            APP_DEBUG turned off. Rebuilds the config cache, restarts the
+#            workers, then shows what is in use (never a secret's value), the
+#            PHP limits, the queue workers and the scheduler.
+#   data-checks: read-only (READ ONLY database session). Paid plans marked
+#            past due, members blocked by the wording rule (paying ones
+#            first), the share of sign-ups per network address (counts only,
+#            never an address) and the speech and credit settings. Prints
+#            member ids only.
+#   page-check: staging only. Shows the pages members use inside the app,
+#            in English and Arabic, as a free and a paying test member, and
+#            fails on an error, a wrong status or text shown as its key
+#            (scripts/support/staging_page_check.php). Billing pages are left
+#            out: staging runs the live Stripe keys.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -37,7 +56,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, data-checks, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -46,6 +65,11 @@ on:
 
 permissions:
   contents: read
+
+# One run at a time per server: a second deploy (or migrate) waits for the first.
+concurrency:
+  group: server-deploy-${{ inputs.target }}
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -216,6 +240,120 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
+          if [ "$MODE" = settings ]; then
+            $S "$FIND; TARGET='$TARGET' bash -s" <<'REMOTE'
+          set -euo pipefail
+          b="storage/app/listen-deploy/env.backup-$(date -u +%Y%m%d%H%M%S)"
+          cp .env "$b" && chmod 600 "$b" && echo "Old .env kept as $b"
+          # KEY=value once: the line is replaced, or added at the end.
+          set_env() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else printf '\n%s=%s\n' "$1" "$2" >> .env; fi; }
+          # The value of KEY in .env, without quotes or spaces.
+          env_of() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | tr -d "\"' " || true; }
+          if [ "$TARGET" = live ]; then set_env LISTEN_LIVE_ACTIONS true; else set_env LISTEN_LIVE_ACTIONS false; fi
+          echo "LISTEN_LIVE_ACTIONS: $(env_of LISTEN_LIVE_ACTIONS)"
+          # The extension's old shared key acted as account 1; members' extensions use their own keys.
+          if grep -q '^LISTEN_API_KEY=' .env; then sed -i '/^LISTEN_API_KEY=/d' .env; echo "LISTEN_API_KEY: removed"; else echo "LISTEN_API_KEY: was not set"; fi
+          if [ "$TARGET" = live ]; then
+            # local or testing believes payment events nobody signed; debug pages show internals.
+            e="$(env_of APP_ENV)"; case "$e" in local|testing) set_env APP_ENV production; echo "APP_ENV: $e -> production";; *) echo "APP_ENV: ${e:-not set} (kept)";; esac
+            d="$(env_of APP_DEBUG)"; case "$d" in true|TRUE|True|1) set_env APP_DEBUG false; echo "APP_DEBUG: $d -> false";; *) echo "APP_DEBUG: ${d:-not set} (kept)";; esac
+          fi
+          if [ -f bootstrap/cache/config.php ]; then php artisan config:cache | tail -1; fi
+          php artisan queue:restart | tail -1 || true
+          echo "== Queue workers running now =="
+          ps -eo pid,etime,args | grep -E 'artisan (queue:(work|listen)|horizon)' | grep -v grep || echo "  none right now"
+          echo "== Cron lines that start Laravel =="
+          crontab -l 2>/dev/null | grep -E 'artisan' || echo "  none in this user's crontab"
+          echo "== PHP-FPM time limits (when this user can read the pool file) =="
+          found=0
+          for f in /etc/php/*/fpm/pool.d/*.conf /etc/php-fpm.d/*.conf /etc/php*/php-fpm.d/*.conf; do
+            [ -r "$f" ] || continue
+            grep -HE '^[[:space:]]*(request_terminate_timeout|php_admin_value\[max_execution_time\]|php_value\[max_execution_time\])' "$f" && found=1 || true
+          done
+          [ "$found" = 1 ] || echo "  not readable from here: set request_terminate_timeout in the Cloudways panel"
+          REMOTE
+            $S "$FIND; php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $line = function (string $label, $value): void { echo '  '.str_pad($label, 46).(is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value)."\n"; };
+          echo "== In use now ==\n";
+          $line('APP_ENV / debug', config('app.env').' / '.(config('app.debug') ? 'ON' : 'off'));
+          $line('Acts on real customers (live-site switch)', App\Support\LiveServer::allowsCustomerActions());
+          $line('Stripe webhook signing secret', trim((string) config('services.stripe.webhook_secret')) !== '' ? 'set' : 'MISSING');
+          $line('Throwaway inboxes refused at sign-up', (bool) config('disposable_email.enabled', true));
+          $line('Queue / retry_after (seconds)', config('queue.default').' / '.config('queue.connections.database.retry_after'));
+          $line('Texts made after the reply from (characters)', (string) config('listen.audio.force_async_chars'));
+          $line('PHP (command line) max_execution_time', (string) ini_get('max_execution_time'));
+          $line('PHP (command line) memory_limit', (string) ini_get('memory_limit'));
+          REMOTE
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = data-checks ]; then
+            $S "$FIND; php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          if (in_array(Illuminate\Support\Facades\DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+              Illuminate\Support\Facades\DB::statement('SET SESSION TRANSACTION READ ONLY');
+          }
+          $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
+          echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
+
+          echo "== Paid plans marked past due (compare each with Stripe) ==\n";
+          $rows = $db('subscriptions')->where('status', 'active')->where('billing_payment_state', 'past_due')->orderBy('id')
+              ->get(['id', 'user_id', 'plan_id', 'billing_grace_ends_at', 'current_period_end', 'updated_at']);
+          foreach ($rows as $r) { echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; }
+          if ($rows->isEmpty()) { echo "  none\n"; }
+
+          echo "== Members blocked by the wording rule ==\n";
+          $wording = App\Models\User::query()->where('is_blocked', true)->whereNull('blocked_by')
+              ->whereIn('blocked_reason', [App\Services\BlockedUserService::DEFAULT_REASON_EN, App\Services\BlockedUserService::DEFAULT_REASON_AR])
+              ->orderBy('id')->get();
+          $paying = $wording->filter(fn ($u) => App\Support\PaidMember::is($u));
+          echo '  blocked by it: ', $wording->count(), ', of whom pay or have paid: ', $paying->count(), "\n";
+          if ($paying->isNotEmpty()) { echo '  paying member ids (unblock these first): ', $paying->pluck('id')->implode(', '), "\n"; }
+          if ($wording->isNotEmpty()) {
+              echo '  member ids: ', $wording->pluck('id')->implode(', '), "\n";
+              $terms = $db('blocked_generations')->whereIn('user_id', $wording->pluck('id'))->selectRaw('matched_term, count(*) as n')
+                  ->groupBy('matched_term')->orderByDesc('n')->limit(25)->get();
+              echo '  words that refused their texts: ', $terms->map(fn ($t) => $t->matched_term.' ('.$t->n.')')->implode(', '), "\n";
+          }
+          $all = App\Models\User::query()->where('is_blocked', true)->count();
+          echo '  all blocked members: ', $all, ' (multi-account and admin blocks included)', "\n";
+
+          echo "== Sign-ups per network address (counts only, never an address) ==\n";
+          $total = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->count();
+          $top = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')
+              ->selectRaw('registration_ip, count(*) as n')->groupBy('registration_ip')->orderByDesc('n')->limit(5)->get();
+          $distinct = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->distinct()->count('registration_ip');
+          echo '  members with a sign-up address: ', $total, ', different addresses: ', $distinct, "\n";
+          foreach ($top as $i => $t) {
+              $public = filter_var($t->registration_ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+              printf("  #%d busiest address: %d sign-ups (%.1f%%), %s\n", $i + 1, $t->n, $total > 0 ? 100 * $t->n / $total : 0, $public ? 'a public address' : 'a PRIVATE or local address (the site sees its proxy)');
+          }
+
+          echo "== Settings ==\n";
+          foreach (['credit_periods_from', 'tts_mode', 'gemini_tts_model', 'demo_char_allowance'] as $key) {
+              $value = $db('site_settings')->where('key', $key)->value('value');
+              echo '  ', str_pad($key, 22), ($value === null || $value === '' ? '(not set)' : $value), "\n";
+          }
+          REMOTE
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = page-check ]; then
+            [ "$TARGET" = staging ] || { echo "page-check runs on staging only"; exit 1; }
+            failed=0
+            for l in en ar; do
+              $S "$FIND; LOCALE=$l php" < scripts/support/staging_page_check.php || failed=1
+            done
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
+          fi
           if [ "$MODE" = indexnow ]; then
             $S "$FIND; php artisan seo:indexnow"
             rm -f ~/.ssh/id_deploy
@@ -240,25 +378,51 @@ jobs:
           fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
-          $S "$FIND; set -e; tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \
-            c=0; [ -f bootstrap/cache/config.php ] && c=1; r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1; \
-            php artisan optimize:clear | tail -6; \
-            [ \$c = 1 ] && php artisan config:cache | tail -1; [ \$r = 1 ] && php artisan route:cache | tail -1; \
-            php artisan view:cache | tail -1; php artisan queue:restart | tail -1 || true; \
-            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'; \
-            rm -f storage/app/listen-deploy/bundle.tgz"
+          # In bash with pipefail, so anything that fails stops the deploy and fails the run.
+          $S "$FIND; bash -s" <<'REMOTE'
+          set -euo pipefail
+          trap 'rm -f storage/app/listen-deploy/bundle.tgz' EXIT
+          # One artisan step: its last lines when it works, all of its output (artisan
+          # prints errors there too) and a FAILED line when it does not.
+          step() {
+            local lines="$1" out; shift
+            if ! out="$(php artisan "$@" 2>&1)"; then
+              printf '%s\n' "$out"; echo "DEPLOY FAILED at: php artisan $*"; exit 1
+            fi
+            printf '%s\n' "$out" | tail -n "$lines"
+          }
+          tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir
+          c=0; [ -f bootstrap/cache/config.php ] && c=1
+          r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1
+          # The app cache stays: it holds the Stripe webhook and email de-duplication,
+          # the daily spend ceilings, rate limits and the keys' "out for today" markers.
+          step 6 optimize:clear --except=cache
+          # The /en and /ar routes have their own cache files (mcamara/laravel-localization).
+          # Clear them every time, and cache routes only with route:trans:cache: plain
+          # route:cache leaves out the language prefix, so every /en and /ar page 404s.
+          step 1 route:trans:clear
+          if [ "$c" = 1 ]; then step 1 config:cache; fi
+          if [ "$r" = 1 ]; then step 1 route:trans:cache; fi
+          step 1 view:cache
+          php artisan queue:restart | tail -1 || true
+          md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'
+          REMOTE
           rm -f ~/.ssh/id_deploy
       - name: Check the public footer
         env:
           BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
         run: |
+          failed=0
           for path in /ar /en; do
             html="$(curl -s --max-time 30 -L "$BASE$path" || true)"
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
             echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
+            # Either home page not loading fails the run, so a broken deploy is not missed.
+            [ "$code" = 200 ] || { echo "::error::$BASE$path answered HTTP $code"; failed=1; }
           done
           # Text the server could not find shows as its key ("ui.pricing.team_title"); list any.
           for path in /ar /en /ar/pricing /en/pricing; do
             keys="$(curl -s --max-time 30 -L "$BASE$path" | grep -oE '>[[:space:]]*ui\.[a-z0-9_]+\.[a-z0-9_.]+' | sed 's/^>[[:space:]]*//' | sort -u | tr '\n' ' ' || true)"
             echo "$path: untranslated keys: ${keys:-none}"
           done
+          exit "$failed"

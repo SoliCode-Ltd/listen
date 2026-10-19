@@ -1,0 +1,128 @@
+<?php
+
+/*
+ * For the "Server deploy" workflow's page-check mode, on STAGING only: shows
+ * the pages members use inside the app (no browser, no network), in one
+ * language per run (LOCALE=en or ar), as a free and as a paying test member,
+ * and fails when a page errors, answers an unexpected status, or shows text
+ * as its translation key ("ui.dashboard.title").
+ *
+ * The billing pages are left out on purpose: staging runs the live Stripe
+ * keys, and showing them can create a customer there. The test members have
+ * no Stripe customer, so nothing here reaches Stripe, and the paying member's
+ * plan is set with model events off (no welcome email) and taken back at the
+ * end. Refuses to run on the live site.
+ *
+ *   ssh user@host 'cd ~/public_html && LOCALE=en php' < scripts/support/staging_page_check.php
+ */
+
+use App\Models\Plan;
+use App\Models\Subscription;
+use App\Models\User;
+use App\Services\PlanAccessService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+
+ini_set('display_errors', 'stderr');
+
+$root = getcwd();
+if (! is_file($root.'/artisan')) {
+    fwrite(STDERR, "Run this from the Laravel app root.\n");
+    exit(1);
+}
+
+$locale = in_array(getenv('LOCALE'), ['en', 'ar'], true) ? (string) getenv('LOCALE') : 'en';
+
+require $root.'/vendor/autoload.php';
+$app = require $root.'/bootstrap/app.php';
+$kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+// Started as a web request in this language, so the pages are found under /en or /ar.
+$app->instance('request', Request::create('/'.$locale));
+$kernel->bootstrap();
+
+if (str_contains(strtolower((string) config('app.url')), 'listenai.studio')) {
+    fwrite(STDERR, "This is the live site: the page check runs on staging only.\n");
+    exit(1);
+}
+
+$access = app(PlanAccessService::class);
+$member = fn (string $email, string $name): User => User::query()->firstOrCreate(
+    ['email' => $email],
+    ['name' => $name, 'password' => bcrypt(Str::random(40))],
+);
+$free = $member('staging-pages-free@example.com', 'Staging pages (free)');
+$paid = $member('staging-pages-paid@example.com', 'Staging pages (paid)');
+$freePlan = $access->freePlan();
+// The dearest plan on sale, so every studio feature is on the page.
+$paidPlan = Plan::query()->subscriptionPlans()->where('is_active', true)->where('price_cents', '>', 0)->orderByDesc('price_cents')->first();
+if (! $freePlan || ! $paidPlan) {
+    fwrite(STDERR, "No free plan or no paid plan on sale.\n");
+    exit(1);
+}
+Subscription::withoutEvents(fn () => $access->assignPlan($free, $freePlan));
+Subscription::withoutEvents(fn () => $access->assignPlan($paid, $paidPlan));
+echo "Language {$locale}: free member {$free->id}, paying member {$paid->id} on {$paidPlan->slug}.\n";
+
+// [who, address, the statuses that are right]
+$pages = [
+    [null, '', [200]],
+    [null, 'pricing', [200]],
+    [null, 'voice-samples', [200]],
+    [null, 'developers', [200]],
+    [null, 'browsers-extension', [200]],
+    [$free, 'dashboard', [200]],
+    [$free, 'demo', [200]],
+    [$free, 'dashboard/api-keys', [200, 302]],
+    [$free, 'dashboard/voice-cloning', [200, 302]],
+    [$paid, 'dashboard', [200]],
+    // The keys page sends a member whose plan has no API to the studio.
+    [$paid, 'dashboard/api-keys', [200, 302]],
+    [$paid, 'dashboard/voice-cloning', [200, 302]],
+    [$paid, 'browsers-extension', [200]],
+    [$paid, 'browsers-extension/download', [200]],
+    // The demo is for free accounts: a member with a plan is sent to the studio.
+    [$paid, 'demo', [302]],
+];
+
+$failed = 0;
+foreach ($pages as [$who, $path, $expected]) {
+    $guard = $app['auth']->guard('web');
+    if ($who) {
+        $guard->setUser($who);
+    } else {
+        $guard->forgetUser();
+    }
+    $request = Request::create('/'.$locale.($path === '' ? '' : '/'.$path), 'GET', [], [], [], ['HTTP_ACCEPT' => 'text/html']);
+    $started = microtime(true);
+    try {
+        $response = $kernel->handle($request);
+        $kernel->terminate($request, $response);
+    } catch (Throwable $e) {
+        $failed++;
+        printf("  FAIL  %-34s %s: %s\n", '/'.$locale.'/'.$path, get_class($e), mb_substr($e->getMessage(), 0, 300));
+
+        continue;
+    }
+    $status = $response->getStatusCode();
+    $body = (string) $response->getContent();
+    preg_match_all('/>\s*(ui\.[a-z0-9_]+\.[a-z0-9_.]+)/', $body, $keys);
+    $keys = array_values(array_unique($keys[1]));
+    $problem = ! in_array($status, $expected, true) ? 'answered '.$status
+        : ($keys !== [] ? 'text shown as keys: '.implode(' ', array_slice($keys, 0, 8)) : null);
+    $error = $response->exception ?? null;
+    if ($problem !== null && $error) {
+        $problem .= ' ('.get_class($error).': '.mb_substr($error->getMessage(), 0, 300).')';
+    }
+    $who = $who === $paid ? 'paying' : ($who === $free ? 'free' : 'visitor');
+    $where = $status >= 300 && $status < 400 ? ' -> '.parse_url((string) $response->headers->get('Location'), PHP_URL_PATH) : '';
+    printf("  %-4s  %-34s %-8s %d %s%s, %d ms%s\n", $problem ? 'FAIL' : 'ok', '/'.$locale.($path === '' ? '' : '/'.$path), $who,
+        $status, $status === 200 ? number_format(strlen($body)).' bytes' : '', $where, (int) round((microtime(true) - $started) * 1000),
+        $problem ? ': '.$problem : '');
+    $failed += $problem ? 1 : 0;
+}
+
+// The paying test member goes back to the free plan.
+Subscription::withoutEvents(fn () => $access->assignPlan($paid, $freePlan));
+
+echo $failed === 0 ? "Every page answered as it should.\n" : "{$failed} page(s) did not.\n";
+exit($failed === 0 ? 0 : 1);

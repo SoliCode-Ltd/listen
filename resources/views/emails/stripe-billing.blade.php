@@ -1,5 +1,10 @@
+@php
+    // The email's own language decides its direction, not the site's.
+    $emailLocale = $locale ?? 'en';
+    $emailDir = $emailLocale === 'ar' ? 'rtl' : 'ltr';
+@endphp
 <!DOCTYPE html>
-<html lang="{{ app()->getLocale() }}" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'ltr' }}">
+<html lang="{{ $emailLocale }}" dir="{{ $emailDir }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -74,7 +79,7 @@
     </style>
 </head>
 <body>
-    <div class="wrapper">
+    <div class="wrapper" dir="{{ $emailDir }}">
         <div class="main">
             <!-- Header -->
             <div class="header">

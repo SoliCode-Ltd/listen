@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -34,7 +35,17 @@ class DemoHistoryImporter
 
         $isPaid = $this->isPaidPlan($activePlan);
         $planSlug = strtolower(trim((string) ($activePlan?->slug ?? '')));
+
+        // Runs on every signed-in page: while the member's paid state and plan are
+        // what they were at the last run (in the last 10 minutes), the rows are left alone.
+        $state = ($isPaid ? 'paid' : 'free').':'.$planSlug;
+        $stateKey = 'demo_history_plan_state:'.$userId;
+        if (Cache::get($stateKey) === $state) {
+            return ['moved_to_history' => 0, 'moved_to_demo' => 0];
+        }
+
         $updated = $this->syncPaidTagOnDemoRows($userId, $isPaid, $planSlug, $limit);
+        Cache::put($stateKey, $state, now()->addMinutes(10));
 
         return [
             'moved_to_history' => $isPaid ? $updated : 0,

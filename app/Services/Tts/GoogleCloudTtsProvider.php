@@ -131,7 +131,11 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $disk->makeDirectory('audio');
         }
 
-        $disk->put($filename, $binary);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $binary)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
         $charCount = mb_strlen($text);
@@ -255,7 +259,8 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
      */
     public static function splitForByteLimit(string $text, int $maxBytes = self::MAX_INPUT_BYTES): array
     {
-        return TextChunker::split($text, $maxBytes, 'strlen');
+        // Read a few at a time: earlier rounds stay full, the last one shares the rest.
+        return TextChunker::split($text, $maxBytes, 'strlen', max(1, (int) config('services.google_tts.max_parallel_requests', 4)));
     }
 
     /**

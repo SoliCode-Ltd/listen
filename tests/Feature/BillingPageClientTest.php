@@ -1,0 +1,172 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Plan;
+use App\Models\SiteSetting;
+use App\Models\User;
+use App\Services\Billing\StripePackGateway;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
+use Tests\Support\FakeStripePackGateway;
+use Tests\TestCase;
+
+/**
+ * The billing pages in the browser: without Stripe.js (blocked or failed) the
+ * card form says so and InstaPay / Vodafone Cash keep working; the pay button
+ * stays off while a payment is on its way; a card is shown the US dollar
+ * amount it is charged, with the local price as "about"; and a pack payment
+ * that is still processing, or declined, is told in the page's language.
+ */
+class BillingPageClientTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private FakeStripePackGateway $stripe;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['services.stripe.key' => 'pk_test_fake', 'services.stripe.secret' => 'sk_test_fake']);
+        Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'is_active' => true]);
+        Plan::factory()->create([
+            'slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'voice_tier' => 'hd', 'is_active' => true,
+            'stripe_price_monthly' => 'price_starter_m', 'stripe_price_yearly' => 'price_starter_y',
+        ]);
+        $this->stripe = new FakeStripePackGateway;
+        $this->app->instance(StripePackGateway::class, $this->stripe);
+    }
+
+    private function billingPage(string $locale): TestResponse
+    {
+        app()->setLocale($locale);
+
+        return $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->getLocalizedRoute('billing.page')->assertOk();
+    }
+
+    private function pack(): Plan
+    {
+        return Plan::factory()->create([
+            'slug' => 'pack', 'name' => 'Premium Pack', 'kind' => Plan::KIND_PACK, 'pack_days' => 30,
+            'price_cents' => 200, 'monthly_chars' => 20000, 'monthly_requests' => 0,
+            'max_chars_per_request' => 5000, 'voice_tier' => 'hd', 'is_active' => true,
+        ]);
+    }
+
+    /** A string as @json writes it into the page's script. */
+    private static function js(string $text): string
+    {
+        return json_encode($text, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT);
+    }
+
+    public function test_the_billing_page_keeps_working_without_stripe_js(): void
+    {
+        $page = $this->billingPage('ar')
+            ->assertSee("stripe = stripeKey && typeof Stripe === 'function' ? Stripe(stripeKey) : null;", false)
+            ->assertSee('const cardFormMissing = Boolean(stripeKey) && !stripe;', false)
+            ->assertSee('if (cardFormMissing && cardError) cardError.textContent = cardUnavailableText;', false)
+            ->assertSee('if (!stripe || !card) throw new Error(cardUnavailableText);', false)
+            ->assertDontSee('const stripe = stripeKey ? Stripe(stripeKey) : null;', false);
+
+        $text = __('ui.billing.card_form_unavailable', [], 'ar');
+        $this->assertMatchesRegularExpression('/\p{Arabic}/u', $text);
+        $page->assertSee('"card_form_unavailable":'.self::js($text), false);
+    }
+
+    public function test_pay_stays_off_until_the_payment_is_answered(): void
+    {
+        $this->billingPage('en')
+            ->assertSee('let paymentInFlight = false;', false)
+            // Redrawing the form (another plan, cycle or method) leaves Pay alone meanwhile.
+            ->assertSee('if (subscribeBtn && !paymentInFlight) {', false)
+            ->assertSee("      paymentInFlight = Boolean(isBusy);\n", false)
+            // A second submit or the trial button does nothing while one is on its way.
+            ->assertSee("e.preventDefault();\n      if (paymentInFlight) return;", false)
+            ->assertSee("trialBtn?.addEventListener('click', async () => {\n      if (paymentInFlight) return;", false)
+            // After success the next page loads with Pay still off.
+            ->assertSee('if (!leaving) setSubscribeButtonBusy(false);', false)
+            // The server's 409 ("a payment is already in progress") is shown as it says.
+            ->assertSee('throw new Error(response.data?.message || i18n.upgrade_failed);', false);
+    }
+
+    public function test_a_card_is_shown_the_dollar_amount_it_is_charged(): void
+    {
+        SiteSetting::set('pricing_forced_country_code', 'EG', 'billing');
+        SiteSetting::set('pricing_exchange_rate_EGP', '50', 'billing');
+
+        // What the page gets: the local price, and the dollar price the Stripe price charges.
+        $page = $this->billingPage('en')
+            ->assertViewHas('plans', function (array $plans): bool {
+                $monthly = collect($plans)->firstWhere('slug', 'starter')['payment_methods']['stripe']['monthly'];
+
+                return $monthly['is_converted'] === true
+                    && $monthly['charge_currency'] === 'USD'
+                    && $monthly['base_usd_formatted'] === '$9.00'
+                    && str_replace("\u{a0}", ' ', $monthly['amount_formatted']) === 'EGP 450';
+            });
+
+        $page->assertSee('<p class="hint amount-about" id="quoteAmountAbout" hidden></p>', false)
+            ->assertSee("if (meta?.is_converted && inDollars && meta?.base_usd_formatted) {", false)
+            ->assertSee('return { amount: String(meta.base_usd_formatted), local: String(meta.amount_formatted || \'\') };', false)
+            ->assertSee("const charge = selected.method === 'stripe' ? cardCharge(selected.meta)", false)
+            ->assertSee('const amount = cardCharge(cycle === \'yearly\' ? plan?.yearly : plan?.monthly).amount;', false);
+
+        $this->assertSame('Charged in US dollars, about EGP 450', __('ui.billing.card_local_about', ['amount' => 'EGP 450'], 'en'));
+        $arabic = __('ui.billing.card_local_about', [], 'ar');
+        $this->assertStringContainsString(':amount', $arabic);
+        $this->assertMatchesRegularExpression('/\p{Arabic}/u', $arabic);
+    }
+
+    public function test_the_pack_page_keeps_pay_off_while_the_bank_processes_and_without_stripe_js(): void
+    {
+        $this->pack();
+        app()->setLocale('ar');
+
+        $page = $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->getLocalizedRoute('billing.pack')->assertOk()
+            ->assertSee("stripe = typeof Stripe === 'function' ? Stripe(", false)
+            ->assertSee('setNotice(i18n.formMissing, \'\');', false)
+            ->assertSee('if (response.status === 202 && response.data.processing) {', false)
+            ->assertSee('button.textContent = i18n.processingButton;', false)
+            ->assertSee('failed(firstError(response.data), response.data && response.data.reason);', false)
+            ->assertSee('return isArabicPage && !/[؀-ۿ]/.test(raw) ? [fallback, raw] : [raw || fallback, \'\'];', false)
+            ->assertDontSee('errorBox.textContent = event.error ? event.error.message', false);
+
+        foreach (['processingButton' => 'ui.pack.card_processing_button', 'formMissing' => 'ui.billing.card_form_unavailable', 'processing' => 'ui.pack.card_processing'] as $name => $key) {
+            $this->assertMatchesRegularExpression('/\p{Arabic}/u', __($key, [], 'ar'));
+            $page->assertSee($name.': '.self::js(__($key, [], 'ar')), false);
+        }
+    }
+
+    public function test_a_declined_pack_card_is_told_in_the_page_language_with_the_reason_aside(): void
+    {
+        $this->pack();
+        $this->stripe->nextOutcome = 'declined';
+        app()->setLocale('ar');
+
+        $response = $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->postJsonLocalizedRoute('billing.pack.card', ['payment_method' => 'pm_card_declined'])
+            ->assertStatus(422)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('message', 'رُفضت بطاقتك، لذلك لم يُخصم أي مبلغ. جرّب بطاقة أخرى.')
+            ->assertJsonPath('reason', 'Your card was declined.');
+
+        $this->assertStringNotContainsString('Your card was declined.', (string) $response->json('message'));
+    }
+
+    public function test_a_pack_payment_the_bank_is_still_processing_says_so(): void
+    {
+        $this->pack();
+        $this->stripe->nextOutcome = 'processing';
+        app()->setLocale('ar');
+
+        $this->actingAs(User::factory()->create(['subscription_status_checked_at' => now()]))
+            ->postJsonLocalizedRoute('billing.pack.card', ['payment_method' => 'pm_card_slow'])
+            ->assertStatus(202)
+            ->assertJsonPath('processing', true)
+            ->assertJsonPath('message', __('ui.pack.card_processing', [], 'ar'))
+            ->assertJsonMissingPath('reason');
+    }
+}

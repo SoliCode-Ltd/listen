@@ -654,17 +654,33 @@ class VoiceCloningTest extends TestCase
         $this->assertSoftDeleted('cloned_voices', ['id' => $voice->id]);
     }
 
-    public function test_user_cannot_delete_a_ready_voice(): void
+    public function test_owner_can_delete_a_ready_voice_and_it_is_removed_everywhere(): void
     {
+        // The person whose voice it is can withdraw consent: the voice goes from
+        // every key's project at the provider, with both recordings, as an admin purge.
+        config(['services.gemini_tts.api_key' => '']);
+        $manager = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class)->makePartial();
+        $manager->shouldReceive('getAllKeys')->andReturn([
+            ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
+            ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
+        ]);
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $manager);
+        \Illuminate\Support\Facades\Http::fake(['*' => \Illuminate\Support\Facades\Http::response([], 200)]);
+
+        Storage::disk('local')->put('voice-cloning/test/sample.wav', 'RIFF....WAVEfmt sample');
+        Storage::disk('local')->put('voice-cloning/test/consent.wav', 'RIFF....WAVEfmt consent');
         $voice = ClonedVoice::factory()->ready()->create([
             'user_id' => $this->paidUser->id,
-            'name' => 'Kept Voice',
+            'name' => 'My Voice',
+            'provider_voice_key' => 'voice_made_on_key_one',
             'source_audio_path' => 'voice-cloning/test/sample.wav',
+            'consent_audio_path' => 'voice-cloning/test/consent.wav',
+            'metadata' => ['voice_copies' => ['GEMINI_TTS_API_KEY_2' => 'voice_copy_on_key_two']],
         ]);
 
         $page = $this->actingAs($this->paidUser)->getLocalizedRoute('dashboard');
         $card = $this->voiceCardHtml($page->getContent(), $voice->id);
-        $this->assertStringNotContainsString('vc-delete-btn', $card);
+        $this->assertStringContainsString('vc-delete-btn', $card);
         $this->assertStringContainsString('data-vc-action="use"', $card);
 
         $response = $this->actingAs($this->paidUser)
@@ -676,12 +692,16 @@ class VoiceCloningTest extends TestCase
             ])
             ->deleteJson($this->localizedRoute('voice-cloning.destroy', ['id' => $voice->id]));
 
-        $response->assertStatus(422);
-        $response->assertJson([
-            'success' => false,
-            'error' => __('ui.voice_cloning.delete_ready_blocked'),
-        ]);
-        $this->assertNotSoftDeleted('cloned_voices', ['id' => $voice->id]);
+        $response->assertOk();
+        $response->assertJson(['success' => true, 'message' => __('ui.voice_cloning.deleted_success')]);
+        $this->assertSoftDeleted('cloned_voices', ['id' => $voice->id]);
+        Storage::disk('local')->assertMissing('voice-cloning/test/sample.wav');
+        Storage::disk('local')->assertMissing('voice-cloning/test/consent.wav');
+        \Illuminate\Support\Facades\Http::assertSent(fn ($request): bool => $request->method() === 'DELETE'
+            && str_ends_with($request->url(), '/voices/voice_made_on_key_one'));
+        \Illuminate\Support\Facades\Http::assertSent(fn ($request): bool => $request->method() === 'DELETE'
+            && str_ends_with($request->url(), '/voices/voice_copy_on_key_two')
+            && ($request->header('x-goog-api-key')[0] ?? null) === 'k2');
     }
 
     /* ------------------------------------------------------------ */

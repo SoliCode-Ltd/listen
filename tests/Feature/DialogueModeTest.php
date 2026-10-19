@@ -8,6 +8,7 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\DialogueSpeakers;
 use App\Support\GeminiTtsModel;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -164,6 +165,66 @@ class DialogueModeTest extends TestCase
         $this->assertSame([], $this->requests, 'nothing was sent for speech');
     }
 
+    /**
+     * A dialogue is made in one request and very long ones come back empty, so
+     * the studio takes up to 2,400 characters and says so before anything is
+     * reserved or spoken; 2,400 itself is fine.
+     */
+    public function test_a_dialogue_longer_than_the_limit_is_refused_before_anything_is_spent(): void
+    {
+        $member = $this->member(dialogue: true);
+        $this->actingAs($member);
+        [$a, $b] = $this->twoPremiumVoices('ar');
+
+        $long = $this->dialogueRequest($a['key'], $b['key']);
+        $long['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 1);
+        $this->postJsonLocalizedRoute('dashboard.generate', $long)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.content.0', __('ui.backend.dialogue_too_long', ['max' => '2,400']));
+
+        $this->assertSame([], $this->requests, 'nothing was sent for speech');
+        $this->assertSame(0, \App\Models\AudioGeneration::query()->count());
+        $this->assertSame(0, (int) \App\Support\CreditPeriod::counter((int) $member->id)->total_chars, 'nothing was reserved');
+
+        $atTheLimit = $this->dialogueRequest($a['key'], $b['key']);
+        $atTheLimit['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS);
+        $this->postJsonLocalizedRoute('dashboard.generate', $atTheLimit)->assertSuccessful();
+    }
+
+    public function test_the_extension_refuses_a_dialogue_longer_than_the_limit(): void
+    {
+        $member = $this->member(dialogue: true);
+        $key = $member->issueApiKey();
+        [$a, $b] = $this->twoPremiumVoices('ar');
+        $request = $this->dialogueRequest($a['key'], $b['key']);
+        $request['content'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 1);
+
+        $this->postJson('/api/reader/queue', $request, ['X-Listen-Key' => $key])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.content.0', __('ui.backend.dialogue_too_long', ['max' => '2,400']));
+
+        $this->assertSame([], $this->requests, 'nothing was sent for speech');
+        $this->assertSame(0, \App\Models\AudioGeneration::query()->count());
+    }
+
+    public function test_the_demo_refuses_a_dialogue_longer_than_the_limit_in_the_members_language(): void
+    {
+        $this->freePlan();
+        SiteSetting::set(\App\Support\DemoAllowance::SETTING_KEY, '5000', 'demo');
+        $this->actingAs(User::factory()->create());
+        [$a, $b] = $this->twoPremiumVoices('ar');
+        app()->setLocale('ar');
+
+        $long = $this->demoRequest($a['key'], $b['key']);
+        $long['text'] = $this->scriptOf(DialogueSpeakers::MAX_SCRIPT_CHARS + 50);
+        $this->postJsonLocalizedRoute('demo.preview', $long)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.text.0', 'يمكن أن يصل الحوار إلى 2,400 حرف. قسّمه إلى أجزاء أقصر.');
+
+        $this->assertSame([], $this->requests, 'nothing was sent for speech');
+        $this->assertSame(0, \App\Models\DemoVoiceGeneration::count());
+    }
+
     public function test_plans_without_dialogue_ignore_the_speakers_and_hide_the_panel(): void
     {
         $member = $this->member(dialogue: false);
@@ -254,6 +315,22 @@ class DialogueModeTest extends TestCase
         return $speech['body']['contents'][0]['parts'] ?? [];
     }
 
+    /**
+     * A two-speaker script of exactly $chars characters, every line named.
+     */
+    private function scriptOf(int $chars): string
+    {
+        $lines = [];
+        for ($i = 1; mb_strlen(implode("\n", $lines)) < $chars; $i++) {
+            $lines[] = ($i % 2 === 1 ? 'سلطان' : 'نورة').': هذا هو السطر رقم '.$i.' من حوارنا الطويل اليوم.';
+        }
+        // Cut to length, never on a space (the text is trimmed before it is counted).
+        $script = mb_substr(implode("\n", $lines), 0, $chars - 1).'.';
+        $this->assertSame($chars, mb_strlen(trim($script)));
+
+        return $script;
+    }
+
     private function member(bool $dialogue): User
     {
         $plan = Plan::factory()->create([
@@ -262,6 +339,9 @@ class DialogueModeTest extends TestCase
             'voice_tier' => 'hd',
             'tts_provider_policy' => 'auto',
             'dialogue_enabled' => $dialogue,
+            'monthly_chars' => 500000,
+            'monthly_requests' => 0,
+            'max_chars_per_request' => 10000,
         ]);
         $user = User::factory()->create();
         Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);

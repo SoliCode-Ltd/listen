@@ -278,7 +278,9 @@ class AudioEffectsTest extends TestCase
 
     private function memberOn(string $tier, bool $effects = true): User
     {
-        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true, 'monthly_chars' => 100000, 'max_chars_per_request' => 5000, 'monthly_requests' => 0, 'sound_effects_enabled' => $effects]);
+        // Only the free plan has the standard voices: every paid plan gets the premium ones.
+        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true, 'monthly_chars' => 100000, 'max_chars_per_request' => 5000, 'monthly_requests' => 0, 'sound_effects_enabled' => $effects]
+            + ($tier === VoiceTier::STANDARD ? ['price_cents' => 0] : []));
         $user = User::factory()->create(['subscription_status_checked_at' => now()]);
         Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);
 

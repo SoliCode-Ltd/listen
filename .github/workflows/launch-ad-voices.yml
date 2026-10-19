@@ -6,16 +6,11 @@ name: Launch ad voices
 # and commits both back to this branch. Only missing clips are made: delete a
 # WAV to remake it. Owner-approved (launch ad request, 2026-10-16). The key is
 # read over SSH, masked in the log and never stored. Speech requests count
-# against that key's quota, which staging shares with live.
+# against that key's quota, which staging shares with live: run it by hand
+# (on the branch to commit to), only when the owner asks.
 
 on:
-  push:
-    branches: [claude/beautiful-sagan-df90b3]
-    paths:
-      - .github/workflows/launch-ad-voices.yml
-      - marketing/launch-ad/lines.php
-      - marketing/launch-ad/transcribe.py
-      - database/seeders/data/environment_samples.php
+  workflow_dispatch:
 
 permissions:
   contents: write

@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use App\Support\GeminiTtsModel;
@@ -191,7 +192,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
         }
     }
 
-    public function test_standard_tier_and_google_mode_do_not_call_gemini(): void
+    public function test_standard_tier_uses_google_and_google_mode_keeps_hd_on_gemini(): void
     {
         $captured = $this->fakeBothProviders();
         $plan = $this->paidPlan();
@@ -205,6 +206,7 @@ class GeminiModelSwitchSafetyTest extends TestCase
             $plan,
         );
 
+        // The Google mode no longer reads paid HD voices with a standard voice.
         SiteSetting::set('tts_mode', TtsRoutingService::MODE_GOOGLE, 'tts');
         $googleMode = app(TtsService::class)->synthesizeAdvanced(
             'جملة أخرى تماما',
@@ -214,18 +216,19 @@ class GeminiModelSwitchSafetyTest extends TestCase
         );
 
         $this->assertSame('google_cloud', $standard['provider']);
-        $this->assertSame('google_cloud', $googleMode['provider']);
+        $this->assertSame('gemini', $googleMode['provider']);
         $this->assertCount(2, $captured->requests);
         $this->assertStringContainsString('texttospeech.googleapis.com', $captured->requests[0]['url']);
-        $this->assertStringContainsString('texttospeech.googleapis.com', $captured->requests[1]['url']);
+        $this->assertStringContainsString('/models/'.GeminiTtsModel::FLASH.':generateContent', $captured->requests[1]['url']);
     }
 
-    public function test_gemini_fallback_audio_is_not_cached_as_the_selected_model(): void
+    public function test_a_failed_gemini_request_is_not_cached_and_never_read_by_google(): void
     {
         $this->useHybridMode();
         SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
         $geminiCalls = 0;
-        Http::fake(function ($request) use (&$geminiCalls) {
+        $googleCalls = 0;
+        Http::fake(function ($request) use (&$geminiCalls, &$googleCalls) {
             if (str_contains($request->url(), 'generativelanguage')) {
                 $geminiCalls++;
                 if ($geminiCalls === 1) {
@@ -234,21 +237,26 @@ class GeminiModelSwitchSafetyTest extends TestCase
 
                 return Http::response($this->geminiBody('audio/wav', $this->wavBytes()));
             }
+            $googleCalls++;
 
             return Http::response(['audioContent' => base64_encode('google-audio')]);
         });
 
         $plan = $this->paidPlan();
         $options = $this->arabicOptions();
-        $failedOver = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
+        try {
+            app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
+            $this->fail('A premium request Gemini cannot make must fail, not use a standard voice.');
+        } catch (PremiumVoiceUnavailableException $e) {
+            $this->assertStringContainsString('HTTP 429', $e->getMessage());
+        }
         $retried = app(TtsService::class)->synthesizeAdvanced(self::TRANSCRIPT_AR, 'ar', $options, $plan);
 
-        $this->assertTrue($failedOver['fallback_used']);
-        $this->assertSame('google_cloud', $failedOver['provider']);
         $this->assertFalse($retried['fallback_used']);
         $this->assertSame('gemini', $retried['provider']);
         $this->assertSame(GeminiTtsModel::FLASH, $retried['model']);
-        $this->assertSame(2, $geminiCalls);
+        $this->assertSame(2, $geminiCalls, 'the failure was not cached');
+        $this->assertSame(0, $googleCalls);
     }
 
     public function test_every_dialect_emotion_and_style_keeps_speech_and_instructions_apart(): void
@@ -372,16 +380,18 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->assertSame([], $failures, implode("\n", $failures));
     }
 
-    public function test_dialogue_above_two_speakers_falls_back_instead_of_failing_the_request(): void
+    public function test_dialogue_gemini_refuses_fails_instead_of_being_read_by_one_standard_voice(): void
     {
         $this->useHybridMode();
         SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
-        Http::fake(function ($request) {
+        $googleCalls = 0;
+        Http::fake(function ($request) use (&$googleCalls) {
             if (str_contains($request->url(), 'generativelanguage')) {
                 return Http::response([
                     'error' => ['message' => 'speaker_voice_configs must equal 2'],
                 ], 400);
             }
+            $googleCalls++;
 
             return Http::response(['audioContent' => base64_encode('google-audio')]);
         });
@@ -393,16 +403,19 @@ class GeminiModelSwitchSafetyTest extends TestCase
             ['name' => 'Nour', 'voice' => 'Puck'],
         ];
 
-        $result = app(TtsService::class)->synthesizeAdvanced(
-            "Sara: إزيك\nWaleed: كويس\nNour: تمام",
-            'ar',
-            $options,
-            $this->paidPlan(),
-        );
+        try {
+            app(TtsService::class)->synthesizeAdvanced(
+                "Sara: إزيك\nWaleed: كويس\nNour: تمام",
+                'ar',
+                $options,
+                $this->paidPlan(),
+            );
+            $this->fail('A dialogue Gemini refuses must fail, not lose its cast to one standard voice.');
+        } catch (PremiumVoiceUnavailableException $e) {
+            $this->assertStringContainsString('speaker_voice_configs', $e->getMessage());
+        }
 
-        $this->assertTrue($result['fallback_used']);
-        $this->assertSame('google_cloud', $result['provider']);
-        $this->assertNotSame('', $result['audio_path']);
+        $this->assertSame(0, $googleCalls);
     }
 
     public function test_extreme_speed_and_pitch_stay_out_of_the_spoken_text(): void

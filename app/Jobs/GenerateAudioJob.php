@@ -13,8 +13,10 @@ use App\Models\UsageCounter;
 use App\Services\Api\ApiUsageMeter;
 use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioDuration;
@@ -22,6 +24,7 @@ use App\Support\AudioEffects;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceCatalog;
@@ -32,6 +35,7 @@ use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class GenerateAudioJob implements ShouldQueue
 {
@@ -81,18 +85,63 @@ class GenerateAudioJob implements ShouldQueue
     public int $tries = 3;
     public int $timeout = 150;
 
+    /** Time a voice made after the reply may take: the stuck-generation sweep fails one still running after 30 minutes anyway. */
+    private const AFTER_RESPONSE_SECONDS = 1800;
+
     public function __construct(public int $audioGenerationId)
     {
     }
 
+    /**
+     * Texts this long are made after the reply (listen.audio.force_async_chars;
+     * 0 makes every text in the request).
+     */
+    public static function runsAfterResponse(int $chars): bool
+    {
+        $fromChars = max(0, (int) config('listen.audio.force_async_chars', 2500));
+
+        return $fromChars > 0 && $chars >= $fromChars;
+    }
+
+    /**
+     * Makes a member's voice after the reply has been sent, in this same PHP
+     * process (the studio and the extension, for long texts): the member is
+     * answered at once and checks on it, the web server's time limit never cuts
+     * it short, and no queue worker is needed (none is sure to run on the
+     * servers). A failure is failed and refunded as in the request; a process
+     * that dies is left to the stuck-generation sweep.
+     */
+    public static function runAfterResponse(int $audioGenerationId): void
+    {
+        $seconds = self::AFTER_RESPONSE_SECONDS;
+
+        dispatch(function () use ($audioGenerationId, $seconds): void {
+            // Nobody waits on the request any more: a closed tab must not stop a paid generation.
+            ignore_user_abort(true);
+            $limit = (int) ini_get('max_execution_time');
+            if ($limit > 0 && $limit < $seconds && function_exists('set_time_limit')) {
+                @set_time_limit($seconds);
+            }
+
+            try {
+                GenerateAudioJob::dispatchSync($audioGenerationId);
+            } catch (\Throwable) {
+                // Failed and refunded by the job itself: a run in this process is its last try.
+            }
+
+            // One the job's own error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund($audioGenerationId, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+        })->afterResponse();
+    }
+
     public function handle(TranslationService $translationService, TtsService $ttsService): void
     {
-        // Locked, so the stuck-generation sweep (developer API) cannot fail it while it starts.
+        // Locked, so a stuck-generation sweep cannot fail it while it starts.
         $generation = DB::transaction(function (): ?AudioGeneration {
             $generation = AudioGeneration::query()->whereKey($this->audioGenerationId)->lockForUpdate()->first();
-            // A developer API generation that failed has had its credits given back
-            // (perhaps by the sweep): it is never made again.
-            if (! $generation || $generation->status === 'done' || ($generation->api_key_id && $generation->status === 'failed')) {
+            // A generation that failed has had its credits given back (perhaps by a
+            // sweep): it is never made again, so a late retry cannot deliver it unpaid.
+            if (! $generation || in_array($generation->status, ['done', 'failed'], true)) {
                 return null;
             }
 
@@ -218,6 +267,11 @@ class GenerateAudioJob implements ShouldQueue
             if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
                 $audio['audio_path'] = $effected;
             }
+            // Charged only for a voice the member can play: a file that was never
+            // saved (or was saved empty) fails the generation, which gives the credits back.
+            if (! self::audioIsSaved($audio['audio_path'] ?? null)) {
+                throw new \RuntimeException('The voice file is missing or empty ('.($audio['audio_path'] ?? 'no path').').');
+            }
             $actualSeconds = $measuredSeconds ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualChars = $actualEstimate['chars'];
             // Members pay for the audio they got: 15 credits a second.
@@ -279,24 +333,21 @@ class GenerateAudioJob implements ShouldQueue
                 // A developer API request waiting for the file: failed now, and its credits
                 // given back here, exactly once (the request does not refund it again).
                 app(ApiUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
+            } elseif ($final && ! $generation->api_key_id) {
+                // A member's generation on its last try: failed and its credits given back
+                // in one locked step, exactly once (failed(), the request and the stuck
+                // sweep find it failed and give nothing back again).
+                app(MemberUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
             } else {
                 // A queued job that will be tried again is not failed yet: it waits for the
                 // next try. A developer API one always waits for failed(), which ends it and
                 // gives its credits back in one locked step.
-                $failNow = $final && ! $generation->api_key_id;
-                DB::transaction(function () use ($generation, $failNow, $message): void {
+                DB::transaction(function () use ($generation): void {
                     $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
-                    if (! $locked || $locked->status !== 'processing') {
-                        return;
+                    if ($locked && $locked->status === 'processing') {
+                        $locked->update(['status' => 'queued', 'error_message' => null]);
                     }
-                    $locked->update($failNow
-                        ? ['status' => 'failed', 'error_message' => $message]
-                        : ['status' => 'queued', 'error_message' => null]);
                 });
-
-                if ($failNow && $generation->text_item_id) {
-                    TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
-                }
             }
             $generation->refresh();
 
@@ -317,8 +368,10 @@ class GenerateAudioJob implements ShouldQueue
     }
 
     /**
-     * What the member is told. A cloned voice has no other engine to fall
-     * back on, so a used-up daily limit is said plainly.
+     * What the member is told, kept in English as the developer API shows it
+     * (the studio and the extension show it in the member's language, with
+     * GenerationMessage). A cloned voice has no other engine to fall back on,
+     * so a used-up daily limit is said plainly.
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
@@ -327,10 +380,15 @@ class GenerateAudioJob implements ShouldQueue
         }
         if (str_starts_with((string) $generation->voice_name, 'cloned_')
             && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
-            return __('ui.backend.cloned_voice_daily_limit');
+            return GenerationMessage::stored('ui.backend.cloned_voice_daily_limit');
+        }
+        // An HD voice is never swapped for a standard one: when the premium engine
+        // is busy or down, the member is told so (and nothing is charged).
+        if ($e instanceof PremiumVoiceUnavailableException) {
+            return GenerationMessage::stored('ui.backend.premium_voices_busy');
         }
 
-        return 'Voice generation failed. Please try again.';
+        return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');
     }
 
     /**
@@ -375,7 +433,7 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        $message = $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.';
+        $message = $e ? $this->failureMessage($generation, $e) : GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');
 
         // A developer API generation is failed and refunded in one locked step, so
         // a request, this hook and the stuck-generation sweep never all refund it.
@@ -396,62 +454,50 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        $generation->update([
-            'status' => 'failed',
-            'error_message' => $message,
-        ]);
+        // Failed and its credits given back in one locked step, only when it was
+        // still queued or running: one that handle(), the request or the stuck
+        // sweep already failed (and refunded) is never refunded again.
+        app(MemberUsageMeter::class)->failAndRefund((int) $generation->id, $message);
 
         // Failures thrown from handle() are recorded there; a timeout or a
         // worker killed mid-run only ever reaches this point.
         if (! $e || $e instanceof MaxAttemptsExceededException || $e instanceof TimeoutExceededException) {
             app(GenerationErrorRecorder::class)->audioGenerationFailed(
-                $generation,
+                $generation->refresh(),
                 $e ?? new \RuntimeException('The generation job failed without an error.'),
                 $this->tries,
                 $this->tries,
                 $generation->error_message,
             );
         }
-
-        // Only release usage for async (queued) jobs.
-        // For sync dispatches, the controller handles the refund
-        // after checking job status — avoiding double-refund.
-        if ($this->connection !== 'sync') {
-            $reserved = $this->reservedUsage($generation);
-
-            $this->applyUsageDelta(
-                $generation,
-                -1,
-                -$reserved['credits'],
-                -$reserved['seconds'],
-            );
-        }
-
-        if ($generation->text_item_id) {
-            TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
-        }
     }
 
     /**
-     * What the controller reserved when the generation was queued: the
-     * estimate from the text (the real length is only known once it is done).
+     * What the request reserved when the generation was queued: the estimate
+     * from the text, unless it kept what it reserved (the real length is only
+     * known once it is done).
      *
      * @return array{credits:int,seconds:int}
      */
     private function reservedUsage(AudioGeneration $generation): array
     {
-        // The developer API stores what it reserved (it allows for a slower speed).
-        $stored = ApiUsageMeter::reservationOf($generation);
-        if ($stored !== null) {
-            return ['credits' => $stored['credits'], 'seconds' => $stored['seconds']];
-        }
-
-        $estimate = UsageEstimator::estimate((string) $generation->input_text);
+        $reservation = MemberUsageMeter::reservationOf($generation);
 
         return [
-            'credits' => $estimate['credits'],
-            'seconds' => $estimate['seconds'],
+            'credits' => $reservation['credits'],
+            'seconds' => $reservation['seconds'],
         ];
+    }
+
+    /** The voice file is on the public disk, with something in it. */
+    private static function audioIsSaved(mixed $path): bool
+    {
+        if (! is_string($path) || trim($path) === '') {
+            return false;
+        }
+        $disk = Storage::disk('public');
+
+        return $disk->exists($path) && (int) $disk->size($path) > 0;
     }
 
     private function usagePeriod(AudioGeneration $generation): string

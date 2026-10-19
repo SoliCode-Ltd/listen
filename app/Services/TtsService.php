@@ -80,8 +80,8 @@ class TtsService
     /**
      * Enhanced synthesize method using the routing service.
      *
-     * Uses plan-aware provider selection, Arabic voice mapping,
-     * fallback logic, and telemetry logging.
+     * Uses quality-aware provider selection (HD never falls back to a
+     * standard voice), Arabic voice mapping, and telemetry logging.
      *
      * @param  string     $text           Text to synthesize
      * @param  string     $targetLanguage Language code
@@ -175,14 +175,11 @@ class TtsService
             ];
         }
 
-        // Synthesize using routing service
+        // Synthesize using routing service (an HD request that Gemini cannot make
+        // throws here, so a failure is never cached).
         $result = $this->routingService->synthesize($text, $targetLanguage, $voiceConfig, $plan, $userId);
 
-        // A Gemini failure falls back to Google for that one request. Caching
-        // that file would keep serving WaveNet after the saved model recovers.
-        if (! ($result['fallback_used'] ?? false)) {
-            $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
-        }
+        $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
 
         return $result;
     }
@@ -370,7 +367,11 @@ class TtsService
             $disk->makeDirectory('audio');
         }
 
-        $disk->put($filename, $binary);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $binary)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         return [
             'audio_path' => $filename,
@@ -534,7 +535,8 @@ class TtsService
 
         foreach ($extensions as $extension) {
             $path = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
-            if ($disk->exists($path)) {
+            // An empty file (a copy cut short) is not a saved voice: it is made again.
+            if ($disk->exists($path) && $disk->size($path) > 0) {
                 return $path;
             }
         }
@@ -552,12 +554,18 @@ class TtsService
 
         $cachePath = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
 
-        if (! $disk->exists($cachePath)) {
+        if (! $disk->exists($cachePath) || $disk->size($cachePath) === 0) {
             $dir = dirname($disk->path($cachePath));
             if (! is_dir($dir)) {
                 mkdir($dir, 0775, true);
             }
-            $disk->copy($sourcePath, $cachePath);
+            // The cache is only a shortcut: when the copy fails, the voice is used
+            // from where it was saved, and a copy cut short is not kept for later.
+            if (! $disk->copy($sourcePath, $cachePath)) {
+                $disk->delete($cachePath);
+
+                return $sourcePath;
+            }
         }
 
         return $cachePath;

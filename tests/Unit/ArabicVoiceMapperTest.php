@@ -235,6 +235,19 @@ class ArabicVoiceMapperTest extends TestCase
         $this->assertSame('Zephyr', $config['voice_name']);
     }
 
+    public function test_auto_detect_sends_no_dialect_to_gemini_and_fusha_stays_fusha(): void
+    {
+        $auto = $this->mapper->mapToProviderConfig('gemini', ['emotion' => 'neutral', 'gender' => 'female']);
+        $this->assertArrayHasKey('dialect', $auto);
+        $this->assertSame('', $auto['dialect'], 'Auto-detect is not turned into Fusha');
+        $this->assertSame('', $this->mapper->mapToProviderConfig('gemini', ['dialect' => null, 'emotion' => 'neutral'])['dialect']);
+        $this->assertSame('', $this->mapper->mapToProviderConfig('gemini', ['dialect' => ' ', 'emotion' => 'neutral'])['dialect']);
+
+        $this->assertSame('ar-XA', $this->mapper->mapToProviderConfig('gemini', ['dialect' => 'ar-XA', 'emotion' => 'neutral'])['dialect'], 'Fusha chosen is Fusha');
+        $this->assertSame('ar-EG', $this->mapper->mapToProviderConfig('gemini', ['dialect' => 'ar-EG', 'emotion' => 'neutral'])['dialect']);
+        $this->assertSame('ar-XA', $this->mapper->mapToProviderConfig('google_cloud', ['emotion' => 'neutral'])['dialect'], 'standard voices as before');
+    }
+
     // ─── Default Handling ─────────────────────────────────────
 
     public function test_map_defaults_when_no_intent_provided(): void

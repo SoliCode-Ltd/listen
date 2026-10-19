@@ -3,25 +3,23 @@ name: Staging voice cloning check
 # Read-only health check of voice cloning on STAGING.
 # Pipes scripts/tts/voice_cloning_check.php over SSH into the staging app's PHP:
 # server setup, the Gemini Voices API, cloned-voice rows (stuck, missing files,
-# orphans on Gemini), and, unless turned off, each ready cloned voice speaking
-# Arabic (Fusha, Saudi, Egyptian) and English (US, UK); Gemini transcribes every
-# clip and the run fails if the words or the language do not match. The
-# database session is READ ONLY; the audio files the synthesis writes are
-# deleted again and come back here as an artifact.
+# orphans on Gemini), and, only when "synthesize" is ticked, each ready cloned
+# voice speaking Arabic (Fusha, Saudi, Egyptian) and English (US, UK); Gemini
+# transcribes every clip and the run fails if the words or the language do not
+# match. The database session is READ ONLY; the audio files the synthesis
+# writes are deleted again and come back here as an artifact.
+# Synthesis spends the speech quota staging shares with live, and staging's
+# cloned voices are members' own (a copy of live): tick it only when the owner
+# has said yes. Run by hand only.
 # Same secrets as the SaaS stats workflow (STAGING_SSH_*).
 
 on:
   workflow_dispatch:
     inputs:
       synthesize:
-        description: Speak Arabic and English test lines with each ready cloned voice
+        description: Speak Arabic and English test lines with each ready cloned voice (uses the speech quota)
         type: boolean
-        default: true
-  push:
-    branches: [claude/elegant-ptolemy-nsecia]
-    paths:
-      - .github/workflows/staging-voice-cloning-check.yml
-      - scripts/tts/voice_cloning_check.php
+        default: false
 
 permissions:
   contents: read
@@ -43,7 +41,7 @@ jobs:
           SSH_USER: ${{ secrets.STAGING_SSH_USER }}
           SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
           APP_PATH: ${{ secrets.STAGING_APP_PATH }}
-          CLONE_SYNTH: ${{ (github.event_name != 'workflow_dispatch' || inputs.synthesize) && '1' || '0' }}
+          CLONE_SYNTH: ${{ inputs.synthesize && '1' || '0' }}
         run: |
           set -euo pipefail
           if [ -z "$SSH_HOST" ] || [ -z "$SSH_USER" ] || [ -z "$SSH_KEY" ]; then

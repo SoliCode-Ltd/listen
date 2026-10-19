@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -11,6 +10,14 @@ use Symfony\Component\Process\Process;
  */
 class ShareableAudio
 {
+    /**
+     * Trims quiet (under -50 dB; voice is counted from 80 ms of sound above it)
+     * before the first word down to 0.2 s and after the last word down to
+     * 0.35 s. Speech sits far above that; the voice itself is untouched.
+     */
+    private const EDGE_SILENCE_TRIM = 'silenceremove=start_periods=1:start_duration=0.08:start_threshold=-50dB:start_silence=0.2,'
+        .'areverse,silenceremove=start_periods=1:start_duration=0.08:start_threshold=-50dB:start_silence=0.35,areverse';
+
     /**
      * @return array{bytes: string, extension: string}
      */
@@ -53,11 +60,13 @@ class ShareableAudio
 
     private static function transcodeWavToMp3(string $wav): ?string
     {
-        if (strlen($wav) < 44 || ! self::canRunProcesses()) {
+        if (strlen($wav) < 44) {
             return null;
         }
 
-        $ffmpeg = (new ExecutableFinder())->find('ffmpeg');
+        // The same ffmpeg the download formats use. Web PHP often runs with
+        // an empty PATH, and looking only there kept HD audio as WAV.
+        $ffmpeg = AudioFormats::ffmpegPath();
         if ($ffmpeg === null) {
             return null;
         }
@@ -71,28 +80,28 @@ class ShareableAudio
                 return null;
             }
 
-            $process = new Process([
-                $ffmpeg,
-                '-hide_banner',
-                '-loglevel', 'error',
-                '-y',
-                '-i', $input,
-                '-codec:a', 'libmp3lame',
-                '-b:a', '192k',
-                '-ac', '1',
-                '-f', 'mp3',
-                $output,
-            ]);
-            $process->setTimeout(30);
-            $process->run();
+            // Long silence before the first word or after the last one is cut
+            // (members pay by the second: a take once ended in 3 minutes of hiss),
+            // keeping a natural 0.2 s lead and 0.35 s tail; anything shorter is
+            // left alone. If that fails, the take is encoded as it came.
+            foreach ([true, false] as $trim) {
+                $process = new Process(array_merge(
+                    [$ffmpeg, '-hide_banner', '-loglevel', 'error', '-y', '-i', $input],
+                    $trim ? ['-af', self::EDGE_SILENCE_TRIM] : [],
+                    ['-codec:a', 'libmp3lame', '-b:a', '192k', '-ac', '1', '-f', 'mp3', $output],
+                ));
+                $process->setTimeout(30);
+                $process->run();
 
-            if (! $process->isSuccessful() || ! is_file($output)) {
-                return null;
+                $mp3 = $process->isSuccessful() && is_file($output) ? file_get_contents($output) : false;
+                // A trim leaving under about a quarter second (192 kbps is 24,000
+                // bytes a second) means the take was all quiet: keep it whole.
+                if (is_string($mp3) && $mp3 !== '' && (! $trim || strlen($mp3) > 6000)) {
+                    return $mp3;
+                }
             }
 
-            $mp3 = file_get_contents($output);
-
-            return is_string($mp3) && $mp3 !== '' ? $mp3 : null;
+            return null;
         } catch (\Throwable) {
             return null;
         } finally {
@@ -103,16 +112,5 @@ class ShareableAudio
                 unlink($output);
             }
         }
-    }
-
-    private static function canRunProcesses(): bool
-    {
-        if (! function_exists('proc_open')) {
-            return false;
-        }
-
-        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-
-        return ! in_array('proc_open', $disabled, true);
     }
 }

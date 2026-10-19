@@ -6,6 +6,7 @@ use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\User;
 use App\Services\Referral\ReferralQualificationService;
+use App\Support\StripeInvoice;
 use Illuminate\Support\Facades\Log;
 
 class TrialOutcomeService
@@ -75,7 +76,7 @@ class TrialOutcomeService
             return;
         }
 
-        $trial = $this->trialForSubscription($this->subscriptionId($invoice));
+        $trial = $this->trialForSubscription(StripeInvoice::subscriptionId($invoice));
         if (! $trial || $trial->status === BillingTrial::STATUS_PAID) {
             return;
         }
@@ -93,7 +94,13 @@ class TrialOutcomeService
 
     private function handleInvoiceFailed(object $invoice): void
     {
-        $trial = $this->trialForSubscription($this->subscriptionId($invoice));
+        // A declined "pay now" (a plan change during the trial) is voided and the
+        // trial goes on, with its limits; only the trial's own charge failing counts.
+        if (StripeInvoice::billingReason($invoice) === 'subscription_update') {
+            return;
+        }
+
+        $trial = $this->trialForSubscription(StripeInvoice::subscriptionId($invoice));
         if (! $trial || $trial->status === BillingTrial::STATUS_PAID) {
             return;
         }
@@ -187,45 +194,6 @@ class TrialOutcomeService
             ->where('stripe_subscription_id', $subscriptionId)
             ->latest('id')
             ->first();
-    }
-
-    private function subscriptionId(object $invoice): string
-    {
-        $subscription = $this->invoiceValue($invoice, 'subscription');
-        $fromTopLevel = $this->idFromMixed($subscription);
-        if ($fromTopLevel !== '') {
-            return $fromTopLevel;
-        }
-
-        $parent = $this->invoiceValue($invoice, 'parent');
-        if (! is_object($parent)) {
-            return '';
-        }
-
-        $details = $this->invoiceValue($parent, 'subscription_details');
-        if (! is_object($details)) {
-            return '';
-        }
-
-        return $this->idFromMixed($this->invoiceValue($details, 'subscription'));
-    }
-
-    private function invoiceValue(object $object, string $key): mixed
-    {
-        if ($object instanceof \ArrayAccess && $object->offsetExists($key)) {
-            return $object->offsetGet($key);
-        }
-
-        return $object->{$key} ?? null;
-    }
-
-    private function idFromMixed(mixed $value): string
-    {
-        if (is_object($value)) {
-            return trim((string) ($value->id ?? ''));
-        }
-
-        return trim((string) $value);
     }
 
     private function qualifyReferral(BillingTrial $trial): void

@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -12,9 +14,15 @@ use Laravel\Cashier\Cashier;
 
 class StripeWebhookEmailService
 {
+    /**
+     * The "already sent" key of the email being prepared: kept once it is
+     * sent, let go otherwise (shouldSkipEmail(), releaseUnsentEmail()).
+     */
+    private ?string $pendingEmailKey = null;
+
     public function sendForEvent(object $event): void
     {
-        if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
+        if (! $this->emailsEnabled()) {
             return;
         }
 
@@ -25,25 +33,51 @@ class StripeWebhookEmailService
             return;
         }
 
-        match ($type) {
-            'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
-            'customer.subscription.created' => $this->handleSubscriptionCreated($object),
-            'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
-            'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
-            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
-            'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
-            'customer.deleted' => $this->handleCustomerDeleted($object),
-            'charge.refunded' => $this->handleChargeRefunded($object),
-            default => null,
-        };
+        try {
+            match ($type) {
+                'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
+                'customer.subscription.created' => $this->handleSubscriptionCreated($object),
+                'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
+                'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
+                'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
+                'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
+                'customer.deleted' => $this->handleCustomerDeleted($object),
+                'charge.refunded' => $this->handleChargeRefunded($object),
+                default => null,
+            };
+        } finally {
+            $this->releaseUnsentEmail();
+        }
     }
 
     public function sendCancellationScheduledForUser(User $user, ?BillingSubscription $billingSubscription = null): void
     {
-        if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
+        if (! $this->emailsEnabled()) {
             return;
         }
 
+        try {
+            $this->sendCancellationScheduled($user, $billingSubscription);
+        } finally {
+            $this->releaseUnsentEmail();
+        }
+    }
+
+    /**
+     * The "Webhook Email Notifications" switch in Billing Settings decides;
+     * until it has been saved, LISTEN_BILLING_WEBHOOK_EMAILS does.
+     */
+    private function emailsEnabled(): bool
+    {
+        $setting = trim((string) SiteSetting::get('billing_webhook_emails', ''));
+
+        return $setting !== ''
+            ? $setting === '1'
+            : (bool) config('listen.billing.webhook_email_enabled', true);
+    }
+
+    private function sendCancellationScheduled(User $user, ?BillingSubscription $billingSubscription): void
+    {
         $billingSubscription = $billingSubscription?->fresh()
             ?? BillingSubscription::query()
                 ->where('user_id', $user->id)
@@ -78,8 +112,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Status' => 'Cancellation scheduled',
             'Access Ends' => $periodEnd,
-            'Stripe Subscription ID' => $subscriptionId !== '' ? $subscriptionId : null,
-            'Stripe Customer ID' => trim((string) ($user->stripe_id ?? '')) ?: null,
         ];
 
         $html = $this->renderEmail(
@@ -130,8 +162,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Amount' => $amount,
             'Mode' => ucfirst($mode !== '' ? $mode : 'payment'),
-            'Stripe Customer ID' => $customerId,
-            'Checkout Session ID' => $sessionId,
             'Purchased At' => $this->formatUnixTimestamp(isset($session->created) ? (int) $session->created : null, true),
         ];
 
@@ -183,7 +213,6 @@ class StripeWebhookEmailService
         $isInitialPurchase = $billingReason === 'subscription_create';
         $periodEnd = $this->extractInvoicePeriodEnd($invoice);
         $invoiceNumber = trim((string) ($invoice->number ?? ''));
-        $subscriptionId = trim((string) ($invoice->subscription ?? ''));
         $invoiceUrl = trim((string) ($invoice->hosted_invoice_url ?? ''));
 
         $details = [
@@ -193,9 +222,6 @@ class StripeWebhookEmailService
             'Billing Reason' => $this->normalizeBillingReason($billingReason),
             'Renewal Date' => $periodEnd,
             'Invoice Number' => $invoiceNumber,
-            // 'Invoice ID' => $invoiceId,
-            // 'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
             'Paid At' => $this->formatUnixTimestamp(isset($invoice->status_transitions->paid_at) ? (int) $invoice->status_transitions->paid_at : null, true),
         ];
 
@@ -241,8 +267,6 @@ class StripeWebhookEmailService
             'Status' => $this->formatStatus($status),
             'Current Period Ends' => $this->formatUnixTimestamp(isset($subscription->current_period_end) ? (int) $subscription->current_period_end : null),
             'Trial Ends' => $this->formatUnixTimestamp(isset($subscription->trial_end) ? (int) $subscription->trial_end : null),
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $subject = $status === 'trialing' ? 'Trial started' : 'Subscription activated';
@@ -299,8 +323,6 @@ class StripeWebhookEmailService
                     'Plan' => $planLabel,
                     'Status' => $this->formatStatus($status),
                     'Current Period Ends' => $periodEnd,
-                    'Stripe Subscription ID' => $subscriptionId,
-                    'Stripe Customer ID' => $customerId,
                 ];
                 $html = $this->renderEmail(
                     $user,
@@ -330,8 +352,6 @@ class StripeWebhookEmailService
                 'Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
                 'Access Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -354,8 +374,6 @@ class StripeWebhookEmailService
             $details = [
                 'Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -379,8 +397,6 @@ class StripeWebhookEmailService
                 'Current Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
                 'Current Period Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -405,8 +421,6 @@ class StripeWebhookEmailService
                 'Status' => $this->formatStatus($status),
                 'Previous Status' => $this->formatStatus($previousStatus),
                 'Current Period Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -452,8 +466,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Status' => 'Canceled',
             'Canceled At' => $this->formatUnixTimestamp(isset($subscription->canceled_at) ? (int) $subscription->canceled_at : null, true),
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $html = $this->renderEmail(
@@ -500,8 +512,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Trial Ends' => $trialEnd,
             'Amount' => $willCancel ? 'No charge (canceled)' : $amount,
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $summary = $willCancel
@@ -539,7 +549,6 @@ class StripeWebhookEmailService
         }
 
         $details = [
-            'Stripe Customer ID' => $customerId,
             'Customer Email' => $customerEmail,
             'Removed At' => now()->format('M j, Y g:i A'),
         ];
@@ -547,7 +556,7 @@ class StripeWebhookEmailService
         $html = $this->renderEmail(
             $user,
             'Billing profile removed',
-            ['Your Stripe customer profile was removed.', 'If this was not expected, contact support and we will help restore billing access.'],
+            ['Your billing profile was removed.', 'If this was not expected, contact support and we will help restore billing access.'],
             $details
         );
 
@@ -575,8 +584,6 @@ class StripeWebhookEmailService
 
         $details = [
             'Refund Amount' => $amount,
-            'Stripe Charge ID' => $chargeId,
-            'Stripe Customer ID' => $customerId,
             'Refunded At' => $this->formatUnixTimestamp(isset($charge->created) ? (int) $charge->created : null, true),
         ];
 
@@ -593,7 +600,16 @@ class StripeWebhookEmailService
     private function sendMail(User $user, string $subject, string $html): void
     {
         $email = trim((string) $user->email);
-        if ($email === '') {
+        // Phone sign-ups have an internal address (…@users.listen.local) that takes no mail.
+        if ($email === '' || str_ends_with(strtolower($email), '@users.listen.local')) {
+            return;
+        }
+
+        // Staging runs on a copy of live members (with the live Stripe keys):
+        // only the live site emails them.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('billing email "'.$subject.'"', ['user_id' => $user->id]);
+
             return;
         }
 
@@ -602,11 +618,26 @@ class StripeWebhookEmailService
                 $message->to($user->email, $user->name ?: null)->subject($subject);
             });
         } catch (\Throwable $exception) {
+            // Not sent: its "already sent" key is let go, so a retry of the event can send it.
             Log::warning('Unable to send Stripe webhook email.', [
                 'user_id' => $user->id,
                 'subject' => $subject,
                 'error' => $exception->getMessage(),
             ]);
+
+            return;
+        }
+
+        // Sent: from now on the same email is never sent again.
+        $this->pendingEmailKey = null;
+    }
+
+    /** An email that was claimed but not sent leaves its key free for a retry. */
+    private function releaseUnsentEmail(): void
+    {
+        if ($this->pendingEmailKey !== null) {
+            Cache::forget($this->pendingEmailKey);
+            $this->pendingEmailKey = null;
         }
     }
 
@@ -771,11 +802,22 @@ class StripeWebhookEmailService
         return $planName !== '' ? $planName : null;
     }
 
+    /**
+     * Whether this email already went out. The key is taken here, so two
+     * deliveries of one event never both send it, but it is kept only once
+     * the email is sent: one that fails or is left out can go on a retry.
+     */
     private function shouldSkipEmail(string $key, int $ttlHours = 72): bool
     {
         $cacheKey = 'stripe_webhook_email:'.sha1($key);
 
-        return ! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)));
+        if (! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)))) {
+            return true;
+        }
+
+        $this->pendingEmailKey = $cacheKey;
+
+        return false;
     }
 
     private function hasAttribute(mixed $attributes, string $key): bool
@@ -827,6 +869,9 @@ class StripeWebhookEmailService
         }
 
         return view('emails.stripe-billing', [
+            // These emails are written in English, so they read left to right
+            // whatever language the site was in when they were made.
+            'locale' => 'en',
             'subject' => $subject,
             'user' => $user,
             'summaryLines' => $summaryLines,

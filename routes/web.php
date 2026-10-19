@@ -17,8 +17,21 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Route;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
+// Audio files need no session, cookies or form token: playing one starts
+// sooner, a player or the extension asking without cookies no longer makes
+// a new session each time, and caches keep the file (a reply that sets a
+// cookie is never cached).
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
+    ->withoutMiddleware([
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \App\Http\Middleware\EnsureUserIsNotBlocked::class,
+        \App\Http\Middleware\CaptureAdClickId::class,
+    ])
     ->name('media.file');
 
 // A member's own audio in a file type the browser cannot make (M4A, OGG, FLAC).
@@ -123,8 +136,9 @@ Route::get('/favicon.ico', function () {
     return redirect()->away($target, 301);
 })->name('favicon');
 
+// A signed link: the controller checks the signature itself, so the https links
+// in emails still work when the proxy hands the request over as http.
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
-    ->middleware('signed')
     ->name('newsletter.unsubscribe');
 
 Route::group([
@@ -208,12 +222,20 @@ Route::group([
         Route::post('/referral/share', [\App\Http\Controllers\ReferralController::class, 'share'])->name('referral.share');
     });
 
+    // What an open studio page asks while it works, every few seconds: these only
+    // read, so they skip the billing sync the pages run.
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/dashboard/jobs/latest', [DashboardController::class, 'latest'])->name('dashboard.jobs.latest');
+        Route::get('/dashboard/jobs/{job}', [DashboardController::class, 'show'])->whereNumber('job')->name('dashboard.jobs.show');
+        Route::get('/dashboard/csrf-token', [DashboardController::class, 'csrfToken'])->name('dashboard.csrf-token');
+    });
+
     Route::middleware(['auth', 'subscription.sync'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-        Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->name('dashboard.queue');
-        Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->name('dashboard.generate');
+        Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.queue');
+        Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
         Route::put('/dashboard/favorite-voices', [\App\Http\Controllers\FavoriteVoicesController::class, 'update'])->name('dashboard.favorite-voices');

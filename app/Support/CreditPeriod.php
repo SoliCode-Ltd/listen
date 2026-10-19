@@ -2,18 +2,27 @@
 
 namespace App\Support;
 
+use App\Models\ApiKey;
+use App\Models\ApiKeyUsage;
 use App\Models\AudioGeneration;
+use App\Models\BillingSubscription;
+use App\Models\CharGift;
+use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * The stretch of time a member's monthly credits belong to.
  *
  * A paid plan's credits follow the plan's own dates: they start when the
  * plan's period starts (the day it was paid for, given or renewed) and start
- * again when a new period starts (a renewal, or subscribing again). A yearly
+ * again when a new period starts (a renewal, or subscribing again). A change
+ * of plan carries the usage on instead (carryOverPlanChange()). A yearly
  * or multi-month period starts again every month on the day it ends. The
  * free plan counts by calendar month, and so does everyone until the switch
  * is on (the site setting below, set by the migration that turned it on).
@@ -21,9 +30,10 @@ use Illuminate\Support\Carbon;
  * Each period has a key, kept in usage_counters.period_ym (and in the gifts
  * and API key budgets): "2026-10" for a calendar month, "2026-10-14 08:37"
  * (UTC) for a period that follows a plan. Both start with the month, so
- * reports by month still group them. A plan period that had started before
- * the switch keeps the calendar-month counter it was already using, so the
- * switch gives nobody new credits.
+ * reports by month still group them. A credit month that had begun before
+ * the switch counts by calendar month until it ends, exactly as before the
+ * switch (a fresh count on the 1st), so the switch gives nobody new credits
+ * and takes none away; the plan's own dates start with the next one.
  */
 final class CreditPeriod
 {
@@ -32,6 +42,12 @@ final class CreditPeriod
 
     /** A first stretch of a plan period shorter than this belongs to the month after it. */
     private const SHORTEST_DAYS = 7;
+
+    /** How long after its end a card plan whose renewal is on its way still counts. */
+    private const RENEWAL_GRACE_HOURS = 2;
+
+    /** On while a plan paid in full by hand is given (startingAfresh()). */
+    private static bool $startingAfresh = false;
 
     /**
      * The member's credit period at a moment (now by default).
@@ -42,26 +58,8 @@ final class CreditPeriod
     {
         $at = $at !== null ? Carbon::instance($at)->utc() : now()->utc();
         $switchedAt = self::switchedAt();
-        $subscription = $switchedAt !== null ? self::paidSubscription($userId, $at) : null;
-        if ($subscription === null) {
-            return self::calendarMonth($at);
-        }
 
-        $began = $subscription->current_period_start ?? $subscription->created_at;
-        $began = $began !== null ? Carbon::instance($began)->utc() : null;
-        $end = $subscription->current_period_end !== null ? Carbon::instance($subscription->current_period_end)->utc() : null;
-        if ($began === null && $end === null) {
-            return self::calendarMonth($at);
-        }
-        [$start, $until] = self::creditMonth($began, $end, $at);
-
-        return [
-            'key' => $start->lt($switchedAt) ? $switchedAt->format('Y-m') : $start->format('Y-m-d H:i'),
-            'starts_at' => $start,
-            'ends_at' => $until,
-            'follows_plan' => true,
-            'plan_ends_at' => $end,
-        ];
+        return self::periodOf($switchedAt !== null ? self::paidSubscription($userId, $at) : null, $at, $switchedAt);
     }
 
     /** The member's usage row for their current credit period (made when missing). */
@@ -106,6 +104,112 @@ final class CreditPeriod
     }
 
     /**
+     * Keeps a member's usage when a change of plan cuts their credit period
+     * short. Called while their subscription row is saved, before it is
+     * written, so no request sees the new period before its counter does.
+     *
+     * Credits start again only at a renewal (the new period starts when the
+     * old one ends) or with a plan taken after the old one ended. A change of
+     * plan restarts the plan's dates on the day it is made, so without this
+     * every change would start a fresh allowance (down a plan and back up
+     * again costs about $1). The new period's counter starts with what the
+     * old one had used, and its gifts and API key spending go on with it.
+     * The counter is made only once (its unique key), so nothing is carried
+     * twice. Between calendar months and plan dates nothing is carried.
+     */
+    public static function carryOverPlanChange(Subscription $subscription): void
+    {
+        $switchedAt = self::switchedAt();
+        if ($switchedAt === null || self::$startingAfresh
+            || ! $subscription->isDirty(['plan_id', 'status', 'current_period_start', 'current_period_end'])) {
+            return;
+        }
+
+        // Only the member's latest row decides their plan.
+        $userId = (int) $subscription->user_id;
+        if ($subscription->exists && Subscription::query()->where('user_id', $userId)->where('id', '>', $subscription->getKey())->exists()) {
+            return;
+        }
+
+        $now = now()->utc();
+        $before = self::current($userId, $now);
+        $after = self::periodOf(self::paidAfterSave($subscription, $now), $now, $switchedAt);
+        if (! self::followsPlan($before['key']) || ! self::followsPlan($after['key'])
+            || $after['key'] === $before['key']
+            // A renewal, or a plan taken after the old one ended: a fresh allowance.
+            || $after['starts_at']->gte($before['ends_at'])) {
+            return;
+        }
+
+        self::carry($userId, $before['key'], $after['key']);
+    }
+
+    /**
+     * Runs $callback, which gives a plan paid in full for a new period of its
+     * own (a payment made by hand): its credits start afresh even when it is
+     * paid before the old period ends.
+     *
+     * @template T
+     *
+     * @param  callable(): T  $callback
+     * @return T
+     */
+    public static function startingAfresh(callable $callback): mixed
+    {
+        $previous = self::$startingAfresh;
+        self::$startingAfresh = true;
+
+        try {
+            return $callback();
+        } finally {
+            self::$startingAfresh = $previous;
+        }
+    }
+
+    /**
+     * The credit period a paid plan's row gives at a moment (no row: the calendar month).
+     *
+     * @return array{key: string, starts_at: Carbon, ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon}
+     */
+    private static function periodOf(?Subscription $subscription, Carbon $at, ?Carbon $switchedAt): array
+    {
+        if ($subscription === null || $switchedAt === null) {
+            return self::calendarMonth($at);
+        }
+
+        $began = $subscription->current_period_start ?? $subscription->created_at;
+        $began = $began !== null ? Carbon::instance($began)->utc() : null;
+        $end = $subscription->current_period_end !== null ? Carbon::instance($subscription->current_period_end)->utc() : null;
+        if ($began === null && $end === null) {
+            return self::calendarMonth($at);
+        }
+        [$start, $until] = self::creditMonth($began, $end, $at);
+
+        // Begun before the switch: the calendar month it is in, as before the
+        // switch, until this credit month ends. Its counter may hold the end of
+        // the previous paid period, which is why the 1st still starts a new one.
+        if ($start->lt($switchedAt)) {
+            $month = self::calendarMonth($at);
+
+            return [
+                'key' => $month['key'],
+                'starts_at' => $month['starts_at'],
+                'ends_at' => $month['ends_at']->lt($until) ? $month['ends_at'] : $until,
+                'follows_plan' => true,
+                'plan_ends_at' => $end,
+            ];
+        }
+
+        return [
+            'key' => $start->format('Y-m-d H:i'),
+            'starts_at' => $start,
+            'ends_at' => $until,
+            'follows_plan' => true,
+            'plan_ends_at' => $end,
+        ];
+    }
+
+    /**
      * The paid plan the member is on now, as PlanAccessService picks it (the
      * latest active one); the free plan and packs count by calendar month.
      */
@@ -114,9 +218,20 @@ final class CreditPeriod
         $subscription = Subscription::query()
             ->where('user_id', $userId)
             ->where('status', 'active')
-            ->where(function ($query) use ($at) {
+            ->where(function ($query) use ($at, $userId) {
                 $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', $at);
+                    ->orWhere('current_period_end', '>=', $at)
+                    // A card renewal reaches us a little after the period ends: while
+                    // the card subscription is live, the plan (and so its credit
+                    // month) carries on for a short while, as in PlanAccessService.
+                    ->orWhere(fn ($renewing) => $renewing
+                        ->where('current_period_end', '>=', $at->copy()->subHours(self::RENEWAL_GRACE_HOURS))
+                        ->whereExists(fn ($card) => $card->selectRaw('1')
+                            ->from((new BillingSubscription)->getTable())
+                            ->where('user_id', $userId)
+                            ->whereIn('stripe_status', ['active', 'trialing'])
+                            // Not one cancelled to end with this period.
+                            ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', $at))));
             })
             ->latest('id')
             ->with('plan')
@@ -128,6 +243,87 @@ final class CreditPeriod
         }
 
         return $subscription;
+    }
+
+    /** The row as it is about to be saved, when that makes a paid plan running now. */
+    private static function paidAfterSave(Subscription $subscription, Carbon $at): ?Subscription
+    {
+        $plan = Plan::query()->find($subscription->plan_id);
+        $end = $subscription->current_period_end;
+        $running = (string) $subscription->status === 'active' && ($end === null || Carbon::instance($end)->gte($at));
+
+        return $running && $plan && (int) $plan->price_cents > 0 && ! $plan->isPack() ? $subscription : null;
+    }
+
+    /**
+     * The new period starts with the old one's usage, its gifts that still
+     * count (so they can be taken back there) and each API key's spending (so
+     * a key's own budget goes on). Made once: if the new period's counter is
+     * already there, everything is left as it is.
+     */
+    private static function carry(int $userId, string $from, string $to): void
+    {
+        $previous = UsageCounter::query()->where('user_id', $userId)->where('period_ym', $from)->first();
+        if (! $previous) {
+            return;
+        }
+
+        $carried = DB::transaction(function () use ($userId, $previous, $from, $to): bool {
+            $made = UsageCounter::query()->insertOrIgnore([
+                'user_id' => $userId,
+                'period_ym' => $to,
+                'total_minutes' => (int) $previous->total_minutes,
+                'total_seconds' => (int) $previous->total_seconds,
+                'total_chars' => (int) $previous->total_chars,
+                'bonus_chars' => (int) $previous->bonus_chars,
+                'total_requests' => (int) $previous->total_requests,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+            if ($made === 0) {
+                return false;
+            }
+
+            CharGift::query()
+                ->where('user_id', $userId)
+                ->where('period_ym', $from)
+                ->whereNull('revoked_at')
+                ->get()
+                ->each(function (CharGift $gift) use ($to): void {
+                    $copy = $gift->replicate();
+                    $copy->period_ym = $to;
+                    // Still shown as given on its own day.
+                    $copy->created_at = $gift->created_at;
+                    $copy->save();
+                });
+
+            // Before the developer API migration there are no keys.
+            if (Schema::hasTable('api_key_usages')) {
+                ApiKeyUsage::query()
+                    ->whereIn('api_key_id', ApiKey::query()->where('user_id', $userId)->select('id'))
+                    ->where('period_ym', $from)
+                    ->get()
+                    ->each(fn (ApiKeyUsage $usage) => ApiKeyUsage::query()->insertOrIgnore([
+                        'api_key_id' => $usage->api_key_id,
+                        'period_ym' => $to,
+                        'requests' => (int) $usage->requests,
+                        'credits' => (int) $usage->credits,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]));
+            }
+
+            return true;
+        });
+
+        if ($carried) {
+            Log::info('Credits carried over to the period a plan change started.', [
+                'user_id' => $userId,
+                'from' => $from,
+                'to' => $to,
+                'chars' => (int) $previous->total_chars,
+            ]);
+        }
     }
 
     /** @return array{key: string, starts_at: Carbon, ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon} */

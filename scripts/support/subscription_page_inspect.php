@@ -5,7 +5,8 @@
  * so the page can be previewed without signing in as them. Reads the
  * database (READ ONLY session) and Stripe (retrieve and list calls only);
  * nothing is synced or written. The member is found by the SHA-256 of their
- * lower-cased email (ACCOUNT_EMAIL_SHA256). Prints one JSON line.
+ * lower-cased email (ACCOUNT_EMAIL_SHA256). Prints one JSON line, naming the
+ * member by account id only.
  */
 
 use App\Models\BillingSubscription;
@@ -64,7 +65,7 @@ $local = fn (int $usdMinor) => $try('egp', fn () => (string) ($pricing->converte
 $localAr = fn (int $usdMinor) => $try('egp_ar', fn () => (string) ($pricing->convertedQuoteFromUsd(abs($usdMinor), 'monthly', $country, 'stripe', 'ar')['amount_formatted'] ?? ''));
 
 $out = [
-    'name' => (string) $user->name,
+    'member' => (int) $user->id,
     'country' => $country['country_code'],
     'stripe_customer' => $user->hasStripeId(),
     'access_plan' => $accessPlan ? ['slug' => $accessPlan->slug, 'en' => $accessPlan->getLocalizedName('en'), 'ar' => $accessPlan->getLocalizedName('ar'), 'tier' => $accessPlan->voice_tier, 'price_cents' => (int) $accessPlan->price_cents] : null,

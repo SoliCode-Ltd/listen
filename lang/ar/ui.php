@@ -585,6 +585,10 @@ return [
         'admin_request_already_reviewed' => 'تمت مراجعة طلب الدفع اليدوي هذا بالفعل.',
         'admin_request_missing_relation' => 'طلب الدفع لا يحتوي على المستخدم أو الخطة بشكل صحيح.',
         'manual_locked_to_egypt' => 'طرق الدفع اليدوي متاحة حالياً لمصر فقط.',
+
+        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        'card_form_unavailable' => 'تعذّر تحميل نموذج الدفع بالبطاقة. تحقّق من اتصالك، ثم أعد تحميل الصفحة وحاول مرة أخرى.',
+        'card_local_about' => 'يُخصم بالدولار الأمريكي، أي نحو :amount',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -817,6 +821,9 @@ return [
         'copied' => 'تم النسخ إلى الحافظة.',
         'copy_failed' => 'تعذّر النسخ. يرجى النسخ يدوياً.',
         'created_prefix' => 'تم الإنشاء',
+
+        // Revoking the key stops the extension at once, so it is asked first.
+        'revoke_confirm' => 'هل تريد إلغاء هذا المفتاح؟ ستتوقف الإضافة عن العمل حتى تُنشئ مفتاحاً جديداً وتلصقه فيها.',
     ],
 
     // ===== DEMO PAGE =====
@@ -939,6 +946,15 @@ return [
         'audio_download' => 'تحميل الصوت',
         'audio_download_as' => 'تحميل بصيغة',
         'audio_download_failed' => 'تعذّر تجهيز هذه الصيغة الآن. حاول مرة أخرى أو اختر صيغة أخرى.',
+
+        // Under a player whose file could not be played or downloaded.
+        'audio_play_failed' => 'تعذّر تشغيل هذا الصوت الآن. حاول مرة أخرى.',
+        'audio_download_unavailable' => 'تعذّر تحميل هذا الصوت الآن. حاول مرة أخرى.',
+
+        // The player for keyboards and screen readers: the button's label while playing, and the position bar.
+        'audio_pause' => 'إيقاف مؤقت',
+        'audio_seek' => 'موضع التشغيل',
+        'audio_position' => ':current من :total',
     ],
 
     // ===== DASHBOARD =====
@@ -1278,6 +1294,18 @@ return [
             'استخدم <وقفة قصيرة> أو <وقفة طويلة> لصمت قصير. علامات الترقيم (… ، .) تتحكم أيضاً في الإيقاع.',
             'الأصوات القياسية تتجاهل الوسوم، فلا تُقرأ بصوت عالٍ أبداً.',
         ],
+
+        // Generate and history: a reply that never came is looked for (the same text is not sent
+        // twice meanwhile), and a page whose form token expired offers a reload.
+        'voice_may_still_be_finishing' => 'ربما لا يزال صوتك قيد الإنشاء، وسيظهر في سجل الأصوات بعد لحظات — يُرجى عدم توليده مرة أخرى.',
+        'page_expired' => 'انتهت صلاحية هذه الصفحة لأنها بقيت مفتوحة وقتاً طويلاً. حدّث الصفحة للمتابعة.',
+        'reload_page' => 'تحديث الصفحة',
+
+        // The extension key: the full key is shown once, when it is made.
+        'extension_key_copy_hint' => 'يظهر المفتاح كاملاً مرة واحدة فقط عند إنشائه، لذلك لا يمكن نسخه من هنا. تحتاجه مرة أخرى؟ أنشئ مفتاحاً جديداً من «:button».',
+
+        // Screen readers: the name of the main text box (dashboard and demo).
+        'text_box_label' => 'النص الذي تريد تحويله إلى كلام',
     ],
 
     // ===== AUTH =====
@@ -1405,6 +1433,13 @@ return [
             'whitelisted_filter' => 'القائمة البيضاء',
             'whitelisted_label' => 'مستثنى من حظر الحسابات المتعددة',
             'whitelisted_help' => 'المستخدمون المستثنون لن يتم حظرهم تلقائياً بواسطة نظام مراقبة الحسابات المتعددة.',
+
+            // Deleting a member who would still be charged is refused.
+            'delete_refused_title' => 'لم يُحذف هذا الحساب',
+            'delete_refused_subscription' => 'لدى هذا العضو اشتراك بالبطاقة لم ينتهِ بعد (نشط أو تجريبي أو متأخر الدفع أو غير مدفوع)، فسيستمر الخصم منه دون حساب يلغيه منه. ألغِ الاشتراك أولاً أو انتظر حتى ينتهي، ثم احذف الحساب.',
+            'delete_refused_trial' => 'هذا العضو في تجربة مجانية تُخصم قيمتها عند انتهائها. ألغِ التجربة أولاً (التجارب، إلغاء التجربة)، ثم احذف الحساب.',
+            'bulk_delete_kept_title' => 'لم تُحذف بعض الحسابات',
+            'bulk_delete_kept_body' => 'حُذف :deleted، وبقي :kept لأن لديهم اشتراكاً بالبطاقة أو تجربة مجانية ما زالت قائمة، فسيستمر الخصم منهم. ألغِها أولاً ثم احذفهم.',
         ],
         'suspicious' => [
             'navigation_label' => 'مستخدمون مشبوهون',
@@ -1506,6 +1541,7 @@ return [
         'auth_social_default_name' => 'مستخدم جوجل',
         'auth_method_disabled' => 'طريقة تسجيل الدخول هذه معطّلة حالياً.',
         'auth_email_disabled' => 'تسجيل الدخول بالبريد الإلكتروني/كلمة المرور معطّل حالياً.',
+        'auth_disposable_email' => 'يبدو أن هذا عنوان بريد مؤقت. يرجى التسجيل ببريد إلكتروني دائم تستخدمه.',
         'auth_google_disabled' => 'تسجيل الدخول عبر جوجل معطّل حالياً.',
         'auth_phone_disabled' => 'تسجيل الدخول عبر الهاتف معطّل حالياً.',
         'auth_phone_verification_failed' => 'تعذّر التحقق من تسجيل الدخول عبر الهاتف. يرجى المحاولة مرة أخرى.',
@@ -1550,6 +1586,7 @@ return [
         'dialogue_needs_two_speakers' => 'اختر متحدثَين مختلفين للحوار.',
         'dialogue_needs_names' => 'ابدأ كل سطر في الحوار باسم المتحدث ثم نقطتين، مثلاً ":name: أهلاً!".',
         'dialogue_needs_hd' => 'وضع الحوار يستخدم الأصوات المميزة، وهي غير متاحة في خطتك.',
+        'dialogue_too_long' => 'يمكن أن يصل الحوار إلى :max حرف. قسّمه إلى أجزاء أقصر.',
         'dashboard_upgrade_for_quality' => 'قم بترقية خطتك للحصول على جودة صوت أعلى.',
         'generation_text_prohibited' => 'تعذّر توليد الصوت لأن النص المُدخل يحتوي على لغة غير مناسبة أو محظورة. لا تسمح منصة إسمع بالمحتوى المسيء.',
         'account_blocked' => 'حسابك محظور حالياً من الوصول إلى منصة إسمع. إذا كنت ترغب في طلب إعادة التفعيل، يرجى التواصل عبر :email.',
@@ -1605,6 +1642,24 @@ return [
         'trial_minute_limit' => 'تم استهلاك دقائق التجربة.',
         'api_missing_key' => 'مفتاح API مفقود.',
         'api_invalid_key' => 'مفتاح API غير صالح.',
+
+        // Payments: no free trial over a plan paid by hand, and one payment at a time.
+        'trial_manual_plan_active' => 'التجربة المجانية غير متاحة ما دامت خطتك المدفوعة الحالية فعّالة.',
+        'billing_payment_in_progress' => 'هناك عملية دفع جارية بالفعل. انتظر لحظة ثم حدّث الصفحة.',
+
+        // Social sign-in that did not confirm the email, for an address that already has an account.
+        'auth_social_unverified_email' => 'يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول بالبريد الإلكتروني وكلمة المرور.',
+
+        // Voice generation: premium voices never fall back to a standard voice, stuck voices are given back, Generate has a rate limit.
+        'premium_voices_busy' => 'أصواتنا المميزة مشغولة الآن، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى بعد دقيقة.',
+        'generation_stuck_refunded' => 'استغرق هذا الصوت وقتاً أطول من اللازم فأوقفناه، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى.',
+        'generate_too_many_requests' => 'طلبات توليد كثيرة في وقت قصير. انتظر :seconds ثانية ثم حاول مرة أخرى.',
+
+        // Studio: a long text is made after the reply, and the page checks on it until it is ready.
+        'dashboard_voice_being_made' => 'جارٍ إنشاء صوتك الآن، وسيظهر في سجل الأصوات ويُشغَّل هنا فور اكتماله.',
+
+        // The demo is for free accounts: members with a plan create in the dashboard.
+        'demo_paid_plan_only' => 'العرض التجريبي مخصّص للحسابات المجانية. خطتك مفعّلة، فأنشئ أصواتك من لوحة التحكم.',
     ],
 
     // ===== استنساخ الأصوات =====
@@ -1727,8 +1782,8 @@ return [
         'retry_not_possible' => 'لا يمكن إرسال هذين التسجيلين مرة أخرى. سجّل عينة وجملة موافقة جديدتين.',
         'technical_details' => 'تفاصيل تقنية',
         'delete_voice' => 'حذف',
-        'delete_confirm' => 'حذف هذا الصوت المستنسخ؟ لن تتمكن من التوليد به بعد ذلك.',
-        'delete_ready_blocked' => 'الصوت الجاهز يبقى في حسابك ويشغل مكاناً من خطتك. يمكنك حذف الصوت الذي لم ينجح فقط.',
+        'delete_confirm' => 'حذف هذا الصوت المستنسخ؟ لن تتمكن من التوليد به بعد ذلك، ويبقى الصوت المكتمل محسوباً ضمن خطتك لمدة 30 يوماً بعد حذفه.',
+        'deleted_voice_counts' => 'الصوت الذي حذفته يبقى محسوباً ضمن خطتك حتى :date.',
         'deleted_success' => 'تم حذف الصوت المستنسخ.',
         'use_in_generator' => 'استخدمه في المولّد',
         'created_on' => 'أُنشئ',
@@ -1753,6 +1808,14 @@ return [
             'language_required' => 'اختر لغة هذا الصوت.',
             'language_invalid' => 'اختر العربية أو إحدى خيارات الإنجليزية.',
         ],
+
+        // When a request fails and the server gives no reason, or never answers.
+        'request_failed' => 'لم تنجح العملية. أعد المحاولة.',
+        'network_error' => 'تعذّر الاتصال. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.',
+        'delete_failed' => 'تعذّر حذف هذا الصوت. أعد المحاولة.',
+
+        // Screen readers: the × beside a chosen file.
+        'remove_file' => 'إزالة هذا الملف',
     ],
     'pack' => [
         'kicker' => 'باقة لمرة واحدة',
@@ -1776,7 +1839,7 @@ return [
         'manual_note' => 'حوّل المبلغ وارفع إيصال التحويل، وسنضيف باقتك فور تأكيده.',
         'card_working' => 'جارٍ الدفع…',
         'card_failed' => 'لم يتم الدفع. حاول مرة أخرى أو استخدم بطاقة أخرى.',
-        'card_declined' => 'رُفضت بطاقتك: :reason',
+        'card_declined' => 'رُفضت بطاقتك، لذلك لم يُخصم أي مبلغ. جرّب بطاقة أخرى.',
         'card_incomplete' => 'من فضلك أكمل بيانات البطاقة.',
         'card_processing' => 'ما زال البنك يعالج الدفع، وستُضاف باقتك فور إتمامه.',
         'added' => 'أُضيف :count حرف متميز إلى حسابك.',
@@ -1808,6 +1871,9 @@ return [
         'meter_text' => 'تبقّى :remaining من :total رصيد',
         'meter_ends' => 'تنتهي في :date',
         'free_try_headline' => ':count حرف متميز للتجربة',
+
+        // The pay button while the bank is still processing a card payment.
+        'card_processing_button' => 'الدفع قيد المعالجة…',
     ],
     'samples' => [
         'title' => 'نماذج الأصوات',

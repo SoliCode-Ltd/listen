@@ -154,11 +154,11 @@ class NewsletterResource extends Resource
                         ->default(true),
                     Forms\Components\Toggle::make('exclude_already_sent')
                         ->label('Skip people who already received this newsletter')
-                        ->helperText('Example sends do not count. You can send the real newsletter to someone after mailing yourself a preview.')
+                        ->helperText('Example sends do not count. You can send the real newsletter to someone after mailing yourself a preview. Turned off, people who had it before can get it once more: each batch still skips people sent it since you turned this off.')
                         ->default(true),
                     Forms\Components\Toggle::make('skip_phone_accounts')
                         ->label('Skip phone accounts without a real email')
-                        ->helperText('Phone signups use an internal address ending in @users.listen.local.')
+                        ->helperText('Phone signups use an internal address ending in @users.listen.local. Those addresses are never emailed.')
                         ->default(true),
                     Forms\Components\Toggle::make('exclude_admins')
                         ->label('Skip admin accounts')

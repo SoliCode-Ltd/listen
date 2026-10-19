@@ -19,7 +19,12 @@
   $originalFormatted = isset($plan['original_price_monthly_formatted']) ? $wholePrice((string) $plan['original_price_monthly_formatted']) : null;
   $isPopular = $state['is_popular'];
   // The card shows what sets this plan apart; lines every plan shares are listed once under the cards.
-  $cardLines = array_values(array_filter($plan['features'], fn ($line) => !in_array($line['label'] ?? '', $pricingHiddenLabels ?? [], true)));
+  // Lines the admin wrote for this card all show on it (except the minutes, shown above them):
+  // the same Arabic wording on every plan must not empty the Arabic cards.
+  $minutesKey = \App\Support\PlanPricingLines::labelKey(__('ui.pricing.lines.label_voice_minutes'));
+  $cardLines = array_values(array_filter($plan['features'], fn ($line) => !empty($plan['own_lines'])
+    ? \App\Support\PlanPricingLines::labelKey((string) ($line['label'] ?? '')) !== $minutesKey
+    : !in_array($line['label'] ?? '', $pricingHiddenLabels ?? [], true)));
   $includedMark = __('ui.pricing.included_mark');
   $minutes = \App\Support\Credits::minutesFor((int) ($plan['monthly_chars'] ?? 0));
 @endphp

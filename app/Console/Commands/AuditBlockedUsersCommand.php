@@ -5,9 +5,9 @@ namespace App\Console\Commands;
 use App\Models\User;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
+use App\Support\PaidMember;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Schema;
 
 class AuditBlockedUsersCommand extends Command
 {
@@ -16,7 +16,7 @@ class AuditBlockedUsersCommand extends Command
         {--user= : Audit a single user by ID}
         {--export= : Export unblocked emails to a file (e.g. --export=unblocked.txt)}';
 
-    protected $description = 'Re-evaluate multi-account blocked users against the current enforcement rules (device-cookie only). Users blocked by IP or signature alone are false positives.';
+    protected $description = 'Re-evaluate multi-account blocked users against the current enforcement rules (accounts made on one browser; members who pay or have paid are never blocked). Users blocked by IP, signature, sign-ins or a paid account are false positives.';
 
     public function handle(MultiAccountEnforcementService $enforcement, BlockedUserService $blockedService): int
     {
@@ -24,9 +24,6 @@ class AuditBlockedUsersCommand extends Command
         $fix = (bool) $this->option('fix');
         $singleUserId = $this->option('user');
         $exportPath = $this->option('export');
-
-        $hasDeviceColumns = Schema::hasColumn('users', 'registration_device_id')
-            && Schema::hasColumn('users', 'last_seen_device_id');
 
         $this->info("Max linked accounts allowed: {$maxAccounts}");
         $this->info($fix ? 'MODE: FIX (will unblock false positives)' : 'MODE: DRY-RUN (preview only)');
@@ -62,17 +59,19 @@ class AuditBlockedUsersCommand extends Command
         $rows = [];
 
         $query->chunkById(100, function ($users) use (
-            $blockedService, $maxAccounts, $hasDeviceColumns,
+            $blockedService, $maxAccounts,
             $fix, &$falsePositives, &$legitimateBlocks, &$rows, &$unblockedEmails
         ) {
             foreach ($users as $user) {
-                // The ONLY signal that matters for enforcement is the device cookie.
-                $deviceCount = $this->countAccountsSharingDevice($user, $hasDeviceColumns);
+                // The ONLY signal that matters for enforcement is the browser the
+                // accounts were made on (device cookie).
+                $deviceCount = $this->accountsOnBrowserWhenMade($user);
 
                 // For context, also show IP-linked count (not used for blocking).
                 $ipCount = $this->countAccountsSharingIp($user);
 
-                if ($deviceCount > $maxAccounts) {
+                // Members who pay or have paid are never blocked by the rule.
+                if ($deviceCount > $maxAccounts && ! PaidMember::is($user)) {
                     $verdict = 'LEGITIMATE';
                     $legitimateBlocks++;
                 } else {
@@ -139,30 +138,24 @@ class AuditBlockedUsersCommand extends Command
     }
 
     /**
-     * Count non-admin, non-whitelisted accounts sharing this user's device cookie.
+     * What the rule counted when this account was made: accounts made on the
+     * same browser (device cookie at sign-up) up to this one, leaving out
+     * admins and accounts already blocked by then. Signing in on a browser
+     * links nothing. Unblocking with --fix does not change the count of the
+     * accounts made after, so the account over the limit stays blocked.
      */
-    private function countAccountsSharingDevice(User $user, bool $hasDeviceColumns): int
+    private function accountsOnBrowserWhenMade(User $user): int
     {
-        if (! $hasDeviceColumns) {
+        $deviceId = trim((string) $user->registration_device_id);
+        if ($deviceId === '' || ! $user->created_at) {
             return 1;
         }
 
-        $deviceIds = array_values(array_unique(array_filter([
-            $user->registration_device_id,
-            $user->last_seen_device_id,
-        ])));
-
-        if ($deviceIds === []) {
-            return 1;
-        }
-
-        return (int) User::query()
+        return 1 + (int) User::query()
+            ->where('registration_device_id', $deviceId)
+            ->where('id', '<', $user->id)
             ->where('is_admin', false)
-            ->where('multi_account_whitelisted', false)
-            ->where(function ($q) use ($deviceIds) {
-                $q->whereIn('registration_device_id', $deviceIds)
-                    ->orWhereIn('last_seen_device_id', $deviceIds);
-            })
+            ->where(fn ($query) => $query->whereNull('blocked_at')->orWhere('blocked_at', '>', $user->created_at))
             ->count();
     }
 

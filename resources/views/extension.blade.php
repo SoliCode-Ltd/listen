@@ -526,7 +526,7 @@
           </div>
         </div>
 
-        <div id="messageBox"></div>
+        <div id="messageBox" role="status"></div>
 
         <div class="api-status">
           <span id="keyBadge" class="badge inactive"><span class="badge-dot"></span>{{ __('ui.extension.no_api_key') }}</span>
@@ -560,6 +560,7 @@
       'generate_failed' => __('ui.extension.generate_failed'),
       'revoked_success' => __('ui.extension.revoked_success'),
       'revoke_failed' => __('ui.extension.revoke_failed'),
+      'revoke_confirm' => __('ui.extension.revoke_confirm'),
       'copied' => __('ui.extension.copied'),
       'copy_failed' => __('ui.extension.copy_failed'),
       'created_prefix' => __('ui.extension.created_prefix'),
@@ -662,6 +663,8 @@
     }
 
     async function revokeKey() {
+      // The extension stops working at once, so never on a stray click.
+      if (!window.confirm(i18n.revoke_confirm)) return;
       revokeBtn.disabled = true;
       showMessage('', '');
       try {

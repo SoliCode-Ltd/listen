@@ -11,10 +11,13 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('listen:billing-sync')->everyFifteenMinutes();
-Schedule::command('listen:billing-reminders')->dailyAt('09:00');
-Schedule::command('listen:billing-enforce-grace')->hourly();
-Schedule::command('plans:expire-discounts')->everyFiveMinutes();
+// Billing: a run that is still going is never started again on top of itself (two
+// syncs at once would call Stripe twice for every member). Each lock lapses after a
+// while, so a run that died never stops the next ones for long.
+Schedule::command('listen:billing-sync')->everyFifteenMinutes()->withoutOverlapping(60);
+Schedule::command('listen:billing-reminders')->dailyAt('09:00')->withoutOverlapping(120);
+Schedule::command('listen:billing-enforce-grace')->hourly()->withoutOverlapping(50);
+Schedule::command('plans:expire-discounts')->everyFiveMinutes()->withoutOverlapping(10);
 
 // Developer API: give back the credits of generations that got stuck.
 // The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
@@ -28,3 +31,7 @@ Schedule::call(function (): void {
         ApiIdempotencyKey::pruneExpired();
     }
 })->daily()->name('api-request-log-prune');
+
+// Studio and extension: give back the credits of members' generations that got stuck.
+// The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
+Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);

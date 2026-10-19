@@ -7,11 +7,11 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
-use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Billing\CharPackService;
-use App\Services\Billing\TrialUsageRecorder;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
@@ -19,13 +19,13 @@ use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
 use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
-use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
@@ -53,9 +53,12 @@ class DashboardController extends Controller
         $voiceNameMap = $this->voiceNameMapForUser($userId);
         $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
+        // The latest 500: a long history no longer makes the page slow to build and load
+        // (the counts below are still of every generation).
         $jobs = (clone $baseQuery)
             ->with(['textItem:id,title'])
             ->latest()
+            ->limit(500)
             ->get();
 
         $reusePreset = null;
@@ -86,6 +89,10 @@ class DashboardController extends Controller
                     ->where('user_id', $userId)
                     ->whereKey($reuseDemoId)
                     ->first();
+                // A demo voice the member deleted is gone for them, its text included.
+                if (filled(data_get($reuseDemoSource?->metadata, 'deleted_by_member_at'))) {
+                    $reuseDemoSource = null;
+                }
                 $reusePreset = $this->buildDemoReusePreset($reuseDemoSource);
             }
         }
@@ -131,9 +138,9 @@ class DashboardController extends Controller
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
             : collect();
-        $voiceCloningCount = $voiceCloningVisible
-            ? $voiceCloningVoices->reject(fn (ClonedVoice $voice) => $voice->isFailed())->count()
-            : 0;
+        // Finished voices the member deleted keep their slot for a while.
+        $voiceCloningCount = $voiceCloningVisible ? VoiceCloningService::slotsInUse($userId) : 0;
+        $voiceCloningDeletedNote = $voiceCloningVisible ? VoiceCloningService::deletedVoiceNote($userId) : '';
         $voiceCloningMaxVoices = VoiceCloningService::maxVoicesForViewer(auth()->user(), $activePlan);
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
         $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);
@@ -214,6 +221,7 @@ class DashboardController extends Controller
             'voiceCloningPlanEnabled' => $voiceCloningPlanEnabled,
             'voiceCloningList' => $voiceCloningVoices,
             'voiceCloningCount' => $voiceCloningCount,
+            'voiceCloningDeletedNote' => $voiceCloningDeletedNote,
             'voiceCloningMaxVoices' => $voiceCloningMaxVoices,
             'voiceCloningMinDuration' => VoiceCloningService::minSampleDuration(),
             'voiceCloningMaxDuration' => VoiceCloningService::maxSampleDuration(),
@@ -233,7 +241,6 @@ class DashboardController extends Controller
         $userId = (int) auth()->id();
         $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
-        $billToPack = CharPackService::billsToPack($quotaPlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false)
@@ -290,6 +297,7 @@ class DashboardController extends Controller
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
+            DialogueSpeakers::ensureShortEnough((string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         // Check if user selected a cloned voice (key format: cloned_{id})
@@ -338,105 +346,83 @@ class DashboardController extends Controller
 
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = SpeechLanguages::detect($text);
-        $estimate = UsageEstimator::estimate($text);
+        // A slower speed makes longer audio, so the reservation allows for it (as in the developer API).
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
             ]);
         }
 
-        $counter = CreditPeriod::counter($userId);
-
-        PlanUsageGuard::assertWithinDailyLimit($quotaPlan, $userId);
-
-        if ($billToPack) {
-            // Takes the pack characters now; given back below if the generation fails.
-            app(CharPackService::class)->reserve($userId, $estimate['credits']);
-        } else {
-            PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
-        }
-
-        try {
-            $recorded = $this->audioGenerationRecorder->createForUser(
-                $userId,
-                [
-                    'source_type' => 'message',
-                    'title' => $validated['title'] ?? null,
-                    'content' => $text,
-                    'language' => $sourceLanguage,
-                    'status' => 'processing',
-                    'received_at' => now(),
-                ],
-                [
-                    'input_text' => $text,
-                    'source_language' => $sourceLanguage,
-                    'target_language' => $validated['target_language'],
-                    'voice_tier' => $requestedTier,
-                    'voice_name' => $voiceName,
-                    'tts_provider' => $voiceProvider,
-                    'translate' => (bool) ($validated['translate'] ?? false),
-                    'duration_seconds' => $estimate['seconds'],
-                    'status' => 'processing',
-                    'dialect' => $studioOptions['dialect'],
-                    'performance_style' => $studioOptions['performance_style'],
-                    'style_prompt' => $studioOptions['style_prompt'],
-                    'emotion' => $studioOptions['emotion'],
-                    'speed' => $studioOptions['speed'],
-                    'pitch' => $studioOptions['pitch'],
-                    // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
-                    'audio_effect' => PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::EFFECTS) && AudioEffects::available()
-                        ? ($validated['audio_effect'] ?? null)
-                        : null,
-                    'is_dialogue' => $dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false),
-                    'dialogue_metadata' => ($dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false)
-                        && ! empty($validated['dialogue_speakers']))
-                        ? ['speakers' => $validated['dialogue_speakers']]
-                        : null,
-                    'billed_to_pack' => $billToPack,
-                    'usage_period' => $counter->period_ym,
-                ],
-            );
-        } catch (\Throwable $e) {
-            if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['credits']);
-            }
-            throw $e;
-        }
+        // The limits are checked and the credits reserved in one locked step, with the
+        // generation saved inside it: two requests at once cannot both spend the last
+        // credits. GenerateAudioJob reconciles them on success, or gives them back.
+        $recorded = app(MemberUsageMeter::class)->reserve($userId, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
+            $userId,
+            [
+                'source_type' => 'message',
+                'title' => $validated['title'] ?? null,
+                'content' => $text,
+                'language' => $sourceLanguage,
+                'status' => 'processing',
+                'received_at' => now(),
+            ],
+            [
+                'input_text' => $text,
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'voice_tier' => $requestedTier,
+                'voice_name' => $voiceName,
+                'tts_provider' => $voiceProvider,
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'duration_seconds' => $estimate['seconds'],
+                'status' => 'processing',
+                'dialect' => $studioOptions['dialect'],
+                'performance_style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
+                'emotion' => $studioOptions['emotion'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+                // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
+                'audio_effect' => PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::EFFECTS) && AudioEffects::available()
+                    ? ($validated['audio_effect'] ?? null)
+                    : null,
+                'is_dialogue' => $dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false),
+                'dialogue_metadata' => ($dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false)
+                    && ! empty($validated['dialogue_speakers']))
+                    ? ['speakers' => $validated['dialogue_speakers']]
+                    : null,
+                'billed_to_pack' => $reservation['billed_to_pack'],
+                'usage_period' => $reservation['period'],
+            ],
+        ));
 
         $job = $recorded['job'];
 
-        // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
-        if (! $billToPack) {
-            $counter->increment('total_requests');
-            $counter->increment('total_chars', $estimate['credits']);
-            $counter->addSeconds($estimate['seconds']);
-            app(TrialUsageRecorder::class)->add($userId, $estimate);
-        }
+        // A long text is made after the reply, so no time limit of the web server can
+        // cut it short: the member is answered at once and the page checks on it.
+        $madeAfterReply = GenerateAudioJob::runsAfterResponse($estimate['chars']);
+        if ($madeAfterReply) {
+            GenerateAudioJob::runAfterResponse((int) $job->id);
+        } else {
+            try {
+                // Dashboard flow is intentionally synchronous for immediate UX.
+                GenerateAudioJob::dispatchSync($job->id);
+            } catch (\Throwable) {
+                // Job failed — status will be checked below.
+            }
 
-        try {
-            // Dashboard flow is intentionally synchronous for immediate UX.
-            GenerateAudioJob::dispatchSync($job->id);
-        } catch (\Throwable) {
-            // Job failed — status will be checked below.
+            // A failed generation has given its credits back itself; one the job's own
+            // error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
         }
 
         $job->refresh();
-        $counter->refresh();
-
-        // Always refund usage when the job actually failed,
-        // regardless of whether the exception propagated.
-        if ($job->status === 'failed') {
-            if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['credits']);
-            } else {
-                $this->releaseReservedUsage($counter, $estimate);
-            }
-            $counter->refresh();
-        }
+        $counter = CreditPeriod::counter($userId);
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -449,6 +435,21 @@ class DashboardController extends Controller
         $usageSnapshot = UsageSnapshot::for($userId, $quotaPlan, $counter);
         $voiceNameMap = $this->voiceNameMapForUser($userId);
 
+        if ($madeAfterReply) {
+            $message = __('ui.backend.dashboard_voice_being_made');
+
+            // Accepted and being made: the history shows it, and the page checks on it.
+            return $request->expectsJson()
+                ? response()->json([
+                    'ok' => true,
+                    'message' => $message,
+                    'job' => $this->buildJobPayload($job, $voiceNameMap),
+                    'usage' => $usageSnapshot,
+                    'stats' => $stats,
+                ], 202)
+                : redirect()->route('dashboard')->with('ok', $message);
+        }
+
         if ($request->expectsJson()) {
             $isDone = $job->status === 'done';
             $statusCode = $isDone ? 200 : 422;
@@ -457,7 +458,7 @@ class DashboardController extends Controller
                 'ok' => $isDone,
                 'message' => $isDone
                     ? __('ui.backend.dashboard_voice_generated')
-                    : ($job->error_message ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
+                    : (GenerationMessage::forDisplay($job->error_message) ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
                 'usage' => $usageSnapshot,
                 'stats' => $stats,
@@ -470,6 +471,66 @@ class DashboardController extends Controller
             $isDone ? 'ok' : 'error',
             $isDone ? __('ui.backend.dashboard_voice_generated') : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
         );
+    }
+
+    /**
+     * One of the member's own generations, as the history shows it: the page
+     * checks on a voice still being made until it is done or failed. Once it has
+     * finished, the usage and the counts come with it, as they have changed.
+     */
+    public function show(Request $request, AudioGeneration $job)
+    {
+        $userId = (int) auth()->id();
+        if ((int) $job->user_id !== $userId) {
+            abort(404);
+        }
+
+        $payload = [
+            'ok' => true,
+            'job' => $this->buildJobPayload($job, $this->voiceNameMapForUser($userId)),
+        ];
+        if (in_array($job->status, ['done', 'failed'], true)) {
+            $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
+            $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
+            $payload['usage'] = UsageSnapshot::for($userId, $quotaPlan, CreditPeriod::counter($userId));
+            $payload['stats'] = $this->historyStats($userId);
+        }
+
+        return response()->json($payload)->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The member's newest few generations made after the given one, newest
+     * first. When a Generate reply never came (a gateway timeout, a dropped
+     * connection), the page finds the voice that request made, instead of the
+     * member making and paying for it twice.
+     */
+    public function latest(Request $request)
+    {
+        $userId = (int) auth()->id();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
+
+        $jobs = $this->userHistoryQuery($userId)
+            ->with('textItem:id,title')
+            ->where('id', '>', max(0, (int) $request->integer('after')))
+            ->latest('id')
+            ->limit(5)
+            ->get()
+            ->map(fn (AudioGeneration $job): array => $this->buildJobPayload($job, $voiceNameMap))
+            ->values()
+            ->all();
+
+        return response()->json(['ok' => true, 'jobs' => $jobs])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * A fresh form token for a page left open so long that its own has expired
+     * (every request then fails with 419): the page sends its request once more
+     * with this one (listenFetchWithFreshCsrf in the studio).
+     */
+    public function csrfToken(Request $request)
+    {
+        return response()->json(['ok' => true, 'token' => csrf_token()])->header('Cache-Control', 'no-store, private');
     }
 
     public function destroy(Request $request, AudioGeneration $job)
@@ -488,6 +549,11 @@ class DashboardController extends Controller
             return $request->expectsJson()
                 ? response()->json(['ok' => false, 'message' => $message], 409)
                 : redirect()->route('dashboard')->with('error', $message);
+        }
+
+        // A stuck one is failed and its credits given back first, so deleting it loses nothing.
+        if (in_array($job->status, ['queued', 'processing'], true)) {
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.generation_stuck_refunded'));
         }
 
         $deletedId = (int) $job->id;
@@ -519,8 +585,23 @@ class DashboardController extends Controller
             abort(404);
         }
 
+        // The row stays: the demo allowance adds up the member's demo rows, so
+        // deleting one must not give its characters back. Without its audio it
+        // drops out of the member's history (which lists only rows with audio),
+        // and the file goes too unless another row still plays it.
         $deletedId = (int) $generation->id;
-        $generation->delete();
+        $audioPath = trim((string) $generation->audio_path);
+        $metadata = is_array($generation->metadata) ? $generation->metadata : [];
+        $generation->forceFill([
+            'audio_path' => null,
+            'metadata' => $metadata + ['deleted_by_member_at' => now()->toIso8601String()],
+        ])->save();
+
+        if ($audioPath !== ''
+            && ! DemoVoiceGeneration::query()->where('audio_path', $audioPath)->exists()
+            && ! AudioGeneration::query()->where('audio_path', $audioPath)->exists()) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($audioPath);
+        }
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -687,21 +768,6 @@ class DashboardController extends Controller
         ];
     }
 
-    /**
-     * @param  array{chars:int,seconds:int}  $estimate
-     */
-    private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
-    {
-        $counter->refresh();
-
-        $counter->update([
-            'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
-        ]);
-        $counter->addSeconds(-(int) $estimate['seconds']);
-        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
-    }
-
     private function buildJobPayload(AudioGeneration $job, array $voiceNameMap): array
     {
         $job->loadMissing('textItem:id,title');
@@ -719,7 +785,7 @@ class DashboardController extends Controller
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
             'audio_url' => AudioUrl::fromPath($job->audio_path),
-            'error_message' => $job->error_message,
+            'error_message' => GenerationMessage::forDisplay($job->error_message),
             'created_human' => $job->created_at?->diffForHumans(),
             'created_at_ts' => $job->created_at?->getTimestamp(),
             'can_reuse_settings' => $job->hasReusablePremiumSettings(),
@@ -853,6 +919,23 @@ class DashboardController extends Controller
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
+        ];
+    }
+
+    /**
+     * The history's counts, as the page shows them.
+     *
+     * @return array{processing:int, done:int, failed:int, total:int}
+     */
+    private function historyStats(int $userId): array
+    {
+        $baseQuery = $this->userHistoryQuery($userId);
+
+        return [
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
+            'done' => (clone $baseQuery)->where('status', 'done')->count(),
+            'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
+            'total' => (clone $baseQuery)->count(),
         ];
     }
 

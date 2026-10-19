@@ -1231,6 +1231,19 @@ html[data-theme="light"] .app-footer {
 .custom-audio-play:active {
   transform: scale(0.95);
 }
+/* Keyboard focus on the player's controls is always visible. */
+.custom-audio-play:focus-visible,
+.custom-audio-menu:focus-visible,
+.custom-audio-progress-container:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+.custom-audio-progress-container:focus-visible {
+  border-radius: 99px;
+}
+.custom-audio-progress-container:focus-visible .custom-audio-thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+}
 .custom-audio-play svg {
   width: 15px;
   height: 15px;
@@ -1367,6 +1380,13 @@ html[data-theme="light"] .app-footer {
   stroke: currentColor;
   stroke-width: 2;
   fill: none;
+}
+/* Under a player whose audio could not be played or saved; takes no room while empty. */
+.custom-audio-notice:not(:empty) {
+  display: block;
+  margin-top: .35rem;
+  font-size: .78rem;
+  color: var(--danger);
 }
 @@container (max-width: 280px) {
   .custom-audio-time {

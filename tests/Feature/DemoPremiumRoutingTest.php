@@ -127,6 +127,56 @@ class DemoPremiumRoutingTest extends TestCase
             ]);
     }
 
+    public function test_demo_hd_preview_never_falls_back_to_a_standard_voice(): void
+    {
+        SiteSetting::set('tts_mode', 'hybrid', 'tts');
+        // The free plan is set to Google, as live has it: premium previews still use Gemini.
+        SiteSetting::set('tts_plan_provider_free', 'google_cloud', 'tts');
+        config(['services.google_tts.api_key' => 'test-google-key', 'services.gemini_tts.retry_pause_ms' => 0]);
+        Plan::query()->create([
+            'slug' => 'free', 'name' => 'Free', 'price_cents' => 0, 'monthly_minutes' => 10, 'monthly_chars' => 10000,
+            'monthly_requests' => 60, 'max_chars_per_request' => 1200, 'voice_tier' => 'standard',
+            'tts_provider_policy' => 'google_cloud', 'dialogue_enabled' => false, 'custom_prompt_enabled' => false, 'is_active' => true,
+        ]);
+        $premiumVoice = Voice::query()->create([
+            'language' => 'en', 'gender' => 'female', 'tier' => 'hd', 'display_name' => 'Serene',
+            'internal_voice_id' => 'en-Gemini-HD-Kore', 'provider' => 'gemini', 'provider_voice_id' => 'Kore', 'is_active' => true,
+        ]);
+        $key = ['key' => 'test-gemini-key', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1];
+        $keys = \Mockery::mock(\App\Services\Tts\GeminiKeyManager::class);
+        $keys->shouldReceive('getAllKeys')->andReturn([$key]);
+        $keys->shouldReceive('getAvailableKey')->andReturn($key);
+        $keys->shouldReceive('recordUsage')->andReturnNull();
+        $keys->shouldReceive('markKeyExhausted')->andReturnNull();
+        $this->app->instance(\App\Services\Tts\GeminiKeyManager::class, $keys);
+        $calls = ['gemini' => 0, 'google' => 0];
+        \Illuminate\Support\Facades\Http::fake(function ($request) use (&$calls) {
+            if (str_contains($request->url(), 'texttospeech')) {
+                $calls['google']++;
+
+                return \Illuminate\Support\Facades\Http::response(['audioContent' => base64_encode('google-audio')]);
+            }
+            $calls['gemini']++;
+
+            return \Illuminate\Support\Facades\Http::response(['error' => ['message' => 'overloaded']], 503);
+        });
+        $this->actingAs(\App\Models\User::factory()->create());
+
+        $this->postJsonLocalizedRoute('demo.preview', [
+            'text' => 'Hello world',
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_tier' => 'hd',
+            'voice_key' => VoiceCatalog::keyFromId((int) $premiumVoice->id),
+            'performance_style' => 'promo',
+            'emotion' => 'excited',
+        ])->assertStatus(422)->assertJsonPath('ok', false);
+
+        $this->assertGreaterThan(0, $calls['gemini']);
+        $this->assertSame(0, $calls['google'], 'a premium preview is never read by a standard voice');
+        $this->assertSame(0, \App\Models\DemoVoiceGeneration::query()->count(), 'nothing is kept or counted');
+    }
+
     /**
      * @return array{0: Plan, 1: Voice, 2: Voice}
      */

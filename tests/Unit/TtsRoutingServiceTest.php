@@ -4,8 +4,10 @@ namespace Tests\Unit;
 
 use App\Contracts\TtsProviderInterface;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\GeminiTtsProvider;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsRoutingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -73,17 +75,22 @@ class TtsRoutingServiceTest extends TestCase
         $this->assertSame('gemini', $provider->name());
     }
 
-    public function test_hybrid_mode_paid_plan_falls_back_to_google_when_gemini_unavailable(): void
+    public function test_hybrid_mode_paid_plan_stays_on_gemini_when_gemini_unavailable(): void
     {
         $geminiUnavailable = $this->createMock(GeminiTtsProvider::class);
         $geminiUnavailable->method('name')->willReturn('gemini');
         $geminiUnavailable->method('isAvailable')->willReturn(false);
+        $geminiUnavailable->expects($this->never())->method('synthesize');
+        $this->google->expects($this->never())->method('synthesize');
 
         $router = new TtsRoutingService($this->google, $geminiUnavailable);
         $plan = $this->makePlan('pro', 1999);
 
         $provider = $router->resolveProvider(TtsRoutingService::MODE_HYBRID, $plan, ['tier' => 'hd']);
-        $this->assertSame('google_cloud', $provider->name());
+        $this->assertSame('gemini', $provider->name(), 'a paid HD request never moves to a standard voice');
+
+        $this->expectException(PremiumVoiceUnavailableException::class);
+        $router->synthesize('Hello there', 'en', ['tier' => 'hd'], $plan);
     }
 
     public function test_standard_tier_forces_google_even_for_paid_plan(): void
@@ -93,7 +100,7 @@ class TtsRoutingServiceTest extends TestCase
         $this->assertSame('google_cloud', $provider->name());
     }
 
-    public function test_hybrid_hd_honors_google_provider_hint(): void
+    public function test_hybrid_hd_ignores_a_google_provider_hint(): void
     {
         $plan = $this->makePlan('creator', 999);
         $provider = $this->router->resolveProvider(TtsRoutingService::MODE_HYBRID, $plan, [
@@ -101,7 +108,7 @@ class TtsRoutingServiceTest extends TestCase
             'provider' => 'google_cloud',
         ]);
 
-        $this->assertSame('google_cloud', $provider->name());
+        $this->assertSame('gemini', $provider->name());
     }
 
     public function test_hybrid_hd_honors_gemini_provider_hint_when_available(): void
@@ -115,7 +122,7 @@ class TtsRoutingServiceTest extends TestCase
         $this->assertSame('gemini', $provider->name());
     }
 
-    public function test_hybrid_hd_gemini_provider_hint_falls_back_to_google_when_unavailable(): void
+    public function test_hybrid_hd_gemini_provider_hint_stays_on_gemini_when_unavailable(): void
     {
         $geminiUnavailable = $this->createMock(GeminiTtsProvider::class);
         $geminiUnavailable->method('name')->willReturn('gemini');
@@ -129,7 +136,52 @@ class TtsRoutingServiceTest extends TestCase
             'provider' => 'gemini',
         ]);
 
-        $this->assertSame('google_cloud', $provider->name());
+        $this->assertSame('gemini', $provider->name());
+    }
+
+    // ─── HD never falls back to a standard voice ──────────────
+
+    public function test_hd_uses_gemini_in_every_mode_whatever_the_plan_policy_or_voice_hint(): void
+    {
+        $plan = $this->makePlan('starter', 900);
+        $plan->tts_provider_policy = 'google_only';
+        SiteSetting::set('tts_plan_provider_starter', 'google_cloud', 'tts');
+
+        foreach ([TtsRoutingService::MODE_LEGACY, TtsRoutingService::MODE_GOOGLE, TtsRoutingService::MODE_HYBRID] as $mode) {
+            foreach ([null, 'google_cloud', 'gemini'] as $hint) {
+                $config = ['tier' => 'hd'] + ($hint ? ['provider' => $hint] : []);
+                $this->assertSame('gemini', $this->router->resolveProvider($mode, $plan, $config)->name(), "{$mode} mode, hint {$hint}");
+            }
+            $this->assertSame('google_cloud', $this->router->resolveProvider($mode, $plan, ['tier' => 'standard', 'provider' => 'gemini'])->name(), 'standard stays on Google');
+        }
+    }
+
+    public function test_hd_failure_throws_and_never_reads_the_text_with_a_standard_voice(): void
+    {
+        SiteSetting::set('tts_mode', TtsRoutingService::MODE_HYBRID, 'tts');
+        SiteSetting::set('tts_fallback_enabled', '1', 'tts');
+        $failure = new \RuntimeException('Gemini TTS request failed (HTTP 500): Internal error');
+        $this->gemini->method('synthesize')->willThrowException($failure);
+        $this->google->expects($this->never())->method('synthesize');
+
+        try {
+            $this->router->synthesize('Hello there', 'en', ['tier' => 'hd', 'voice_name' => 'Kore'], $this->makePlan('creator', 999), 7);
+            $this->fail('An HD request whose engine fails must fail.');
+        } catch (PremiumVoiceUnavailableException $e) {
+            $this->assertSame($failure, $e->getPrevious());
+            $this->assertStringContainsString('HTTP 500', $e->getMessage());
+        }
+    }
+
+    public function test_standard_voice_result_says_no_backup_engine_was_used(): void
+    {
+        $this->google->method('synthesize')->willReturn(['audio_path' => 'audio/x.mp3', 'provider' => 'google_cloud']);
+        $this->gemini->expects($this->never())->method('synthesize');
+
+        $result = $this->router->synthesize('Hello there', 'en', ['tier' => 'standard'], $this->makePlan('free', 0));
+
+        $this->assertSame('google_cloud', $result['provider']);
+        $this->assertFalse($result['fallback_used']);
     }
 
     // ─── getProviderByName ────────────────────────────────────

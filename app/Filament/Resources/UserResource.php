@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Billing\CharPackService;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
+use App\Services\UserDeletionService;
 use App\Support\Countries;
 use App\Support\DemoAllowance;
 use Filament\Forms;
@@ -18,6 +19,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\HtmlString;
@@ -495,7 +497,33 @@ HTML;
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    // Members who would still be charged are kept; the notice says how many.
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->action(function (Tables\Actions\DeleteBulkAction $action, Collection $records): void {
+                            $deletion = app(UserDeletionService::class);
+                            $kept = 0;
+                            foreach ($records as $user) {
+                                if ($deletion->delete($user, Auth::user()) !== null) {
+                                    $kept++;
+                                }
+                            }
+
+                            if ($kept === 0) {
+                                $action->success();
+
+                                return;
+                            }
+
+                            Notification::make()
+                                ->warning()
+                                ->title(__('ui.admin.users.bulk_delete_kept_title'))
+                                ->body(__('ui.admin.users.bulk_delete_kept_body', [
+                                    'deleted' => $records->count() - $kept,
+                                    'kept' => $kept,
+                                ]))
+                                ->persistent()
+                                ->send();
+                        }),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

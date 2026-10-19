@@ -4,7 +4,8 @@ name: Subscription page inspect
 # Pipes scripts/support/subscription_page_inspect.php over SSH into the app's own
 # PHP (READ ONLY database session). The member is named by the SHA-256 of
 # their lower-cased email, so no address is stored in the repository; other
-# members' emails are masked in the output. Nothing is written.
+# members' emails are masked in the output. Nothing is written. Run by hand,
+# naming the member each time.
 
 on:
   workflow_dispatch:
@@ -12,11 +13,6 @@ on:
       email_sha256:
         description: SHA-256 of the member's lower-cased email
         required: true
-  push:
-    branches: [ccr-133b8b13-pcl57v]
-    paths:
-      - .github/workflows/subscription-page-inspect.yml
-      - scripts/support/subscription_page_inspect.php
 
 permissions:
   contents: read
@@ -29,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Inspect live over SSH
         env:
-          EMAIL_SHA256: ${{ inputs.email_sha256 || 'f9259a3de240311f3aa7181ff12b141125eb845c43f69e42ae5001ac566e6d5e' }}
+          EMAIL_SHA256: ${{ inputs.email_sha256 }}
           SSH_HOST: ${{ secrets.LIVE_SSH_HOST }}
           SSH_USER: ${{ secrets.LIVE_SSH_USER }}
           SSH_KEY: ${{ secrets.LIVE_SSH_KEY }}

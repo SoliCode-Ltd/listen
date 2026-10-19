@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class Newsletter extends Model
@@ -30,6 +31,9 @@ class Newsletter extends Model
     public const LANGUAGE_AR = 'ar';
 
     public const LANGUAGE_BOTH = 'both';
+
+    // When "skip people who already received this newsletter" was last turned off.
+    private const RESEND_FROM_SETTING = 'newsletter_resend_from.';
 
     protected $fillable = [
         'name',
@@ -88,6 +92,47 @@ class Newsletter extends Model
         'sent_count' => 'integer',
         'failed_count' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        // Turning off "skip people who already received this newsletter" starts a
+        // new round from that moment: people who had it before can get it again,
+        // once, so each batch moves on instead of mailing the first people again.
+        static::created(function (Newsletter $newsletter): void {
+            if (! $newsletter->exclude_already_sent) {
+                $newsletter->startResendRound();
+            }
+        });
+
+        static::updated(function (Newsletter $newsletter): void {
+            if ($newsletter->wasChanged('exclude_already_sent') && ! $newsletter->exclude_already_sent) {
+                $newsletter->startResendRound();
+            }
+        });
+    }
+
+    /**
+     * When the current round of sending it again began, or null when that is
+     * not known (then everyone it was already sent to counts as done).
+     */
+    public function resendFrom(): ?Carbon
+    {
+        $value = trim((string) SiteSetting::get(self::RESEND_FROM_SETTING.$this->getKey(), ''));
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function startResendRound(): void
+    {
+        SiteSetting::set(self::RESEND_FROM_SETTING.$this->getKey(), now()->toIso8601String(), 'newsletter');
+    }
 
     public function plan(): BelongsTo
     {

@@ -584,6 +584,10 @@ return [
         'admin_request_already_reviewed' => 'This manual payment request has already been reviewed.',
         'admin_request_missing_relation' => 'The payment request is missing its user or plan relationship.',
         'manual_locked_to_egypt' => 'Manual payment methods are currently available only for Egypt.',
+
+        // Card checkout: when the card form cannot load, and the local price beside the dollar amount.
+        'card_form_unavailable' => "The card payment form couldn't load. Check your connection, then reload the page to try again.",
+        'card_local_about' => 'Charged in US dollars, about :amount',
     ],
 
     // ===== MANAGE SUBSCRIPTION PAGE =====
@@ -816,6 +820,9 @@ return [
         'copied' => 'Copied to clipboard.',
         'copy_failed' => 'Copy failed. Please copy manually.',
         'created_prefix' => 'created',
+
+        // Revoking the key stops the extension at once, so it is asked first.
+        'revoke_confirm' => 'Revoke this key? The extension stops working until you create a new key and paste it in.',
     ],
 
     // ===== DEMO PAGE =====
@@ -938,6 +945,15 @@ return [
         'audio_download' => 'Download Audio',
         'audio_download_as' => 'Download as',
         'audio_download_failed' => 'This file type could not be made right now. Please try again or pick another type.',
+
+        // Under a player whose file could not be played or downloaded.
+        'audio_play_failed' => "This audio couldn't be played right now. Please try again.",
+        'audio_download_unavailable' => "This audio couldn't be downloaded right now. Please try again.",
+
+        // The player for keyboards and screen readers: the button's label while playing, and the position bar.
+        'audio_pause' => 'Pause',
+        'audio_seek' => 'Playback position',
+        'audio_position' => ':current of :total',
     ],
 
     // ===== DASHBOARD =====
@@ -1272,6 +1288,18 @@ return [
             'Use <short pause> or <long pause> for a moment of silence. Punctuation (… , .) also shapes the pacing.',
             'Standard voices skip tags, so they are never read aloud.',
         ],
+
+        // Generate and history: a reply that never came is looked for (the same text is not sent
+        // twice meanwhile), and a page whose form token expired offers a reload.
+        'voice_may_still_be_finishing' => 'Your voice may still be finishing. It will appear in your history in a moment — please don\'t generate it again.',
+        'page_expired' => 'This page has been open a long time and has expired. Reload it to carry on.',
+        'reload_page' => 'Reload page',
+
+        // The extension key: the full key is shown once, when it is made.
+        'extension_key_copy_hint' => "The full key is shown only once, when it's created, so it can't be copied here. Need it again? Create a new key with :button.",
+
+        // Screen readers: the name of the main text box (dashboard and demo).
+        'text_box_label' => 'Text to turn into speech',
     ],
 
     // ===== AUTH =====
@@ -1399,6 +1427,13 @@ return [
             'whitelisted_filter' => 'Whitelisted',
             'whitelisted_label' => 'Multi-Account Whitelisted',
             'whitelisted_help' => 'Whitelisted users will not be auto-blocked by the multi-account enforcement system.',
+
+            // Deleting a member who would still be charged is refused.
+            'delete_refused_title' => 'This account was not deleted',
+            'delete_refused_subscription' => 'This member has a card subscription that has not ended (active, trialing, past due or unpaid), so they would still be charged with no account to cancel from. Cancel the subscription first, or wait until it ends, then delete the account.',
+            'delete_refused_trial' => 'This member is on a free trial that is charged when it ends. Cancel the trial first (Trials, Cancel trial), then delete the account.',
+            'bulk_delete_kept_title' => 'Some accounts were not deleted',
+            'bulk_delete_kept_body' => 'Deleted :deleted. Kept :kept: they have a card subscription or free trial that is still running, so they would still be charged. Cancel those first, then delete them.',
         ],
         'suspicious' => [
             'navigation_label' => 'Suspicious Users',
@@ -1500,10 +1535,11 @@ return [
         'auth_social_default_name' => 'Google User',
         'auth_method_disabled' => 'This authentication method is currently disabled.',
         'auth_email_disabled' => 'Email/password authentication is currently disabled.',
+        'auth_disposable_email' => "This looks like a temporary email address. Please sign up with one you'll keep using.",
         'auth_google_disabled' => 'Google sign-in is currently disabled.',
         'auth_phone_disabled' => 'Phone authentication is currently disabled.',
         'auth_phone_verification_failed' => 'Unable to verify phone sign-in. Please try again.',
-        'auth_firebase_google_disabled' => 'Google sign-in (Firebase) is currently disabled.',
+        'auth_firebase_google_disabled' => 'Google sign-in is currently disabled.',
         'auth_firebase_google_failed' => 'Unable to verify Google sign-in. Please try again.',
         'demo_setup_validated' => 'Setup validated.',
         'demo_translate_note_before' => 'Text will be translated before speaking.',
@@ -1544,6 +1580,7 @@ return [
         'dialogue_needs_two_speakers' => 'Choose two different speakers for the dialogue.',
         'dialogue_needs_names' => 'Start each line of the dialogue with a speaker\'s name and a colon, for example ":name: Hello!".',
         'dialogue_needs_hd' => 'Dialogue mode uses premium voices, which your plan does not include.',
+        'dialogue_too_long' => 'A dialogue can be up to :max characters. Split it into shorter parts.',
         'dashboard_upgrade_for_quality' => 'Upgrade your plan for higher voice quality.',
         'generation_text_prohibited' => 'Audio could not be generated because the entered text contains inappropriate or prohibited language. Listen does not allow abusive content.',
         'account_blocked' => 'Your account is currently blocked from accessing Listen. If you would like to request access again, please contact :email.',
@@ -1599,6 +1636,24 @@ return [
         'trial_minute_limit' => 'The trial minute allowance has been used.',
         'api_missing_key' => 'Missing API key.',
         'api_invalid_key' => 'Invalid API key.',
+
+        // Payments: no free trial over a plan paid by hand, and one payment at a time.
+        'trial_manual_plan_active' => "The free trial isn't available while your current paid plan is active.",
+        'billing_payment_in_progress' => 'A payment is already in progress. Please wait a moment, then refresh the page.',
+
+        // Social sign-in that did not confirm the email, for an address that already has an account.
+        'auth_social_unverified_email' => 'This email already has an account. Sign in with your email and password.',
+
+        // Voice generation: premium voices never fall back to a standard voice, stuck voices are given back, Generate has a rate limit.
+        'premium_voices_busy' => 'Our premium voices are busy right now. Nothing was charged — please try again in a minute.',
+        'generation_stuck_refunded' => 'This voice took too long, so we stopped it. Nothing was charged — please try again.',
+        'generate_too_many_requests' => 'You are generating very quickly. Please wait :seconds seconds and try again.',
+
+        // Studio: a long text is made after the reply, and the page checks on it until it is ready.
+        'dashboard_voice_being_made' => 'Your voice is being made. It will appear in your history and play here as soon as it is ready.',
+
+        // The demo is for free accounts: members with a plan create in the dashboard.
+        'demo_paid_plan_only' => 'The demo is for free accounts. Your plan is active, so create your voices in the dashboard.',
     ],
 
     // ===== VOICE CLONING =====
@@ -1721,8 +1776,8 @@ return [
         'retry_not_possible' => 'These recordings can’t be sent again. Record a new sample and consent sentence.',
         'technical_details' => 'Technical details',
         'delete_voice' => 'Delete',
-        'delete_confirm' => 'Delete this cloned voice? You will not be able to generate with it again.',
-        'delete_ready_blocked' => 'A finished voice stays on your account and uses one of your plan slots. You can delete a voice that did not succeed.',
+        'delete_confirm' => 'Delete this cloned voice? You will not be able to generate with it again. A finished voice still counts toward your plan for 30 days after you delete it.',
+        'deleted_voice_counts' => 'A voice you deleted still counts toward your plan until :date.',
         'deleted_success' => 'Cloned voice deleted.',
         'use_in_generator' => 'Use in the generator',
         'created_on' => 'Created',
@@ -1747,6 +1802,14 @@ return [
             'language_required' => 'Choose the language of this voice.',
             'language_invalid' => 'Choose Arabic or one of the English options.',
         ],
+
+        // When a request fails and the server gives no reason, or never answers.
+        'request_failed' => "That didn't work. Please try again.",
+        'network_error' => "We couldn't connect. Check your internet connection and try again.",
+        'delete_failed' => "This voice couldn't be deleted. Please try again.",
+
+        // Screen readers: the × beside a chosen file.
+        'remove_file' => 'Remove this file',
     ],
     'pack' => [
         'kicker' => 'One-time pack',
@@ -1770,7 +1833,7 @@ return [
         'manual_note' => 'Send the amount, upload the receipt, and we add your pack once we confirm it.',
         'card_working' => 'Processing…',
         'card_failed' => 'The payment did not go through. Please try again or use another card.',
-        'card_declined' => 'Your card was declined: :reason',
+        'card_declined' => 'Your card was declined, so nothing was charged. Please try another card.',
         'card_incomplete' => 'Please complete your card details.',
         'card_processing' => 'Your bank is still processing the payment. Your pack will be added as soon as it goes through.',
         'added' => ':count premium characters were added to your account.',
@@ -1802,6 +1865,9 @@ return [
         'meter_text' => ':remaining of :total credits left',
         'meter_ends' => 'Ends :date',
         'free_try_headline' => ':count premium characters to try',
+
+        // The pay button while the bank is still processing a card payment.
+        'card_processing_button' => 'Payment processing…',
     ],
     'samples' => [
         'title' => 'Voice samples',

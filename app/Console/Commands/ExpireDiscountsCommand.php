@@ -34,11 +34,22 @@ class ExpireDiscountsCommand extends Command
             $plan->discount_ends_at = null;
             $plan->save();
 
-            // Re-sync with Stripe to remove coupon
+            // Re-sync with Stripe to remove coupon (only the live site changes Stripe;
+            // elsewhere the discount ends here only).
             if ($syncService->isConfigured() && $plan->price_cents > 0) {
                 try {
-                    $syncService->syncPlan($plan);
-                    $this->info("  Stripe coupon cleaned up for: {$plan->slug}");
+                    $result = $syncService->syncPlan($plan);
+                    if ($result['success']) {
+                        $this->info("  Stripe coupon cleaned up for: {$plan->slug}");
+                    } elseif (! empty($result['skipped'])) {
+                        $this->info("  Stripe not changed for {$plan->slug}: {$result['message']}");
+                    } else {
+                        $this->warn("  Failed to sync Stripe for {$plan->slug}: {$result['message']}");
+                        Log::warning('Discount expiry Stripe sync failed', [
+                            'plan_slug' => $plan->slug,
+                            'error' => $result['message'],
+                        ]);
+                    }
                 } catch (\Exception $e) {
                     $this->warn("  Failed to sync Stripe for {$plan->slug}: {$e->getMessage()}");
                     Log::warning('Discount expiry Stripe sync failed', [

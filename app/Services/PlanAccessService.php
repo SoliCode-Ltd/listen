@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -12,15 +13,12 @@ use App\Support\VoiceTier;
 
 class PlanAccessService
 {
+    /** How long after a card plan's period ended its renewal may still be on the way. */
+    private const RENEWAL_WINDOW_HOURS = 2;
+
     public function resolveActivePlanForUserId(int $userId): ?Plan
     {
-        $subscription = Subscription::query()
-            ->where('user_id', $userId)
-            ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', now());
-            })
+        $subscription = $this->activeSubscriptions($userId)
             ->latest('id')
             ->with('plan')
             ->first();
@@ -125,16 +123,38 @@ class PlanAccessService
             });
     }
 
+    /**
+     * The member's plan rows that count now. A card plan whose period ended
+     * less than two hours ago still counts while its Stripe subscription is
+     * active or trialing: Stripe charges the renewal a little after the period
+     * ends, and until it reaches us the member must not drop to Free (and the
+     * standard voices).
+     *
+     * @return \Illuminate\Database\Eloquent\Builder<Subscription>
+     */
+    private function activeSubscriptions(int $userId): \Illuminate\Database\Eloquent\Builder
+    {
+        return Subscription::query()
+            ->where('user_id', $userId)
+            ->where('status', 'active')
+            ->where(function ($query) use ($userId) {
+                $query->whereNull('current_period_end')
+                    ->orWhere('current_period_end', '>=', now())
+                    ->orWhere(function ($renewing) use ($userId) {
+                        $renewing->where('current_period_end', '>=', now()->subHours(self::RENEWAL_WINDOW_HOURS))
+                            ->whereExists(BillingSubscription::query()
+                                ->selectRaw('1')
+                                ->where('user_id', $userId)
+                                ->whereIn('stripe_status', ['active', 'trialing'])
+                                // Not one cancelled to end with this period.
+                                ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', now())));
+                    });
+            });
+    }
+
     public function ensureFreePlanForUser(User $user): void
     {
-        $hasActive = Subscription::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->where(function ($query) {
-                $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', now());
-            })
-            ->exists();
+        $hasActive = $this->activeSubscriptions((int) $user->id)->exists();
 
         if ($hasActive) {
             return;
@@ -217,6 +237,12 @@ class PlanAccessService
 
     public function resolveTierForPlan(?Plan $plan): string
     {
+        // Everyone who pays gets the premium (HD) voices, whatever the plan's voice
+        // tier field says; only the free plan follows its setting.
+        if ($plan && ((int) $plan->price_cents > 0 || $plan->isPack())) {
+            return VoiceTier::HD;
+        }
+
         return VoiceTier::normalize((string) ($plan?->voice_tier ?: VoiceTier::STANDARD));
     }
 
