@@ -7,6 +7,7 @@ use App\Models\NewsletterDelivery;
 use App\Models\NewsletterSuppression;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\RenewalGrace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -329,7 +330,9 @@ class NewsletterAudience
             ->whereIn('status', ['active', 'trialing'])
             ->where(function (Builder $period): void {
                 $period->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', now());
+                    ->orWhere('current_period_end', '>=', now())
+                    // A paid plan kept on through a failed renewal's grace days.
+                    ->orWhere(fn (Builder $grace) => RenewalGrace::whereKept($grace, now()));
             })
             ->groupBy('user_id');
     }

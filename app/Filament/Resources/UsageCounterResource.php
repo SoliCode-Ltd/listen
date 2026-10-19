@@ -7,6 +7,7 @@ use App\Models\CharGift;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Services\Billing\RenewalGrace;
 use App\Services\PlanAccessService;
 use App\Support\PlanUsageGuard;
 use Filament\Forms;
@@ -243,7 +244,9 @@ class UsageCounterResource extends Resource
     {
         return Subscription::query()
             ->where('status', 'active')
-            ->where(fn (Builder $q) => $q->whereNull('current_period_end')->orWhere('current_period_end', '>=', now()));
+            ->where(fn (Builder $q) => $q->whereNull('current_period_end')->orWhere('current_period_end', '>=', now())
+                // A paid plan kept on through a failed renewal's grace days.
+                ->orWhere(fn (Builder $grace) => RenewalGrace::whereKept($grace, now())));
     }
 
     private static function planNow(UsageCounter $record): ?Plan
