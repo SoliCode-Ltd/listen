@@ -22,6 +22,7 @@ use App\Support\AudioEffects;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCloningAccess;
 use App\Support\VoiceCatalog;
@@ -317,8 +318,10 @@ class GenerateAudioJob implements ShouldQueue
     }
 
     /**
-     * What the member is told. A cloned voice has no other engine to fall
-     * back on, so a used-up daily limit is said plainly.
+     * What the member is told, kept in English as the developer API shows it
+     * (the studio and the extension show it in the member's language, with
+     * GenerationMessage). A cloned voice has no other engine to fall back on,
+     * so a used-up daily limit is said plainly.
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
@@ -327,10 +330,10 @@ class GenerateAudioJob implements ShouldQueue
         }
         if (str_starts_with((string) $generation->voice_name, 'cloned_')
             && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
-            return __('ui.backend.cloned_voice_daily_limit');
+            return GenerationMessage::stored('ui.backend.cloned_voice_daily_limit');
         }
 
-        return 'Voice generation failed. Please try again.';
+        return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');
     }
 
     /**
@@ -375,7 +378,7 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        $message = $e ? $this->failureMessage($generation, $e) : 'Voice generation failed. Please try again.';
+        $message = $e ? $this->failureMessage($generation, $e) : GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');
 
         // A developer API generation is failed and refunded in one locked step, so
         // a request, this hook and the stuck-generation sweep never all refund it.

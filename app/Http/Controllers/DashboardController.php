@@ -19,6 +19,7 @@ use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
 use App\Support\CreditPeriod;
@@ -458,7 +459,7 @@ class DashboardController extends Controller
                 'ok' => $isDone,
                 'message' => $isDone
                     ? __('ui.backend.dashboard_voice_generated')
-                    : ($job->error_message ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
+                    : (GenerationMessage::forDisplay($job->error_message) ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
                 'usage' => $usageSnapshot,
                 'stats' => $stats,
@@ -735,7 +736,7 @@ class DashboardController extends Controller
             'translate' => (bool) $job->translate,
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
             'audio_url' => AudioUrl::fromPath($job->audio_path),
-            'error_message' => $job->error_message,
+            'error_message' => GenerationMessage::forDisplay($job->error_message),
             'created_human' => $job->created_at?->diffForHumans(),
             'created_at_ts' => $job->created_at?->getTimestamp(),
             'can_reuse_settings' => $job->hasReusablePremiumSettings(),

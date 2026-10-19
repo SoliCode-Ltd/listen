@@ -20,6 +20,7 @@ use App\Support\AudioUrl;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\DialogueSpeakers;
+use App\Support\GenerationMessage;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
@@ -338,7 +339,7 @@ class MessageReaderController extends Controller
             'voice_tier' => $requestedTier,
             'voice_tier_label' => VoiceTier::label($requestedTier),
             'audio_url' => AudioUrl::fromPath($job->audio_path),
-            'error_message' => $job->error_message,
+            'error_message' => GenerationMessage::forDisplay($job->error_message),
             'estimated_chars' => $estimate['chars'],
             'estimated_credits' => $estimate['credits'],
             'estimated_seconds' => $estimate['seconds'],
@@ -383,7 +384,7 @@ class MessageReaderController extends Controller
                     'status' => $job->status,
                     'duration_seconds' => $job->duration_seconds,
                     'audio_url' => AudioUrl::fromPath($job->audio_path),
-                    'error_message' => $job->error_message,
+                    'error_message' => GenerationMessage::forDisplay($job->error_message),
                     'created_at' => $job->created_at,
                 ];
             });

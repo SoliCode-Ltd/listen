@@ -2859,7 +2859,7 @@
                   'translate' => $job->translate,
                   'duration_seconds' => $job->duration_seconds,
                   'audio_url' => $job->audio_path ? \App\Support\AudioUrl::fromPath($job->audio_path) : null,
-                  'error_message' => $job->error_message,
+                  'error_message' => \App\Support\GenerationMessage::forDisplay($job->error_message),
                   'created_human' => $job->created_at?->diffForHumans(),
                   'created_at_ts' => $job->created_at?->getTimestamp(),
                   'can_reuse_settings' => $job->hasReusablePremiumSettings(),
@@ -2883,7 +2883,7 @@
                         data-download-quality="{{ \App\Support\VoiceTier::label((string) ($job->voice_tier ?: \App\Support\VoiceTier::STANDARD)) }}"
                       ></audio>
                     @elseif($job->status === 'failed')
-	                      <small style="color: var(--danger);">{{ $job->error_message ?: __('ui.dashboard.generation_failed') }}</small>
+	                      <small style="color: var(--danger);">{{ \App\Support\GenerationMessage::forDisplay($job->error_message) ?: __('ui.dashboard.generation_failed') }}</small>
 	                    @else
 	                      <small style="color: var(--muted);">{{ __('ui.dashboard.processing_ellipsis') }}</small>
 	                    @endif
