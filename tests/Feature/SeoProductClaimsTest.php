@@ -45,6 +45,25 @@ class SeoProductClaimsTest extends TestCase
         }
     }
 
+    public function test_the_demo_is_promised_once_not_as_an_allowance_for_every_new_account(): void
+    {
+        // One demo per device, and an email sign-up confirms its address first.
+        $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []],
+            ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'egyptian']], ['seo.accent', ['accent' => 'british']]];
+        foreach ($pages as [$route, $params]) {
+            foreach (['en', 'ar'] as $locale) {
+                $html = (string) $this->page($locale, $route, $params)->assertOk()->getContent();
+                $this->assertDoesNotMatchRegularExpression('/small allowance|Every new account|رصيد صغير|كل حساب جديد/u', $html, $route.' '.$locale);
+            }
+        }
+
+        $this->page('en', 'seo.dialect', ['dialect' => 'egyptian'])->assertSee('Yes. New members can try the voices once in the demo, then you pick the plan that fits your use.');
+        $this->page('ar', 'seo.dialect', ['dialect' => 'egyptian'])->assertSee('نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.');
+        $this->page('en', 'seo.english-accents')->assertSee('Yes. New members can try the voices and accents once in the demo.');
+        $this->page('ar', 'seo.arabic-dialects')->assertSee('نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.');
+        $this->assertStringContainsString('new members can try the voices once in the demo', (string) $this->get('/llms.txt')->getContent());
+    }
+
     public function test_downloads_are_promised_on_paid_plans_only(): void
     {
         // A demo clip's download button opens billing instead.

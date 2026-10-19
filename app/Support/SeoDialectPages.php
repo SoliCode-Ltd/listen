@@ -329,7 +329,7 @@ final class SeoDialectPages
                         ? 'تُنطق الفصحى نطقاً كاملاً بمخارج الحروف الصحيحة ودون مفردات عامية.'
                         : 'عند اختيار '.$dialect.' في الاستوديو تُوجَّه الأصوات عالية الدقة لنطق الحروف وإيقاع الكلام كما يتكلم أهل البلد. للحصول على أفضل نتيجة اكتب النص نفسه بالعامية.'],
                     ['question' => 'ما اللكنات المتاحة '.$with.'؟', 'answer' => $accentNames.'.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.'],
                     ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'في كل باقة مدفوعة يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
                 ],
                 'cta_title' => 'ابدأ التعليق الصوتي '.$with,
@@ -382,7 +382,7 @@ final class SeoDialectPages
                     ? 'Yes. Fusha is spoken with full, correct articulation and no colloquial words.'
                     : 'When you choose '.$dialect.' in the studio, HD voices are directed to use local pronunciation and rhythm. For the most natural result, write the script itself in the dialect.'],
                 ['question' => 'Which '.$dialect.' accents are available?', 'answer' => $accentNames.'.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo, then you pick the plan that fits your use.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices once in the demo, then you pick the plan that fits your use.'],
                 ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'On every paid plan, each clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
             ],
             'cta_title' => 'Start your '.$dialect.' voiceover',
@@ -411,7 +411,7 @@ final class SeoDialectPages
                 'faqs' => [
                     ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => $accents.' لكنة من '.$countries.' دولة، بالإضافة إلى العربية الفصحى.'],
                     ['question' => 'هل أكتب النص بالعامية أم بالفصحى؟', 'answer' => 'للحصول على أكثر نتيجة طبيعية اكتب النص باللهجة نفسها. ويمكنك أيضاً كتابة نص فصيح واختيار اللهجة.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللهجات في العرض التجريبي.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.'],
                 ],
                 'cta_title' => 'اسمع نصك بلهجة جمهورك',
                 'cta_body' => 'أنشئ حسابك واختر الفصحى أو واحدة من '.$accents.' لكنة عربية.',
@@ -427,7 +427,7 @@ final class SeoDialectPages
             'faqs' => [
                 ['question' => 'How many Arabic dialects does Listen support?', 'answer' => $accents.' accents from '.$countries.' countries, plus Modern Standard Arabic (Fusha).'],
                 ['question' => 'Should I write the script in dialect or in Fusha?', 'answer' => 'For the most natural result, write the script in the dialect itself. You can also write in Fusha and choose a dialect.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and dialects in the demo.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices and dialects once in the demo.'],
             ],
             'cta_title' => 'Speak your audience\'s dialect',
             'cta_body' => 'Create your account and choose Fusha or one of '.$accents.' Arabic accents.',

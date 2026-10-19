@@ -325,7 +325,7 @@ class SeoHelper
                     'faqs' => [
                         ['question' => 'What is AI text to speech used for?', 'answer' => 'Teams use AI text to speech to convert written content into spoken audio for products, marketing, support, and training.'],
                         ['question' => 'Which languages does Listen speak?', 'answer' => 'Arabic, in Fusha and '.DialectCounts::arabic().'+ regional accents, and English in more than '.DialectCounts::english().' accents, from American and British to English with a Spanish, French or Arabic accent.'],
-                        ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo before choosing a plan.'],
+                        ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. New members can try the voices once in the demo before choosing a plan.'],
                         ['question' => 'Who is this page for?', 'answer' => 'It is ideal for creators, startups, product teams, agencies, and organizations that publish multilingual audio content.'],
                     ],
                     'cta_title' => 'Start generating production-ready audio',
@@ -355,7 +355,7 @@ class SeoHelper
                     'faqs' => [
                         ['question' => 'في ماذا يُستخدم تحويل النص إلى صوت بالذكاء الاصطناعي؟', 'answer' => 'يُستخدم لتحويل المحتوى المكتوب إلى صوت في المنتجات، والتسويق، والدعم، والتدريب، وتجارب الوصول الرقمي.'],
                         ['question' => 'ما اللغات التي تتحدث بها منصة إسمع؟', 'answer' => 'العربية بالفصحى وبـ'.DialectCounts::arabic().' لكنة محلية، والإنجليزية بأكثر من '.DialectCounts::english().' لكنة، من الأمريكية والبريطانية إلى الإنجليزية بلكنة إسبانية أو فرنسية أو عربية.'],
-                        ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي قبل اختيار الباقة.'],
+                        ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي قبل اختيار الباقة.'],
                         ['question' => 'لمن تناسب هذه الصفحة؟', 'answer' => 'تناسب صناع المحتوى، والشركات الناشئة، وفرق المنتجات، والجهات التعليمية، والفرق التي تعمل بلغتين.'],
                     ],
                     'cta_title' => 'ابدأ إنتاج صوت جاهز للنشر',
@@ -480,7 +480,7 @@ class SeoHelper
                         ['question' => 'كيف أحول نص عربي إلى صوت؟', 'answer' => 'أنشئ حساباً واختر باقة مدفوعة، الصق النص، اختر الصوت واللهجة، ثم اضغط توليد وحمّل الملف بصيغة MP3.'],
                         ['question' => 'هل يدعم التشكيل والنص غير المشكول؟', 'answer' => 'نعم، يقرأ النص المشكول وغير المشكول. إضافة التشكيل على الكلمات الملتبسة تساعد على نطق أدق.'],
                         ['question' => 'هل يمكن تحويل النص إلى صوت باللهجة السعودية أو المصرية أو المغربية؟', 'answer' => 'نعم، اختر اللهجة من الاستوديو: لهجات الخليج (السعودية بلكناتها، الإماراتية، الكويتية، القطرية، البحرينية، العُمانية)، والشام، ومصر والسودان، والعراق واليمن، والمغرب العربي.'],
-                        ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي، ثم تختار الباقة التي تناسب عدد الأحرف الذي تحتاجه.'],
+                        ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي، ثم تختار الباقة التي تناسب عدد الأحرف الذي تحتاجه.'],
                     ],
                     'cta_title' => 'حوّل نصك العربي إلى صوت الآن',
                     'cta_body' => 'أنشئ حسابك واسمع نصك بصوت عربي طبيعي خلال ثوانٍ.',
@@ -509,7 +509,7 @@ class SeoHelper
                     ],
                     'faq_title' => 'Frequently asked questions',
                     'faqs' => [
-                        ['question' => 'Can I try Listen before I pay?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo. Plans add monthly characters, premium voices, dialects, accents and emotions.'],
+                        ['question' => 'Can I try Listen before I pay?', 'answer' => 'Yes. New members can try the voices once in the demo. Plans add monthly characters, premium voices, dialects, accents and emotions.'],
                         ['question' => 'How do I convert text to speech?', 'answer' => 'Sign up and choose a paid plan, paste your text, pick a language, voice and dialect, then generate and download the MP3.'],
                         ['question' => 'Which languages are supported?', 'answer' => 'Arabic, including Modern Standard Arabic and dialects from Egypt, the Gulf, the Levant, Iraq, Yemen, Sudan and the Maghreb, and English in more than '.DialectCounts::english().' accents.'],
                         ['question' => 'Can I read web pages aloud?', 'answer' => 'Yes. The Listen Reader Chrome extension reads selected text on any page.'],
@@ -539,7 +539,7 @@ class SeoHelper
                     ],
                     'faq_title' => 'الأسئلة الشائعة',
                     'faqs' => [
-                        ['question' => 'هل يمكن تجربة منصة إسمع قبل الدفع؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي. الباقات تضيف أحرفاً شهرية وأصواتاً مميزة ولهجات ولكنات ومشاعر.'],
+                        ['question' => 'هل يمكن تجربة منصة إسمع قبل الدفع؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي. الباقات تضيف أحرفاً شهرية وأصواتاً مميزة ولهجات ولكنات ومشاعر.'],
                         ['question' => 'كيف أحول الكتابة إلى صوت؟', 'answer' => 'سجّل حساباً واختر باقة مدفوعة، الصق النص، اختر اللغة والصوت واللهجة، ثم اضغط توليد وحمّل ملف MP3.'],
                         ['question' => 'ما اللغات المدعومة؟', 'answer' => 'العربية بالفصحى ولهجات مصر والخليج والشام والعراق واليمن والسودان والمغرب العربي، والإنجليزية بأكثر من '.DialectCounts::english().' لكنة.'],
                         ['question' => 'هل يمكن قراءة صفحات الويب بصوت عالٍ؟', 'answer' => 'نعم، إضافة إسمع لمتصفح كروم تقرأ أي نص تحدده على أي صفحة.'],
@@ -764,7 +764,7 @@ class SeoHelper
             "- [AI text to speech]({$base}/en/ai-text-to-speech)",
             "- [AI voice generator]({$base}/en/ai-voice-generator)",
             "- [Voice samples]({$base}/en/voice-samples): samples of English accents, moods, conversations and sound environments, ready to play; the Arabic page ({$base}/ar/voice-samples) has samples of Arabic dialects",
-            "- [Pricing]({$base}/en/pricing): monthly plans; new accounts can try the voices in the demo first",
+            "- [Pricing]({$base}/en/pricing): monthly plans; new members can try the voices once in the demo first",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             "- [Contact]({$base}/en/contact-us)",
             '',
