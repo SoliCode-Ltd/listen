@@ -63,7 +63,7 @@ npm install
 npm run build
 ```
 
-`php artisan migrate --seed` creates plans, the voice catalog, voice samples, a test user (`test@example.com` / `password`), and an admin user. Change those seeded passwords before any shared environment.
+`php artisan migrate --seed` creates plans, the voice catalog, voice samples, and the admin account. Its password is `ADMIN_SEED_PASSWORD` when that is set (for example `ADMIN_SEED_PASSWORD='…' php artisan db:seed`), otherwise the seeder prints a random one once. An admin account that already exists is never changed, so seeding again does not reset its password. Only `local` and `testing` environments also get a test user (`test@example.com` / `password`).
 
 For day-to-day development, one command starts the app, the queue worker, the log tail, and Vite:
 

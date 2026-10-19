@@ -284,6 +284,20 @@ class HybridTtsSeeder extends Seeder
         ];
 
         foreach ($geminiVoices as $voiceData) {
+            // A language holds each name once, and VoiceSeeder may already give
+            // this one to another voice (its "Marcus" is Schedar): that voice
+            // keeps the name, and this one is left out instead of failing.
+            $nameTaken = Voice::query()
+                ->where('language', $voiceData['language'])
+                ->whereRaw('lower(display_name) = ?', [strtolower($voiceData['display_name'])])
+                ->where('internal_voice_id', '!=', $voiceData['internal_voice_id'])
+                ->exists();
+            if ($nameTaken) {
+                $this->command->warn("Skipped {$voiceData['internal_voice_id']}: another {$voiceData['language']} voice is already called {$voiceData['display_name']}.");
+
+                continue;
+            }
+
             Voice::updateOrCreate(
                 ['internal_voice_id' => $voiceData['internal_voice_id']],
                 array_merge($voiceData, ['is_active' => true])
