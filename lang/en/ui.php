@@ -1399,6 +1399,13 @@ return [
             'whitelisted_filter' => 'Whitelisted',
             'whitelisted_label' => 'Multi-Account Whitelisted',
             'whitelisted_help' => 'Whitelisted users will not be auto-blocked by the multi-account enforcement system.',
+
+            // Deleting a member who would still be charged is refused.
+            'delete_refused_title' => 'This account was not deleted',
+            'delete_refused_subscription' => 'This member has a card subscription that has not ended (active, trialing, past due or unpaid), so they would still be charged with no account to cancel from. Cancel the subscription first, or wait until it ends, then delete the account.',
+            'delete_refused_trial' => 'This member is on a free trial that is charged when it ends. Cancel the trial first (Trials, Cancel trial), then delete the account.',
+            'bulk_delete_kept_title' => 'Some accounts were not deleted',
+            'bulk_delete_kept_body' => 'Deleted :deleted. Kept :kept: they have a card subscription or free trial that is still running, so they would still be charged. Cancel those first, then delete them.',
         ],
         'suspicious' => [
             'navigation_label' => 'Suspicious Users',
