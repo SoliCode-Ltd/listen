@@ -50,7 +50,7 @@ $out = [
         'generated_at' => now()->toIso8601String(),
         'app_env' => app()->environment(),
         'auth' => trim((string) config('services.google_tts.api_key', '')) !== '' ? 'api_key' : 'service_account',
-        'audio_encoding' => (string) config('services.google_tts.audio_encoding', 'MP3'),
+        'audio_encoding' => (string) config('services.google_tts.audio_encoding', 'LINEAR16'),
         'parallel_requests' => (int) config('services.google_tts.max_parallel_requests', 4),
     ],
     'voice_list' => [],

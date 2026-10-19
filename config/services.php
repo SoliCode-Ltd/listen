@@ -51,7 +51,9 @@ return [
         'credentials_path' => env('SPEECH_TTS_CREDENTIALS_PATH', env('GOOGLE_TTS_CREDENTIALS_PATH', '')),
         'verify_ssl' => env('SPEECH_TTS_VERIFY_SSL', env('GOOGLE_TTS_VERIFY_SSL', true)),
         'voice_catalog' => [],
-        'audio_encoding' => env('SPEECH_TTS_AUDIO_ENCODING', env('GOOGLE_TTS_AUDIO_ENCODING', 'MP3')),
+        // What the standard voices are asked for. LINEAR16 (uncompressed) is compressed
+        // once here into the MP3 members get; MP3 is stored as the engine sends it.
+        'audio_encoding' => env('SPEECH_TTS_AUDIO_ENCODING', env('GOOGLE_TTS_AUDIO_ENCODING', 'LINEAR16')),
         'speaking_rate' => (float) env('SPEECH_TTS_SPEAKING_RATE', env('GOOGLE_TTS_SPEAKING_RATE', 1.0)),
         'pitch' => (float) env('SPEECH_TTS_PITCH', env('GOOGLE_TTS_PITCH', 0.0)),
         'timeout_seconds' => (int) env('SPEECH_TTS_TIMEOUT_SECONDS', env('GOOGLE_TTS_TIMEOUT_SECONDS', 30)),

@@ -3,7 +3,10 @@
 namespace App\Services\Tts;
 
 use App\Contracts\TtsProviderInterface;
+use App\Support\AudioFormats;
 use App\Support\GeminiVocalTags;
+use App\Support\ShareableAudio;
+use App\Support\SpeechJoin;
 use App\Support\StandardVoiceEngine;
 use App\Support\TextChunker;
 use App\Support\VoiceCatalog;
@@ -91,10 +94,18 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $gender = $this->resolveSsmlGender($voiceName);
         }
 
+        // Uncompressed audio is compressed once here, into the MP3 members get
+        // (ShareableAudio), rather than taken compressed and compressed again
+        // for downloads. A server that cannot compress it asks for MP3 as before.
+        $encoding = strtoupper((string) config('services.google_tts.audio_encoding', 'LINEAR16'));
+        if ($encoding === 'LINEAR16' && AudioFormats::ffmpegPath() === null) {
+            $encoding = 'MP3';
+        }
+
         // Chirp voices (chirp, chirp3, chirp2) don't support pitch parameters
         $supportsProsodicParams = !$this->isChirpVoice($voiceName);
         $audioConfig = [
-            'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
+            'audioEncoding' => $encoding,
             'speakingRate' => max(0.25, min(4.0, $speed)),
         ];
         if ($supportsProsodicParams) {
@@ -113,29 +124,17 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             'audioConfig' => $audioConfig,
         ];
 
-        // MP3 frames can be joined end to end; other encodings carry a header
-        // per file, so they keep the single-request behaviour.
+        // MP3 frames and LINEAR16 samples can be joined end to end; other
+        // encodings carry a header per file, so they keep the single-request behaviour.
         $text = self::breakLongSentences(self::stripPerformanceMarkup($text));
-        $chunks = $audioConfig['audioEncoding'] === 'MP3'
+        $chunks = in_array($encoding, ['MP3', 'LINEAR16'], true)
             ? self::splitForByteLimit($text, self::MAX_INPUT_BYTES)
             : [mb_substr($text, 0, 5000)];
-
-        $binary = count($chunks) === 1
-            ? $this->requestAudio(array_replace_recursive($payload, ['input' => ['text' => $chunks[0]]]), $endpoint, $timeout, $verifySsl)
+        $pieces = count($chunks) === 1
+            ? [$this->requestAudio(array_replace_recursive($payload, ['input' => ['text' => $chunks[0]]]), $endpoint, $timeout, $verifySsl)]
             : $this->requestAudioPieces($payload, $chunks, $endpoint, $timeout, $verifySsl);
 
-        $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
-        $disk = Storage::disk('public');
-
-        if (!$disk->exists('audio')) {
-            $disk->makeDirectory('audio');
-        }
-
-        // The public disk reports a failed write instead of throwing: without this
-        // the generation would point at a file that is not there.
-        if (! $disk->put($filename, $binary)) {
-            throw new \RuntimeException('The voice file could not be saved.');
-        }
+        $filename = $encoding === 'LINEAR16' ? $this->saveUncompressed($pieces) : $this->saveAsSent($pieces);
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
         $charCount = mb_strlen($text);
@@ -264,21 +263,73 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
     }
 
     /**
+     * Uncompressed pieces (LINEAR16: a WAV each), joined end to end as the
+     * engine reads them into a file, piece by piece as they come, compressed
+     * once into the MP3 members get and streamed to the disk: an hour of it
+     * is never held whole. Without a converter that works, it is kept as WAV.
+     *
+     * @param  iterable<int, string>  $pieces
+     */
+    private function saveUncompressed(iterable $pieces): string
+    {
+        $joined = SpeechJoin::toFile($pieces, [], [], 0.0);
+        $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
+        try {
+            $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
+            $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.' . $packaged['extension'];
+            ShareableAudio::store($packaged['path'], $filename);
+
+            return $filename;
+        } finally {
+            ShareableAudio::discard($joined['path'], $packaged['path']);
+        }
+    }
+
+    /**
+     * MP3 pieces (or one piece in another encoding), stored as the engine sent them.
+     *
+     * @param  iterable<int, string>  $pieces
+     */
+    private function saveAsSent(iterable $pieces): string
+    {
+        $binary = '';
+        foreach ($pieces as $piece) {
+            $binary .= $piece;
+        }
+
+        $filename = 'audio/' . now()->format('Ymd_His') . '_' . Str::random(12) . '.mp3';
+        $disk = Storage::disk('public');
+
+        if (!$disk->exists('audio')) {
+            $disk->makeDirectory('audio');
+        }
+
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $binary)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
+
+        return $filename;
+    }
+
+    /**
      * Long texts are read in pieces. The pieces go out in parallel batches
      * (Chirp 3 HD takes about three times longer than WaveNet per piece, so
-     * one after another would run past the job timeout), and are joined in
-     * order. A piece that fails is sent again on its own.
+     * one after another would run past the job timeout), and are handed
+     * over in order as each batch comes in. A piece that fails is sent again
+     * on its own.
      *
      * @param  array<int, string>  $chunks
+     * @return \Generator<int, string>
      */
-    private function requestAudioPieces(array $payload, array $chunks, string $endpoint, int $timeout, bool $verifySsl): string
+    private function requestAudioPieces(array $payload, array $chunks, string $endpoint, int $timeout, bool $verifySsl): \Generator
     {
         $parallel = max(1, (int) config('services.google_tts.max_parallel_requests', 4));
         $apiKey = trim((string) config('services.google_tts.api_key', ''));
         $headers = $apiKey !== ''
             ? ['X-Goog-Api-Key' => $apiKey]
             : ['Authorization' => 'Bearer '.$this->getGoogleAccessToken()];
-        $parts = [];
 
         foreach (array_chunk($chunks, $parallel, true) as $batch) {
             $responses = Http::pool(function (Pool $pool) use ($batch, $payload, $endpoint, $timeout, $verifySsl, $headers) {
@@ -292,34 +343,36 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             });
 
             foreach ($batch as $index => $chunk) {
+                // Each reply is let go once its audio is out.
                 $response = $responses['part'.$index] ?? null;
+                unset($responses['part'.$index]);
                 $audio = $response instanceof Response && $response->ok()
                     ? base64_decode((string) ($response->json('audioContent') ?? ''), true)
                     : false;
 
-                if (is_string($audio) && $audio !== '') {
-                    $parts[$index] = $audio;
-
-                    continue;
+                if (! is_string($audio) || $audio === '') {
+                    Log::warning('Speech piece failed; sending it again on its own.', [
+                        'piece' => $index + 1,
+                        'pieces' => count($chunks),
+                        'status' => $response instanceof Response ? $response->status() : null,
+                    ]);
+                    $response = null;
+                    $audio = $this->requestAudio(
+                        array_replace_recursive($payload, ['input' => ['text' => $chunk]]),
+                        $endpoint,
+                        $timeout,
+                        $verifySsl,
+                    );
                 }
-
-                Log::warning('Speech piece failed; sending it again on its own.', [
-                    'piece' => $index + 1,
-                    'pieces' => count($chunks),
-                    'status' => $response instanceof Response ? $response->status() : null,
-                ]);
-                $parts[$index] = $this->requestAudio(
-                    array_replace_recursive($payload, ['input' => ['text' => $chunk]]),
-                    $endpoint,
-                    $timeout,
-                    $verifySsl,
-                );
+                $response = null;
+                yield $index => $audio;
+                $audio = null;
             }
+            // The client's pooled requests hold themselves in reference cycles: without
+            // this, every batch's replies stay in memory until the whole text is read.
+            unset($responses);
+            gc_collect_cycles();
         }
-
-        ksort($parts);
-
-        return implode('', $parts);
     }
 
     private function requestAudio(array $payload, string $endpoint, int $timeout, bool $verifySsl): string

@@ -34,6 +34,14 @@ jobs:
           # This branch's engine and Google provider, moved to the ListenUnderTest
           # namespace so they load next to the server's own copies. The engine copy
           # reads its choice from $GLOBALS['standard_engine'] instead of the database.
+          # The provider saves its audio through the take helpers (join, packaging,
+          # loudness, the converter's path): those this branch has come along too.
+          helpers=""
+          for f in AudioFormats WavPcm SpeechJoin SpeechLoudness ShareableAudio; do
+            if [ -f "app/Support/$f.php" ]; then helpers="$helpers $f"; fi
+          done
+          drop=(-e '/^use App\\Support\\StandardVoiceEngine;/d' -e '/^use App\\Support\\GeminiVocalTags;/d')
+          for f in $helpers; do drop+=(-e "/^use App\\\\Support\\\\$f;/d"); done
           {
             echo '<?php'
             sed -e '1d' \
@@ -42,15 +50,19 @@ jobs:
                 app/Support/StandardVoiceEngine.php
             sed -e '1d' -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' \
                 app/Support/GeminiVocalTags.php
+            for f in $helpers; do
+              sed -e '1d' -e 's/^namespace App\\Support;/namespace ListenUnderTest;/' "app/Support/$f.php"
+            done
+            # The cost guardrail stays the server's own (it is in the provider's namespace).
             sed -e '1d' \
-                -e 's/^namespace App\\Services\\Tts;/namespace ListenUnderTest;/' \
-                -e '/^use App\\Support\\StandardVoiceEngine;/d' \
-                -e '/^use App\\Support\\GeminiVocalTags;/d' \
+                -e 's/^namespace App\\Services\\Tts;/namespace ListenUnderTest;\nuse App\\Services\\Tts\\TtsCostGuardrail;/' \
+                "${drop[@]}" \
                 app/Services/Tts/GoogleCloudTtsProvider.php
           } > under_test.php
           php -l under_test.php
           grep -q "GLOBALS\['standard_engine'\]" under_test.php
-          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = 3
+          test "$(grep -c '^namespace ListenUnderTest;' under_test.php)" = "$((3 + $(echo $helpers | wc -w)))"
+          ! grep -nE '^use App\\Support\\(AudioFormats|WavPcm|SpeechJoin|SpeechLoudness|ShareableAudio);' under_test.php
           python3 - <<'PY'
           import base64
           code = base64.b64encode(open('under_test.php', 'rb').read()).decode()
