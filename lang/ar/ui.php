@@ -942,6 +942,10 @@ return [
         'audio_download' => 'تحميل الصوت',
         'audio_download_as' => 'تحميل بصيغة',
         'audio_download_failed' => 'تعذّر تجهيز هذه الصيغة الآن. حاول مرة أخرى أو اختر صيغة أخرى.',
+
+        // Under a player whose file could not be played or downloaded.
+        'audio_play_failed' => 'تعذّر تشغيل هذا الصوت الآن. حاول مرة أخرى.',
+        'audio_download_unavailable' => 'تعذّر تحميل هذا الصوت الآن. حاول مرة أخرى.',
     ],
 
     // ===== DASHBOARD =====

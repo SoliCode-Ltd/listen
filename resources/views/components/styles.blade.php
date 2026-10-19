@@ -1368,6 +1368,13 @@ html[data-theme="light"] .app-footer {
   stroke-width: 2;
   fill: none;
 }
+/* Under a player whose audio could not be played or saved; takes no room while empty. */
+.custom-audio-notice:not(:empty) {
+  display: block;
+  margin-top: .35rem;
+  font-size: .78rem;
+  color: var(--danger);
+}
 @@container (max-width: 280px) {
   .custom-audio-time {
     min-width: 35px;

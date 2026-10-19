@@ -4,6 +4,8 @@
     'audio_download' => __('ui.scripts.audio_download'),
     'audio_download_as' => __('ui.scripts.audio_download_as'),
     'audio_download_failed' => __('ui.scripts.audio_download_failed'),
+    'audio_play_failed' => __('ui.scripts.audio_play_failed'),
+    'audio_download_unavailable' => __('ui.scripts.audio_download_unavailable'),
   ];
   // The file types this member's plan offers for download (Plans → Downloads).
   $downloadFormats = rescue(fn () => \App\Support\AudioFormats::menuFor(
@@ -382,7 +384,16 @@
         wrapper.appendChild(menuBtn);
       }
 
+      // Says on the player's own row when its audio cannot be played or saved.
+      var notice = document.createElement('small');
+      notice.className = 'custom-audio-notice';
+      notice.setAttribute('role', 'status');
+      var showNotice = function(text) {
+        notice.textContent = text || '';
+      };
+
       audio.parentNode.insertBefore(wrapper, audio.nextSibling);
+      wrapper.parentNode.insertBefore(notice, wrapper.nextSibling);
 
       var formatTime = function(seconds) {
         if (!seconds || isNaN(seconds) || seconds === Infinity) return '0:00';
@@ -527,6 +538,18 @@
         currTime.textContent = '0:00';
       });
 
+      // A file that is gone or cannot be read: the row says so instead of a
+      // button that does nothing. Code 1 is a load the page itself stopped.
+      audio.addEventListener('error', function() {
+        if (!audio.getAttribute('src') || !audio.error || audio.error.code === 1) return;
+        cancelProgressLoop();
+        setPlayButtonState(false);
+        showNotice(i18n.audio_play_failed);
+      });
+      audio.addEventListener('playing', function() {
+        showNotice('');
+      });
+
       playBtn.addEventListener('click', function(e) {
         e.preventDefault();
         e.stopPropagation();
@@ -549,6 +572,8 @@
           }
 
           var requestId = ++playRequestId;
+          // After a failed load, pressing play tries the file again.
+          if (audio.error) audio.load();
           var playPromise = audio.play();
           if (playPromise !== undefined) {
              pendingPlayPromise = playPromise;
@@ -560,6 +585,7 @@
                 if (!(error && error.name === 'AbortError')) {
                   console.warn('Audio playback failed', error);
                 }
+                if (error && error.name === 'NotSupportedError') showNotice(i18n.audio_play_failed);
                 setPlayButtonState(false);
              }).finally(function() {
                 if (requestId !== playRequestId) return;
@@ -663,6 +689,12 @@
           a.click();
           document.body.removeChild(a);
         };
+        // Only audio is saved: an error page (a file that is gone, a session that
+        // ended) never becomes an ".mp3" on the member's computer.
+        var isAudioResponse = function(response) {
+          var type = String(response.headers.get('Content-Type') || '').toLowerCase();
+          return type === '' || /^(audio|video)\//.test(type) || /^application\/(octet-stream|ogg)/.test(type);
+        };
         // M4A, OGG and FLAC are converted on the server from the file being played.
         var fetchFromServer = function(src, format) {
           var path = '';
@@ -671,7 +703,8 @@
           var name = buildDownloadFilename(format).replace(/\.[a-z0-9]+$/i, '');
           var url = serverDownloadUrl + '?path=' + encodeURIComponent(path) + '&format=' + encodeURIComponent(format) + '&name=' + encodeURIComponent(name);
           return fetch(url, { credentials: 'same-origin' }).then(function(response) {
-            if (!response.ok) throw new Error('server');
+            // 503: this file type cannot be made right now. Anything else: the file cannot be had.
+            if (!response.ok || !isAudioResponse(response)) throw new Error(response.status === 503 ? 'format' : 'missing');
             return response.blob();
           }).then(function(blob) { return { blob: blob, extension: format }; });
         };
@@ -680,21 +713,32 @@
           if (!src || menuBtn.dataset.busy === '1') return;
           menuBtn.dataset.busy = '1';
           menuBtn.disabled = true;
+          showNotice('');
           var work;
           var match = downloadFormats.find(function(f) { return f.key === format; });
           if (match && !match.browser) {
-            work = fetchFromServer(src, format).catch(function() {
-              window.alert(i18n.audio_download_failed || 'This file type is not available right now.');
+            work = fetchFromServer(src, format).catch(function(error) {
+              showNotice(error && error.message === 'format' ? i18n.audio_download_failed : i18n.audio_download_unavailable);
               return null;
             });
           } else {
             work = fetch(src, { credentials: 'same-origin' })
               .then(function(response) {
-                if (!response.ok) throw new Error('audio');
-                return response.arrayBuffer();
+                if (!response.ok || !isAudioResponse(response)) throw new Error('missing');
+                return response.arrayBuffer()
+                  .then(function(buffer) { return format === 'wav' ? toWavAudio(buffer) : toWhatsAppAudio(buffer); })
+                  // The file is fine but this browser cannot convert it: save it as it is.
+                  .catch(function() { saveOriginal(src); return null; });
               })
-              .then(function(buffer) { return format === 'wav' ? toWavAudio(buffer) : toWhatsAppAudio(buffer); })
-              .catch(function() { saveOriginal(src); return null; });
+              .catch(function(error) {
+                if (error && error.message === 'missing') {
+                  showNotice(i18n.audio_download_unavailable);
+                } else {
+                  // No answer the page may read (offline, or another site's file): the browser tries the link itself.
+                  saveOriginal(src);
+                }
+                return null;
+              });
           }
           work.then(function(file) { if (file) saveBlob(file); })
             .finally(function() {
@@ -775,6 +819,7 @@
              progThumb.style.left = '0%';
              currTime.textContent = '0:00';
              durTime.textContent = '0:00';
+             showNotice('');
           }
         });
       });

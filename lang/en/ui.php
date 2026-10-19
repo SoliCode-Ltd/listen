@@ -941,6 +941,10 @@ return [
         'audio_download' => 'Download Audio',
         'audio_download_as' => 'Download as',
         'audio_download_failed' => 'This file type could not be made right now. Please try again or pick another type.',
+
+        // Under a player whose file could not be played or downloaded.
+        'audio_play_failed' => "This audio couldn't be played right now. Please try again.",
+        'audio_download_unavailable' => "This audio couldn't be downloaded right now. Please try again.",
     ],
 
     // ===== DASHBOARD =====
