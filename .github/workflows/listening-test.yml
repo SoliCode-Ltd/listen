@@ -6,7 +6,7 @@ name: Listening test
 # length, the pauses inside long texts; scripts/tts/listening_measure.py) and
 # keeps the recordings with the run, so a change to how the voices sound can
 # be heard and measured before and after. It uses the speech quota staging
-# shares with live (about 20 requests a run): run it by hand only, when the
+# shares with live (about 30 requests a run): run it by hand only, when the
 # owner has said yes. It never runs on live.
 
 on:
@@ -15,15 +15,9 @@ on:
       label:
         description: A name for this set of recordings (before, after, ...)
         default: before
-  # Until this file is on main (manual runs need that), a change to it on the
-  # branch being tried runs it once, with the label below.
-  push:
-    branches: [solicode/eloquent-noether-e1jfjs]
-    paths:
-      - .github/workflows/listening-test.yml
 
 env:
-  LABEL: ${{ inputs.label || 'before' }}
+  LABEL: ${{ inputs.label }}
 
 permissions:
   contents: read

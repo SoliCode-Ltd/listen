@@ -67,6 +67,14 @@ def main():
             with open(path, 'wb') as handle:
                 handle.write(base64.b64decode(audio))
             case.update(measure(path))
+        # The sample the voice list plays for the case's voice, to hear against the take.
+        sample = case.pop('sample_base64', None)
+        if sample:
+            extension = os.path.splitext(case.get('sample_file') or 'x.mp3')[1] or '.mp3'
+            path = os.path.join(out, case['id'][:2] + '-sample' + extension)
+            with open(path, 'wb') as handle:
+                handle.write(base64.b64decode(sample))
+            case['sample'] = measure(path)
         rows.append(case)
 
     lines = [f'# Listening test: {label}', '']
@@ -89,6 +97,12 @@ def main():
         for key, name in (('07', '0.9x'), ('08', '1.1x'), ('09', '1.2x')):
             if speeds.get(key):
                 lines.append(f'Speed {name}: {speeds[key]} s against {speeds["02"]} s at 1.0x ({speeds[key] / speeds["02"]:.2f} of its length).')
+    compared = [r for r in rows if r.get('sample')]
+    if compared:
+        lines += ['', 'The samples the voice list plays for the same voices (NN-sample):', '']
+        for row in compared:
+            s = row['sample']
+            lines.append(f"- {row['id'][:2]}-sample: {s.get('length')} s, {s.get('lufs')} LUFS, true peak {s.get('true_peak')} dBTP")
     lines += ['', '## What to listen for', '']
     for row in rows:
         detail = row.get('refused') or row.get('error') or ''
