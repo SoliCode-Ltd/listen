@@ -1609,6 +1609,9 @@ return [
         // Payments: no free trial over a plan paid by hand, and one payment at a time.
         'trial_manual_plan_active' => 'التجربة المجانية غير متاحة ما دامت خطتك المدفوعة الحالية فعّالة.',
         'billing_payment_in_progress' => 'هناك عملية دفع جارية بالفعل. انتظر لحظة ثم حدّث الصفحة.',
+
+        // Social sign-in that did not confirm the email, for an address that already has an account.
+        'auth_social_unverified_email' => 'يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول بالبريد الإلكتروني وكلمة المرور.',
     ],
 
     // ===== استنساخ الأصوات =====

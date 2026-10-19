@@ -1603,6 +1603,9 @@ return [
         // Payments: no free trial over a plan paid by hand, and one payment at a time.
         'trial_manual_plan_active' => "The free trial isn't available while your current paid plan is active.",
         'billing_payment_in_progress' => 'A payment is already in progress. Please wait a moment, then refresh the page.',
+
+        // Social sign-in that did not confirm the email, for an address that already has an account.
+        'auth_social_unverified_email' => 'This email already has an account. Sign in with your email and password.',
     ],
 
     // ===== VOICE CLONING =====

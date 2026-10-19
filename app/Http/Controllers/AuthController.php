@@ -267,7 +267,7 @@ class AuthController extends Controller
 
         $email = trim((string) $googleUser->getEmail());
         // Google reports whether it verified the address; never match an account by an unverified one.
-        $emailVerified = $googleUser->user['email_verified'] ?? $googleUser->user['verified_email'] ?? true;
+        $emailVerified = $googleUser->user['email_verified'] ?? $googleUser->user['verified_email'] ?? null;
         if ($email === '' || $emailVerified === false || $emailVerified === 'false') {
             return redirect()->route('login')->withErrors([
                 'email' => __('ui.backend.auth_social_no_email'),
@@ -277,10 +277,20 @@ class AuthController extends Controller
         $googleId = (string) $googleUser->getId();
         $avatar = $googleUser->getAvatar();
 
-        $user = User::query()
-            ->where('google_id', $googleId)
-            ->orWhere('email', $email)
-            ->first();
+        $user = User::query()->where('google_id', $googleId)->first();
+
+        // Joining this Google identity to an account that already has the
+        // address needs Google to say outright that it verified the address.
+        // Without that claim it may only sign in its own account or make a new one.
+        if (! $user) {
+            $user = User::query()->where('email', $email)->first();
+
+            if ($user && filter_var($emailVerified, FILTER_VALIDATE_BOOLEAN) !== true) {
+                return redirect()->route('login')->withErrors([
+                    'email' => __('ui.backend.auth_social_unverified_email'),
+                ]);
+            }
+        }
 
         if (! $user) {
             $name = trim((string) ($googleUser->getName() ?: $googleUser->getNickname() ?: __('ui.backend.auth_social_default_name')));
