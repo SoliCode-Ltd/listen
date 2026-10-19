@@ -1,0 +1,128 @@
+name: Extension store package
+
+# Builds the browser extension's package for the Chrome Web Store from
+# public/extensions/chrome-listen-reader, with manifest.json at the zip's root
+# as the store requires (the site's own download keeps a folder inside, for
+# "Load unpacked"). It starts from the package the store publishes now, so the
+# store's users keep the same service address (config.js), name, description
+# and icons, and it shows every file that differs from that package and any
+# change in permissions (a new one would make Chrome turn the extension off
+# until each user accepts it).
+#
+# Nothing is sent to the store. The zip is kept with the run, and printed in
+# the log as base64 between two marker lines. To publish: Chrome Web Store
+# Developer Dashboard, the Listen item, Package, Upload new package, then
+# Submit for review.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [solicode/eloquent-noether-e1jfjs]
+    paths:
+      - .github/workflows/extension-store-package.yml
+      - public/extensions/chrome-listen-reader/**
+
+permissions:
+  contents: read
+
+env:
+  ITEM_ID: hgffdggimfklddpnjdfjonijlempljpa
+  SOURCE: public/extensions/chrome-listen-reader
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: The package the store publishes now
+        run: |
+          set -euo pipefail
+          curl -sSL --fail --max-time 60 -o published.crx \
+            "https://clients2.google.com/service/update2/crx?response=redirect&prodversion=140.0&acceptformat=crx2,crx3&x=id%3D${ITEM_ID}%26uc"
+          python3 - <<'PY'
+          import io, struct, zipfile
+          data = open('published.crx', 'rb').read()
+          assert data[:4] == b'Cr24', 'the store did not answer with an extension package'
+          if struct.unpack('<I', data[4:8])[0] == 3:
+              start = 12 + struct.unpack('<I', data[8:12])[0]
+          else:
+              start = 16 + struct.unpack('<I', data[8:12])[0] + struct.unpack('<I', data[12:16])[0]
+          zipfile.ZipFile(io.BytesIO(data[start:])).extractall('published')
+          PY
+          rm -rf published/_metadata
+          python3 - <<'PY'
+          import json
+          m = json.load(open('published/manifest.json', encoding='utf-8-sig'))
+          print('Published version:', m.get('version'))
+          print('Name:', m.get('name'))
+          print('Description:', m.get('description'))
+          PY
+          echo "== Its config.js =="
+          sed 's/^/  /' published/config.js
+
+      - name: Build the store package
+        run: |
+          set -euo pipefail
+          rm -rf build && mkdir build && cp -R "$SOURCE/." build/
+          # Keep what store users have now: the service address, the icons, and the
+          # name and description the store shows.
+          cp published/config.js build/config.js
+          for f in icon-16.png icon-32.png icon-48.png icon-128.png; do
+            [ -f "published/$f" ] && cp "published/$f" "build/$f"
+          done
+          python3 - <<'PY'
+          import json
+          published = json.load(open('published/manifest.json', encoding='utf-8-sig'))
+          manifest = json.load(open('build/manifest.json', encoding='utf-8-sig'))
+          for key in ('name', 'description'):
+              if published.get(key) and published[key] != manifest.get(key):
+                  manifest[key] = published[key]
+          with open('build/manifest.json', 'w', encoding='utf-8') as f:
+              json.dump(manifest, f, indent=2, ensure_ascii=False)
+              f.write('\n')
+          print('Package version:', manifest['version'])
+          from itertools import zip_longest
+          def parts(v): return [int(p) for p in v.split('.')]
+          a, b = parts(manifest['version']), parts(published.get('version', '0'))
+          newer = [x for x in zip_longest(a, b, fillvalue=0) if x[0] != x[1]]
+          assert newer and newer[0][0] > newer[0][1], 'the package must be a newer version than the store has'
+          for key in ('permissions', 'host_permissions', 'optional_permissions', 'content_scripts'):
+              if json.dumps(published.get(key), sort_keys=True) != json.dumps(manifest.get(key), sort_keys=True):
+                  print(f'::warning::{key} differs from the published package: {published.get(key)} -> {manifest.get(key)}')
+          PY
+          echo "== Files that differ from the published package =="
+          python3 - <<'PY'
+          import hashlib, os
+          def files(root):
+              out = {}
+              for d, _, names in os.walk(root):
+                  for n in names:
+                      p = os.path.join(d, n)
+                      out[os.path.relpath(p, root)] = hashlib.sha256(open(p, 'rb').read()).hexdigest()
+              return out
+          old, new = files('published'), files('build')
+          for name in sorted(set(old) | set(new)):
+              if name not in old:
+                  print('  new      ', name)
+              elif name not in new:
+                  print('  removed  ', name)
+              elif old[name] != new[name]:
+                  print('  changed  ', name)
+          PY
+          version="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['version'])")"
+          zip_name="listen-extension-$version-store.zip"
+          (cd build && find . -type f | LC_ALL=C sort | sed 's|^\./||' | zip -X -q "../$zip_name" -@)
+          unzip -l "$zip_name"
+          echo "zip_name=$zip_name" >> "$GITHUB_ENV"
+          echo "sha256: $(sha256sum "$zip_name" | cut -d' ' -f1)"
+          echo "----- BEGIN $zip_name (base64) -----"
+          base64 -w 76 "$zip_name"
+          echo "----- END $zip_name -----"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.zip_name }}
+          path: ${{ env.zip_name }}
+          retention-days: 30
