@@ -249,8 +249,8 @@ class RenewalGraceTest extends TestCase
 
         $this->assertSame('past_due', $this->plan()->billing_payment_state);
         $this->assertKeptOnThePaidMonth(4000);
-        // Read from the failed renewal invoice.
-        $this->assertTrue($this->stripe->sent('get', '/v1/invoices/in_renewal'));
+        // Read from the failed renewal invoice, once.
+        $this->assertCount(1, $this->paramsSent('get', '/v1/invoices/in_renewal', 'expand'));
 
         // The failed invoice that comes after changes nothing.
         $this->paymentFailed()->assertOk();
@@ -579,6 +579,32 @@ class RenewalGraceTest extends TestCase
         ])->assertOk();
         $this->sync();
         $this->assertNoGrace();
+    }
+
+    public function test_a_failed_invoice_that_is_not_a_renewal_leaves_the_plan_as_it_is_through_a_sync(): void
+    {
+        // In the month paid for, a plan change made in Stripe charged the difference at once and
+        // the card was declined: Stripe says past due, with that change's invoice open.
+        $this->travelTo(Carbon::parse('2026-10-05 12:00:00'));
+        $this->stripeHas('past_due', self::PAID_FROM, self::RENEWS_AT, ['latest_invoice' => 'in_change']);
+        $this->stripe->answer('get', '/v1/invoices/in_change', [
+            'id' => 'in_change', 'object' => 'invoice', 'customer' => 'cus_grace', 'currency' => 'usd', 'status' => 'open',
+            'billing_reason' => 'subscription_update', 'amount_due' => 450, 'amount_paid' => 0,
+            'period_start' => Carbon::parse('2026-10-05 11:55:00')->getTimestamp(), 'period_end' => Carbon::parse('2026-10-05 11:55:00')->getTimestamp(),
+            'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_grace']],
+        ]);
+        $this->stripe->answer('get', '/v1/invoices', ['object' => 'list', 'data' => [], 'has_more' => false, 'url' => '/v1/invoices']);
+
+        $this->sync();
+        $this->paymentFailed('evt_change_declined', ['id' => 'in_change', 'billing_reason' => 'subscription_update'])->assertOk();
+        $this->sync();
+
+        // As the failed-payment webhook does: no grace, no warning, and the plan, its dates and its credits as they were.
+        $plan = $this->plan();
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertSame([], $this->sentSubjects());
+        $this->assertKeptOnThePaidMonth(4000);
     }
 
     public function test_a_plan_paid_by_hand_is_never_touched(): void

@@ -184,7 +184,7 @@ class RenewalGrace
      * For the billing sync, when Stripe says the member's subscription is
      * behind on payment: whether their plan stays exactly as it is (the grace
      * keeps it, or it ran out and waits for the grace job), or moves to Free.
-     * A missed payment seen here first is recorded, and the member warned.
+     * A missed renewal seen here first is recorded, and the member warned.
      *
      * @param  string|null  $stateBeforeRead  the plan row's billing_payment_state before Stripe was read
      *
@@ -209,7 +209,18 @@ class RenewalGrace
             return false;
         }
 
-        $outcome = $this->begin($plan, $stripeSubscription);
+        $invoice = null;
+        if (! $recordedBefore) {
+            // Only a renewal that could not be charged is a payment missing on the plan
+            // the member has. Another invoice (a plan change or a first payment that
+            // failed) leaves the plan exactly as it is, as the failed-payment webhook does.
+            $invoice = $this->latestInvoice($stripeSubscription, null);
+            if ($invoice === null || StripeInvoice::billingReason($invoice) !== 'subscription_cycle') {
+                return true;
+            }
+        }
+
+        $outcome = $this->begin($plan, $stripeSubscription, $invoice);
         if (! $recordedBefore) {
             $this->warn($user, $plan);
         }
