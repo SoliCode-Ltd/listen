@@ -383,6 +383,21 @@ class BillingEdgeCasesTest extends TestCase
             ->assertJsonPath('charged', null);
     }
 
+    public function test_order_details_say_credits_used_this_month_count_on_the_new_plan(): void
+    {
+        $user = $this->userWithSubscription('active', 'price_starter_m');
+
+        $page = $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk();
+        $this->assertMatchesRegularExpression(
+            '#<section class="order-details"[^>]*>.*'.preg_quote(e(__('ui.billing.order_usage_note')), '#').'.*</section>#s',
+            $page->getContent()
+        );
+
+        app()->setLocale('ar');
+        $this->actingAs($user)->getLocalizedRoute('billing.page')->assertOk()
+            ->assertSee(__('ui.billing.order_usage_note', [], 'ar'));
+    }
+
     public function test_no_order_details_on_a_trial_or_the_same_plan(): void
     {
         $user = $this->userWithSubscription('active', 'price_starter_m');

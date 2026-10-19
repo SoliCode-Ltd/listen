@@ -101,6 +101,15 @@
       font-size: .74rem;
       font-weight: 700;
     }
+    /* Under the switch when prices show in another currency: what cards are charged in. */
+    .currency-note {
+      max-width: 62ch;
+      margin: 1rem auto 0;
+      color: var(--muted);
+      font-size: .86rem;
+      line-height: 1.55;
+      text-wrap: pretty;
+    }
 
     /* ── Plan cards ──
        Monthly plans in one aligned row (CSS subgrid: every card's badge, name, price,
@@ -208,6 +217,7 @@
       font-variant-numeric: tabular-nums;
     }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
+    .price-usd { color: var(--muted); font-size: .84rem; font-weight: 600; }
     .price-note { color: var(--muted); font-size: .84rem; min-height: 0; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
@@ -613,6 +623,20 @@
     .faq-item[open] .faq-toggle { transform: rotate(45deg); background: color-mix(in oklab, var(--text) 5%, transparent); }
     .faq-item p { margin: 0; padding: 0 0 1.5rem; padding-inline-end: 3.5rem; color: var(--muted); font-size: .97rem; line-height: 1.7; max-width: 68ch; }
 
+    /* Why a link brought the visitor here instead: a trial or a pack that is not on offer. */
+    .page-notice {
+      display: block;
+      width: fit-content;
+      margin: 0 auto 1.25rem;
+      padding: .6rem 1.1rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: .92rem;
+      font-weight: 600;
+    }
+
     .trial-pill {
       display: inline-flex;
       align-items: center;
@@ -748,6 +772,16 @@
       if ($mainPlans === []) {
         $mainPlans = $pricingPlans;
       }
+      // Prices in another currency are a guide: cards are charged each plan's price in US
+      // dollars. Egypt's prices in pounds are what paying in pounds costs; only a card
+      // payment is in dollars.
+      $shownPlan = reset($mainPlans) ?: [];
+      $shownCurrency = (string) ($shownPlan['display_currency'] ?? 'USD');
+      $currencyNote = match (true) {
+        $shownCurrency === 'USD' => '',
+        !empty($shownPlan['display_is_manual']) => __('ui.pricing.currency_note_egp'),
+        default => __('ui.pricing.currency_note', ['currency' => $shownCurrency]),
+      };
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
       $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
       // The icon drawn beside each line, on the cards and in the comparison table.
@@ -768,14 +802,15 @@
         default => '<path d="M20 6 9 17l-5-5"/>',
       };
 
-      // The comparison table is built from the plans' own card data (Admin → Plans):
-      // nothing in it is typed twice. Every line on the cards, with each plan's value,
-      // and the credits each card shows under its minutes.
+      // The comparison table is written from the plans' own settings (Admin → Plans),
+      // not from their card text, which each plan may word in its own way: every row
+      // is one line with each plan's value, the admin's extra lines, and the credits
+      // each card shows under its minutes.
       $includedMark = __('ui.pricing.included_mark');
       $minutesLabel = __('ui.pricing.lines.label_voice_minutes');
       $creditsLabel = __('ui.pricing.compare_credits');
       $comparePlans = array_values(array_filter($pricingPlans, fn ($p) => empty($p['is_pack'])));
-      // One row per line even when a plan spells its label a little differently
+      // One row per line even when a plan spells an extra line's label a little differently
       // ("التوليدات يومياً" / "التوليدات يوميا"): the row takes the site's own label when
       // there is one, else the first plan's.
       $compareLabels = [];
@@ -784,7 +819,7 @@
       }
       $compareRows = [];
       foreach ($comparePlans as $comparePlan) {
-        foreach ($comparePlan['features'] as $line) {
+        foreach ($comparePlan['compare_lines'] as $line) {
           $label = trim((string) ($line['label'] ?? ''));
           if ($label !== '') {
             $label = $compareLabels[\App\Support\PlanPricingLines::labelKey($label)] ??= $label;
@@ -831,6 +866,9 @@
       $pricingHiddenLabels = array_merge(array_keys($commonLines), [__('ui.pricing.lines.label_voice_minutes')]);
     @endphp
     <section class="page-hero reveal">
+      @if(session('notice'))
+        <p class="page-notice" role="status">{{ session('notice') }}</p>
+      @endif
       @if(!empty($trialPromo['show']))
         <div class="trial-pill">
           <span class="trial-pill-icon" aria-hidden="true">
@@ -856,6 +894,9 @@
           </button>
         </div>
       </div>
+      @if($currencyNote !== '')
+        <p class="currency-note">{{ $currencyNote }}</p>
+      @endif
     </section>
 
     @php $planCount = min(6, max(1, count($mainPlans))); @endphp
@@ -1029,6 +1070,10 @@
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
+
+          // A price in another currency: the US-dollar price a card is charged, for the cycle shown.
+          var usd = card.querySelector('.price-usd');
+          if (usd) usd.textContent = String(usd.getAttribute(isYearly ? 'data-yearly' : 'data-monthly') || '');
 
           // How long the discount lasts and the regular price after it, for the cycle shown.
           var terms = card.querySelector('.discount-terms');

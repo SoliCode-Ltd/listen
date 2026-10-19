@@ -94,6 +94,10 @@ return [
         // Longer single-voice texts are read in pieces sent at the same time.
         'max_chars_per_request' => (int) env('GEMINI_TTS_MAX_CHARS_PER_REQUEST', 900),
         'max_parallel_requests' => (int) env('GEMINI_TTS_MAX_PARALLEL_REQUESTS', 4),
+        // Each piece of a long text is checked before it is joined, and one that
+        // stops early, repeats itself, stalls or strays from the voice's pace or
+        // pitch is taken once more (App\Support\PieceCheck).
+        'check_pieces' => (bool) env('GEMINI_TTS_CHECK_PIECES', true),
 
         // Dialogue pieces: a longer dialogue is made in pieces split at speaker
         // turns, about 1.5 to 2 minutes of conversation each, well under the 2,400

@@ -25,6 +25,8 @@ use Laravel\Cashier\Cashier;
  * takes Stripe's new period, a fresh allowance as for any renewal. Unpaid,
  * the plan stops counting the moment the grace ends, and the grace job cancels
  * the subscription (BillingLifecycleService::downgradeExpiredGraceSubscriptions()).
+ * Stripe ending the subscription first (its own retry settings) changes none
+ * of this: the plan stays on until the grace ends, as the member was told.
  *
  * No grace for a member who never paid for the plan: the first charge after a
  * free trial failing pauses the paid features at once. A declined first payment

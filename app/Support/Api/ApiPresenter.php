@@ -6,6 +6,7 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\Voice;
 use App\Services\Api\ApiSpeechService;
+use App\Services\Api\ApiUsageMeter;
 use App\Support\Credits;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -91,8 +92,9 @@ final class ApiPresenter
         return match (self::status($generation->status)) {
             'completed' => Credits::forSeconds((int) $generation->duration_seconds),
             'failed' => 0,
-            // As reserved: a slower speed makes longer audio.
-            default => ApiSpeechService::estimate((string) $generation->input_text, (float) ($generation->speed ?: 1.0))['credits'],
+            // As reserved (older generations kept no reservation: estimated again).
+            default => ApiUsageMeter::reservationOf($generation)['credits']
+                ?? ApiSpeechService::estimate((string) $generation->input_text, (float) ($generation->speed ?: 1.0), (string) ($generation->voice_tier ?: VoiceTier::HD), $generation->only(['performance_style', 'emotion', 'dialect', 'style_prompt']))['credits'],
         };
     }
 

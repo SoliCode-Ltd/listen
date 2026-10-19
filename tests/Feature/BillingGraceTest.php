@@ -137,17 +137,20 @@ class BillingGraceTest extends TestCase
         $this->assertSame([], $this->sentSubjects());
     }
 
-    public function test_a_subscription_that_already_ended_is_not_cancelled_again(): void
+    public function test_a_subscription_that_already_ended_is_not_cancelled_again_but_the_plan_ends_as_told(): void
     {
+        // Stripe's own retries ended it during the grace days.
         $this->stripe->subscription('sub_grace', 'canceled', 'cus_grace');
 
-        $this->assertSame(0, $this->runGraceJob());
+        $this->assertSame(1, $this->runGraceJob());
 
         $this->assertFalse($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'));
-        $this->assertSame('ok', $this->plan()->billing_payment_state);
-        $this->assertNull($this->plan()->billing_grace_ends_at);
-        $this->assertSame([], $this->sentSubjects());
-        // The sync moves the plan to what Stripe now says.
+        $plan = $this->plan();
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertNotNull($plan->billing_downgraded_at);
+        // Told once, as when the job cancels it.
+        $this->assertSame(['Your subscription was canceled'], $this->sentSubjects());
         $this->assertSame(1, $this->syncs);
     }
 

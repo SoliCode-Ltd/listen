@@ -23,6 +23,7 @@ use App\Support\GenerationMessage;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
+use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -91,6 +92,8 @@ class MessageReaderController extends Controller
                     'voice_cloning_enabled' => VoiceCloningAccess::allows($user, $activePlan),
                 ],
                 'usage' => ['period' => $counter->period_ym] + $usage,
+                // The numbers the popup estimates a text's length and cost with, as the studio does.
+                'estimate' => UsageEstimator::clientConfig(),
                 'links' => [
                     'dashboard' => $this->localizedUrl('dashboard', $locale),
                     'pricing' => $this->localizedUrl('pricing', $locale),
@@ -209,7 +212,7 @@ class MessageReaderController extends Controller
         }
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         // A slower speed makes longer audio, so the reservation allows for it, as in the dashboard.
-        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed'], $requestedTier, $studioOptions);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
@@ -219,9 +222,34 @@ class MessageReaderController extends Controller
         $runAsync = $processingMode === 'queue';
         // Otherwise a long text is made after the reply, whatever the extension asks (an
         // older one asks to wait for every text): no time limit of the web server cuts it
-        // short, and it needs no queue worker. The extension checks on it.
-        $afterResponse = ! $runAsync && GenerateAudioJob::runsAfterResponse($estimate['chars']);
+        // short, and it needs no queue worker. The extension checks on it. A shorter one
+        // is too when the extension asks not to wait (prefer_sync false), as Chrome may
+        // stop an extension while one request takes over 30 seconds.
+        $afterResponse = ! $runAsync && (
+            GenerateAudioJob::runsAfterResponse($estimate['chars']) || ! (bool) ($validated['prefer_sync'] ?? true)
+        );
         $initialStatus = $runAsync ? 'queued' : 'processing';
+        $isDialogue = $dialogueEnabled
+            && $requestedTier !== VoiceTier::STANDARD
+            && ($validated['is_dialogue'] ?? false);
+        $dialogueMetadata = $isDialogue && ! empty($validated['dialogue_speakers'])
+            ? ['speakers' => $validated['dialogue_speakers']]
+            : null;
+
+        // An older extension stops waiting for a long text after about 30 seconds and
+        // says "try again" while it is still being made: the same voice asked for again
+        // gets that one back, instead of a second one reserved and charged again.
+        $beingMade = $this->sameVoiceBeingMade((int) $user->id, $text, [
+            'target_language' => $validated['target_language'],
+            'voice_tier' => $requestedTier,
+            'voice_name' => $voiceName,
+            'translate' => (bool) ($validated['translate'] ?? false),
+            'is_dialogue' => $isDialogue,
+            'dialogue_metadata' => $dialogueMetadata,
+        ] + $studioOptions);
+        if ($beingMade) {
+            return $this->queueReply($user, $quotaPlan, $beingMade, $estimate);
+        }
 
         // The limits are checked and the credits reserved in one locked step, with the
         // generation saved inside it, as in the dashboard: two requests at once cannot
@@ -252,25 +280,18 @@ class MessageReaderController extends Controller
                 'style_prompt' => $studioOptions['style_prompt'],
                 'speed' => $studioOptions['speed'],
                 'pitch' => $studioOptions['pitch'],
-                'is_dialogue' => $dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false),
-                'dialogue_metadata' => ($dialogueEnabled
-                    && $requestedTier !== VoiceTier::STANDARD
-                    && ($validated['is_dialogue'] ?? false)
-                    && ! empty($validated['dialogue_speakers']))
-                    ? ['speakers' => $validated['dialogue_speakers']]
-                    : null,
+                'is_dialogue' => $isDialogue,
+                'dialogue_metadata' => $dialogueMetadata,
                 'billed_to_pack' => $reservation['billed_to_pack'],
                 'usage_period' => $reservation['period'],
             ],
         ));
 
-        $item = $recorded['item'];
         $job = $recorded['job'];
 
         if ($runAsync) {
-            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
+            // "Priority" and "highest" rank above "high": never the slower default queue.
+            $queueName = in_array(strtolower((string) ($activePlan?->processing_priority ?? 'standard')), ['high', 'priority', 'highest'], true)
                 ? 'high'
                 : 'default';
 
@@ -291,6 +312,46 @@ class MessageReaderController extends Controller
             $job->refresh();
         }
 
+        return $this->queueReply($user, $quotaPlan, $job, $estimate);
+    }
+
+    /**
+     * The member's own generation of this same text, voice and options (the
+     * generation's columns, as they are saved) that is still being made, from
+     * the last 30 minutes. Developer API generations have their Idempotency-Key.
+     *
+     * @param  array<string, mixed>  $choices
+     */
+    private function sameVoiceBeingMade(int $userId, string $text, array $choices): ?AudioGeneration
+    {
+        return AudioGeneration::query()
+            ->where('user_id', $userId)
+            ->whereIn('status', ['queued', 'processing'])
+            ->where('created_at', '>=', now()->subMinutes(30))
+            ->latest('id')
+            ->get()
+            ->first(function (AudioGeneration $generation) use ($text, $choices): bool {
+                if ($generation->api_key_id !== null || $generation->input_text !== $text) {
+                    return false;
+                }
+
+                foreach ($choices as $column => $value) {
+                    if ($generation->getAttribute($column) !== $value) {
+                        return false;
+                    }
+                }
+
+                return true;
+            });
+    }
+
+    /**
+     * The reply about a voice asked for: its generation, and the member's usage now.
+     *
+     * @param  array{chars:int,words:int,seconds:int,minutes:int,credits:int}  $estimate
+     */
+    private function queueReply(User $user, ?\App\Models\Plan $quotaPlan, AudioGeneration $job, array $estimate): \Illuminate\Http\JsonResponse
+    {
         $isFailed = $job->status === 'failed';
         $counter = CreditPeriod::counter((int) $user->id);
         $statusCode = in_array($job->status, ['queued', 'processing'], true)
@@ -300,11 +361,11 @@ class MessageReaderController extends Controller
         return response()->json([
             'ok' => ! $isFailed,
             'job_id' => $job->id,
-            'item_id' => $item->id,
+            'item_id' => $job->text_item_id,
             'status' => $job->status,
-            'voice' => VoiceCatalog::voiceMeta($voiceName),
-            'voice_tier' => $requestedTier,
-            'voice_tier_label' => VoiceTier::label($requestedTier),
+            'voice' => VoiceCatalog::voiceMeta($job->voice_name),
+            'voice_tier' => $job->voice_tier,
+            'voice_tier_label' => VoiceTier::label($job->voice_tier),
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => GenerationMessage::forDisplay($job->error_message),
             'estimated_chars' => $estimate['chars'],

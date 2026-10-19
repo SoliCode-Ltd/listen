@@ -219,7 +219,8 @@ class ClonedVoiceDialectTest extends TestCase
         $generation = $this->clonedGeneration([], fn () => Http::response(['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']], 429));
 
         $this->assertSame('failed', $generation->status);
-        $this->assertSame(__('ui.backend.cloned_voice_daily_limit'), $generation->error_message);
+        // Every key out for the day is a limit on our side: no wait is promised.
+        $this->assertSame(__('ui.backend.cloned_voices_our_limit'), $generation->error_message);
     }
 
     public function test_cloned_voice_is_copied_to_a_key_with_room_when_its_own_key_is_out_for_the_day(): void

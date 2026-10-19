@@ -744,6 +744,12 @@
       font-weight: 800;
       font-size: 1.05rem;
     }
+    .order-note {
+      margin: .6rem 0 0;
+      color: var(--muted);
+      font-size: .85rem;
+      line-height: 1.55;
+    }
     .quick-links {
       margin-top: .35rem;
       display: flex;
@@ -1175,6 +1181,8 @@
             <dt>{{ __('ui.billing.order_total') }}</dt>
             <dd id="orderTotal" dir="ltr">-</dd>
           </div>
+          {{-- A change of plan starts no fresh allowance (App\Support\CreditPeriod). --}}
+          <p class="order-note">{{ __('ui.billing.order_usage_note') }}</p>
         </section>
 
         <div class="quote-details">

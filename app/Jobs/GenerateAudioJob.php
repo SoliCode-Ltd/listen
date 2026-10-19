@@ -16,6 +16,7 @@ use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
+use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
@@ -280,15 +281,27 @@ class GenerateAudioJob implements ShouldQueue
                 );
             }
 
-            $actualEstimate = UsageEstimator::estimate($textForSpeech);
+            $actualEstimate = UsageEstimator::estimate($textForSpeech, $requestedTier, (float) ($studioOptions['speed'] ?? 1.0), $studioOptions);
             // The real length of the saved file; the provider's figure is only a guess from the text.
             // Measured before any effect, so an echo's tail is never charged.
             $measuredSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null));
 
             // A sound environment for the whole recording, added to a copy of the clean voice.
             $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
-            if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
-                $audio['audio_path'] = $effected;
+            $effectNotAdded = false;
+            if ($effect !== '' && ! empty($audio['audio_path'])) {
+                $effected = AudioEffects::apply((string) $audio['audio_path'], $effect);
+                if ($effected !== null) {
+                    // Nothing plays the clean take now, and it would stay at an address of its
+                    // own: it goes, as in the demo. The speech cache's copy is shared, so it stays.
+                    if (! str_starts_with((string) $audio['audio_path'], 'audio/cache/')) {
+                        Storage::disk('public')->delete((string) $audio['audio_path']);
+                    }
+                    $audio['audio_path'] = $effected;
+                } else {
+                    // The member gets the clean voice (charged the same) and is told so.
+                    $effectNotAdded = true;
+                }
             }
             // Charged only for a voice the member can play: a file that was never
             // saved (or was saved empty) fails the generation, which gives the credits back.
@@ -303,10 +316,26 @@ class GenerateAudioJob implements ShouldQueue
             // Done and charged together: a failure in between leaves neither, so a retry
             // never charges twice. A generation failed meanwhile (swept as stuck, its
             // credits already given back) is not delivered or charged.
-            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved): bool {
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded): bool {
                 $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
                 if (! $locked || $locked->status !== 'processing') {
                     return false;
+                }
+
+                $snapshot = (array) ($locked->settings_snapshot ?? []);
+                if (! empty($audio['cache_path'])) {
+                    // The speech cache's copy of this take (TtsService): deleted with the voice.
+                    $snapshot['cache_copy'] = (string) $audio['cache_path'];
+                }
+                if (! empty($audio['pieces_check'])) {
+                    // How the pieces of a long voice were checked, and how many were taken again (PieceCheck).
+                    $snapshot['pieces_check'] = $audio['pieces_check'];
+                }
+                if ($effectNotAdded) {
+                    // The history and the developer API read audio_effect as the voice's own,
+                    // so a sound environment that could not be added is kept apart.
+                    unset($snapshot['audio_effect']);
+                    $snapshot['audio_effect_not_added'] = $effect;
                 }
 
                 $locked->update([
@@ -322,6 +351,7 @@ class GenerateAudioJob implements ShouldQueue
                     'tts_fallback_used' => $audio['fallback_used'] ?? false,
                     'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
                     'billable_chars' => $actualChars,
+                    'settings_snapshot' => $snapshot !== [] ? $snapshot : null,
                 ]);
 
                 $this->applyUsageDelta(
@@ -393,22 +423,34 @@ class GenerateAudioJob implements ShouldQueue
     /**
      * What the member is told, kept in English as the developer API shows it
      * (the studio and the extension show it in the member's language, with
-     * GenerationMessage). A cloned voice has no other engine to fall back on,
-     * so a used-up daily limit is said plainly.
+     * GenerationMessage). Only a passing overload promises a minute: a limit
+     * on our side that lasts (the spending cap, every key out for the day, the
+     * site's daily ceiling) is said plainly, with no wait promised, and text the
+     * engine will not read asks for other wording.
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
         if ($e instanceof TranslationFailedException) {
             return $e->getMessage();
         }
-        if (str_starts_with((string) $generation->voice_name, 'cloned_')
-            && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
-            return GenerationMessage::stored('ui.backend.cloned_voice_daily_limit');
+        // A cloned voice has no other engine to fall back on.
+        if (str_starts_with((string) $generation->voice_name, 'cloned_')) {
+            if ($e instanceof GeminiKeysOutException) {
+                return GenerationMessage::stored('ui.backend.cloned_voices_our_limit');
+            }
+            if (preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
+                return GenerationMessage::stored('ui.backend.premium_voices_busy');
+            }
         }
-        // An HD voice is never swapped for a standard one: when the premium engine
-        // is busy or down, the member is told so (and nothing is charged).
+        // An HD voice is never swapped for a standard one: the member is told
+        // whether the premium engine is busy, held back by a limit on our side,
+        // or would not read the text (and that nothing is charged).
         if ($e instanceof PremiumVoiceUnavailableException) {
-            return GenerationMessage::stored('ui.backend.premium_voices_busy');
+            return GenerationMessage::stored(match ($e->reason) {
+                PremiumVoiceUnavailableException::OUR_LIMIT => 'ui.backend.premium_voices_our_limit',
+                PremiumVoiceUnavailableException::TEXT_REFUSED => 'ui.backend.premium_text_refused',
+                default => 'ui.backend.premium_voices_busy',
+            });
         }
 
         return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');

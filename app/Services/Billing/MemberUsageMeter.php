@@ -12,6 +12,7 @@ use App\Support\CreditPeriod;
 use App\Support\EmailVerification;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
+use App\Support\VoiceTier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -117,7 +118,8 @@ class MemberUsageMeter
             return $stored;
         }
 
-        $estimate = UsageEstimator::estimate((string) $generation->input_text);
+        $estimate = UsageEstimator::estimate((string) $generation->input_text, (string) ($generation->voice_tier ?: VoiceTier::STANDARD), (float) ($generation->speed ?: 1.0),
+            $generation->only(['performance_style', 'emotion', 'dialect', 'style_prompt']));
 
         return [
             'period' => CreditPeriod::ofGeneration($generation),

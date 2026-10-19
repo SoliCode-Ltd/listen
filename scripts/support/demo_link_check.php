@@ -123,6 +123,22 @@ foreach ($candidates as $u) {
         $u->id, $u->created_at->utc()->format('Y-m-d H:i'), $u->created_at->diffInHours($t->created_at, false) * -1, $how($u), $demoChars($u->id),
         App\Support\PaidMember::is($u) ? 'yes' : 'no', implode('; ', $shares) ?: '-', $rules === [] ? 'NO' : implode(', ', $rules));
 }
+// What the demo now remembers (App\Services\DemoLinkedAccounts): every browser and
+// device the member used the demo from, and the pool the demo counts for them.
+if (App\Services\DemoLinkedAccounts::available()) {
+    echo "== Browsers and devices the demo remembers for member {$t->id} ==\n";
+    $rows = App\Models\MemberDevice::query()->where('user_id', $t->id)->orderBy('kind')->get();
+    foreach ($rows as $row) {
+        $others = App\Models\MemberDevice::query()->where('kind', $row->kind)->where('signal', $row->signal)->where('user_id', '<>', $t->id)->pluck('user_id')->all();
+        echo '  ', str_pad($row->kind, 8), $short($row->signal), $row->touch ? ' (phone or tablet)' : '', ', first ', $row->first_seen_at?->utc()->format('m-d H:i'),
+            ', last ', $row->last_seen_at?->utc()->format('m-d H:i'), ', also used by: ', $others === [] ? 'no other account' : 'members '.implode(', ', $others), "\n";
+    }
+    if ($rows->isEmpty()) {
+        echo "  none yet (the member has not opened the demo since this was added)\n";
+    }
+    $pool = app(App\Services\DemoLinkedAccounts::class)->linkedUserIds($t);
+    echo '  the demo pool by browser and device: members ', implode(', ', $pool), '; demo characters used among them: ', array_sum(array_map($demoChars, $pool)), "\n";
+}
 $total = array_sum(array_map($demoChars, array_keys($counted)));
 echo "== The demo the site sees for member {$t->id} (without the current browser cookie) ==\n";
 echo '  linked accounts counted: ', implode(', ', array_keys($counted)), "; demo characters used among them: $total\n";

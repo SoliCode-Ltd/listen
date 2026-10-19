@@ -218,6 +218,34 @@ class GeminiVocalTags
     }
 
     /**
+     * Every way a sound may be written, folded as canonical() folds it, with
+     * the tag it stands for (public/js/audio-estimate.js reads tags with it).
+     *
+     * @return array<string, string>
+     */
+    public static function spellingIndex(): array
+    {
+        return array_combine(self::all(), self::all()) + self::ALIASES + self::arabicIndex();
+    }
+
+    /**
+     * Every way a delivery tag may be written, folded as delivery() folds
+     * it, with the tag it stands for (for public/js/audio-estimate.js).
+     *
+     * @return array<string, string>
+     */
+    public static function deliveryIndex(): array
+    {
+        $arabic = [];
+        foreach (self::DELIVERY_ARABIC as $tag => $name) {
+            $arabic[self::plainArabic($name)] = $tag;
+        }
+        $keys = array_keys(self::DELIVERY_DIRECTIONS);
+
+        return array_combine($keys, $keys) + array_fill_keys(['همس', 'هامسا', 'بهمس', 'whisper', 'whispers'], 'whispering') + $arabic;
+    }
+
+    /**
      * Every written form of the tags: English names and Arabic names.
      *
      * @return array<int, string>

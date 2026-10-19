@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\RenewalGrace;
 use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -452,6 +453,13 @@ class StripeWebhookEmailService
             return;
         }
 
+        // A failed renewal's grace keeps the plan on until the date the member was
+        // told, though Stripe ended the subscription first: the grace job tells them
+        // when the plan ends, on that date.
+        if (RenewalGrace::keeps($localSubscription)) {
+            return;
+        }
+
         $subscriptionId = trim((string) ($subscription->id ?? ''));
         if ($this->shouldSkipEmail("subscription-canceled:{$subscriptionId}", 24 * 30)) {
             return;
@@ -739,15 +747,42 @@ class StripeWebhookEmailService
 
     private function extractPriceIdFromInvoice(object $invoice): ?string
     {
+        $priceId = trim((string) ($this->planLine($invoice)?->price->id ?? ''));
+
+        return $priceId !== '' ? $priceId : null;
+    }
+
+    /**
+     * The invoice line for the plan the member pays for now. A plan change lists
+     * its prorations first ("Unused time on <old plan>", a credit), so it is the
+     * first line that is not a proration; when every line is one, the first that
+     * charges something.
+     */
+    private function planLine(object $invoice): ?object
+    {
         $lines = $invoice->lines->data ?? [];
-        if (is_array($lines) && isset($lines[0]) && is_object($lines[0])) {
-            $priceId = trim((string) ($lines[0]->price->id ?? ''));
-            if ($priceId !== '') {
-                return $priceId;
+        $lines = is_array($lines) ? array_values(array_filter($lines, 'is_object')) : [];
+
+        foreach ($lines as $line) {
+            if (! $this->isProration($line)) {
+                return $line;
+            }
+        }
+        foreach ($lines as $line) {
+            if ((int) ($line->amount ?? 0) > 0) {
+                return $line;
             }
         }
 
-        return null;
+        return $lines[0] ?? null;
+    }
+
+    /** Whether an invoice line is a proration, in the API versions from before and after it moved under parent. */
+    private function isProration(object $line): bool
+    {
+        return (bool) ($line->proration ?? false)
+            || (bool) ($line->parent->subscription_item_details->proration ?? false)
+            || (bool) ($line->parent->invoice_item_details->proration ?? false);
     }
 
     private function extractPriceIdFromSubscription(object $subscription): ?string
@@ -765,28 +800,16 @@ class StripeWebhookEmailService
 
     private function extractInvoiceLineDescription(object $invoice): ?string
     {
-        $lines = $invoice->lines->data ?? [];
-        if (is_array($lines) && isset($lines[0]) && is_object($lines[0])) {
-            $description = trim((string) ($lines[0]->description ?? ''));
-            if ($description !== '') {
-                return $description;
-            }
-        }
+        $description = trim((string) ($this->planLine($invoice)?->description ?? ''));
 
-        return null;
+        return $description !== '' ? $description : null;
     }
 
     private function extractInvoicePeriodEnd(object $invoice): string
     {
-        $lines = $invoice->lines->data ?? [];
-        if (is_array($lines) && isset($lines[0]) && is_object($lines[0])) {
-            $end = isset($lines[0]->period->end) ? (int) $lines[0]->period->end : 0;
-            if ($end > 0) {
-                return $this->formatUnixTimestamp($end);
-            }
-        }
+        $end = (int) ($this->planLine($invoice)?->period->end ?? 0);
 
-        return 'N/A';
+        return $end > 0 ? $this->formatUnixTimestamp($end) : 'N/A';
     }
 
     private function localPlanLabelFromUser(User $user): ?string

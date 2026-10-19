@@ -3,6 +3,9 @@
 namespace Tests\Feature;
 
 use App\Models\SiteSetting;
+use App\Support\ArabicDialects;
+use App\Support\DialectCounts;
+use App\Support\EnglishAccents;
 use App\Support\SeoHelper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -34,6 +37,21 @@ class SeoRoutesTest extends TestCase
         $this->get('/llms.txt')
             ->assertOk()
             ->assertSee('## Official URLs', false);
+    }
+
+    public function test_llms_txt_counts_the_spoken_dialects_and_offers_samples_not_every_voice(): void
+    {
+        $text = (string) $this->get('/llms.txt')->assertOk()->getContent();
+
+        // The spoken dialects, as the dialect hub counts them, not every catalog row but one: Fusha and its styles are named apart.
+        $this->assertStringContainsString('It speaks Modern Standard Arabic (Fusha), '.DialectCounts::spokenArabic().' Arabic dialect accents from '
+            .(count(ArabicDialects::COUNTRIES) - 1).' countries and '.count(EnglishAccents::ALL).' English accents', $text);
+        $this->assertStringNotContainsString((count(ArabicDialects::ALL) - 1).' Arabic', $text);
+        // The samples page plays the samples that were made, not one for every accent and dialect.
+        $this->assertStringContainsString('samples of English accents, moods, conversations and sound environments, ready to play', $text);
+        $this->assertStringContainsString('has samples of Arabic dialects', $text);
+        $this->assertStringNotContainsString('every English accent', $text);
+        $this->assertStringNotContainsString('every Arabic dialect', $text);
     }
 
     public function test_llms_route_can_be_disabled_from_dashboard_setting(): void

@@ -240,6 +240,7 @@ Route::group([
     // read, so they skip the billing sync the pages run.
     Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard/jobs/latest', [DashboardController::class, 'latest'])->name('dashboard.jobs.latest');
+        Route::get('/dashboard/jobs/older', [DashboardController::class, 'older'])->name('dashboard.jobs.older');
         Route::get('/dashboard/jobs/{job}', [DashboardController::class, 'show'])->whereNumber('job')->name('dashboard.jobs.show');
         Route::get('/dashboard/csrf-token', [DashboardController::class, 'csrfToken'])->name('dashboard.csrf-token');
     });

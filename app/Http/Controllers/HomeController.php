@@ -345,10 +345,13 @@ class HomeController extends Controller
             $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
         }
 
+        // Once per page: a visitor's country can take a few seconds to look up.
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+
         return view('pricing', [
-            'pricingPlans' => $this->pricingPlans(),
+            'pricingPlans' => $this->pricingPlans($countryContext),
             'activePlanSlug' => $activePlanSlug,
-            'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
+            'countryContext' => $countryContext,
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),
         ]);
@@ -356,9 +359,16 @@ class HomeController extends Controller
 
     public function startFreeTrial(Request $request)
     {
+        $trials = app(TrialEligibilityService::class);
+        // With trials switched off there is no trial to start: the plans page says so,
+        // instead of a sign-up that ends at the paid checkout.
+        if (! $trials->enabled()) {
+            return redirect()->route('pricing')->with('notice', __('ui.backend.trial_disabled'));
+        }
+
         $cycle = $request->query('billing_cycle') === 'yearly' ? 'yearly' : 'monthly';
         $query = ['billing_cycle' => $cycle, 'payment_method' => 'stripe'];
-        $plan = app(TrialEligibilityService::class)->trialPlan((string) $request->query('plan', ''), $cycle);
+        $plan = $trials->trialPlan((string) $request->query('plan', ''), $cycle);
         if ($plan) {
             $query = ['plan' => $plan->slug] + $query;
         }
@@ -530,6 +540,7 @@ class HomeController extends Controller
     public function demo(Request $request)
     {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         try {
             $maxChars = $this->demoCharAllowance($request);
@@ -648,6 +659,7 @@ class HomeController extends Controller
         TtsService $ttsService,
     ) {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         $maxChars = $this->demoCharAllowance($request);
         $demoPlan = $this->planAccessService->freePlan();
@@ -1196,9 +1208,10 @@ class HomeController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $countryContext
      * @return array<int, array<string, mixed>>
      */
-    private function pricingPlans(): array
+    private function pricingPlans(array $countryContext): array
     {
         $plans = Plan::query()
             ->where('is_active', true)
@@ -1206,7 +1219,6 @@ class HomeController extends Controller
             ->get();
 
         $locale = app()->getLocale();
-        $countryContext = $this->localizedPricingService->resolveCountryContext(request());
 
         $packs = app(CharPackService::class);
         $viewer = auth()->user();
@@ -1321,6 +1333,10 @@ class HomeController extends Controller
                     $locale
                 ),
                 'display_is_manual' => $manualMethod !== null,
+                // What a card is really charged (Stripe prices are in US dollars), shown
+                // beside a price in another currency: a month, and a month of the yearly price.
+                'usd_price_monthly_formatted' => (string) $stripeMonthlyQuote['base_usd_formatted'],
+                'usd_price_yearly_monthly_formatted' => $this->localizedPricingService->formatAmount((int) round($yearlyCents / 12), LocalizedPricingService::CURRENCY_USD, $locale),
                 'monthly_minutes' => (int) $plan->monthly_minutes,
                 'monthly_chars' => (int) $plan->monthly_chars,
                 'monthly_requests' => (int) $plan->monthly_requests,
@@ -1341,6 +1357,8 @@ class HomeController extends Controller
                 'topup_minute_price_cents' => $topupMinCents,
                 'is_featured' => (bool) ($plan->is_featured ?? false),
                 'features' => $features,
+                // The comparison table's lines: from the plan's settings, never its card text.
+                'compare_lines' => PlanPricingLines::forComparison($plan, $locale),
                 // Lines the admin wrote for this card in this language.
                 'own_lines' => (bool) $plan->pricing_use_custom_text && $plan->getLocalizedFeatures($locale) !== null,
                 'is_pack' => $plan->isPack(),
@@ -1370,6 +1388,17 @@ class HomeController extends Controller
     private function demoCharAllowance(Request $request): int
     {
         return DemoAllowance::chars();
+    }
+
+    /**
+     * The page counts a line break as one character, but its form sends it as
+     * \r\n: read as the page counted it, the text is checked, charged and spoken the same.
+     */
+    private function readTextAsCounted(Request $request): void
+    {
+        if (is_string($request->input('text'))) {
+            $request->merge(['text' => str_replace(["\r\n", "\r"], "\n", $request->input('text'))]);
+        }
     }
 
     private function demoLimitExceededMessage(Request $request, int $maxChars): string
@@ -1792,6 +1821,8 @@ class HomeController extends Controller
                     'total_chars' => $totalChars !== null ? (int) $totalChars : ($originalChars ?? UsageEstimator::estimate($inputText)['chars']),
                     'dialogue_speakers' => ($validated['is_dialogue'] ?? false) ? ($validated['dialogue_speakers'] ?? []) : null,
                     'audio_effect' => $audio['audio_effect'] ?? null,
+                    // The speech cache's copy of this take (TtsService): deleted with the voice.
+                    'cache_copy' => $audio['cache_path'] ?? null,
                 ],
             ]);
         } catch (\Throwable $e) {

@@ -68,6 +68,17 @@ name: Server deploy
 #            use, and every account sharing a browser, a demo fingerprint or an
 #            address with them, and whether the demo's linking rules count it.
 #            Addresses, cookies and fingerprints only as short hashes.
+#   join-check: read-only (READ ONLY database session). Whether the newest
+#            long premium voices, read in pieces and joined, keep one voice:
+#            each piece's pace, pitch and level against the voice's others
+#            and against the halves of one piece (scripts/support/join_check.php).
+#            Numbers and voice ids only, never a text.
+#   speech-rates: read-only (READ ONLY database session). How long the voices
+#            really take to say a text, from the finished voices whose audio
+#            was measured: how far the studio's estimate is from the real
+#            length, the speaking rates by language and engine, and a fit of
+#            the seconds against what the texts hold. Totals only, never a
+#            text or a member (scripts/support/speech_rates.php).
 #   email-check: read-only (READ ONLY database session). Whether the site's
 #            email goes out (the mailer in use, never a password), the sign-ups
 #            since confirmation links began and how many confirmed, log lines
@@ -90,14 +101,14 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
         type: string
         default: ""
       member:
-        description: "email-check and demo-links: a member's email or member id"
+        description: "email-check, demo-links and join-check: a member's email or member id"
         type: string
         default: ""
 
@@ -356,6 +367,17 @@ jobs:
           fi
           if [ "$MODE" = promises ]; then
             tool promises_inspect.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = join-check ]; then
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            tool join_check.php | $S "$FIND; LIMIT=40 MEMBER='$MEMBER' nice php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = speech-rates ]; then
+            tool speech_rates.php | $S "$FIND; php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

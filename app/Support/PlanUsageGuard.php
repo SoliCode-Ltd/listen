@@ -109,10 +109,14 @@ class PlanUsageGuard
             $charsLimit = self::charsLimit($plan, $counter);
             $incoming = (int) ($estimate['credits'] ?? $estimate['chars']);
             if (((int) $counter->total_chars + $incoming) > $charsLimit) {
+                $remaining = max(0, $charsLimit - (int) $counter->total_chars);
                 throw ValidationException::withMessages([
-                    'content' => $plan?->getAttribute('no_free_monthly_chars') && $charsLimit <= (int) $counter->total_chars
-                        ? __('ui.backend.no_chars_yet')
-                        : __('ui.backend.monthly_chars_exceeded'),
+                    'content' => match (true) {
+                        $plan?->getAttribute('no_free_monthly_chars') && $remaining <= 0 => __('ui.backend.no_chars_yet'),
+                        // Credits are left, only not enough for this text: say how many, as a pack does.
+                        $remaining > 0 => __('ui.backend.monthly_chars_not_enough', ['remaining' => number_format($remaining), 'needed' => number_format($incoming)]),
+                        default => __('ui.backend.monthly_chars_exceeded'),
+                    },
                 ]);
             }
         }

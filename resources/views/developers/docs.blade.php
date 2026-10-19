@@ -14,7 +14,8 @@
     $listed = fn (string $list) => \App\Support\Api\ApiDocs::listed($list, $offered, $arabic);
     $keysUrl = route('developers.keys');
     $voiceName = $arabic && ($voice['name_ar'] ?? '') !== '' ? $voice['name_ar'] : $voice['name'];
-    $supportEmail = '<a href="mailto:support@listenai.studio" dir="ltr">support@listenai.studio</a>';
+    $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
+    $supportEmail = '<a href="mailto:'.e($contactEmail).'" dir="ltr">'.e($contactEmail).'</a>';
     $check = '<span class="docs-yes"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span class="sr-only">'.e($plain('plans.included')).'</span></span>';
     $dash = '<span class="docs-no"><span class="sr-only">'.e($plain('plans.not_included')).'</span></span>';
     $nav = [

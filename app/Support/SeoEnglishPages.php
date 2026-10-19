@@ -306,8 +306,8 @@ final class SeoEnglishPages
                 'faqs' => [
                     ['question' => 'هل يمكنني كتابة النص بالعربية والحصول على صوت إنجليزي '.$accent.'؟', 'answer' => 'نعم، فعّل الترجمة في الاستوديو فيُترجم النص إلى الإنجليزية ثم يُحوَّل إلى صوت باللكنة التي تختارها.'],
                     ['question' => 'ما اللكنات المتاحة؟', 'answer' => $names.'. وتتوفر لكنات إنجليزية أخرى من صفحة اللكنات الإنجليزية.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي.'],
-                    ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي.'],
+                    ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'في كل باقة مدفوعة يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
                 ],
                 'cta_title' => 'ابدأ التعليق الصوتي الإنجليزي '.$accent,
                 'cta_body' => 'أنشئ حسابك واسمع نصك خلال ثوانٍ.',
@@ -344,8 +344,8 @@ final class SeoEnglishPages
             'faqs' => [
                 ['question' => 'Can I write in Arabic and get English audio with '.$accentName.'?', 'answer' => 'Yes. Turn on translation in the studio and your script is translated into English, then spoken in the accent you choose.'],
                 ['question' => 'Which accents are available?', 'answer' => $names.'. More English accents are listed on the English accents page.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo.'],
-                ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'Every clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices once in the demo.'],
+                ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'On every paid plan, each clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
             ],
             'cta_title' => 'Start your English voiceover',
             'cta_body' => 'Create your account and hear your script with '.$accentName.' in seconds.',
@@ -364,13 +364,13 @@ final class SeoEnglishPages
         if ($locale === 'ar') {
             return [
                 'eyebrow' => 'اللكنات الإنجليزية',
-                'h1' => 'تحويل النص إلى صوت إنجليزي بكل اللكنات',
-                'intro' => 'منصة إسمع تتكلم الإنجليزية بـ'.$count.' لكنة من '.$countries.' دولة: الأمريكية والبريطانية والأسترالية والكندية والأيرلندية والهندية وغيرها، بالإضافة إلى الإنجليزية بلكنة عربية. اكتب بالإنجليزية أو بالعربية مع الترجمة واختر اللكنة.',
+                'h1' => 'تحويل النص إلى صوت إنجليزي بكل اللكنات الرئيسية',
+                'intro' => 'منصة إسمع تتكلم الإنجليزية بـ'.$count.' لكنة من '.$countries.' دولة: الأمريكية والبريطانية والأسترالية والكندية والأيرلندية والهندية وغيرها، ومنها الإنجليزية بلكنة عربية. اكتب بالإنجليزية أو بالعربية مع الترجمة واختر اللكنة.',
                 'faq_title' => 'الأسئلة الشائعة',
                 'faqs' => [
-                    ['question' => 'كم لكنة إنجليزية تدعمها منصة إسمع؟', 'answer' => $count.' لكنة من '.$countries.' دولة، بالإضافة إلى الإنجليزية بلكنة عربية.'],
+                    ['question' => 'كم لكنة إنجليزية تدعمها منصة إسمع؟', 'answer' => $count.' لكنة من '.$countries.' دولة، منها الإنجليزية بلكنة عربية.'],
                     ['question' => 'هل يمكنني الكتابة بالعربية والحصول على صوت إنجليزي؟', 'answer' => 'نعم، فعّل الترجمة في الاستوديو فيُترجم النص ثم يُحوَّل إلى صوت إنجليزي.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللكنات في العرض التجريبي.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات واللكنات مرة واحدة في العرض التجريبي.'],
                 ],
                 'cta_title' => 'اسمع نصك بالإنجليزية',
                 'cta_body' => 'أنشئ حسابك واختر من '.$count.' لكنة إنجليزية.',
@@ -381,12 +381,12 @@ final class SeoEnglishPages
         return [
             'eyebrow' => 'English accents',
             'h1' => 'English Text to Speech in Every Major Accent',
-            'intro' => 'Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, plus English with an Arabic accent. Write in English, or in Arabic with translation, and pick the accent.',
+            'intro' => 'Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, including English with an Arabic accent. Write in English, or in Arabic with translation, and pick the accent.',
             'faq_title' => 'Frequently asked questions',
             'faqs' => [
-                ['question' => 'How many English accents does Listen support?', 'answer' => $count.' accents from '.$countries.' countries, plus English with an Arabic accent.'],
+                ['question' => 'How many English accents does Listen support?', 'answer' => $count.' accents from '.$countries.' countries, including English with an Arabic accent.'],
                 ['question' => 'Can I write in Arabic and get English audio?', 'answer' => 'Yes. Turn on translation in the studio and your script is translated, then spoken in English.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and accents in the demo.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices and accents once in the demo.'],
             ],
             'cta_title' => 'Hear your script in English',
             'cta_body' => 'Create your account and choose from '.$count.' English accents.',

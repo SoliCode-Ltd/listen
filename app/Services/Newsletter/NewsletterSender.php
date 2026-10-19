@@ -7,6 +7,7 @@ use App\Models\Newsletter;
 use App\Models\NewsletterDelivery;
 use App\Models\NewsletterSuppression;
 use App\Models\User;
+use App\Support\LiveServer;
 use App\Support\TitanMailbox;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -108,6 +109,8 @@ class NewsletterSender
             throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
         }
 
+        $this->ensureLiveSite();
+
         if (! $newsletter->getKey()) {
             throw new RuntimeException('Save the newsletter before sending it.');
         }
@@ -177,6 +180,8 @@ class NewsletterSender
         if (! $confirmed) {
             throw new RuntimeException('Audience send must be confirmed in the Newsletter admin.');
         }
+
+        $this->ensureLiveSite();
 
         if (! $this->takeDrainLock()) {
             throw new RuntimeException('A batch is already going out, from another page or the background sender. Wait a minute, then press send again.');
@@ -374,6 +379,14 @@ class NewsletterSender
      */
     private function drainLocked(int $limit, bool $respectPace, ?callable $tick, ?int $newsletterId): int
     {
+        // Mail queued on the live site comes along when its members are copied to
+        // staging: only the live site sends it.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('queued newsletter emails');
+
+            return 0;
+        }
+
         if ($respectPace) {
             if ($this->pace->holdReason() !== null) {
                 return 0;
@@ -467,6 +480,19 @@ class NewsletterSender
         }
 
         return $sent;
+    }
+
+    /**
+     * Members are emailed from the live site only: staging runs on a copy of live
+     * members. An example (sendExample()), to the one address typed, goes out anywhere.
+     */
+    private function ensureLiveSite(): void
+    {
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('newsletter to members');
+
+            throw new RuntimeException('Not sent: this is not the live site, and only the live site emails members. An example to your own address works here.');
+        }
     }
 
     /**

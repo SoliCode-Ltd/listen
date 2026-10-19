@@ -25,7 +25,8 @@ use Tests\TestCase;
  * inside the web request, where the web server's time limit can cut it short:
  * the studio and the extension are answered at once with the voice being made,
  * and it is made right after the reply in the same process, with no queue
- * worker. Shorter texts are made in the request as before. Speech is faked.
+ * worker. Shorter texts are made in the request as before, unless the
+ * extension asks not to wait (prefer_sync false). Speech is faked.
  */
 class LongTextAfterReplyTest extends TestCase
 {
@@ -202,6 +203,32 @@ class LongTextAfterReplyTest extends TestCase
         ])->assertOk()->assertJsonPath('status', 'done');
 
         $this->assertFalse($this->spokenAfterReply);
+    }
+
+    public function test_a_shorter_extension_text_is_made_after_the_reply_when_it_asks_not_to_wait(): void
+    {
+        $user = $this->member();
+        $key = $this->extensionKey($user);
+        $this->fakeSpeech();
+
+        // From about 800 characters the extension asks not to wait: Chrome may stop it
+        // while one request takes over 30 seconds.
+        $response = $this->withHeaders(['X-Listen-Key' => $key])->postJson('/api/reader/queue', [
+            'content' => self::SHORT_TEXT,
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => $this->voiceKey(),
+            'prefer_sync' => false,
+        ]);
+
+        $response->assertStatus(202)
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('status', 'processing')
+            ->assertJsonPath('audio_url', null);
+        $this->assertGreaterThan(0, (int) $response->json('job_id'));
+        $this->assertTrue($this->spokenAfterReply, 'made after the reply');
+        $this->assertSame('done', AudioGeneration::query()->whereKey((int) $response->json('job_id'))->value('status'));
+        $this->assertSame(0, DB::table('jobs')->count(), 'nothing waits for a queue worker');
     }
 
     public function test_with_the_threshold_off_a_long_text_is_made_in_the_request(): void

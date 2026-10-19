@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\AudioGeneration;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -60,7 +61,7 @@ class ApiAsyncGenerationTest extends TestCase
             'title' => 'Chapter one',
             'text' => 'Hello there, this is a test.',
             'character_count' => 28,
-            'credits_used' => 45,
+            'credits_used' => 60,
             'duration_seconds' => null,
             'audio_url' => null,
             'error' => null,
@@ -69,8 +70,8 @@ class ApiAsyncGenerationTest extends TestCase
             'text', 'character_count', 'credits_used', 'duration_seconds', 'audio_url', 'error',
         ])));
 
-        $this->assertSame([45, 1, 3], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)], 'reserved now');
-        $this->assertSame([45, 1], [$this->keyCreditsSpent($key), $this->keyRequestsCounted($key)]);
+        $this->assertSame([60, 1, 4], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)], 'reserved now');
+        $this->assertSame([60, 1], [$this->keyCreditsSpent($key), $this->keyRequestsCounted($key)]);
         $this->assertSame(['default'], DB::table('jobs')->pluck('queue')->all());
         $this->assertSame(0, $this->speechCalls->gemini, 'nothing is generated before a worker runs');
 
@@ -120,6 +121,32 @@ class ApiAsyncGenerationTest extends TestCase
         $this->speakAsync($priority, $voice)->assertStatus(202);
 
         $this->assertSame(['default', 'high'], DB::table('jobs')->orderBy('id')->pluck('queue')->all());
+    }
+
+    /**
+     * "Priority" and "highest" rank above "high": their background generations
+     * take the high queue too, from the API and from the browser extension,
+     * never the slower default one.
+     */
+    public function test_priority_and_highest_plans_use_the_high_queue_too(): void
+    {
+        config(['listen.audio.processing' => 'queue']);
+        $voice = $this->premiumVoice();
+
+        foreach (['priority' => 'pro', 'highest' => 'studio_max'] as $priority => $slug) {
+            $user = $this->apiMember($this->apiPlan(['slug' => $slug, 'name' => $slug, 'processing_priority' => $priority]));
+            $this->speakAsync($this->issueKey($user)['plain'], $voice)->assertStatus(202);
+
+            $extensionKey = 'lk_live_'.str_repeat($priority[0], 32);
+            $user->forceFill(['api_key_hash' => hash('sha256', $extensionKey)])->save();
+            $this->withHeaders(['X-Listen-Key' => $extensionKey])->postJson('/api/reader/queue', [
+                'content' => 'Hello there, this is a test.',
+                'target_language' => 'en',
+                'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+            ])->assertStatus(202)->assertJsonPath('status', 'queued');
+        }
+
+        $this->assertSame(['high', 'high', 'high', 'high'], DB::table('jobs')->orderBy('id')->pluck('queue')->all());
     }
 
     /**

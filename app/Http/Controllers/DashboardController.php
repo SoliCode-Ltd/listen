@@ -18,6 +18,7 @@ use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
 use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
+use App\Support\AudioFiles;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
 use App\Support\EmailVerification;
@@ -38,6 +39,9 @@ use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
+    /** Generations the history lists at first, and fetches each time older ones are asked for. */
+    private const HISTORY_PAGE = 500;
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly AudioGenerationRecorder $audioGenerationRecorder,
@@ -56,11 +60,12 @@ class DashboardController extends Controller
         $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
         // The latest 500: a long history no longer makes the page slow to build and load
-        // (the counts below are still of every generation).
+        // (the counts below are still of every generation). Older ones come a page at a
+        // time from older(), which goes on from the oldest of these by id.
         $jobs = (clone $baseQuery)
             ->with(['textItem:id,title'])
-            ->latest()
-            ->limit(500)
+            ->latest('id')
+            ->limit(self::HISTORY_PAGE)
             ->get();
 
         $reusePreset = null;
@@ -178,6 +183,8 @@ class DashboardController extends Controller
                 fn (array $line): bool => $line['label'] !== __('ui.pricing.lines.label_card_needed'),
             )),
             'jobs' => $jobs,
+            // Where "Show older voices" goes on from, while there are older ones.
+            'olderJobsBefore' => $stats['total'] > $jobs->count() ? (int) $jobs->min('id') : null,
             'stats' => $stats,
             'activePlan' => $activePlan,
             'planTier' => $planTier,
@@ -273,6 +280,14 @@ class DashboardController extends Controller
         $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
         $emotionValues = TtsStudioConfig::emotionValues();
 
+        // The page counts a line break as one character, but its form sends it as \r\n:
+        // read as the page counted it, the text is checked, charged and spoken the same.
+        foreach (['content', 'text'] as $field) {
+            if (is_string($request->input($field))) {
+                $request->merge([$field => str_replace(["\r\n", "\r"], "\n", $request->input($field))]);
+            }
+        }
+
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(ProfanityFilter::class))],
@@ -357,7 +372,7 @@ class DashboardController extends Controller
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = SpeechLanguages::detect($text);
         // A slower speed makes longer audio, so the reservation allows for it (as in the developer API).
-        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed'], $requestedTier, $studioOptions);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
@@ -467,7 +482,7 @@ class DashboardController extends Controller
             return response()->json([
                 'ok' => $isDone,
                 'message' => $isDone
-                    ? __('ui.backend.dashboard_voice_generated')
+                    ? ($this->environmentNote($job) ?? __('ui.backend.dashboard_voice_generated'))
                     : (GenerationMessage::forDisplay($job->error_message) ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
                 'usage' => $usageSnapshot,
@@ -479,7 +494,7 @@ class DashboardController extends Controller
 
         return redirect()->route('dashboard')->with(
             $isDone ? 'ok' : 'error',
-            $isDone ? __('ui.backend.dashboard_voice_generated') : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
+            $isDone ? ($this->environmentNote($job) ?? __('ui.backend.dashboard_voice_generated')) : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
         );
     }
 
@@ -534,6 +549,33 @@ class DashboardController extends Controller
     }
 
     /**
+     * The member's next page of generations older than the given one, newest
+     * first: the studio lists the latest 500, and "Show older voices" fetches
+     * the rest, so no plan's history (Studio Max's without a limit) is cut short.
+     * next_before is where the page after goes on from, null at the oldest.
+     */
+    public function older(Request $request)
+    {
+        $userId = (int) auth()->id();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
+
+        $jobs = $this->userHistoryQuery($userId)
+            ->with('textItem:id,title')
+            ->where('id', '<', max(0, (int) $request->integer('before')))
+            ->latest('id')
+            ->limit(self::HISTORY_PAGE + 1)
+            ->get();
+        $hasMore = $jobs->count() > self::HISTORY_PAGE;
+        $jobs = $jobs->take(self::HISTORY_PAGE);
+
+        return response()->json([
+            'ok' => true,
+            'jobs' => $jobs->map(fn (AudioGeneration $job): array => $this->buildJobPayload($job, $voiceNameMap))->values()->all(),
+            'next_before' => $hasMore ? (int) $jobs->last()->id : null,
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
      * A fresh form token for a page left open so long that its own has expired
      * (every request then fails with 419): the page sends its request once more
      * with this one (listenFetchWithFreshCsrf in the studio).
@@ -567,7 +609,8 @@ class DashboardController extends Controller
         }
 
         $deletedId = (int) $job->id;
-        $job->delete();
+        // Its audio goes too: until a file is deleted, anyone with its address can play it.
+        $job->deleteWithAudio();
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -598,20 +641,20 @@ class DashboardController extends Controller
         // The row stays: the demo allowance adds up the member's demo rows, so
         // deleting one must not give its characters back. Without its audio it
         // drops out of the member's history (which lists only rows with audio),
-        // and the file goes too unless another row still plays it.
+        // its texts are emptied, and its files go too (the speech cache's copy
+        // made from it included) unless another row still plays them.
         $deletedId = (int) $generation->id;
         $audioPath = trim((string) $generation->audio_path);
         $metadata = is_array($generation->metadata) ? $generation->metadata : [];
         $generation->forceFill([
             'audio_path' => null,
+            'input_text' => '',
+            'speech_text' => null,
+            'style_prompt' => null,
             'metadata' => $metadata + ['deleted_by_member_at' => now()->toIso8601String()],
         ])->save();
 
-        if ($audioPath !== ''
-            && ! DemoVoiceGeneration::query()->where('audio_path', $audioPath)->exists()
-            && ! AudioGeneration::query()->where('audio_path', $audioPath)->exists()) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($audioPath);
-        }
+        AudioFiles::deleteUnused([$audioPath, $metadata['cache_copy'] ?? null]);
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -796,6 +839,7 @@ class DashboardController extends Controller
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => GenerationMessage::forDisplay($job->error_message),
+            'note' => $this->environmentNote($job),
             'created_human' => $job->created_at?->diffForHumans(),
             'created_at_ts' => $job->created_at?->getTimestamp(),
             'can_reuse_settings' => $job->hasReusablePremiumSettings(),
@@ -805,6 +849,19 @@ class DashboardController extends Controller
             'is_demo_history' => false,
             'row_key' => 'audio:'.$job->id,
         ];
+    }
+
+    /**
+     * What a finished voice tells its member beyond being ready: the sound
+     * environment they chose, when it could not be added (GenerateAudioJob).
+     */
+    private function environmentNote(AudioGeneration $job): ?string
+    {
+        $effect = (string) (($job->settings_snapshot ?? [])['audio_effect_not_added'] ?? '');
+
+        return $job->status === 'done' && $effect !== ''
+            ? __('ui.backend.environment_not_added', ['environment' => AudioEffects::label($effect, app()->getLocale() === 'ar')])
+            : null;
     }
 
     /**

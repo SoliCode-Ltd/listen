@@ -138,7 +138,7 @@ class ApiIdempotencyTest extends TestCase
             ->assertJsonPath('history_item_id', $id)
             ->assertJsonPath('status', 'queued');
         $this->assertSame(1, DB::table('jobs')->count(), 'queued once');
-        $this->assertSame(45, $this->creditsSpent($user), 'reserved once');
+        $this->assertSame(60, $this->creditsSpent($user), 'reserved once');
 
         $this->assertSame(0, Artisan::call('queue:work', ['--once' => true, '--queue' => 'high,default']));
         $this->speakAsync($plain, $voice, [], $headers)->assertStatus(202)
@@ -376,7 +376,7 @@ class ApiIdempotencyTest extends TestCase
         $retry = $this->speakAsync($plain, $voice, [], $headers)->assertStatus(202)->assertHeaderMissing('Idempotent-Replayed');
 
         $this->assertNotSame($stuck, $retry->json('history_item_id'));
-        $this->assertSame([45, 1], [$this->creditsSpent($user), $this->requestsCounted($user)], 'reserved once, for the new one');
+        $this->assertSame([60, 1], [$this->creditsSpent($user), $this->requestsCounted($user)], 'reserved once, for the new one');
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Support\Api;
 
+use App\Models\SiteSetting;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
 use App\Support\AudioEffects;
@@ -36,7 +37,7 @@ final class OpenApiSpec
                 'version' => self::VERSION,
                 'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'.',
                 'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Full guide: '.url('/developers'),
-                'contact' => ['name' => 'Listen support', 'email' => 'support@listenai.studio', 'url' => url('/contact-us')],
+                'contact' => ['name' => 'Listen support', 'email' => trim((string) SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
             'servers' => [['url' => url('/v1'), 'description' => 'Production']],
@@ -570,7 +571,7 @@ final class OpenApiSpec
         $descriptions = [
             '400' => 'The body is not valid JSON, or the Idempotency-Key is too long.',
             '401' => 'Missing or invalid API key.',
-            '402' => 'Not enough credits on the plan or on the key\'s monthly limit.',
+            '402' => 'Not enough credits on the plan or on the key\'s monthly limit, or the plan\'s monthly request limit is reached.',
             '403' => 'Your plan or key does not allow this: the API is not in your plan or starts after the first payment, the key lacks a permission, or an option is not in your plan (feature_not_in_plan, with the plans that include it).',
             '404' => 'Not found.',
             '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',

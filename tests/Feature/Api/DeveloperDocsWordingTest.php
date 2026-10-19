@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Support\Api\ApiCodeSamples;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -75,6 +76,31 @@ class DeveloperDocsWordingTest extends TestCase
         $plain = $this->issueKey($member)['plain'];
         $generation = $this->storedGeneration($member);
         $this->assertApiError($this->apiGet($plain, '/history/'.$generation->id.'/audio?output_format=aiff'), 422, 'invalid_output_format', 'invalid_request_error', 'output_format');
+    }
+
+    public function test_quota_exceeded_also_answers_the_monthly_request_limit(): void
+    {
+        $this->docs('en')->assertSee('Your plan does not have enough credits left this month, or its monthly request limit is reached.');
+        $this->docs('ar')->assertSee('لا تكفي أرصدة باقتك المتبقية هذا الشهر، أو بلغت باقتك حدها الشهري من الطلبات.');
+        $spec = (string) json_encode($this->getJson('/v1/openapi.json')->assertOk()->json());
+        $this->assertStringContainsString("or the plan's monthly request limit is reached.", $spec);
+
+        // With credits left, the plan's last generation of the month is the last one.
+        $plain = $this->issueKey($this->apiMember($this->apiPlan(['monthly_requests' => 1])))['plain'];
+        $voice = $this->premiumVoice();
+        $this->speak($plain, $voice, ['text' => 'First of the month.'])->assertOk();
+        $this->assertApiError($this->speak($plain, $voice, ['text' => 'Second of the month.']), 402, 'quota_exceeded', 'quota_error');
+    }
+
+    public function test_the_javascript_samples_say_to_save_them_as_an_es_module(): void
+    {
+        // They use top-level await (and import, when they save the audio): a plain .js file runs neither by default.
+        foreach ([ApiCodeSamples::all('GET', 'https://listen.example/v1/voices'), ApiCodeSamples::all('POST', 'https://listen.example/v1/text-to-speech/voice_1', ['text' => 'Hi'], 'speech.mp3')] as $samples) {
+            $this->assertStringStartsWith("// Node.js 20 or later (fetch is built in). Save it as a .mjs file: it is an ES module.\n", $samples['javascript']);
+            $this->assertStringContainsString('const response = await fetch(', $samples['javascript']);
+        }
+        $this->assertStringNotContainsString('Node.js 18', (string) $this->docs('en')->getContent());
+        $this->docs('en')->assertSee('Save it as a .mjs file: it is an ES module.');
     }
 
     public function test_mp3_is_always_accepted_but_may_come_back_as_wav(): void

@@ -554,9 +554,16 @@
             <button class="btn btn-primary" id="resumeBtn" type="button">{{ __('ui.manage_subscription.resume_subscription') }}</button>
           @endif
           @if($hasCancelableSubscription)
-            <button class="btn btn-danger" id="cancelBtn" type="button">{{ __('ui.manage_subscription.cancel_subscription') }}</button>
+            <button class="btn btn-danger" id="cancelBtn" type="button"@if(!empty($cancelEndsNow)) data-confirm="{{ __('ui.manage_subscription.confirm_cancel_unpaid_prompt') }}"@endif>{{ __('ui.manage_subscription.cancel_subscription') }}</button>
           @endif
         </div>
+        @if(!empty($cancelEndsNow))
+          {{-- A failed renewal's grace days: the renewal was never paid, so cancelling ends the plan now. --}}
+          <p class="no-cancel-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="7.9" r="1.05" fill="currentColor"/></svg>
+            <span>{{ __('ui.manage_subscription.cancel_unpaid_note') }}</span>
+          </p>
+        @endif
         @if($noRenewal && ! $hasCancelableSubscription)
           <p class="no-cancel-note">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.25" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M12 11v5.2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle cx="12" cy="7.9" r="1.05" fill="currentColor"/></svg>
@@ -693,6 +700,7 @@
       'cancellation_failed' => __('ui.manage_subscription.cancellation_failed'),
       'subscription_canceled_success' => __('ui.manage_subscription.subscription_canceled_success'),
       'cancellation_scheduled' => __('ui.manage_subscription.cancellation_scheduled'),
+      'status_canceled' => __('ui.manage_subscription.status_canceled'),
       'resuming' => __('ui.manage_subscription.resuming'),
       'resume_failed' => __('ui.manage_subscription.resume_failed'),
       'subscription_resumed' => __('ui.manage_subscription.subscription_resumed'),
@@ -892,7 +900,8 @@
     });
 
     cancelBtn?.addEventListener('click', async () => {
-      if (!window.confirm(i18n.confirm_cancel_prompt)) return;
+      // In a failed renewal's grace days the button has its own prompt: the plan ends now.
+      if (!window.confirm(cancelBtn.dataset.confirm || i18n.confirm_cancel_prompt)) return;
       setButtonBusy(cancelBtn, true, i18n.canceling, cancelBtnDefaultText);
       setMessage(subscriptionMessageBox, '', '');
 
@@ -904,10 +913,12 @@
 
         setMessage(subscriptionMessageBox, 'ok', response.data?.message || i18n.subscription_canceled_success);
 
-        subscriptionStatusBadge?.classList.remove('active', 'canceled');
-        subscriptionStatusBadge?.classList.add('pending');
+        // Ended now (a renewal never paid), or set to end with the period paid for.
+        const ended = Boolean(response.data?.ended);
+        subscriptionStatusBadge?.classList.remove('active', 'canceled', 'pending');
+        subscriptionStatusBadge?.classList.add(ended ? 'canceled' : 'pending');
         if (subscriptionStatusBadge) {
-          subscriptionStatusBadge.textContent = i18n.cancellation_scheduled;
+          subscriptionStatusBadge.textContent = ended ? i18n.status_canceled : i18n.cancellation_scheduled;
         }
 
         renewsOnRow?.remove();

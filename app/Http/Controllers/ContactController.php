@@ -38,10 +38,11 @@ class ContactController extends Controller
 
         Contact::create($validated);
 
-        $recipientEmail = trim((string) SiteSetting::get(
-            'contact_submission_email',
-            SiteSetting::get('contact_email', config('mail.from.address', ''))
-        ));
+        // A field the admin saved empty is stored as '', not missing: it falls back too,
+        // so the message still reaches someone who can answer it by email.
+        $recipientEmail = trim((string) SiteSetting::get('contact_submission_email', ''))
+            ?: trim((string) SiteSetting::get('contact_email', ''))
+            ?: trim((string) config('mail.from.address', ''));
         $recipientName = trim((string) SiteSetting::get(
             'contact_submission_name',
             config('app.name', 'Listen') . ' Contact'

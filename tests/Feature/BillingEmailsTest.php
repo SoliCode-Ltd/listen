@@ -106,6 +106,67 @@ class BillingEmailsTest extends TestCase
         $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'Your billing profile was removed.')));
     }
 
+    public function test_the_receipt_for_a_plan_change_names_the_new_plan_and_its_renewal_date(): void
+    {
+        config(['services.stripe.prices' => [
+            'starter' => ['monthly' => 'price_starter_m'],
+            'creator' => ['monthly' => 'price_creator_m'],
+        ]]);
+        $oldRenewal = now()->addDays(9)->startOfDay();
+        $newRenewal = now()->addMonth()->startOfDay();
+        $emails = app(StripeWebhookEmailService::class);
+
+        // Stripe lists the credit for the old plan first. As the current API sends it...
+        $emails->sendForEvent($this->event('invoice.paid', $this->planChangeInvoice('in_change', [
+            [
+                'description' => 'Unused time on Starter after 5 Oct 2026', 'amount' => -450,
+                'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => true]],
+                'period' => ['start' => now()->timestamp, 'end' => $oldRenewal->timestamp],
+            ],
+            [
+                'description' => '1 × Creator (at $19.00 / month)', 'amount' => 1900,
+                'parent' => ['type' => 'subscription_item_details', 'subscription_item_details' => ['proration' => false]],
+                'period' => ['start' => now()->timestamp, 'end' => $newRenewal->timestamp],
+            ],
+        ])));
+        // ...and as older API versions did, with the line's own price.
+        $emails->sendForEvent($this->event('invoice.paid', $this->planChangeInvoice('in_change_old_api', [
+            [
+                'description' => 'Unused time on Starter after 5 Oct 2026', 'amount' => -450, 'proration' => true,
+                'price' => ['id' => 'price_starter_m'], 'period' => ['start' => now()->timestamp, 'end' => $oldRenewal->timestamp],
+            ],
+            [
+                'description' => '1 × Creator (at $19.00 / month)', 'amount' => 1900, 'proration' => false,
+                'price' => ['id' => 'price_creator_m'], 'period' => ['start' => now()->timestamp, 'end' => $newRenewal->timestamp],
+            ],
+        ])));
+
+        $sent = $this->sentEmails()->map(fn ($message): string => (string) $message->getOriginalMessage()->getHtmlBody())->values();
+        $this->assertCount(2, $sent);
+        $this->assertStringContainsString('1 × Creator (at $19.00 / month)', $sent[0]);
+        $this->assertStringContainsString('Creator (Monthly)', $sent[1]);
+        foreach ($sent as $html) {
+            $this->assertStringNotContainsString('Starter', $html);
+            $this->assertStringContainsString($newRenewal->format('M j, Y'), $html);
+            $this->assertStringNotContainsString($oldRenewal->format('M j, Y'), $html);
+        }
+    }
+
+    /**
+     * A paid plan change's invoice (Starter to Creator, charged at once).
+     *
+     * @param  list<array<string, mixed>>  $lines
+     * @return array<string, mixed>
+     */
+    private function planChangeInvoice(string $id, array $lines): array
+    {
+        return [
+            'id' => $id, 'customer' => 'cus_mail', 'subscription' => 'sub_change', 'amount_paid' => 1450, 'currency' => 'usd',
+            'billing_reason' => 'subscription_update', 'status_transitions' => ['paid_at' => now()->timestamp],
+            'lines' => ['data' => $lines],
+        ];
+    }
+
     public function test_the_billing_settings_switch_decides_whether_they_are_sent(): void
     {
         $emails = app(StripeWebhookEmailService::class);

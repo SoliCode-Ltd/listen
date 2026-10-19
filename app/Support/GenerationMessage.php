@@ -12,10 +12,13 @@ namespace App\Support;
  */
 final class GenerationMessage
 {
-    /** The messages GenerateAudioJob and the refunds keep on a generation. */
+    /** The messages GenerateAudioJob and the refunds keep on a generation (cloned_voice_daily_limit: older ones only). */
     private const KEYS = [
         'ui.backend.dashboard_voice_generation_failed_try_again',
         'ui.backend.premium_voices_busy',
+        'ui.backend.premium_voices_our_limit',
+        'ui.backend.cloned_voices_our_limit',
+        'ui.backend.premium_text_refused',
         'ui.backend.generation_stuck_refunded',
         'ui.backend.cloned_voice_daily_limit',
         'ui.backend.translation_failed',

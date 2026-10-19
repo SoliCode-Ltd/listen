@@ -106,8 +106,9 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
-      $supportEmailLink = '<a href="mailto:support@listenai.studio">support@listenai.studio</a>';
+      $effectiveDate = app()->getLocale() === 'ar' ? '19 أكتوبر 2026' : 'October 19, 2026';
+      $contactEmail = trim((string) \App\Models\SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio';
+      $supportEmailLink = '<a href="mailto:'.e($contactEmail).'">'.e($contactEmail).'</a>';
     @endphp
     <article class="legal-shell">
       <span class="legal-kicker">{{ __('ui.legal.kicker') }}</span>

@@ -1608,6 +1608,8 @@
       border-color: transparent;
       color: #fff;
     }
+    .jobs-older[hidden] { display: none; }
+    .jobs-older .pagination-btn { padding: 0 1rem; }
     .job-delete-btn {
       min-width: auto;
       height: 1.95rem;
@@ -2906,6 +2908,10 @@
           </table>
         </div>
         <div class="pagination" id="jobsPagination"></div>
+        {{-- The newest 500 voices are listed; older ones come a page at a time. --}}
+        <div class="pagination jobs-older" id="jobsOlder" @if(! ($olderJobsBefore ?? null)) hidden @endif>
+          <button type="button" class="pagination-btn" id="jobsOlderBtn">{{ __('ui.dashboard.show_older_voices') }}</button>
+        </div>
       </div>
     </section>
 
@@ -3002,7 +3008,7 @@
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}" role="status">
                       @if($voice->isProcessing())<span class="dot"></span>@endif
-                      {{ __('ui.voice_cloning.status_' . $voice->status) }}
+                      {{ \App\Services\VoiceCloningService::statusLabel($voice) }}
                     </span>
                   </div>
                   <div class="vc-card-meta">
@@ -3029,7 +3035,7 @@
                       <div class="vc-progress-fill" data-vc-progress-fill style="width: {{ $vcInitialProgress }}%"></div>
                     </div>
                     <div class="vc-progress-meta">
-                      <span data-vc-progress-status>{{ __('ui.voice_cloning.status_' . $voice->status) }}</span>
+                      <span data-vc-progress-status>{{ \App\Services\VoiceCloningService::statusLabel($voice) }}</span>
                       <span data-vc-progress-percent>{{ $vcInitialProgress }}%</span>
                     </div>
                     <div class="vc-progress-delay" data-vc-progress-delay></div>
@@ -3287,6 +3293,7 @@
       'voices' => __('ui.dashboard.voices'),
       'prev' => __('ui.dashboard.prev'),
       'next' => __('ui.dashboard.next'),
+      'older_voices_failed' => __('ui.dashboard.older_voices_failed'),
       'reuse_settings' => __('ui.dashboard.reuse_settings'),
       'language_ar' => __('ui.dashboard.arabic'),
       'language_en' => __('ui.dashboard.english'),
@@ -3299,6 +3306,7 @@
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
       'instant_preview' => __('ui.dashboard.instant_preview'),
       'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
+      'generated_audio_charged' => __('ui.dashboard.generated_audio_charged'),
       'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
       'performance_style_required' => __('ui.backend.performance_style_required'),
       'emotion_required' => __('ui.backend.emotion_required'),
@@ -3315,7 +3323,9 @@
     ];
   @endphp
   <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
+  <script src="{{ asset('js/audio-estimate.js') }}?v={{ filemtime(public_path('js/audio-estimate.js')) }}"></script>
   <script>
+    window.ListenAudioEstimate?.configure(@json(\App\Support\UsageEstimator::clientConfig()));
     const voiceCatalog = @json($voiceCatalog);
     const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
     const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
@@ -3339,6 +3349,7 @@
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
     const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
     const latestJobsUrl = '{{ route('dashboard.jobs.latest') }}';
+    const olderJobsUrl = '{{ route('dashboard.jobs.older') }}';
     const csrfTokenUrl = '{{ route('dashboard.csrf-token') }}';
     // Renewed by listenFetchWithFreshCsrf when the page's token has expired.
     let csrfToken = '{{ csrf_token() }}';
@@ -3758,9 +3769,19 @@
       if (generatedAudioMeta) {
         const meta = [`${i18n.speaker_prefix} ${voiceLabel}`];
         if (voiceTier) meta.push(formatTierLabel(voiceTier));
+        // The real length and what it cost, beside the estimate shown before.
+        const seconds = Number(job?.duration_seconds || 0);
+        if (seconds > 0) {
+          meta.push(formatQuotaText(i18n.generated_audio_charged, {
+            duration: Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'),
+            credits: formatNumber(seconds * {{ \App\Support\Credits::PER_SECOND }}),
+          }));
+        }
         meta.push(i18n.generated_audio_ready);
         generatedAudioMeta.textContent = meta.join(' - ');
       }
+      // The finished voice says so when its sound environment could not be added.
+      if (job?.note) showFormMessage('note', String(job.note));
     }
 
     function setActiveDashboardSection(sectionId) {
@@ -3921,16 +3942,34 @@
       return `${Math.max(0, 100 - Number(percent || 0))}%`;
     }
 
-    // The credits left drop live as the text grows, by about what this voice
-    // will cost: 15 credits a second of audio, about 15 characters a second
-    // (the server's estimate; the real audio length decides the final charge).
+    // The credits left drop live as the text grows, by what this voice will
+    // cost: 15 credits a second of audio, the length estimated as the server
+    // estimates and reserves it (js/audio-estimate.js), from the text, the
+    // voice's tier and the pace. The real audio length decides the final charge.
     let creditLiveShown = null;
+    function estimateTier() {
+      if (document.getElementById('dialogueSelect')?.value === '1') return 'hd';
+      const key = String(voiceSelect?.value || '');
+      if (clonedVoices.some(function (entry) { return String(entry.key) === key; })) return 'hd';
+      const list = voiceCatalog?.[voiceLanguageOf(normalizeLanguage(targetLanguage?.value || 'ar'))];
+      const voice = (Array.isArray(list) ? list : []).find(function (v) { return String(v?.key) === key; });
+
+      return String(voice?.tier || 'standard');
+    }
     function estimateCreditsFor(text) {
-      const value = String(text || '').trim();
-      const length = Array.from(value).length;
-      if (!length) return 0;
-      const words = (value.match(/[\p{L}\p{N}']+/gu) || []).length;
-      return Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) * 15;
+      if (!window.ListenAudioEstimate) return 0;
+      const tier = estimateTier();
+      const field = function (id) { return String(document.getElementById(id)?.value || ''); };
+
+      // A standard voice is always read at the normal pace and plainly.
+      return window.ListenAudioEstimate.credits(text, tier === 'hd' ? {
+        tier: tier,
+        speed: Number(field('speed') || 1),
+        performance_style: field('performance_style'),
+        emotion: field('emotion'),
+        dialect: field('dialect'),
+        style_prompt: field('style_prompt'),
+      } : { tier: tier });
     }
     function refreshCreditLive() {
       const box = document.getElementById('creditLive');
@@ -4254,6 +4293,51 @@
       }
     }
 
+    // The page lists the newest voices; "Show older voices" adds the next page of older
+    // ones to the history and opens it at the first of them, until there are no more.
+    const jobsOlder = document.getElementById('jobsOlder');
+    const jobsOlderBtn = document.getElementById('jobsOlderBtn');
+    let olderJobsBefore = @json($olderJobsBefore ?? null);
+
+    async function loadOlderJobs() {
+      if (!olderJobsBefore || !jobsOlderBtn || jobsOlderBtn.disabled) return;
+      jobsOlderBtn.disabled = true;
+      let data = null;
+      try {
+        const response = await fetch(`${olderJobsUrl}?before=${encodeURIComponent(String(olderJobsBefore))}`, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        data = response.ok ? await response.json().catch(() => null) : null;
+      } catch (error) {
+        // No connection: said below, and the button stays to try again.
+      }
+      jobsOlderBtn.disabled = false;
+      if (!Array.isArray(data?.jobs)) {
+        showJobsMessage('error', i18n.older_voices_failed);
+        return;
+      }
+      showJobsMessage(null, '');
+
+      const known = new Set(allJobs.map(resolveJobKey));
+      const added = new Set();
+      data.jobs.forEach(function(job) {
+        const normalized = normalizeJob(job);
+        const key = normalized ? resolveJobKey(normalized) : '';
+        if (!key || known.has(key)) return;
+        known.add(key);
+        added.add(key);
+        allJobs.push(normalized);
+      });
+      sortAllJobsByNewest();
+      const firstAdded = allJobs.findIndex((job) => added.has(resolveJobKey(job)));
+      if (firstAdded !== -1) jobsCurrentPage = Math.floor(firstAdded / jobsPerPage) + 1;
+      renderJobsPage();
+
+      olderJobsBefore = data.next_before || null;
+      if (jobsOlder) jobsOlder.hidden = !olderJobsBefore;
+    }
+
     // Voices still being made (a long text is made after the reply) are checked on
     // until they finish: every 2 seconds at first, slowing to every 6, for at most
     // 20 minutes, and not while the tab is hidden. A finished one plays in the
@@ -4505,6 +4589,7 @@
       if (!btn || btn.disabled) return;
       goToPage(btn.getAttribute('data-page'));
     });
+    jobsOlderBtn?.addEventListener('click', loadOlderJobs);
     jobsTableBody?.addEventListener('click', function(e) {
       const reuseLink = e.target.closest('.job-reuse-btn');
       if (reuseLink instanceof HTMLAnchorElement) {
@@ -4668,10 +4753,19 @@
       renderVoiceOptions();
       renderDialectOptions();
       applyStudioDefaults();
+      refreshCreditLive();
     });
     voiceSelect?.addEventListener('change', function() {
       rememberCurrentVoiceSelection();
+      refreshCreditLive();
     });
+    // The voice, its tier, the pace and dialogue mode change how long the text takes.
+    document.getElementById('speed')?.addEventListener('input', refreshCreditLive);
+    ['performance_style', 'emotion', 'dialect'].forEach(function (id) {
+      document.getElementById(id)?.addEventListener('change', refreshCreditLive);
+    });
+    // After js/dialogue-mode.js has set the dialogue field from its switch.
+    document.getElementById('dialogueToggle')?.addEventListener('change', function () { setTimeout(refreshCreditLive, 0); });
     translateToggle?.addEventListener('change', function() {
       if (translateSelect) translateSelect.value = translateToggle.checked ? '1' : '0';
       if (translateToggle.checked) {
@@ -5368,7 +5462,8 @@
         const isDelayed = Boolean(payload.is_delayed || (['pending', 'validating', 'processing'].includes(status) && elapsedSeconds >= 90));
 
         const statusBadge = card.querySelector('.vc-status');
-        const statusText = statusLabels[status] || status.toUpperCase();
+        // The server's label: a failure on our side is not called a bad take.
+        const statusText = String(payload.status_label || statusLabels[status] || status.toUpperCase());
         // Rewritten only when the status changes, so screen readers hear it once, not on every check.
         if (statusBadge && (statusBadge.textContent.trim() !== statusText || !statusBadge.classList.contains(status))) {
           statusBadge.className = `vc-status ${status}`;
@@ -5449,7 +5544,7 @@
         const languageCode = String(voice?.language_code || 'ar-XA');
         const languageLabel = languageLabels[languageCode] || languageCode;
         const name = escapeHtml(String(voice?.name || `Voice ${voiceId}`));
-        const statusLabel = escapeHtml(statusLabels[status] || status.toUpperCase());
+        const statusLabel = escapeHtml(String(voice?.status_label || statusLabels[status] || status.toUpperCase()));
         const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
 
         return `

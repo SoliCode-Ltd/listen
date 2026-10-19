@@ -505,7 +505,7 @@ function createContextMenu() {
     return contextMenuInitPromise;
   }
 
-  const menuTitle = chrome.i18n.getMessage('contextMenuTitle') || 'Listen Selected Text';
+  const menuTitle = chrome.i18n.getMessage('contextMenuTitle') || 'Listen to the selected text';
 
   contextMenuInitPromise = new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
@@ -556,9 +556,43 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabPlaybackTokens.delete(tabId);
 });
 
-function getSettings() {
+// Settings, the API key among them, stay in this browser (storage.local): Chrome
+// keeps storage.sync in the member's account and copies it to every browser they
+// sign in to. Versions before 1.2.2 kept them there, so the first run of this one
+// moves them here and takes them out of the account.
+const SETTINGS_MOVED_KEY = 'listen_settings_moved_from_sync';
+let settingsMove = null;
+
+function moveSettingsFromSync() {
+  settingsMove = settingsMove || (async () => {
+    try {
+      const local = await chrome.storage.local.get(SETTINGS_MOVED_KEY);
+      if (local?.[SETTINGS_MOVED_KEY]) {
+        return;
+      }
+
+      const keys = Object.keys(DEFAULT_SETTINGS);
+      const synced = await chrome.storage.sync.get(keys);
+      const found = Object.keys(synced || {});
+      if (found.length) {
+        // What this browser already keeps wins over the copy from the account.
+        const kept = await chrome.storage.local.get(found);
+        await chrome.storage.local.set({ ...synced, ...kept });
+        await chrome.storage.sync.remove(found);
+      }
+      await chrome.storage.local.set({ [SETTINGS_MOVED_KEY]: true });
+    } catch (_error) {
+      // Tried again the next time the extension starts.
+    }
+  })();
+
+  return settingsMove;
+}
+
+async function getSettings() {
+  await moveSettingsFromSync();
   return new Promise((resolve) => {
-    chrome.storage.sync.get(DEFAULT_SETTINGS, (stored) => {
+    chrome.storage.local.get(DEFAULT_SETTINGS, (stored) => {
       const storedApiBase = normalizeApiBase(stored?.apiBase);
       const apiBase = storedApiBase || PACKAGED_API_BASE;
       const targetLanguage = normalizeLanguage(stored?.targetLanguage);
@@ -628,7 +662,7 @@ async function saveSettings(settings) {
   payload.emotion = String(payload.emotion || '').trim();
 
   return new Promise((resolve) => {
-    chrome.storage.sync.set(payload, () => resolve(payload));
+    chrome.storage.local.set(payload, () => resolve(payload));
   });
 }
 
@@ -664,10 +698,12 @@ async function fetchAudioPacket(audioUrl) {
   };
 }
 
-// Texts this long are made after the reply, as the server does them
-// (listen.audio.force_async_chars): the extension checks on them instead of
-// waiting for the audio in the request.
-const LONG_TEXT_CHARS = 2500;
+// Only a text shorter than this is waited for in the request. Chrome may stop the
+// extension while one request takes over 30 seconds, and the voice would then be
+// charged with no audio, so from here the server is asked not to wait
+// (prefer_sync false) and the extension checks on the voice, as on a long text
+// (the server makes one after the reply from 2,500 characters anyway).
+const WAIT_IN_REQUEST_CHARS = 800;
 
 // How long to keep checking on a voice: a minute, and a second more for every
 // 40 characters of text, at most 15 minutes.
@@ -753,17 +789,34 @@ async function openSidePlayer(tabId, audioUrl, textPreview, voiceLabel = '', req
   if (!response?.ok) {
     const ready = await ensureContentScriptReady(tabId);
     if (!ready) {
-      throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
+      throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
     }
 
     response = await sendTabMessage(tabId, message).catch(() => null);
   }
 
   if (!response?.ok) {
-    throw new Error(bgText('errSidePlayer', 'Could not open side player in this page. Try in a regular website tab.'));
+    throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
   }
 
   return { skipped: false };
+}
+
+function playerPageUrl(audioUrl) {
+  return chrome.runtime.getURL(`player.html?${new URLSearchParams({ audio: audioUrl })}`);
+}
+
+// The voice is made and paid for by now: if the page does not take the side
+// player after all, the extension's own player plays it in a new tab.
+async function playVoice(tabId, audioUrl, textPreview, voiceLabel = '', requestToken = 0) {
+  try {
+    await openSidePlayer(tabId, audioUrl, textPreview, voiceLabel, requestToken);
+  } catch (_error) {
+    const opened = await chrome.tabs.create({ url: playerPageUrl(audioUrl) }).catch(() => null);
+    if (!opened) {
+      throw new Error(bgText('errSidePlayer', 'Your voice is ready, but it could not be played here. You will find it in your dashboard history.'));
+    }
+  }
 }
 
 async function fetchProfile(overrides = {}) {
@@ -829,6 +882,15 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     throw new Error(bgText('errSetApiKey', 'Set API Key in extension settings.'));
   }
 
+  // The side player opens in the page, and no extension can run in Chrome's own
+  // pages or the Web Store: that is found out before the voice is made and charged.
+  const playbackTabId = settings.autoPlay
+    ? (typeof runtimeContext.tabId === 'number' ? runtimeContext.tabId : await getActiveTabId())
+    : null;
+  if (settings.autoPlay && !(await ensureContentScriptReady(playbackTabId))) {
+    throw new Error(bgText('errSidePlayerPage', 'The side player cannot open on this page, so nothing was made or charged. Try a regular website tab, or turn off "Play voice in side panel".'));
+  }
+
   const selectedTargetLanguage = settings.translate !== false
     ? normalizeLanguage(settings.translationTargetLanguage || settings.targetLanguage)
     : normalizeLanguage(settings.targetLanguage);
@@ -848,9 +910,9 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     target_language: targetLanguage,
     source_type: 'message',
     translate: shouldTranslate,
-    // A shorter text is waited for in the request; a long one is made after the
+    // A short text is waited for in the request; a longer one is made after the
     // reply and checked on below, for as long as its length needs.
-    prefer_sync: Array.from(selectedText).length < LONG_TEXT_CHARS,
+    prefer_sync: Array.from(selectedText).length < WAIT_IN_REQUEST_CHARS,
   };
 
   const voiceKey = targetLanguage === selectedTargetLanguage ? selectedVoiceForTarget : '';
@@ -908,11 +970,8 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
   if (data.audio_url) {
     const absoluteAudioUrl = toAbsoluteAudioUrl(data.audio_url, apiBase);
     if (settings.autoPlay) {
-      const tabId = typeof runtimeContext.tabId === 'number'
-        ? runtimeContext.tabId
-        : await getActiveTabId();
-      await openSidePlayer(
-        tabId,
+      await playVoice(
+        playbackTabId,
         absoluteAudioUrl,
         selectedText,
         getVoiceLabel(data?.voice, uiLang),
@@ -933,11 +992,8 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     const absoluteJobAudioUrl = toAbsoluteAudioUrl(readyJob.audio_url, apiBase);
 
     if (settings.autoPlay) {
-      const tabId = typeof runtimeContext.tabId === 'number'
-        ? runtimeContext.tabId
-        : await getActiveTabId();
-      await openSidePlayer(
-        tabId,
+      await playVoice(
+        playbackTabId,
         absoluteJobAudioUrl,
         selectedText,
         getVoiceLabel(readyJob?.voice, uiLang),

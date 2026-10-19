@@ -11,10 +11,13 @@ use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
+use App\Support\PieceCheck;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
+use App\Support\UsageEstimator;
+use App\Support\VoiceTier;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -459,14 +462,14 @@ class GeminiTtsProvider implements TtsProviderInterface
      * Get an available API key via GeminiKeyManager.
      *
      * @return array{key: string, name: string, index: int}
-     * @throws \RuntimeException if no keys available
+     * @throws GeminiKeysOutException if no keys available
      */
     private function getAvailableKey(): array
     {
         $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel)
             ?? ($this->getKeyManager()->keysInOrder($this->currentModel)[0] ?? null);
         if ($keyInfo === null) {
-            throw new \RuntimeException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
+            throw new GeminiKeysOutException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
         }
         $this->currentKeyInfo = $keyInfo;
         return $keyInfo;
@@ -620,9 +623,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         // Long outputs end with finishReason OTHER and no audio, so long
         // texts are read in pieces and the audio is joined.
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
-        $payloads = [];
-        $groups = [];
-        $pauses = [];
+        $pieces = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
             // Read 4 at a time: earlier rounds stay full, the last one shares the rest.
@@ -630,25 +631,84 @@ class GeminiTtsProvider implements TtsProviderInterface
                 ? TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4)))
                 : [['text' => $part['text'], 'gap' => '']];
             foreach ($chunks as $chunk) {
-                $performed = GeminiVocalTags::forPerformance($chunk['text'], $partStyle);
-                $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
-                // The part of the script it reads ([whispering] …): each part keeps its own level.
-                $groups[] = (int) $partIndex;
-                // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
-                $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
+                $pieces[] = [(int) $partIndex, $chunk, $partStyle];
             }
         }
 
+        $payloads = [];
+        $groups = [];
+        $pauses = [];
+        $texts = [];
+        $inPart = array_count_values(array_column($pieces, 0));
+        $seen = [];
+        foreach ($pieces as [$partIndex, $chunk, $partStyle]) {
+            // The pieces one stretch of the script (one direction) is cut into are told they
+            // are one reading; a mood tag's own part changes the delivery on purpose.
+            $n = $seen[$partIndex] = ($seen[$partIndex] ?? -1) + 1;
+            $style = $inPart[$partIndex] > 1 && GeminiTtsModel::usesStructuredSpeech($model) ? self::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle;
+            $performed = GeminiVocalTags::forPerformance($chunk['text'], $style);
+            $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
+            // The part of the script it reads ([whispering] …): each part keeps its own level.
+            $groups[] = $partIndex;
+            // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
+            $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
+            // What its take is checked against (PieceCheck): the seconds its text needs, and its part.
+            $texts[] = self::pieceText($chunk['text'], $speed, $voiceConfig) + ['part' => $partIndex];
+        }
+
+        $checked = null;
         if (count($payloads) === 1) {
             $audio = $this->requestAudio($endpoint, $payloads[0]);
             $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
         } else {
-            $filename = $this->saveJoinedAudio($this->joinAudioParts($this->requestAudioParts($endpoint, $payloads), $groups, $pauses));
+            $checked = PieceCheck::emptyReport();
+            $texts = config('services.gemini_tts.check_pieces', true) ? $texts : [];
+            $filename = $this->saveJoinedAudio($this->joinAudioParts($this->requestAudioParts($endpoint, $payloads, $texts, $checked), $groups, $pauses));
+            if ($checked['retaken'] > 0) {
+                Log::info('Gemini TTS: pieces of a long voice were taken again.', $checked);
+            }
         }
 
         return [
             'audio_path' => $filename,
             'duration_seconds' => $this->estimateDurationSeconds($text),
+        ] + ($checked !== null ? ['pieces_check' => $checked] : []);
+    }
+
+    /**
+     * Piece $n of the $count a long stretch of text (one direction) is cut
+     * into is told it is one part of a single reading by one speaker: the
+     * same voice, accent, pace, energy and tone as the rest, carrying on from
+     * the part before and into the next. It is part of the direction, which
+     * the voice never reads aloud.
+     */
+    public static function continuing(string $style, int $n, int $count): string
+    {
+        $line = 'This is part '.($n + 1).' of '.$count.' of one continuous recording, read in one sitting by the same speaker: '
+            .'keep exactly the same voice, accent, pace, energy and tone as in the rest of it.';
+        if ($n > 0) {
+            $line .= ' It carries straight on from the part before it, so do not start it as a new opening.';
+        }
+        if ($n < $count - 1) {
+            $line .= ' The recording goes on after it, so do not close it as an ending.';
+        }
+
+        return trim($style) === '' ? $line : trim($style)."\n".$line;
+    }
+
+    /**
+     * What a piece's take is checked against (PieceCheck): the seconds its
+     * text needs on a premium voice at this pace and with these settings, and
+     * whether it asks for pauses.
+     *
+     * @param  array<string, mixed>  $voiceConfig
+     * @return array{expected: float, pauses: bool}
+     */
+    public static function pieceText(string $text, float $speed, array $voiceConfig): array
+    {
+        return [
+            'expected' => UsageEstimator::rawSeconds(UsageEstimator::features($text), VoiceTier::HD, $speed > 0 ? $speed : 1.0, $voiceConfig),
+            'pauses' => preg_match('/<(?:short|long) pause>|\[(?:short|long) pause\]/u', $text) === 1,
         ];
     }
 
@@ -661,18 +721,28 @@ class GeminiTtsProvider implements TtsProviderInterface
      * retry budget runs from the start of each batch, so a long text's earlier
      * batches never use it up for a later piece.
      *
+     * Each round's pieces are checked before they are handed over
+     * (PieceCheck, when $texts says what each one's text needs): one that
+     * stands out is taken once more and the better take is kept; $report
+     * counts them.
+     *
      * @param  array<int, array<string, mixed>>  $payloads
+     * @param  array<int, array{expected: float, pauses: bool, part: int}>  $texts
+     * @param  array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>}|null  $report
      * @return \Generator<int, array{bytes:string,mime_type:?string}>
      */
-    private function requestAudioParts(string $endpoint, array $payloads): \Generator
+    private function requestAudioParts(string $endpoint, array $payloads, array $texts = [], ?array &$report = null): \Generator
     {
         $timeout = (int) config('services.gemini_tts.timeout_seconds', 60);
         $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
         $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
         $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
         $answeredBy = [];
+        $history = ['paces' => [], 'pitches' => []];
+        $report ??= PieceCheck::emptyReport();
 
         foreach (array_chunk($payloads, $parallel, true) as $batch) {
+            $ready = [];
             // The key in use now: after a piece hit a key's limit, the next one.
             $keyInfo = $this->currentKeyInfo ?? $this->getAvailableKey();
             $startedAt = microtime(true);
@@ -705,7 +775,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                     }
                     if ($part !== null) {
                         $response = null;
-                        yield $index => $part;
+                        $ready[$index] = $part;
                         $part = null;
 
                         continue;
@@ -728,15 +798,29 @@ class GeminiTtsProvider implements TtsProviderInterface
                 }
 
                 $response = null;
-                $part = $this->requestAudio($endpoint, $payload);
+                $ready[$index] = $this->requestAudio($endpoint, $payload);
                 $answeredBy[$index] = ($this->currentKeyInfo ?? $keyInfo)['name'];
-                yield $index => $part;
-                $part = null;
             }
+            unset($responses);
+
+            // The round's takes, checked against their texts and the voice so far:
+            // one that stands out is taken once more, and the better one is kept.
+            if ($texts !== []) {
+                $ready = PieceCheck::review($ready, array_intersect_key($texts, $ready), function (int $index) use ($endpoint, $payloads, &$answeredBy): array {
+                    $again = $this->requestAudio($endpoint, $payloads[$index]);
+                    $answeredBy['retake-'.$index] = ($this->currentKeyInfo ?? $this->getAvailableKey())['name'];
+
+                    return $again;
+                }, $history, $report);
+            }
+            foreach ($ready as $index => $part) {
+                unset($ready[$index]);
+                yield $index => $part;
+            }
+            $part = null;
             // The client's pooled requests hold themselves in reference cycles: without
             // this, every batch's replies (3-4 MB of base64 each) stay in memory until
             // the whole text is read, and an hour of them is too much for live.
-            unset($responses);
             gc_collect_cycles();
         }
 
@@ -753,16 +837,17 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * A piece came back with its key's limit (429) or with the key refused: the
-     * key is set aside (for the minute, or for the day after a daily quota or a
-     * refusal) and the next request goes to another key, when there is one.
-     * False for any other error.
+     * key is set aside (for the minute, for the day after a daily quota or a
+     * refusal, or for an hour after its spending cap) and the next request goes
+     * to another key, when there is one. False for any other error.
      */
     private function setKeyAside(Response $response, array $keyInfo, string $endpoint): bool
     {
         $status = $response->status();
         $body = (string) $response->body();
         $badKey = GeminiKeyManager::isKeyProblem($status, $body);
-        if ($status !== 429 && ! $badKey) {
+        $spendingCap = GeminiKeyManager::isSpendingCapError($status, $body);
+        if ($status !== 429 && ! $badKey && ! $spendingCap) {
             return false;
         }
 
@@ -771,6 +856,9 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $keyInfo['name'],
                 GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
             );
+        }
+        if ($spendingCap) {
+            $this->getKeyManager()->markOutForSpendingCap($keyInfo['name']);
         }
 
         // Once for the batch: its other pieces went on the same key.
@@ -1374,6 +1462,9 @@ class GeminiTtsProvider implements TtsProviderInterface
         $maxAttempts = count($this->getKeyManager()->getAllKeys());
         $attempts = 0;
         $tried = [];
+        // Keys that answered with a limit that outlasts the minute: the day's
+        // quota, the spending cap, or a refusal of the key itself.
+        $keysOut = 0;
 
         while ($attempts < $maxAttempts) {
             // Get current available key (already set in synthesize, or get a new one)
@@ -1407,11 +1498,18 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
 
             // A used-up daily quota stays skipped until Google resets it.
-            if (GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body())) {
+            $dailyQuota = GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body());
+            if ($dailyQuota) {
                 $this->getKeyManager()->markOutForToday(
                     $keyInfo['name'],
                     GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
                 );
+            }
+
+            // A spending cap stops every model on the key, and not for a minute.
+            $spendingCap = GeminiKeyManager::isSpendingCapError($response->status(), (string) $response->body());
+            if ($spendingCap) {
+                $this->getKeyManager()->markOutForSpendingCap($keyInfo['name']);
             }
 
             // A key Google refuses (invalid, expired, blocked) is set aside for
@@ -1428,9 +1526,12 @@ class GeminiTtsProvider implements TtsProviderInterface
                     GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
                 );
             }
+            if ($dailyQuota || $spendingCap || $badKey) {
+                $keysOut++;
+            }
 
-            // On 429 or a refused key, rotate to next key and retry
-            if (($response->status() === 429 || $badKey) && $attempts < $maxAttempts) {
+            // On 429, a spending cap or a refused key, rotate to next key and retry
+            if (($response->status() === 429 || $spendingCap || $badKey) && $attempts < $maxAttempts) {
                 Log::warning('Gemini TTS key hit 429, rotating to next key.', [
                     'key' => $keyInfo['name'],
                     'attempts' => $attempts,
@@ -1441,6 +1542,12 @@ class GeminiTtsProvider implements TtsProviderInterface
                     break; // No more keys available
                 }
                 continue;
+            }
+
+            // Every key answered with a limit that lasts: the member is told the
+            // limit is ours, not that the voices are busy for a minute.
+            if ($keysOut === $maxAttempts) {
+                throw new GeminiKeysOutException('Every Gemini TTS API key is out (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
             }
 
             if ($response->serverError()) {
@@ -1469,7 +1576,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             return $json;
         }
 
-        // All keys exhausted
+        // All keys exhausted: for the minute, or for longer when each one tried was out.
+        if ($keysOut > 0 && $keysOut === $attempts) {
+            throw new GeminiKeysOutException('Every Gemini TTS API key is out (their daily quota, spending cap or a refused key).');
+        }
         throw new \RuntimeException('All Gemini TTS API keys exhausted (429 rate limit). Add more keys or wait for limits to reset.');
     }
 
@@ -1480,7 +1590,7 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $blockReason = $response['promptFeedback']['blockReason'] ?? null;
         if (is_string($blockReason) && $blockReason !== '') {
-            throw new \RuntimeException('Gemini TTS blocked the prompt: ' . $blockReason);
+            throw new GeminiTextRefusedException('Gemini TTS blocked the prompt: ' . $blockReason);
         }
 
         $candidates = $response['candidates'] ?? [];
@@ -1490,7 +1600,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $finishReason = (string) ($candidates[0]['finishReason'] ?? '');
         if (in_array($finishReason, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'], true)) {
-            throw new \RuntimeException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
+            throw new GeminiTextRefusedException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
         }
 
         // Stopped at the output limit: the audio ends mid-sentence. It is asked

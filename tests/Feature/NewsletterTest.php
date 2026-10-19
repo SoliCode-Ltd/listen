@@ -218,6 +218,48 @@ class NewsletterTest extends TestCase
         $this->assertSame($free->email, 'lina@example.com');
     }
 
+    public function test_off_the_live_site_members_are_never_emailed_but_an_example_is(): void
+    {
+        Mail::fake();
+        config(['listen.live_actions' => false]);
+        $member = User::factory()->create(['email' => 'copy@example.com']);
+        $newsletter = Newsletter::query()->create(Newsletter::defaultAttributes());
+        $sender = app(NewsletterSender::class);
+
+        foreach ([
+            fn () => $sender->sendToAudience($newsletter, true),
+            fn () => $sender->queueNextBatch($newsletter, 10, true),
+        ] as $send) {
+            try {
+                $send();
+                $this->fail('Members must not be emailed from a server that is not the live site.');
+            } catch (RuntimeException $exception) {
+                $this->assertStringContainsString('not the live site', $exception->getMessage());
+            }
+        }
+        $this->assertSame(0, $newsletter->deliveries()->count());
+
+        // Mail the live site had queued when its members were copied here stays queued.
+        NewsletterDelivery::query()->create([
+            'newsletter_id' => $newsletter->id, 'user_id' => $member->id, 'email' => 'copy@example.com',
+            'locale' => Newsletter::LANGUAGE_BOTH, 'is_test' => false, 'status' => NewsletterDelivery::STATUS_QUEUED,
+        ]);
+        $this->assertSame(0, $sender->drain(10));
+        try {
+            $sender->sendNow($newsletter->fresh(), 10, true);
+            $this->fail('Queued mail must not go out from a server that is not the live site.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('not the live site', $exception->getMessage());
+        }
+        Mail::assertNothingSent();
+        $this->assertSame(1, $newsletter->queuedDeliveries()->count());
+
+        // An example to your own address still goes out.
+        $sender->sendExample($newsletter, 'owner@example.com', Newsletter::LANGUAGE_EN);
+        Mail::assertSent(NewsletterMail::class, 1);
+        Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo('owner@example.com'));
+    }
+
     public function test_unsubscribe_link_suppresses_the_address(): void
     {
         $user = User::factory()->create(['email' => 'reader@example.com']);

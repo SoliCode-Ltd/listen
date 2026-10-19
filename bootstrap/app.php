@@ -86,6 +86,13 @@ return Application::configure(basePath: dirname(__DIR__))
             before: \App\Http\Middleware\AuthenticateApiKey::class,
             prepend: \App\Http\Middleware\ApiRequestContext::class,
         );
+        // A friend opening a referral link is not signed in yet: the visit is recorded
+        // (and the referral cookie set) before 'auth' sends them to sign in. Without
+        // this, Laravel's priority order runs 'auth' first and the referral is lost.
+        $middleware->prependToPriorityList(
+            before: \Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests::class,
+            prepend: \App\Http\Middleware\CaptureReferralVisit::class,
+        );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // Developer API (/v1): every error in one JSON shape, never an HTML page.

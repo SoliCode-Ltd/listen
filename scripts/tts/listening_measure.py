@@ -2,8 +2,9 @@
 """For the "Listening test" workflow: saves each recording the staging run
 returned and measures it with ffmpeg: integrated loudness (LUFS), true peak
 (dBTP), loudness range, length, and the pauses inside it (silences of 0.15 s
-or more below -40 dB, leaving out the start and the end). Writes summary.md
-next to the recordings and prints it.
+or more below -40 dB, leaving out the start and the end), and for a long voice
+how its pieces were checked as it was made. Writes summary.md next to the
+recordings and prints it.
 
   python3 scripts/tts/listening_measure.py result.jsonl out before
 """
@@ -103,6 +104,17 @@ def main():
         for row in compared:
             s = row['sample']
             lines.append(f"- {row['id'][:2]}-sample: {s.get('length')} s, {s.get('lufs')} LUFS, true peak {s.get('true_peak')} dBTP")
+    checked = [r for r in rows if r.get('pieces_check')]
+    if checked:
+        lines += ['', 'How the pieces of each long voice were checked as it was made (PieceCheck): pieces taken again and why,',
+                  'and how far the kept pieces stray from the voice (the worst piece, against the median of its direction):', '']
+        for row in checked:
+            c = row['pieces_check']
+            reasons = ', '.join(f'{k} {v}' for k, v in (c.get('reasons') or {}).items())
+            pitch = '-' if c.get('pitch_spread') is None else f"{c['pitch_spread']} semitones"
+            pace = '-' if c.get('pace_spread') is None else f"{round(100 * c['pace_spread'])}%"
+            lines.append(f"- {row['id']}: {c.get('pieces', 0)} pieces, {c.get('retaken', 0)} taken again"
+                         + (f' ({reasons})' if reasons else '') + f", {c.get('kept_retake', 0)} retake(s) kept; pitch {pitch}, pace {pace}")
     lines += ['', '## What to listen for', '']
     for row in rows:
         detail = row.get('refused') or row.get('error') or ''

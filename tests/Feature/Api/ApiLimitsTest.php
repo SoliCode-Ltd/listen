@@ -39,13 +39,13 @@ class ApiLimitsTest extends TestCase
     {
         $user = $this->apiMember();
         ['key' => $key, 'plain' => $plain] = $this->issueKey($user);
-        CreditPeriod::counter($user->id)->update(['total_chars' => 90000 - 44]);
+        CreditPeriod::counter($user->id)->update(['total_chars' => 90000 - 59]);
 
         $response = $this->speak($plain, $this->premiumVoice());
 
         $this->assertApiError($response, 402, 'quota_exceeded', 'quota_error')
-            ->assertJsonPath('error.credits_needed', 45);
-        $this->assertSame(90000 - 44, $this->creditsSpent($user), 'nothing more is spent');
+            ->assertJsonPath('error.credits_needed', 60);
+        $this->assertSame(90000 - 59, $this->creditsSpent($user), 'nothing more is spent');
         $this->assertSame(0, $this->requestsCounted($user));
         $this->assertSame(0, $this->keyCreditsSpent($key));
         $this->assertSame(0, AudioGeneration::query()->count());
@@ -58,11 +58,11 @@ class ApiLimitsTest extends TestCase
      */
     public function test_the_last_credits_can_be_spent_and_then_the_plan_stops(): void
     {
-        $this->audioSeconds = 3;
+        $this->audioSeconds = 4;
         $user = $this->apiMember();
         $plain = $this->issueKey($user)['plain'];
         $voice = $this->premiumVoice();
-        CreditPeriod::counter($user->id)->update(['total_chars' => 90000 - 45]);
+        CreditPeriod::counter($user->id)->update(['total_chars' => 90000 - 60]);
 
         $this->speak($plain, $voice)->assertOk()->assertHeader('X-Credits-Remaining', '0');
         $this->assertApiError($this->speak($plain, $voice, ['text' => 'One more, please.']), 402, 'quota_exceeded');

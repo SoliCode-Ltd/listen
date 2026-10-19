@@ -184,7 +184,14 @@ class TtsService
         // throws here, so a failure is never cached).
         $result = $this->routingService->synthesize($text, $targetLanguage, $voiceConfig, $plan, $userId);
 
-        $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
+        // The saved copy is shared by everyone who makes the same text the same way.
+        // One made from this take is this member's voice too, so its address goes back
+        // and deleting the voice deletes it (a copy that is gone is made again).
+        $copied = false;
+        $cachePath = $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage, $copied);
+        if ($copied) {
+            $result['cache_path'] = $cachePath;
+        }
 
         return $result;
     }
@@ -570,7 +577,8 @@ class TtsService
         return null;
     }
 
-    private function storeInCache(string $sourcePath, string $hash, string $targetLanguage): string
+    /** $copied says whether this call made the saved copy (there was none yet). */
+    private function storeInCache(string $sourcePath, string $hash, string $targetLanguage, bool &$copied = false): string
     {
         $disk = Storage::disk('public');
         $extension = strtolower((string) pathinfo($sourcePath, PATHINFO_EXTENSION));
@@ -592,6 +600,7 @@ class TtsService
 
                 return $sourcePath;
             }
+            $copied = true;
         }
 
         return $cachePath;

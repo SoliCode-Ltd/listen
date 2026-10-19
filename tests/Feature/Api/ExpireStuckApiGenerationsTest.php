@@ -44,7 +44,7 @@ class ExpireStuckApiGenerationsTest extends TestCase
         $voice = $this->premiumVoice();
         $this->speak($plain, $voice, ['text' => 'A finished one.'])->assertOk();
         $id = $this->speakAsync($plain, $voice)->assertStatus(202)->json('history_item_id');
-        $this->assertSame([105, 2, 7], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)]);
+        $this->assertSame([120, 2, 8], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)]);
 
         $this->travel(61)->minutes();
         $this->artisan('api:expire-stuck-generations')->expectsOutput('Expired 1 stuck API generation(s).')->assertSuccessful();
@@ -76,7 +76,7 @@ class ExpireStuckApiGenerationsTest extends TestCase
 
         $this->travel(59)->minutes();
         $this->artisan('api:expire-stuck-generations')->expectsOutput('Expired 0 stuck API generation(s).');
-        $this->assertSame(['queued', 45], [AudioGeneration::query()->findOrFail($id)->status, $this->creditsSpent($user)]);
+        $this->assertSame(['queued', 60], [AudioGeneration::query()->findOrFail($id)->status, $this->creditsSpent($user)]);
 
         $this->travel(2)->minutes();
         $this->artisan('api:expire-stuck-generations')->expectsOutput('Expired 1 stuck API generation(s).');
