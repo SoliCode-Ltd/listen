@@ -505,7 +505,7 @@ function createContextMenu() {
     return contextMenuInitPromise;
   }
 
-  const menuTitle = chrome.i18n.getMessage('contextMenuTitle') || 'Listen Selected Text';
+  const menuTitle = chrome.i18n.getMessage('contextMenuTitle') || 'Listen to the selected text';
 
   contextMenuInitPromise = new Promise((resolve) => {
     chrome.contextMenus.removeAll(() => {
