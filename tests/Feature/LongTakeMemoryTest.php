@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\AudioDuration;
 use App\Support\AudioFormats;
+use App\Support\JoinPauses;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -23,6 +24,9 @@ class LongTakeMemoryTest extends TestCase
 
     private const PCM_BYTES = self::PIECES * self::PIECE_SECONDS * 24000 * 2;
 
+    /** At each join a piece's own 0.09 s of quiet after its last syllable gives way to the sentence pause. */
+    private const JOINED_SECONDS = self::PIECES * self::PIECE_SECONDS + (self::PIECES - 1) * (JoinPauses::SENTENCE - 0.09);
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -37,7 +41,7 @@ class LongTakeMemoryTest extends TestCase
         // Well under one copy: only a batch of pieces and small buffers are ever held.
         $this->assertLessThan((int) (0.25 * self::PCM_BYTES), $peak, 'peak '.round($peak / 1048576).' MB above the start');
         $this->assertSame(AudioFormats::serverCanConvert() ? 'mp3' : 'wav', pathinfo($path, PATHINFO_EXTENSION));
-        $this->assertEqualsWithDelta(self::PIECES * self::PIECE_SECONDS + (self::PIECES - 1) * 0.3, AudioDuration::ofStoredFile($path), 2.0);
+        $this->assertEqualsWithDelta(self::JOINED_SECONDS, AudioDuration::ofStoredFile($path), 2.0);
     }
 
     public function test_without_ffmpeg_an_hour_is_saved_as_wav_in_a_fraction_of_its_size(): void
@@ -49,7 +53,7 @@ class LongTakeMemoryTest extends TestCase
         $this->assertLessThan((int) (0.25 * self::PCM_BYTES), $peak, 'peak '.round($peak / 1048576).' MB above the start');
         $this->assertStringEndsWith('.wav', $path);
         // Measured from its header, not read whole.
-        $this->assertEqualsWithDelta(self::PIECES * self::PIECE_SECONDS + (self::PIECES - 1) * 0.3, AudioDuration::ofStoredFile($path), 0.01);
+        $this->assertEqualsWithDelta(self::JOINED_SECONDS, AudioDuration::ofStoredFile($path), 0.01);
     }
 
     /**
@@ -61,7 +65,9 @@ class LongTakeMemoryTest extends TestCase
     private function saveAnHour(): array
     {
         $provider = app(GeminiTtsProvider::class);
-        $save = \Closure::bind(fn (iterable $parts): string => $this->saveJoinedAudio($this->joinAudioParts($parts)), $provider, GeminiTtsProvider::class);
+        // Joined as a long text is: each piece's own quiet cut at the join, a sentence's pause between.
+        $pauses = array_fill(0, self::PIECES, JoinPauses::SENTENCE);
+        $save = \Closure::bind(fn (iterable $parts): string => $this->saveJoinedAudio($this->joinAudioParts($parts, [], $pauses)), $provider, GeminiTtsProvider::class);
         $second = $this->speechLikeSecond();
         $pieces = (function () use ($second): \Generator {
             for ($i = 0; $i < self::PIECES; $i++) {

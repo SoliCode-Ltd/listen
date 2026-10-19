@@ -10,6 +10,7 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
+use App\Support\JoinPauses;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
@@ -374,20 +375,23 @@ class VoiceCloningService
         $chunks = [];
         $styles = [];
         $groups = [];
+        $pauses = [];
         foreach ($parts as $partIndex => $part) {
-            foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
-                $performed = GeminiVocalTags::forPerformance($chunk, GeminiVocalTags::withCues($style, $part['cues']));
+            foreach (TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
+                $performed = GeminiVocalTags::forPerformance($chunk['text'], GeminiVocalTags::withCues($style, $part['cues']));
                 $chunks[] = $performed['text'];
                 $styles[] = $performed['style'];
                 // The part of the script it reads: each part keeps its own level.
                 $groups[] = (int) $partIndex;
+                // The pause after it, from where its text ends (JoinPauses).
+                $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
             }
         }
         // Written to a file piece by piece as they come, packaged from there and
         // streamed to the disk: a long script is never held whole.
         $joined = SpeechJoin::toFile(count($chunks) === 1
             ? [$this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])]
-            : $this->speakPieces($chunks, $voiceCloningKey, $styles), [], $groups);
+            : $this->speakPieces($chunks, $voiceCloningKey, $styles), $pauses, $groups, SpeechJoin::PAUSE, true);
         $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
         try {
             $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);

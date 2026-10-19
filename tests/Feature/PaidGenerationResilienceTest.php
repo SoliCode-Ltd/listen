@@ -315,22 +315,27 @@ class PaidGenerationResilienceTest extends TestCase
         Storage::disk('public')->assertExists($result['audio_path']);
     }
 
-    public function test_pieces_are_joined_into_one_wav_with_a_pause(): void
+    public function test_pieces_are_joined_into_one_wav_with_the_pause_their_text_calls_for(): void
     {
         $provider = app(\App\Services\Tts\GeminiTtsProvider::class);
         $join = new \ReflectionMethod($provider, 'joinAudioParts');
-        $first = pack('v*', 1, 2, 3);
-        $second = pack('v*', 4, 5);
+        // Each piece: 0.25 s of quiet, 0.1 s of voice, 0.2 s of quiet (L16, then WAV).
+        $voice = pack('v*', ...array_map(fn (int $i): int => (int) round(8000 * sin($i / 10)), range(0, 2399)));
+        $piece = str_repeat("\0", 2 * 6000).$voice.str_repeat("\0", 2 * 4800);
 
         $joined = $join->invoke($provider, [
-            ['bytes' => $first, 'mime_type' => 'audio/L16;codec=pcm;rate=24000'],
-            ['bytes' => WavPcm::header(strlen($second), 24000).$second, 'mime_type' => 'audio/wav'],
-        ]);
+            ['bytes' => $piece, 'mime_type' => 'audio/L16;codec=pcm;rate=24000'],
+            ['bytes' => WavPcm::header(strlen($piece), 24000).$piece, 'mime_type' => 'audio/wav'],
+        ], [0, 0], [\App\Support\JoinPauses::SENTENCE, \App\Support\JoinPauses::SENTENCE]);
 
-        $pause = str_repeat("\0", 7200 * 2);
+        // The first piece's quiet after its voice is cut to 40 ms, the second's before it to
+        // 20 ms, and silence makes up the rest of the sentence pause (0.45 s): before, every
+        // join was a fixed 0.3 s on top of both pieces' own quiet.
+        $between = str_repeat("\0", 2 * (int) round(0.45 * 24000));
+        $expected = str_repeat("\0", 2 * 6000).$voice.$between.$voice.str_repeat("\0", 2 * 4800);
         $this->assertSame('audio/wav', $joined['mime_type']);
-        $this->assertSame(WavPcm::header(strlen($first.$pause.$second), 24000).$first.$pause.$second, file_get_contents($joined['path']));
-        $this->assertSame([[0, 3, 0], [7203, 7205, 0]], $joined['pieces'], 'where each piece sits, for levelling');
+        $this->assertSame(WavPcm::header(strlen($expected), 24000).$expected, file_get_contents($joined['path']));
+        $this->assertSame([[0, 6000 + 2400 + 960, 0], [6000 + 2400 + 10800 - 480, 6000 + 2400 + 10800 + 2400 + 4800, 0]], $joined['pieces'], 'where each piece sits, for levelling');
         unlink($joined['path']);
     }
 
@@ -341,7 +346,7 @@ class PaidGenerationResilienceTest extends TestCase
         $join = \Closure::bind(fn (int $pieces, int $bytes): array => $this->joinAudioParts(array_map(
             fn (): array => ['bytes' => WavPcm::header($bytes, 24000).str_repeat("\1\0", intdiv($bytes, 2)), 'mime_type' => 'audio/wav'],
             range(1, $pieces),
-        )), $provider, \App\Services\Tts\GeminiTtsProvider::class);
+        ), [], array_fill(0, $pieces, \App\Support\JoinPauses::SENTENCE)), $provider, \App\Services\Tts\GeminiTtsProvider::class);
         $total = 24 * 2_000_000;
 
         gc_collect_cycles();

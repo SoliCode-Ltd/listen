@@ -9,6 +9,7 @@ use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
+use App\Support\JoinPauses;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
@@ -620,17 +621,20 @@ class GeminiTtsProvider implements TtsProviderInterface
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
         $payloads = [];
         $groups = [];
+        $pauses = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
             // Read 4 at a time: earlier rounds stay full, the last one shares the rest.
             $chunks = mb_strlen($part['text']) > $maxChars
-                ? TextChunker::split($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4)))
-                : [$part['text']];
+                ? TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4)))
+                : [['text' => $part['text'], 'gap' => '']];
             foreach ($chunks as $chunk) {
-                $performed = GeminiVocalTags::forPerformance($chunk, $partStyle);
+                $performed = GeminiVocalTags::forPerformance($chunk['text'], $partStyle);
                 $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
                 // The part of the script it reads ([whispering] …): each part keeps its own level.
                 $groups[] = (int) $partIndex;
+                // The pause after it, from where its text ends: a sentence, a comma, a line, or mid-sentence.
+                $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
             }
         }
 
@@ -638,7 +642,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             $audio = $this->requestAudio($endpoint, $payloads[0]);
             $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
         } else {
-            $filename = $this->saveJoinedAudio($this->joinAudioParts($this->requestAudioParts($endpoint, $payloads), $groups));
+            $filename = $this->saveJoinedAudio($this->joinAudioParts($this->requestAudioParts($endpoint, $payloads), $groups, $pauses));
         }
 
         return [
@@ -773,18 +777,21 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * Join the pieces into one WAV file with a short pause between them. Each
+     * Join the pieces into one WAV file with a pause between them: the one
+     * their text calls for (JoinPauses), each piece's own quiet cut at the
+     * join so that pause is the whole pause; 0.3 s when none is given. Each
      * piece is written as it comes and let go (SpeechJoin), so a long text
      * (50,000 characters is close to an hour of audio) is never held whole
      * within the web server's memory limit.
      *
      * @param  iterable<int, array{bytes:string,mime_type:?string}>  $parts
      * @param  array<int, int>  $groups  the part of the script each piece reads
+     * @param  array<int, float>  $pauses  seconds of pause after each piece
      * @return array{path:string,mime_type:string,pieces:array<int, array{0:int,1:int,2:int}>}
      */
-    private function joinAudioParts(iterable $parts, array $groups = []): array
+    private function joinAudioParts(iterable $parts, array $groups = [], array $pauses = []): array
     {
-        return SpeechJoin::toFile(is_array($parts) ? SpeechJoin::draining($parts) : $parts, [], $groups);
+        return SpeechJoin::toFile(is_array($parts) ? SpeechJoin::draining($parts) : $parts, $pauses, $groups, SpeechJoin::PAUSE, $pauses !== []);
     }
 
     /**

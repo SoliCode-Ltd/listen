@@ -16,14 +16,25 @@ final class SpeechJoin
     public const PAUSE = 0.3;
 
     /**
+     * At a join, a piece's own quiet is cut to this much before its first
+     * word and after its last (so no breath or decay is clipped), and the
+     * pause is made up to its length with silence.
+     */
+    private const KEEP_BEFORE = 0.02;
+
+    private const KEEP_AFTER = 0.04;
+
+    /**
      * @param  iterable<int, string|array{bytes: string, mime_type?: ?string}>  $pieces  in reading order
      * @param  array<int, float>  $pauses  seconds of quiet after piece $k (by its key); $pause when not given
      * @param  array<int, int>  $groups  the part of the script piece $k reads (by its key)
+     * @param  bool  $trimJoins  cut each piece's own quiet at a join, so the pause is the whole pause
+     *                           between the last word of one piece and the first of the next
      * @return array{path: string, mime_type: string, pieces: array<int, array{0: int, 1: int, 2: int}>}
      *         the temp file (the caller removes it) and, for a WAV, where each piece sits in it:
      *         its first frame, the frame after its last one, and its part
      */
-    public static function toFile(iterable $pieces, array $pauses = [], array $groups = [], float $pause = self::PAUSE): array
+    public static function toFile(iterable $pieces, array $pauses = [], array $groups = [], float $pause = self::PAUSE, bool $trimJoins = false): array
     {
         $path = (string) tempnam(sys_get_temp_dir(), 'listen-take-');
         $file = fopen($path, 'w+b');
@@ -35,6 +46,9 @@ final class SpeechJoin
         $asIs = null;
         $spans = [];
         $previous = null;
+        // The previous piece's quiet after its last word: cut once another piece follows.
+        $tailCut = 0;
+        $tailKept = 0.0;
 
         try {
             foreach ($pieces as $key => $piece) {
@@ -58,13 +72,38 @@ final class SpeechJoin
                     self::write($file, $bytes);
                 } else {
                     $frame = 2 * $format['channels'];
+                    $rate = $format['rate'];
+                    $from = 0;
+                    $to = intdiv($pcm['length'], $frame);
+                    $leadKept = 0.0;
+                    $nextTailCut = 0;
+                    $nextTailKept = 0.0;
+                    if ($trimJoins && ($sound = self::sound($bytes, $pcm)) !== null) {
+                        if ($previous !== null) {
+                            $from = max(0, $sound[0] - (int) round(self::KEEP_BEFORE * $rate));
+                            $leadKept = ($sound[0] - $from) / $rate;
+                        }
+                        $end = min($to, $sound[1] + (int) round(self::KEEP_AFTER * $rate));
+                        $nextTailCut = ($to - $end) * $frame;
+                        $nextTailKept = ($end - $sound[1]) / $rate;
+                    }
                     if ($previous !== null) {
-                        self::write($file, str_repeat("\0", (int) round(($pauses[$previous] ?? $pause) * $format['rate']) * $frame));
+                        if ($tailCut > 0) {
+                            // Another piece follows: the previous one's quiet after its last word goes.
+                            $size = (int) ftell($file) - $tailCut;
+                            if (! ftruncate($file, $size) || fseek($file, $size) !== 0) {
+                                throw new \RuntimeException('The voice file could not be saved.');
+                            }
+                            $spans[count($spans) - 1][1] -= intdiv($tailCut, $frame);
+                        }
+                        $quiet = ($pauses[$previous] ?? $pause) - ($trimJoins ? $tailKept + $leadKept : 0.0);
+                        self::write($file, str_repeat("\0", (int) round(max(0.0, $quiet) * $rate) * $frame));
                     }
                     $start = intdiv((int) ftell($file) - WavPcm::HEADER_BYTES, $frame);
-                    $length = $pcm['length'];
-                    self::write($file, $pcm['offset'] === 0 && $length === strlen($bytes) ? $bytes : substr($bytes, $pcm['offset'], $length));
-                    $spans[] = [$start, $start + intdiv($length, $frame), (int) ($groups[$key] ?? 0)];
+                    $length = ($to - $from) * $frame;
+                    self::write($file, $pcm['offset'] === 0 && $length === strlen($bytes) ? $bytes : substr($bytes, $pcm['offset'] + $from * $frame, $length));
+                    $spans[] = [$start, $start + ($to - $from), (int) ($groups[$key] ?? 0)];
+                    [$tailCut, $tailKept] = [$nextTailCut, $nextTailKept];
                 }
 
                 unset($bytes, $pcm);
@@ -112,6 +151,36 @@ final class SpeechJoin
             unset($pieces[$key]);
             yield $key => $piece;
             unset($piece);
+        }
+    }
+
+    /**
+     * Where a piece's first word starts and its last one ends (frames), by
+     * the same rule as the take's own edges (ShareableAudio); null when the
+     * piece has no word.
+     *
+     * @param  array{offset: int, length: int, rate: int, channels: int}  $pcm
+     * @return array{0: int, 1: int}|null
+     */
+    private static function sound(string $bytes, array $pcm): ?array
+    {
+        $source = fopen('php://memory', 'w+b');
+        if ($source === false || fwrite($source, $bytes) !== strlen($bytes)) {
+            return null;
+        }
+
+        try {
+            $frames = intdiv($pcm['length'], 2 * $pcm['channels']);
+            $first = ShareableAudio::firstSound($source, $pcm, 0, $frames);
+            if ($first === null) {
+                return null;
+            }
+            // A last word of just 80 ms may be missed counting back: then the piece keeps its end.
+            $last = ShareableAudio::lastSound($source, $pcm, $first, $frames) ?? $frames;
+
+            return [$first, max($last, $first + 1)];
+        } finally {
+            fclose($source);
         }
     }
 
