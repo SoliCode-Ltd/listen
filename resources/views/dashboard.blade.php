@@ -24,6 +24,7 @@
       margin-top: 1.15rem;
     }
     .vc-count { font-size: .9rem; color: var(--muted); margin: 0; white-space: nowrap; }
+    .vc-count-note { flex-basis: 100%; font-size: .85rem; color: var(--muted); margin: 0; }
     .vc-reconsent-banner {
       display: flex;
       align-items: flex-start;
@@ -2936,6 +2937,7 @@
             @endif
             @if($vcStudioOpen)
             <div class="vc-count">{{ __('ui.voice_cloning.voice_count', ['count' => $voiceCloningCount, 'max' => $voiceCloningMaxVoices]) }}</div>
+            <p class="vc-count-note" id="vcDeletedNote" aria-live="polite" @if(($voiceCloningDeletedNote ?? '') === '') hidden @endif>{{ $voiceCloningDeletedNote ?? '' }}</p>
             @endif
           </div>
           @endif
@@ -5072,7 +5074,7 @@
         else if (payload.failure_detail !== undefined) ensureTechDetail(card, payload.failure_detail);
         updateProgressUI(card, status, elapsedSeconds, isDelayed, serverProgress);
         setUseButton(card, payload.id || card.dataset.voiceId, status === 'ready');
-        setDeleteButton(card, status !== 'ready');
+        setDeleteButton(card, true);
         if (status !== 'failed') setRetryButton(card, payload.id || card.dataset.voiceId, false);
         else if (payload.can_retry !== undefined) setRetryButton(card, payload.id || card.dataset.voiceId, Boolean(payload.can_retry));
         if (status !== 'failed') setReconsentButton(card, payload.id || card.dataset.voiceId, false);
@@ -6044,7 +6046,17 @@
             if (card) {
               const occupying = String(card.dataset.status || '') !== 'failed';
               card.remove();
-              if (occupying) {
+              // A finished voice keeps its slot for a while after it is deleted,
+              // so the server says how many slots are still in use.
+              if (typeof data.slots_in_use === 'number') {
+                currentVoiceCount = Math.max(0, data.slots_in_use);
+                const note = document.getElementById('vcDeletedNote');
+                if (note) {
+                  note.textContent = String(data.deleted_voice_note || '');
+                  note.hidden = note.textContent === '';
+                }
+                updateCountUI();
+              } else if (occupying) {
                 currentVoiceCount = Math.max(0, currentVoiceCount - 1);
                 updateCountUI();
               }

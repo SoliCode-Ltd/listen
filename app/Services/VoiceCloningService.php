@@ -1099,6 +1099,72 @@ class VoiceCloningService
     }
 
     /**
+     * How long a finished voice the member deleted keeps its plan slot.
+     */
+    public const DELETED_VOICE_SLOT_DAYS = 30;
+
+    /**
+     * The member's voices that use a plan slot: every voice that has not failed,
+     * plus each finished voice they deleted in the last 30 days. Deleting takes
+     * a voice away at once, but its slot comes back only later, so deleting and
+     * cloning again can't make voice after voice.
+     */
+    public static function slotsInUse(int $userId): int
+    {
+        return ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count()
+            + self::deletedVoicesHoldingSlots($userId)->count();
+    }
+
+    /**
+     * When the first slot held by a deleted voice comes back, or null when
+     * none is held.
+     */
+    public static function deletedVoiceSlotFreesAt(int $userId): ?\Carbon\CarbonInterface
+    {
+        $deletedAt = self::deletedVoicesHoldingSlots($userId)->min('deleted_at');
+
+        return $deletedAt ? \Illuminate\Support\Carbon::parse($deletedAt)->addDays(self::DELETED_VOICE_SLOT_DAYS) : null;
+    }
+
+    /**
+     * "A voice you deleted counts until …", or empty when no deleted voice
+     * holds a slot.
+     */
+    public static function deletedVoiceNote(int $userId): string
+    {
+        $freesAt = self::deletedVoiceSlotFreesAt($userId);
+
+        return $freesAt
+            ? __('ui.voice_cloning.deleted_voice_counts', ['date' => $freesAt->locale(app()->getLocale())->translatedFormat('j F Y')])
+            : '';
+    }
+
+    /**
+     * Mark a finished voice as deleted by its owner, before it is purged, so
+     * it keeps its slot. Voices that never finished free theirs at once, and
+     * a voice an admin removes frees its slot too.
+     */
+    public static function markDeletedByMember(ClonedVoice $voice): void
+    {
+        if ($voice->status !== 'ready') {
+            return;
+        }
+
+        $voice->forceFill([
+            'metadata' => array_merge($voice->metadata ?? [], ['deleted_by_member_at' => now()->toIso8601String()]),
+        ])->save();
+    }
+
+    private static function deletedVoicesHoldingSlots(int $userId): \Illuminate\Database\Eloquent\Builder
+    {
+        return ClonedVoice::onlyTrashed()
+            ->forUser($userId)
+            ->where('status', 'ready')
+            ->whereNotNull('metadata->deleted_by_member_at')
+            ->where('deleted_at', '>', now()->subDays(self::DELETED_VOICE_SLOT_DAYS));
+    }
+
+    /**
      * Display progress for a cloning job. It only moves forward within a status.
      */
     public static function progressPercent(string $status, int $elapsedSeconds): int
@@ -1315,7 +1381,8 @@ class VoiceCloningService
     /**
      * The owner can remove any of their voices, finished ones too: the person
      * whose voice it is can withdraw their consent at any time, without
-     * asking support. Removing it frees its plan slot.
+     * asking support. A finished voice keeps its plan slot for 30 days
+     * after it is removed (see slotsInUse).
      */
     public static function canUserDelete(ClonedVoice $voice): bool
     {

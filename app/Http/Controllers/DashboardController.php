@@ -131,9 +131,9 @@ class DashboardController extends Controller
         $voiceCloningVoices = $voiceCloningVisible
             ? ClonedVoice::forUser($userId)->orderByDesc('created_at')->get()
             : collect();
-        $voiceCloningCount = $voiceCloningVisible
-            ? $voiceCloningVoices->reject(fn (ClonedVoice $voice) => $voice->isFailed())->count()
-            : 0;
+        // Finished voices the member deleted keep their slot for a while.
+        $voiceCloningCount = $voiceCloningVisible ? VoiceCloningService::slotsInUse($userId) : 0;
+        $voiceCloningDeletedNote = $voiceCloningVisible ? VoiceCloningService::deletedVoiceNote($userId) : '';
         $voiceCloningMaxVoices = VoiceCloningService::maxVoicesForViewer(auth()->user(), $activePlan);
         $voiceCloningEnabledGlobally = VoiceCloningService::isEnabled();
         $voiceCloningPlanEnabled = VoiceCloningService::planAllows($activePlan);
@@ -214,6 +214,7 @@ class DashboardController extends Controller
             'voiceCloningPlanEnabled' => $voiceCloningPlanEnabled,
             'voiceCloningList' => $voiceCloningVoices,
             'voiceCloningCount' => $voiceCloningCount,
+            'voiceCloningDeletedNote' => $voiceCloningDeletedNote,
             'voiceCloningMaxVoices' => $voiceCloningMaxVoices,
             'voiceCloningMinDuration' => VoiceCloningService::minSampleDuration(),
             'voiceCloningMaxDuration' => VoiceCloningService::maxSampleDuration(),

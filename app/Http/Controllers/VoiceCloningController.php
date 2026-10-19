@@ -62,10 +62,10 @@ class VoiceCloningController extends Controller
         // Check the plan cap. A stored max of 0 uses the site-wide default.
         // Failed attempts do not keep a slot, so the user can record again.
         VoiceCloningService::failStalledForUser($userId);
-        $currentCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
+        $currentCount = VoiceCloningService::slotsInUse($userId);
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($currentCount >= $maxVoices) {
-            return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
+            return $this->jsonError($this->limitReachedMessage($userId, $maxVoices), 422);
         }
 
         // Validate inputs
@@ -272,10 +272,10 @@ class VoiceCloningController extends Controller
         }
 
         VoiceCloningService::failStalledForUser($userId);
-        $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
+        $activeCount = VoiceCloningService::slotsInUse($userId);
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($activeCount >= $maxVoices) {
-            return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
+            return $this->jsonError($this->limitReachedMessage($userId, $maxVoices), 422);
         }
 
         $minConsent = VoiceCloningService::minConsentDuration();
@@ -385,10 +385,10 @@ class VoiceCloningController extends Controller
         }
 
         VoiceCloningService::failStalledForUser($userId);
-        $activeCount = ClonedVoice::forUser($userId)->where('status', '!=', 'failed')->count();
+        $activeCount = VoiceCloningService::slotsInUse($userId);
         $maxVoices = VoiceCloningService::maxVoicesForViewer($request->user(), $activePlan);
         if ($activeCount >= $maxVoices) {
-            return $this->jsonError(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]), 422);
+            return $this->jsonError($this->limitReachedMessage($userId, $maxVoices), 422);
         }
 
         $clonedVoice->update([
@@ -431,19 +431,29 @@ class VoiceCloningController extends Controller
             abort(404);
         }
 
-        $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
+        $userId = (int) auth()->id();
+        $clonedVoice = ClonedVoice::forUser($userId)->findOrFail($id);
 
+        // A finished voice keeps its plan slot for a while after it is deleted.
+        VoiceCloningService::markDeletedByMember($clonedVoice);
         app(VoiceCloningService::class)->purge($clonedVoice);
 
         if ($request->expectsJson()) {
             return response()->json([
                 'success' => true,
                 'message' => __('ui.voice_cloning.deleted_success'),
+                'slots_in_use' => VoiceCloningService::slotsInUse($userId),
+                'deleted_voice_note' => VoiceCloningService::deletedVoiceNote($userId),
             ]);
         }
 
         return redirect()->to(route('dashboard') . '#voiceCloningSection')
             ->with('success', __('ui.voice_cloning.deleted_success'));
+    }
+
+    private function limitReachedMessage(int $userId, int $maxVoices): string
+    {
+        return trim(__('ui.voice_cloning.limit_reached', ['max' => $maxVoices]).' '.VoiceCloningService::deletedVoiceNote($userId));
     }
 
     /**
