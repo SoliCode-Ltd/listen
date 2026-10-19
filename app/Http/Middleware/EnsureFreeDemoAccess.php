@@ -28,7 +28,7 @@ class EnsureFreeDemoAccess
             if ($request->expectsJson()) {
                 return response()->json([
                     'ok' => false,
-                    'message' => 'Demo access is available only for free-plan users.',
+                    'message' => __('ui.backend.demo_paid_plan_only'),
                     'redirect_url' => route('dashboard'),
                 ], 403);
             }

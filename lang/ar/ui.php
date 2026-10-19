@@ -1638,6 +1638,9 @@ return [
 
         // Studio: a long text is made after the reply, and the page checks on it until it is ready.
         'dashboard_voice_being_made' => 'جارٍ إنشاء صوتك الآن، وسيظهر في سجل الأصوات ويُشغَّل هنا فور اكتماله.',
+
+        // The demo is for free accounts: members with a plan create in the dashboard.
+        'demo_paid_plan_only' => 'العرض التجريبي مخصّص للحسابات المجانية. خطتك مفعّلة، فأنشئ أصواتك من لوحة التحكم.',
     ],
 
     // ===== استنساخ الأصوات =====

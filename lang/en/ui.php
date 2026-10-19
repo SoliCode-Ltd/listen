@@ -1632,6 +1632,9 @@ return [
 
         // Studio: a long text is made after the reply, and the page checks on it until it is ready.
         'dashboard_voice_being_made' => 'Your voice is being made. It will appear in your history and play here as soon as it is ready.',
+
+        // The demo is for free accounts: members with a plan create in the dashboard.
+        'demo_paid_plan_only' => 'The demo is for free accounts. Your plan is active, so create your voices in the dashboard.',
     ],
 
     // ===== VOICE CLONING =====
