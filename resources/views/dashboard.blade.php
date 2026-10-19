@@ -4091,7 +4091,7 @@
       });
     }
 
-    function renderJobRow(job) {
+    function renderJobRow(job, preloadAudio = false) {
       const isDemoHistory = isDemoHistoryJob(job);
       const jobKey = resolveJobKey(job);
       const status = String(job?.status || 'processing').toLowerCase();
@@ -4116,7 +4116,7 @@
         : title;
 
       let audioCell = '<small style="color: var(--muted);">' + i18n.processing_ellipsis + '</small>';
-      if (audioUrl) audioCell = '<audio controls preload="none" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
+      if (audioUrl) audioCell = '<audio controls preload="' + (preloadAudio ? 'auto' : 'none') + '" src="' + audioUrl + '" data-download-language="' + escapeHtml(targetLanguageCode) + '" data-download-text="' + textExcerpt + '" data-download-speaker="' + voiceLabel + '" data-download-quality="' + voiceTier + '"></audio>';
       else if (statusClass === 'failed') audioCell = '<small style="color: var(--danger);">' + errorMessage + '</small>';
 
       const actions = [];
@@ -4183,8 +4183,11 @@
       if (pageJobs.length === 0) {
         jobsTableBody.innerHTML = '<tr id="jobsEmptyRow"><td colspan="8" style="color: var(--muted);">' + i18n.no_jobs_yet + '</td></tr>';
       } else {
+        // The newest finished voice loads ahead, so it plays at once; the others wait for a click.
+        const newestReady = allJobs.find((job) => String(job?.status || '') === 'done' && job?.audio_url);
+        const newestReadyKey = newestReady ? resolveJobKey(newestReady) : '';
         pageJobs.forEach(function(job) {
-          jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job));
+          jobsTableBody.insertAdjacentHTML('beforeend', renderJobRow(job, resolveJobKey(job) === newestReadyKey));
         });
       }
 
