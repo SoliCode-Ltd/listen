@@ -556,9 +556,43 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabPlaybackTokens.delete(tabId);
 });
 
-function getSettings() {
+// Settings, the API key among them, stay in this browser (storage.local): Chrome
+// keeps storage.sync in the member's account and copies it to every browser they
+// sign in to. Versions before 1.2.2 kept them there, so the first run of this one
+// moves them here and takes them out of the account.
+const SETTINGS_MOVED_KEY = 'listen_settings_moved_from_sync';
+let settingsMove = null;
+
+function moveSettingsFromSync() {
+  settingsMove = settingsMove || (async () => {
+    try {
+      const local = await chrome.storage.local.get(SETTINGS_MOVED_KEY);
+      if (local?.[SETTINGS_MOVED_KEY]) {
+        return;
+      }
+
+      const keys = Object.keys(DEFAULT_SETTINGS);
+      const synced = await chrome.storage.sync.get(keys);
+      const found = Object.keys(synced || {});
+      if (found.length) {
+        // What this browser already keeps wins over the copy from the account.
+        const kept = await chrome.storage.local.get(found);
+        await chrome.storage.local.set({ ...synced, ...kept });
+        await chrome.storage.sync.remove(found);
+      }
+      await chrome.storage.local.set({ [SETTINGS_MOVED_KEY]: true });
+    } catch (_error) {
+      // Tried again the next time the extension starts.
+    }
+  })();
+
+  return settingsMove;
+}
+
+async function getSettings() {
+  await moveSettingsFromSync();
   return new Promise((resolve) => {
-    chrome.storage.sync.get(DEFAULT_SETTINGS, (stored) => {
+    chrome.storage.local.get(DEFAULT_SETTINGS, (stored) => {
       const storedApiBase = normalizeApiBase(stored?.apiBase);
       const apiBase = storedApiBase || PACKAGED_API_BASE;
       const targetLanguage = normalizeLanguage(stored?.targetLanguage);
@@ -628,7 +662,7 @@ async function saveSettings(settings) {
   payload.emotion = String(payload.emotion || '').trim();
 
   return new Promise((resolve) => {
-    chrome.storage.sync.set(payload, () => resolve(payload));
+    chrome.storage.local.set(payload, () => resolve(payload));
   });
 }
 
