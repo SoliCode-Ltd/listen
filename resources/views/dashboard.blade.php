@@ -86,8 +86,9 @@
       width: 100%;
       margin-top: 1.15rem;
     }
-    .vc-playback.is-ready { display: flex; }
+    .vc-playback.is-ready { display: flex; flex-wrap: wrap; }
     .vc-playback[hidden] { display: none !important; }
+    .vc-playback .custom-audio-notice:not(:empty) { flex-basis: 100%; text-align: center; }
     .vc-preview-audio {
       width: min(100%, 28rem);
       max-width: 28rem;

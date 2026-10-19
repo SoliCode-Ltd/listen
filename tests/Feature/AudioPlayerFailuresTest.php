@@ -67,7 +67,10 @@ class AudioPlayerFailuresTest extends TestCase
             ->assertSee("showNotice(i18n.audio_play_failed);", false)
             // Pressing play again tries the file again.
             ->assertSee('if (audio.error) audio.load();', false)
-            ->assertSee('.custom-audio-notice:not(:empty) {', false);
+            ->assertSee('.custom-audio-notice:not(:empty) {', false)
+            // Under a cloning preview (a row of its own) the note takes the next line.
+            ->assertSee('.vc-playback.is-ready { display: flex; flex-wrap: wrap; }', false)
+            ->assertSee('.vc-playback .custom-audio-notice:not(:empty) { flex-basis: 100%; text-align: center; }', false);
     }
 
     public function test_the_messages_are_in_the_page_language(): void
