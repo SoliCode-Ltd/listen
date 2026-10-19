@@ -5,11 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateAudioJob;
 use App\Models\AudioGeneration;
-use App\Models\UsageCounter;
 use App\Models\User;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Services\BlockedUserService;
 use App\Services\BillingSyncService;
@@ -305,17 +305,11 @@ class MessageReaderController extends Controller
                 // Job failed — status will be checked below.
             }
 
-            $job->refresh();
+            // A failed generation has given its credits back itself; one the job's own
+            // error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
 
-            // Always refund usage when the job actually failed,
-            // regardless of whether the exception propagated.
-            if ($job->status === 'failed') {
-                if ($billToPack) {
-                    app(CharPackService::class)->release((int) $user->id, $estimate['credits']);
-                } else {
-                    $this->releaseReservedUsage($counter, $estimate);
-                }
-            }
+            $job->refresh();
         } else {
             $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
                 ? 'high'
@@ -452,21 +446,6 @@ class MessageReaderController extends Controller
         }
 
         abort(401, __('ui.backend.api_invalid_key'));
-    }
-
-    /**
-     * @param  array{chars:int,seconds:int}  $estimate
-     */
-    private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
-    {
-        $counter->refresh();
-
-        $counter->update([
-            'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
-        ]);
-        $counter->addSeconds(-(int) $estimate['seconds']);
-        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
     private function normalizeVoiceSelection(string $language, ?string $voiceKey, ?string $voiceName, string $tier): string

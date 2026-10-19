@@ -13,6 +13,7 @@ use App\Models\UsageCounter;
 use App\Services\Api\ApiUsageMeter;
 use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
 use App\Services\Tts\PremiumVoiceUnavailableException;
@@ -89,12 +90,12 @@ class GenerateAudioJob implements ShouldQueue
 
     public function handle(TranslationService $translationService, TtsService $ttsService): void
     {
-        // Locked, so the stuck-generation sweep (developer API) cannot fail it while it starts.
+        // Locked, so a stuck-generation sweep cannot fail it while it starts.
         $generation = DB::transaction(function (): ?AudioGeneration {
             $generation = AudioGeneration::query()->whereKey($this->audioGenerationId)->lockForUpdate()->first();
-            // A developer API generation that failed has had its credits given back
-            // (perhaps by the sweep): it is never made again.
-            if (! $generation || $generation->status === 'done' || ($generation->api_key_id && $generation->status === 'failed')) {
+            // A generation that failed has had its credits given back (perhaps by a
+            // sweep): it is never made again, so a late retry cannot deliver it unpaid.
+            if (! $generation || in_array($generation->status, ['done', 'failed'], true)) {
                 return null;
             }
 
@@ -281,24 +282,21 @@ class GenerateAudioJob implements ShouldQueue
                 // A developer API request waiting for the file: failed now, and its credits
                 // given back here, exactly once (the request does not refund it again).
                 app(ApiUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
+            } elseif ($final && ! $generation->api_key_id) {
+                // A member's generation on its last try: failed and its credits given back
+                // in one locked step, exactly once (failed(), the request and the stuck
+                // sweep find it failed and give nothing back again).
+                app(MemberUsageMeter::class)->failAndRefund((int) $generation->id, $message, ['processing']);
             } else {
                 // A queued job that will be tried again is not failed yet: it waits for the
                 // next try. A developer API one always waits for failed(), which ends it and
                 // gives its credits back in one locked step.
-                $failNow = $final && ! $generation->api_key_id;
-                DB::transaction(function () use ($generation, $failNow, $message): void {
+                DB::transaction(function () use ($generation): void {
                     $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
-                    if (! $locked || $locked->status !== 'processing') {
-                        return;
+                    if ($locked && $locked->status === 'processing') {
+                        $locked->update(['status' => 'queued', 'error_message' => null]);
                     }
-                    $locked->update($failNow
-                        ? ['status' => 'failed', 'error_message' => $message]
-                        : ['status' => 'queued', 'error_message' => null]);
                 });
-
-                if ($failNow && $generation->text_item_id) {
-                    TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
-                }
             }
             $generation->refresh();
 
@@ -405,61 +403,38 @@ class GenerateAudioJob implements ShouldQueue
             return;
         }
 
-        $generation->update([
-            'status' => 'failed',
-            'error_message' => $message,
-        ]);
+        // Failed and its credits given back in one locked step, only when it was
+        // still queued or running: one that handle(), the request or the stuck
+        // sweep already failed (and refunded) is never refunded again.
+        app(MemberUsageMeter::class)->failAndRefund((int) $generation->id, $message);
 
         // Failures thrown from handle() are recorded there; a timeout or a
         // worker killed mid-run only ever reaches this point.
         if (! $e || $e instanceof MaxAttemptsExceededException || $e instanceof TimeoutExceededException) {
             app(GenerationErrorRecorder::class)->audioGenerationFailed(
-                $generation,
+                $generation->refresh(),
                 $e ?? new \RuntimeException('The generation job failed without an error.'),
                 $this->tries,
                 $this->tries,
                 $generation->error_message,
             );
         }
-
-        // Only release usage for async (queued) jobs.
-        // For sync dispatches, the controller handles the refund
-        // after checking job status — avoiding double-refund.
-        if ($this->connection !== 'sync') {
-            $reserved = $this->reservedUsage($generation);
-
-            $this->applyUsageDelta(
-                $generation,
-                -1,
-                -$reserved['credits'],
-                -$reserved['seconds'],
-            );
-        }
-
-        if ($generation->text_item_id) {
-            TextItem::whereKey($generation->text_item_id)->update(['status' => 'failed']);
-        }
     }
 
     /**
-     * What the controller reserved when the generation was queued: the
-     * estimate from the text (the real length is only known once it is done).
+     * What the request reserved when the generation was queued: the estimate
+     * from the text, unless it kept what it reserved (the real length is only
+     * known once it is done).
      *
      * @return array{credits:int,seconds:int}
      */
     private function reservedUsage(AudioGeneration $generation): array
     {
-        // The developer API stores what it reserved (it allows for a slower speed).
-        $stored = ApiUsageMeter::reservationOf($generation);
-        if ($stored !== null) {
-            return ['credits' => $stored['credits'], 'seconds' => $stored['seconds']];
-        }
-
-        $estimate = UsageEstimator::estimate((string) $generation->input_text);
+        $reservation = MemberUsageMeter::reservationOf($generation);
 
         return [
-            'credits' => $estimate['credits'],
-            'seconds' => $estimate['seconds'],
+            'credits' => $reservation['credits'],
+            'seconds' => $reservation['seconds'],
         ];
     }
 

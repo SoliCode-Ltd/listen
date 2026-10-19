@@ -31,3 +31,7 @@ Schedule::call(function (): void {
         ApiIdempotencyKey::pruneExpired();
     }
 })->daily()->name('api-request-log-prune');
+
+// Studio and extension: give back the credits of members' generations that got stuck.
+// The overlap lock lapses after 10 minutes, so a run that died never stops the next ones for long.
+Schedule::command('listen:expire-stuck-generations')->everyFiveMinutes()->withoutOverlapping(10);

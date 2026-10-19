@@ -508,7 +508,8 @@ class GenerationErrorsAndChoicesTest extends TestCase
 
     private function runJob(AudioGeneration $generation): void
     {
-        $generation->update(['status' => 'queued']);
+        // Queued again in the database, as a queue retry finds it (a failed one is never made again).
+        $generation->refresh()->update(['status' => 'queued']);
 
         try {
             GenerateAudioJob::dispatchSync($generation->id);

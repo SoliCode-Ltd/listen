@@ -16,12 +16,14 @@ final class GenerationMessage
     private const KEYS = [
         'ui.backend.dashboard_voice_generation_failed_try_again',
         'ui.backend.premium_voices_busy',
+        'ui.backend.generation_stuck_refunded',
         'ui.backend.cloned_voice_daily_limit',
         'ui.backend.translation_failed',
     ];
 
     /** Messages only the developer API keeps (in English), with what the studio says for them. */
     private const API_MESSAGES = [
+        'Voice generation took too long and was stopped. No credits were charged; please try again.' => 'ui.backend.generation_stuck_refunded',
         'Voice generation could not be started. Please try again.' => 'ui.backend.dashboard_voice_generation_failed_try_again',
     ];
 

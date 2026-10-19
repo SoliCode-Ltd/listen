@@ -7,10 +7,10 @@ use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
-use App\Models\UsageCounter;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\MemberUsageMeter;
 use App\Services\Billing\TrialUsageRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
@@ -426,19 +426,12 @@ class DashboardController extends Controller
             // Job failed — status will be checked below.
         }
 
+        // A failed generation has given its credits back itself; one the job's own
+        // error handling never reached is failed and refunded here, exactly once.
+        app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+
         $job->refresh();
         $counter->refresh();
-
-        // Always refund usage when the job actually failed,
-        // regardless of whether the exception propagated.
-        if ($job->status === 'failed') {
-            if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['credits']);
-            } else {
-                $this->releaseReservedUsage($counter, $estimate);
-            }
-            $counter->refresh();
-        }
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -490,6 +483,11 @@ class DashboardController extends Controller
             return $request->expectsJson()
                 ? response()->json(['ok' => false, 'message' => $message], 409)
                 : redirect()->route('dashboard')->with('error', $message);
+        }
+
+        // A stuck one is failed and its credits given back first, so deleting it loses nothing.
+        if (in_array($job->status, ['queued', 'processing'], true)) {
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.generation_stuck_refunded'));
         }
 
         $deletedId = (int) $job->id;
@@ -702,21 +700,6 @@ class DashboardController extends Controller
             'state' => $state,
             'options' => $options,
         ];
-    }
-
-    /**
-     * @param  array{chars:int,seconds:int}  $estimate
-     */
-    private function releaseReservedUsage(UsageCounter $counter, array $estimate): void
-    {
-        $counter->refresh();
-
-        $counter->update([
-            'total_requests' => max(0, (int) $counter->total_requests - 1),
-            'total_chars' => max(0, (int) $counter->total_chars - (int) $estimate['credits']),
-        ]);
-        $counter->addSeconds(-(int) $estimate['seconds']);
-        app(TrialUsageRecorder::class)->release((int) $counter->user_id, $estimate);
     }
 
     private function buildJobPayload(AudioGeneration $job, array $voiceNameMap): array
