@@ -526,7 +526,7 @@
           </div>
         </div>
 
-        <div id="messageBox"></div>
+        <div id="messageBox" role="status"></div>
 
         <div class="api-status">
           <span id="keyBadge" class="badge inactive"><span class="badge-dot"></span>{{ __('ui.extension.no_api_key') }}</span>

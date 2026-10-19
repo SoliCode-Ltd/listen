@@ -946,6 +946,11 @@ return [
         // Under a player whose file could not be played or downloaded.
         'audio_play_failed' => 'تعذّر تشغيل هذا الصوت الآن. حاول مرة أخرى.',
         'audio_download_unavailable' => 'تعذّر تحميل هذا الصوت الآن. حاول مرة أخرى.',
+
+        // The player for keyboards and screen readers: the button's label while playing, and the position bar.
+        'audio_pause' => 'إيقاف مؤقت',
+        'audio_seek' => 'موضع التشغيل',
+        'audio_position' => ':current من :total',
     ],
 
     // ===== DASHBOARD =====
@@ -1294,6 +1299,9 @@ return [
 
         // The extension key: the full key is shown once, when it is made.
         'extension_key_copy_hint' => 'يظهر المفتاح كاملاً مرة واحدة فقط عند إنشائه، لذلك لا يمكن نسخه من هنا. تحتاجه مرة أخرى؟ أنشئ مفتاحاً جديداً من «:button».',
+
+        // Screen readers: the name of the main text box (dashboard and demo).
+        'text_box_label' => 'النص الذي تريد تحويله إلى كلام',
     ],
 
     // ===== AUTH =====
@@ -1801,6 +1809,9 @@ return [
         'request_failed' => 'لم تنجح العملية. أعد المحاولة.',
         'network_error' => 'تعذّر الاتصال. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.',
         'delete_failed' => 'تعذّر حذف هذا الصوت. أعد المحاولة.',
+
+        // Screen readers: the × beside a chosen file.
+        'remove_file' => 'إزالة هذا الملف',
     ],
     'pack' => [
         'kicker' => 'باقة لمرة واحدة',

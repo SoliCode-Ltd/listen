@@ -945,6 +945,11 @@ return [
         // Under a player whose file could not be played or downloaded.
         'audio_play_failed' => "This audio couldn't be played right now. Please try again.",
         'audio_download_unavailable' => "This audio couldn't be downloaded right now. Please try again.",
+
+        // The player for keyboards and screen readers: the button's label while playing, and the position bar.
+        'audio_pause' => 'Pause',
+        'audio_seek' => 'Playback position',
+        'audio_position' => ':current of :total',
     ],
 
     // ===== DASHBOARD =====
@@ -1288,6 +1293,9 @@ return [
 
         // The extension key: the full key is shown once, when it is made.
         'extension_key_copy_hint' => "The full key is shown only once, when it's created, so it can't be copied here. Need it again? Create a new key with :button.",
+
+        // Screen readers: the name of the main text box (dashboard and demo).
+        'text_box_label' => 'Text to turn into speech',
     ],
 
     // ===== AUTH =====
@@ -1795,6 +1803,9 @@ return [
         'request_failed' => "That didn't work. Please try again.",
         'network_error' => "We couldn't connect. Check your internet connection and try again.",
         'delete_failed' => "This voice couldn't be deleted. Please try again.",
+
+        // Screen readers: the × beside a chosen file.
+        'remove_file' => 'Remove this file',
     ],
     'pack' => [
         'kicker' => 'One-time pack',

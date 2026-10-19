@@ -6,6 +6,9 @@
     'audio_download_failed' => __('ui.scripts.audio_download_failed'),
     'audio_play_failed' => __('ui.scripts.audio_play_failed'),
     'audio_download_unavailable' => __('ui.scripts.audio_download_unavailable'),
+    'audio_pause' => __('ui.scripts.audio_pause'),
+    'audio_seek' => __('ui.scripts.audio_seek'),
+    'audio_position' => __('ui.scripts.audio_position'),
   ];
   // The file types this member's plan offers for download (Plans → Downloads).
   $downloadFormats = rescue(fn () => \App\Support\AudioFormats::menuFor(
@@ -349,7 +352,14 @@
 
       var progContainer = document.createElement('div');
       progContainer.className = 'custom-audio-progress-container';
-      
+      // A slider for the keyboard and screen readers too (keys below).
+      progContainer.tabIndex = 0;
+      progContainer.setAttribute('role', 'slider');
+      progContainer.setAttribute('aria-label', i18n.audio_seek);
+      progContainer.setAttribute('aria-valuemin', '0');
+      progContainer.setAttribute('aria-valuemax', '0');
+      progContainer.setAttribute('aria-valuenow', '0');
+
       var progTrack = document.createElement('div');
       progTrack.className = 'custom-audio-track';
 
@@ -453,10 +463,20 @@
         } catch (e) {}
         return 0;
       };
+      // What the slider tells screen readers, e.g. "0:12 of 1:30"; written only when a whole second changes.
+      var setSliderValue = function(current, duration) {
+        var now = String(Math.floor(current || 0));
+        var max = String(Math.floor(duration || 0));
+        if (progContainer.getAttribute('aria-valuenow') === now && progContainer.getAttribute('aria-valuemax') === max) return;
+        progContainer.setAttribute('aria-valuemax', max);
+        progContainer.setAttribute('aria-valuenow', now);
+        progContainer.setAttribute('aria-valuetext', String(i18n.audio_position).replace(':current', formatTime(current)).replace(':total', formatTime(duration)));
+      };
       var updateProgress = function() {
         if (isDragging) return;
         var current = Number(audio.currentTime || 0);
         var duration = getEffectiveDuration();
+        setSliderValue(current, duration);
         if (duration <= 0) {
           currTime.textContent = formatTime(current);
           return;
@@ -471,6 +491,7 @@
         var duration = getEffectiveDuration();
         if (duration > 0) {
           durTime.textContent = formatTime(duration);
+          setSliderValue(Number(audio.currentTime || 0), duration);
         }
       };
 
@@ -513,6 +534,7 @@
       var setPlayButtonState = function(isPlaying) {
         playBtn.classList.toggle('playing', !!isPlaying);
         playBtn.innerHTML = isPlaying ? pauseIconMarkup : playIconMarkup;
+        playBtn.setAttribute('aria-label', isPlaying ? i18n.audio_pause : i18n.audio_play);
       };
       var playRequestId = 0;
       var pendingPlayPromise = null;
@@ -536,6 +558,7 @@
         progBar.style.width = '0%';
         progThumb.style.left = '0%';
         currTime.textContent = '0:00';
+        setSliderValue(0, getEffectiveDuration());
       });
 
       // A file that is gone or cannot be read: the row says so instead of a
@@ -569,6 +592,7 @@
           for (var j = 0; j < otherBtns.length; j++) {
              otherBtns[j].classList.remove('playing');
              otherBtns[j].innerHTML = playIconMarkup;
+             otherBtns[j].setAttribute('aria-label', i18n.audio_play);
           }
 
           var requestId = ++playRequestId;
@@ -668,6 +692,26 @@
         if (!d) return;
         var percent = setProgressFromEvent(e);
         audio.currentTime = Math.max(0, Math.min(d, percent * d));
+        updateProgress();
+      });
+      // On the bar: Space or Enter plays and pauses, the arrows move 5 seconds,
+      // Home and End go to the start and the end.
+      progContainer.addEventListener('keydown', function(e) {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          playBtn.click();
+          return;
+        }
+        var step = { ArrowRight: 5, ArrowUp: 5, ArrowLeft: -5, ArrowDown: -5 }[e.key];
+        if (step === undefined && e.key !== 'Home' && e.key !== 'End') return;
+        e.preventDefault();
+        var d = getEffectiveDuration();
+        if (!d) {
+          audio.load();
+          return;
+        }
+        var target = e.key === 'Home' ? 0 : (e.key === 'End' ? d : Number(audio.currentTime || 0) + step);
+        audio.currentTime = Math.max(0, Math.min(d, target));
         updateProgress();
       });
       if (menuBtn) {
@@ -775,6 +819,13 @@
             });
             menu.appendChild(item);
           });
+          // Escape closes it and gives focus back to the download button.
+          menu.addEventListener('keydown', function(ev) {
+            if (ev.key !== 'Escape') return;
+            ev.preventDefault();
+            closeFormatMenu();
+            menuBtn.focus();
+          });
           document.body.appendChild(menu);
           var rect = menuBtn.getBoundingClientRect();
           var width = menu.offsetWidth;
@@ -819,6 +870,7 @@
              progThumb.style.left = '0%';
              currTime.textContent = '0:00';
              durTime.textContent = '0:00';
+             setSliderValue(0, 0);
              showNotice('');
           }
         });

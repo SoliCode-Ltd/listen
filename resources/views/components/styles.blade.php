@@ -1231,6 +1231,19 @@ html[data-theme="light"] .app-footer {
 .custom-audio-play:active {
   transform: scale(0.95);
 }
+/* Keyboard focus on the player's controls is always visible. */
+.custom-audio-play:focus-visible,
+.custom-audio-menu:focus-visible,
+.custom-audio-progress-container:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
+.custom-audio-progress-container:focus-visible {
+  border-radius: 99px;
+}
+.custom-audio-progress-container:focus-visible .custom-audio-thumb {
+  transform: translate(-50%, -50%) scale(1.15);
+}
 .custom-audio-play svg {
   width: 15px;
   height: 15px;

@@ -123,7 +123,7 @@
             </x-voice-studio.setbar>
             <div class="tag-editor" data-vs-editor>
               <div class="tag-editor-backdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
-              <textarea id="text" name="text" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" required></textarea>
+              <textarea id="text" name="text" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" placeholder="{{ __('ui.dashboard.paste_text') }}" aria-label="{{ __('ui.dashboard.text_box_label') }}" required></textarea>
             </div>
             <div class="demo-samples">
               <div class="sample-chips">
@@ -205,7 +205,7 @@
             preload="none"
             data-download-redirect-url="{{ route('billing.page', ['plan' => $upgradePlanSlug]) }}"
           ></audio>
-          <div class="audio-meta" id="audioMeta"></div>
+          <div class="audio-meta" id="audioMeta" role="status"></div>
         </div>
 
         <div class="s-card output-panel reveal" id="outputPlaceholder">

@@ -344,8 +344,9 @@
       font-size: .85rem;
     }
     .vc-file-info span:first-child { min-width: 0; overflow-wrap: anywhere; }
-    .vc-file-info .remove { cursor: pointer; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+    .vc-file-info .remove { cursor: pointer; font: inherit; font-weight: 700; line-height: 1; color: var(--muted); flex-shrink: 0; background: none; border: 0; padding: 0 .2rem; }
     .vc-file-info .remove:hover { color: #dc2626; }
+    .vc-file-info .remove:focus-visible { outline: 2px solid var(--brand-accent); outline-offset: 2px; border-radius: 4px; }
     .vc-recorder { text-align: center; border: 1px solid color-mix(in oklab, var(--line) 60%, transparent); border-radius: .9rem; padding: 1rem; background: color-mix(in oklab, var(--surface) 78%, transparent); }
     .vc-recorder .rec-btn { width: 68px; height: 68px; border-radius: 999px; border: 3px solid var(--line); background: var(--surface); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; transition: all .2s; }
     .vc-recorder .rec-btn:hover { border-color: var(--a); }
@@ -2661,7 +2662,7 @@
               </x-voice-studio.setbar>
               <div class="tag-editor" id="tagEditor" data-vs-editor>
                 <div class="tag-editor-backdrop" id="tagEditorBackdrop" data-vs-backdrop aria-hidden="true" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}"></div>
-                <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}">{{ $prefillValue('content') }}</textarea>
+                <textarea name="content" id="contentTextarea" dir="{{ app()->getLocale() === 'ar' ? 'rtl' : 'auto' }}" rows="8" required placeholder="{{ __('ui.dashboard.paste_text') }}" aria-label="{{ __('ui.dashboard.text_box_label') }}">{{ $prefillValue('content') }}</textarea>
               </div>
               {{-- Left empty, the history names the voice from its first words. --}}
               <div class="vs-name-row">
@@ -2691,7 +2692,7 @@
           </button>
               </div>
             </div>
-            <div id="formMessage"></div>
+            <div id="formMessage" role="status"></div>
           </div>
 
           <aside class="vs-side">
@@ -2733,7 +2734,7 @@
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
               {{ __('ui.dashboard.output_title') }}
             </div>
-            <div class="audio-meta" id="generatedAudioMeta"></div>
+            <div class="audio-meta" id="generatedAudioMeta" role="status"></div>
           </div>
           <audio id="generatedPreviewAudio" controls preload="none"></audio>
         </div>
@@ -2995,7 +2996,7 @@
                 <article class="vc-card" data-voice-id="{{ $voice->id }}" data-voice-name="{{ $voice->name }}" data-language-code="{{ $voice->language_code }}" data-status="{{ $voice->status }}" data-created-ts="{{ $voice->created_at?->getTimestamp() }}" data-started-ts="{{ $voice->attemptStartedAt()?->getTimestamp() }}" data-failure-reason="{{ $voice->isFailed() ? \App\Services\VoiceCloningService::publicFailureMessage($voice) : '' }}">
                   <div class="vc-card-header">
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
-                    <span class="vc-status {{ $voice->status }}">
+                    <span class="vc-status {{ $voice->status }}" role="status">
                       @if($voice->isProcessing())<span class="dot"></span>@endif
                       {{ __('ui.voice_cloning.status_' . $voice->status) }}
                     </span>
@@ -3121,13 +3122,13 @@
 
                   <div class="vc-tab-panel" id="vcUploadPanel">
                     <div class="vc-upload-zone" id="vcUploadZone">
-                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*">
+                      <input type="file" name="audio_file" id="vcFileInput" accept=".wav,.mp3,.m4a,.mp4,.ogg,.webm,.flac,audio/*" aria-label="{{ __('ui.voice_cloning.upload_label') }}">
                       <p>{{ __('ui.voice_cloning.upload_hint') }}</p>
                       <p class="formats">{{ __('ui.voice_cloning.upload_formats') }} &middot; {{ __('ui.voice_cloning.upload_max_size', ['size' => $voiceCloningMaxUploadMb]) }}</p>
                     </div>
                     <div class="vc-file-info" id="vcFileInfo" style="display:none">
                       <span id="vcFileName"></span>
-                      <span class="remove" id="vcFileRemove">&times;</span>
+                      <button type="button" class="remove" id="vcFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
                     </div>
                     <p class="vc-range" id="vcSampleRange">{{ __('ui.voice_cloning.duration_range', ['min' => $voiceCloningMinDuration, 'max' => $voiceCloningMaxDuration]) }}</p>
                   </div>
@@ -3213,7 +3214,7 @@
                     </div>
                     <div class="vc-file-info" id="vcConsentFileInfo" style="display:none">
                       <span id="vcConsentFileName"></span>
-                      <span class="remove" id="vcConsentFileRemove">&times;</span>
+                      <button type="button" class="remove" id="vcConsentFileRemove" aria-label="{{ __('ui.voice_cloning.remove_file') }}">&times;</button>
                     </div>
                   </div>
 
@@ -5362,9 +5363,11 @@
         const isDelayed = Boolean(payload.is_delayed || (['pending', 'validating', 'processing'].includes(status) && elapsedSeconds >= 90));
 
         const statusBadge = card.querySelector('.vc-status');
-        if (statusBadge) {
+        const statusText = statusLabels[status] || status.toUpperCase();
+        // Rewritten only when the status changes, so screen readers hear it once, not on every check.
+        if (statusBadge && (statusBadge.textContent.trim() !== statusText || !statusBadge.classList.contains(status))) {
           statusBadge.className = `vc-status ${status}`;
-          statusBadge.innerHTML = `${['pending', 'validating', 'processing'].includes(status) ? '<span class="dot"></span>' : ''}${escapeHtml(statusLabels[status] || status.toUpperCase())}`;
+          statusBadge.innerHTML = `${['pending', 'validating', 'processing'].includes(status) ? '<span class="dot"></span>' : ''}${escapeHtml(statusText)}`;
         }
 
         ensureProcessingHint(card, ['pending', 'validating', 'processing'].includes(status));
@@ -5447,7 +5450,7 @@
           <article class="vc-card" data-voice-id="${escapeHtml(voiceId)}" data-voice-name="${name}" data-language-code="${escapeHtml(languageCode)}" data-status="${escapeHtml(status)}" data-created-ts="${createdTs}" data-started-ts="${Number(voice?.started_at_ts || createdTs)}" data-failure-reason="${failureReason}">
             <div class="vc-card-header">
               <h3 class="vc-card-name">${name}</h3>
-              <span class="vc-status ${escapeHtml(status)}">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
+              <span class="vc-status ${escapeHtml(status)}" role="status">${isProcessing ? '<span class="dot"></span>' : ''}${statusLabel}</span>
             </div>
             <div class="vc-card-meta">
               <span>{{ __('ui.voice_cloning.created_on') }} ${escapeHtml(createdLabel)}</span>

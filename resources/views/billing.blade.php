@@ -1081,7 +1081,7 @@
                 </div>
               @endif
               <div id="card-element"></div>
-              <div id="card-error" class="card-error"></div>
+              <div id="card-error" class="card-error" aria-live="polite"></div>
               <label class="save-card-checkbox">
                 <input type="checkbox" id="saveCard" checked>
                 <span>{{ __('ui.billing.save_card_for_future') }}</span>
@@ -1140,7 +1140,7 @@
             @endif
             <a class="btn" href="{{ route('manage-subscription.page') }}">{{ __('ui.billing.manage_subscription') }}</a>
           </div>
-          <div id="message" class="message {{ $initialMessageType }}">{{ $initialMessageText }}</div>
+          <div id="message" class="message {{ $initialMessageType }}" role="status">{{ $initialMessageText }}</div>
         </form>
       </div>
 
