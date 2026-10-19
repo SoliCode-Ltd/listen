@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\ApiRequestLog;
+use App\Models\SiteSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -43,6 +44,27 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('ولا يُخزّن بشكل دائم')
             ->assertDontSee('وفقاً لإعدادات خطتك')
             ->assertDontSee('من خلال لوحة التحكم');
+    }
+
+    public function test_the_legal_pages_give_the_sites_own_mailbox(): void
+    {
+        foreach (['legal.privacy', 'legal.terms', 'legal.cookies'] as $route) {
+            foreach (['en', 'ar'] as $locale) {
+                $this->page($locale, $route)
+                    ->assertSee('<a href="mailto:help@listenai.studio">help@listenai.studio</a>', false)
+                    ->assertDontSee('support@listenai.studio');
+            }
+        }
+
+        // The developer docs and their machine-readable spec give the same mailbox.
+        $this->page('en', 'developers')
+            ->assertSee('<a href="mailto:help@listenai.studio" dir="ltr">help@listenai.studio</a>', false)
+            ->assertDontSee('support@listenai.studio');
+        $this->getJson('/v1/openapi.json')->assertOk()->assertJsonPath('info.contact.email', 'help@listenai.studio');
+
+        // The address set in Admin → Site Settings, as on the contact page.
+        SiteSetting::set('contact_email', 'team@example.com', 'contact');
+        $this->page('en', 'legal.terms')->assertSee('<a href="mailto:team@example.com">team@example.com</a>', false);
     }
 
     public function test_the_privacy_policy_names_no_provider(): void

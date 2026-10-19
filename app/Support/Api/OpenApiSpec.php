@@ -2,6 +2,7 @@
 
 namespace App\Support\Api;
 
+use App\Models\SiteSetting;
 use App\Services\Api\ApiIdempotency;
 use App\Services\Api\ApiSpeechService;
 use App\Support\AudioEffects;
@@ -36,7 +37,7 @@ final class OpenApiSpec
                 'version' => self::VERSION,
                 'summary' => 'Arabic and English text to speech: '.ApiDocs::series(['studio voices', 'Arabic dialects', 'English accents', 'emotions', ...$extras], false).'.',
                 'description' => 'Turn text into natural Arabic and English speech with one model, '.ApiModels::PREMIUM.', and every option of the studio. The dashboard, the browser extension and the API share one balance: generations are charged to your plan\'s credits exactly as in the dashboard (15 credits per second of audio) and stop at your plan\'s limit, with no overage. Options a plan does not include are refused with 403 feature_not_in_plan, naming the plans that include them. Full guide: '.url('/developers'),
-                'contact' => ['name' => 'Listen support', 'email' => 'support@listenai.studio', 'url' => url('/contact-us')],
+                'contact' => ['name' => 'Listen support', 'email' => trim((string) SiteSetting::get('contact_email', '')) ?: 'help@listenai.studio', 'url' => url('/contact-us')],
                 'termsOfService' => url('/terms-of-service'),
             ],
             'servers' => [['url' => url('/v1'), 'description' => 'Production']],
