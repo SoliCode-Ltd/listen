@@ -4759,8 +4759,11 @@
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();
-    // Voices still being made when the page opened are checked on too.
-    allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job)).forEach((job) => watchJob(job.id));
+    // Voices still being made when the page opened are checked on too: those from the
+    // last hour (by the server's clock), as an older one is stuck and the sweep fails it.
+    const pageOpenedAtTs = {{ now()->getTimestamp() }};
+    allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job) && pageOpenedAtTs - Number(job.created_at_ts || 0) < 3600)
+      .forEach((job) => watchJob(job.id));
     // A text kept by "Reload page" comes back once, into an empty box.
     (function restoreStudioDraft() {
       let draft = null;

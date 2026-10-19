@@ -116,9 +116,12 @@ class StudioJobStatusTest extends TestCase
         $html = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString("const jobStatusUrlTemplate = '".route('dashboard.jobs.show', ['job' => '__JOB_ID__'])."';", $html);
-        // A new reply that is still being made, and voices being made when the page opened.
+        // A new reply that is still being made, and voices being made when the page opened
+        // (from the last hour by the server's clock: an older one is stuck, and swept).
         $this->assertStringContainsString('} else if (data?.job && isJobRunning(data.job)) {', $html);
-        $this->assertStringContainsString('allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job)).forEach((job) => watchJob(job.id));', $html);
+        $this->assertMatchesRegularExpression('/const pageOpenedAtTs = \d{10};/', $html);
+        $this->assertStringContainsString('allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job) && pageOpenedAtTs - Number(job.created_at_ts || 0) < 3600)', $html);
+        $this->assertStringContainsString('.forEach((job) => watchJob(job.id));', $html);
         // From every 2 seconds, slowing to every 6, for 20 minutes, never while the tab is hidden.
         $this->assertStringContainsString('const JOB_CHECK_FIRST_MS = 2000;', $html);
         $this->assertStringContainsString('const JOB_CHECK_SLOWEST_MS = 6000;', $html);
