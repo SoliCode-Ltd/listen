@@ -95,6 +95,7 @@ return [
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),
+        // Empty: found by itself. "none": run as a server without ffmpeg.
         'ffmpeg_path' => env('FFMPEG_PATH', ''),
     ],
 

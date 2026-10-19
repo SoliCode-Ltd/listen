@@ -173,6 +173,10 @@ class AudioFormats
         }
 
         $configured = trim((string) config('services.gemini_tts.ffmpeg_path', ''));
+        // FFMPEG_PATH=none: run as a server without ffmpeg (audio is kept as the engines send it).
+        if (strtolower($configured) === 'none') {
+            return null;
+        }
         if ($configured !== '' && is_executable($configured)) {
             return $configured;
         }

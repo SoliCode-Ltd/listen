@@ -12,6 +12,7 @@ use App\Services\Tts\GoogleCloudTtsProvider;
 use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
+use App\Support\WavPcm;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
@@ -317,19 +318,20 @@ class PaidGenerationResilienceTest extends TestCase
     public function test_pieces_are_joined_into_one_wav_with_a_pause(): void
     {
         $provider = app(\App\Services\Tts\GeminiTtsProvider::class);
-        $wrap = new \ReflectionMethod($provider, 'wrapPcmL16AsWav');
         $join = new \ReflectionMethod($provider, 'joinAudioParts');
         $first = pack('v*', 1, 2, 3);
         $second = pack('v*', 4, 5);
 
         $joined = $join->invoke($provider, [
             ['bytes' => $first, 'mime_type' => 'audio/L16;codec=pcm;rate=24000'],
-            ['bytes' => $wrap->invoke($provider, $second, 24000, 1, 16), 'mime_type' => 'audio/wav'],
+            ['bytes' => WavPcm::header(strlen($second), 24000).$second, 'mime_type' => 'audio/wav'],
         ]);
 
         $pause = str_repeat("\0", 7200 * 2);
         $this->assertSame('audio/wav', $joined['mime_type']);
-        $this->assertSame($wrap->invoke($provider, $first . $pause . $second, 24000, 1, 16), $joined['bytes']);
+        $this->assertSame(WavPcm::header(strlen($first.$pause.$second), 24000).$first.$pause.$second, file_get_contents($joined['path']));
+        $this->assertSame([[0, 3, 0], [7203, 7205, 0]], $joined['pieces'], 'where each piece sits, for levelling');
+        unlink($joined['path']);
     }
 
     public function test_joining_a_long_text_holds_its_audio_about_once(): void
@@ -337,7 +339,7 @@ class PaidGenerationResilienceTest extends TestCase
         $provider = app(\App\Services\Tts\GeminiTtsProvider::class);
         // Bound to the provider, so the pieces go straight in and nothing else holds them.
         $join = \Closure::bind(fn (int $pieces, int $bytes): array => $this->joinAudioParts(array_map(
-            fn (): array => ['bytes' => $this->wrapPcmL16AsWav(str_repeat("\1\0", intdiv($bytes, 2)), 24000, 1, 16), 'mime_type' => 'audio/wav'],
+            fn (): array => ['bytes' => WavPcm::header($bytes, 24000).str_repeat("\1\0", intdiv($bytes, 2)), 'mime_type' => 'audio/wav'],
             range(1, $pieces),
         )), $provider, \App\Services\Tts\GeminiTtsProvider::class);
         $total = 24 * 2_000_000;
@@ -348,9 +350,11 @@ class PaidGenerationResilienceTest extends TestCase
         $joined = $join(24, 2_000_000);
         $peak = memory_get_peak_usage() - $before;
 
-        $this->assertGreaterThan($total, strlen($joined['bytes']));
-        // Before, the pieces, the joined audio and its WAV were all held at once (three copies).
-        $this->assertLessThan((int) (2.5 * $total), $peak);
+        $this->assertGreaterThan($total, filesize($joined['path']));
+        unlink($joined['path']);
+        // The pieces handed in are the one copy: each is written to the file and let go.
+        // (Before, the pieces, the joined audio and its WAV were held at once, up to three copies.)
+        $this->assertLessThan((int) (1.3 * $total), $peak);
     }
 
     public function test_a_voice_made_after_the_reply_may_use_more_memory_than_a_page(): void

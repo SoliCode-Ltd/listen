@@ -10,13 +10,13 @@ use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
 use App\Support\ShareableAudio;
+use App\Support\SpeechJoin;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 /**
@@ -619,7 +619,8 @@ class GeminiTtsProvider implements TtsProviderInterface
         // texts are read in pieces and the audio is joined.
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
         $payloads = [];
-        foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $part) {
+        $groups = [];
+        foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
             // Read 4 at a time: earlier rounds stay full, the last one shares the rest.
             $chunks = mb_strlen($part['text']) > $maxChars
@@ -628,13 +629,17 @@ class GeminiTtsProvider implements TtsProviderInterface
             foreach ($chunks as $chunk) {
                 $performed = GeminiVocalTags::forPerformance($chunk, $partStyle);
                 $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);
+                // The part of the script it reads ([whispering] …): each part keeps its own level.
+                $groups[] = (int) $partIndex;
             }
         }
 
-        $audio = count($payloads) === 1
-            ? $this->requestAudio($endpoint, $payloads[0])
-            : $this->joinAudioParts($this->requestAudioParts($endpoint, $payloads));
-        $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+        if (count($payloads) === 1) {
+            $audio = $this->requestAudio($endpoint, $payloads[0]);
+            $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
+        } else {
+            $filename = $this->saveJoinedAudio($this->joinAudioParts($this->requestAudioParts($endpoint, $payloads), $groups));
+        }
 
         return [
             'audio_path' => $filename,
@@ -643,22 +648,23 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * Send the pieces in parallel batches. A piece that fails is sent again
+     * Send the pieces in parallel batches, and hand each one over, in order,
+     * as soon as its batch is in: the join writes it to its file and lets it
+     * go, so a long text is never held whole. A piece that fails is sent again
      * on its own, with the usual retries; one that hit its key's limit (or a
      * key Google refused) is sent on another key, not the same one again. The
      * retry budget runs from the start of each batch, so a long text's earlier
      * batches never use it up for a later piece.
      *
      * @param  array<int, array<string, mixed>>  $payloads
-     * @return array<int, array{bytes:string,mime_type:?string}>
+     * @return \Generator<int, array{bytes:string,mime_type:?string}>
      */
-    private function requestAudioParts(string $endpoint, array $payloads): array
+    private function requestAudioParts(string $endpoint, array $payloads): \Generator
     {
         $timeout = (int) config('services.gemini_tts.timeout_seconds', 60);
         $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
         $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
         $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
-        $parts = [];
         $answeredBy = [];
 
         foreach (array_chunk($payloads, $parallel, true) as $batch) {
@@ -679,16 +685,25 @@ class GeminiTtsProvider implements TtsProviderInterface
             });
 
             foreach ($batch as $index => $payload) {
+                // Each reply is let go once its audio is out.
                 $response = $responses['part' . $index] ?? null;
+                unset($responses['part' . $index]);
                 $error = $response instanceof \Throwable ? $response->getMessage() : null;
+                $part = null;
 
                 if ($response instanceof Response && $response->ok() && is_array($response->json())) {
                     try {
-                        $parts[$index] = $this->extractAudioFromResponse($response->json());
+                        $part = $this->extractAudioFromResponse($response->json());
                         $answeredBy[$index] = $keyInfo['name'];
-                        continue;
                     } catch (TransientGeminiException $e) {
                         $error = $e->getMessage();
+                    }
+                    if ($part !== null) {
+                        $response = null;
+                        yield $index => $part;
+                        $part = null;
+
+                        continue;
                     }
                 } elseif ($response instanceof Response) {
                     $error = 'HTTP ' . $response->status() . ': ' . mb_substr($response->body(), 0, 200);
@@ -707,9 +722,13 @@ class GeminiTtsProvider implements TtsProviderInterface
                     throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
                 }
 
-                $parts[$index] = $this->requestAudio($endpoint, $payload);
+                $response = null;
+                $part = $this->requestAudio($endpoint, $payload);
                 $answeredBy[$index] = ($this->currentKeyInfo ?? $keyInfo)['name'];
+                yield $index => $part;
+                $part = null;
             }
+            unset($responses);
         }
 
         // One request for each piece, counted on the key that answered it; synthesize()
@@ -721,10 +740,6 @@ class GeminiTtsProvider implements TtsProviderInterface
         foreach ($answeredBy as $keyName) {
             $this->getKeyManager()->recordUsage($keyName, 0);
         }
-
-        ksort($parts);
-
-        return $parts;
     }
 
     /**
@@ -758,70 +773,18 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * Join the pieces into one WAV with a short pause between them.
+     * Join the pieces into one WAV file with a short pause between them. Each
+     * piece is written as it comes and let go (SpeechJoin), so a long text
+     * (50,000 characters is close to an hour of audio) is never held whole
+     * within the web server's memory limit.
      *
-     * @param  array<int, array{bytes:string,mime_type:?string}>  $parts
-     * @return array{bytes:string,mime_type:string}
+     * @param  iterable<int, array{bytes:string,mime_type:?string}>  $parts
+     * @param  array<int, int>  $groups  the part of the script each piece reads
+     * @return array{path:string,mime_type:string,pieces:array<int, array{0:int,1:int,2:int}>}
      */
-    private function joinAudioParts(array $parts): array
+    private function joinAudioParts(iterable $parts, array $groups = []): array
     {
-        $types = array_map(fn(array $part) => $this->detectAudioMimeType($part['bytes'], $part['mime_type']), $parts);
-        if (count(array_unique($types)) === 1 && reset($types) === 'audio/mpeg') {
-            return ['bytes' => implode('', array_column($parts, 'bytes')), 'mime_type' => 'audio/mpeg'];
-        }
-
-        // Each piece is let go once it is joined, so a long text (50,000
-        // characters is close to an hour of audio) holds its audio about once,
-        // not twice, within the web server's memory limit.
-        $pcm = '';
-        $sampleRate = null;
-        $channels = 1;
-        $joined = 0;
-        foreach (array_keys($parts) as $key) {
-            $decoded = $this->decodePcm($parts[$key]['bytes'], $parts[$key]['mime_type']);
-            unset($parts[$key]);
-            $sampleRate ??= $decoded['sample_rate'];
-            $channels = $decoded['channels'];
-            if ($joined++ > 0) {
-                $pcm .= str_repeat("\0", (int) round($sampleRate * 0.3) * 2 * $channels);
-            }
-            $pcm .= strlen($decoded['pcm']) % 2 === 0 ? $decoded['pcm'] : substr($decoded['pcm'], 0, -1);
-            unset($decoded);
-        }
-
-        return [
-            'bytes' => $this->wrapPcmL16AsWav($pcm, $sampleRate ?? 24000, $channels, 16),
-            'mime_type' => 'audio/wav',
-        ];
-    }
-
-    /**
-     * @return array{pcm:string,sample_rate:int,channels:int}
-     */
-    private function decodePcm(string $data, ?string $mimeTypeHint): array
-    {
-        $sampleRate = preg_match('/rate=(\d+)/i', (string) $mimeTypeHint, $m) ? (int) $m[1] : 24000;
-        $channels = 1;
-
-        if ($this->detectAudioMimeType($data, $mimeTypeHint) !== 'audio/wav') {
-            return ['pcm' => $data, 'sample_rate' => $sampleRate, 'channels' => $channels];
-        }
-
-        $pcm = '';
-        $offset = 12;
-        while ($offset + 8 <= strlen($data)) {
-            $id = substr($data, $offset, 4);
-            $size = unpack('V', substr($data, $offset + 4, 4))[1];
-            if ($id === 'fmt ' && $size >= 16) {
-                $channels = unpack('v', substr($data, $offset + 10, 2))[1] ?: 1;
-                $sampleRate = unpack('V', substr($data, $offset + 12, 4))[1] ?: $sampleRate;
-            } elseif ($id === 'data') {
-                $pcm .= substr($data, $offset + 8, $size);
-            }
-            $offset += 8 + $size + ($size % 2);
-        }
-
-        return ['pcm' => $pcm, 'sample_rate' => $sampleRate, 'channels' => $channels];
+        return SpeechJoin::toFile(is_array($parts) ? SpeechJoin::draining($parts) : $parts, [], $groups);
     }
 
     /**
@@ -1340,115 +1303,28 @@ class GeminiTtsProvider implements TtsProviderInterface
      */
     private function saveAudioFile(string $audioData, ?string $mimeTypeHint = null): string
     {
-        // Gemini can return raw PCM (L16); detect and wrap as WAV when needed.
-        $mimeType = $this->detectAudioMimeType($audioData, $mimeTypeHint);
-        if ($mimeType === 'audio/l16') {
-            $audioData = $this->wrapPcmL16AsWav($audioData, 24000, 1, 16);
-            $mimeType = 'audio/wav';
-        }
-        $packaged = ShareableAudio::package($audioData);
-        $audioData = $packaged['bytes'];
-        $extension = $packaged['extension'];
-
-        $filename = 'audio/' . now()->format('Ymd_His') . '_listen.studio_' . Str::random(12) . '.' . $extension;
-        $disk = Storage::disk('public');
-
-        if (!$disk->exists('audio')) {
-            $disk->makeDirectory('audio');
-        }
-
-        // The public disk reports a failed write instead of throwing: without this
-        // the generation would point at a file that is not there.
-        if (! $disk->put($filename, $audioData)) {
-            throw new \RuntimeException('The voice file could not be saved.');
-        }
-
-        return $filename;
+        // Gemini can return raw PCM (L16): it is written as a WAV on the way.
+        return $this->saveJoinedAudio(SpeechJoin::toFile([['bytes' => $audioData, 'mime_type' => $mimeTypeHint]]));
     }
 
     /**
-     * Detect audio MIME type from raw bytes.
+     * Save a take from its temp file: packaged (MP3, ShareableAudio) and
+     * written to the disk as a stream, so a long one is never held whole.
+     *
+     * @param  array{path:string,mime_type:string,pieces:array<int, array<int, int>>}  $joined
      */
-    private function detectAudioMimeType(string $data, ?string $hint = null): string
+    private function saveJoinedAudio(array $joined): string
     {
-        if (strlen($data) >= 12 && substr($data, 0, 4) === 'RIFF' && substr($data, 8, 4) === 'WAVE') {
-            return 'audio/wav';
+        $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
+        try {
+            $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
+            $filename = 'audio/' . now()->format('Ymd_His') . '_listen.studio_' . Str::random(12) . '.' . $packaged['extension'];
+            ShareableAudio::store($packaged['path'], $filename);
+
+            return $filename;
+        } finally {
+            ShareableAudio::discard($joined['path'], $packaged['path']);
         }
-
-        if ($this->looksLikeMpegAudio($data)) {
-            return 'audio/mpeg';
-        }
-
-        $normalizedHint = strtolower(trim((string) $hint));
-        if ($normalizedHint !== '') {
-            if (str_starts_with($normalizedHint, 'audio/wav') || str_starts_with($normalizedHint, 'audio/x-wav')) {
-                return 'audio/wav';
-            }
-            if (str_starts_with($normalizedHint, 'audio/mpeg') || str_starts_with($normalizedHint, 'audio/mp3')) {
-                return 'audio/mpeg';
-            }
-            if (str_starts_with($normalizedHint, 'audio/l16') || str_starts_with($normalizedHint, 'audio/pcm')) {
-                return 'audio/l16';
-            }
-        }
-
-        // Gemini 2.5 commonly returns raw 16-bit PCM (audio/L16) in inlineData.
-        return 'audio/l16';
-    }
-
-    /**
-     * PCM can start with 0xFFFF, which matches a loose MPEG sync mask.
-     * Require a real frame header so that sample is saved as WAV.
-     */
-    private function looksLikeMpegAudio(string $data): bool
-    {
-        if (strlen($data) >= 3 && substr($data, 0, 3) === 'ID3') {
-            return true;
-        }
-        if (strlen($data) < 4 || ord($data[0]) !== 0xFF || (ord($data[1]) & 0xE0) !== 0xE0) {
-            return false;
-        }
-
-        $version = (ord($data[1]) >> 3) & 0x03;
-        $layer = (ord($data[1]) >> 1) & 0x03;
-        $bitrate = (ord($data[2]) >> 4) & 0x0F;
-        $sampleRate = (ord($data[2]) >> 2) & 0x03;
-
-        return $version !== 0x01
-            && $layer !== 0x00
-            && $bitrate !== 0x00
-            && $bitrate !== 0x0F
-            && $sampleRate !== 0x03;
-    }
-
-    private function wrapPcmL16AsWav(
-        string $pcmData,
-        int $sampleRate = 24000,
-        int $channels = 1,
-        int $bitsPerSample = 16
-    ): string {
-        if ((strlen($pcmData) % 2) !== 0) {
-            $pcmData = substr($pcmData, 0, -1);
-        }
-
-        $dataLength = strlen($pcmData);
-        $byteRate = (int) ($sampleRate * $channels * ($bitsPerSample / 8));
-        $blockAlign = (int) ($channels * ($bitsPerSample / 8));
-
-        return 'RIFF'
-            . pack('V', 36 + $dataLength)
-            . 'WAVE'
-            . 'fmt '
-            . pack('V', 16)
-            . pack('v', 1)
-            . pack('v', $channels)
-            . pack('V', $sampleRate)
-            . pack('V', $byteRate)
-            . pack('v', $blockAlign)
-            . pack('v', $bitsPerSample)
-            . 'data'
-            . pack('V', $dataLength)
-            . $pcmData;
     }
 
     /**
