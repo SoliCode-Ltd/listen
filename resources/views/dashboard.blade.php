@@ -1608,6 +1608,8 @@
       border-color: transparent;
       color: #fff;
     }
+    .jobs-older[hidden] { display: none; }
+    .jobs-older .pagination-btn { padding: 0 1rem; }
     .job-delete-btn {
       min-width: auto;
       height: 1.95rem;
@@ -2906,6 +2908,10 @@
           </table>
         </div>
         <div class="pagination" id="jobsPagination"></div>
+        {{-- The newest 500 voices are listed; older ones come a page at a time. --}}
+        <div class="pagination jobs-older" id="jobsOlder" @if(! ($olderJobsBefore ?? null)) hidden @endif>
+          <button type="button" class="pagination-btn" id="jobsOlderBtn">{{ __('ui.dashboard.show_older_voices') }}</button>
+        </div>
       </div>
     </section>
 
@@ -3287,6 +3293,7 @@
       'voices' => __('ui.dashboard.voices'),
       'prev' => __('ui.dashboard.prev'),
       'next' => __('ui.dashboard.next'),
+      'older_voices_failed' => __('ui.dashboard.older_voices_failed'),
       'reuse_settings' => __('ui.dashboard.reuse_settings'),
       'language_ar' => __('ui.dashboard.arabic'),
       'language_en' => __('ui.dashboard.english'),
@@ -3342,6 +3349,7 @@
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
     const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
     const latestJobsUrl = '{{ route('dashboard.jobs.latest') }}';
+    const olderJobsUrl = '{{ route('dashboard.jobs.older') }}';
     const csrfTokenUrl = '{{ route('dashboard.csrf-token') }}';
     // Renewed by listenFetchWithFreshCsrf when the page's token has expired.
     let csrfToken = '{{ csrf_token() }}';
@@ -3772,6 +3780,8 @@
         meta.push(i18n.generated_audio_ready);
         generatedAudioMeta.textContent = meta.join(' - ');
       }
+      // The finished voice says so when its sound environment could not be added.
+      if (job?.note) showFormMessage('note', String(job.note));
     }
 
     function setActiveDashboardSection(sectionId) {
@@ -4283,6 +4293,51 @@
       }
     }
 
+    // The page lists the newest voices; "Show older voices" adds the next page of older
+    // ones to the history and opens it at the first of them, until there are no more.
+    const jobsOlder = document.getElementById('jobsOlder');
+    const jobsOlderBtn = document.getElementById('jobsOlderBtn');
+    let olderJobsBefore = @json($olderJobsBefore ?? null);
+
+    async function loadOlderJobs() {
+      if (!olderJobsBefore || !jobsOlderBtn || jobsOlderBtn.disabled) return;
+      jobsOlderBtn.disabled = true;
+      let data = null;
+      try {
+        const response = await fetch(`${olderJobsUrl}?before=${encodeURIComponent(String(olderJobsBefore))}`, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        data = response.ok ? await response.json().catch(() => null) : null;
+      } catch (error) {
+        // No connection: said below, and the button stays to try again.
+      }
+      jobsOlderBtn.disabled = false;
+      if (!Array.isArray(data?.jobs)) {
+        showJobsMessage('error', i18n.older_voices_failed);
+        return;
+      }
+      showJobsMessage(null, '');
+
+      const known = new Set(allJobs.map(resolveJobKey));
+      const added = new Set();
+      data.jobs.forEach(function(job) {
+        const normalized = normalizeJob(job);
+        const key = normalized ? resolveJobKey(normalized) : '';
+        if (!key || known.has(key)) return;
+        known.add(key);
+        added.add(key);
+        allJobs.push(normalized);
+      });
+      sortAllJobsByNewest();
+      const firstAdded = allJobs.findIndex((job) => added.has(resolveJobKey(job)));
+      if (firstAdded !== -1) jobsCurrentPage = Math.floor(firstAdded / jobsPerPage) + 1;
+      renderJobsPage();
+
+      olderJobsBefore = data.next_before || null;
+      if (jobsOlder) jobsOlder.hidden = !olderJobsBefore;
+    }
+
     // Voices still being made (a long text is made after the reply) are checked on
     // until they finish: every 2 seconds at first, slowing to every 6, for at most
     // 20 minutes, and not while the tab is hidden. A finished one plays in the
@@ -4534,6 +4589,7 @@
       if (!btn || btn.disabled) return;
       goToPage(btn.getAttribute('data-page'));
     });
+    jobsOlderBtn?.addEventListener('click', loadOlderJobs);
     jobsTableBody?.addEventListener('click', function(e) {
       const reuseLink = e.target.closest('.job-reuse-btn');
       if (reuseLink instanceof HTMLAnchorElement) {

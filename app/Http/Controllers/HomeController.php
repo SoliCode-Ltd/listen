@@ -540,6 +540,7 @@ class HomeController extends Controller
     public function demo(Request $request)
     {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         try {
             $maxChars = $this->demoCharAllowance($request);
@@ -658,6 +659,7 @@ class HomeController extends Controller
         TtsService $ttsService,
     ) {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         $maxChars = $this->demoCharAllowance($request);
         $demoPlan = $this->planAccessService->freePlan();
@@ -1388,6 +1390,17 @@ class HomeController extends Controller
         return DemoAllowance::chars();
     }
 
+    /**
+     * The page counts a line break as one character, but its form sends it as
+     * \r\n: read as the page counted it, the text is checked, charged and spoken the same.
+     */
+    private function readTextAsCounted(Request $request): void
+    {
+        if (is_string($request->input('text'))) {
+            $request->merge(['text' => str_replace(["\r\n", "\r"], "\n", $request->input('text'))]);
+        }
+    }
+
     private function demoLimitExceededMessage(Request $request, int $maxChars): string
     {
         return __('ui.backend.demo_trial_limit_exceeded', ['max' => $maxChars]);
@@ -1808,6 +1821,8 @@ class HomeController extends Controller
                     'total_chars' => $totalChars !== null ? (int) $totalChars : ($originalChars ?? UsageEstimator::estimate($inputText)['chars']),
                     'dialogue_speakers' => ($validated['is_dialogue'] ?? false) ? ($validated['dialogue_speakers'] ?? []) : null,
                     'audio_effect' => $audio['audio_effect'] ?? null,
+                    // The speech cache's copy of this take (TtsService): deleted with the voice.
+                    'cache_copy' => $audio['cache_path'] ?? null,
                 ],
             ]);
         } catch (\Throwable $e) {

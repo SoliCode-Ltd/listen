@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Support\AudioFiles;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 
@@ -93,6 +94,25 @@ class AudioGeneration extends Model
     }
 
     /**
+     * Deletes the generation as its member does (the studio and the developer API),
+     * with what it leaves behind: its audio, the speech cache's copy of it
+     * (GenerateAudioJob keeps that address) and its text, each unless another
+     * voice still uses it.
+     */
+    public function deleteWithAudio(): void
+    {
+        $files = [$this->audio_path, ($this->settings_snapshot ?? [])['cache_copy'] ?? null];
+        $textItemId = (int) $this->text_item_id;
+
+        $this->delete();
+
+        AudioFiles::deleteUnused($files);
+        if ($textItemId > 0 && ! self::query()->where('text_item_id', $textItemId)->exists()) {
+            TextItem::query()->whereKey($textItemId)->delete();
+        }
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function reusableSettings(): ?array
@@ -125,7 +145,8 @@ class AudioGeneration extends Model
             'pitch' => $snapshot['pitch'] ?? $this->pitch,
             'is_dialogue' => (bool) ($snapshot['is_dialogue'] ?? $this->is_dialogue),
             'dialogue_speakers' => $snapshot['dialogue_speakers'] ?? ($dialogueMetadata['speakers'] ?? null),
-            'audio_effect' => $snapshot['audio_effect'] ?? null,
+            // The environment chosen, also one that could not be added (GenerateAudioJob).
+            'audio_effect' => $snapshot['audio_effect'] ?? $snapshot['audio_effect_not_added'] ?? null,
         ];
 
         return array_filter($settings, static fn (mixed $value): bool => $value !== null && $value !== '' && $value !== []);
