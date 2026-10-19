@@ -131,7 +131,10 @@ class ApiAsyncGenerationTest extends TestCase
         $user = $this->apiMember();
         $plain = $this->issueKey($user)['plain'];
 
-        $this->speakAsync($plain, $this->premiumVoice(), ['voice_settings' => ['speed' => 0.5]])->assertStatus(202);
+        $this->speakAsync($plain, $this->premiumVoice(), ['voice_settings' => ['speed' => 0.5]])
+            ->assertStatus(202)
+            // The answer shows what was reserved, not the estimate at normal speed.
+            ->assertJsonPath('credits_used', 90);
         $this->assertSame([90, 6], [$this->creditsSpent($user), $this->secondsCounted($user)]);
 
         $this->runWorker();

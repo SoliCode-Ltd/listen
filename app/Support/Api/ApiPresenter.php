@@ -5,6 +5,7 @@ namespace App\Support\Api;
 use App\Models\AudioGeneration;
 use App\Models\ClonedVoice;
 use App\Models\Voice;
+use App\Services\Api\ApiSpeechService;
 use App\Support\Credits;
 use App\Support\UsageEstimator;
 use App\Support\VoiceCatalog;
@@ -90,7 +91,8 @@ final class ApiPresenter
         return match (self::status($generation->status)) {
             'completed' => Credits::forSeconds((int) $generation->duration_seconds),
             'failed' => 0,
-            default => UsageEstimator::estimate((string) $generation->input_text)['credits'],
+            // As reserved: a slower speed makes longer audio.
+            default => ApiSpeechService::estimate((string) $generation->input_text, (float) ($generation->speed ?: 1.0))['credits'],
         };
     }
 

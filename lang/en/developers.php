@@ -277,6 +277,7 @@ return [
                 'The same key with a different body is refused with `422` and `idempotency_key_reused`.',
                 'While the first request is still running, a retry gets `409` and `idempotent_request_in_progress`: wait, then send it again.',
                 'If the first generation failed, the key can be used again: nothing was charged for it.',
+                'If you deleted the first generation, a retry gets `410` and `idempotent_result_deleted` and nothing is made or charged: send a new key to generate it again.',
             ],
         ],
 
@@ -416,6 +417,8 @@ return [
                 ['409', 'audio_not_ready', 'The generation has not finished yet.'],
                 ['409', 'history_item_in_progress', 'The generation is still running, so it cannot be deleted yet.'],
                 ['409', 'idempotent_request_in_progress', 'A request with this `Idempotency-Key` is still running.'],
+                ['410', 'audio_expired', 'The audio file of this history item is no longer stored.'],
+                ['410', 'idempotent_result_deleted', 'The generation made with this `Idempotency-Key` was deleted. Use a new key to generate it again.'],
                 ['422', 'validation_failed', 'A parameter is missing or not valid (see `param`).'],
                 // A fourth value: the row shows only when some plan includes that feature.
                 ['422', 'invalid_dialect', 'Unknown `dialect` for the language. The same goes for `invalid_style` and `invalid_emotion`.'],

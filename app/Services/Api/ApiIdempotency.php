@@ -92,6 +92,13 @@ class ApiIdempotency
                 }
 
                 if (! hash_equals((string) $row->fingerprint, $idempotency['fingerprint'])) {
+                    // Made, then deleted by the member: never made (and charged) again for this key.
+                    if (hash_equals((string) $row->fingerprint, self::deletedFingerprint($idempotency['fingerprint']))) {
+                        throw new ApiError(410, ApiError::TYPE_INVALID_REQUEST, 'idempotent_result_deleted',
+                            'The generation made with this Idempotency-Key was deleted. Send a new Idempotency-Key to generate it again.',
+                            self::HEADER);
+                    }
+
                     throw ApiError::invalid('idempotency_key_reused', 'This Idempotency-Key was already used for a different request. Use a new key for a new request.', self::HEADER);
                 }
 
@@ -156,6 +163,36 @@ class ApiIdempotency
         } catch (\Throwable $e) {
             Log::warning('Could not release an Idempotency-Key.', ['error' => $e->getMessage()]);
         }
+    }
+
+    /**
+     * A member deleted a generation a key made. Deleting it clears the key's
+     * link, which would let a retry with that key make and charge it again:
+     * the key is kept instead, marked as having made something now deleted,
+     * until it expires.
+     */
+    public static function markResultDeleted(AudioGeneration $generation): void
+    {
+        if ($generation->api_key_id === null || ! self::available()) {
+            return;
+        }
+
+        try {
+            ApiIdempotencyKey::query()
+                ->where('user_id', $generation->user_id)
+                ->where('audio_generation_id', $generation->id)
+                ->get()
+                ->each(fn (ApiIdempotencyKey $row) => $row->forceFill([
+                    'fingerprint' => self::deletedFingerprint((string) $row->fingerprint),
+                ])->save());
+        } catch (\Throwable $e) {
+            Log::warning('Could not keep the Idempotency-Key of a deleted generation.', ['error' => $e->getMessage()]);
+        }
+    }
+
+    private static function deletedFingerprint(string $fingerprint): string
+    {
+        return hash('sha256', 'deleted:'.$fingerprint);
     }
 
     private static function inProgress(?AudioGeneration $generation): ApiError

@@ -276,6 +276,7 @@ return [
                 'المفتاح نفسه مع جسم مختلف يُرفض بالحالة `422` والرمز `idempotency_key_reused`.',
                 'ما دام الطلب الأول قيد التنفيذ، تحصل إعادة المحاولة على `409` والرمز `idempotent_request_in_progress`: انتظر ثم أرسله مجددًا.',
                 'إذا فشلت عملية التوليد الأولى فيمكن استخدام المفتاح مرة أخرى، إذ لم يُخصم عنها شيء.',
+                'إذا حذفت عملية التوليد الأولى، تحصل إعادة المحاولة على `410` والرمز `idempotent_result_deleted` دون أي توليد أو خصم: أرسل قيمة جديدة لتوليدها مرة أخرى.',
             ],
         ],
 
@@ -415,6 +416,8 @@ return [
                 ['409', 'audio_not_ready', 'لم تكتمل عملية التوليد بعد.'],
                 ['409', 'history_item_in_progress', 'عملية التوليد ما زالت جارية فلا يمكن حذفها بعد.'],
                 ['409', 'idempotent_request_in_progress', 'طلب بقيمة `Idempotency-Key` نفسها ما زال قيد التنفيذ.'],
+                ['410', 'audio_expired', 'لم يعد ملف الصوت لهذا العنصر من السجل محفوظًا.'],
+                ['410', 'idempotent_result_deleted', 'حُذفت عملية التوليد التي صُنعت بقيمة `Idempotency-Key` هذه. استخدم قيمة جديدة لتوليدها مرة أخرى.'],
                 ['422', 'validation_failed', 'معامل مفقود أو غير صالح (راجع `param`).'],
                 // A fourth value: the row shows only when some plan includes that feature.
                 ['422', 'invalid_dialect', 'قيمة `dialect` غير معروفة لهذه اللغة، ومثلها `invalid_style` و`invalid_emotion`.'],

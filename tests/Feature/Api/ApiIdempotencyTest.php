@@ -245,6 +245,35 @@ class ApiIdempotencyTest extends TestCase
     }
 
     /**
+     * Deleting the history item a key made never lets a retry with that key
+     * make it (and charge it) again: the retry is told it was deleted.
+     */
+    public function test_a_retry_after_deleting_the_item_is_not_charged_again(): void
+    {
+        $user = $this->apiMember();
+        $plain = $this->issueKey($user)['plain'];
+        $voice = $this->premiumVoice();
+        $headers = ['Idempotency-Key' => 'order-1010'];
+
+        $first = $this->speak($plain, $voice, [], $headers)->assertOk();
+        $this->apiDelete($plain, '/history/'.$first->headers->get('X-History-Item-Id'))->assertOk();
+
+        $this->assertApiError($this->speak($plain, $voice, [], $headers), 410, 'idempotent_result_deleted');
+        $this->travel(3)->minutes();
+        $this->assertApiError($this->speak($plain, $voice, [], $headers), 410, 'idempotent_result_deleted');
+        // Another body under the same key is still a reused key.
+        $this->assertApiError($this->speak($plain, $voice, ['text' => 'Something else entirely.'], $headers), 422, 'idempotency_key_reused');
+
+        $this->assertSame([60, 1], [$this->creditsSpent($user), $this->requestsCounted($user)]);
+        $this->assertSame(1, $this->speechCalls->gemini);
+        $this->assertSame(0, AudioGeneration::query()->count());
+
+        // A new key makes it again, charged once more.
+        $this->speak($plain, $voice, [], ['Idempotency-Key' => 'order-1011'])->assertOk();
+        $this->assertSame(120, $this->creditsSpent($user));
+    }
+
+    /**
      * Another account sending the same key and body gets a generation of its
      * own, paid by itself; it never receives the first account's audio.
      */
