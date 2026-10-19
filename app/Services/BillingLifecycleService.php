@@ -14,6 +14,12 @@ use Laravel\Cashier\Cashier;
 
 class BillingLifecycleService
 {
+    /** What the cancellation email says when the grace days ran out unpaid. */
+    private const GRACE_RAN_OUT = [
+        'Your grace period ended without a successful payment, so the subscription was canceled.',
+        'Your account is on the free plan now.',
+    ];
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BillingSyncService $billingSyncService,
@@ -260,13 +266,12 @@ class BillingLifecycleService
                     }
 
                     if (! $billingSubscription || ! in_array($stripeStatus, ['past_due', 'unpaid'], true)) {
-                        // Nothing live in Stripe to cancel (it ended, or never started):
-                        // the flag is settled and the sync decides the plan.
-                        $subscription->forceFill([
-                            'billing_payment_state' => 'ok',
-                            'billing_grace_ends_at' => null,
-                        ])->save();
-                        $this->billingSyncService->syncIfStale($user, true);
+                        // Nothing live in Stripe to cancel: it ended meanwhile (Stripe's own
+                        // retries can cancel it before the grace runs out), or never started.
+                        // The plan was kept on until now, as the member was told; it ends
+                        // now, and they are told, as when it is cancelled below.
+                        $this->endUnpaidPlan($user, $subscription);
+                        $count++;
 
                         continue;
                     }
@@ -285,47 +290,117 @@ class BillingLifecycleService
                         continue;
                     }
 
-                    if (! $this->cancelStripeSubscriptionNow($user, $billingSubscription)) {
+                    if (! $this->endUnpaidSubscription($user, $subscription, $billingSubscription)) {
                         continue;
                     }
 
-                    $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
-                    $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
-                    $subscription->forceFill([
-                        'billing_payment_state' => 'ok',
-                        'billing_grace_ends_at' => null,
-                        'billing_downgraded_at' => now(),
-                    ])->save();
-                    // On Free now, also when the billing sync below cannot read Stripe.
-                    $this->moveToFreePlan($user);
-
-                    $this->mail->send(
-                        $user,
-                        'Your subscription was canceled',
-                        $this->mail->compose(
-                            $user,
-                            [
-                                'Your grace period ended without a successful payment, so the subscription was canceled.',
-                                'Your account is on the free plan now.',
-                            ],
-                            [
-                                'Plan' => $planName,
-                                'Grace Period Ended' => $graceEndedAt,
-                                'Canceled At' => now()->format('M j, Y g:i A'),
-                                'Payment State' => 'Canceled',
-                            ],
-                            'You can upgrade again any time from '.$this->mail->manageBillingUrl()
-                        ),
-                        "grace-cancel:{$user->id}:{$graceEndedAt}",
-                        24 * 30
-                    );
-
-                    $this->billingSyncService->syncIfStale($user, true);
                     $count++;
                 }
             });
 
         return $count;
+    }
+
+    /**
+     * The member cancels while a failed renewal's grace days keep their plan on.
+     * The renewal was never paid, so no paid period is left to run to its end:
+     * the subscription and the plan end now, the way the grace job ends them,
+     * and the member is on Free. False when that could not be done, and nothing
+     * changed: Stripe could not be read or refused, or has been paid since.
+     */
+    public function cancelDuringGrace(User $user): bool
+    {
+        $subscription = $this->latestLocalSubscription($user);
+        $billingSubscription = $this->latestBillingSubscription($user);
+        if (! RenewalGrace::keeps($subscription) || ! $billingSubscription) {
+            return false;
+        }
+
+        // Stripe decides, not our copy: a renewal paid meanwhile is never cancelled this way.
+        if (! in_array($this->stripeStatusNow($billingSubscription), ['past_due', 'unpaid'], true)) {
+            $this->billingSyncService->syncIfStale($user, true);
+
+            return false;
+        }
+
+        if (! LiveServer::allowsCustomerActions()) {
+            // As the grace job there: staging never cancels in Stripe or emails, and its
+            // own copy of the member ends on Free, as on the live site.
+            LiveServer::skipped('cancelling a subscription during its grace period', [
+                'user_id' => $user->id,
+                'stripe_subscription_id' => $billingSubscription->stripe_id,
+            ]);
+            $this->moveToFreePlan($user);
+
+            return true;
+        }
+
+        return $this->endUnpaidSubscription($user, $subscription, $billingSubscription, [
+            'You canceled your subscription while its latest payment was still unpaid, so it ended straight away.',
+            'Your account is on the free plan now, and nothing more will be charged.',
+        ]);
+    }
+
+    /**
+     * Ends a card subscription whose renewal was never paid, on the live site:
+     * cancelled now in Stripe, its open invoice voided, and the plan moved to
+     * Free (endUnpaidPlan()). The grace job does this when the grace days run
+     * out, and the member when they cancel during them. False when Stripe could
+     * not cancel it: nothing changed.
+     *
+     * @param  list<string>  $summary  what the email says happened
+     */
+    private function endUnpaidSubscription(User $user, Subscription $subscription, BillingSubscription $billingSubscription, array $summary = self::GRACE_RAN_OUT): bool
+    {
+        if (! $this->cancelStripeSubscriptionNow($user, $billingSubscription)) {
+            return false;
+        }
+
+        $this->voidOpenInvoices($user, (string) $billingSubscription->stripe_id);
+        $this->endUnpaidPlan($user, $subscription, $summary);
+
+        return true;
+    }
+
+    /**
+     * Moves a card plan whose renewal was never paid to Free, and tells the
+     * member (once: the email's dedupe key).
+     *
+     * @param  list<string>  $summary  what the email says happened
+     */
+    private function endUnpaidPlan(User $user, Subscription $subscription, array $summary = self::GRACE_RAN_OUT): void
+    {
+        $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
+        $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
+        // Cancelled by the member before the grace days ran out: they did not end.
+        $graceRanOut = $subscription->billing_grace_ends_at === null || $subscription->billing_grace_ends_at->lte(now());
+        $subscription->forceFill([
+            'billing_payment_state' => 'ok',
+            'billing_grace_ends_at' => null,
+            'billing_downgraded_at' => now(),
+        ])->save();
+        // On Free now, also when the billing sync below cannot read Stripe.
+        $this->moveToFreePlan($user);
+
+        $this->mail->send(
+            $user,
+            'Your subscription was canceled',
+            $this->mail->compose(
+                $user,
+                $summary,
+                [
+                    'Plan' => $planName,
+                    'Grace Period Ended' => $graceRanOut ? $graceEndedAt : null,
+                    'Canceled At' => now()->format('M j, Y g:i A'),
+                    'Payment State' => 'Canceled',
+                ],
+                'You can upgrade again any time from '.$this->mail->manageBillingUrl()
+            ),
+            "grace-cancel:{$user->id}:{$graceEndedAt}",
+            24 * 30
+        );
+
+        $this->billingSyncService->syncIfStale($user, true);
     }
 
     public function syncUserByStripeCustomerId(?string $stripeCustomerId): void
@@ -441,6 +516,27 @@ class BillingLifecycleService
             ]);
 
             return false;
+        }
+    }
+
+    /**
+     * Cancelling only pauses collection on the subscription's open invoices: the
+     * unpaid renewal is voided, so it can never be paid for a period the member
+     * no longer has (Manage Subscription lists an open invoice with a pay link).
+     */
+    private function voidOpenInvoices(User $user, string $stripeSubscriptionId): void
+    {
+        try {
+            $open = Cashier::stripe()->invoices->all(['subscription' => $stripeSubscriptionId, 'status' => 'open', 'limit' => 20]);
+            foreach ($open->data ?? [] as $invoice) {
+                Cashier::stripe()->invoices->voidInvoice((string) $invoice->id, []);
+            }
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to void the open invoices of a subscription cancelled unpaid.', [
+                'user_id' => $user->id,
+                'stripe_subscription_id' => $stripeSubscriptionId,
+                'error' => $exception->getMessage(),
+            ]);
         }
     }
 }

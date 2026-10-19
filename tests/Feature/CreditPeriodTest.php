@@ -279,7 +279,7 @@ class CreditPeriodTest extends TestCase
         $this->assertSame('2027-03-31 10:00', CreditPeriod::current($yearly->id)['key']);
     }
 
-    public function test_a_plan_paid_by_hand_starts_afresh_even_before_the_old_period_ends(): void
+    public function test_a_plan_paid_by_hand_again_before_it_ends_gets_its_new_month_after_the_one_paid_for(): void
     {
         $this->switchOn('2026-10-01 00:00:00');
         $user = User::factory()->create();
@@ -289,13 +289,54 @@ class CreditPeriodTest extends TestCase
         $payments->approve($this->manualPayment($user), $reviewer);
         $this->spend($user, 900000);
 
-        // Out of credits on the 25th, the member pays again: a new month of credits now.
+        // Out of credits on the 25th, the member pays again: the month paid for runs to
+        // its end with what it used, and the new month follows it.
         $this->travelTo(Carbon::parse('2026-10-25 10:00:00'));
         $payments->approve($this->manualPayment($user), $reviewer);
 
+        $this->assertSame('2026-12-01 10:00:00', $this->planEnd($user));
         $counter = CreditPeriod::counter($user->id);
-        $this->assertSame('2026-10-25 10:00', $counter->period_ym);
-        $this->assertSame(0, $counter->total_chars);
+        $this->assertSame('2026-10-01 10:00', $counter->period_ym);
+        $this->assertSame(900000, $counter->total_chars);
+
+        // The new month starts where the paid one ends, with a fresh allowance.
+        $this->travelTo(Carbon::parse('2026-11-01 10:05:00'));
+        $period = CreditPeriod::current($user->id);
+        $this->assertSame('2026-11-01 10:00', $period['key']);
+        $this->assertSame('2026-12-01 10:00:00', $period['ends_at']->toDateTimeString());
+        $this->assertSame(0, CreditPeriod::counter($user->id)->total_chars);
+    }
+
+    public function test_renewing_by_hand_when_reminded_keeps_the_days_already_paid_for(): void
+    {
+        $this->switchOn('2026-09-01 00:00:00');
+        $user = User::factory()->create();
+        $reviewer = User::factory()->create(['is_admin' => true]);
+        $payments = app(ManualPaymentService::class);
+        $this->travelTo(Carbon::parse('2026-09-26 10:00:00'));
+        $payments->approve($this->manualPayment($user), $reviewer);
+        $this->assertSame('2026-10-26 10:00:00', $this->planEnd($user));
+
+        // "Your plan ends in 7 days ... To keep it, renew": the member pays again on 19 October.
+        $this->travelTo(Carbon::parse('2026-10-19 10:00:00'));
+        $payments->approve($this->manualPayment($user), $reviewer);
+        $this->assertSame('2026-11-26 10:00:00', $this->planEnd($user), 'The 7 days already paid for are kept.');
+
+        // A yearly payment follows on in the same way.
+        $this->travelTo(Carbon::parse('2026-11-20 10:00:00'));
+        $payments->approve($this->manualPayment($user, 'yearly'), $reviewer);
+        $this->assertSame('2027-11-26 10:00:00', $this->planEnd($user));
+
+        // Paid after the plan ended: the new month starts on the day it is paid.
+        $this->travelTo(Carbon::parse('2027-12-03 10:00:00'));
+        $payments->approve($this->manualPayment($user), $reviewer);
+        $this->assertSame('2028-01-03 10:00:00', $this->planEnd($user));
+        $this->assertSame('2027-12-03 10:00', CreditPeriod::current($user->id)['key']);
+    }
+
+    private function planEnd(User $user): string
+    {
+        return Subscription::query()->where('user_id', $user->id)->latest('id')->firstOrFail()->current_period_end->toDateTimeString();
     }
 
     private function switchOn(string $at): void
@@ -317,12 +358,12 @@ class CreditPeriodTest extends TestCase
         $counter->addSeconds(intdiv($chars, 15));
     }
 
-    private function manualPayment(User $user): ManualPaymentRequest
+    private function manualPayment(User $user, string $cycle = 'monthly'): ManualPaymentRequest
     {
         return app(ManualPaymentService::class)->createRequest(
             $user,
             $this->creator,
-            'monthly',
+            $cycle,
             'instapay',
             ['amount_minor' => 99900, 'currency' => 'EGP', 'country_code' => 'EG'],
             ['country_code' => 'EG', 'lines' => ['0123456789']],

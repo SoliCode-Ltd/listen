@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Mail;
 
 /**
  * The plain-text billing emails Listen sends by itself: plan end reminders,
- * a missed card payment and a subscription cancelled after its grace days.
+ * a missed card payment and a subscription cancelled unpaid (its grace days
+ * ran out, or the member cancelled during them).
  * Only the live site sends them, and each one once (its dedupe key).
  */
 class BillingLifecycleMail

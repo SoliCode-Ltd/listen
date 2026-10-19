@@ -49,6 +49,9 @@ class AuthController extends Controller
             }
 
             $this->referralService->attachReferrerOnRegister($user, $code, $request);
+            // A campaign that rewards the sign-up itself decides it now (the abuse guard
+            // can hold it for review); other steps are decided when they happen.
+            app(\App\Services\Referral\ReferralQualificationService::class)->evaluate($user, 'signup');
             \Illuminate\Support\Facades\Cookie::queue(
                 \Illuminate\Support\Facades\Cookie::forget(CaptureReferralVisit::COOKIE_NAME)
             );

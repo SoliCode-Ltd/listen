@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\CaptureReferralVisit;
 use App\Models\DemoRewardTransaction;
 use App\Models\Plan;
 use App\Models\ReferralCampaign;
@@ -216,7 +217,65 @@ class ReferralProgramTest extends TestCase
         $this->assertSame(0, $ledger->balanceFor($referrer));
     }
 
-    private function seedCampaign(): ReferralCampaign
+    public function test_without_a_running_campaign_the_demo_page_promises_no_referral_reward(): void
+    {
+        ReferralCampaign::query()->update(['is_active' => false]);
+        ReferralCampaign::forgetCache();
+        $member = User::factory()->create();
+
+        $this->actingAs($member)->getLocalizedRoute('demo.page')
+            ->assertOk()
+            ->assertDontSee('id="referralModal"', false)
+            ->assertDontSee('id="referralGiftFab"', false);
+
+        // With one running, the popup gives its own reward and says what earns it.
+        $this->seedCampaign(ReferralCampaign::QUALIFICATION_PAID_PLAN, 2500);
+        $this->actingAs($member)->getLocalizedRoute('demo.page')
+            ->assertOk()
+            ->assertSee('id="referralModal"', false)
+            ->assertSee(str_replace('{reward_amount}', '2,500', __('ui.referral.popup_description_paid_plan')))
+            ->assertDontSee(__('ui.referral.popup_description_signup'));
+
+        app()->setLocale('ar');
+        $this->seedCampaign(ReferralCampaign::QUALIFICATION_SIGNUP, 2500);
+        $this->actingAs($member)->getLocalizedRoute('demo.page')
+            ->assertOk()
+            ->assertSee(str_replace('{reward_amount}', '2,500', __('ui.referral.popup_description_signup', [], 'ar')));
+    }
+
+    public function test_with_a_signup_campaign_signing_up_through_a_referral_link_rewards_the_referrer(): void
+    {
+        $campaign = $this->seedCampaign(ReferralCampaign::QUALIFICATION_SIGNUP);
+        $this->seedFreePlan();
+        // An established referrer: signups minutes apart are flagged as tandem abuse.
+        $referrer = User::factory()->create(['created_at' => now()->subDays(2)]);
+        $code = app(ReferralService::class)->ensureProfile($referrer)->referral_code;
+
+        // The friend opens the link (the demo asks them to sign up first), then signs up.
+        $visit = $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($this->localizedRoute('demo.page').'?ref='.$code);
+        $cookie = $visit->getCookie(CaptureReferralVisit::COOKIE_NAME);
+        $this->assertNotNull($cookie);
+
+        $this->withCookie(CaptureReferralVisit::COOKIE_NAME, (string) $cookie->getValue())
+            ->postLocalizedRoute('register.submit', [
+                'name' => 'Friend',
+                'email' => 'friend@example.test',
+                'password' => 'password123',
+                'password_confirmation' => 'password123',
+            ])->assertRedirect();
+
+        $friend = User::query()->where('email', 'friend@example.test')->firstOrFail();
+        $conversion = ReferralConversion::query()->where('referred_user_id', $friend->id)->firstOrFail();
+        $this->assertSame((int) $referrer->id, (int) $conversion->referrer_user_id);
+        $this->assertSame(ReferralConversion::STATUS_APPROVED, $conversion->status);
+        $this->assertSame((int) $campaign->reward_chars, app(DemoRewardLedgerService::class)->balanceFor($referrer));
+    }
+
+    private function seedCampaign(string $step = ReferralCampaign::QUALIFICATION_PAID_PLAN, int $reward = 1000): ReferralCampaign
     {
         ReferralCampaign::forgetCache();
 
@@ -224,8 +283,8 @@ class ReferralProgramTest extends TestCase
         return ReferralCampaign::query()->updateOrCreate(['slug' => 'default'], [
             'name' => 'Default',
             'is_active' => true,
-            'qualification_step' => ReferralCampaign::QUALIFICATION_PAID_PLAN,
-            'reward_chars' => 1000,
+            'qualification_step' => $step,
+            'reward_chars' => $reward,
             'visit_window_days' => 30,
             'max_conversions_per_referrer_per_day' => 100,
             'max_conversions_per_referrer_total' => 10000,

@@ -1398,7 +1398,10 @@
   </script>
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
   @auth
-    @include('referral.popup')
+    {{-- Only while a referral campaign runs: without one no reward is given. --}}
+    @if (\App\Models\ReferralCampaign::active())
+      @include('referral.popup')
+    @endif
   @endauth
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>

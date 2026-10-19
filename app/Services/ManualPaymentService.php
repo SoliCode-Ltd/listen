@@ -97,18 +97,26 @@ class ManualPaymentService
             $priceSnapshot = is_array($request->price_snapshot) ? $request->price_snapshot : [];
             $priceSnapshot['approval_context'] = $this->snapshotApprovalContext($currentSubscription);
 
+            // Paid before the plan paid by hand has ended (the reminders ask members to
+            // renew before then): the new period follows the one already paid for, so
+            // no paid day is lost. Otherwise it starts now.
+            $paidUntil = $this->paidByHandUntil($currentSubscription);
+            $from = $paidUntil ?? now();
             $periodEnd = strtolower($request->billing_cycle) === 'yearly'
-                ? now()->addYear()
-                : now()->addMonth();
+                ? $from->copy()->addYear()
+                : $from->copy()->addMonth();
 
             // Paid in full for a period of its own: its credits start afresh, even
-            // when the member pays before the old period ends (a plan change by
-            // card carries the credits on instead, App\Support\CreditPeriod).
+            // when it replaces a plan given by the team before that one ends (a plan
+            // change by card carries the credits on instead, App\Support\CreditPeriod).
+            // A period that follows one paid by hand keeps that one's start, so its
+            // credits run to its end and the new period's credits start fresh then.
             $subscription = CreditPeriod::startingAfresh(fn (): Subscription => $this->planAccessService->assignPlan(
                 $request->user,
                 $request->plan,
                 'active',
                 $periodEnd,
+                $paidUntil !== null ? ($currentSubscription->current_period_start ?? $currentSubscription->created_at) : null,
             ));
 
             $subscription->forceFill([
@@ -273,6 +281,29 @@ class ManualPaymentService
         }
 
         abort(404);
+    }
+
+    /**
+     * When the member's plan paid by hand ends, while it is still running: the
+     * plan an approved InstaPay / Vodafone Cash payment set. Null when it has
+     * ended, or was not paid by hand (given by the team, paid by card, free).
+     */
+    private function paidByHandUntil(?Subscription $current): ?Carbon
+    {
+        $end = $current?->current_period_end;
+        if ($end === null || $end->lte(now()) || (string) $current->status !== 'active'
+            || (string) $current->billing_payment_state !== 'manual_override') {
+            return null;
+        }
+
+        $paidByHand = ManualPaymentRequest::query()
+            ->where('user_id', $current->user_id)
+            ->where('status', ManualPaymentRequest::STATUS_APPROVED)
+            ->where('approved_subscription_id', $current->id)
+            ->where('plan_id', $current->plan_id)
+            ->exists();
+
+        return $paidByHand ? $end->copy() : null;
     }
 
     private function hasActiveStripeSubscription(User $user): bool
