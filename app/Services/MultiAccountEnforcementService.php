@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\PaidMember;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -29,12 +30,14 @@ class MultiAccountEnforcementService
 
     /**
      * Check if the given user exceeds the max linked-account limit and
-     * auto-block them if so. Admins are never auto-blocked.
+     * auto-block them if so. Admins are never auto-blocked, and neither are
+     * members who pay or have paid: an admin decides about those.
      *
      * Auto-blocking uses ONLY the device cookie as evidence. The device
      * cookie is a random 48-char token unique to each browser instance —
-     * if multiple accounts share one, it is hard proof of same-browser
-     * multi-accounting.
+     * if several accounts were made on one, it is hard proof of same-browser
+     * multi-accounting. Signing in on a shared browser later (a family or
+     * office computer) links nothing.
      */
     public function enforceAfterAuth(User $user): void
     {
@@ -54,12 +57,7 @@ class MultiAccountEnforcementService
             return;
         }
 
-        $deviceIds = array_values(array_unique(array_filter([
-            $user->registration_device_id,
-            $user->last_seen_device_id,
-        ])));
-
-        if ($deviceIds === []) {
+        if (! filled($user->registration_device_id)) {
             return;
         }
 
@@ -68,16 +66,27 @@ class MultiAccountEnforcementService
         }
 
         $maxAccounts = $this->maxAccountsPerIp();
-        $accountCount = $this->countAccountsSharingDevice($deviceIds);
+        $accountCount = $this->accountsMadeOnSameBrowser($user);
 
         if ($accountCount <= $maxAccounts) {
+            return;
+        }
+
+        if (PaidMember::is($user)) {
+            Log::warning('Multi-account rule matched a member who pays or has paid; not blocked, left for an admin.', [
+                'user_id' => $user->id,
+                'registration_device_id' => $user->registration_device_id,
+                'account_count' => $accountCount,
+                'max_allowed' => $maxAccounts,
+            ]);
+
             return;
         }
 
         Log::warning('Multi-account auto-block triggered.', [
             'user_id' => $user->id,
             'email' => $user->email,
-            'device_ids' => $deviceIds,
+            'registration_device_id' => $user->registration_device_id,
             'account_count' => $accountCount,
             'max_allowed' => $maxAccounts,
         ]);
@@ -98,8 +107,9 @@ class MultiAccountEnforcementService
     /**
      * The account was made on a browser where another account had already
      * been blocked: a blocked member starting over under a new name. Accounts
-     * that were there before the block (a shared family computer) are left
-     * alone, and an admin can unblock this one (that whitelists it).
+     * that were there before the block (a shared family computer), accounts
+     * that only signed in there later, and members who pay or have paid are
+     * left alone, and an admin can unblock this one (that whitelists it).
      */
     public function blockIfEvadingBlock(User $user): bool
     {
@@ -113,6 +123,15 @@ class MultiAccountEnforcementService
 
         $source = $this->blockedAccountBefore($user);
         if (! $source) {
+            return false;
+        }
+
+        if (PaidMember::is($user)) {
+            Log::warning('Account made on the browser of a blocked account belongs to a member who pays or has paid; not blocked, left for an admin.', [
+                'user_id' => $user->id,
+                'blocked_account_id' => $source->id,
+            ]);
+
             return false;
         }
 
@@ -134,17 +153,14 @@ class MultiAccountEnforcementService
     }
 
     /**
-     * A blocked account on the same browser (device cookie) whose block came
-     * before this account was created.
+     * A blocked account made on the browser this account was made on (device
+     * cookie at sign-up) whose block came before this account was created.
      */
     public function blockedAccountBefore(User $user): ?User
     {
-        $deviceIds = array_values(array_unique(array_filter([
-            $user->registration_device_id,
-            $user->last_seen_device_id,
-        ])));
+        $deviceId = trim((string) $user->registration_device_id);
 
-        if ($deviceIds === [] || ! $user->created_at) {
+        if ($deviceId === '' || ! $user->created_at) {
             return null;
         }
 
@@ -153,12 +169,32 @@ class MultiAccountEnforcementService
             ->where('is_blocked', true)
             ->whereNotNull('blocked_at')
             ->where('blocked_at', '<=', $user->created_at)
-            ->where(function ($q) use ($deviceIds) {
-                $q->whereIn('registration_device_id', $deviceIds)
-                    ->orWhereIn('last_seen_device_id', $deviceIds);
-            })
+            ->where('registration_device_id', $deviceId)
             ->orderBy('blocked_at')
             ->first();
+    }
+
+    /**
+     * Accounts made on the same browser as this one (device cookie at sign-up)
+     * that are still in use, this account included. Blocked accounts, admins
+     * and accounts an admin trusted do not count, and neither do accounts
+     * that only signed in on that browser later.
+     */
+    public function accountsMadeOnSameBrowser(User $user): int
+    {
+        $deviceId = trim((string) $user->registration_device_id);
+
+        if ($deviceId === '' || ! $this->hasDeviceColumns()) {
+            return 1;
+        }
+
+        return 1 + (int) User::query()
+            ->whereKeyNot($user->id)
+            ->where('registration_device_id', $deviceId)
+            ->where('is_admin', false)
+            ->where('is_blocked', false)
+            ->where('multi_account_whitelisted', false)
+            ->count();
     }
 
     public function maxAccountsPerIp(): int
@@ -236,28 +272,6 @@ class MultiAccountEnforcementService
                     $q->orWhereIn('registration_device_id', $deviceIds)
                         ->orWhereIn('last_seen_device_id', $deviceIds);
                 }
-            })
-            ->count();
-    }
-
-    /**
-     * Count accounts sharing the same device cookie.
-     * This is the ONLY signal used for auto-blocking.
-     *
-     * @param  list<string>  $deviceIds
-     */
-    private function countAccountsSharingDevice(array $deviceIds): int
-    {
-        if ($deviceIds === []) {
-            return 0;
-        }
-
-        return (int) User::query()
-            ->where('is_admin', false)
-            ->where('multi_account_whitelisted', false)
-            ->where(function ($q) use ($deviceIds) {
-                $q->whereIn('registration_device_id', $deviceIds)
-                    ->orWhereIn('last_seen_device_id', $deviceIds);
             })
             ->count();
     }

@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\BillingTrial;
+use App\Models\CharPackPurchase;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
@@ -126,6 +127,44 @@ class BlockEvasionTest extends TestCase
         $this->register('second@example.com');
 
         $this->assertFalse(User::where('email', 'second@example.com')->first()->isBlocked());
+    }
+
+    public function test_signing_in_on_a_blocked_members_browser_later_does_not_count(): void
+    {
+        $this->blockedMember();
+        $this->travel(5)->minutes();
+        // Made on another browser after the block, then used once on the blocked member's.
+        $relative = User::factory()->create([
+            'email' => 'relative@example.com',
+            'password' => Hash::make('Password123!'),
+            'registration_device_id' => 'dev_another_browser_abcdef0123456789',
+        ]);
+
+        $this->withCookies(['listen_demo_device' => self::BROWSER])
+            ->postLocalizedRoute('login.submit', ['email' => 'relative@example.com', 'password' => 'Password123!']);
+
+        $this->assertFalse($relative->fresh()->isBlocked());
+        $this->assertAuthenticatedAs($relative);
+    }
+
+    public function test_a_member_who_pays_or_has_paid_is_left_to_an_admin(): void
+    {
+        $this->blockedMember();
+        $this->travel(5)->minutes();
+        $member = User::factory()->create(['registration_device_id' => self::BROWSER]);
+        CharPackPurchase::query()->forceCreate([
+            'user_id' => $member->id, 'method' => 'card', 'status' => CharPackPurchase::STATUS_PAID,
+            'chars' => 1000, 'days' => 30, 'amount_minor' => 500, 'currency' => 'USD', 'paid_at' => now(),
+        ]);
+
+        $this->assertFalse(app(MultiAccountEnforcementService::class)->blockIfEvadingBlock($member->fresh()));
+        $this->assertFalse($member->fresh()->isBlocked());
+
+        $this->artisan('listen:block-evading-accounts')
+            ->expectsOutputToContain('pays or has paid')
+            ->assertSuccessful();
+        $this->artisan('listen:block-evading-accounts --apply')->assertSuccessful();
+        $this->assertFalse($member->fresh()->isBlocked());
     }
 
     public function test_admins_are_never_blocked_by_it(): void

@@ -429,7 +429,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
     //  SECTION 6: Cross-signal enforcement (IP + device + signature combos)
     // ══════════════════════════════════════════════════════════════════════
 
-    public function test_cross_column_device_id_matching_triggers_enforcement(): void
+    public function test_an_account_only_seen_on_the_device_does_not_count_towards_enforcement(): void
     {
         $sharedDevice = 'dev_cross_column_device_01234567';
 
@@ -440,7 +440,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
             'registration_device_id' => $sharedDevice,
             'last_seen_device_id' => null,
         ]);
-        // User B has it as last_seen_device_id
+        // User B has it as last_seen_device_id only: signed in there, made elsewhere.
         User::factory()->create([
             'registration_ip' => '10.4.0.2',
             'last_login_ip' => '10.4.0.2',
@@ -449,7 +449,7 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         ]);
 
         // User C also has it
-        $abuser = User::factory()->create([
+        $userC = User::factory()->create([
             'registration_ip' => '10.4.0.3',
             'last_login_ip' => '10.4.0.3',
             'registration_device_id' => $sharedDevice,
@@ -457,10 +457,10 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         ]);
 
         $service = app(MultiAccountEnforcementService::class);
-        $service->enforceAfterAuth($abuser);
+        $service->enforceAfterAuth($userC);
 
-        $abuser->refresh();
-        $this->assertTrue($abuser->isBlocked(), 'Cross-column device_id match should trigger blocking');
+        $userC->refresh();
+        $this->assertFalse($userC->isBlocked(), 'Only accounts made on the device count (2, within the limit)');
     }
 
     public function test_shared_ip_does_not_count_towards_the_device_limit(): void
@@ -888,9 +888,10 @@ class SuspiciousUsersComprehensiveTest extends TestCase
         $this->artisan('listen:multi-account-backfill')
             ->assertExitCode(0);
 
-        // All 3 should be blocked since each one's linked count exceeds max (2)
-        $blockedCount = User::where('registration_device_id', $sharedDevice)->where('is_blocked', true)->count();
-        $this->assertSame(3, $blockedCount);
+        // Only the newest is over the limit (2): a blocked account no longer counts
+        // against the others, so the first two stay.
+        $blockedIds = User::where('registration_device_id', $sharedDevice)->where('is_blocked', true)->pluck('id')->all();
+        $this->assertSame([$u3->id], $blockedIds);
     }
 
     public function test_backfill_reports_zero_when_no_eligible_users(): void

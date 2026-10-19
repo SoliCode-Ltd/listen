@@ -4,11 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\MultiAccountEnforcementService;
+use App\Support\PaidMember;
 use Illuminate\Console\Command;
 
 /**
- * One-off catch-up for accounts made on a blocked member's browser before
- * the sign-in check existed. Lists them by default; --apply blocks them.
+ * One-off catch-up for accounts made on a blocked member's browser (the one
+ * they signed up on) before the sign-in check existed. Lists them by default;
+ * --apply blocks them.
  */
 class BlockEvadingAccountsCommand extends Command
 {
@@ -26,7 +28,7 @@ class BlockEvadingAccountsCommand extends Command
             ->where('is_admin', false)
             ->where('is_blocked', false)
             ->where('multi_account_whitelisted', false)
-            ->where(fn ($q) => $q->whereNotNull('registration_device_id')->orWhereNotNull('last_seen_device_id'))
+            ->whereNotNull('registration_device_id')
             ->orderBy('id')
             ->chunkById(500, function ($users) use ($service, $apply, &$rows): void {
                 foreach ($users as $user) {
@@ -35,13 +37,19 @@ class BlockEvadingAccountsCommand extends Command
                         continue;
                     }
 
-                    $blocked = $apply && $service->blockIfEvadingBlock($user);
+                    // Members who pay or have paid are never blocked by the rule.
+                    $paid = PaidMember::is($user);
+                    $blocked = $apply && ! $paid && $service->blockIfEvadingBlock($user);
                     $rows[] = [
                         $user->id,
                         $this->mask($user->email),
                         (string) $user->created_at,
                         "#{$source->id} (blocked ".$source->blocked_at.')',
-                        $apply ? ($blocked ? 'blocked' : 'skipped') : 'would block',
+                        match (true) {
+                            $paid => 'left alone: pays or has paid',
+                            $apply => $blocked ? 'blocked' : 'skipped',
+                            default => 'would block',
+                        },
                     ];
                 }
             });
