@@ -32,7 +32,9 @@ name: Server deploy
 #            storage/app/listen-deploy): LISTEN_LIVE_ACTIONS true on live and
 #            false on staging, the extension's old shared LISTEN_API_KEY
 #            removed, .env readable by its owner and the web server only (640),
-#            and on live a local/testing APP_ENV set to production and
+#            standard voices asked for uncompressed audio (an MP3
+#            SPEECH_TTS_AUDIO_ENCODING becomes LINEAR16; they are compressed
+#            once on the server), and on live a local/testing APP_ENV set to production and
 #            APP_DEBUG turned off. Rebuilds the config cache, restarts the
 #            workers, then shows what is in use (never a secret's value), the
 #            PHP limits, the queue workers and the scheduler.
@@ -40,13 +42,17 @@ name: Server deploy
 #            files this user can read, any .user.ini, and what the web
 #            server's PHP really uses (memory, time, upload sizes, opcache),
 #            read from a one-off page under a random name that is deleted
-#            straight after. Also who the web server runs as and who can read
-#            .env.
+#            straight after. Also who the web server runs as, who can read
+#            .env, the cron lines that start Laravel, and how long work after
+#            the reply may run (each run reads the last run's test and starts
+#            a new one: a page that answers at once, then waits up to 15 min).
 #   data-checks: read-only (READ ONLY database session). Paid plans marked
 #            past due, members blocked by the wording rule (paying ones
 #            first), the share of sign-ups per network address (counts only,
-#            never an address) and the speech and credit settings. Prints
-#            member ids only.
+#            never an address), the speech and credit settings, how the long
+#            texts of the last 90 days fared, and PHP's memory and time errors
+#            in the app's logs (counts, times and code lines, never a text).
+#            Prints member ids only.
 #   wording-blocks: read-only. Re-checks the accounts the wording rule blocked
 #            by itself against today's word list and rule (member ids and words
 #            only, never a text). wording-blocks-apply unblocks the accounts
@@ -266,6 +272,9 @@ jobs:
           echo "LISTEN_LIVE_ACTIONS: $(env_of LISTEN_LIVE_ACTIONS)"
           # The extension's old shared key acted as account 1; members' extensions use their own keys.
           if grep -q '^LISTEN_API_KEY=' .env; then sed -i '/^LISTEN_API_KEY=/d' .env; echo "LISTEN_API_KEY: removed"; else echo "LISTEN_API_KEY: was not set"; fi
+          # Standard voices: the engine's uncompressed audio, compressed once here (without ffmpeg the site asks for MP3 itself).
+          a="$(env_of SPEECH_TTS_AUDIO_ENCODING)"; a="${a:-$(env_of GOOGLE_TTS_AUDIO_ENCODING)}"
+          case "$a" in mp3|MP3) set_env SPEECH_TTS_AUDIO_ENCODING LINEAR16; echo "SPEECH_TTS_AUDIO_ENCODING: $a -> LINEAR16";; *) echo "SPEECH_TTS_AUDIO_ENCODING: ${a:-not set} (kept)";; esac
           # Its owner and the web server's group only: it was readable by every account on the server.
           chmod 640 .env 2>/dev/null && echo ".env: owner and web server only (640)" || echo ".env: who can read it was left as it was"
           if [ "$TARGET" = live ]; then
@@ -299,6 +308,7 @@ jobs:
           $line('Stripe webhook signing secret', trim((string) config('services.stripe.webhook_secret')) !== '' ? 'set' : 'MISSING');
           $line('Throwaway inboxes refused at sign-up', (bool) config('disposable_email.enabled', true));
           $line('Free use waits for a confirmed email', (bool) config('listen.demo.require_verified_email', true));
+          $line('Standard voices asked for', strtoupper((string) config('services.google_tts.audio_encoding')));
           $line('Queue / retry_after (seconds)', config('queue.default').' / '.config('queue.connections.database.retry_after'));
           $line('Texts made after the reply from (characters)', (string) config('listen.audio.force_async_chars'));
           $line('PHP (command line) max_execution_time', (string) ini_get('max_execution_time'));
