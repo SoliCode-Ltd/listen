@@ -71,7 +71,13 @@ class GeminiStylePromptTest extends TestCase
 
         $this->assertStringContainsString('Voice dialect:', $prompt);
         $this->assertStringContainsString($expectedDialectName, $prompt);
-        $this->assertStringContainsString('authentic regional pronunciation', $prompt);
+        // Plain Fusha is asked for as formal Arabic; every regional dialect keeps its regional wording.
+        if (\App\Support\ArabicDialects::isPlainFusha($dialectCode)) {
+            $this->assertStringContainsString('clear, formal Modern Standard Arabic pronunciation', $prompt);
+            $this->assertStringNotContainsString('regional', $prompt);
+        } else {
+            $this->assertStringContainsString('authentic regional pronunciation', $prompt);
+        }
     }
 
     public static function arabicDialectsProvider(): array

@@ -1475,10 +1475,14 @@ class GeminiTtsProvider implements TtsProviderInterface
         if ($isArabic && $dialect !== null && $dialect !== '') {
             $dialectName = self::ARABIC_DIALECT_PROMPTS[$dialect] ?? ArabicDialects::prompt($dialect);
             if ($dialectName !== null) {
-                $dialectInstruction = "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
+                // Plain Fusha is formal Arabic, not a regional variety: it gets no regional wording.
+                $fusha = ArabicDialects::isPlainFusha($dialect);
+                $dialectInstruction = $fusha
+                    ? "Voice dialect: {$dialectName}. Speak with clear, formal Modern Standard Arabic pronunciation. "
+                    : "Voice dialect: {$dialectName}. Speak with authentic regional pronunciation and natural dialect characteristics. ";
                 $markers = ArabicDialects::markers($dialect);
                 if ($markers !== null) {
-                    $dialectInstruction .= "Dialect markers to make clearly audible: {$markers} ";
+                    $dialectInstruction .= ($fusha ? 'Pronunciation' : 'Dialect markers')." to make clearly audible: {$markers} ";
                 }
             } else {
                 $dialectInstruction = "Voice dialect/language variant: {$dialect}. Keep pronunciation consistent with this dialect setting. ";

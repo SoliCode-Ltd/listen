@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
+use App\Support\ArabicDialects;
 use App\Support\GeminiTtsModel;
 use App\Support\PaceAndPitch;
 use App\Support\StandardVoiceEngine;
@@ -241,6 +242,11 @@ class TtsService
         }
 
         if ($provider === 'gemini') {
+            // Plain Fusha (for the script or a speaker) is now asked for as formal Arabic.
+            $fushaSpeaker = is_array($speakers) && array_filter($speakers, fn ($speaker) => is_array($speaker) && ArabicDialects::isPlainFusha($speaker['dialect'] ?? null)) !== [];
+            if (ArabicDialects::isPlainFusha($config['dialect'] ?? null) || $fushaSpeaker) {
+                $parts[] = 'fusha:formal';
+            }
             $model = GeminiTtsModel::resolve();
             if ($model !== GeminiTtsModel::CURRENT) {
                 $parts[] = 'model:'.$model;
