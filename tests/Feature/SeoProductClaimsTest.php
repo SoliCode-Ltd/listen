@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Plan;
 use App\Models\User;
+use App\Support\Credits;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -62,6 +63,22 @@ class SeoProductClaimsTest extends TestCase
         $this->page('en', 'seo.english-accents')->assertSee('Yes. New members can try the voices and accents once in the demo.');
         $this->page('ar', 'seo.arabic-dialects')->assertSee('نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.');
         $this->assertStringContainsString('new members can try the voices once in the demo', (string) $this->get('/llms.txt')->getContent());
+    }
+
+    public function test_plans_are_described_in_credits_not_characters(): void
+    {
+        // Plans meter the audio itself: credits, 900 of them a minute.
+        $this->assertSame(1, Credits::minutesFor(900));
+
+        $this->page('en', 'seo.text-to-speech')->assertOk()
+            ->assertSee('Plans add monthly credits, premium voices, dialects, accents and emotions.')
+            ->assertDontSee('monthly characters');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()
+            ->assertSee('الباقات تضيف رصيداً شهرياً وأصواتاً مميزة ولهجات ولكنات ومشاعر.')
+            ->assertDontSee('أحرفاً شهرية');
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()
+            ->assertSee('ثم تختار الباقة التي تناسب الرصيد الذي تحتاجه.')
+            ->assertDontSee('عدد الأحرف');
     }
 
     public function test_downloads_are_promised_on_paid_plans_only(): void
