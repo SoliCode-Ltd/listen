@@ -27,13 +27,24 @@ if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
 }
 echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
 
+// The site's own delivery tags, by the direction the voice is given; a
+// member's own direction is counted as "custom", never shown.
+$known = [];
+foreach ((new ReflectionClassConstant(GeminiVocalTags::class, 'DELIVERY_DIRECTIONS'))->getValue() as $tag => $direction) {
+    $known[$direction] = $tag;
+}
+
 /** What a text holds, as the speech pipeline reads it. */
-$features = function (string $text): array {
+$features = function (string $text) use ($known): array {
     $parts = GeminiVocalTags::parts($text, true);
     $spoken = '';
     $sounds = $short = $long = 0;
     $delivery = false;
+    $moods = [];
     foreach ($parts as $part) {
+        foreach ($part['cues'] ?? [] as $cue) {
+            $moods[] = $known[$cue] ?? 'custom';
+        }
         preg_match_all('/<([a-z][a-z -]*)>/', (string) $part['text'], $m);
         foreach ($m[1] as $tag) {
             if ($tag === 'short pause') {
@@ -60,6 +71,7 @@ $features = function (string $text): array {
         'lines' => preg_match_all('/\n\s*/u', $spoken),
         'joins' => max(0, count($parts) - 1),
         'delivery' => $delivery,
+        'moods' => array_values(array_unique($moods)),
         'digits' => preg_match_all('/\p{N}+/u', $spoken),
         // Vowel marks (tashkeel) are not letters, but a fully marked text may be read slower.
         'marks' => preg_match_all('/\p{Mn}/u', $spoken),
@@ -69,7 +81,7 @@ $features = function (string $text): array {
 $rows = [];
 $skipped = ['translated' => 0, 'dialogue' => 0, 'no words' => 0];
 DB::table('audio_generations')
-    ->select(['id', 'input_text', 'target_language', 'voice_tier', 'tts_provider', 'tts_model', 'speed', 'dialect', 'translate', 'is_dialogue', 'duration_seconds', 'created_at'])
+    ->select(['id', 'user_id', 'input_text', 'target_language', 'voice_tier', 'tts_provider', 'tts_model', 'speed', 'dialect', 'performance_style', 'emotion', 'style_prompt', 'translate', 'is_dialogue', 'duration_seconds', 'created_at'])
     ->where('status', 'done')
     ->where('duration_measured', true)
     ->where('duration_seconds', '>', 0)
@@ -102,6 +114,11 @@ DB::table('audio_generations')
                 'model' => (string) ($g->tts_model ?: '-'),
                 'speed' => $g->speed === null ? 1.0 : (float) $g->speed,
                 'dialect' => (string) ($g->dialect ?: '-'),
+                'style' => (string) ($g->performance_style ?: 'neutral'),
+                'emotion' => (string) ($g->emotion ?: 'neutral'),
+                'prompt' => trim((string) $g->style_prompt) !== '',
+                'id' => (int) $g->id,
+                'user' => (int) $g->user_id,
                 'seconds' => (int) $g->duration_seconds,
                 'estimate' => UsageEstimator::estimate($text)['seconds'],
                 'days' => (int) now()->diffInDays($g->created_at, true),
@@ -355,4 +372,47 @@ foreach ($models as $k => $model) {
     $by = array_count_values(array_map(fn ($r) => $r['engine'].' '.$r['model'].' '.$size($r), $short));
     ksort($by);
     printf("  %-14s %d of %d%s\n", $k, count($short), count($list), $by === [] ? '' : ': '.implode(', ', array_map(fn ($a, $b) => "{$a} {$b}", array_keys($by), $by)));
+}
+
+// What else makes a premium voice longer than its text: the studio's
+// performance style and emotion, a written direction, moods in the text.
+echo "\n== Premium voices at the normal pace: real against the fit, by studio setting ==\n";
+foreach (['ar', 'en'] as $lang) {
+    $model = $models['hd '.$lang] ?? null;
+    if ($model === null) {
+        continue;
+    }
+    $list = array_values(array_filter($normal, fn ($r) => $r['tier'] === 'hd' && $r['lang'] === $lang));
+    $by = function (string $title, callable $key) use ($list, $model, $apply, $quantile, $fmt, $lang): void {
+        $groups = [];
+        foreach ($list as $r) {
+            foreach ((array) $key($r) as $k) {
+                $groups[$k][] = $r['seconds'] / max(1.0, $apply($model)($r));
+            }
+        }
+        uasort($groups, fn ($a, $b) => count($b) <=> count($a));
+        foreach (array_slice($groups, 0, 14, true) as $k => $ratios) {
+            if (count($ratios) >= 4) {
+                printf("  hd %s %-10s %-24s %5d voices: real / fit p25 %s median %s p75 %s\n", $lang, $title, $k, count($ratios), $fmt($quantile($ratios, .25)), $fmt($quantile($ratios, .5)), $fmt($quantile($ratios, .75)));
+            }
+        }
+    };
+    $by('style', fn ($r) => $r['style']);
+    $by('emotion', fn ($r) => $r['emotion']);
+    $by('direction', fn ($r) => $r['prompt'] ? 'written' : 'none');
+    $by('mood', fn ($r) => $r['moods'] === [] ? ['none'] : $r['moods']);
+    $by('dialect', fn ($r) => $r['dialect']);
+}
+
+// The site's own test voices (admin accounts), the newest first: what the
+// fit says against the real length, and the settings, never the text.
+$admins = DB::table('users')->where('is_admin', true)->pluck('id')->map(fn ($id) => (int) $id)->all();
+echo "\n== The newest voices made by admin accounts (for checking one by hand) ==\n";
+$own = array_slice(array_reverse(array_values(array_filter($rows, fn ($r) => in_array($r['user'], $admins, true)))), 0, 10);
+foreach ($own as $r) {
+    $model = $models[$r['tier'].' '.$r['lang']] ?? null;
+    printf("  #%d %s %s %s pace %.2f %s style %s emotion %s%s: letters %d, sounds %d, moods %s; fit %s s, today's estimate %d s, real %d s\n",
+        $r['id'], $r['tier'], $r['lang'], $r['model'], $r['speed'], $r['dialect'], $r['style'], $r['emotion'], $r['prompt'] ? ', a written direction' : '',
+        $r['letters'], $r['sounds'] + $r['short'] + $r['long'], $r['moods'] === [] ? 'none' : implode('+', $r['moods']),
+        $model === null ? '-' : $fmt($apply($model)($r) / max(0.01, $r['speed'] < 1 ? $r['speed'] ** 0.7 : $r['speed'] ** 0.2), 1), $r['estimate'], $r['seconds']);
 }
