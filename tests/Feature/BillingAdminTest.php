@@ -188,6 +188,26 @@ class BillingAdminTest extends TestCase
         $this->assertSame([], $this->stripe->requests);
     }
 
+    public function test_grace_days_start_at_one_and_the_hint_says_how_long_they_may_be(): void
+    {
+        // 0 is refused: it used to be saved and then quietly mean one day.
+        $this->billingSettings()
+            ->fillForm(['grace_days' => 0])
+            ->call('save')
+            ->assertHasFormErrors(['grace_days' => 'min']);
+        $this->assertNull(SiteSetting::query()->where('key', 'billing_grace_days')->value('value'));
+
+        $this->billingSettings()
+            ->fillForm(['grace_days' => 1])
+            ->call('save')
+            ->assertHasNoFormErrors();
+        $this->assertSame('1', (string) SiteSetting::get('billing_grace_days'));
+
+        $this->billingSettings()
+            ->assertSee('shorter than Stripe&#039;s own retry period for failed payments', false)
+            ->assertSee('shorter than a billing month', false);
+    }
+
     private function stripeConfigured(): void
     {
         config(['services.stripe.secret' => 'sk_test_fake', 'cashier.secret' => 'sk_test_fake']);

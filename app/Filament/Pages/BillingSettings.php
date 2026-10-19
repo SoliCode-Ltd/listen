@@ -135,10 +135,10 @@ class BillingSettings extends Page implements HasForms
                         Forms\Components\TextInput::make('grace_days')
                             ->label('Grace Period (days)')
                             ->numeric()
-                            ->minValue(0)
+                            ->minValue(1)
                             ->maxValue(90)
                             ->default(7)
-                            ->helperText('Days a member keeps their paid plan after a renewal payment fails. If it is still unpaid then, the subscription is canceled and they move to the free plan. The first payment after a free trial gets no grace days.'),
+                            ->helperText('Days a member keeps their paid plan after a renewal payment fails. If it is still unpaid then, the subscription is canceled and they move to the free plan. The first payment after a free trial gets no grace days. Keep it shorter than Stripe\'s own retry period for failed payments, so Stripe keeps retrying the card throughout and never ends the subscription first, and shorter than a billing month, so no further renewal falls inside it.'),
                         Forms\Components\Toggle::make('webhook_emails_enabled')
                             ->label('Webhook Email Notifications')
                             ->helperText('Send email notifications on subscription lifecycle events.'),
