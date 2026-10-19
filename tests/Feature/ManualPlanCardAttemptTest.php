@@ -235,4 +235,28 @@ class ManualPlanCardAttemptTest extends TestCase
         $this->travel(32)->days();
         $this->assertNull(app(TrialEligibilityService::class)->denialReason($member->fresh(), null));
     }
+
+    public function test_a_trial_taken_after_a_plan_paid_by_hand_ended_is_followed_by_the_sync(): void
+    {
+        $member = $this->paidByInstaPay(null);
+        $this->travel(32)->days();
+        $member->forceFill(['subscription_status_checked_at' => now()])->save();
+        $trials = new FakeStripeTrialGateway;
+        $this->app->instance(StripeTrialGateway::class, $trials);
+
+        $this->actingAs($member);
+        $setup = $this->postJsonLocalizedRoute('billing.trial.setup', ['plan' => 'creator', 'billing_cycle' => 'monthly'])->assertOk();
+        $trials->putCard(['id' => 'pm_trial', 'customer' => $member->fresh()->stripe_id, 'fingerprint' => 'fp_trial']);
+        $trials->markSucceeded((string) $setup->json('setup_intent_id'), 'pm_trial');
+        $this->postJsonLocalizedRoute('billing.trial.confirm', ['setup_intent_id' => (string) $setup->json('setup_intent_id')])->assertOk();
+        // The trial's first invoice, for $0.
+        $this->webhook('evt_trial_invoice', 'invoice.paid', [
+            'id' => 'in_trial', 'customer' => $member->fresh()->stripe_id, 'billing_reason' => 'subscription_create',
+            'subscription' => 'sub_test_1', 'amount_paid' => 0,
+        ])->assertOk();
+
+        $this->assertSame('creator', $this->activePlan($member));
+        // The old hand-paid state no longer stops the sync from following the trial.
+        $this->assertSame('ok', $this->plan($member)->billing_payment_state);
+    }
 }
