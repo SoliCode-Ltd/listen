@@ -77,7 +77,7 @@ class StripeWebhookController extends Controller
             match ($type) {
                 'checkout.session.completed' => $billingLifecycleService->syncUserByStripeCustomerId($customerId),
                 'invoice.payment_failed' => $billingLifecycleService->handlePaymentFailed($event->data->object),
-                'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($customerId),
+                'invoice.paid', 'invoice.payment_succeeded' => $billingLifecycleService->handlePaymentRecovered($event->data->object),
                 'customer.subscription.created',
                 'customer.subscription.updated',
                 'customer.subscription.deleted',

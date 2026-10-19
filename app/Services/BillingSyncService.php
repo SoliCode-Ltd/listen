@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -68,7 +69,7 @@ class BillingSyncService
                         'pm_last_four' => null,
                     ])->save();
                 } else {
-                    [$stripeSubscription, $unknownPaid] = $this->resolveRelevantStripeSubscription($user->stripe_id);
+                    [$stripeSubscription, $unknownPaid, $onlyDeclined] = $this->resolveRelevantStripeSubscription($user->stripe_id);
                     $selectedPaid = in_array((string) ($stripeSubscription->status ?? ''), ['active', 'trialing'], true);
 
                     if ($unknownPaid !== [] && ! $selectedPaid) {
@@ -98,11 +99,16 @@ class BillingSyncService
                                 ?? $stripeSubscription->items->data[0]->current_period_start
                                 ?? 0);
                             $periodStart = $periodStartTs > 0 ? Carbon::createFromTimestamp($periodStartTs) : null;
+                        } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
+                            && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
+                            // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.
+                            $keepPlanAsIs = true;
                         }
 
                         $this->persistBillingSubscription($user, $stripeSubscription);
                     } else {
                         $targetPlan = $freePlan;
+                        $keepPlanAsIs = $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined);
                         $billingSubscription = BillingSubscription::query()
                             ->where('user_id', $user->id)
                             ->where('type', 'default')
@@ -177,6 +183,37 @@ class BillingSyncService
             ->exists();
     }
 
+    /**
+     * Whether the member keeps their paid plan although Stripe has nothing live
+     * for them, because it was given by hand: Stripe never charged them for any
+     * plan (only declined first payments), or an approved InstaPay / Vodafone
+     * Cash payment set the plan they have now.
+     */
+    private function keepsPlanGivenByHand(User $user, ?Plan $currentPlan, bool $onlyDeclined): bool
+    {
+        if (! $currentPlan || (int) $currentPlan->price_cents <= 0 || $currentPlan->isPack()) {
+            return false;
+        }
+
+        if ($onlyDeclined) {
+            return true;
+        }
+
+        $current = Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('plan_id', $currentPlan->id)
+            ->latest('id')
+            ->first();
+
+        return $current !== null && ManualPaymentRequest::query()
+            ->where('user_id', $user->id)
+            ->where('status', ManualPaymentRequest::STATUS_APPROVED)
+            ->where('approved_subscription_id', $current->id)
+            ->where('plan_id', $current->plan_id)
+            ->exists();
+    }
+
     public function syncActiveSubscribers(): int
     {
         $count = 0;
@@ -202,10 +239,11 @@ class BillingSyncService
     }
 
     /**
-     * The member's subscription that decides their plan, and the ids of any live
-     * subscriptions Stripe charges for that no plan owns.
+     * The member's subscription that decides their plan, the ids of any live
+     * subscriptions Stripe charges for that no plan owns, and whether all Stripe
+     * has for them are declined first payments (or nothing at all).
      *
-     * @return array{0: ?object, 1: list<string>}
+     * @return array{0: ?object, 1: list<string>, 2: bool}
      */
     private function resolveRelevantStripeSubscription(string $stripeCustomerId): array
     {
@@ -248,7 +286,9 @@ class BillingSyncService
             })
             ->values();
 
-        return [$sorted->first(), $unknownPaid];
+        $onlyDeclined = $all->every(fn ($sub) => in_array((string) ($sub->status ?? ''), ['incomplete', 'incomplete_expired'], true));
+
+        return [$sorted->first(), $unknownPaid, $onlyDeclined];
     }
 
     public function persistBillingSubscription(User $user, object $stripeSubscription): void

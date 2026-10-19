@@ -639,6 +639,7 @@ class TrialSubscriptionService
     {
         return match ($reason) {
             TrialEligibilityService::REASON_ALREADY_SUBSCRIBED => 'ui.backend.trial_already_subscribed',
+            TrialEligibilityService::REASON_MANUAL_PLAN => 'ui.backend.trial_manual_plan_active',
             default => 'ui.backend.trial_already_used',
         };
     }

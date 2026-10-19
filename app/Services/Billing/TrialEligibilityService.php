@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\BillingTrial;
 use App\Models\Plan;
 use App\Models\SiteSetting;
+use App\Models\Subscription;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -23,6 +24,8 @@ class TrialEligibilityService
     public const REASON_ALREADY_USED_CARD = 'already_used_card';
 
     public const REASON_ALREADY_SUBSCRIBED = 'already_subscribed';
+
+    public const REASON_MANUAL_PLAN = 'manual_plan_active';
 
     public const CYCLES = ['monthly', 'yearly'];
 
@@ -169,6 +172,12 @@ class TrialEligibilityService
 
         if ($this->hasProtectedSubscription($user)) {
             return self::REASON_ALREADY_SUBSCRIBED;
+        }
+
+        // A trial would take the place of a plan paid by InstaPay / Vodafone Cash
+        // (or given by the team) and change its end date.
+        if ($this->hasActiveManualPlan($user)) {
+            return self::REASON_MANUAL_PLAN;
         }
 
         return null;
@@ -406,6 +415,20 @@ class TrialEligibilityService
         return BillingSubscription::query()
             ->where('user_id', $user->id)
             ->whereIn('stripe_status', ['active', 'trialing', 'past_due', 'unpaid'])
+            ->exists();
+    }
+
+    private function hasActiveManualPlan(User $user): bool
+    {
+        return Subscription::query()
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->where('billing_payment_state', 'manual_override')
+            ->where(function ($query) {
+                $query->whereNull('current_period_end')
+                    ->orWhere('current_period_end', '>=', now());
+            })
+            ->whereHas('plan', fn ($plan) => $plan->where('price_cents', '>', 0))
             ->exists();
     }
 

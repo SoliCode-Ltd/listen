@@ -177,9 +177,9 @@ class BillingLifecycleService
         ])->save();
     }
 
-    public function handlePaymentRecovered(?string $stripeCustomerId): void
+    public function handlePaymentRecovered(object $invoice): void
     {
-        $user = $this->findUserByStripeCustomerId($stripeCustomerId);
+        $user = $this->findUserByStripeCustomerId((string) ($invoice->customer ?? ''));
         if (! $user) {
             return;
         }
@@ -189,11 +189,26 @@ class BillingLifecycleService
             return;
         }
 
+        // A plan paid by InstaPay / Vodafone Cash keeps its state, unless this invoice
+        // really charged a card subscription: the member now pays by card, so the
+        // card plan takes over, as after a checkout (a $0 trial invoice never does).
+        $cardTakesOver = false;
+        if ($subscription->billing_payment_state === 'manual_override') {
+            if ((int) ($invoice->amount_paid ?? 0) <= 0 || StripeInvoice::subscriptionId($invoice) === '') {
+                return;
+            }
+            $cardTakesOver = true;
+        }
+
         $subscription->forceFill([
             'billing_payment_state' => 'ok',
             'billing_grace_ends_at' => null,
             'billing_failed_notice_sent_at' => null,
         ])->save();
+
+        if ($cardTakesOver) {
+            $this->billingSyncService->syncIfStale($user, true);
+        }
     }
 
     public function downgradeExpiredGraceSubscriptions(): int

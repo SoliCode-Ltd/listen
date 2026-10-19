@@ -1599,6 +1599,9 @@ return [
         'trial_minute_limit' => 'The trial minute allowance has been used.',
         'api_missing_key' => 'Missing API key.',
         'api_invalid_key' => 'Invalid API key.',
+
+        // Payments: no free trial over a plan paid by hand.
+        'trial_manual_plan_active' => "The free trial isn't available while your current paid plan is active.",
     ],
 
     // ===== VOICE CLONING =====

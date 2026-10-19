@@ -1605,6 +1605,9 @@ return [
         'trial_minute_limit' => 'تم استهلاك دقائق التجربة.',
         'api_missing_key' => 'مفتاح API مفقود.',
         'api_invalid_key' => 'مفتاح API غير صالح.',
+
+        // Payments: no free trial over a plan paid by hand.
+        'trial_manual_plan_active' => 'التجربة المجانية غير متاحة ما دامت خطتك المدفوعة الحالية فعّالة.',
     ],
 
     // ===== استنساخ الأصوات =====
