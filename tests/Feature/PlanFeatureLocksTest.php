@@ -15,12 +15,13 @@ class PlanFeatureLocksTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_a_starter_member_sees_every_option_locked_with_the_plan_that_unlocks_it(): void
+    public function test_a_member_on_the_standard_voices_sees_every_option_locked_with_the_plan_that_unlocks_it(): void
     {
-        $starter = Plan::factory()->create(['slug' => 'starter', 'name' => 'Starter', 'voice_tier' => VoiceTier::STANDARD, 'is_active' => true, 'price_cents' => 900]);
+        // Only the free plan has the standard voices: every paid plan gets the premium ones.
+        $free = Plan::factory()->create(['slug' => 'free', 'name' => 'Free', 'voice_tier' => VoiceTier::STANDARD, 'is_active' => true, 'price_cents' => 0]);
         Plan::factory()->create(['slug' => 'creator', 'name' => 'Creator', 'voice_tier' => VoiceTier::HD, 'is_active' => true, 'price_cents' => 2200, 'sound_effects_enabled' => true]);
         Plan::factory()->create(['slug' => 'pro', 'name' => 'Pro', 'voice_tier' => VoiceTier::HD, 'is_active' => true, 'price_cents' => 4900, 'dialogue_enabled' => true, 'custom_prompt_enabled' => true, 'sound_effects_enabled' => true]);
-        $user = $this->memberOf($starter);
+        $user = $this->memberOf($free);
 
         $html = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
@@ -55,11 +56,11 @@ class PlanFeatureLocksTest extends TestCase
 
     public function test_the_arabic_button_names_the_plan_in_arabic(): void
     {
-        $starter = Plan::factory()->create(['slug' => 'starter', 'voice_tier' => VoiceTier::STANDARD, 'is_active' => true, 'price_cents' => 900]);
+        $free = Plan::factory()->create(['slug' => 'free', 'voice_tier' => VoiceTier::STANDARD, 'is_active' => true, 'price_cents' => 0]);
         Plan::factory()->create(['slug' => 'creator', 'name' => 'Creator', 'name_ar' => 'المبدع', 'voice_tier' => VoiceTier::HD, 'is_active' => true, 'price_cents' => 2200]);
         app()->setLocale('ar');
 
-        $html = $this->actingAs($this->memberOf($starter))->getLocalizedRoute('dashboard')->assertOk()->getContent();
+        $html = $this->actingAs($this->memberOf($free))->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString('متاح في المبدع', $html);
     }

@@ -237,6 +237,12 @@ class PlanAccessService
 
     public function resolveTierForPlan(?Plan $plan): string
     {
+        // Everyone who pays gets the premium (HD) voices, whatever the plan's voice
+        // tier field says; only the free plan follows its setting.
+        if ($plan && ((int) $plan->price_cents > 0 || $plan->isPack())) {
+            return VoiceTier::HD;
+        }
+
         return VoiceTier::normalize((string) ($plan?->voice_tier ?: VoiceTier::STANDARD));
     }
 

@@ -621,7 +621,8 @@ class GeminiVocalTagsTest extends TestCase
 
     private function memberOn(string $tier): User
     {
-        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true]);
+        // Only the free plan has the standard voices: every paid plan gets the premium ones.
+        $plan = Plan::factory()->create(['voice_tier' => $tier, 'is_active' => true] + ($tier === VoiceTier::STANDARD ? ['price_cents' => 0] : []));
         $user = User::factory()->create();
         Subscription::query()->create(['user_id' => $user->id, 'plan_id' => $plan->id, 'status' => 'active']);
 
