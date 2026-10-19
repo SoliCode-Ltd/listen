@@ -327,6 +327,10 @@ class GenerateAudioJob implements ShouldQueue
                     // The speech cache's copy of this take (TtsService): deleted with the voice.
                     $snapshot['cache_copy'] = (string) $audio['cache_path'];
                 }
+                if (! empty($audio['pieces_check'])) {
+                    // How the pieces of a long voice were checked, and how many were taken again (PieceCheck).
+                    $snapshot['pieces_check'] = $audio['pieces_check'];
+                }
                 if ($effectNotAdded) {
                     // The history and the developer API read audio_effect as the voice's own,
                     // so a sound environment that could not be added is kept apart.

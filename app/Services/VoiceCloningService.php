@@ -8,11 +8,13 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiKeysOutException;
+use App\Services\Tts\GeminiTtsProvider;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
 use App\Support\JoinPauses;
 use App\Support\PaceAndPitch;
+use App\Support\PieceCheck;
 use App\Support\ShareableAudio;
 use App\Support\SpeechJoin;
 use App\Support\TextChunker;
@@ -389,26 +391,42 @@ class VoiceCloningService
         // Long outputs end with no audio, so long scripts are read in pieces
         // and joined, the same way the stock Gemini voices are.
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
+        $pieces = [];
+        foreach ($parts as $partIndex => $part) {
+            foreach (TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
+                $pieces[] = [(int) $partIndex, $chunk, GeminiVocalTags::withCues($style, $part['cues'])];
+            }
+        }
         $chunks = [];
         $styles = [];
         $groups = [];
         $pauses = [];
-        foreach ($parts as $partIndex => $part) {
-            foreach (TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
-                $performed = GeminiVocalTags::forPerformance($chunk['text'], GeminiVocalTags::withCues($style, $part['cues']));
-                $chunks[] = $performed['text'];
-                $styles[] = $performed['style'];
-                // The part of the script it reads: each part keeps its own level.
-                $groups[] = (int) $partIndex;
-                // The pause after it, from where its text ends (JoinPauses).
-                $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
-            }
+        $texts = [];
+        $inPart = array_count_values(array_column($pieces, 0));
+        $seen = [];
+        foreach ($pieces as [$partIndex, $chunk, $partStyle]) {
+            // The pieces one stretch of the script (one direction) is cut into are told they
+            // are one reading; a mood tag's own part changes the delivery on purpose.
+            $n = $seen[$partIndex] = ($seen[$partIndex] ?? -1) + 1;
+            $performed = GeminiVocalTags::forPerformance($chunk['text'], $inPart[$partIndex] > 1 ? GeminiTtsProvider::continuing($partStyle, $n, $inPart[$partIndex]) : $partStyle);
+            $chunks[] = $performed['text'];
+            $styles[] = $performed['style'];
+            // The part of the script it reads: each part keeps its own level.
+            $groups[] = $partIndex;
+            // The pause after it, from where its text ends (JoinPauses).
+            $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
+            // What its take is checked against (PieceCheck): the seconds its text needs, and its part.
+            $texts[] = GeminiTtsProvider::pieceText($chunk['text'], 1.0, []) + ['part' => $partIndex];
         }
         // Written to a file piece by piece as they come, packaged from there and
         // streamed to the disk: a long script is never held whole.
+        $checked = PieceCheck::emptyReport();
         $joined = SpeechJoin::toFile(count($chunks) === 1
             ? [$this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])]
-            : $this->speakPieces($chunks, $voiceCloningKey, $styles), $pauses, $groups, SpeechJoin::PAUSE, true);
+            : $this->speakPieces($chunks, $voiceCloningKey, $styles, config('services.gemini_tts.check_pieces', true) ? $texts : [], $checked), $pauses, $groups, SpeechJoin::PAUSE, true);
+        if ($checked['retaken'] > 0) {
+            Log::info('Cloned voice: pieces of a long script were taken again.', $checked);
+        }
         $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
         try {
             $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
@@ -430,7 +448,7 @@ class VoiceCloningService
             'cost_estimate_usd' => $this->estimateCost(mb_strlen($text)),
             'char_count' => mb_strlen($text),
             'duration_seconds' => null,
-        ];
+        ] + (count($chunks) > 1 ? ['pieces_check' => $checked] : []);
     }
 
     /**
@@ -465,14 +483,20 @@ class VoiceCloningService
      * Send the pieces in parallel batches so long scripts fit in the job timeout,
      * and hand each one over, in order, as soon as its batch is in (the join
      * writes it to its file and lets it go). A piece that fails is sent again
-     * on its own, with key rotation and the fallback.
+     * on its own, with key rotation and the fallback. Each round's pieces are
+     * checked first (PieceCheck, when $texts says what each one's text needs):
+     * one that stands out is taken once more and the better take is kept.
      *
      * @param  array<int, string>  $chunks
      * @param  string|array<int, string>  $style  One direction for all pieces, or one per piece.
-     * @return \Generator<int, string>
+     * @param  array<int, array{expected: float, pauses: bool, part: int}>  $texts
+     * @param  array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>}|null  $report
+     * @return \Generator<int, array{bytes: string}>
      */
-    private function speakPieces(array $chunks, string $voiceId, string|array $style): \Generator
+    private function speakPieces(array $chunks, string $voiceId, string|array $style, array $texts = [], ?array &$report = null): \Generator
     {
+        $history = ['paces' => [], 'pitches' => []];
+        $report ??= PieceCheck::emptyReport();
         $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $keys = $this->apiKeys();
         if ($keys === []) {
@@ -483,6 +507,7 @@ class VoiceCloningService
         $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
 
         foreach (array_chunk($chunks, $parallel, true) as $batch) {
+            $ready = [];
             $responses = Http::pool(function (Pool $pool) use ($batch, $baseUrl, $key, $verify, $voiceId, $style) {
                 foreach ($batch as $index => $chunk) {
                     $pool->as('part'.$index)
@@ -520,12 +545,23 @@ class VoiceCloningService
                     $audio = $this->speakPiece($chunk, $voiceId, is_array($style) ? $style[$index] : $style);
                 }
                 $response = null;
-                yield $index => $audio;
+                $ready[$index] = ['bytes' => $audio];
                 $audio = null;
             }
+            unset($responses);
+            // The round's takes, checked against their texts and the voice so far:
+            // one that stands out is taken once more, and the better one is kept.
+            if ($texts !== []) {
+                $ready = PieceCheck::review($ready, array_intersect_key($texts, $ready),
+                    fn (int $index): array => ['bytes' => $this->speakPiece($chunks[$index], $voiceId, is_array($style) ? $style[$index] : $style)], $history, $report);
+            }
+            foreach ($ready as $index => $audio) {
+                unset($ready[$index]);
+                yield $index => $audio;
+            }
+            $audio = null;
             // The client's pooled requests hold themselves in reference cycles: without
             // this, every batch's replies stay in memory until the whole script is read.
-            unset($responses);
             gc_collect_cycles();
         }
     }
