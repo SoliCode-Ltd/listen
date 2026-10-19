@@ -4,12 +4,17 @@ namespace Tests\Feature;
 
 use App\Models\BillingSubscription;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\StripeWebhookEmailService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Stripe\ApiRequestor;
+use Symfony\Component\Mailer\Exception\TransportException;
+use Symfony\Component\Mailer\SentMessage;
+use Symfony\Component\Mailer\Transport\AbstractTransport;
 use Tests\Support\FakeStripePlanSyncClient;
 use Tests\TestCase;
 
@@ -99,6 +104,58 @@ class BillingEmailsTest extends TestCase
         // The invoice number is the member's own reference, on their invoice too.
         $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'LISTEN-0042')));
         $this->assertTrue($sent->contains(fn (string $html): bool => str_contains($html, 'Your billing profile was removed.')));
+    }
+
+    public function test_the_billing_settings_switch_decides_whether_they_are_sent(): void
+    {
+        $emails = app(StripeWebhookEmailService::class);
+
+        // Switched off in Billing Settings, though the server's setting says on.
+        config(['listen.billing.webhook_email_enabled' => true]);
+        SiteSetting::set('billing_webhook_emails', '0', 'billing');
+        $emails->sendForEvent($this->cancelledEvent('sub_off'));
+        $this->assertCount(0, $this->sentEmails());
+
+        // Switched on there, though the server's setting says off.
+        config(['listen.billing.webhook_email_enabled' => false]);
+        SiteSetting::set('billing_webhook_emails', '1', 'billing');
+        $emails->sendForEvent($this->cancelledEvent('sub_on'));
+        $this->assertCount(1, $this->sentEmails());
+
+        // Never saved: the server's setting decides.
+        SiteSetting::query()->where('key', 'billing_webhook_emails')->delete();
+        Cache::forget('site_setting.billing_webhook_emails');
+        $emails->sendForEvent($this->cancelledEvent('sub_default'));
+        $this->assertCount(1, $this->sentEmails());
+    }
+
+    public function test_an_email_that_failed_to_send_goes_out_when_the_event_comes_again(): void
+    {
+        $mailer = app('mailer');
+        $working = $mailer->getSymfonyTransport();
+        $mailer->setSymfonyTransport(new class extends AbstractTransport
+        {
+            protected function doSend(SentMessage $message): void
+            {
+                throw new TransportException('The mailbox is busy.');
+            }
+
+            public function __toString(): string
+            {
+                return 'failing';
+            }
+        });
+
+        app(StripeWebhookEmailService::class)->sendForEvent($this->cancelledEvent('sub_retry'));
+
+        // Stripe sends the event again once the mailbox works.
+        $mailer->setSymfonyTransport($working);
+        app(StripeWebhookEmailService::class)->sendForEvent($this->cancelledEvent('sub_retry'));
+        $this->assertCount(1, $this->sentEmails());
+
+        // Sent once: a third delivery sends nothing more.
+        app(StripeWebhookEmailService::class)->sendForEvent($this->cancelledEvent('sub_retry'));
+        $this->assertCount(1, $this->sentEmails());
     }
 
     /**

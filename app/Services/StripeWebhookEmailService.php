@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
+use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Support\LiveServer;
@@ -13,9 +14,15 @@ use Laravel\Cashier\Cashier;
 
 class StripeWebhookEmailService
 {
+    /**
+     * The "already sent" key of the email being prepared: kept once it is
+     * sent, let go otherwise (shouldSkipEmail(), releaseUnsentEmail()).
+     */
+    private ?string $pendingEmailKey = null;
+
     public function sendForEvent(object $event): void
     {
-        if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
+        if (! $this->emailsEnabled()) {
             return;
         }
 
@@ -26,25 +33,51 @@ class StripeWebhookEmailService
             return;
         }
 
-        match ($type) {
-            'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
-            'customer.subscription.created' => $this->handleSubscriptionCreated($object),
-            'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
-            'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
-            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
-            'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
-            'customer.deleted' => $this->handleCustomerDeleted($object),
-            'charge.refunded' => $this->handleChargeRefunded($object),
-            default => null,
-        };
+        try {
+            match ($type) {
+                'checkout.session.completed' => $this->handleCheckoutSessionCompleted($object),
+                'customer.subscription.created' => $this->handleSubscriptionCreated($object),
+                'invoice.paid', 'invoice.payment_succeeded' => $this->handleInvoicePaid($object),
+                'customer.subscription.updated' => $this->handleSubscriptionUpdated($object, $event->data->previous_attributes ?? null),
+                'customer.subscription.deleted' => $this->handleSubscriptionDeleted($object),
+                'customer.subscription.trial_will_end' => $this->handleTrialWillEnd($object),
+                'customer.deleted' => $this->handleCustomerDeleted($object),
+                'charge.refunded' => $this->handleChargeRefunded($object),
+                default => null,
+            };
+        } finally {
+            $this->releaseUnsentEmail();
+        }
     }
 
     public function sendCancellationScheduledForUser(User $user, ?BillingSubscription $billingSubscription = null): void
     {
-        if (! (bool) config('listen.billing.webhook_email_enabled', true)) {
+        if (! $this->emailsEnabled()) {
             return;
         }
 
+        try {
+            $this->sendCancellationScheduled($user, $billingSubscription);
+        } finally {
+            $this->releaseUnsentEmail();
+        }
+    }
+
+    /**
+     * The "Webhook Email Notifications" switch in Billing Settings decides;
+     * until it has been saved, LISTEN_BILLING_WEBHOOK_EMAILS does.
+     */
+    private function emailsEnabled(): bool
+    {
+        $setting = trim((string) SiteSetting::get('billing_webhook_emails', ''));
+
+        return $setting !== ''
+            ? $setting === '1'
+            : (bool) config('listen.billing.webhook_email_enabled', true);
+    }
+
+    private function sendCancellationScheduled(User $user, ?BillingSubscription $billingSubscription): void
+    {
         $billingSubscription = $billingSubscription?->fresh()
             ?? BillingSubscription::query()
                 ->where('user_id', $user->id)
@@ -584,11 +617,26 @@ class StripeWebhookEmailService
                 $message->to($user->email, $user->name ?: null)->subject($subject);
             });
         } catch (\Throwable $exception) {
+            // Not sent: its "already sent" key is let go, so a retry of the event can send it.
             Log::warning('Unable to send Stripe webhook email.', [
                 'user_id' => $user->id,
                 'subject' => $subject,
                 'error' => $exception->getMessage(),
             ]);
+
+            return;
+        }
+
+        // Sent: from now on the same email is never sent again.
+        $this->pendingEmailKey = null;
+    }
+
+    /** An email that was claimed but not sent leaves its key free for a retry. */
+    private function releaseUnsentEmail(): void
+    {
+        if ($this->pendingEmailKey !== null) {
+            Cache::forget($this->pendingEmailKey);
+            $this->pendingEmailKey = null;
         }
     }
 
@@ -753,11 +801,22 @@ class StripeWebhookEmailService
         return $planName !== '' ? $planName : null;
     }
 
+    /**
+     * Whether this email already went out. The key is taken here, so two
+     * deliveries of one event never both send it, but it is kept only once
+     * the email is sent: one that fails or is left out can go on a retry.
+     */
     private function shouldSkipEmail(string $key, int $ttlHours = 72): bool
     {
         $cacheKey = 'stripe_webhook_email:'.sha1($key);
 
-        return ! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)));
+        if (! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)))) {
+            return true;
+        }
+
+        $this->pendingEmailKey = $cacheKey;
+
+        return false;
     }
 
     private function hasAttribute(mixed $attributes, string $key): bool
