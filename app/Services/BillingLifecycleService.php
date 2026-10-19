@@ -6,6 +6,7 @@ use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\LiveServer;
 use App\Support\StripeInvoice;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -214,20 +215,57 @@ class BillingLifecycleService
                         continue;
                     }
 
-                    $stripeCanceled = $this->cancelStripeSubscriptionNow($user);
-                    if (! $stripeCanceled) {
+                    // Stripe decides, not our copy: a member who has paid since keeps
+                    // their plan, and only a subscription still owed is cancelled.
+                    $billingSubscription = $this->latestBillingSubscription($user);
+                    $stripeStatus = $this->stripeStatusNow($billingSubscription);
+                    if ($stripeStatus === null) {
                         continue;
                     }
 
-                    $local = $this->latestLocalSubscription($user);
-                    $local?->forceFill([
+                    if (in_array($stripeStatus, ['active', 'trialing'], true)) {
+                        $subscription->forceFill([
+                            'billing_payment_state' => 'ok',
+                            'billing_grace_ends_at' => null,
+                            'billing_failed_notice_sent_at' => null,
+                        ])->save();
+
+                        continue;
+                    }
+
+                    if (! $billingSubscription || ! in_array($stripeStatus, ['past_due', 'unpaid'], true)) {
+                        // Nothing live in Stripe to cancel (it ended, or never started):
+                        // the flag is settled and the sync decides the plan.
+                        $subscription->forceFill([
+                            'billing_payment_state' => 'ok',
+                            'billing_grace_ends_at' => null,
+                        ])->save();
+                        $this->billingSyncService->syncIfStale($user, true);
+
+                        continue;
+                    }
+
+                    if (! LiveServer::allowsCustomerActions()) {
+                        LiveServer::skipped('cancelling a subscription whose grace period ended', [
+                            'user_id' => $user->id,
+                            'stripe_subscription_id' => $billingSubscription->stripe_id,
+                        ]);
+
+                        continue;
+                    }
+
+                    if (! $this->cancelStripeSubscriptionNow($user, $billingSubscription)) {
+                        continue;
+                    }
+
+                    $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
+                    $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
+                    $subscription->forceFill([
                         'billing_payment_state' => 'ok',
                         'billing_grace_ends_at' => null,
                         'billing_downgraded_at' => now(),
                     ])->save();
 
-                    $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
-                    $graceEndedAt = optional($subscription->billing_grace_ends_at)->format('M j, Y') ?? now()->format('M j, Y');
                     $this->sendMail(
                         $user,
                         'Your subscription was canceled',
@@ -340,18 +378,42 @@ class BillingLifecycleService
         }
     }
 
-    private function cancelStripeSubscriptionNow(User $user): bool
+    private function latestBillingSubscription(User $user): ?BillingSubscription
     {
-        $billingSubscription = BillingSubscription::query()
+        return BillingSubscription::query()
             ->where('user_id', $user->id)
             ->where('type', 'default')
             ->latest('id')
             ->first();
+    }
 
-        if (! $billingSubscription || ! $billingSubscription->valid()) {
-            return true;
+    /**
+     * What Stripe says about the card subscription right now: its status, '' when
+     * there is none to ask about, or null when Stripe could not be read (the
+     * next run asks again).
+     */
+    private function stripeStatusNow(?BillingSubscription $billingSubscription): ?string
+    {
+        $stripeId = trim((string) ($billingSubscription?->stripe_id ?? ''));
+        if ($stripeId === '') {
+            return '';
         }
 
+        try {
+            return strtolower((string) (Cashier::stripe()->subscriptions->retrieve($stripeId, [])->status ?? ''));
+        } catch (\Throwable $exception) {
+            Log::warning('Unable to read the Stripe subscription after grace period.', [
+                'user_id' => $billingSubscription->user_id,
+                'stripe_subscription_id' => $stripeId,
+                'error' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function cancelStripeSubscriptionNow(User $user, BillingSubscription $billingSubscription): bool
+    {
         try {
             $billingSubscription->cancelNow();
             return true;
