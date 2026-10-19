@@ -133,6 +133,47 @@ class PieceCheckTest extends TestCase
         $this->assertCount(1, $history['pitches'][1]);
     }
 
+    public function test_a_direction_read_in_two_pieces_keeps_them_in_one_tone(): void
+    {
+        $this->needsFfmpeg();
+        $pieces = [$this->slice(0, 13), $this->slice(13, 27)];
+        $texts = array_map(fn ($p) => ['expected' => PieceCheck::measure($this->wav($p))['seconds'], 'pauses' => false], $pieces);
+        $even = array_map(fn ($p) => ['bytes' => $this->wav($p)], $pieces);
+        // The first piece four semitones higher: the two halves of one reading in two tones, as a test voice's were on staging.
+        $higher = [['bytes' => $this->changed($pieces[0], 'asetrate=24000*1.26,aresample=24000,atempo=0.7937')], $even[1]];
+
+        $history = ['paces' => [], 'pitches' => []];
+        $report = PieceCheck::emptyReport();
+        $this->assertSame($even, PieceCheck::review($even, $texts, fn () => $this->fail('the two pieces sound alike'), $history, $report));
+        $this->assertSame(0, $report['retaken']);
+        $this->assertLessThan(PieceCheck::PAIR_SEMITONES / 2, $report['pitch_spread']);
+
+        $asked = [];
+        $history = ['paces' => [], 'pitches' => []];
+        $report = PieceCheck::emptyReport();
+        $kept = PieceCheck::review($higher, $texts, function (int $k) use (&$asked, $even): array {
+            $asked[] = $k;
+
+            return $even[$k];
+        }, $history, $report);
+        $this->assertSame([1, 0], $asked, 'the later piece is taken again, and as that does not bring them together, the earlier one');
+        $this->assertSame($even, $kept);
+        $this->assertSame([2, 1, 2], [$report['retaken'], $report['kept_retake'], $report['reasons']['pitch']]);
+
+        // The first piece came in an earlier round: the second is still set against it.
+        $history = ['paces' => [], 'pitches' => []];
+        $report = PieceCheck::emptyReport();
+        PieceCheck::review([0 => $higher[0]], [0 => $texts[0]], fn () => $this->fail('one piece alone'), $history, $report);
+        $asked = [];
+        PieceCheck::review([1 => $even[1]], [1 => $texts[1]], function (int $k) use (&$asked, $even): array {
+            $asked[] = $k;
+
+            return $even[$k];
+        }, $history, $report);
+        $this->assertSame([1], $asked);
+        $this->assertCount(2, $history['pitches'][0]);
+    }
+
     public function test_takes_of_one_voice_are_left_alone_and_a_retake_that_fails_keeps_the_first(): void
     {
         $pieces = [$this->slice(0, 9), $this->slice(9, 18), $this->slice(18, 27)];

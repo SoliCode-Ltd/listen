@@ -18,7 +18,8 @@ namespace App\Support;
  * few milliseconds of it at a time as numbers. Its length is set against what
  * its text needs (UsageEstimator, without the margin); its pace (syllable
  * beats a second of speech) and its pitch against the median of the voice's
- * pieces so far, once there are three to go by. Measured on live (Server
+ * pieces so far, once there are three to go by, or against the other piece
+ * when a direction is read in just two. Measured on live (Server
  * deploy join-check, October 2026): within one take the halves of a long piece
  * differ by up to about 13% in pace and 2.5 semitones in pitch, while one
  * long voice in three had a piece further off than that.
@@ -39,6 +40,13 @@ final class PieceCheck
 
     /** A take whose pitch is off the voice's by more than this many semitones. */
     public const PITCH_SEMITONES = 2.5;
+
+    /**
+     * Two pieces of a direction read in only two, further apart in pitch than
+     * this many semitones (within one take the halves of a piece differ by
+     * about 2.5 at most; one test voice's two pieces were 6.6 apart).
+     */
+    public const PAIR_SEMITONES = 3.0;
 
     /** Pieces shorter than this (seconds of text) are too short to judge pace and pitch by. */
     public const SHORTEST_JUDGED = 6.0;
@@ -197,6 +205,7 @@ final class PieceCheck
         // Each direction's voice: its pieces so far and this round's, so an odd one stands out of either.
         $paces = $history['paces'];
         $pitches = $history['pitches'];
+        $taken = [];
         foreach ($measured as $k => $m) {
             $part = (int) ($texts[$k]['part'] ?? 0);
             if ($m !== null && ($texts[$k]['expected'] ?? 0) >= self::SHORTEST_JUDGED) {
@@ -239,8 +248,63 @@ final class PieceCheck
                     $m = $second;
                     $report['kept_retake']++;
                 }
+                $taken[$k] = true;
             }
-            if ($m !== null && $expected >= self::SHORTEST_JUDGED) {
+            $measured[$k] = $m;
+        }
+
+        // A direction read in just two pieces has no third to tell which one is off, but the two
+        // must still sound like one reading: the later one is taken again, then the earlier one,
+        // and the closer pair is kept.
+        $judged = [];
+        foreach ($measured as $k => $m) {
+            if ($m !== null && ($texts[$k]['expected'] ?? 0) >= self::SHORTEST_JUDGED) {
+                $judged[(int) ($texts[$k]['part'] ?? 0)][] = $k;
+            }
+        }
+        foreach ($judged as $part => $keys) {
+            $before = max(count($history['paces'][$part] ?? []), count($history['pitches'][$part] ?? []));
+            if ($before + count($keys) !== 2) {
+                continue;
+            }
+            $earlier = $before === 1 ? ['pace' => $history['paces'][$part][0] ?? null, 'pitch' => $history['pitches'][$part][0] ?? null] : $measured[$keys[0]];
+            $later = $keys[count($keys) - 1];
+            $order = $before === 1 ? [$later] : [$later, $keys[0]];
+            foreach ($order as $k) {
+                $other = $k === $later ? $earlier : $measured[$later];
+                $apart = self::apart($measured[$k], $other);
+                if ($apart === [] || isset($taken[$k])) {
+                    continue;
+                }
+                foreach ($apart as $p) {
+                    $report['reasons'][$p] = ($report['reasons'][$p] ?? 0) + 1;
+                }
+                $report['retaken']++;
+                $taken[$k] = true;
+                try {
+                    $again = $retake($k);
+                } catch (\Throwable $e) {
+                    report($e);
+                    $again = null;
+                }
+                $second = $again === null ? null : self::measure((string) $again['bytes'], $again['mime_type'] ?? null);
+                $expected = (float) ($texts[$k]['expected'] ?? 0);
+                $pauses = (bool) ($texts[$k]['pauses'] ?? false);
+                if ($second !== null && count(self::problems($second, $expected, [], $pauses)) <= count(self::problems($measured[$k], $expected, [], $pauses))
+                    && self::pairDistance($second, $other) < self::pairDistance($measured[$k], $other)) {
+                    $takes[$k] = $again;
+                    $measured[$k] = $second;
+                    $report['kept_retake']++;
+                }
+                if ($k === $later && self::apart($measured[$later], $earlier) === []) {
+                    break;
+                }
+            }
+        }
+
+        foreach ($measured as $k => $m) {
+            if ($m !== null && ($texts[$k]['expected'] ?? 0) >= self::SHORTEST_JUDGED) {
+                $part = (int) ($texts[$k]['part'] ?? 0);
                 if ($m['pace'] !== null) {
                     $history['paces'][$part][] = $m['pace'];
                 }
@@ -254,7 +318,7 @@ final class PieceCheck
         foreach (['pitch_spread' => 'pitches', 'pace_spread' => 'paces'] as $key => $list) {
             $worst = null;
             foreach ($history[$list] as $values) {
-                if (count($values) >= self::PIECES_TO_JUDGE_BY && ($median = self::median($values)) > 0) {
+                if (count($values) >= 2 && ($median = self::median($values)) > 0) {
                     foreach ($values as $v) {
                         $off = $list === 'pitches' ? abs(12 * log($v / $median, 2)) : abs($v / $median - 1);
                         $worst = max($worst ?? 0.0, $off);
@@ -271,6 +335,41 @@ final class PieceCheck
     public static function emptyReport(): array
     {
         return ['pieces' => 0, 'retaken' => 0, 'kept_retake' => 0, 'reasons' => [], 'pitch_spread' => null, 'pace_spread' => null];
+    }
+
+    /**
+     * Whether two takes of one direction sound apart: 'pitch' over PAIR_SEMITONES
+     * or 'pace' over PACE_DIFFERENCE from each other.
+     *
+     * @param  array{pace?: ?float, pitch?: ?float}  $a
+     * @param  array{pace?: ?float, pitch?: ?float}  $b
+     * @return array<int, string>
+     */
+    private static function apart(array $a, array $b): array
+    {
+        $apart = [];
+        if (! empty($a['pace']) && ! empty($b['pace']) && abs($a['pace'] / $b['pace'] - 1) > self::PACE_DIFFERENCE) {
+            $apart[] = 'pace';
+        }
+        if (! empty($a['pitch']) && ! empty($b['pitch']) && abs(12 * log($a['pitch'] / $b['pitch'], 2)) > self::PAIR_SEMITONES) {
+            $apart[] = 'pitch';
+        }
+
+        return $apart;
+    }
+
+    /** How far apart two takes sound, in pace and pitch: smaller is closer. */
+    private static function pairDistance(array $a, array $b): float
+    {
+        $distance = 0.0;
+        if (! empty($a['pace']) && ! empty($b['pace'])) {
+            $distance += abs(log($a['pace'] / $b['pace'])) / log(1 + self::PACE_DIFFERENCE);
+        }
+        if (! empty($a['pitch']) && ! empty($b['pitch'])) {
+            $distance += abs(12 * log($a['pitch'] / $b['pitch'], 2)) / self::PAIR_SEMITONES;
+        }
+
+        return $distance;
     }
 
     /** How far a take is from what its text needs and from the voice: smaller is better. */

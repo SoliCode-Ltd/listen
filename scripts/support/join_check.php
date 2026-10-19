@@ -296,7 +296,11 @@ foreach ($voices as $g) {
     $s['moods'] = count($parts) > 1;
     $across[] = $s;
     // What the piece check (App\Support\PieceCheck) would take again: with three
-    // pieces or more, one over 25% off the voice's pace or 2.5 semitones off its pitch.
+    // pieces or more, one over 25% off the voice's pace or 2.5 semitones off its
+    // pitch; with two, the pair when over 25% or 3 semitones apart.
+    if (count($pieces) === 2 && ! $s['moods']) {
+        $retakes[] = abs($pieces[1]['pace'] / $pieces[0]['pace'] - 1) > 0.25 || abs(12 * log($pieces[1]['pitch'] / $pieces[0]['pitch'], 2)) > 3.0;
+    }
     if (count($pieces) >= 3) {
         $voicePace = $quantile(array_column($pieces, 'pace'), .5);
         $voicePitch = $quantile(array_column($pieces, 'pitch'), .5);
@@ -351,4 +355,4 @@ foreach (['across the pieces of one voice' => $across, '  of those, voices with 
 }
 printf("Voices with a piece that stands out (pace over 20%%, pitch over 2 semitones or level over 3 dB from the voice's median): %d of %d.\n",
     count(array_filter($rows)), count($rows));
-printf("Pieces the piece check would take again (voices of 3 pieces or more): %d of %d.\n", count(array_filter($retakes)), count($retakes));
+printf("Pieces the piece check would take again (pieces of voices of 3 or more, and pairs of 2-piece voices): %d of %d.\n", count(array_filter($retakes)), count($retakes));
