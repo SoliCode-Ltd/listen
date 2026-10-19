@@ -227,6 +227,7 @@ Route::group([
     Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard/jobs/latest', [DashboardController::class, 'latest'])->name('dashboard.jobs.latest');
         Route::get('/dashboard/jobs/{job}', [DashboardController::class, 'show'])->whereNumber('job')->name('dashboard.jobs.show');
+        Route::get('/dashboard/csrf-token', [DashboardController::class, 'csrfToken'])->name('dashboard.csrf-token');
     });
 
     Route::middleware(['auth', 'subscription.sync'])->group(function () {

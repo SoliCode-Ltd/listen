@@ -1273,8 +1273,11 @@ return [
             'Standard voices skip tags, so they are never read aloud.',
         ],
 
-        // Generate: a reply that never came is looked for, and the same text is not sent twice meanwhile.
+        // Generate and history: a reply that never came is looked for (the same text is not sent
+        // twice meanwhile), and a page whose form token expired offers a reload.
         'voice_may_still_be_finishing' => 'Your voice may still be finishing. It will appear in your history in a moment — please don\'t generate it again.',
+        'page_expired' => 'This page has been open a long time and has expired. Reload it to carry on.',
+        'reload_page' => 'Reload page',
     ],
 
     // ===== AUTH =====

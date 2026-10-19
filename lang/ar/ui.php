@@ -1279,8 +1279,11 @@ return [
             'الأصوات القياسية تتجاهل الوسوم، فلا تُقرأ بصوت عالٍ أبداً.',
         ],
 
-        // Generate: a reply that never came is looked for, and the same text is not sent twice meanwhile.
+        // Generate and history: a reply that never came is looked for (the same text is not sent
+        // twice meanwhile), and a page whose form token expired offers a reload.
         'voice_may_still_be_finishing' => 'ربما لا يزال صوتك قيد الإنشاء، وسيظهر في سجل الأصوات بعد لحظات — يُرجى عدم توليده مرة أخرى.',
+        'page_expired' => 'انتهت صلاحية هذه الصفحة لأنها بقيت مفتوحة وقتاً طويلاً. حدّث الصفحة للمتابعة.',
+        'reload_page' => 'تحديث الصفحة',
     ],
 
     // ===== AUTH =====

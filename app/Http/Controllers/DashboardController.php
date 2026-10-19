@@ -522,6 +522,16 @@ class DashboardController extends Controller
         return response()->json(['ok' => true, 'jobs' => $jobs])->header('Cache-Control', 'no-store, private');
     }
 
+    /**
+     * A fresh form token for a page left open so long that its own has expired
+     * (every request then fails with 419): the page sends its request once more
+     * with this one (listenFetchWithFreshCsrf in the studio).
+     */
+    public function csrfToken(Request $request)
+    {
+        return response()->json(['ok' => true, 'token' => csrf_token()])->header('Cache-Control', 'no-store, private');
+    }
+
     public function destroy(Request $request, AudioGeneration $job)
     {
         $userId = (int) auth()->id();

@@ -3320,6 +3320,8 @@
       'demo_paid_tag' => app()->getLocale() === 'ar' ? 'ديمو مجاني' : 'Free Demo',
       'demo_history_locked' => app()->getLocale() === 'ar' ? 'عنصر من الديمو' : 'Demo entry',
       'voice_may_still_be_finishing' => __('ui.dashboard.voice_may_still_be_finishing'),
+      'page_expired' => __('ui.dashboard.page_expired'),
+      'reload_page' => __('ui.dashboard.reload_page'),
     ];
   @endphp
   <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
@@ -3347,7 +3349,9 @@
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
     const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
     const latestJobsUrl = '{{ route('dashboard.jobs.latest') }}';
-    const csrfToken = '{{ csrf_token() }}';
+    const csrfTokenUrl = '{{ route('dashboard.csrf-token') }}';
+    // Renewed by listenFetchWithFreshCsrf when the page's token has expired.
+    let csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
     const formMessage = document.getElementById('formMessage');
@@ -3632,6 +3636,66 @@
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
       scrollFeedbackIntoView(formMessage);
     }
+
+    // A page left open long holds an expired form token, and every request then fails
+    // with 419. listenFetchWithFreshCsrf(url, options) sends a request with the page's
+    // token and, on a 419, gets a fresh token from the server, puts it in the page and
+    // sends the request once more; a 419 that comes back again is the caller's to show
+    // (showPageExpired offers a reload). Generate and history delete use it, and so can
+    // the page's other forms. A form's own _token field is renewed too, as the server
+    // reads it before the header.
+    function withCsrfToken(options) {
+      const headers = new Headers(options.headers || {});
+      headers.set('X-CSRF-TOKEN', csrfToken);
+      if (options.body instanceof FormData && options.body.has('_token')) options.body.set('_token', csrfToken);
+      return { ...options, headers };
+    }
+
+    async function renewCsrfToken() {
+      try {
+        const response = await fetch(csrfTokenUrl, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        const data = response.ok ? await response.json().catch(() => null) : null;
+        const token = String(data?.token || '');
+        if (!token) return false;
+        csrfToken = token;
+        document.querySelectorAll('input[name="_token"]').forEach((input) => { input.value = token; });
+        document.querySelector('meta[name="csrf-token"]')?.setAttribute('content', token);
+        return true;
+      } catch (error) {
+        return false;
+      }
+    }
+
+    async function listenFetchWithFreshCsrf(url, options = {}) {
+      const response = await fetch(url, withCsrfToken(options));
+      if (response.status !== 419 || !(await renewCsrfToken())) return response;
+      return fetch(url, withCsrfToken(options));
+    }
+    window.listenFetchWithFreshCsrf = listenFetchWithFreshCsrf;
+
+    // Still expired with a fresh token asked for (signed out meanwhile): only a reload helps.
+    function showPageExpired(target) {
+      if (!target) return;
+      if (target === formMessage) beingMadeNoteJobId = 0;
+      target.innerHTML = `<div class="error">${escapeHtml(i18n.page_expired)} <button type="button" class="pagination-btn" data-action="reload-page">${escapeHtml(i18n.reload_page)}</button></div>`;
+      scrollFeedbackIntoView(target);
+    }
+
+    // The text being written is kept for the reloaded page (this tab only).
+    const studioDraftKey = 'listen_studio_draft';
+    document.addEventListener('click', function(event) {
+      if (!event.target.closest('[data-action="reload-page"]')) return;
+      try {
+        const content = String(contentInput?.value || '');
+        if (content.trim()) {
+          sessionStorage.setItem(studioDraftKey, JSON.stringify({ content, title: String(document.getElementById('voiceTitle')?.value || '') }));
+        }
+      } catch (error) {}
+      window.location.reload();
+    });
 
     // The history's own messages: the form's are hidden while the history is shown.
     function showJobsMessage(type, message) {
@@ -4420,16 +4484,19 @@
       let replyStatus = 0;
       try {
         const baseUrl = parsedSource === 'demo' ? deleteDemoJobBaseUrl : deleteJobBaseUrl;
-        const response = await fetch(`${baseUrl}/${parsedJobId}`, {
+        const response = await listenFetchWithFreshCsrf(`${baseUrl}/${parsedJobId}`, {
           method: 'DELETE',
           headers: {
-            'X-CSRF-TOKEN': csrfToken,
             'Accept': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
           },
         });
 
         replyStatus = response.status;
+        if (replyStatus === 419) {
+          showPageExpired(jobsMessage);
+          return;
+        }
         data = await response.json().catch(() => null);
         if (!response.ok || !data || data.ok === false) {
           throw new Error(extractErrorMessage(data, i18n.unable_delete_voice, replyStatus));
@@ -4557,9 +4624,9 @@
       try {
         let response = null;
         try {
-          response = await fetch(queueUrl, {
+          response = await listenFetchWithFreshCsrf(queueUrl, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
             body: new FormData(voiceForm),
           });
         } catch (networkError) {
@@ -4571,6 +4638,13 @@
           return;
         }
         replyStatus = response.status;
+        if (replyStatus === 419) {
+          // Refused before anything was made or charged.
+          showPageExpired(formMessage);
+          generateBtn.disabled = false;
+          renderGenerateButtonContent(defaultText);
+          return;
+        }
         data = await response.json().catch(() => null);
         if (data?.job) upsertJobRow(data.job);
         if (data?.usage) updateUsagePanel(data.usage);
@@ -4684,6 +4758,18 @@
     renderJobsPage();
     // Voices still being made when the page opened are checked on too.
     allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job)).forEach((job) => watchJob(job.id));
+    // A text kept by "Reload page" comes back once, into an empty box.
+    (function restoreStudioDraft() {
+      let draft = null;
+      try {
+        draft = JSON.parse(sessionStorage.getItem(studioDraftKey) || 'null');
+        sessionStorage.removeItem(studioDraftKey);
+      } catch (error) {}
+      if (!draft?.content || !contentInput || contentInput.value.trim()) return;
+      contentInput.value = String(draft.content);
+      const titleInput = document.getElementById('voiceTitle');
+      if (titleInput && !titleInput.value && draft.title) titleInput.value = String(draft.title);
+    })();
 
     // Dialogue mode (js/dialogue-mode.js): two speakers, each with a premium voice
     // and their own dialect or accent.
