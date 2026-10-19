@@ -168,6 +168,32 @@ printf("  %-4s  %-34s %-8s %d -> %s: %s\n", $confirmed ? 'ok' : 'FAIL', 'GET /'.
 $failed += $confirmed ? 0 : 1;
 $free->forceFill(['email_verified_at' => null])->save();
 
+// The demo remembers the device it is used from (App\Services\DemoLinkedAccounts),
+// so a new account in an incognito window on it shares this member's demo. A
+// made-up fingerprint for this test member only; nothing is generated.
+if (App\Services\DemoLinkedAccounts::available()) {
+    $device = hash('sha256', 'staging-page-check-device');
+    $guard->setUser($free);
+    $request = Request::create('/'.$locale.'/demo/quota', 'POST', [], [], [], [
+        'HTTP_ACCEPT' => 'application/json', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest',
+        'HTTP_X_CLIENT_DEVICE' => $device, 'HTTP_X_CLIENT_DEVICE_TOUCH' => '0',
+    ]);
+    try {
+        $response = $kernel->handle($request);
+        $kernel->terminate($request, $response);
+        $status = $response->getStatusCode();
+    } catch (Throwable $e) {
+        $status = 0;
+    }
+    $remembered = $status === 200 && App\Models\MemberDevice::query()
+        ->where('user_id', $free->id)->where('kind', App\Models\MemberDevice::DEVICE)->where('signal', $device)->exists();
+    printf("  %-4s  %-34s %-8s %d: %s\n", $remembered ? 'ok' : 'FAIL', 'POST /'.$locale.'/demo/quota', 'free', $status, $remembered ? 'the device is remembered' : 'the device is NOT remembered');
+    $failed += $remembered ? 0 : 1;
+    $guard->forgetUser();
+} else {
+    echo "  --    the member_devices table is not there yet: run the migration\n";
+}
+
 // The paying test member goes back to the free plan.
 Subscription::withoutEvents(fn () => $access->assignPlan($paid, $freePlan));
 
