@@ -92,6 +92,13 @@ return [
         // Longer single-voice texts are read in pieces sent at the same time.
         'max_chars_per_request' => (int) env('GEMINI_TTS_MAX_CHARS_PER_REQUEST', 900),
         'max_parallel_requests' => (int) env('GEMINI_TTS_MAX_PARALLEL_REQUESTS', 4),
+
+        // Dialogue pieces: a longer dialogue is made in pieces split at speaker
+        // turns, about 1.5 to 2 minutes of conversation each, well under the 2,400
+        // characters one dialogue request used to be allowed (the longest of those
+        // came back without audio). The pieces are joined like a single voice's.
+        'max_dialogue_chars_per_request' => (int) env('GEMINI_TTS_MAX_DIALOGUE_CHARS_PER_REQUEST', 1500),
+
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),

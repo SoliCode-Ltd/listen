@@ -871,15 +871,166 @@ class GeminiTtsProvider implements TtsProviderInterface
             $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
             [$text, $stylePrompt] = [$performed['text'], $performed['style']];
         }
-        $payload = $this->buildDialoguePayload($model, $text, $stylePrompt, $speakers, $languageCode, $speakerStyles);
+        // A long dialogue is made in pieces split at speaker turns, each with the same
+        // speakers and voices, and joined in order with a short pause (dialoguePieces()).
+        $payloads = [];
+        foreach ($this->dialoguePieces($text, $speakers) as $piece) {
+            $cast = array_map(fn (array $speaker): string => trim((string) ($speaker['name'] ?? $speaker['id'] ?? '')), $piece['speakers']);
+            $payloads[] = $this->buildDialoguePayload($model, $piece['text'], $stylePrompt, $piece['speakers'], $languageCode, array_intersect_key($speakerStyles, array_flip($cast)));
+        }
 
-        $audio = $this->requestAudio($endpoint, $payload);
+        $audio = count($payloads) === 1
+            ? $this->requestAudio($endpoint, $payloads[0])
+            : $this->joinAudioParts($this->requestAudioParts($endpoint, $payloads));
         $filename = $this->saveAudioFile($audio['bytes'], $audio['mime_type']);
 
         return [
             'audio_path' => $filename,
             'duration_seconds' => $this->estimateDurationSeconds($text),
         ];
+    }
+
+    /**
+     * A dialogue is made in one request, and very long ones come back without
+     * audio. A dialogue longer than services.gemini_tts.max_dialogue_chars_per_request
+     * (1,500 characters: about 1.5 to 2 minutes of conversation, well under the
+     * 2,400 one dialogue request used to be allowed; shorter dialogues stay one
+     * request, as before) is split at speaker turns into pieces of about even length.
+     * A single turn longer than that is split at sentence ends, every part
+     * starting with its speaker's name.
+     *
+     * Every piece is made with the same speakers and voices, even a piece where only
+     * one of them talks. The engine takes at most two voices a request, so a
+     * dialogue with three or more speakers is also split where a third speaker
+     * would come in: each piece has two of them, each always with their own voice.
+     *
+     * @param  array<int, array<string, mixed>>  $speakers
+     * @return array<int, array{text: string, speakers: array<int, array<string, mixed>>}>
+     */
+    private function dialoguePieces(string $text, array $speakers): array
+    {
+        $byName = [];
+        foreach ($speakers as $speaker) {
+            $name = trim((string) ($speaker['name'] ?? $speaker['id'] ?? ''));
+            if ($name !== '' && ! isset($byName[$name])) {
+                $byName[$name] = $speaker;
+            }
+        }
+        $names = array_keys($byName);
+        $pairs = count($names) > 2;
+        $max = max(300, (int) config('services.gemini_tts.max_dialogue_chars_per_request', 1500));
+        if (! $pairs && mb_strlen($text) <= $max) {
+            return [['text' => $text, 'speakers' => $speakers]];
+        }
+
+        // The turns: a "Name:" line starts one, a line without a name goes on with it.
+        $turns = [];
+        foreach (preg_split("/\r\n|\n|\r/", $text) ?: [] as $line) {
+            $line = trim((string) $line);
+            if ($line === '') {
+                continue;
+            }
+            $speaker = null;
+            foreach ($names as $name) {
+                if (str_starts_with($line, $name.':')) {
+                    $speaker = $name;
+                    break;
+                }
+            }
+            if ($speaker !== null || $turns === []) {
+                $turns[] = ['speaker' => $speaker ?? ($names[0] ?? 'Speaker'), 'named' => $speaker !== null, 'lines' => []];
+            }
+            $turns[array_key_last($turns)]['lines'][] = $line;
+        }
+        foreach ($turns as $i => $turn) {
+            $spoken = implode("\n", $turn['lines']);
+            $turns[$i]['words'] = GeminiVocalTags::hasWords($turn['named'] ? mb_substr($spoken, mb_strlen($turn['speaker']) + 1) : $spoken);
+        }
+
+        // The fewest pieces the size allows, then the smallest size that gives no more
+        // of them: pieces of about even length, made at the same time.
+        $pieces = $this->packDialogueTurns($turns, $max, $pairs);
+        if (count($pieces) > 1) {
+            $total = array_sum(array_map(fn (array $turn): int => mb_strlen(implode("\n", $turn['lines'])) + 1, $turns));
+            [$low, $high] = [min($max, max(200, intdiv($total, count($pieces)))), $max];
+            while ($low < $high) {
+                $size = intdiv($low + $high, 2);
+                if (count($this->packDialogueTurns($turns, $size, $pairs)) <= count($pieces)) {
+                    $high = $size;
+                } else {
+                    $low = $size + 1;
+                }
+            }
+            $pieces = $this->packDialogueTurns($turns, $low, $pairs);
+        }
+
+        return array_map(function (array $units) use ($speakers, $byName, $names, $pairs): array {
+            $cast = $speakers;
+            if ($pairs) {
+                // Its two speakers, in the dialogue's order; one who talks alone gets the
+                // next speaker as the second voice, so the request stays a dialogue.
+                $voices = array_values(array_intersect($names, array_column($units, 'speaker')));
+                if (count($voices) < 2) {
+                    $voices = array_values(array_intersect($names, [$voices[0], current(array_diff($names, $voices))]));
+                }
+                $cast = array_map(fn (string $name): array => $byName[$name], $voices);
+            }
+
+            return ['text' => implode("\n", array_merge(...array_column($units, 'lines'))), 'speakers' => $cast];
+        }, $pieces);
+    }
+
+    /**
+     * The dialogue's turns in order, in pieces of at most $limit characters (and of
+     * two speakers when $pairs). A turn of tags alone ("Omar: [scared]") goes on with
+     * the words after it, which it directs.
+     *
+     * @param  array<int, array{speaker: string, named: bool, lines: array<int, string>, words: bool}>  $turns
+     * @return array<int, array<int, array{speaker: string, named: bool, lines: array<int, string>, words: bool}>>
+     */
+    private function packDialogueTurns(array $turns, int $limit, bool $pairs): array
+    {
+        $pieces = [];
+        $current = [];
+        $size = -1;
+        foreach ($turns as $turn) {
+            $units = [$turn];
+            $text = implode("\n", $turn['lines']);
+            if (mb_strlen($text) > $limit) {
+                // One very long turn: split at sentence ends, each part with the speaker's name.
+                $label = $turn['speaker'].': ';
+                $spoken = $turn['named'] ? trim(mb_substr($text, mb_strlen($turn['speaker']) + 1)) : $text;
+                $units = array_map(
+                    fn (string $chunk): array => ['speaker' => $turn['speaker'], 'named' => true, 'lines' => [$label.$chunk], 'words' => true],
+                    TextChunker::split($spoken, max(100, $limit - mb_strlen($label)), 'mb_strlen'),
+                );
+            }
+
+            foreach ($units as $unit) {
+                $unitSize = mb_strlen(implode("\n", $unit['lines']));
+                $voices = array_unique(array_merge(array_column($current, 'speaker'), [$unit['speaker']]));
+                if ($current !== [] && ($size + 1 + $unitSize > $limit || ($pairs && count($voices) > 2))) {
+                    $carry = [];
+                    while (count($current) > 1 && ! end($current)['words']) {
+                        array_unshift($carry, array_pop($current));
+                    }
+                    if ($pairs && count(array_unique(array_merge(array_column($carry, 'speaker'), [$unit['speaker']]))) > 2) {
+                        $current = array_merge($current, $carry);
+                        $carry = [];
+                    }
+                    $pieces[] = $current;
+                    $current = $carry;
+                    $size = $carry === [] ? -1 : mb_strlen(implode("\n", array_merge(...array_column($carry, 'lines'))));
+                }
+                $current[] = $unit;
+                $size += 1 + $unitSize;
+            }
+        }
+        if ($current !== []) {
+            $pieces[] = $current;
+        }
+
+        return $pieces;
     }
 
     /**
