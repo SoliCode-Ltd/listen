@@ -1625,6 +1625,9 @@ return [
         'premium_voices_busy' => 'أصواتنا المميزة مشغولة الآن، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى بعد دقيقة.',
         'generation_stuck_refunded' => 'استغرق هذا الصوت وقتاً أطول من اللازم فأوقفناه، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى.',
         'generate_too_many_requests' => 'طلبات توليد كثيرة في وقت قصير. انتظر :seconds ثانية ثم حاول مرة أخرى.',
+
+        // Studio: a long text is made after the reply, and the page checks on it until it is ready.
+        'dashboard_voice_being_made' => 'جارٍ إنشاء صوتك الآن، وسيظهر في سجل الأصوات ويُشغَّل هنا فور اكتماله.',
     ],
 
     // ===== استنساخ الأصوات =====

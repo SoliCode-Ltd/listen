@@ -402,16 +402,23 @@ class DashboardController extends Controller
 
         $job = $recorded['job'];
 
-        try {
-            // Dashboard flow is intentionally synchronous for immediate UX.
-            GenerateAudioJob::dispatchSync($job->id);
-        } catch (\Throwable) {
-            // Job failed — status will be checked below.
-        }
+        // A long text is made after the reply, so no time limit of the web server can
+        // cut it short: the member is answered at once and the page checks on it.
+        $madeAfterReply = GenerateAudioJob::runsAfterResponse($estimate['chars']);
+        if ($madeAfterReply) {
+            GenerateAudioJob::runAfterResponse((int) $job->id);
+        } else {
+            try {
+                // Dashboard flow is intentionally synchronous for immediate UX.
+                GenerateAudioJob::dispatchSync($job->id);
+            } catch (\Throwable) {
+                // Job failed — status will be checked below.
+            }
 
-        // A failed generation has given its credits back itself; one the job's own
-        // error handling never reached is failed and refunded here, exactly once.
-        app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+            // A failed generation has given its credits back itself; one the job's own
+            // error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+        }
 
         $job->refresh();
         $counter = CreditPeriod::counter($userId);
@@ -426,6 +433,21 @@ class DashboardController extends Controller
 
         $usageSnapshot = UsageSnapshot::for($userId, $quotaPlan, $counter);
         $voiceNameMap = $this->voiceNameMapForUser($userId);
+
+        if ($madeAfterReply) {
+            $message = __('ui.backend.dashboard_voice_being_made');
+
+            // Accepted and being made: the history shows it, and the page checks on it.
+            return $request->expectsJson()
+                ? response()->json([
+                    'ok' => true,
+                    'message' => $message,
+                    'job' => $this->buildJobPayload($job, $voiceNameMap),
+                    'usage' => $usageSnapshot,
+                    'stats' => $stats,
+                ], 202)
+                : redirect()->route('dashboard')->with('ok', $message);
+        }
 
         if ($request->expectsJson()) {
             $isDone = $job->status === 'done';

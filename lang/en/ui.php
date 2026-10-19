@@ -1619,6 +1619,9 @@ return [
         'premium_voices_busy' => 'Our premium voices are busy right now. Nothing was charged — please try again in a minute.',
         'generation_stuck_refunded' => 'This voice took too long, so we stopped it. Nothing was charged — please try again.',
         'generate_too_many_requests' => 'You are generating very quickly. Please wait :seconds seconds and try again.',
+
+        // Studio: a long text is made after the reply, and the page checks on it until it is ready.
+        'dashboard_voice_being_made' => 'Your voice is being made. It will appear in your history and play here as soon as it is ready.',
     ],
 
     // ===== VOICE CLONING =====

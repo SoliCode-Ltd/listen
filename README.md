@@ -112,7 +112,8 @@ STRIPE_SECRET=
 STRIPE_WEBHOOK_SECRET=
 
 # sync: generate inside the request. queue: always use the worker.
-# In sync mode, texts at least this long are still queued.
+# In sync mode, texts at least this long are made right after the reply, in the
+# same PHP process (no worker needed); the studio and the extension check on them.
 LISTEN_AUDIO_PROCESSING=sync
 LISTEN_AUDIO_FORCE_ASYNC_CHARS=2500
 
@@ -214,7 +215,7 @@ Other commands:
 | `listen:audit-blocked` | Audit blocked accounts |
 | `listen:multi-account-backfill` | Backfill multi-account blocks |
 
-Keep a queue worker running in production, whatever `LISTEN_AUDIO_PROCESSING` says: the extension and the developer API queue their background generations, the paid welcome email is queued, and with `LISTEN_AUDIO_PROCESSING=queue` every generation is. On Cloudways, add it under Supervisor with two processes:
+Keep a queue worker running in production, whatever `LISTEN_AUDIO_PROCESSING` says: the developer API queues its background generations, the paid welcome email is queued, and with `LISTEN_AUDIO_PROCESSING=queue` every generation is. On Cloudways, add it under Supervisor with two processes:
 
 ```bash
 php artisan queue:work database --queue=high,default --tries=3 --timeout=150 --max-time=3600

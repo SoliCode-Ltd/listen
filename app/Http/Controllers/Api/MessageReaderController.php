@@ -216,15 +216,11 @@ class MessageReaderController extends Controller
             ]);
         }
 
-        $forceAsyncChars = max(0, (int) config('listen.audio.force_async_chars', 2500));
-        $preferSync = (bool) ($validated['prefer_sync'] ?? false);
-        $runAsync = $processingMode === 'queue'
-            || (
-                ! $preferSync
-                && $processingMode === 'sync'
-                && $forceAsyncChars > 0
-                && $estimate['chars'] >= $forceAsyncChars
-            );
+        $runAsync = $processingMode === 'queue';
+        // Otherwise a long text is made after the reply, whatever the extension asks (an
+        // older one asks to wait for every text): no time limit of the web server cuts it
+        // short, and it needs no queue worker. The extension checks on it.
+        $afterResponse = ! $runAsync && GenerateAudioJob::runsAfterResponse($estimate['chars']);
         $initialStatus = $runAsync ? 'queued' : 'processing';
 
         // The limits are checked and the credits reserved in one locked step, with the
@@ -273,7 +269,15 @@ class MessageReaderController extends Controller
         $item = $recorded['item'];
         $job = $recorded['job'];
 
-        if (! $runAsync) {
+        if ($runAsync) {
+            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
+                ? 'high'
+                : 'default';
+
+            GenerateAudioJob::dispatch($job->id)->onQueue($queueName);
+        } elseif ($afterResponse) {
+            GenerateAudioJob::runAfterResponse((int) $job->id);
+        } else {
             try {
                 GenerateAudioJob::dispatchSync($job->id);
             } catch (\Throwable) {
@@ -285,12 +289,6 @@ class MessageReaderController extends Controller
             app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
 
             $job->refresh();
-        } else {
-            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
-                ? 'high'
-                : 'default';
-
-            GenerateAudioJob::dispatch($job->id)->onQueue($queueName);
         }
 
         $isFailed = $job->status === 'failed';

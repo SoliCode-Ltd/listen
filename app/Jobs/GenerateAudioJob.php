@@ -85,8 +85,53 @@ class GenerateAudioJob implements ShouldQueue
     public int $tries = 3;
     public int $timeout = 150;
 
+    /** Time a voice made after the reply may take: the stuck-generation sweep fails one still running after 30 minutes anyway. */
+    private const AFTER_RESPONSE_SECONDS = 1800;
+
     public function __construct(public int $audioGenerationId)
     {
+    }
+
+    /**
+     * Texts this long are made after the reply (listen.audio.force_async_chars;
+     * 0 makes every text in the request).
+     */
+    public static function runsAfterResponse(int $chars): bool
+    {
+        $fromChars = max(0, (int) config('listen.audio.force_async_chars', 2500));
+
+        return $fromChars > 0 && $chars >= $fromChars;
+    }
+
+    /**
+     * Makes a member's voice after the reply has been sent, in this same PHP
+     * process (the studio and the extension, for long texts): the member is
+     * answered at once and checks on it, the web server's time limit never cuts
+     * it short, and no queue worker is needed (none is sure to run on the
+     * servers). A failure is failed and refunded as in the request; a process
+     * that dies is left to the stuck-generation sweep.
+     */
+    public static function runAfterResponse(int $audioGenerationId): void
+    {
+        $seconds = self::AFTER_RESPONSE_SECONDS;
+
+        dispatch(function () use ($audioGenerationId, $seconds): void {
+            // Nobody waits on the request any more: a closed tab must not stop a paid generation.
+            ignore_user_abort(true);
+            $limit = (int) ini_get('max_execution_time');
+            if ($limit > 0 && $limit < $seconds && function_exists('set_time_limit')) {
+                @set_time_limit($seconds);
+            }
+
+            try {
+                GenerateAudioJob::dispatchSync($audioGenerationId);
+            } catch (\Throwable) {
+                // Failed and refunded by the job itself: a run in this process is its last try.
+            }
+
+            // One the job's own error handling never reached is failed and refunded here, exactly once.
+            app(MemberUsageMeter::class)->failAndRefund($audioGenerationId, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
+        })->afterResponse();
     }
 
     public function handle(TranslationService $translationService, TtsService $ttsService): void
