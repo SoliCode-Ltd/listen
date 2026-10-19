@@ -230,6 +230,11 @@ class TtsService
                 && (trim((string) ($config['dialect'] ?? '')) !== '' || (is_string($encoded) && str_contains($encoded, '"dialect"')))) {
                 $parts[] = 'script:dialect';
             }
+
+            // A mood or delivery tag in a dialogue now directs its own turn, not every line.
+            if ($provider === 'gemini' && \App\Support\GeminiVocalTags::prepare($text)['cues'] !== []) {
+                $parts[] = 'cues:own-turn';
+            }
         }
 
         // Chirp 3 HD standard voices sound different from WaveNet ones, so they

@@ -369,16 +369,18 @@ class GeminiVocalTags
         return $text;
     }
 
-    public static function parts(string $text): array
+    public static function parts(string $text, bool $keepSounds = false): array
     {
         $text = self::normalizeMarkup($text);
         $pieces = preg_split('/(\[[^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'}\])/u', $text, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$text];
         $parts = [];
         $current = null;
         $buffer = '';
-        $flush = function () use (&$parts, &$buffer, &$current): void {
+        $flush = function () use (&$parts, &$buffer, &$current, $keepSounds): void {
             $prepared = self::prepare($buffer);
-            if (trim(self::strip($prepared['text'])) !== '') {
+            // With $keepSounds, a part that is only a sound (a dialogue line "<laugh>") is kept too.
+            $sounds = $keepSounds && self::strip($prepared['text']) !== $prepared['text'];
+            if (trim(self::strip($prepared['text'])) !== '' || $sounds) {
                 $cues = $current !== null ? array_merge([$current], $prepared['cues']) : $prepared['cues'];
                 $parts[] = ['text' => $prepared['text'], 'cues' => array_values(array_unique($cues))];
             }
@@ -408,6 +410,46 @@ class GeminiVocalTags
         $flush();
 
         return $parts;
+    }
+
+    /**
+     * Ready a dialogue for Gemini 3.8: sounds become <tag> as in prepare(), and
+     * moods and delivery tags stay where they are written, so each turn can be
+     * read with its own (see parts()).
+     */
+    public static function tagSounds(string $text): string
+    {
+        return (string) preg_replace_callback(
+            '/\[([^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'})\]|<([^<>\s](?:[^<>\n]{0,'.(self::MAX_CUE_LENGTH - 2).'}[^<>\s])?)>|\(([^()\n]{1,'.self::MAX_CUE_LENGTH.'})\)/u',
+            function (array $m): string {
+                $inner = trim($m[3] ?? '') !== '' ? $m[3] : (trim($m[2] ?? '') !== '' ? $m[2] : $m[1]);
+                $tag = self::canonical($inner);
+
+                return $tag !== null ? '<'.$tag.'>' : $m[0];
+            },
+            self::normalizeMarkup($text),
+        );
+    }
+
+    /**
+     * The delivery tags a text ends with, with nothing spoken after them
+     * ("Fine. [angry]", or a line of tags alone), or ''.
+     */
+    public static function trailingDelivery(string $text): string
+    {
+        $tags = [];
+        foreach (preg_split('/(\[[^\[\]\n]{1,'.self::MAX_CUE_LENGTH.'}\])/u', self::normalizeMarkup($text), -1, PREG_SPLIT_DELIM_CAPTURE) ?: [] as $piece) {
+            $inner = preg_match('/^\[([^\[\]\n]+)\]$/u', $piece, $m) ? $m[1] : null;
+            if ($inner !== null && trim($inner) !== '/'
+                && (self::delivery($inner) !== null || (self::canonical($inner) === null && self::looksLikeCue($inner)))) {
+                $tags[] = $piece;
+            } elseif (trim($piece) !== '') {
+                // Words, a sound or the end of a span come after: the tags before directed them.
+                $tags = [];
+            }
+        }
+
+        return implode(' ', $tags);
     }
 
     /**
@@ -570,8 +612,9 @@ class GeminiVocalTags
         }
 
         // A sound inside a running sentence is often swallowed: end the words before it.
+        // Right after a bracketed tag ("[angry] <scream>") it already starts its own part.
         $names = implode('|', array_map(fn ($t) => preg_quote($t, '/'), array_keys($found)));
-        $text = (string) preg_replace('/(?<=[^\s.!?؟،,…:;>])[ \t]*<('.$names.')>/u', '. <$1>', $text);
+        $text = (string) preg_replace('/(?<=[^\s.!?؟،,…:;>\]])[ \t]*<('.$names.')>/u', '. <$1>', $text);
 
         $lines = [];
         foreach (array_keys($found) as $tag) {

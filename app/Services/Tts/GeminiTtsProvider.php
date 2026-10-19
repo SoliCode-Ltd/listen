@@ -532,16 +532,15 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         // Sound tags: <laugh> for Gemini 3.8, [laugh] for the older prompt model.
         // Delivery tags ([excited]) split a single voice's script into parts,
-        // each read with its own direction; in a dialogue they apply to the whole script.
+        // each read with its own direction; in a dialogue each directs its own turn.
         if (GeminiTtsModel::usesStructuredSpeech($model)) {
             if ($isDialogue) {
                 // Each line is rewritten into its speaker's dialect, as a single voice's script is.
                 if ($this->isArabicLanguage($targetLanguage) && config('services.gemini_tts.dialect_rewrite', true)) {
                     $text = $this->dialogueInDialects($text, $speakers, trim((string) ($voiceConfig['dialect'] ?? '')));
                 }
-                $prepared = GeminiVocalTags::prepare($text);
-                $text = $prepared['text'];
-                $voiceConfig['vocal_cues'] = $prepared['cues'];
+                // Moods stay where they are written: structuredDialogueParts() gives each to its turn.
+                $text = GeminiVocalTags::tagSounds($text);
             } else {
                 // A dialect lives in its words as much as its accent: the script is
                 // rewritten into the chosen Arabic variety first, as for cloned voices.
@@ -864,11 +863,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             $speakerStyle = $customPrompt !== ''
                 ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own, $structured)
                 : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch, $structured);
-            $speakerStyle = GeminiVocalTags::withCues($speakerStyle, $voiceConfig['vocal_cues'] ?? []);
             $speakerStyles[$name] = $structured ? GeminiVocalTags::forPerformance($text, $speakerStyle)['style'] : $speakerStyle;
         }
 
-        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $voiceConfig['vocal_cues'] ?? []);
+        // Moods and delivery tags direct their own turn only (structuredDialogueParts()).
         if ($structured) {
             $performed = GeminiVocalTags::forPerformance($text, $stylePrompt);
             [$text, $stylePrompt] = [$performed['text'], $performed['style']];
@@ -1032,6 +1030,10 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * Split a script into verbatim turns so Gemini 3.8 does not read speaker labels aloud.
+     * Every line is a part with its speaker and that speaker's direction. A mood or
+     * delivery tag ([angry]) directs its own turn only, from where it is written to
+     * the end of the turn (all of it when nothing follows the tag); a turn of tags
+     * alone directs the next turn. It never colours the rest of the dialogue.
      *
      * @param  array<int, array<string, mixed>>  $speakers
      * @param  array<string, string>  $speakerStyles  direction per speaker name, for speakers with their own dialect
@@ -1047,8 +1049,9 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
         }
 
+        // The turns: a "Name:" line starts one, a line without a name goes on with it.
         $currentSpeaker = $names[0] ?? 'Speaker';
-        $parts = [];
+        $turns = [];
         foreach (preg_split("/\r\n|\n|\r/", $text) ?: [] as $line) {
             $line = trim((string) $line);
             if ($line === '') {
@@ -1056,34 +1059,59 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
 
             $spoken = $line;
+            $named = false;
             foreach ($names as $name) {
                 $prefix = $name.':';
                 if (str_starts_with($line, $prefix)) {
                     $currentSpeaker = $name;
                     $spoken = trim(substr($line, strlen($prefix)));
+                    $named = true;
                     break;
                 }
             }
 
-            if ($spoken === '') {
-                continue;
+            if ($named || $turns === []) {
+                $turns[] = ['speaker' => $currentSpeaker, 'lines' => []];
             }
+            if ($spoken !== '') {
+                $turns[array_key_last($turns)]['lines'][] = $spoken;
+            }
+        }
 
-            $part = ['text' => $spoken];
-            $metadata = ['speaker' => $currentSpeaker];
-            $lineStyle = $speakerStyles[$currentSpeaker] ?? $stylePrompt;
-            if (trim($lineStyle) !== '') {
-                $metadata['style'] = $lineStyle;
+        $parts = [];
+        $carried = '';
+        foreach ($turns as $turn) {
+            $script = trim($carried.' '.implode("\n", $turn['lines']));
+            $pieces = GeminiVocalTags::parts($script, true);
+            $trailing = GeminiVocalTags::trailingDelivery($script);
+            $carried = $pieces === [] ? $trailing : '';
+            $turnCues = $pieces !== [] && $trailing !== '' ? GeminiVocalTags::prepare($trailing)['cues'] : [];
+            foreach ($pieces as $piece) {
+                $lineStyle = GeminiVocalTags::withCues(
+                    $speakerStyles[$turn['speaker']] ?? $stylePrompt,
+                    array_values(array_unique(array_merge($piece['cues'], $turnCues))),
+                );
+                // One part per line, as written.
+                foreach (preg_split("/\r\n|\n|\r/", $piece['text']) ?: [] as $spoken) {
+                    if (trim($spoken) === '') {
+                        continue;
+                    }
+                    $metadata = ['speaker' => $turn['speaker']];
+                    if (trim($lineStyle) !== '') {
+                        $metadata['style'] = $lineStyle;
+                    }
+                    $parts[] = ['text' => trim($spoken), 'speech_metadata' => $metadata];
+                }
             }
-            $part['speech_metadata'] = $metadata;
-            $parts[] = $part;
         }
 
         if ($parts !== []) {
             return $parts;
         }
 
-        $part = ['text' => $text, 'speech_metadata' => ['speaker' => $currentSpeaker]];
+        $prepared = GeminiVocalTags::prepare($text);
+        $part = ['text' => $prepared['text'], 'speech_metadata' => ['speaker' => $currentSpeaker]];
+        $stylePrompt = GeminiVocalTags::withCues($stylePrompt, $prepared['cues']);
         if (trim($stylePrompt) !== '') {
             $part['speech_metadata']['style'] = $stylePrompt;
         }
