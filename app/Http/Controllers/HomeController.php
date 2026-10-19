@@ -9,6 +9,7 @@ use App\Models\SiteSetting;
 use App\Models\User;
 use App\Models\VoiceSample;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
@@ -27,6 +28,7 @@ use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
 use App\Support\DialogueSpeakers;
 use App\Support\DiscountTerms;
+use App\Support\EmailVerification;
 use App\Support\FreeAllowance;
 use App\Support\PlanPricingLines;
 use App\Support\SeoDialectPages;
@@ -478,7 +480,14 @@ class HomeController extends Controller
             ->orderBy('price_cents')
             ->value('slug') ?? 'starter');
 
+        // An account that must confirm its email first sees what to do, with a button for a new link, instead of Generate.
+        $member = $request->user();
+        $verifyEmail = EmailVerification::requiredForFreeUse($member)
+            ? ['address' => (string) $member->email, 'sent' => EmailVerificationMailer::linkSentRecently($member)]
+            : null;
+
         $response = response()->view('demo', [
+            'verifyEmail' => $verifyEmail,
             'voiceCatalog' => $this->demoVoiceCatalog(),
             'defaultTier' => $defaultTier,
             'defaultVoiceAr' => VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', $defaultTier, $defaultProvider)),

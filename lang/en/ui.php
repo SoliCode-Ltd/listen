@@ -1364,6 +1364,38 @@ return [
         'phone_configuration_error' => 'Phone sign-in is not available right now. Please try again later.',
     ],
 
+    // ===== EMAIL CONFIRMATION (accounts made with an email and a password, before the free demo) =====
+    'verify_email' => [
+        'mail_subject' => 'Confirm your email for Listen',
+        'mail_greeting' => 'Hi :name,',
+        'mail_greeting_anonymous' => 'Hi there,',
+        'mail_intro' => 'Thanks for signing up to Listen. Open this link to confirm your email address and start making free voices:',
+        'mail_expiry' => 'The link works for :days days. If it has run out, sign in and send yourself a new one from the demo page.',
+        'mail_ignore' => "If you didn't sign up to Listen, you can ignore this email.",
+        'mail_thanks' => 'Thanks,',
+        'mail_signature' => 'Listen Studio Team',
+        'notice_title' => 'Confirm your email to try the demo',
+        'studio_notice_title' => 'Confirm your email to use your free credits',
+        'notice_body' => 'We sent a confirmation link to :email. Open it to start making free voices.',
+        'notice_body_unsent' => 'Send yourself a confirmation link at :email, then open it to start making free voices.',
+        'notice_hint' => "Can't find it? Look in your spam or junk folder, or send yourself a new link.",
+        'resend_button' => 'Send a new link',
+        'send_button' => 'Send me a confirmation link',
+        'demo_required' => 'Confirm your email to try the demo: open the confirmation link sent to :email. No email? Send yourself a link on the demo page.',
+        'studio_required' => 'Confirm your email to use your free credits: open the confirmation link sent to :email. No email? Send yourself a link on your dashboard.',
+        'resent' => 'We sent a confirmation link to :email. It works for :days days.',
+        'resend_failed' => "We couldn't send the email just now. Please try again in a few minutes.",
+        'resend_too_many' => '{1} You asked for several new links. Please wait a minute, then try again.|[2,*] You asked for several new links. Please wait :count minutes, then try again.',
+        'already_verified' => 'Your email is already confirmed.',
+        'verified' => 'Thanks, your email is confirmed. You can try the demo now.',
+        'verified_plain' => 'Thanks, your email is confirmed.',
+        'verified_sign_in' => 'Thanks, your email is confirmed. Sign in to try the demo.',
+        'verified_other_account' => 'That email address is now confirmed. You are signed in with a different account.',
+        'link_expired' => 'This confirmation link has expired.',
+        'link_invalid' => 'This confirmation link is not valid.',
+        'sign_in_for_new_link' => 'Sign in to send yourself a new one.',
+    ],
+
     'admin' => [
         'users' => [
             'account_section' => 'Account Information',

@@ -8,6 +8,7 @@ use App\Rules\NotDisposableEmail;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
+use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Auth\PhoneAuthBridgeService;
 use App\Services\PlanAccessService;
 use App\Services\Referral\ReferralService;
@@ -33,6 +34,7 @@ class AuthController extends Controller
         private readonly PhoneAuthBridgeService $phoneAuthBridge,
         private readonly MultiAccountEnforcementService $multiAccountEnforcement,
         private readonly ReferralService $referralService,
+        private readonly EmailVerificationMailer $emailVerificationMailer,
     ) {
     }
 
@@ -214,6 +216,11 @@ class AuthController extends Controller
                     ->with('blocked_notice', $this->blockedUserService->noticePayload($user))
             );
         }
+
+        // The link that confirms the address, before the first free demo, in the page's
+        // language. It goes out after the reply, so sign-up never waits for the mail
+        // server; if it fails, that is logged and the member can send a new one.
+        $this->emailVerificationMailer->sendAfterResponse($user, app()->getLocale());
 
         $intended = $this->landingAfterSignIn($request, $user);
 
