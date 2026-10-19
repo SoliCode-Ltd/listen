@@ -561,6 +561,7 @@ class HomeController extends Controller
             }
             if ($validated['is_dialogue'] ?? false) {
                 DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
+                DialogueSpeakers::ensureShortEnough((string) $validated['text'], 'text');
             }
             $voiceName = $this->normalizeVoiceSelection(
                 $validated['target_language'],
@@ -679,6 +680,7 @@ class HomeController extends Controller
         $isDialogue = (bool) ($validated['is_dialogue'] ?? false);
         if ($isDialogue) {
             DialogueSpeakers::ensureUsable($tier, (array) ($validated['dialogue_speakers'] ?? []), (string) $validated['text'], 'text');
+            DialogueSpeakers::ensureShortEnough((string) $validated['text'], 'text');
         }
         $demoRoutingPlan = $this->demoRoutingPlan($demoPlan, $tier);
         $voiceName = $this->normalizeVoiceSelection(
