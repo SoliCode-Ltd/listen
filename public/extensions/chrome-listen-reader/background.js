@@ -595,9 +595,11 @@ function getSettings() {
   });
 }
 
-function saveSettings(settings) {
+async function saveSettings(settings) {
+  // Merged with what is stored: the popup never sends the service address (the
+  // server may have moved it), so a save keeps it rather than resetting it.
   const payload = {
-    ...DEFAULT_SETTINGS,
+    ...(await getSettings()),
     ...settings,
   };
 
