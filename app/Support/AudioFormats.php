@@ -133,7 +133,9 @@ class AudioFormats
 
         try {
             $process = new Process(array_merge(
-                [$ffmpeg, '-hide_banner', '-loglevel', 'error', '-y', '-i', $absolutePath, '-vn', '-ac', '1'],
+                // The file's own channels: a voice in a sound environment is stereo
+                // (folding it to mono drops the room's width and 3 dB of level).
+                [$ffmpeg, '-hide_banner', '-loglevel', 'error', '-y', '-i', $absolutePath, '-vn'],
                 self::ALL[$format]['args'],
                 [$output],
             ));
