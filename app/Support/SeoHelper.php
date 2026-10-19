@@ -458,13 +458,13 @@ class SeoHelper
                 ],
                 'ar' => [
                     'eyebrow' => 'تحويل النص العربي إلى صوت',
-                    'h1' => 'تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات',
+                    'h1' => 'تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات الرئيسية',
                     'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى وأكثر من '.DialectCounts::arabic().' لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
                     'highlights_title' => 'لماذا منصة إسمع للنص العربي؟',
                     'highlights_intro' => 'لأن العربية ليست لغة إضافية عندنا، بل اللغة الأساسية.',
                     'highlights' => [
                         ['title' => 'نطق عربي صحيح', 'body' => 'مخارج حروف واضحة، ونطق سليم للأسماء والأرقام والتواريخ في النص العربي.'],
-                        ['title' => 'الفصحى وكل اللهجات', 'body' => 'اختر الفصحى للمحتوى الرسمي والتعليمي، أو لهجة جمهورك: الخليجية أو الشامية أو المصرية أو العراقية أو المغاربية.'],
+                        ['title' => 'الفصحى وكل اللهجات الرئيسية', 'body' => 'اختر الفصحى للمحتوى الرسمي والتعليمي، أو لهجة جمهورك: الخليجية أو الشامية أو المصرية أو العراقية أو المغاربية.'],
                         ['title' => 'تحكم في الأداء والمشاعر', 'body' => 'اختر أسلوب الإلقاء: إعلاني، قصصي، تعليمي، أو حواري، مع تحديد النبرة والمشاعر.'],
                     ],
                     'use_cases_title' => 'استخدامات تحويل النص العربي إلى صوت',
@@ -496,7 +496,7 @@ class SeoHelper
                     'highlights_intro' => 'Human-sounding voices without the robotic tone.',
                     'highlights' => [
                         ['title' => 'Natural HD voices', 'body' => 'Choose Standard voices for everyday reading or HD voices with emotion and performance styles for professional voiceovers.'],
-                        ['title' => 'English and Arabic, every dialect', 'body' => 'More than '.DialectCounts::english().' English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
+                        ['title' => 'English and Arabic, every major dialect', 'body' => 'More than '.DialectCounts::english().' English accents including American, British and Australian, plus Modern Standard Arabic and Gulf, Levantine, Egyptian, Iraqi and Maghrebi dialects.'],
                         ['title' => 'Translate, then speak', 'body' => 'Write in one language and get audio in the other with built-in translation.'],
                     ],
                     'use_cases_title' => 'What people use it for',
@@ -526,7 +526,7 @@ class SeoHelper
                     'highlights_intro' => 'أصوات تشبه البشر، بلا نبرة آلية.',
                     'highlights' => [
                         ['title' => 'أصوات طبيعية عالية الدقة', 'body' => 'أصوات قياسية للقراءة اليومية، وأصوات عالية الدقة بالمشاعر وأساليب الأداء للتعليق الصوتي الاحترافي.'],
-                        ['title' => 'العربية بكل لهجاتها والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، وأكثر من '.DialectCounts::english().' لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
+                        ['title' => 'العربية بكل لهجاتها الرئيسية والإنجليزية', 'body' => 'الفصحى، ولهجات الخليج والشام ومصر والعراق والمغرب العربي، وأكثر من '.DialectCounts::english().' لكنة إنجليزية منها الأمريكية والبريطانية والأسترالية.'],
                         ['title' => 'ترجم ثم حوّل إلى صوت', 'body' => 'اكتب بلغة واحصل على الصوت باللغة الأخرى عبر الترجمة المدمجة.'],
                     ],
                     'use_cases_title' => 'فيم يُستخدم',

@@ -44,6 +44,30 @@ class SeoProductClaimsTest extends TestCase
         }
     }
 
+    public function test_pages_promise_every_major_dialect_not_every_dialect(): void
+    {
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()
+            ->assertSee('تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات الرئيسية')
+            ->assertSee('الفصحى وكل اللهجات الرئيسية');
+        $this->page('en', 'seo.text-to-speech')->assertOk()->assertSee('English and Arabic, every major dialect');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()->assertSee('العربية بكل لهجاتها الرئيسية والإنجليزية');
+        $this->page('ar', 'seo.english-accents')->assertOk()->assertSee('<title>تحويل النص إلى صوت إنجليزي بكل اللكنات الرئيسية', false);
+
+        $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
+            ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'saudi']], ['seo.accent', ['accent' => 'british']],
+            ['home', []], ['samples', []]];
+        foreach ($pages as [$route, $params]) {
+            foreach (['en', 'ar'] as $locale) {
+                // "All Arabic dialects" links to the list of the ones Listen has, and stays.
+                $this->assertDoesNotMatchRegularExpression(
+                    '/every (?:dialect|accent)\b|كل اللهجات(?! (?:الرئيسية|العربية))|بكل لهجاتها(?! الرئيسية)|بكل اللكنات(?! الرئيسية)|كل البلاد العربية/u',
+                    (string) $this->page($locale, $route, $params)->assertOk()->getContent(),
+                    $route.' '.$locale
+                );
+            }
+        }
+    }
+
     public function test_accent_pages_for_other_languages_render_with_breadcrumbs(): void
     {
         $html = $this->page('en', 'seo.accent', ['accent' => 'spanish-accent'])->assertOk()->getContent();
