@@ -1614,6 +1614,7 @@ return [
         'dashboard_request_limit' => 'النص يتجاوز حد :max حرف لخطتك.',
         'dashboard_text_needs_words' => 'أضف كلمات ينطقها الصوت. الحالات والأصوات مثل [خائف] أو <صرخة> تُكتب مع الكلام، لا وحدها.',
         'dashboard_voice_generated' => 'تم توليد الصوت بنجاح!',
+        'environment_not_added' => 'صوتك جاهز، لكن تعذّرت إضافة بيئة الصوت «:environment» هذه المرة، فهذا هو الصوت النقي.',
         'dashboard_voice_generation_failed_try_again' => 'فشل توليد الصوت. يرجى المحاولة مرة أخرى.',
         'dashboard_voice_generation_failed_check_jobs' => 'فشل توليد الصوت. تحقق من المهام الأخيرة.',
         'dashboard_voice_deleted' => 'تم حذف الصوت بنجاح.',

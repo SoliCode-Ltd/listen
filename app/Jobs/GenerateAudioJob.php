@@ -287,13 +287,20 @@ class GenerateAudioJob implements ShouldQueue
 
             // A sound environment for the whole recording, added to a copy of the clean voice.
             $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
-            if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
-                // Nothing plays the clean take now, and it would stay at an address of its
-                // own: it goes, as in the demo. The speech cache's copy is shared, so it stays.
-                if (! str_starts_with((string) $audio['audio_path'], 'audio/cache/')) {
-                    Storage::disk('public')->delete((string) $audio['audio_path']);
+            $effectNotAdded = false;
+            if ($effect !== '' && ! empty($audio['audio_path'])) {
+                $effected = AudioEffects::apply((string) $audio['audio_path'], $effect);
+                if ($effected !== null) {
+                    // Nothing plays the clean take now, and it would stay at an address of its
+                    // own: it goes, as in the demo. The speech cache's copy is shared, so it stays.
+                    if (! str_starts_with((string) $audio['audio_path'], 'audio/cache/')) {
+                        Storage::disk('public')->delete((string) $audio['audio_path']);
+                    }
+                    $audio['audio_path'] = $effected;
+                } else {
+                    // The member gets the clean voice (charged the same) and is told so.
+                    $effectNotAdded = true;
                 }
-                $audio['audio_path'] = $effected;
             }
             // Charged only for a voice the member can play: a file that was never
             // saved (or was saved empty) fails the generation, which gives the credits back.
@@ -308,7 +315,7 @@ class GenerateAudioJob implements ShouldQueue
             // Done and charged together: a failure in between leaves neither, so a retry
             // never charges twice. A generation failed meanwhile (swept as stuck, its
             // credits already given back) is not delivered or charged.
-            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved): bool {
+            $settled = DB::transaction(function () use ($generation, $audio, $actualSeconds, $measuredSeconds, $actualChars, $actualCredits, $reserved, $effect, $effectNotAdded): bool {
                 $locked = AudioGeneration::query()->whereKey($generation->id)->lockForUpdate()->first();
                 if (! $locked || $locked->status !== 'processing') {
                     return false;
@@ -318,6 +325,12 @@ class GenerateAudioJob implements ShouldQueue
                 if (! empty($audio['cache_path'])) {
                     // The speech cache's copy of this take (TtsService): deleted with the voice.
                     $snapshot['cache_copy'] = (string) $audio['cache_path'];
+                }
+                if ($effectNotAdded) {
+                    // The history and the developer API read audio_effect as the voice's own,
+                    // so a sound environment that could not be added is kept apart.
+                    unset($snapshot['audio_effect']);
+                    $snapshot['audio_effect_not_added'] = $effect;
                 }
 
                 $locked->update([

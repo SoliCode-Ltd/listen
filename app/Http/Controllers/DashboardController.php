@@ -482,7 +482,7 @@ class DashboardController extends Controller
             return response()->json([
                 'ok' => $isDone,
                 'message' => $isDone
-                    ? __('ui.backend.dashboard_voice_generated')
+                    ? ($this->environmentNote($job) ?? __('ui.backend.dashboard_voice_generated'))
                     : (GenerationMessage::forDisplay($job->error_message) ?: __('ui.backend.dashboard_voice_generation_failed_try_again')),
                 'job' => $this->buildJobPayload($job, $voiceNameMap),
                 'usage' => $usageSnapshot,
@@ -494,7 +494,7 @@ class DashboardController extends Controller
 
         return redirect()->route('dashboard')->with(
             $isDone ? 'ok' : 'error',
-            $isDone ? __('ui.backend.dashboard_voice_generated') : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
+            $isDone ? ($this->environmentNote($job) ?? __('ui.backend.dashboard_voice_generated')) : __('ui.backend.dashboard_voice_generation_failed_check_jobs')
         );
     }
 
@@ -839,6 +839,7 @@ class DashboardController extends Controller
             'duration_seconds' => $job->duration_seconds ? (int) $job->duration_seconds : null,
             'audio_url' => AudioUrl::fromPath($job->audio_path),
             'error_message' => GenerationMessage::forDisplay($job->error_message),
+            'note' => $this->environmentNote($job),
             'created_human' => $job->created_at?->diffForHumans(),
             'created_at_ts' => $job->created_at?->getTimestamp(),
             'can_reuse_settings' => $job->hasReusablePremiumSettings(),
@@ -848,6 +849,19 @@ class DashboardController extends Controller
             'is_demo_history' => false,
             'row_key' => 'audio:'.$job->id,
         ];
+    }
+
+    /**
+     * What a finished voice tells its member beyond being ready: the sound
+     * environment they chose, when it could not be added (GenerateAudioJob).
+     */
+    private function environmentNote(AudioGeneration $job): ?string
+    {
+        $effect = (string) (($job->settings_snapshot ?? [])['audio_effect_not_added'] ?? '');
+
+        return $job->status === 'done' && $effect !== ''
+            ? __('ui.backend.environment_not_added', ['environment' => AudioEffects::label($effect, app()->getLocale() === 'ar')])
+            : null;
     }
 
     /**

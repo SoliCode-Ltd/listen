@@ -3769,6 +3769,8 @@
         meta.push(i18n.generated_audio_ready);
         generatedAudioMeta.textContent = meta.join(' - ');
       }
+      // The finished voice says so when its sound environment could not be added.
+      if (job?.note) showFormMessage('note', String(job.note));
     }
 
     function setActiveDashboardSection(sectionId) {

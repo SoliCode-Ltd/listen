@@ -1609,6 +1609,7 @@ return [
         'dashboard_request_limit' => 'Text exceeds :max character limit for your plan.',
         'dashboard_text_needs_words' => 'Add some words for the voice to say. Moods and sounds like [scared] or <scream> go with words, not on their own.',
         'dashboard_voice_generated' => 'Voice generated successfully!',
+        'environment_not_added' => 'Your voice is ready, but the “:environment” sound environment could not be added this time, so this is the clean voice.',
         'dashboard_voice_generation_failed_try_again' => 'Voice generation failed. Please try again.',
         'dashboard_voice_generation_failed_check_jobs' => 'Voice generation failed. Check your recent jobs.',
         'dashboard_voice_deleted' => 'Voice deleted successfully.',
