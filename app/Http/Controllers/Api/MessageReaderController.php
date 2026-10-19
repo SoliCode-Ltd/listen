@@ -407,9 +407,12 @@ class MessageReaderController extends Controller
             return $user;
         }
 
-        // Backward-compatible emergency key for server-to-server integrations.
+        // Backward-compatible emergency key for server-to-server integrations. It
+        // acts as the owner's account, so it is taken from a header only: a key
+        // in a link ends up in browser history and server logs.
         $legacyApiKey = trim((string) env('LISTEN_API_KEY', ''));
-        if ($legacyApiKey !== '' && hash_equals($legacyApiKey, $provided)) {
+        $fromHeader = trim((string) ($request->header('X-Listen-Key') ?? $request->header('X-API-Key') ?? ''));
+        if ($legacyApiKey !== '' && $fromHeader !== '' && hash_equals($legacyApiKey, $fromHeader)) {
             $user = User::query()->findOrFail(1);
             if ($this->blockedUserService->isBlocked($user)) {
                 abort(403, $this->blockedUserService->messageFor($user));
