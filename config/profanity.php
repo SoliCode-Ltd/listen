@@ -13,9 +13,22 @@ return [
     | strips diacritics/tatweel, collapses separators, and can be extended
     | easily with more languages over time.
     |
+    | Terms match whole words only, and a phrase only as those words in a
+    | row. Digits count as letters only inside words ("sh1t"), and letters
+    | spaced out one by one ("f u c k") are read as one word.
+    |
     */
 
     'collapse_repeated_characters' => true,
+
+    /*
+    | Ordinary phrases that hold a listed word. They are taken out of the
+    | text before it is checked.
+    */
+    'allowed_phrases' => [
+        // Latin "cum" (with): magna cum laude, summa cum laude.
+        'cum laude',
+    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -39,6 +52,14 @@ return [
 
     'lists' => [
         'ar' => [
+            // Left out on purpose, everyday words with another meaning: يخول and
+            // خول (authorizes), مفسوخ (rescinded), زبر (Quran 18:96), زبور (the
+            // Psalms), قضيب (rod), لحس (lick), بغي (wrong; "wanted" in the Gulf),
+            // ينكح and انكح (marry, in religious texts), خوال (maternal uncles),
+            // زامل (a name; worked alongside), الزريبة (animal pen), دعارة (a news
+            // word), حلمات, مفشوخ, نايك (a brand name), and "يا ابن ال" (also starts
+            // "يا ابن الحلال"; the insults it was there for are listed).
+
             // Sexual / genital terms
             'كس',
             'كثمك',
@@ -53,7 +74,7 @@ return [
             'زبكم',
             'زبي',
             'زبها',
-            'اير',
+            // Not اير on its own: it is also the English "air" in Arabic letters.
             'ايرك',
             'ايره',
             'ايرها',
@@ -63,11 +84,7 @@ return [
             'ايور',
             'بزاز',
             'بعبص',
-            'حلمات',
             'زبار',
-            'زبر',
-            'زبور',
-            'قضيب',
             'قضيبي',
             'كس اختك',
             'كس امك',
@@ -94,28 +111,22 @@ return [
             'نيكك',
             'نيككك',
             'ناك',
-            'انكح',
             'انيك',
             'انيكك',
             'ينيك',
-            'ينكح',
             'افسخك',
             'تجليخ',
             'جلخ',
             'جلق',
-            'لحس',
             'مص زب',
             'متناك',
             'مبعوص',
-            'مفسوخ',
-            'مفشوخ',
             'ممحون',
             'منايك',
             'منيك',
             'منيوك',
             'منيوكة',
             'ناكك',
-            'نايك',
             'نيج',
             'نكت اخته',
             'نكت امه',
@@ -136,30 +147,27 @@ return [
             'الكحبة',
             'الكحبه',
             'القحبه',
-            'بغي',
             'بغاي',
             'داعر',
-            'دعارة',
-            'دعاره',
             'سارموتا',
             'سرموتا',
             'شرموط',
             'شرموطة',
             'شرموطه',
+            'الشرموطة',
+            'الشرموطه',
             'شراميط',
             'عاهرة',
             'عاهره',
+            'العاهرة',
+            'العاهره',
             'قحاب',
             'قحبة',
             'قحبه',
-            'خول',
-            'خوال',
             'خانيث',
             'خنيث',
             'كحبه',
-            'يخول',
             'يعرص',
-            'الزريبة',
             'كحبة',
             'لقحاب',
             'ولد القحبة',
@@ -172,7 +180,6 @@ return [
             'لوطي',
             'مخانيث',
             'مخنث',
-            'زامل',
 
             // Pimping / cuckoldry slurs (genuinely vulgar, no dual meaning)
             'عرص',
@@ -189,10 +196,10 @@ return [
             'ابن المرة',
             'ابن المرا',
             'ابن كلب',
+            'ابن الكلب',
             'كل خرا',
             'كل خرة',
             'كل زق',
-            'يا ابن ال',
             'ياشرموطة',
             'ياشرموطه',
             'ياقحبة',
@@ -221,13 +228,16 @@ return [
         ],
 
         'en' => [
-            'ass',
+            // Left out on purpose, everyday words with another meaning: ass
+            // (donkey; Ass. Prof.), tit (tit for tat; the bird), cock (rooster),
+            // prick (prick a finger), bastard and jackass (their literal sense),
+            // horny (horny skin), spunk (courage), fag (cigarette) and xxx
+            // (kisses; Roman 30).
             'arse',
             'arsehole',
             'asshole',
             'asshat',
             'asswipe',
-            'bastard',
             'biatch',
             'bitch',
             'bitches',
@@ -238,7 +248,6 @@ return [
             'boobs',
             'bullshit',
             'buttplug',
-            'cock',
             'cocksucker',
             'clit',
             'clitoris',
@@ -251,7 +260,6 @@ return [
             'doggystyle',
             'douche',
             'douchebag',
-            'fag',
             'faggot',
             'fuck',
             'fucked',
@@ -264,8 +272,6 @@ return [
             'fuckwit',
             'fuck you',
             'handjob',
-            'horny',
-            'jackass',
             'jerk off',
             'jerking off',
             'masturbate',
@@ -277,7 +283,6 @@ return [
             'nutsack',
             'orgasm',
             'piece of shit',
-            'prick',
             'porn',
             'porno',
             'pornographic',
@@ -291,10 +296,8 @@ return [
             'slut',
             'sluts',
             'son of a bitch',
-            'spunk',
             'teabagging',
             'testicles',
-            'tit',
             'tits',
             'titjob',
             'twat',
@@ -302,7 +305,6 @@ return [
             'wanker',
             'whore',
             'whores',
-            'xxx',
         ],
     ],
 ];
