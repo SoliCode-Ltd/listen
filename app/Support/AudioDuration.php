@@ -31,6 +31,17 @@ final class AudioDuration
                 return null;
             }
 
+            // A WAV is measured from its header: an hour of it is about 170 MB,
+            // more than the web server's PHP should read in to count it.
+            $stream = $disk->readStream($path);
+            $head = is_resource($stream) ? (string) fread($stream, 65536) : '';
+            if (is_resource($stream)) {
+                fclose($stream);
+            }
+            if (ShareableAudio::isWav($head)) {
+                return self::wavSeconds($head, (int) $disk->size($path));
+            }
+
             return self::seconds((string) $disk->get($path));
         } catch (\Throwable) {
             return null;
@@ -52,17 +63,20 @@ final class AudioDuration
         return null;
     }
 
-    private static function wavSeconds(string $bytes): ?float
+    /**
+     * $total is the length of the whole file when $bytes is only its head.
+     */
+    private static function wavSeconds(string $bytes, ?int $total = null): ?float
     {
         $byteRate = null;
         $offset = 12;
-        $length = strlen($bytes);
+        $length = $total ?? strlen($bytes);
 
-        while ($offset + 8 <= $length) {
+        while ($offset + 8 <= strlen($bytes)) {
             $id = substr($bytes, $offset, 4);
             $size = unpack('V', substr($bytes, $offset + 4, 4))[1];
 
-            if ($id === 'fmt ' && $offset + 20 <= $length) {
+            if ($id === 'fmt ' && $offset + 20 <= strlen($bytes)) {
                 $byteRate = unpack('V', substr($bytes, $offset + 16, 4))[1];
             }
             if ($id === 'data') {

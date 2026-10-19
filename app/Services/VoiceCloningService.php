@@ -10,6 +10,10 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
+use App\Support\JoinPauses;
+use App\Support\PaceAndPitch;
+use App\Support\ShareableAudio;
+use App\Support\SpeechJoin;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Http\Client\ConnectionException;
@@ -32,6 +36,9 @@ use Illuminate\Support\Str;
 class VoiceCloningService
 {
     public const MODEL = 'gemini-3.8-flash-tts';
+
+    /** A take up to this size (about 8 minutes of MP3) is also handed back as bytes. */
+    private const AUDIO_CONTENT_MAX_BYTES = 10_000_000;
 
     /**
      * Text models that can rewrite a script into another dialect.
@@ -328,6 +335,9 @@ class VoiceCloningService
     }
 
     /**
+     * audio_content is the saved file's bytes, or '' for a take over about 8
+     * minutes (it stays on the disk only).
+     *
      * @return array{audio_content: string, audio_path: string, provider: string, model: string, latency_ms: int, cost_estimate_usd: float, char_count: int, duration_seconds: null}
      */
     public function synthesizeWithClonedVoice(
@@ -365,25 +375,34 @@ class VoiceCloningService
         $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
         $chunks = [];
         $styles = [];
-        foreach ($parts as $part) {
-            foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
-                $performed = GeminiVocalTags::forPerformance($chunk, GeminiVocalTags::withCues($style, $part['cues']));
+        $groups = [];
+        $pauses = [];
+        foreach ($parts as $partIndex => $part) {
+            foreach (TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
+                $performed = GeminiVocalTags::forPerformance($chunk['text'], GeminiVocalTags::withCues($style, $part['cues']));
                 $chunks[] = $performed['text'];
                 $styles[] = $performed['style'];
+                // The part of the script it reads: each part keeps its own level.
+                $groups[] = (int) $partIndex;
+                // The pause after it, from where its text ends (JoinPauses).
+                $pauses[] = JoinPauses::after($chunk['text'], $chunk['gap']);
             }
         }
-        $audioContent = count($chunks) === 1
-            ? $this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])
-            : $this->joinWavPieces($this->speakPieces($chunks, $voiceCloningKey, $styles));
-
-        $packaged = \App\Support\ShareableAudio::package($audioContent);
-        $audioContent = $packaged['bytes'];
-        $extension = $packaged['extension'];
-        $filename = 'audio/cloned/'.now()->format('Ymd').'/'.Str::uuid().'.'.$extension;
-        // The public disk reports a failed write instead of throwing: without this
-        // the generation would point at a file that is not there.
-        if (! Storage::disk('public')->put($filename, $audioContent)) {
-            throw new \RuntimeException('The voice file could not be saved.');
+        // Written to a file piece by piece as they come, packaged from there and
+        // streamed to the disk: a long script is never held whole.
+        $joined = SpeechJoin::toFile(count($chunks) === 1
+            ? [$this->speakPiece($chunks[0], $voiceCloningKey, $styles[0])]
+            : $this->speakPieces($chunks, $voiceCloningKey, $styles), $pauses, $groups, SpeechJoin::PAUSE, true);
+        $packaged = ['path' => $joined['path'], 'extension' => 'wav'];
+        try {
+            $packaged = ShareableAudio::packageFile($joined['path'], $joined['pieces']);
+            $filename = 'audio/cloned/'.now()->format('Ymd').'/'.Str::uuid().'.'.$packaged['extension'];
+            ShareableAudio::store($packaged['path'], $filename);
+            // The checks that listen to a take read it from here; a long one is left on the disk.
+            clearstatcache(true, $packaged['path']);
+            $audioContent = filesize($packaged['path']) <= self::AUDIO_CONTENT_MAX_BYTES ? (string) file_get_contents($packaged['path']) : '';
+        } finally {
+            ShareableAudio::discard($joined['path'], $packaged['path']);
         }
 
         return [
@@ -427,16 +446,16 @@ class VoiceCloningService
     }
 
     /**
-     * Send the pieces in parallel batches so long scripts fit in the job timeout.
-     * A piece that fails is sent again on its own, with key rotation and the fallback.
+     * Send the pieces in parallel batches so long scripts fit in the job timeout,
+     * and hand each one over, in order, as soon as its batch is in (the join
+     * writes it to its file and lets it go). A piece that fails is sent again
+     * on its own, with key rotation and the fallback.
      *
      * @param  array<int, string>  $chunks
-     * @return array<int, string>
-     */
-    /**
      * @param  string|array<int, string>  $style  One direction for all pieces, or one per piece.
+     * @return \Generator<int, string>
      */
-    private function speakPieces(array $chunks, string $voiceId, string|array $style): array
+    private function speakPieces(array $chunks, string $voiceId, string|array $style): \Generator
     {
         $baseUrl = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $keys = $this->apiKeys();
@@ -446,7 +465,6 @@ class VoiceCloningService
         $key = $keys[0]['key'];
         $verify = (bool) config('services.gemini_tts.verify_ssl', true);
         $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
-        $parts = [];
 
         foreach (array_chunk($chunks, $parallel, true) as $batch) {
             $responses = Http::pool(function (Pool $pool) use ($batch, $baseUrl, $key, $verify, $voiceId, $style) {
@@ -464,82 +482,36 @@ class VoiceCloningService
             });
 
             foreach ($batch as $index => $chunk) {
+                // Each reply is let go once its audio is out.
                 $response = $responses['part'.$index] ?? null;
+                unset($responses['part'.$index]);
+                $audio = null;
                 if ($response instanceof Response && $response->successful()) {
                     try {
-                        $parts[$index] = $this->audioFromResponse($response);
-
-                        continue;
+                        $audio = $this->audioFromResponse($response);
                     } catch (\RuntimeException) {
                         // Sent again on its own below.
                     }
                 }
 
-                Log::warning('Cloned voice piece failed; sending it again.', [
-                    'piece' => $index + 1,
-                    'pieces' => count($chunks),
-                    'status' => $response instanceof Response ? $response->status() : null,
-                ]);
-                $parts[$index] = $this->speakPiece($chunk, $voiceId, is_array($style) ? $style[$index] : $style);
+                if ($audio === null) {
+                    Log::warning('Cloned voice piece failed; sending it again.', [
+                        'piece' => $index + 1,
+                        'pieces' => count($chunks),
+                        'status' => $response instanceof Response ? $response->status() : null,
+                    ]);
+                    $response = null;
+                    $audio = $this->speakPiece($chunk, $voiceId, is_array($style) ? $style[$index] : $style);
+                }
+                $response = null;
+                yield $index => $audio;
+                $audio = null;
             }
+            // The client's pooled requests hold themselves in reference cycles: without
+            // this, every batch's replies stay in memory until the whole script is read.
+            unset($responses);
+            gc_collect_cycles();
         }
-
-        ksort($parts);
-
-        return $parts;
-    }
-
-    /**
-     * Join WAV pieces into one WAV with a short pause between them.
-     *
-     * @param  array<int, string>  $pieces
-     */
-    private function joinWavPieces(array $pieces): string
-    {
-        $pcm = '';
-        $sampleRate = 24000;
-        $channels = 1;
-        foreach (array_values($pieces) as $i => $piece) {
-            $decoded = $this->wavToPcm($piece);
-            if ($i === 0) {
-                $sampleRate = $decoded['sample_rate'];
-                $channels = $decoded['channels'];
-            } else {
-                $pcm .= str_repeat("\0", (int) round($sampleRate * 0.3) * 2 * $channels);
-            }
-            $samples = $decoded['pcm'];
-            $pcm .= strlen($samples) % 2 === 0 ? $samples : substr($samples, 0, -1);
-        }
-
-        return $this->pcmToWav($pcm, $sampleRate, $channels);
-    }
-
-    /**
-     * @return array{pcm: string, sample_rate: int, channels: int}
-     */
-    private function wavToPcm(string $wav): array
-    {
-        $sampleRate = 24000;
-        $channels = 1;
-        if (! str_starts_with($wav, 'RIFF') || substr($wav, 8, 4) !== 'WAVE') {
-            return ['pcm' => $wav, 'sample_rate' => $sampleRate, 'channels' => $channels];
-        }
-
-        $pcm = '';
-        $offset = 12;
-        while ($offset + 8 <= strlen($wav)) {
-            $id = substr($wav, $offset, 4);
-            $size = unpack('V', substr($wav, $offset + 4, 4))[1];
-            if ($id === 'fmt ' && $size >= 16) {
-                $channels = unpack('v', substr($wav, $offset + 10, 2))[1] ?: 1;
-                $sampleRate = unpack('V', substr($wav, $offset + 12, 4))[1] ?: $sampleRate;
-            } elseif ($id === 'data') {
-                $pcm .= substr($wav, $offset + 8, $size);
-            }
-            $offset += 8 + $size + ($size % 2);
-        }
-
-        return ['pcm' => $pcm, 'sample_rate' => $sampleRate, 'channels' => $channels];
     }
 
     /**
@@ -597,14 +569,15 @@ class VoiceCloningService
         float $pitch = 0.0,
     ): string {
         $parts = [];
-        $accent = $this->clonedAccentInstruction($dialect);
-        if ($accent !== '') {
-            $parts[] = $accent;
-        }
-
+        // The member's own words lead, as for the stock voices; the accent they picked follows.
         $custom = trim((string) $customPrompt);
         if ($custom !== '') {
             $parts[] = $custom;
+        }
+
+        $accent = $this->clonedAccentInstruction($dialect);
+        if ($accent !== '') {
+            $parts[] = $accent;
         }
 
         $performance = strtolower(trim($performanceStyle));
@@ -617,17 +590,11 @@ class VoiceCloningService
             $parts[] = 'Emotional tone: '.str_replace(['_', '-'], ' ', $emotion).'.';
         }
 
-        if ($speed > 0 && abs($speed - 1) >= 0.15) {
-            $parts[] = $speed < 1 ? 'Speak a little more slowly.' : 'Speak a little more quickly.';
-        }
+        // The same graded directions as the stock voices: every step but 1.0x and 0.
+        $parts[] = PaceAndPitch::speed($speed);
+        $parts[] = PaceAndPitch::pitch($pitch);
 
-        if ($pitch <= -3) {
-            $parts[] = 'Use a deeper, lower-pitched voice.';
-        } elseif ($pitch >= 3) {
-            $parts[] = 'Use a higher-pitched, brighter voice.';
-        }
-
-        return trim(implode(' ', $parts));
+        return trim(implode(' ', array_filter($parts, fn (string $part): bool => $part !== '')));
     }
 
     private function clonedAccentInstruction(?string $dialect): string

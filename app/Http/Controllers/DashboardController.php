@@ -10,6 +10,7 @@ use App\Models\Plan;
 use App\Rules\DoesNotContainProfanity;
 use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
+use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\LocalizedPricingService;
@@ -19,6 +20,7 @@ use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
+use App\Support\EmailVerification;
 use App\Support\GenerationMessage;
 use App\Support\PlanFeatures;
 use App\Support\PlanPricingLines;
@@ -118,6 +120,14 @@ class DashboardController extends Controller
             $preferredProvider = VoiceCatalog::preferredProviderForTier($planTier);
             $tierCatalog = $catalogByTier[$planTier] ?? VoiceCatalog::publicCatalog($planTier, $preferredProvider);
         }
+        // Free credits wait for a confirmed email (App\Support\EmailVerification): say so,
+        // with a button for a new link, while there are free credits to spend.
+        $verifyEmail = ! $planShowcase
+            && $usageSnapshot['mode'] === 'monthly'
+            && (int) $usageSnapshot['remaining_chars'] > 0
+            && EmailVerification::requiredForFreeUse($request->user())
+                ? ['address' => (string) $request->user()->email, 'sent' => EmailVerificationMailer::linkSentRecently($request->user())]
+                : null;
         $planChars = $usageSnapshot['plan_chars'];
         $giftChars = $usageSnapshot['gift_chars'];
         $planRequests = PlanUsageGuard::planRequests($quotaPlan);
@@ -156,6 +166,7 @@ class DashboardController extends Controller
         }
 
         $page = view('dashboard', [
+            'verifyEmail' => $verifyEmail,
             'developerApi' => $developerApi,
             'usage' => $usage,
             'usageSnapshot' => $usageSnapshot,
@@ -297,7 +308,6 @@ class DashboardController extends Controller
 
         if ($dialogueEnabled && ($validated['is_dialogue'] ?? false)) {
             DialogueSpeakers::ensureUsable($requestedTier, (array) ($validated['dialogue_speakers'] ?? []), (string) ($validated['content'] ?? $validated['text'] ?? ''));
-            DialogueSpeakers::ensureShortEnough((string) ($validated['content'] ?? $validated['text'] ?? ''));
         }
 
         // Check if user selected a cloned voice (key format: cloned_{id})

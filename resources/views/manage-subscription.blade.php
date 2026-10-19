@@ -408,6 +408,11 @@
         {{ $trialNotice }}
       </div>
     @endif
+    @if(!empty($paymentGraceNotice ?? null))
+      <div class="message error" id="paymentGraceNotice" role="status" style="margin-top:-.4rem;margin-bottom:1rem;">
+        {{ $paymentGraceNotice }}
+      </div>
+    @endif
     @if(!empty($manual['pending_plan']))
       <div class="message info" style="margin-top:-.4rem;margin-bottom:1rem;">
         {{ __('ui.manage_subscription.manual_pending_notice', ['plan' => $manual['pending_plan']]) }}

@@ -14,9 +14,10 @@ use Tests\Support\FakeStripeHttpClient;
 use Tests\TestCase;
 
 /**
- * A failed card payment pauses a member's plan only when a payment on that plan
- * is really missing: never for a declined upgrade, a declined first payment, or
- * an invoice that has been paid since.
+ * A failed card payment counts as a missed payment on a member's plan (its grace
+ * period starts, RenewalGraceTest) only when a payment on that plan is really
+ * missing: never for a declined upgrade, a declined first payment, or an invoice
+ * that has been paid since.
  */
 class DeclinedPaymentTest extends TestCase
 {
@@ -177,7 +178,7 @@ class DeclinedPaymentTest extends TestCase
         $this->assertFalse($this->stripe->sent('get', '/v1/subscriptions/sub_someone_else'));
     }
 
-    public function test_another_failed_invoice_pauses_the_plan_only_while_stripe_says_it_is_owed(): void
+    public function test_another_failed_invoice_counts_only_while_stripe_says_it_is_owed(): void
     {
         $this->stripe->subscription('sub_live', 'active', 'cus_member');
         $this->webhook('evt_manual_active', 'invoice.payment_failed', [

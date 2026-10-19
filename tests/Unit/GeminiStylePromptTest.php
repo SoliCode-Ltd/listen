@@ -71,7 +71,13 @@ class GeminiStylePromptTest extends TestCase
 
         $this->assertStringContainsString('Voice dialect:', $prompt);
         $this->assertStringContainsString($expectedDialectName, $prompt);
-        $this->assertStringContainsString('authentic regional pronunciation', $prompt);
+        // Plain Fusha is asked for as formal Arabic; every regional dialect keeps its regional wording.
+        if (\App\Support\ArabicDialects::isPlainFusha($dialectCode)) {
+            $this->assertStringContainsString('clear, formal Modern Standard Arabic pronunciation', $prompt);
+            $this->assertStringNotContainsString('regional', $prompt);
+        } else {
+            $this->assertStringContainsString('authentic regional pronunciation', $prompt);
+        }
     }
 
     public static function arabicDialectsProvider(): array
@@ -352,22 +358,27 @@ class GeminiStylePromptTest extends TestCase
         } else {
             // Normal speed should not have speed instruction
             $this->assertStringNotContainsString('slowly', $prompt);
+            $this->assertStringNotContainsString('slower', $prompt);
             $this->assertStringNotContainsString('quickly', $prompt);
             $this->assertStringNotContainsString('faster', $prompt);
         }
     }
 
+    /**
+     * Every step but 1.0x has its own direction, graded by size (0.9x, 1.1x and
+     * 1.2x used to send nothing, and 0.6x read like 0.5x, 0.8x like 0.7x).
+     */
     public static function speedVariationsProvider(): array
     {
         return [
             'very slow (0.5)' => [0.5, 'very slowly'],
-            'very slow (0.6)' => [0.6, 'very slowly'],
+            'slow and deliberate (0.6)' => [0.6, 'slowly and deliberately, about 40% slower'],
             'slow (0.7)' => [0.7, 'slow, measured pace'],
-            'slow (0.8)' => [0.8, 'slow, measured pace'],
-            'normal (0.9)' => [0.9, null],
+            'noticeably slower (0.8)' => [0.8, 'noticeably slower than a normal pace'],
+            'slightly slower (0.9)' => [0.9, 'slightly slower than a normal pace'],
             'normal (1.0)' => [1.0, null],
-            'normal (1.1)' => [1.1, null],
-            'normal (1.2)' => [1.2, null],
+            'slightly faster (1.1)' => [1.1, 'slightly faster than a normal pace'],
+            'noticeably faster (1.2)' => [1.2, 'noticeably faster than a normal pace'],
             'fast (1.3)' => [1.3, 'faster pace'],
             'fast (1.4)' => [1.4, 'faster pace'],
             'very fast (1.6)' => [1.6, 'very quickly'],
@@ -396,6 +407,7 @@ class GeminiStylePromptTest extends TestCase
             $this->assertStringContainsString($expectedInstruction, $prompt);
         } else {
             // Normal pitch should not have pitch instruction
+            $this->assertStringNotContainsString('pitch', $prompt);
             $this->assertStringNotContainsString('deep', $prompt);
             $this->assertStringNotContainsString('low-pitched', $prompt);
             $this->assertStringNotContainsString('high-pitched', $prompt);
@@ -403,6 +415,9 @@ class GeminiStylePromptTest extends TestCase
         }
     }
 
+    /**
+     * Every step but 0 has its own direction (-3 to +3 used to send nothing).
+     */
     public static function pitchVariationsProvider(): array
     {
         return [
@@ -410,11 +425,11 @@ class GeminiStylePromptTest extends TestCase
             'very low (-10)' => [-10, 'very deep, low-pitched'],
             'low (-5)' => [-5, 'deeper, lower-pitched'],
             'low (-4)' => [-4, 'deeper, lower-pitched'],
-            'normal (-3)' => [-3, null],
-            'normal (-2)' => [-2, null],
+            'noticeably lower (-3)' => [-3, 'noticeably lower pitch'],
+            'slightly lower (-2)' => [-2, 'slightly lower pitch'],
             'normal (0)' => [0, null],
-            'normal (2)' => [2, null],
-            'normal (3)' => [3, null],
+            'slightly higher (2)' => [2, 'slightly higher pitch'],
+            'noticeably higher (3)' => [3, 'noticeably higher pitch'],
             'high (4)' => [4, 'higher-pitched, brighter'],
             'high (8)' => [8, 'higher-pitched, brighter'],
             'very high (10)' => [10, 'very high-pitched, bright'],

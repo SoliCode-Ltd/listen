@@ -5,6 +5,7 @@ use App\Http\Controllers\AdminManualPaymentProofController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BillingController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\EmailVerificationController;
 use App\Http\Controllers\ExtensionController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\ManualPaymentController;
@@ -205,6 +206,18 @@ Route::group([
             ->name('auth.firebase-google.verify');
     });
 
+    // Confirming the email of an account made with an email and a password. The
+    // link works whether or not the member is signed in, and confirms only the
+    // account it was made for; a new link is a few an hour.
+    Route::get('/email/verify/{id}/{hash}', [EmailVerificationController::class, 'verify'])
+        ->whereNumber('id')
+        ->where('hash', '[0-9a-f]{40}')
+        ->middleware('throttle:10,1')
+        ->name('verification.verify');
+    Route::post('/email/verification-notification', [EmailVerificationController::class, 'resend'])
+        ->middleware(['auth', 'throttle:verify-email'])
+        ->name('verification.send');
+
     // Referral capture runs BEFORE auth so guests landing on the demo page
     // with ?ref=CODE still record the visit and get the referral cookie set
     // before the login redirect.
@@ -212,8 +225,9 @@ Route::group([
         Route::middleware(['auth', 'subscription.sync', 'demo.free'])->group(function () {
             Route::get('/demo', [HomeController::class, 'demoPage'])->name('demo.page');
             Route::post('/demo/quota', [HomeController::class, 'demoQuota'])->name('demo.quota');
-            Route::post('/demo', [HomeController::class, 'demo'])->name('demo.run');
-            Route::post('/preview', [HomeController::class, 'preview'])->name('demo.preview');
+            // Spending the demo needs a confirmed email (Google and phone sign-ins have one).
+            Route::post('/demo', [HomeController::class, 'demo'])->middleware('demo.verified')->name('demo.run');
+            Route::post('/preview', [HomeController::class, 'preview'])->middleware('demo.verified')->name('demo.preview');
         });
     });
 

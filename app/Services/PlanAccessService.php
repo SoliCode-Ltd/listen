@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\Billing\CharPackService;
+use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\TrialEligibilityService;
 use App\Support\VoiceTier;
 
@@ -128,7 +129,8 @@ class PlanAccessService
      * less than two hours ago still counts while its Stripe subscription is
      * active or trialing: Stripe charges the renewal a little after the period
      * ends, and until it reaches us the member must not drop to Free (and the
-     * standard voices).
+     * standard voices). A card plan whose renewal payment failed counts until
+     * its grace days run out (RenewalGrace), with the dates of the period paid.
      *
      * @return \Illuminate\Database\Eloquent\Builder<Subscription>
      */
@@ -148,7 +150,8 @@ class PlanAccessService
                                 ->whereIn('stripe_status', ['active', 'trialing'])
                                 // Not one cancelled to end with this period.
                                 ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', now())));
-                    });
+                    })
+                    ->orWhere(fn ($grace) => RenewalGrace::whereKept($grace, now()));
             });
     }
 
@@ -157,6 +160,13 @@ class PlanAccessService
         $hasActive = $this->activeSubscriptions((int) $user->id)->exists();
 
         if ($hasActive) {
+            return;
+        }
+
+        // A card plan whose grace days ran out unpaid is left for the grace job,
+        // which cancels its subscription first and then moves it to Free. Nothing
+        // counts it meanwhile, so the member already has the free plan.
+        if (RenewalGrace::ranOut(Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first())) {
             return;
         }
 

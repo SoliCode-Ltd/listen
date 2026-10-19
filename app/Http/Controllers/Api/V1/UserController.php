@@ -67,7 +67,11 @@ class UserController extends Controller
             ->first();
 
         $isPack = $usage['mode'] === 'pack';
-        $resetsAt = $period['ends_at'];
+        // A renewal payment that failed: the plan stays on until its grace days run
+        // out (then it moves to the free plan unless paid), and its credits stay in
+        // the period that was paid for until then.
+        $graceEndsAt = $period['grace_ends_at'] ?? null;
+        $resetsAt = $graceEndsAt ?? $period['ends_at'];
 
         return [
             'plan' => [
@@ -80,9 +84,9 @@ class UserController extends Controller
                 'commercial_use_allowed' => (bool) ($plan?->commercial_use_allowed ?? false),
                 'processing_priority' => (string) ($plan?->processing_priority ?: 'standard'),
             ],
-            'status' => $subscription?->status ?? 'active',
+            'status' => $graceEndsAt !== null ? 'past_due' : ($subscription?->status ?? 'active'),
             'trial' => $this->planAccessService->userHasUnpaidTrialWindow($userId),
-            'current_period_end' => $subscription?->current_period_end?->toIso8601String(),
+            'current_period_end' => ($graceEndsAt ?? $subscription?->current_period_end)?->toIso8601String(),
             'billing_mode' => $isPack ? 'pack' : 'monthly',
             'credits' => [
                 'used' => (int) $usage['total_chars'],

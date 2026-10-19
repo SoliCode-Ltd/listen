@@ -3,24 +3,22 @@
 namespace App\Services;
 
 use App\Models\BillingSubscription;
-use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\BillingLifecycleMail;
+use App\Services\Billing\RenewalGrace;
 use App\Support\LiveServer;
 use App\Support\StripeInvoice;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Cashier;
 
 class BillingLifecycleService
 {
-    private const EMAIL_SIGNATURE = 'Listen Studio Team';
-
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly BillingSyncService $billingSyncService,
+        private readonly RenewalGrace $renewalGrace,
+        private readonly BillingLifecycleMail $mail,
     ) {}
 
     public function sendPreRenewalReminders(): int
@@ -77,13 +75,12 @@ class BillingLifecycleService
                     // Cash, or given by the team): say when it ends, not that it renews.
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
                     $planName = (string) ($subscription->plan?->name ?? 'your plan');
-                    $displayName = $this->displayName($user);
 
                     $subject = $day === 1
                         ? 'Your plan ends tomorrow'
                         : 'Your plan ends in '.$day.' days';
-                    $body = $this->composeBody(
-                        $displayName,
+                    $body = $this->mail->compose(
+                        $user,
                         ["{$planName} ends on {$periodEnd}. It does not renew by itself."],
                         [
                             'Plan' => $planName,
@@ -91,10 +88,10 @@ class BillingLifecycleService
                             'Days Remaining' => (string) $day,
                             'Subscription Status' => ucfirst((string) ($subscription->status ?? 'active')),
                         ],
-                        'To keep it, renew or choose a plan at '.$this->manageBillingUrl()
+                        'To keep it, renew or choose a plan at '.$this->mail->manageBillingUrl()
                     );
 
-                    $wasSent = $this->sendMail(
+                    $wasSent = $this->mail->send(
                         $user,
                         $subject,
                         $body,
@@ -127,11 +124,13 @@ class BillingLifecycleService
     }
 
     /**
-     * A card payment failed (invoice.payment_failed). The member's plan is marked
-     * past due, with a grace period, only when the invoice is for their own card
-     * subscription and Stripe still says that subscription is behind on payment.
-     * A declined plan change or first payment, an invoice paid since (a late
-     * event) and a plan paid by InstaPay / Vodafone Cash never are.
+     * A card payment failed (invoice.payment_failed). It counts only when the
+     * invoice is for the member's own card subscription and Stripe still says
+     * that subscription is behind on payment: never a declined plan change or
+     * first payment, an invoice paid since (a late event), or a plan paid by
+     * InstaPay / Vodafone Cash. Then RenewalGrace decides, once: a member who
+     * paid for the plan before keeps it until the grace days run out; one who
+     * never did (a free trial's first charge) is moved to Free at once.
      */
     public function handlePaymentFailed(object $invoice): void
     {
@@ -140,8 +139,17 @@ class BillingLifecycleService
             return;
         }
 
-        $subscription = $this->latestPaidLocalSubscription($user);
-        if (! $subscription || $subscription->billing_payment_state === 'manual_override') {
+        // The member's own plan row: the one their plan comes from.
+        $subscription = $this->latestLocalSubscription($user);
+        if (! $subscription
+            || (string) $subscription->status !== 'active'
+            || $subscription->billing_payment_state === 'manual_override') {
+            return;
+        }
+
+        // Nothing paid to keep, unless the missed payment was recorded before (a
+        // billing sync saw it first and moved a plan never paid for to Free).
+        if ($subscription->billing_payment_state !== 'past_due' && ! RenewalGrace::isPaidPlan($subscription)) {
             return;
         }
 
@@ -152,43 +160,18 @@ class BillingLifecycleService
             return;
         }
 
-        if (! $this->stripeSaysBehindOnPayment($user, StripeInvoice::subscriptionId($invoice))) {
+        $stripeSubscription = $this->ownSubscriptionBehindOnPayment($user, StripeInvoice::subscriptionId($invoice));
+        if (! $stripeSubscription) {
             return;
         }
 
-        $graceDays = max(1, (int) SiteSetting::get('billing_grace_days', config('listen.billing.grace_days', 7)));
-        $graceEndsAt = now()->addDays($graceDays);
-
-        $subscription->forceFill([
-            'billing_payment_state' => 'past_due',
-            'billing_grace_ends_at' => $graceEndsAt,
-        ])->save();
-
-        if ($subscription->billing_failed_notice_sent_at) {
-            return;
-        }
-
-        $graceEnds = $graceEndsAt->format('M j, Y');
-        $planName = (string) ($subscription->plan?->name ?? 'your paid plan');
-        $subject = 'Payment failed - action required';
-        $body = $this->composeBody(
-            $this->displayName($user),
-            [
-                'We could not take your latest payment, so your paid features are paused.',
-                'Update your card and pay the open invoice to get them back straight away.',
-            ],
-            [
-                'Plan' => $planName,
-                'Payment State' => 'Past due',
-            ],
-            'Update your payment method at '.$this->manageBillingUrl()
-        );
-
+        $outcome = $this->renewalGrace->begin($subscription, $stripeSubscription, $invoice);
         // Marked as sent only once it was, so a later failure tries the warning again.
-        if ($this->sendMail($user, $subject, $body, "payment-failed:{$subscription->id}:{$graceEnds}", 24 * 14)) {
-            $subscription->forceFill([
-                'billing_failed_notice_sent_at' => now(),
-            ])->save();
+        $this->renewalGrace->warn($user, $subscription);
+
+        // No grace: the paid features pause now, whichever of Stripe's events comes first.
+        if ($outcome === RenewalGrace::PAUSED && RenewalGrace::isPaidPlan($subscription)) {
+            $this->moveToFreePlan($user);
         }
     }
 
@@ -213,6 +196,16 @@ class BillingLifecycleService
                 return;
             }
             $cardTakesOver = true;
+        }
+
+        // Behind on payment: Stripe decides whether that is over. The billing sync
+        // takes Stripe's paid period (a fresh allowance from the renewal date) and
+        // settles the missed payment; until it has, a grace keeps the plan on, so
+        // a sync that cannot reach Stripe never drops a member who has just paid.
+        if (! $cardTakesOver && $subscription->billing_payment_state === 'past_due') {
+            $this->billingSyncService->syncIfStale($user, true);
+
+            return;
         }
 
         $subscription->forceFill([
@@ -259,6 +252,9 @@ class BillingLifecycleService
                             'billing_grace_ends_at' => null,
                             'billing_failed_notice_sent_at' => null,
                         ])->save();
+                        // The plan still has the dates of the period paid before: it
+                        // takes the one just paid for (a fresh allowance) from Stripe.
+                        $this->billingSyncService->syncIfStale($user, true);
 
                         continue;
                     }
@@ -276,10 +272,15 @@ class BillingLifecycleService
                     }
 
                     if (! LiveServer::allowsCustomerActions()) {
+                        // Staging works on a copy of live members with the live Stripe keys:
+                        // it never cancels in Stripe or emails them (the live site does).
+                        // Its own copy of the member ends the plan as the live site does,
+                        // on Free; the missed payment stays recorded, as Stripe still has it.
                         LiveServer::skipped('cancelling a subscription whose grace period ended', [
                             'user_id' => $user->id,
                             'stripe_subscription_id' => $billingSubscription->stripe_id,
                         ]);
+                        $this->moveToFreePlan($user);
 
                         continue;
                     }
@@ -295,20 +296,25 @@ class BillingLifecycleService
                         'billing_grace_ends_at' => null,
                         'billing_downgraded_at' => now(),
                     ])->save();
+                    // On Free now, also when the billing sync below cannot read Stripe.
+                    $this->moveToFreePlan($user);
 
-                    $this->sendMail(
+                    $this->mail->send(
                         $user,
                         'Your subscription was canceled',
-                        $this->composeBody(
-                            $this->displayName($user),
-                            ['Your grace period ended without a successful payment, so the subscription was canceled.'],
+                        $this->mail->compose(
+                            $user,
+                            [
+                                'Your grace period ended without a successful payment, so the subscription was canceled.',
+                                'Your account is on the free plan now.',
+                            ],
                             [
                                 'Plan' => $planName,
                                 'Grace Period Ended' => $graceEndedAt,
                                 'Canceled At' => now()->format('M j, Y g:i A'),
                                 'Payment State' => 'Canceled',
                             ],
-                            'You can upgrade again any time from '.$this->manageBillingUrl()
+                            'You can upgrade again any time from '.$this->mail->manageBillingUrl()
                         ),
                         "grace-cancel:{$user->id}:{$graceEndedAt}",
                         24 * 30
@@ -333,15 +339,15 @@ class BillingLifecycleService
     }
 
     /**
-     * Whether the subscription is the member's own and Stripe, asked now, says
-     * it is behind on payment. After a late event for an invoice that has been
-     * paid since, Stripe says it is active again. If Stripe cannot be read, the
-     * error goes up so the webhook is sent again later.
+     * The member's own subscription as Stripe has it now, when Stripe says it is
+     * behind on payment (null otherwise). After a late event for an invoice that
+     * has been paid since, Stripe says it is active again. If Stripe cannot be
+     * read, the error goes up so the webhook is sent again later.
      */
-    private function stripeSaysBehindOnPayment(User $user, string $stripeSubscriptionId): bool
+    private function ownSubscriptionBehindOnPayment(User $user, string $stripeSubscriptionId): ?object
     {
         if ($stripeSubscriptionId === '') {
-            return false;
+            return null;
         }
 
         $ours = BillingSubscription::query()
@@ -349,22 +355,20 @@ class BillingLifecycleService
             ->where('stripe_id', $stripeSubscriptionId)
             ->exists();
         if (! $ours) {
-            return false;
+            return null;
         }
 
         $live = Cashier::stripe()->subscriptions->retrieve($stripeSubscriptionId, []);
 
-        return in_array(strtolower((string) ($live->status ?? '')), ['past_due', 'unpaid'], true);
+        return in_array(strtolower((string) ($live->status ?? '')), ['past_due', 'unpaid'], true) ? $live : null;
     }
 
-    private function latestPaidLocalSubscription(User $user): ?Subscription
+    private function moveToFreePlan(User $user): void
     {
-        return Subscription::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->whereHas('plan', fn ($q) => $q->where('price_cents', '>', 0))
-            ->latest('id')
-            ->first();
+        $free = $this->planAccessService->freePlan();
+        if ($free) {
+            $this->planAccessService->assignPlan($user, $free);
+        }
     }
 
     private function latestLocalSubscription(User $user): ?Subscription
@@ -383,48 +387,6 @@ class BillingLifecycleService
         }
 
         return User::query()->where('stripe_id', $stripeCustomerId)->first();
-    }
-
-    /**
-     * Whether the email went out now. Not when it was sent before (the dedupe key),
-     * on a server that is not the live site, or when sending failed; a failed send
-     * is not remembered, so a later run can try again.
-     */
-    private function sendMail(User $user, string $subject, string $body, ?string $dedupeKey = null, int $ttlHours = 72): bool
-    {
-        if (! $user->email) {
-            return false;
-        }
-
-        if (! LiveServer::allowsCustomerActions()) {
-            LiveServer::skipped('billing email "'.$subject.'"', ['user_id' => $user->id]);
-
-            return false;
-        }
-
-        if ($dedupeKey !== null && $this->shouldSkipEmail($dedupeKey, $ttlHours)) {
-            return false;
-        }
-
-        try {
-            Mail::raw($body, function ($message) use ($user, $subject) {
-                $message->to($user->email, $user->name ?: null)->subject($subject);
-            });
-        } catch (\Throwable $exception) {
-            if ($dedupeKey !== null) {
-                Cache::forget($this->emailCacheKey($dedupeKey));
-            }
-
-            Log::warning('Unable to send billing lifecycle email.', [
-                'user_id' => $user->id,
-                'subject' => $subject,
-                'error' => $exception->getMessage(),
-            ]);
-
-            return false;
-        }
-
-        return true;
     }
 
     private function latestBillingSubscription(User $user): ?BillingSubscription
@@ -464,7 +426,11 @@ class BillingLifecycleService
     private function cancelStripeSubscriptionNow(User $user, BillingSubscription $billingSubscription): bool
     {
         try {
-            $billingSubscription->cancelNow();
+            // Without proration: the period this cuts short was never paid, so it
+            // must leave no credit for unused time (a later subscription would get
+            // it as a discount). Cashier prorates by default.
+            $billingSubscription->noProrate()->cancelNow();
+
             return true;
         } catch (\Throwable $exception) {
             Log::warning('Unable to cancel Stripe subscription after grace period.', [
@@ -476,71 +442,5 @@ class BillingLifecycleService
 
             return false;
         }
-    }
-
-    private function shouldSkipEmail(string $key, int $ttlHours = 72): bool
-    {
-        return ! Cache::add($this->emailCacheKey($key), now()->timestamp, now()->addHours(max(1, $ttlHours)));
-    }
-
-    private function emailCacheKey(string $key): string
-    {
-        return 'billing_lifecycle_email:'.sha1($key);
-    }
-
-    /**
-     * @param  array<int, string>  $summaryLines
-     * @param  array<string, string|null>  $details
-     */
-    private function composeBody(string $displayName, array $summaryLines, array $details = [], ?string $actionLine = null): string
-    {
-        $lines = [
-            'Hi '.$displayName.',',
-            '',
-        ];
-
-        foreach ($summaryLines as $line) {
-            $line = trim((string) $line);
-            if ($line !== '') {
-                $lines[] = $line;
-            }
-        }
-
-        $filtered = [];
-        foreach ($details as $label => $value) {
-            $value = trim((string) $value);
-            if ($value !== '' && $value !== 'N/A') {
-                $filtered[$label] = $value;
-            }
-        }
-
-        if ($filtered !== []) {
-            $lines[] = '';
-            $lines[] = 'Details:';
-            foreach ($filtered as $label => $value) {
-                $lines[] = "- {$label}: {$value}";
-            }
-        }
-
-        if ($actionLine !== null && trim($actionLine) !== '') {
-            $lines[] = '';
-            $lines[] = trim($actionLine);
-        }
-
-        $lines[] = '';
-        $lines[] = 'Thanks,';
-        $lines[] = self::EMAIL_SIGNATURE;
-
-        return implode("\n", $lines);
-    }
-
-    private function displayName(User $user): string
-    {
-        return trim((string) $user->name) !== '' ? (string) $user->name : 'there';
-    }
-
-    private function manageBillingUrl(): string
-    {
-        return rtrim((string) config('app.url', ''), '/').'/manage-subscription';
     }
 }

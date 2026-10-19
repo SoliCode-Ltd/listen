@@ -224,6 +224,12 @@ class SavedVoiceFileTest extends TestCase
                 return $this->failing === 'put' ? false : parent::put($path, $contents, $options);
             }
 
+            // Long takes are written as a stream: the same kind of write.
+            public function writeStream($path, $resource, array $options = [])
+            {
+                return $this->failing === 'put' ? false : parent::writeStream($path, $resource, $options);
+            }
+
             public function copy($from, $to)
             {
                 return $this->failing === 'copy' ? false : parent::copy($from, $to);

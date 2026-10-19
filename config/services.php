@@ -51,7 +51,9 @@ return [
         'credentials_path' => env('SPEECH_TTS_CREDENTIALS_PATH', env('GOOGLE_TTS_CREDENTIALS_PATH', '')),
         'verify_ssl' => env('SPEECH_TTS_VERIFY_SSL', env('GOOGLE_TTS_VERIFY_SSL', true)),
         'voice_catalog' => [],
-        'audio_encoding' => env('SPEECH_TTS_AUDIO_ENCODING', env('GOOGLE_TTS_AUDIO_ENCODING', 'MP3')),
+        // What the standard voices are asked for. LINEAR16 (uncompressed) is compressed
+        // once here into the MP3 members get; MP3 is stored as the engine sends it.
+        'audio_encoding' => env('SPEECH_TTS_AUDIO_ENCODING', env('GOOGLE_TTS_AUDIO_ENCODING', 'LINEAR16')),
         'speaking_rate' => (float) env('SPEECH_TTS_SPEAKING_RATE', env('GOOGLE_TTS_SPEAKING_RATE', 1.0)),
         'pitch' => (float) env('SPEECH_TTS_PITCH', env('GOOGLE_TTS_PITCH', 0.0)),
         'timeout_seconds' => (int) env('SPEECH_TTS_TIMEOUT_SECONDS', env('GOOGLE_TTS_TIMEOUT_SECONDS', 30)),
@@ -92,9 +94,17 @@ return [
         // Longer single-voice texts are read in pieces sent at the same time.
         'max_chars_per_request' => (int) env('GEMINI_TTS_MAX_CHARS_PER_REQUEST', 900),
         'max_parallel_requests' => (int) env('GEMINI_TTS_MAX_PARALLEL_REQUESTS', 4),
+
+        // Dialogue pieces: a longer dialogue is made in pieces split at speaker
+        // turns, about 1.5 to 2 minutes of conversation each, well under the 2,400
+        // characters one dialogue request used to be allowed (the longest of those
+        // came back without audio). The pieces are joined like a single voice's.
+        'max_dialogue_chars_per_request' => (int) env('GEMINI_TTS_MAX_DIALOGUE_CHARS_PER_REQUEST', 1500),
+
         // Optional HTTP(S) proxy for voice replication only, e.g. when the
         // server's country is not supported. Example: http://user:pass@host:3128
         'voice_proxy' => env('GEMINI_VOICE_PROXY', ''),
+        // Empty: found by itself. "none": run as a server without ffmpeg.
         'ffmpeg_path' => env('FFMPEG_PATH', ''),
     ],
 

@@ -2,7 +2,7 @@
 
 /*
  * For the "Server deploy" workflow's page-check mode, on STAGING only: shows
- * the pages members use inside the app (no browser, no network), in one
+ * the pages members use inside the app (no browser), in one
  * language per run (LOCALE=en or ar), as a free and as a paying test member,
  * and fails when a page errors, answers an unexpected status, or shows text
  * as its translation key ("ui.dashboard.title").
@@ -11,7 +11,9 @@
  * keys, and showing them can create a customer there. The test members have
  * no Stripe customer, so nothing here reaches Stripe, and the paying member's
  * plan is set with model events off (no welcome email) and taken back at the
- * end. Refuses to run on the live site.
+ * end. As the free member it also checks that the demo waits for a confirmed
+ * email and that a confirmation link works through the host's proxy (no email
+ * is sent). Refuses to run on the live site.
  *
  *   ssh user@host 'cd ~/public_html && LOCALE=en php' < scripts/support/staging_page_check.php
  */
@@ -61,6 +63,8 @@ if (! $freePlan || ! $paidPlan) {
 }
 Subscription::withoutEvents(fn () => $access->assignPlan($free, $freePlan));
 Subscription::withoutEvents(fn () => $access->assignPlan($paid, $paidPlan));
+// The free member has not confirmed its email, so its pages show what to do about it.
+$free->forceFill(['email_verified_at' => null, 'phone_verified_at' => null])->save();
 echo "Language {$locale}: free member {$free->id}, paying member {$paid->id} on {$paidPlan->slug}.\n";
 
 // [who, address, the statuses that are right]
@@ -120,6 +124,49 @@ foreach ($pages as [$who, $path, $expected]) {
         $problem ? ': '.$problem : '');
     $failed += $problem ? 1 : 0;
 }
+
+// Confirming an email (App\Support\EmailVerification). The demo refuses the
+// unconfirmed free member before anything is checked or made (an empty text:
+// were it let through, the demo would refuse the text, never make a voice).
+// Then the link its email would carry, opened signed out at the site's own
+// address through the host's proxy as a mail app would, confirms the address.
+// No email is sent; the member is left unconfirmed again for the next run.
+$app->instance(Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class, new class($app, $app['encrypter']) extends Illuminate\Foundation\Http\Middleware\ValidateCsrfToken
+{
+    public function handle($request, Closure $next)
+    {
+        return $next($request);
+    }
+});
+$guard = $app['auth']->guard('web');
+$guard->setUser($free);
+$request = Request::create('/'.$locale.'/demo', 'POST', ['text' => ''], [], [], ['HTTP_ACCEPT' => 'application/json', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest']);
+try {
+    $response = $kernel->handle($request);
+    $kernel->terminate($request, $response);
+    $status = $response->getStatusCode();
+    $refused = $status === 403 && (json_decode((string) $response->getContent(), true)['email_verification_required'] ?? false) === true;
+} catch (Throwable $e) {
+    $status = 0;
+    $refused = false;
+}
+printf("  %-4s  %-34s %-8s %d: %s\n", $refused ? 'ok' : 'FAIL', 'POST /'.$locale.'/demo', 'free', $status, $refused ? 'refused until the email is confirmed' : 'NOT refused for an unconfirmed email');
+$failed += $refused ? 0 : 1;
+$guard->forgetUser();
+
+$link = app(App\Services\Auth\EmailVerificationMailer::class)->verificationUrl($free);
+try {
+    $reply = Illuminate\Support\Facades\Http::withoutRedirecting()->timeout(30)->get($link);
+    $status = $reply->status();
+    $landing = (string) parse_url((string) $reply->header('Location'), PHP_URL_PATH);
+} catch (Throwable $e) {
+    $status = 0;
+    $landing = get_class($e);
+}
+$confirmed = $free->fresh()?->email_verified_at !== null;
+printf("  %-4s  %-34s %-8s %d -> %s: %s\n", $confirmed ? 'ok' : 'FAIL', 'GET /'.$locale.'/email/verify/…', 'link', $status, $landing !== '' ? $landing : '-', $confirmed ? 'the address is confirmed' : 'the address is NOT confirmed');
+$failed += $confirmed ? 0 : 1;
+$free->forceFill(['email_verified_at' => null])->save();
 
 // The paying test member goes back to the free plan.
 Subscription::withoutEvents(fn () => $access->assignPlan($paid, $freePlan));

@@ -140,6 +140,26 @@ class TextChunkerTest extends TestCase
         $this->assertSame($this->words($text), $this->words(implode(' ', $chunks)));
     }
 
+    public function test_each_piece_says_what_came_after_it(): void
+    {
+        $paragraphs = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $paragraphs[] = "Paragraph {$i} opens here. It has a second sentence that runs on a little longer than the first one did.";
+        }
+        $text = implode("\n\n", $paragraphs).' And a last sentence follows on the same line as the sixth paragraph.';
+
+        $pieces = TextChunker::pieces($text, 250, 'mb_strlen');
+
+        $this->assertSame(TextChunker::split($text, 250, 'mb_strlen'), array_column($pieces, 'text'));
+        $this->assertGreaterThan(2, count($pieces));
+        $this->assertSame('', end($pieces)['gap'], 'nothing after the last');
+        foreach (array_slice($pieces, 0, -1) as $i => $piece) {
+            // A line break after a piece exactly when the next one opens a paragraph.
+            $this->assertSame(str_starts_with($pieces[$i + 1]['text'], 'Paragraph') ? "\n" : ' ', $piece['gap'], $piece['text']);
+        }
+        $this->assertSame([['text' => 'short text', 'gap' => '']], TextChunker::pieces('short text', 250, 'mb_strlen'));
+    }
+
     public function test_a_word_longer_than_the_limit_is_cut(): void
     {
         $word = str_repeat('ب', 1000);

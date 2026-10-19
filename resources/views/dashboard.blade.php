@@ -2630,6 +2630,8 @@
         @if(session('ok'))<div class="note">{{ session('ok') }}</div>@endif
         @if(session('error'))<div class="error">{{ session('error') }}</div>@endif
         @if($errors->any())<div class="error">{{ $errors->first() }}</div>@endif
+        {{-- Free credits wait for a confirmed email: what to do, with a button for a new link. --}}
+        @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.studio_notice_title')])
         @php
           $prefillValue = fn (string $key, mixed $default = null) => old($key, data_get($reusePreset ?? [], $key, $default));
           $prefillTranslate = (string) old('translate', data_get($reusePreset ?? [], 'translate') ? '1' : '0');

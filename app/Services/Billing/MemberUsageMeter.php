@@ -6,11 +6,14 @@ use App\Models\AudioGeneration;
 use App\Models\Plan;
 use App\Models\TextItem;
 use App\Models\UsageCounter;
+use App\Models\User;
 use App\Services\Api\ApiUsageMeter;
 use App\Support\CreditPeriod;
+use App\Support\EmailVerification;
 use App\Support\PlanUsageGuard;
 use App\Support\UsageEstimator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Charges a member's own generations (the studio and the browser extension)
@@ -19,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  * the trial meter. Credits are reserved from the text before generating;
  * GenerateAudioJob corrects them to the real audio length, and a generation
  * that fails gives back everything its request reserved, exactly once.
+ * Credits nobody paid for are spent only by an account whose email is
+ * confirmed, as the free demo is (App\Support\EmailVerification).
  */
 class MemberUsageMeter
 {
@@ -67,6 +72,7 @@ class MemberUsageMeter
                 $this->charPackService->reserve($userId, $reservation['credits']);
             } else {
                 PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
+                $this->assertMaySpendFreeCredits($userId);
                 $counter->increment('total_requests');
                 $counter->increment('total_chars', $reservation['credits']);
                 $counter->addSeconds($reservation['seconds']);
@@ -79,6 +85,22 @@ class MemberUsageMeter
 
             return $recorded;
         }, 3);
+    }
+
+    /**
+     * The free plan's monthly credits and gifted credits need a confirmed
+     * email; whoever pays or has paid never waits for it. Checked after the
+     * limits, so a member without credits is told that first, and before
+     * anything is reserved.
+     */
+    private function assertMaySpendFreeCredits(int $userId): void
+    {
+        $user = User::query()->find($userId);
+        if (EmailVerification::requiredForFreeUse($user)) {
+            throw ValidationException::withMessages([
+                'content' => __('ui.verify_email.studio_required', ['email' => (string) $user->email]),
+            ]);
+        }
     }
 
     /**

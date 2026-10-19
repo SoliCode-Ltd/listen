@@ -17,6 +17,7 @@ use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Voice;
+use App\Models\VoiceSample;
 use App\Services\PlanAccessService;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
@@ -77,9 +78,13 @@ if (! $plan) {
 Subscription::withoutEvents(fn () => $access->assignPlan($member, $plan));
 fwrite(STDERR, "Test member {$member->id} on {$plan->slug}, ".count($cases)." case(s).\n");
 
-$voiceKey = function (string $internal, string $language, string $tier): string {
+// The case's own voice, or else the first one of its language and tier (never another voice for an exact one).
+$voiceKey = function (string $internal, string $language, string $tier, bool $exact = false): string {
     $active = Voice::query()->where('is_active', true);
     $voice = $internal !== '' ? (clone $active)->where('internal_voice_id', $internal)->first() : null;
+    if (! $voice && $exact) {
+        throw new RuntimeException("The voice {$internal} is not on sale on this site.");
+    }
     $voice ??= (clone $active)->where('language', $language)->where('tier', $tier)->orderBy('id')->first();
     if (! $voice) {
         throw new RuntimeException("No active {$tier} voice for {$language}.");
@@ -88,12 +93,36 @@ $voiceKey = function (string $internal, string $language, string $tier): string 
     return VoiceCatalog::keyFromId((int) $voice->id);
 };
 
+// The sample the voice list plays for a voice (its preview, else its own sample), to hear against a take made now.
+$voiceSample = function (string $internal): ?array {
+    $voice = Voice::query()->where('internal_voice_id', $internal)->first();
+    $paths = [(string) $voice?->preview_audio_path];
+    foreach (VoiceSample::query()->where('is_active', true)->where('voice_name', $internal)->orderByDesc('is_featured')->orderBy('sort_order')->get(['audio_path', 'metadata']) as $sample) {
+        if ((array) (($sample->metadata ?? [])['turns'] ?? []) === []) {
+            $paths[] = (string) $sample->audio_path;
+        }
+    }
+    foreach ($paths as $path) {
+        $path = ltrim(trim($path), '/');
+        $bytes = $path === '' ? null : (Storage::disk('public')->exists($path) ? Storage::disk('public')->get($path) : (is_file(public_path($path)) ? file_get_contents(public_path($path)) : null));
+        if (is_string($bytes) && $bytes !== '') {
+            return ['file' => basename($path), 'bytes' => $bytes];
+        }
+    }
+
+    return null;
+};
+
 $guard = $app['auth']->guard('web');
 foreach ($cases as $case) {
     $line = ['id' => $case['id'], 'listen_for' => $case['listen_for'] ?? ''];
     try {
         $payload = $case['request'];
-        $payload['voice_key'] = $voiceKey((string) ($case['voice'] ?? ''), (string) $payload['target_language'], (string) ($payload['voice_tier'] ?? 'hd'));
+        $payload['voice_key'] = $voiceKey((string) ($case['voice'] ?? ''), (string) $payload['target_language'], (string) ($payload['voice_tier'] ?? 'hd'), ! empty($case['exact_voice']));
+        if (! empty($case['compare_sample']) && ($sample = $voiceSample((string) $case['voice'])) !== null) {
+            $line['sample_file'] = $sample['file'];
+            $line['sample_base64'] = base64_encode($sample['bytes']);
+        }
         foreach ($case['dialogue'] ?? [] as $speaker) {
             $payload['dialogue_speakers'][] = [
                 'name' => $speaker['name'],

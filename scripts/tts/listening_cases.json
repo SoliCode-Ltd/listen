@@ -182,5 +182,52 @@
       "dialect": "ar-EG",
       "is_dialogue": true
     }
+  },
+  {
+    "id": "15-long-text-after-the-reply",
+    "listen_for": "A text of 2,500+ characters, made after the reply as long studio texts are: one level all through and natural pauses where the pieces meet.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "The harbour wakes up long before the town does. By five, the first boats are already coming in, low in the water, and the gulls follow them in wide, lazy circles. The fishermen do not talk much at that hour. They tie up, lift the crates onto the stone, and wave to the buyers who have been waiting by the wall with their flasks of tea.\n\nBy six the market is open. It is not a large market, a single row of tables under a long white awning, but everything on it was in the sea a few hours ago. There are sardines laid out in silver rows, a few proud sea bass, a tray of small red mullet, and in a bucket at the end, a pile of crabs that will not stay still. The prices are written in chalk on little boards, and they change as the morning goes on.\n\nMaria has had the third table for twenty-two years. She learned the trade from her father, who learned it from his, and she can tell where a fish was caught by the colour of its eyes. Regulars come to her not only for the fish but for the advice: how long to grill it, which herbs to use, whether today is a day for soup or for something simple with lemon and salt. She never writes anything down. She simply remembers who likes what, and puts it aside before they ask.\n\nAround eight, the town arrives. Parents on the way to school stop for something for dinner, cooks from the restaurants on the square come with their lists, and a few visitors take photographs of the crabs, which do not seem to mind. The noise rises, the awning fills with voices, and for an hour the harbour is the busiest place for miles.\n\nThen, almost as quickly as it began, it is over. By ten the tables are washed down, the boards are wiped clean, and the boats rock quietly at their moorings. The fishermen go home to sleep, and the gulls settle on the wall to wait for tomorrow. Maria counts her takings, folds her apron, and walks up the hill for a late breakfast of bread, olives and very strong coffee.\n\nIn winter the market changes. The storms keep the smaller boats in, the awning comes down, and the tables move into the old net store by the slipway. There is less to sell and more time to talk, and the same few faces come every day, as much for the company as for the fish. Maria brings a radio and a heater, and on the coldest mornings somebody always arrives with a tin of warm pastries to share.\n\nPeople sometimes ask her whether she ever wanted a different life, somewhere bigger, with regular hours and a roof that does not flap in the wind. She always laughs at that. Where else, she says, would I see the sun come up over the water every morning, and know the name of everyone who buys my fish? Some jobs you choose, and some jobs choose you. This one, she says, chose well.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US"
+    }
+  },
+  {
+    "id": "16-once-standard-ar-charon",
+    "listen_for": "A premium voice the standard engine used to read, now read by the premium engine's voice of the same name: compare it with 16-sample, the sample the voice list plays for it. If it sounds off, hide the voice.",
+    "voice": "ar-XA-Chirp3-HD-Charon",
+    "exact_voice": true,
+    "compare_sample": true,
+    "request": {
+      "content": "مرحباً بكم في نشرة الأخبار. نبدأ اليوم بالحديث عن حالة الطقس، إذ يُتوقع أن تكون الأجواء معتدلة في معظم المناطق، مع فرصة لهطول أمطار خفيفة مساءً.",
+      "target_language": "ar",
+      "voice_tier": "hd"
+    }
+  },
+  {
+    "id": "17-once-standard-en-aoede",
+    "listen_for": "A premium voice the standard engine used to read, now read by the premium engine's voice of the same name: compare it with 17-sample, the sample the voice list plays for it. If it sounds off, hide the voice.",
+    "voice": "en-US-Chirp3-HD-Aoede",
+    "exact_voice": true,
+    "compare_sample": true,
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd"
+    }
+  },
+  {
+    "id": "18-once-standard-ar-kore",
+    "listen_for": "A premium voice the standard engine used to read, now read by the premium engine's voice of the same name: compare it with 18-sample, the sample the voice list plays for it. If it sounds off, hide the voice.",
+    "voice": "ar-XA-Chirp3-HD-Kore",
+    "exact_voice": true,
+    "compare_sample": true,
+    "request": {
+      "content": "مرحباً بكم في نشرة الأخبار. نبدأ اليوم بالحديث عن حالة الطقس، إذ يُتوقع أن تكون الأجواء معتدلة في معظم المناطق، مع فرصة لهطول أمطار خفيفة مساءً.",
+      "target_language": "ar",
+      "voice_tier": "hd"
+    }
   }
 ]
