@@ -44,7 +44,7 @@ jobs:
           set -euo pipefail
           git fetch -q --depth=1 origin main
           git worktree add -q ../main-copy FETCH_HEAD
-          (cd ../main-copy && git ls-files | grep -v -E '^(\.github/|tests/|\.env|storage/|vendor/|node_modules/|public/storage)' \
+          (cd ../main-copy && git ls-files | grep -v -E '^(\.github/|tests/|marketing/|\.env|storage/|vendor/|node_modules/|public/storage)' \
             | grep -v -E '(^|/)\.git(ignore|attributes)$|^public/extensions/[^/]+/config\.js$' \
             | tr '\n' '\0' | xargs -0 sha1sum) > manifest.txt
           echo "main is $(git rev-parse --short FETCH_HEAD), $(wc -l < manifest.txt) files"

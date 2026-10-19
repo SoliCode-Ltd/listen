@@ -94,6 +94,8 @@ class TtsService
      *                                     - speed: float
      *                                     - pitch: float
      *                                     - speakers: array (dialogue mode)
+     *                                     - fresh_take: bool (never answer from the
+     *                                       saved copy of an identical earlier take)
      * @param  Plan|null  $plan           User's active plan
      * @param  int|null   $userId         User ID for telemetry
      * @return array
@@ -158,9 +160,10 @@ class TtsService
         $voiceConfig['style'] = $studio['performance_style']; // Backward compatibility for providers expecting `style`.
         $voiceConfig['emotion'] = $studio['emotion'];
 
-        // Check cache
+        // Check cache. A member making the same text again wants another reading
+        // (and pays for it), so a fresh take is never answered from the saved copy.
         $cacheKey = $this->buildAdvancedCacheKey($text, $targetLanguage, $voiceConfig, $provider->name());
-        if ($cached = $this->findCachedAudio($cacheKey, $targetLanguage)) {
+        if (empty($options['fresh_take']) && ($cached = $this->findCachedAudio($cacheKey, $targetLanguage))) {
             return [
                 'audio_path' => $cached,
                 'duration_seconds' => $this->estimateDurationSeconds($text),

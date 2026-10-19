@@ -332,6 +332,48 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame($wrap->invoke($provider, $first . $pause . $second, 24000, 1, 16), $joined['bytes']);
     }
 
+    public function test_joining_a_long_text_holds_its_audio_about_once(): void
+    {
+        $provider = app(\App\Services\Tts\GeminiTtsProvider::class);
+        // Bound to the provider, so the pieces go straight in and nothing else holds them.
+        $join = \Closure::bind(fn (int $pieces, int $bytes): array => $this->joinAudioParts(array_map(
+            fn (): array => ['bytes' => $this->wrapPcmL16AsWav(str_repeat("\1\0", intdiv($bytes, 2)), 24000, 1, 16), 'mime_type' => 'audio/wav'],
+            range(1, $pieces),
+        )), $provider, \App\Services\Tts\GeminiTtsProvider::class);
+        $total = 24 * 2_000_000;
+
+        gc_collect_cycles();
+        $before = memory_get_usage();
+        memory_reset_peak_usage();
+        $joined = $join(24, 2_000_000);
+        $peak = memory_get_peak_usage() - $before;
+
+        $this->assertGreaterThan($total, strlen($joined['bytes']));
+        // Before, the pieces, the joined audio and its WAV were all held at once (three copies).
+        $this->assertLessThan((int) (2.5 * $total), $peak);
+    }
+
+    public function test_a_voice_made_after_the_reply_may_use_more_memory_than_a_page(): void
+    {
+        $original = ini_get('memory_limit');
+
+        try {
+            ini_set('memory_limit', '512M');
+            \App\Jobs\GenerateAudioJob::raiseMemoryLimit('1024M');
+            $this->assertSame('1024M', ini_get('memory_limit'));
+
+            ini_set('memory_limit', '2G');
+            \App\Jobs\GenerateAudioJob::raiseMemoryLimit('1024M');
+            $this->assertSame('2G', ini_get('memory_limit'), 'never lowered');
+
+            ini_set('memory_limit', '-1');
+            \App\Jobs\GenerateAudioJob::raiseMemoryLimit('1024M');
+            $this->assertSame('-1', ini_get('memory_limit'), 'no limit stays no limit');
+        } finally {
+            ini_set('memory_limit', $original);
+        }
+    }
+
     public function test_failed_piece_is_retried_on_its_own(): void
     {
         config(['services.gemini_tts.model' => 'gemini-3.8-flash-tts', 'services.gemini_tts.max_chars_per_request' => 300]);

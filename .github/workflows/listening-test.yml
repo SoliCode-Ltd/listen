@@ -1,0 +1,86 @@
+name: Listening test
+
+# Makes a fixed set of voices on STAGING the way a member's studio voice is
+# made (scripts/tts/listening_test.php, the cases in
+# scripts/tts/listening_cases.json), measures each one (loudness, true peak,
+# length, the pauses inside long texts; scripts/tts/listening_measure.py) and
+# keeps the recordings with the run, so a change to how the voices sound can
+# be heard and measured before and after. It uses the speech quota staging
+# shares with live (about 20 requests a run): run it by hand only, when the
+# owner has said yes. It never runs on live.
+
+on:
+  workflow_dispatch:
+    inputs:
+      label:
+        description: A name for this set of recordings (before, after, ...)
+        default: before
+  # Until this file is on main (manual runs need that), a change to it on the
+  # branch being tried runs it once, with the label below.
+  push:
+    branches: [solicode/eloquent-noether-e1jfjs]
+    paths:
+      - .github/workflows/listening-test.yml
+
+env:
+  LABEL: ${{ inputs.label || 'before' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: listening-test
+  cancel-in-progress: false
+
+jobs:
+  listen:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg > /dev/null
+
+      - name: Put the cases into the script
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64, json
+          cases = json.load(open('scripts/tts/listening_cases.json', encoding='utf-8'))
+          assert cases and all('id' in c and 'request' in c for c in cases)
+          script = open('scripts/tts/listening_test.php', encoding='utf-8').read()
+          assert '__CASES__' in script
+          open('listen.php', 'w', encoding='utf-8').write(script.replace('__CASES__', base64.b64encode(json.dumps(cases).encode()).decode()))
+          PY
+          php -l listen.php
+
+      - name: Make the voices on staging
+        env:
+          SSH_HOST: ${{ secrets.STAGING_SSH_HOST }}
+          SSH_USER: ${{ secrets.STAGING_SSH_USER }}
+          SSH_KEY: ${{ secrets.STAGING_SSH_KEY }}
+          APP_PATH: ${{ secrets.STAGING_APP_PATH }}
+        run: |
+          set -euo pipefail
+          SSH_HOST="$(printf '%s' "$SSH_HOST" | tr -d '[:space:]')"
+          SSH_USER="$(printf '%s' "$SSH_USER" | tr -d '[:space:]')"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_listen
+          chmod 600 ~/.ssh/id_listen
+          ssh-keyscan -T 15 -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+          remote="for d in ${APP_PATH:+'$APP_PATH'} ~/public_html ~; do [ -f \"\$d/artisan\" ] && cd \"\$d\" && break; done; php"
+          ssh -i ~/.ssh/id_listen -o BatchMode=yes -o ConnectTimeout=20 -o ServerAliveInterval=30 "$SSH_USER@$SSH_HOST" "$remote" < listen.php > result.jsonl
+          rm -f ~/.ssh/id_listen
+          echo "$(grep -c '^{' result.jsonl) case(s) back"
+
+      - name: Measure
+        run: python3 scripts/tts/listening_measure.py result.jsonl recordings "$LABEL"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: listening-test-${{ env.LABEL }}-${{ github.run_number }}
+          path: recordings/
+          if-no-files-found: ignore
+          retention-days: 30

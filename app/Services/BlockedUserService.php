@@ -104,7 +104,12 @@ class BlockedUserService
         }
     }
 
-    public function unblock(User $user): void
+    /**
+     * An admin's unblock also trusts the member (never blocked automatically
+     * again, by either rule); an unblock that only corrects a rule's mistake
+     * passes $trust false and leaves that as it was.
+     */
+    public function unblock(User $user, bool $trust = true): void
     {
         $user->forceFill([
             'is_blocked' => false,
@@ -113,7 +118,7 @@ class BlockedUserService
             'blocked_reason_ar' => null,
             'blocked_reason_en' => null,
             'blocked_by' => null,
-            'multi_account_whitelisted' => true,
+            'multi_account_whitelisted' => $trust ? true : (bool) $user->multi_account_whitelisted,
             'remember_token' => Str::random(60),
         ])->save();
 
