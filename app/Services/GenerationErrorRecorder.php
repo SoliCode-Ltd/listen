@@ -72,28 +72,6 @@ class GenerationErrorRecorder
         ]);
     }
 
-    /**
-     * The chosen engine failed and the member got audio from the backup one.
-     *
-     * @param  array<string, mixed>  $voiceConfig
-     */
-    public function fallbackUsed(string $failedProvider, \Throwable $error, ?int $userId, string $targetLanguage, array $voiceConfig): void
-    {
-        $this->record([
-            'source' => GenerationError::SOURCE_FALLBACK,
-            'severity' => GenerationError::SEVERITY_WARNING,
-            'user_id' => $userId,
-            'provider' => $failedProvider,
-            'voice_name' => isset($voiceConfig['voice_name']) ? (string) $voiceConfig['voice_name'] : null,
-            'voice_tier' => isset($voiceConfig['tier']) ? (string) $voiceConfig['tier'] : null,
-            'target_language' => $targetLanguage,
-            'dialect' => isset($voiceConfig['dialect']) ? (string) $voiceConfig['dialect'] : null,
-            'exception_class' => get_class($error),
-            'message' => $error->getMessage(),
-            'user_message' => 'The member still got audio, from the backup voice engine.',
-        ]);
-    }
-
     public function voiceCloningFailed(ClonedVoice $voice, string $reason, string $code, ?int $httpStatus = null): void
     {
         $this->record([

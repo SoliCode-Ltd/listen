@@ -1613,6 +1613,9 @@ return [
 
         // Social sign-in that did not confirm the email, for an address that already has an account.
         'auth_social_unverified_email' => 'This email already has an account. Sign in with your email and password.',
+
+        // Voice generation: premium voices never fall back to a standard voice.
+        'premium_voices_busy' => 'Our premium voices are busy right now. Nothing was charged — please try again in a minute.',
     ],
 
     // ===== VOICE CLONING =====

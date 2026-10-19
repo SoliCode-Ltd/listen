@@ -360,10 +360,10 @@ class PlanResource extends Resource
                                 'default' => 'Use Global Setting',
                                 'google_only' => 'Google Cloud TTS Only',
                                 'gemini_only' => 'Gemini TTS Only',
-                                'gemini_preferred' => 'Gemini Preferred (fallback to Google)',
+                                'gemini_preferred' => 'Gemini Preferred',
                             ])
                             ->default('default')
-                            ->helperText('Override the global TTS mode for this plan. "Default" follows the system-wide setting.'),
+                            ->helperText('Kept for reference: it no longer changes the engine. Standard voices always use Google Cloud, and HD voices always use Gemini, never a standard voice.'),
                         Forms\Components\Select::make('quality_tier')
                             ->label('Audio Quality Tier')
                             ->options([

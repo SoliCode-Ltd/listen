@@ -15,6 +15,7 @@ use App\Services\GenerationErrorRecorder;
 use App\Services\Billing\CharPackService;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
 use App\Support\AudioDuration;
@@ -331,6 +332,11 @@ class GenerateAudioJob implements ShouldQueue
         if (str_starts_with((string) $generation->voice_name, 'cloned_')
             && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
             return GenerationMessage::stored('ui.backend.cloned_voice_daily_limit');
+        }
+        // An HD voice is never swapped for a standard one: when the premium engine
+        // is busy or down, the member is told so (and nothing is charged).
+        if ($e instanceof PremiumVoiceUnavailableException) {
+            return GenerationMessage::stored('ui.backend.premium_voices_busy');
         }
 
         return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');

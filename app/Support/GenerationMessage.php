@@ -15,6 +15,7 @@ final class GenerationMessage
     /** The messages GenerateAudioJob and the refunds keep on a generation. */
     private const KEYS = [
         'ui.backend.dashboard_voice_generation_failed_try_again',
+        'ui.backend.premium_voices_busy',
         'ui.backend.cloned_voice_daily_limit',
         'ui.backend.translation_failed',
     ];

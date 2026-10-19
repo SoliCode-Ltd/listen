@@ -9,6 +9,7 @@ use App\Models\TtsLog;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GoogleCloudTtsProvider;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -44,7 +45,7 @@ class PaidGenerationResilienceTest extends TestCase
         $this->app->instance(GeminiKeyManager::class, $manager);
     }
 
-    public function test_gemini_server_error_is_retried_before_falling_back(): void
+    public function test_gemini_server_error_is_retried(): void
     {
         $calls = $this->fakeGemini([
             Http::response(['error' => ['message' => 'Internal error']], 500),
@@ -72,43 +73,52 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame(2, $calls->gemini);
     }
 
-    public function test_slow_reply_without_audio_falls_back_without_retrying(): void
+    public function test_slow_reply_without_audio_fails_without_retrying(): void
     {
         config(['services.gemini_tts.retry_budget_seconds' => 0]);
         $calls = $this->fakeGemini([
             Http::response(['candidates' => [['finishReason' => 'OTHER', 'content' => ['parts' => [['text' => '']]]]]]),
         ]);
 
-        $result = app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+        $this->assertPremiumFails(fn () => app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan()));
 
-        $this->assertTrue($result['fallback_used']);
         $this->assertSame(1, $calls->gemini);
-        $this->assertSame(1, $calls->google);
+        $this->assertSame(0, $calls->google, 'never read by a standard voice instead');
     }
 
     public function test_bad_request_is_not_retried(): void
     {
         $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'bad']], 400)]);
 
-        $result = app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+        $this->assertPremiumFails(fn () => app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan()));
 
-        $this->assertTrue($result['fallback_used']);
         $this->assertSame(1, $calls->gemini);
+        $this->assertSame(0, $calls->google);
     }
 
-    public function test_long_arabic_fallback_is_split_under_googles_byte_limit(): void
+    public function test_gemini_down_fails_an_hd_request_after_its_retries_without_google(): void
     {
-        config(['services.gemini_tts.max_chars_per_request' => 5000]);
+        $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
+
+        $error = $this->assertPremiumFails(fn () => app(TtsService::class)->synthesizeAdvanced('مرحبا بكم في المنصة', 'ar', $this->hdOptions(), $this->starterPlan()));
+
+        $this->assertStringContainsString('HTTP 503', $error->getMessage());
+        $this->assertSame(3, $calls->gemini, 'the first try and two retries');
+        $this->assertSame(0, $calls->google);
+    }
+
+    public function test_long_arabic_standard_voice_is_split_under_googles_byte_limit(): void
+    {
         $calls = $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
         $text = trim(str_repeat('هذا نص عربي طويل لاختبار حد البايتات في جوجل. ', 100));
         $this->assertGreaterThan(5000, strlen($text));
         $this->assertLessThanOrEqual(5000, mb_strlen($text));
 
-        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->standardOptions(), $this->starterPlan());
 
         $this->assertSame('google_cloud', $result['provider']);
-        $this->assertTrue($result['fallback_used']);
-        $this->assertSame(3, $calls->gemini);
+        $this->assertFalse($result['fallback_used']);
+        $this->assertSame(0, $calls->gemini);
         $this->assertGreaterThan(1, count($calls->googleTexts));
         foreach ($calls->googleTexts as $chunk) {
             $this->assertLessThanOrEqual(5000, strlen($chunk));
@@ -123,22 +133,24 @@ class PaidGenerationResilienceTest extends TestCase
         );
     }
 
-    public function test_both_errors_are_kept_when_fallback_also_fails(): void
+    public function test_the_gemini_error_is_kept_when_an_hd_request_fails(): void
     {
-        Http::fake(function ($request) {
-            return str_contains($request->url(), 'texttospeech')
-                ? Http::response(['error' => ['message' => 'quota exceeded']], 429)
-                : Http::response(['error' => ['message' => 'Internal error']], 500);
+        $googleCalls = 0;
+        Http::fake(function ($request) use (&$googleCalls) {
+            if (str_contains($request->url(), 'texttospeech')) {
+                $googleCalls++;
+
+                return Http::response(['error' => ['message' => 'quota exceeded']], 429);
+            }
+
+            return Http::response(['error' => ['message' => 'Internal error']], 500);
         });
 
-        try {
-            app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
-            $this->fail('Expected the synthesis to fail.');
-        } catch (\RuntimeException $e) {
-            $this->assertStringContainsString('HTTP 500', $e->getMessage());
-            $this->assertStringContainsString('Google fallback failed', $e->getMessage());
-            $this->assertStringContainsString('quota exceeded', $e->getMessage());
-        }
+        $error = $this->assertPremiumFails(fn () => app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan()));
+
+        $this->assertStringContainsString('HTTP 500', $error->getMessage());
+        $this->assertStringContainsString('Internal error', $error->getPrevious()?->getMessage() ?? '');
+        $this->assertSame(0, $googleCalls);
     }
 
     public function test_split_keeps_every_word_and_respects_the_limit(): void
@@ -163,12 +175,11 @@ class PaidGenerationResilienceTest extends TestCase
         $calls = $this->fakeGemini([
             Http::response(['candidates' => [['finishReason' => 'OTHER', 'content' => ['parts' => [['text' => '']]]]]]),
         ]);
-        config(['services.gemini_tts.retry_budget_seconds' => 0]);
         $text = 'سالفة '.trim(str_repeat('كان يا ما كان في قديم الزمان رجل طيب، ', 60));
 
-        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->standardOptions(), $this->starterPlan());
 
-        $this->assertTrue($result['fallback_used']);
+        $this->assertSame('google_cloud', $result['provider']);
         $sent = implode(' ', $calls->googleTexts);
         foreach (preg_split('/(?<=[.!?؟…])\s+/u', $sent) as $sentence) {
             $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_SENTENCE_CHARS, mb_strlen($sentence));
@@ -194,9 +205,9 @@ class PaidGenerationResilienceTest extends TestCase
         $line = trim(str_repeat('كلام عراقي من القلب ', 4));
         $text = 'سالفة '.implode("\n", array_fill(0, 28, $line));
 
-        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->hdOptions(), $this->starterPlan());
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'ar', $this->standardOptions(), $this->starterPlan());
 
-        $this->assertTrue($result['fallback_used']);
+        $this->assertSame('google_cloud', $result['provider']);
         $this->assertGreaterThan(1, count($calls->googleTexts));
         foreach ($calls->googleTexts as $chunk) {
             $this->assertLessThanOrEqual(GoogleCloudTtsProvider::MAX_INPUT_BYTES, strlen($chunk));
@@ -210,7 +221,7 @@ class PaidGenerationResilienceTest extends TestCase
     {
         $this->fakeGemini([Http::response(['error' => ['message' => 'down']], 503)]);
 
-        app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+        app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->standardOptions(), $this->starterPlan());
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'texttospeech')
             && ! str_contains($request->url(), 'test-google-key')
@@ -386,5 +397,34 @@ class PaidGenerationResilienceTest extends TestCase
             'performance_style' => 'neutral',
             'emotion' => 'neutral',
         ];
+    }
+
+    /**
+     * A Standard voice: read by Google Cloud directly.
+     *
+     * @return array<string, mixed>
+     */
+    private function standardOptions(): array
+    {
+        return [
+            'tier' => 'standard',
+            'gender' => 'female',
+            'performance_style' => 'neutral',
+            'emotion' => 'neutral',
+        ];
+    }
+
+    /**
+     * An HD request Gemini cannot make fails: it is never read by a standard voice instead.
+     */
+    private function assertPremiumFails(callable $synthesize): PremiumVoiceUnavailableException
+    {
+        try {
+            $synthesize();
+        } catch (PremiumVoiceUnavailableException $e) {
+            return $e;
+        }
+
+        $this->fail('The HD request should have failed rather than use a standard voice.');
     }
 }

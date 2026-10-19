@@ -1619,6 +1619,9 @@ return [
 
         // Social sign-in that did not confirm the email, for an address that already has an account.
         'auth_social_unverified_email' => 'يوجد حساب بهذا البريد الإلكتروني. سجّل الدخول بالبريد الإلكتروني وكلمة المرور.',
+
+        // Voice generation: premium voices never fall back to a standard voice.
+        'premium_voices_busy' => 'أصواتنا المميزة مشغولة الآن، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى بعد دقيقة.',
     ],
 
     // ===== استنساخ الأصوات =====

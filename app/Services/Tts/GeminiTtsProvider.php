@@ -512,7 +512,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         $charCount = mb_strlen($text);
         $startTime = microtime(true);
 
-        // Over the daily ceiling this throws, and routing falls back to Google if allowed.
+        // Over the daily ceiling this throws: the HD request then fails, and its credits are given back.
         $guardrail = app(TtsCostGuardrail::class);
         $guardrail->assertCanSynthesize($this->name(), $charCount);
 
@@ -1095,7 +1095,8 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $retries = max(0, (int) config('services.gemini_tts.transient_retries', 2));
         // A slow failure would push the dashboard request past the web
-        // server timeout if repeated; let the Google fallback take over instead.
+        // server timeout if repeated: past the budget the request fails instead
+        // (and the member's credits are given back).
         $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
         $startedAt = microtime(true);
 

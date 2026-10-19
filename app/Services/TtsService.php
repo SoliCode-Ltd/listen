@@ -80,8 +80,8 @@ class TtsService
     /**
      * Enhanced synthesize method using the routing service.
      *
-     * Uses plan-aware provider selection, Arabic voice mapping,
-     * fallback logic, and telemetry logging.
+     * Uses quality-aware provider selection (HD never falls back to a
+     * standard voice), Arabic voice mapping, and telemetry logging.
      *
      * @param  string     $text           Text to synthesize
      * @param  string     $targetLanguage Language code
@@ -175,14 +175,11 @@ class TtsService
             ];
         }
 
-        // Synthesize using routing service
+        // Synthesize using routing service (an HD request that Gemini cannot make
+        // throws here, so a failure is never cached).
         $result = $this->routingService->synthesize($text, $targetLanguage, $voiceConfig, $plan, $userId);
 
-        // A Gemini failure falls back to Google for that one request. Caching
-        // that file would keep serving WaveNet after the saved model recovers.
-        if (! ($result['fallback_used'] ?? false)) {
-            $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
-        }
+        $this->storeInCache($result['audio_path'], $cacheKey, $targetLanguage);
 
         return $result;
     }

@@ -21,6 +21,7 @@ use App\Models\User;
 use App\Models\Voice;
 use App\Services\GenerationErrorRecorder;
 use App\Services\Tts\GeminiKeyManager;
+use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\Tts\TtsRoutingService;
 use App\Services\TranslationService;
 use App\Services\TtsService;
@@ -340,7 +341,7 @@ class GenerationErrorsAndChoicesTest extends TestCase
         $this->assertStringContainsString('HTTP 403', $error->message);
     }
 
-    public function test_backup_engine_use_is_recorded_as_a_warning(): void
+    public function test_a_failed_premium_voice_uses_no_backup_engine(): void
     {
         config([
             'services.google_tts.api_key' => 'test-google-key',
@@ -364,18 +365,18 @@ class GenerationErrorsAndChoicesTest extends TestCase
         $user = User::factory()->create();
         $plan = Plan::factory()->create(['slug' => 'starter-x', 'price_cents' => 900, 'tts_provider_policy' => 'gemini', 'voice_tier' => 'hd', 'max_chars_per_request' => 5000]);
 
-        $result = app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', [
-            'voice_name' => 'Kore', 'provider' => 'gemini', 'tier' => 'hd', 'gender' => 'female',
-            'performance_style' => 'neutral', 'emotion' => 'neutral', 'dialect' => 'en-GB',
-        ], $plan, $user->id);
+        try {
+            app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', [
+                'voice_name' => 'Kore', 'provider' => 'gemini', 'tier' => 'hd', 'gender' => 'female',
+                'performance_style' => 'neutral', 'emotion' => 'neutral', 'dialect' => 'en-GB',
+            ], $plan, $user->id);
+            $this->fail('A premium voice that fails is not read by a backup engine.');
+        } catch (PremiumVoiceUnavailableException $e) {
+            $this->assertStringContainsString('HTTP 400', $e->getMessage());
+        }
 
-        $this->assertTrue($result['fallback_used']);
-        $error = GenerationError::first();
-        $this->assertSame('fallback', $error->source);
-        $this->assertSame('warning', $error->severity);
-        $this->assertSame('gemini', $error->provider);
-        $this->assertSame($user->id, $error->user_id);
-        $this->assertSame('en-GB', $error->dialect);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'texttospeech'));
+        $this->assertSame(0, GenerationError::query()->where('source', 'fallback')->count(), 'no "backup engine used" warning');
     }
 
     public function test_voice_cloning_failure_is_recorded(): void

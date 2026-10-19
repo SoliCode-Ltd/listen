@@ -95,7 +95,7 @@ class DiagnoseUserGenerationsCommand extends Command
 
         $this->section('TTS routing');
         $mode = $routing->getGlobalMode();
-        $this->line("Mode: {$mode}   Fallback to Google: ".($routing->shouldFallback($mode) ? 'on' : 'OFF'));
+        $this->line("Mode: {$mode}   HD voices: Gemini only (a failure is refunded, never read by Google)");
         $this->line('Plan provider: '.($active ? (SiteSetting::get("tts_plan_provider_{$active->slug}") ?: ($active->tts_provider_policy ?: 'default')) : '-'));
         $this->line('Gemini model: '.GeminiTtsModel::resolve().'   timeout '.(int) config('services.gemini_tts.timeout_seconds').'s');
         $this->line('Google Cloud configured: '.((new GoogleCloudTtsProvider)->isAvailable() ? 'yes' : 'NO'));
