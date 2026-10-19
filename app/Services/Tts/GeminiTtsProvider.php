@@ -621,7 +621,10 @@ class GeminiTtsProvider implements TtsProviderInterface
         $payloads = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
-            $chunks = mb_strlen($part['text']) > $maxChars ? TextChunker::split($part['text'], $maxChars, 'mb_strlen') : [$part['text']];
+            // Read 4 at a time: earlier rounds stay full, the last one shares the rest.
+            $chunks = mb_strlen($part['text']) > $maxChars
+                ? TextChunker::split($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4)))
+                : [$part['text']];
             foreach ($chunks as $chunk) {
                 $performed = GeminiVocalTags::forPerformance($chunk, $partStyle);
                 $payloads[] = $this->buildSingleSpeakerPayload($model, $performed['text'], $performed['style'], $voiceName, $languageCode);

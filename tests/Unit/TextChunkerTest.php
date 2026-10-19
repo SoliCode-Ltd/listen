@@ -90,6 +90,25 @@ class TextChunkerTest extends TestCase
         $this->assertSame($this->words($sentence), $this->words(implode(' ', $chunks)));
     }
 
+    public function test_a_sentence_ending_in_a_closing_quote_is_still_a_sentence_end(): void
+    {
+        $sentences = [];
+        for ($i = 1; $i <= 30; $i++) {
+            $sentences[] = $i % 2 === 0
+                ? "قال الرجل في المرة رقم {$i}: «سأعود غدًا إلى البيت.»"
+                : "She said in line {$i}: \"I will be home tomorrow.\"";
+        }
+        $text = implode(' ', $sentences);
+
+        $chunks = TextChunker::split($text, 400, 'mb_strlen');
+
+        $this->assertGreaterThan(1, count($chunks));
+        foreach ($chunks as $chunk) {
+            $this->assertMatchesRegularExpression('/(\.»|\.")$/u', $chunk, 'Each piece ends at a sentence end, after its quote.');
+        }
+        $this->assertSame($this->words($text), $this->words(implode(' ', $chunks)));
+    }
+
     public function test_paragraph_breaks_stay_inside_a_piece(): void
     {
         $paragraphs = [];

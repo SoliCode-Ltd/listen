@@ -22,14 +22,15 @@ class TextChunker
         }
 
         $pieces = [];
-        foreach (self::cut($text, '/((?<=[.!?؟؛…])\s+|\s*\n\s*)/u', ' ') as [$gap, $sentence]) {
+        // A sentence end may be followed by a closing quote or bracket (.» ." ؟" .)).
+        foreach (self::cut($text, '/((?<=[.!?؟؛…]|[.!?؟؛…]["\'»”’)\]])\s+|\s*\n\s*)/u', ' ') as [$gap, $sentence]) {
             if ($measure($sentence) <= $max) {
                 $pieces[] = [$gap, $sentence];
                 continue;
             }
             // A long sentence breaks at its commas before its spaces, so the
             // pause between pieces falls between clauses, not inside one.
-            foreach (self::cut($sentence, '/((?<=[،,:;])\s+)/u', $gap) as [$gap, $clause]) {
+            foreach (self::cut($sentence, '/((?<=[،,:;]|[،,:;]["\'»”’)\]])\s+)/u', $gap) as [$gap, $clause]) {
                 if ($measure($clause) <= $max) {
                     $pieces[] = [$gap, $clause];
                     continue;

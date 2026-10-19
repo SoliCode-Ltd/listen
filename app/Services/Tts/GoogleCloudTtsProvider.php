@@ -259,7 +259,8 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
      */
     public static function splitForByteLimit(string $text, int $maxBytes = self::MAX_INPUT_BYTES): array
     {
-        return TextChunker::split($text, $maxBytes, 'strlen');
+        // Read a few at a time: earlier rounds stay full, the last one shares the rest.
+        return TextChunker::split($text, $maxBytes, 'strlen', max(1, (int) config('services.google_tts.max_parallel_requests', 4)));
     }
 
     /**

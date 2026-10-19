@@ -366,7 +366,7 @@ class VoiceCloningService
         $chunks = [];
         $styles = [];
         foreach ($parts as $part) {
-            foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen') as $chunk) {
+            foreach (TextChunker::split($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4))) as $chunk) {
                 $performed = GeminiVocalTags::forPerformance($chunk, GeminiVocalTags::withCues($style, $part['cues']));
                 $chunks[] = $performed['text'];
                 $styles[] = $performed['style'];
