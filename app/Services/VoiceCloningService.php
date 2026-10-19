@@ -1783,7 +1783,8 @@ class VoiceCloningService
             }
         }
 
-        return null;
+        // Also the copy the "Server deploy" workflow puts in storage/app/bin.
+        return \App\Support\AudioFormats::ffmpegPath();
     }
 
     private function loadAudioBytes(string $path): string

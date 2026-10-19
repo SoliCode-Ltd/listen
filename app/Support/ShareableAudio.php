@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use Symfony\Component\Process\ExecutableFinder;
 use Symfony\Component\Process\Process;
 
 /**
@@ -53,11 +52,13 @@ class ShareableAudio
 
     private static function transcodeWavToMp3(string $wav): ?string
     {
-        if (strlen($wav) < 44 || ! self::canRunProcesses()) {
+        if (strlen($wav) < 44) {
             return null;
         }
 
-        $ffmpeg = (new ExecutableFinder())->find('ffmpeg');
+        // The same ffmpeg the download formats use. Web PHP often runs with
+        // an empty PATH, and looking only there kept HD audio as WAV.
+        $ffmpeg = AudioFormats::ffmpegPath();
         if ($ffmpeg === null) {
             return null;
         }
@@ -103,16 +104,5 @@ class ShareableAudio
                 unlink($output);
             }
         }
-    }
-
-    private static function canRunProcesses(): bool
-    {
-        if (! function_exists('proc_open')) {
-            return false;
-        }
-
-        $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
-
-        return ! in_array('proc_open', $disabled, true);
     }
 }

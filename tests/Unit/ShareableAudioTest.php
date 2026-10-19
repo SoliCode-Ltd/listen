@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Support\AudioFormats;
 use App\Support\ShareableAudio;
 use Tests\TestCase;
 
@@ -14,6 +15,24 @@ class ShareableAudioTest extends TestCase
         $this->assertSame('mp3', $packaged['extension']);
         $this->assertTrue(ShareableAudio::isMp3($packaged['bytes']));
         $this->assertFalse(ShareableAudio::isWav($packaged['bytes']));
+    }
+
+    public function test_wav_speech_is_packaged_as_mp3_when_web_php_has_no_path(): void
+    {
+        if (AudioFormats::ffmpegPath() === null) {
+            $this->markTestSkipped('ffmpeg is not installed here.');
+        }
+        $path = getenv('PATH');
+        putenv('PATH=');
+
+        try {
+            $packaged = ShareableAudio::package($this->silentWav());
+        } finally {
+            putenv('PATH='.$path);
+        }
+
+        $this->assertSame('mp3', $packaged['extension']);
+        $this->assertTrue(ShareableAudio::isMp3($packaged['bytes']));
     }
 
     public function test_an_mp3_is_left_unchanged(): void
