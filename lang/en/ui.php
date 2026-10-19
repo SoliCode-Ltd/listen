@@ -479,6 +479,7 @@ return [
         'order_discount_line' => 'Discount',
         'order_balance_line' => 'Account credit used',
         'order_total' => 'Total due today',
+        'order_usage_note' => "Credits you've already used this month count on the new plan.",
         'order_renews_month' => 'Then :amount a month from :date.',
         'order_renews_year' => 'Then :amount a year from :date.',
         'order_credit_left' => ':amount goes to your account credit and pays your next renewals.',

@@ -480,6 +480,7 @@ return [
         'order_discount_line' => 'الخصم',
         'order_balance_line' => 'من رصيد حسابك',
         'order_total' => 'الإجمالي المستحق اليوم',
+        'order_usage_note' => 'الرصيد الذي استخدمته هذا الشهر يُحتسب ضمن الخطة الجديدة.',
         'order_renews_month' => 'ثم :amount شهريًا بدءًا من :date.',
         'order_renews_year' => 'ثم :amount سنويًا بدءًا من :date.',
         'order_credit_left' => 'يُضاف :amount إلى رصيد حسابك ويُستخدم في التجديدات القادمة.',
