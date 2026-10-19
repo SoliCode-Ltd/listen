@@ -103,7 +103,8 @@ final class ApiCodeSamples
 
     private static function javascript(string $method, string $url, ?array $body, ?string $saveAs): string
     {
-        $code = "// Node.js 18 or later (fetch is built in).\n";
+        // import and top-level await need an ES module: a .js file is not one by default.
+        $code = "// Node.js 20 or later (fetch is built in). Save it as a .mjs file: it is an ES module.\n";
         if ($saveAs !== null) {
             $code .= "import { writeFile } from \"node:fs/promises\";\n\n";
         }

@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
+use App\Models\User;
+use App\Support\Credits;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -41,6 +43,85 @@ class SeoProductClaimsTest extends TestCase
         foreach ($pages as [$locale, $route, $params]) {
             $html = $this->page($locale, $route, $params)->assertOk()->getContent();
             $this->assertDoesNotMatchRegularExpression('/free account|free plan|free to try|Free forever|حساب مجاني|حسابك المجاني|الخطة المجانية|جرّبه مجاناً/iu', $html, $route.' '.$locale);
+        }
+    }
+
+    public function test_the_demo_is_promised_once_not_as_an_allowance_for_every_new_account(): void
+    {
+        // One demo per device, and an email sign-up confirms its address first.
+        $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []],
+            ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'egyptian']], ['seo.accent', ['accent' => 'british']]];
+        foreach ($pages as [$route, $params]) {
+            foreach (['en', 'ar'] as $locale) {
+                $html = (string) $this->page($locale, $route, $params)->assertOk()->getContent();
+                $this->assertDoesNotMatchRegularExpression('/small allowance|Every new account|رصيد صغير|كل حساب جديد/u', $html, $route.' '.$locale);
+            }
+        }
+
+        $this->page('en', 'seo.dialect', ['dialect' => 'egyptian'])->assertSee('Yes. New members can try the voices once in the demo, then you pick the plan that fits your use.');
+        $this->page('ar', 'seo.dialect', ['dialect' => 'egyptian'])->assertSee('نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.');
+        $this->page('en', 'seo.english-accents')->assertSee('Yes. New members can try the voices and accents once in the demo.');
+        $this->page('ar', 'seo.arabic-dialects')->assertSee('نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.');
+        $this->assertStringContainsString('new members can try the voices once in the demo', (string) $this->get('/llms.txt')->getContent());
+    }
+
+    public function test_plans_are_described_in_credits_not_characters(): void
+    {
+        // Plans meter the audio itself: credits, 900 of them a minute.
+        $this->assertSame(1, Credits::minutesFor(900));
+
+        $this->page('en', 'seo.text-to-speech')->assertOk()
+            ->assertSee('Plans add monthly credits, premium voices, dialects, accents and emotions.')
+            ->assertDontSee('monthly characters');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()
+            ->assertSee('الباقات تضيف رصيداً شهرياً وأصواتاً مميزة ولهجات ولكنات ومشاعر.')
+            ->assertDontSee('أحرفاً شهرية');
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()
+            ->assertSee('ثم تختار الباقة التي تناسب الرصيد الذي تحتاجه.')
+            ->assertDontSee('عدد الأحرف');
+    }
+
+    public function test_downloads_are_promised_on_paid_plans_only(): void
+    {
+        // A demo clip's download button opens billing instead.
+        $this->actingAs(User::factory()->create());
+        $this->page('en', 'demo.page')->assertOk()->assertSee('data-download-redirect-url="'.route('billing.page'), false);
+        auth()->logout();
+
+        foreach ([['seo.dialect', ['dialect' => 'egyptian']], ['seo.accent', ['accent' => 'british']]] as [$route, $params]) {
+            $this->page('en', $route, $params)->assertOk()
+                ->assertSee('On every paid plan, each clip downloads as MP3.')
+                ->assertDontSee('Every clip downloads as MP3.');
+            $this->page('ar', $route, $params)->assertOk()
+                ->assertSee('في كل باقة مدفوعة يمكنك تحميل كل مقطع بصيغة MP3.');
+        }
+        $this->page('en', 'seo.text-to-speech')->assertOk()
+            ->assertSee('Sign up and choose a paid plan, paste your text, pick a language, voice and dialect, then generate and download the MP3.');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()->assertSee('سجّل حساباً واختر باقة مدفوعة، الصق النص');
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()->assertSee('أنشئ حساباً واختر باقة مدفوعة، الصق النص');
+    }
+
+    public function test_pages_promise_every_major_dialect_not_every_dialect(): void
+    {
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()
+            ->assertSee('تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات الرئيسية')
+            ->assertSee('الفصحى وكل اللهجات الرئيسية');
+        $this->page('en', 'seo.text-to-speech')->assertOk()->assertSee('English and Arabic, every major dialect');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()->assertSee('العربية بكل لهجاتها الرئيسية والإنجليزية');
+        $this->page('ar', 'seo.english-accents')->assertOk()->assertSee('<title>تحويل النص إلى صوت إنجليزي بكل اللكنات الرئيسية', false);
+
+        $pages = [['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
+            ['seo.arabic-dialects', []], ['seo.english-accents', []], ['seo.dialect', ['dialect' => 'saudi']], ['seo.accent', ['accent' => 'british']],
+            ['home', []], ['samples', []]];
+        foreach ($pages as [$route, $params]) {
+            foreach (['en', 'ar'] as $locale) {
+                // "All Arabic dialects" links to the list of the ones Listen has, and stays.
+                $this->assertDoesNotMatchRegularExpression(
+                    '/every (?:dialect|accent)\b|كل اللهجات(?! (?:الرئيسية|العربية))|بكل لهجاتها(?! الرئيسية)|بكل اللكنات(?! الرئيسية)|كل البلاد العربية/u',
+                    (string) $this->page($locale, $route, $params)->assertOk()->getContent(),
+                    $route.' '.$locale
+                );
+            }
         }
     }
 

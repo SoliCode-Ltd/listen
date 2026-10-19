@@ -405,7 +405,7 @@ return [
                 ['400', 'invalid_idempotency_key', 'The `Idempotency-Key` is longer than 255 characters.'],
                 ['401', 'missing_api_key', 'No key was sent.'],
                 ['401', 'invalid_api_key', 'The key is wrong or revoked.'],
-                ['402', 'quota_exceeded', 'Your plan does not have enough credits left this month.'],
+                ['402', 'quota_exceeded', 'Your plan does not have enough credits left this month, or its monthly request limit is reached.'],
                 ['402', 'key_credit_limit_exceeded', 'This key has reached its own monthly credit limit.'],
                 ['403', 'api_access_not_in_plan', 'Your plan does not include the developer API.'],
                 ['403', 'api_not_available_during_trial', 'The developer API starts after your first payment.'],

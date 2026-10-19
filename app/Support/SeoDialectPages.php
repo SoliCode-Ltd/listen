@@ -143,7 +143,7 @@ final class SeoDialectPages
                 'label' => 'Arabic Dialects',
                 'title' => 'Arabic Dialects Text to Speech',
                 'title_key' => 'ui.seo.arabic_dialects_title',
-                'description' => 'AI text to speech in Fusha and more than '.DialectCounts::arabic().' Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
+                'description' => 'AI text to speech in Fusha and '.DialectCounts::arabic().'+ Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
                 'description_key' => 'ui.seo.arabic_dialects_description',
                 'robots' => $robots,
                 'path' => '/arabic-dialects',
@@ -329,8 +329,8 @@ final class SeoDialectPages
                         ? 'تُنطق الفصحى نطقاً كاملاً بمخارج الحروف الصحيحة ودون مفردات عامية.'
                         : 'عند اختيار '.$dialect.' في الاستوديو تُوجَّه الأصوات عالية الدقة لنطق الحروف وإيقاع الكلام كما يتكلم أهل البلد. للحصول على أفضل نتيجة اكتب النص نفسه بالعامية.'],
                     ['question' => 'ما اللكنات المتاحة '.$with.'؟', 'answer' => $accentNames.'.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.'],
-                    ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات مرة واحدة في العرض التجريبي، ثم تختار الباقة المناسبة لاستخدامك.'],
+                    ['question' => 'هل يمكن تحميل الصوت واستخدامه تجارياً؟', 'answer' => 'في كل باقة مدفوعة يمكنك تحميل كل مقطع بصيغة MP3. حقوق الاستخدام التجاري تعتمد على خطتك، وتجد تفاصيلها في صفحة الأسعار.'],
                 ],
                 'cta_title' => 'ابدأ التعليق الصوتي '.$with,
                 'cta_body' => 'أنشئ حسابك واسمع نصك '.$with.' خلال ثوانٍ.',
@@ -382,8 +382,8 @@ final class SeoDialectPages
                     ? 'Yes. Fusha is spoken with full, correct articulation and no colloquial words.'
                     : 'When you choose '.$dialect.' in the studio, HD voices are directed to use local pronunciation and rhythm. For the most natural result, write the script itself in the dialect.'],
                 ['question' => 'Which '.$dialect.' accents are available?', 'answer' => $accentNames.'.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo, then you pick the plan that fits your use.'],
-                ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'Every clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices once in the demo, then you pick the plan that fits your use.'],
+                ['question' => 'Can I download the audio and use it commercially?', 'answer' => 'On every paid plan, each clip downloads as MP3. Commercial use depends on your plan; see the pricing page for details.'],
             ],
             'cta_title' => 'Start your '.$dialect.' voiceover',
             'cta_body' => 'Create your account and hear your script in '.$dialect.' in seconds.',
@@ -398,19 +398,23 @@ final class SeoDialectPages
      */
     public static function hubContent(string $locale): array
     {
+        // Fusha and its styles are named apart, not counted among the accents or their countries.
+        $accents = DialectCounts::spokenArabic();
+        $countries = count(ArabicDialects::COUNTRIES) - 1;
+
         if ($locale === 'ar') {
             return [
                 'eyebrow' => 'اللهجات العربية',
                 'h1' => 'تحويل النص إلى صوت باللهجات العربية والفصحى',
-                'intro' => 'منصة إسمع تتكلم '.count(ArabicDialects::ALL).' لكنة عربية من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة بالإضافة إلى الفصحى: لهجات الخليج والشام ومصر والسودان والعراق واليمن والمغرب العربي. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
+                'intro' => 'منصة إسمع تتكلم '.$accents.' لكنة عربية من '.$countries.' دولة بالإضافة إلى الفصحى: لهجات الخليج والشام ومصر والسودان والعراق واليمن والمغرب العربي. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
                 'faq_title' => 'الأسئلة الشائعة',
                 'faqs' => [
-                    ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => count(ArabicDialects::ALL).' لكنة من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة عربية، بالإضافة إلى العربية الفصحى.'],
+                    ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => $accents.' لكنة من '.$countries.' دولة، بالإضافة إلى العربية الفصحى.'],
                     ['question' => 'هل أكتب النص بالعامية أم بالفصحى؟', 'answer' => 'للحصول على أكثر نتيجة طبيعية اكتب النص باللهجة نفسها. ويمكنك أيضاً كتابة نص فصيح واختيار اللهجة.'],
-                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللهجات في العرض التجريبي.'],
+                    ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يمكن للأعضاء الجدد تجربة الأصوات واللهجات مرة واحدة في العرض التجريبي.'],
                 ],
                 'cta_title' => 'اسمع نصك بلهجة جمهورك',
-                'cta_body' => 'أنشئ حسابك واختر من أكثر من '.count(ArabicDialects::ALL).' لكنة عربية.',
+                'cta_body' => 'أنشئ حسابك واختر الفصحى أو واحدة من '.$accents.' لكنة عربية.',
                 'cta_primary' => 'أنشئ حسابك',
             ];
         }
@@ -418,15 +422,15 @@ final class SeoDialectPages
         return [
             'eyebrow' => 'Arabic dialects',
             'h1' => 'Text to Speech in Every Major Arabic Dialect',
-            'intro' => 'Listen speaks '.count(ArabicDialects::ALL).' Arabic accents from '.(count(ArabicDialects::COUNTRIES) - 1).' countries plus Modern Standard Arabic: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi dialects. Pick your audience\'s dialect and hear your script the way locals say it.',
+            'intro' => 'Listen speaks '.$accents.' Arabic accents from '.$countries.' countries plus Modern Standard Arabic: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi dialects. Pick your audience\'s dialect and hear your script the way locals say it.',
             'faq_title' => 'Frequently asked questions',
             'faqs' => [
-                ['question' => 'How many Arabic dialects does Listen support?', 'answer' => count(ArabicDialects::ALL).' accents from '.(count(ArabicDialects::COUNTRIES) - 1).' Arab countries, plus Modern Standard Arabic (Fusha).'],
+                ['question' => 'How many Arabic dialects does Listen support?', 'answer' => $accents.' accents from '.$countries.' countries, plus Modern Standard Arabic (Fusha).'],
                 ['question' => 'Should I write the script in dialect or in Fusha?', 'answer' => 'For the most natural result, write the script in the dialect itself. You can also write in Fusha and choose a dialect.'],
-                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and dialects in the demo.'],
+                ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. New members can try the voices and dialects once in the demo.'],
             ],
             'cta_title' => 'Speak your audience\'s dialect',
-            'cta_body' => 'Create your account and choose from '.count(ArabicDialects::ALL).' Arabic accents.',
+            'cta_body' => 'Create your account and choose Fusha or one of '.$accents.' Arabic accents.',
             'cta_primary' => 'Create your account',
         ];
     }
