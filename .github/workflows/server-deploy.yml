@@ -28,6 +28,18 @@ name: Server deploy
 #            subscription: how the plan is saved, whether anything was paid
 #            for it, and whether it needs a look. Writes nothing; prints
 #            member ids only.
+#   settings: the server's own switches in .env (the old .env is kept in
+#            storage/app/listen-deploy): LISTEN_LIVE_ACTIONS true on live and
+#            false on staging, the extension's old shared LISTEN_API_KEY
+#            removed, and on live a local/testing APP_ENV set to production and
+#            APP_DEBUG turned off. Rebuilds the config cache, restarts the
+#            workers, then shows what is in use (never a secret's value), the
+#            PHP limits, the queue workers and the scheduler.
+#   data-checks: read-only (READ ONLY database session). Paid plans marked
+#            past due, members blocked by the wording rule (paying ones
+#            first), the share of sign-ups per network address (counts only,
+#            never an address) and the speech and credit settings. Prints
+#            member ids only.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -39,7 +51,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, data-checks, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -219,6 +231,111 @@ jobs:
           php artisan queue:restart | tail -1
           echo "== In use =="
           php artisan config:show queue.connections.database 2>/dev/null | grep -iE 'retry_after' || echo "  (could not read the config)"
+          REMOTE
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = settings ]; then
+            $S "$FIND; TARGET='$TARGET' bash -s" <<'REMOTE'
+          set -euo pipefail
+          b="storage/app/listen-deploy/env.backup-$(date -u +%Y%m%d%H%M%S)"
+          cp .env "$b" && chmod 600 "$b" && echo "Old .env kept as $b"
+          # KEY=value once: the line is replaced, or added at the end.
+          set_env() { if grep -q "^$1=" .env; then sed -i "s|^$1=.*|$1=$2|" .env; else printf '\n%s=%s\n' "$1" "$2" >> .env; fi; }
+          # The value of KEY in .env, without quotes or spaces.
+          env_of() { grep -E "^$1=" .env | tail -1 | cut -d= -f2- | tr -d "\"' " || true; }
+          if [ "$TARGET" = live ]; then set_env LISTEN_LIVE_ACTIONS true; else set_env LISTEN_LIVE_ACTIONS false; fi
+          echo "LISTEN_LIVE_ACTIONS: $(env_of LISTEN_LIVE_ACTIONS)"
+          # The extension's old shared key acted as account 1; members' extensions use their own keys.
+          if grep -q '^LISTEN_API_KEY=' .env; then sed -i '/^LISTEN_API_KEY=/d' .env; echo "LISTEN_API_KEY: removed"; else echo "LISTEN_API_KEY: was not set"; fi
+          if [ "$TARGET" = live ]; then
+            # local or testing believes payment events nobody signed; debug pages show internals.
+            e="$(env_of APP_ENV)"; case "$e" in local|testing) set_env APP_ENV production; echo "APP_ENV: $e -> production";; *) echo "APP_ENV: ${e:-not set} (kept)";; esac
+            d="$(env_of APP_DEBUG)"; case "$d" in true|TRUE|True|1) set_env APP_DEBUG false; echo "APP_DEBUG: $d -> false";; *) echo "APP_DEBUG: ${d:-not set} (kept)";; esac
+          fi
+          if [ -f bootstrap/cache/config.php ]; then php artisan config:cache | tail -1; fi
+          php artisan queue:restart | tail -1 || true
+          echo "== Queue workers running now =="
+          ps -eo pid,etime,args | grep -E 'artisan (queue:(work|listen)|horizon)' | grep -v grep || echo "  none right now"
+          echo "== Cron lines that start Laravel =="
+          crontab -l 2>/dev/null | grep -E 'artisan' || echo "  none in this user's crontab"
+          echo "== PHP-FPM time limits (when this user can read the pool file) =="
+          found=0
+          for f in /etc/php/*/fpm/pool.d/*.conf /etc/php-fpm.d/*.conf /etc/php*/php-fpm.d/*.conf; do
+            [ -r "$f" ] || continue
+            grep -HE '^[[:space:]]*(request_terminate_timeout|php_admin_value\[max_execution_time\]|php_value\[max_execution_time\])' "$f" && found=1 || true
+          done
+          [ "$found" = 1 ] || echo "  not readable from here: set request_terminate_timeout in the Cloudways panel"
+          REMOTE
+            $S "$FIND; php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          $line = function (string $label, $value): void { echo '  '.str_pad($label, 46).(is_bool($value) ? ($value ? 'yes' : 'no') : (string) $value)."\n"; };
+          echo "== In use now ==\n";
+          $line('APP_ENV / debug', config('app.env').' / '.(config('app.debug') ? 'ON' : 'off'));
+          $line('Acts on real customers (live-site switch)', App\Support\LiveServer::allowsCustomerActions());
+          $line('Stripe webhook signing secret', trim((string) config('services.stripe.webhook_secret')) !== '' ? 'set' : 'MISSING');
+          $line('Throwaway inboxes refused at sign-up', (bool) config('disposable_email.enabled', true));
+          $line('Queue / retry_after (seconds)', config('queue.default').' / '.config('queue.connections.database.retry_after'));
+          $line('Texts made after the reply from (characters)', (string) config('listen.audio.force_async_chars'));
+          $line('PHP (command line) max_execution_time', (string) ini_get('max_execution_time'));
+          $line('PHP (command line) memory_limit', (string) ini_get('memory_limit'));
+          REMOTE
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = data-checks ]; then
+            $S "$FIND; php" <<'REMOTE'
+          <?php
+          require 'vendor/autoload.php';
+          $app = require 'bootstrap/app.php';
+          $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+          if (in_array(Illuminate\Support\Facades\DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+              Illuminate\Support\Facades\DB::statement('SET SESSION TRANSACTION READ ONLY');
+          }
+          $db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
+          echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
+
+          echo "== Paid plans marked past due (compare each with Stripe) ==\n";
+          $rows = $db('subscriptions')->where('status', 'active')->where('billing_payment_state', 'past_due')->orderBy('id')
+              ->get(['id', 'user_id', 'plan_id', 'billing_grace_ends_at', 'current_period_end', 'updated_at']);
+          foreach ($rows as $r) { echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; }
+          if ($rows->isEmpty()) { echo "  none\n"; }
+
+          echo "== Members blocked by the wording rule ==\n";
+          $wording = App\Models\User::query()->where('is_blocked', true)->whereNull('blocked_by')
+              ->whereIn('blocked_reason', [App\Services\BlockedUserService::DEFAULT_REASON_EN, App\Services\BlockedUserService::DEFAULT_REASON_AR])
+              ->orderBy('id')->get();
+          $paying = $wording->filter(fn ($u) => App\Support\PaidMember::is($u));
+          echo '  blocked by it: ', $wording->count(), ', of whom pay or have paid: ', $paying->count(), "\n";
+          if ($paying->isNotEmpty()) { echo '  paying member ids (unblock these first): ', $paying->pluck('id')->implode(', '), "\n"; }
+          if ($wording->isNotEmpty()) {
+              echo '  member ids: ', $wording->pluck('id')->implode(', '), "\n";
+              $terms = $db('blocked_generations')->whereIn('user_id', $wording->pluck('id'))->selectRaw('matched_term, count(*) as n')
+                  ->groupBy('matched_term')->orderByDesc('n')->limit(25)->get();
+              echo '  words that refused their texts: ', $terms->map(fn ($t) => $t->matched_term.' ('.$t->n.')')->implode(', '), "\n";
+          }
+          $all = App\Models\User::query()->where('is_blocked', true)->count();
+          echo '  all blocked members: ', $all, ' (multi-account and admin blocks included)', "\n";
+
+          echo "== Sign-ups per network address (counts only, never an address) ==\n";
+          $total = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->count();
+          $top = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')
+              ->selectRaw('registration_ip, count(*) as n')->groupBy('registration_ip')->orderByDesc('n')->limit(5)->get();
+          $distinct = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->distinct()->count('registration_ip');
+          echo '  members with a sign-up address: ', $total, ', different addresses: ', $distinct, "\n";
+          foreach ($top as $i => $t) {
+              $public = filter_var($t->registration_ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+              printf("  #%d busiest address: %d sign-ups (%.1f%%), %s\n", $i + 1, $t->n, $total > 0 ? 100 * $t->n / $total : 0, $public ? 'a public address' : 'a PRIVATE or local address (the site sees its proxy)');
+          }
+
+          echo "== Settings ==\n";
+          foreach (['credit_periods_from', 'tts_mode', 'gemini_tts_model', 'demo_char_allowance'] as $key) {
+              $value = $db('site_settings')->where('key', $key)->value('value');
+              echo '  ', str_pad($key, 22), ($value === null || $value === '' ? '(not set)' : $value), "\n";
+          }
           REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0
