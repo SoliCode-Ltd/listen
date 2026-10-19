@@ -121,7 +121,7 @@ return [
         'tour_dialogue_title' => 'Conversations',
         'tour_dialogue_body' => 'Write who says what, and two voices perform the script turn by turn.',
         'tour_places_title' => 'Sound environments',
-        'tour_places_body' => 'Hear the same voice move from the studio into a cave. 20+ places, from a stadium to a phone call.',
+        'tour_places_body' => 'Hear the same voice move from the studio into a cave. 20+ sound environments, from a stadium to a phone call.',
         'hero_play_one' => 'Hear :name',
         'hero_listen' => 'Hear the voices',
         'facts_label' => 'Listen at a glance',
