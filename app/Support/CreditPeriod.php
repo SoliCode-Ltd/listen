@@ -21,7 +21,8 @@ use Illuminate\Support\Facades\Schema;
  *
  * A paid plan's credits follow the plan's own dates: they start when the
  * plan's period starts (the day it was paid for, given or renewed) and start
- * again when a new period starts (a renewal, or subscribing again). A yearly
+ * again when a new period starts (a renewal, or subscribing again). A change
+ * of plan carries the usage on instead (carryOverPlanChange()). A yearly
  * or multi-month period starts again every month on the day it ends. The
  * free plan counts by calendar month, and so does everyone until the switch
  * is on (the site setting below, set by the migration that turned it on).
