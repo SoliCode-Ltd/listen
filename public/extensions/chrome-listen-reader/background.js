@@ -698,10 +698,12 @@ async function fetchAudioPacket(audioUrl) {
   };
 }
 
-// Texts this long are made after the reply, as the server does them
-// (listen.audio.force_async_chars): the extension checks on them instead of
-// waiting for the audio in the request.
-const LONG_TEXT_CHARS = 2500;
+// Only a text shorter than this is waited for in the request. Chrome may stop the
+// extension while one request takes over 30 seconds, and the voice would then be
+// charged with no audio, so from here the server is asked not to wait
+// (prefer_sync false) and the extension checks on the voice, as on a long text
+// (the server makes one after the reply from 2,500 characters anyway).
+const WAIT_IN_REQUEST_CHARS = 800;
 
 // How long to keep checking on a voice: a minute, and a second more for every
 // 40 characters of text, at most 15 minutes.
@@ -908,9 +910,9 @@ async function queueTextForPlayback(text, overrides = {}, runtimeContext = {}) {
     target_language: targetLanguage,
     source_type: 'message',
     translate: shouldTranslate,
-    // A shorter text is waited for in the request; a long one is made after the
+    // A short text is waited for in the request; a longer one is made after the
     // reply and checked on below, for as long as its length needs.
-    prefer_sync: Array.from(selectedText).length < LONG_TEXT_CHARS,
+    prefer_sync: Array.from(selectedText).length < WAIT_IN_REQUEST_CHARS,
   };
 
   const voiceKey = targetLanguage === selectedTargetLanguage ? selectedVoiceForTarget : '';

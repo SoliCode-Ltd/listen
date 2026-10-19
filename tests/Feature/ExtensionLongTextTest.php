@@ -5,20 +5,24 @@ namespace Tests\Feature;
 use Tests\TestCase;
 
 /**
- * The browser extension asks to wait for the audio only for a shorter text:
- * the server makes a long one after the reply (2,500 characters or more), and
+ * The browser extension asks to wait for the audio only for a short text
+ * (under 800 characters): the server makes a longer one after the reply, and
  * the extension checks on it for as long as its length needs, instead of
  * giving up after about 30 seconds and saying "try again", which charged twice.
  */
 class ExtensionLongTextTest extends TestCase
 {
-    public function test_only_a_shorter_text_asks_to_be_waited_for(): void
+    public function test_only_a_short_text_asks_to_be_waited_for(): void
     {
         $js = $this->background();
 
-        $this->assertStringContainsString('const LONG_TEXT_CHARS = '.(int) config('listen.audio.force_async_chars').';', $js, 'the server\'s own threshold');
-        $this->assertStringContainsString('prefer_sync: Array.from(selectedText).length < LONG_TEXT_CHARS,', $js);
+        // Below about 800 characters, well under the server's own threshold: Chrome may
+        // stop the extension while one request takes over 30 seconds.
+        $this->assertStringContainsString('const WAIT_IN_REQUEST_CHARS = 800;', $js);
+        $this->assertLessThan((int) config('listen.audio.force_async_chars'), 800);
+        $this->assertStringContainsString('prefer_sync: Array.from(selectedText).length < WAIT_IN_REQUEST_CHARS,', $js);
         $this->assertStringNotContainsString('prefer_sync: true', $js);
+        $this->assertStringNotContainsString('LONG_TEXT_CHARS', $js);
     }
 
     public function test_a_long_text_is_checked_on_for_as_long_as_its_length_needs(): void

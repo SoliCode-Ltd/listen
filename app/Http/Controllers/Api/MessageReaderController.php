@@ -219,8 +219,12 @@ class MessageReaderController extends Controller
         $runAsync = $processingMode === 'queue';
         // Otherwise a long text is made after the reply, whatever the extension asks (an
         // older one asks to wait for every text): no time limit of the web server cuts it
-        // short, and it needs no queue worker. The extension checks on it.
-        $afterResponse = ! $runAsync && GenerateAudioJob::runsAfterResponse($estimate['chars']);
+        // short, and it needs no queue worker. The extension checks on it. A shorter one
+        // is too when the extension asks not to wait (prefer_sync false), as Chrome may
+        // stop an extension while one request takes over 30 seconds.
+        $afterResponse = ! $runAsync && (
+            GenerateAudioJob::runsAfterResponse($estimate['chars']) || ! (bool) ($validated['prefer_sync'] ?? true)
+        );
         $initialStatus = $runAsync ? 'queued' : 'processing';
         $isDialogue = $dialogueEnabled
             && $requestedTier !== VoiceTier::STANDARD
