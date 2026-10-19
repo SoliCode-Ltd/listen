@@ -121,7 +121,10 @@ DB::table('audio_generations')
                 'id' => (int) $g->id,
                 'user' => (int) $g->user_id,
                 'seconds' => (int) $g->duration_seconds,
-                'estimate' => UsageEstimator::estimate($text)['seconds'],
+                // With the voice's tier, pace and settings (an older estimator ignores them).
+                'estimate' => UsageEstimator::estimate($text, (string) $g->voice_tier, $g->speed === null ? 1.0 : (float) $g->speed, [
+                    'performance_style' => $g->performance_style, 'emotion' => $g->emotion, 'dialect' => $g->dialect, 'style_prompt' => $g->style_prompt,
+                ])['seconds'],
                 'days' => (int) now()->diffInDays($g->created_at, true),
             ];
         }
