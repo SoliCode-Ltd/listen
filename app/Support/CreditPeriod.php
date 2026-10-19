@@ -21,9 +21,10 @@ use Illuminate\Support\Carbon;
  * Each period has a key, kept in usage_counters.period_ym (and in the gifts
  * and API key budgets): "2026-10" for a calendar month, "2026-10-14 08:37"
  * (UTC) for a period that follows a plan. Both start with the month, so
- * reports by month still group them. A plan period that had started before
- * the switch keeps the calendar-month counter it was already using, so the
- * switch gives nobody new credits.
+ * reports by month still group them. A credit month that had begun before
+ * the switch counts by calendar month until it ends, exactly as before the
+ * switch (a fresh count on the 1st), so the switch gives nobody new credits
+ * and takes none away; the plan's own dates start with the next one.
  */
 final class CreditPeriod
 {
@@ -55,8 +56,23 @@ final class CreditPeriod
         }
         [$start, $until] = self::creditMonth($began, $end, $at);
 
+        // Begun before the switch: the calendar month it is in, as before the
+        // switch, until this credit month ends. Its counter may hold the end of
+        // the previous paid period, which is why the 1st still starts a new one.
+        if ($start->lt($switchedAt)) {
+            $month = self::calendarMonth($at);
+
+            return [
+                'key' => $month['key'],
+                'starts_at' => $month['starts_at'],
+                'ends_at' => $month['ends_at']->lt($until) ? $month['ends_at'] : $until,
+                'follows_plan' => true,
+                'plan_ends_at' => $end,
+            ];
+        }
+
         return [
-            'key' => $start->lt($switchedAt) ? $switchedAt->format('Y-m') : $start->format('Y-m-d H:i'),
+            'key' => $start->format('Y-m-d H:i'),
             'starts_at' => $start,
             'ends_at' => $until,
             'follows_plan' => true,

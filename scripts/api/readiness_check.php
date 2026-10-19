@@ -123,7 +123,7 @@ if (! class_exists(CreditPeriod::class)) {
         $period = CreditPeriod::current((int) $subscription->user_id);
         $note = match (true) {
             ! $period['follows_plan'] => ' (calendar month)',
-            ! CreditPeriod::followsPlan($period['key']) => ' (began before the switch: keeps the count it had)',
+            ! CreditPeriod::followsPlan($period['key']) => ' (began before the switch: calendar months until it ends)',
             default => '',
         };
         $dates = $period['starts_at']->format('Y-m-d H:i').' to '.$period['ends_at']->format('Y-m-d H:i');
