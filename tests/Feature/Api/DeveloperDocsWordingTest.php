@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Api;
 
+use App\Support\Api\ApiCodeSamples;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -89,6 +90,17 @@ class DeveloperDocsWordingTest extends TestCase
         $voice = $this->premiumVoice();
         $this->speak($plain, $voice, ['text' => 'First of the month.'])->assertOk();
         $this->assertApiError($this->speak($plain, $voice, ['text' => 'Second of the month.']), 402, 'quota_exceeded', 'quota_error');
+    }
+
+    public function test_the_javascript_samples_say_to_save_them_as_an_es_module(): void
+    {
+        // They use top-level await (and import, when they save the audio): a plain .js file runs neither by default.
+        foreach ([ApiCodeSamples::all('GET', 'https://listen.example/v1/voices'), ApiCodeSamples::all('POST', 'https://listen.example/v1/text-to-speech/voice_1', ['text' => 'Hi'], 'speech.mp3')] as $samples) {
+            $this->assertStringStartsWith("// Node.js 20 or later (fetch is built in). Save it as a .mjs file: it is an ES module.\n", $samples['javascript']);
+            $this->assertStringContainsString('const response = await fetch(', $samples['javascript']);
+        }
+        $this->assertStringNotContainsString('Node.js 18', (string) $this->docs('en')->getContent());
+        $this->docs('en')->assertSee('Save it as a .mjs file: it is an ES module.');
     }
 
     public function test_mp3_is_always_accepted_but_may_come_back_as_wav(): void
