@@ -2,14 +2,11 @@ name: Tag variant experiment
 
 # Experiment on STAGING: which way of sending Arabic sound tags gets them
 # performed (see scripts/tts/tag_variant_experiment.php). Nothing is written.
+# It makes speech with Gemini, on the quota staging shares with live: run by
+# hand only, when the owner has said yes.
 
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/tag-variant-experiment.yml
-      - scripts/tts/tag_variant_experiment.php
 
 permissions:
   contents: read

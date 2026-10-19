@@ -5,13 +5,10 @@ name: Environment samples generate
 # one in its environment with the studio's engine, and commits the MP3s back
 # to this branch (only the missing ones). Owner-approved (homepage section request, 2026-10-15). The key is read over SSH, masked in the log and never stored.
 # Speech requests count against that key's quota, which staging shares with
-# live: run it only when the owner asks.
+# live: run it by hand (on the branch to commit to), only when the owner asks.
 
 on:
-  push:
-    branches: [claude/beautiful-sagan-df90b3]
-    paths:
-      - .github/workflows/environment-samples-generate.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -64,7 +61,7 @@ jobs:
           rm -f ~/.ssh/id_gen
           if [ -z "$KEY" ]; then echo "No GEMINI_TTS_API_KEY on staging"; exit 1; fi
           echo "::add-mask::$KEY"
-          echo "Using staging key 1: ${KEY:0:6}...${KEY: -4}"
+          echo "Using staging key 1 (ending ${KEY: -4})"
           php artisan tts:showcase --set=environments --generate --render --pause=20 --key="$KEY" 2>&1 | grep -v '^\*' | cut -c1-160 || echo "Some clips failed (see above); the ones made are still committed, and the next run makes only the missing ones."
 
       - name: Commit the clips

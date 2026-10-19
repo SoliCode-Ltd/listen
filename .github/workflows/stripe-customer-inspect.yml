@@ -2,6 +2,7 @@ name: Stripe customer inspect
 
 # Read-only: why a customer's payment failed and whether Stripe will retry.
 # Runs the app's own Stripe key on the chosen server (GET requests only).
+# Run by hand, naming the customer each time.
 
 on:
   workflow_dispatch:
@@ -13,11 +14,6 @@ on:
         type: choice
         options: [live, staging]
         default: live
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/stripe-customer-inspect.yml
-      - scripts/billing/stripe_customer_inspect.php
 
 permissions:
   contents: read
@@ -31,7 +27,7 @@ jobs:
       - name: Inspect over SSH
         env:
           TARGET: ${{ inputs.target || 'live' }}
-          CUSTOMER: ${{ inputs.customer || 'cus_VNPiD4ZfOINWsW' }}
+          CUSTOMER: ${{ inputs.customer }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}

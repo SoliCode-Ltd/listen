@@ -2,15 +2,12 @@ name: Sign-in samples inspect
 
 # Read-only: compares each sign-in page sample's stored text with what its
 # audio actually says (transcribed by Gemini) on STAGING. Nothing is written.
+# The transcriptions use the speech quota staging shares with live: run by
+# hand only, when the owner has said yes.
 # Same secrets as the other staging checks (STAGING_SSH_*).
 
 on:
   workflow_dispatch:
-  push:
-    branches: [claude/serene-albattani-ksbqof]
-    paths:
-      - .github/workflows/hero-samples-inspect.yml
-      - scripts/tts/hero_samples_inspect.php
 
 permissions:
   contents: read

@@ -3,8 +3,8 @@ name: Developer API smoke test
 # Makes TWO real voices on STAGING through the developer API, the way a
 # customer would: the docs' English sample while waiting for the file, and
 # the docs' Arabic sample in the background (made by the queue worker).
-# They use the speech quota staging shares with live: run it only when the
-# owner has said yes. It never runs on live.
+# They use the speech quota staging shares with live: run it by hand only,
+# when the owner has said yes. It never runs on live.
 #
 # Over SSH (scripts/api/staging_smoke_member.php) it sets up a test member
 # (staging-api-check@example.com: no Stripe customer, no email sent) on the
@@ -15,12 +15,6 @@ name: Developer API smoke test
 
 on:
   workflow_dispatch:
-  # Until this file is on main (manual runs need that), a change to it on the
-  # API branch runs it.
-  push:
-    branches: [main-vtswl7]
-    paths:
-      - .github/workflows/developer-api-smoke.yml
 
 permissions:
   contents: read

@@ -3,7 +3,8 @@
 /*
  * Read-only: the Gemini keys this server rotates between. For each key: its
  * name, whether Google accepts it (a free model-list call, no speech), and
- * whether it is marked out for today on the speech model. Keys are masked.
+ * whether it is marked out for today on the speech model. Each key shows only
+ * its last 4 characters.
  */
 
 use App\Services\Tts\GeminiKeyManager;
@@ -25,7 +26,7 @@ foreach ($manager->getAllKeys() as $k) {
     $r = Http::timeout(20)->withHeaders(['x-goog-api-key' => $k['key']])->get($base.'/models', ['pageSize' => 1]);
     $out['keys'][] = [
         'name' => $k['name'],
-        'masked' => substr($k['key'], 0, 6).'...'.substr($k['key'], -4),
+        'masked' => '...'.substr($k['key'], -4),
         'google_accepts' => $r->ok(),
         'status' => $r->status(),
         'out_for_today' => method_exists($manager, 'isOutForToday') ? $manager->isOutForToday($k['name'], $model) : 'n/a',
