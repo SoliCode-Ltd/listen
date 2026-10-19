@@ -324,7 +324,7 @@ class SeoHelper
                     'faq_title' => 'Frequently asked questions',
                     'faqs' => [
                         ['question' => 'What is AI text to speech used for?', 'answer' => 'Teams use AI text to speech to convert written content into spoken audio for products, marketing, support, and training.'],
-                        ['question' => 'Which languages does Listen speak?', 'answer' => 'Arabic, in Fusha and more than '.DialectCounts::arabic().' regional accents, and English in more than '.DialectCounts::english().' accents, from American and British to English with a Spanish, French or Arabic accent.'],
+                        ['question' => 'Which languages does Listen speak?', 'answer' => 'Arabic, in Fusha and '.DialectCounts::arabic().'+ regional accents, and English in more than '.DialectCounts::english().' accents, from American and British to English with a Spanish, French or Arabic accent.'],
                         ['question' => 'Can I test before I commit to a paid plan?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices in the demo before choosing a plan.'],
                         ['question' => 'Who is this page for?', 'answer' => 'It is ideal for creators, startups, product teams, agencies, and organizations that publish multilingual audio content.'],
                     ],
@@ -354,7 +354,7 @@ class SeoHelper
                     'faq_title' => 'الأسئلة الشائعة',
                     'faqs' => [
                         ['question' => 'في ماذا يُستخدم تحويل النص إلى صوت بالذكاء الاصطناعي؟', 'answer' => 'يُستخدم لتحويل المحتوى المكتوب إلى صوت في المنتجات، والتسويق، والدعم، والتدريب، وتجارب الوصول الرقمي.'],
-                        ['question' => 'ما اللغات التي تتحدث بها منصة إسمع؟', 'answer' => 'العربية بالفصحى وبأكثر من '.DialectCounts::arabic().' لكنة محلية، والإنجليزية بأكثر من '.DialectCounts::english().' لكنة، من الأمريكية والبريطانية إلى الإنجليزية بلكنة إسبانية أو فرنسية أو عربية.'],
+                        ['question' => 'ما اللغات التي تتحدث بها منصة إسمع؟', 'answer' => 'العربية بالفصحى وبـ'.DialectCounts::arabic().' لكنة محلية، والإنجليزية بأكثر من '.DialectCounts::english().' لكنة، من الأمريكية والبريطانية إلى الإنجليزية بلكنة إسبانية أو فرنسية أو عربية.'],
                         ['question' => 'هل يمكن التجربة قبل الاشتراك المدفوع؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات في العرض التجريبي قبل اختيار الباقة.'],
                         ['question' => 'لمن تناسب هذه الصفحة؟', 'answer' => 'تناسب صناع المحتوى، والشركات الناشئة، وفرق المنتجات، والجهات التعليمية، والفرق التي تعمل بلغتين.'],
                     ],
@@ -459,7 +459,7 @@ class SeoHelper
                 'ar' => [
                     'eyebrow' => 'تحويل النص العربي إلى صوت',
                     'h1' => 'تحويل النص العربي إلى كلام بصوت طبيعي وبكل اللهجات الرئيسية',
-                    'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى وأكثر من '.DialectCounts::arabic().' لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
+                    'intro' => 'اكتب أو الصق أي نص عربي، فصحى أو عامية، واحصل على صوت بشري طبيعي بنطق صحيح خلال ثوانٍ. منصة إسمع مبنية للعربية أولاً، وتدعم الفصحى و'.DialectCounts::arabic().' لكنة عربية من مصر والخليج والشام والعراق والمغرب العربي.',
                     'highlights_title' => 'لماذا منصة إسمع للنص العربي؟',
                     'highlights_intro' => 'لأن العربية ليست لغة إضافية عندنا، بل اللغة الأساسية.',
                     'highlights' => [
@@ -491,7 +491,7 @@ class SeoHelper
                 'en' => [
                     'eyebrow' => 'Text to Speech Online',
                     'h1' => 'Text to Speech Online with Natural Arabic and English Voices',
-                    'intro' => 'Paste any text, choose a voice, and get natural-sounding speech in seconds. Listen reads English and Arabic, including Fusha and more than '.DialectCounts::arabic().' Arabic accents and more than '.DialectCounts::english().' English accents, and gives you an MP3 you can download and use.',
+                    'intro' => 'Paste any text, choose a voice, and get natural-sounding speech in seconds. Listen reads English and Arabic, including Fusha and '.DialectCounts::arabic().'+ Arabic accents and more than '.DialectCounts::english().' English accents, and gives you an MP3 you can download and use.',
                     'highlights_title' => 'Why use Listen for text to speech',
                     'highlights_intro' => 'Human-sounding voices without the robotic tone.',
                     'highlights' => [
@@ -521,7 +521,7 @@ class SeoHelper
                 'ar' => [
                     'eyebrow' => 'تحويل النص إلى كلام',
                     'h1' => 'تحويل النص إلى كلام أونلاين بصوت عربي وإنجليزي طبيعي',
-                    'intro' => 'الصق أي نص، اختر الصوت، واحصل على كلام طبيعي خلال ثوانٍ. منصة إسمع تقرأ العربية والإنجليزية، بالفصحى وبأكثر من '.DialectCounts::arabic().' لكنة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، وتعطيك ملف MP3 جاهزاً للتحميل والاستخدام.',
+                    'intro' => 'الصق أي نص، اختر الصوت، واحصل على كلام طبيعي خلال ثوانٍ. منصة إسمع تقرأ العربية والإنجليزية، بالفصحى وبـ'.DialectCounts::arabic().' لكنة عربية وأكثر من '.DialectCounts::english().' لكنة إنجليزية، وتعطيك ملف MP3 جاهزاً للتحميل والاستخدام.',
                     'highlights_title' => 'لماذا منصة إسمع لتحويل الكتابة إلى صوت',
                     'highlights_intro' => 'أصوات تشبه البشر، بلا نبرة آلية.',
                     'highlights' => [
@@ -1281,7 +1281,7 @@ class SeoHelper
             'description' => self::siteDescription($locale),
             'inLanguage' => ['ar', 'en'],
             'featureList' => $locale === 'ar'
-                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى وأكثر من '.DialectCounts::arabic().' لكنة عربية', 'أكثر من '.DialectCounts::english().' لكنة إنجليزية', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'بيئات صوتية مثل القاعة والهاتف والراديو', 'ترجمة قبل التحويل إلى صوت', 'إضافة لمتصفح كروم']
+                ? ['تحويل النص إلى صوت بالعربية والإنجليزية', 'العربية الفصحى و'.DialectCounts::arabic().' لكنة عربية', 'أكثر من '.DialectCounts::english().' لكنة إنجليزية', 'أصوات عالية الدقة مع التحكم في المشاعر والأداء', 'بيئات صوتية مثل القاعة والهاتف والراديو', 'ترجمة قبل التحويل إلى صوت', 'إضافة لمتصفح كروم']
                 : ['Arabic and English text to speech', 'Modern Standard Arabic and '.DialectCounts::arabic().'+ Arabic accents', ''.DialectCounts::english().'+ English accents', 'HD voices with emotion and performance control', 'Sound environments such as hall, phone and radio', 'Translate before speech', 'Chrome extension'],
             'publisher' => ['@id' => $organizationId],
         ];

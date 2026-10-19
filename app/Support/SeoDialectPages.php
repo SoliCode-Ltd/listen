@@ -143,7 +143,7 @@ final class SeoDialectPages
                 'label' => 'Arabic Dialects',
                 'title' => 'Arabic Dialects Text to Speech',
                 'title_key' => 'ui.seo.arabic_dialects_title',
-                'description' => 'AI text to speech in Fusha and more than '.DialectCounts::arabic().' Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
+                'description' => 'AI text to speech in Fusha and '.DialectCounts::arabic().'+ Arabic accents from the Gulf, the Levant, Egypt, Sudan, Iraq, Yemen and the Maghreb.',
                 'description_key' => 'ui.seo.arabic_dialects_description',
                 'robots' => $robots,
                 'path' => '/arabic-dialects',

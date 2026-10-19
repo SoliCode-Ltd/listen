@@ -4,7 +4,7 @@ namespace App\Support;
 
 /**
  * The numbers the site quotes: spoken Arabic dialects (Fusha and its styles are
- * named apart, as "Fusha and more than N Arabic accents") and English accents,
+ * named apart, as "Fusha and 140+ Arabic accents") and English accents,
  * rounded down to the ten ("140+") so the claim stays true as more are added.
  * The language files quote them as plain numbers; DialectCountsTest keeps those equal.
  */

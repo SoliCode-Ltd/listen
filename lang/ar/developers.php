@@ -101,7 +101,7 @@ return [
 
     'docs' => [
         'seo_title' => 'واجهة برمجية لتحويل النص إلى كلام بالعربية والإنجليزية',
-        'seo_description' => 'واجهة إسمع البرمجية لتحويل النص إلى كلام: أكثر من 140 لهجة عربية ولكنات إنجليزية وأساليب إلقاء ومشاعر، تُحتسب من أرصدة باقتك دون أي رسوم إضافية.',
+        'seo_description' => 'واجهة إسمع البرمجية لتحويل النص إلى كلام: 140 لهجة عربية ولكنات إنجليزية وأساليب إلقاء ومشاعر، تُحتسب من أرصدة باقتك دون أي رسوم إضافية.',
 
         'title' => 'واجهة إسمع البرمجية',
         'subtitle' => 'كلام عربي وإنجليزي طبيعي لتطبيقاتك ومساعديك. أصوات الاستوديو، و:options، في طلب واحد.',
@@ -142,7 +142,7 @@ return [
         // Lists joined into sentences (ApiDocs::listed). An item keyed by a
         // feature shows only while some plan includes that feature.
         'lists' => [
-            'subtitle' => ['أكثر من 140 لهجة عربية', 'لكنات إنجليزية', 'مشاعر', 'sound_environments' => 'بيئات صوتية'],
+            'subtitle' => ['140 لهجة عربية', 'لكنات إنجليزية', 'مشاعر', 'sound_environments' => 'بيئات صوتية'],
             'intro_features' => ['sound_environments' => 'البيئات الصوتية', 'dialogue' => 'الحوار بعدة أصوات'],
             'plan_features' => ['custom_direction' => 'التوجيه المخصص (`style_prompt`)', 'sound_environments' => 'البيئات الصوتية (`audio_effect`)', 'dialogue' => 'الحوار (`dialogue`)', 'cloned_voices' => 'الأصوات المستنسخة', 'بعض صيغ الصوت'],
             'options_fields' => ['`dialect`', '`style`', '`emotion`', 'sound_environments' => '`audio_effect`'],
