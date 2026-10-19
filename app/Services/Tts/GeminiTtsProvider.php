@@ -459,14 +459,14 @@ class GeminiTtsProvider implements TtsProviderInterface
      * Get an available API key via GeminiKeyManager.
      *
      * @return array{key: string, name: string, index: int}
-     * @throws \RuntimeException if no keys available
+     * @throws GeminiKeysOutException if no keys available
      */
     private function getAvailableKey(): array
     {
         $keyInfo = $this->getKeyManager()->getAvailableKey($this->currentModel)
             ?? ($this->getKeyManager()->keysInOrder($this->currentModel)[0] ?? null);
         if ($keyInfo === null) {
-            throw new \RuntimeException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
+            throw new GeminiKeysOutException('All Gemini API keys exhausted. Please add more keys or wait for rate limits to reset.');
         }
         $this->currentKeyInfo = $keyInfo;
         return $keyInfo;
@@ -753,16 +753,17 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * A piece came back with its key's limit (429) or with the key refused: the
-     * key is set aside (for the minute, or for the day after a daily quota or a
-     * refusal) and the next request goes to another key, when there is one.
-     * False for any other error.
+     * key is set aside (for the minute, for the day after a daily quota or a
+     * refusal, or for an hour after its spending cap) and the next request goes
+     * to another key, when there is one. False for any other error.
      */
     private function setKeyAside(Response $response, array $keyInfo, string $endpoint): bool
     {
         $status = $response->status();
         $body = (string) $response->body();
         $badKey = GeminiKeyManager::isKeyProblem($status, $body);
-        if ($status !== 429 && ! $badKey) {
+        $spendingCap = GeminiKeyManager::isSpendingCapError($status, $body);
+        if ($status !== 429 && ! $badKey && ! $spendingCap) {
             return false;
         }
 
@@ -771,6 +772,9 @@ class GeminiTtsProvider implements TtsProviderInterface
                 $keyInfo['name'],
                 GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
             );
+        }
+        if ($spendingCap) {
+            $this->getKeyManager()->markOutForSpendingCap($keyInfo['name']);
         }
 
         // Once for the batch: its other pieces went on the same key.
@@ -1374,6 +1378,9 @@ class GeminiTtsProvider implements TtsProviderInterface
         $maxAttempts = count($this->getKeyManager()->getAllKeys());
         $attempts = 0;
         $tried = [];
+        // Keys that answered with a limit that outlasts the minute: the day's
+        // quota, the spending cap, or a refusal of the key itself.
+        $keysOut = 0;
 
         while ($attempts < $maxAttempts) {
             // Get current available key (already set in synthesize, or get a new one)
@@ -1407,11 +1414,18 @@ class GeminiTtsProvider implements TtsProviderInterface
             }
 
             // A used-up daily quota stays skipped until Google resets it.
-            if (GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body())) {
+            $dailyQuota = GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body());
+            if ($dailyQuota) {
                 $this->getKeyManager()->markOutForToday(
                     $keyInfo['name'],
                     GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
                 );
+            }
+
+            // A spending cap stops every model on the key, and not for a minute.
+            $spendingCap = GeminiKeyManager::isSpendingCapError($response->status(), (string) $response->body());
+            if ($spendingCap) {
+                $this->getKeyManager()->markOutForSpendingCap($keyInfo['name']);
             }
 
             // A key Google refuses (invalid, expired, blocked) is set aside for
@@ -1428,9 +1442,12 @@ class GeminiTtsProvider implements TtsProviderInterface
                     GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
                 );
             }
+            if ($dailyQuota || $spendingCap || $badKey) {
+                $keysOut++;
+            }
 
-            // On 429 or a refused key, rotate to next key and retry
-            if (($response->status() === 429 || $badKey) && $attempts < $maxAttempts) {
+            // On 429, a spending cap or a refused key, rotate to next key and retry
+            if (($response->status() === 429 || $spendingCap || $badKey) && $attempts < $maxAttempts) {
                 Log::warning('Gemini TTS key hit 429, rotating to next key.', [
                     'key' => $keyInfo['name'],
                     'attempts' => $attempts,
@@ -1441,6 +1458,12 @@ class GeminiTtsProvider implements TtsProviderInterface
                     break; // No more keys available
                 }
                 continue;
+            }
+
+            // Every key answered with a limit that lasts: the member is told the
+            // limit is ours, not that the voices are busy for a minute.
+            if ($keysOut === $maxAttempts) {
+                throw new GeminiKeysOutException('Every Gemini TTS API key is out (HTTP ' . $response->status() . '): ' . mb_substr($response->body(), 0, 200));
             }
 
             if ($response->serverError()) {
@@ -1469,7 +1492,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             return $json;
         }
 
-        // All keys exhausted
+        // All keys exhausted: for the minute, or for longer when each one tried was out.
+        if ($keysOut > 0 && $keysOut === $attempts) {
+            throw new GeminiKeysOutException('Every Gemini TTS API key is out (their daily quota, spending cap or a refused key).');
+        }
         throw new \RuntimeException('All Gemini TTS API keys exhausted (429 rate limit). Add more keys or wait for limits to reset.');
     }
 
@@ -1480,7 +1506,7 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $blockReason = $response['promptFeedback']['blockReason'] ?? null;
         if (is_string($blockReason) && $blockReason !== '') {
-            throw new \RuntimeException('Gemini TTS blocked the prompt: ' . $blockReason);
+            throw new GeminiTextRefusedException('Gemini TTS blocked the prompt: ' . $blockReason);
         }
 
         $candidates = $response['candidates'] ?? [];
@@ -1490,7 +1516,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $finishReason = (string) ($candidates[0]['finishReason'] ?? '');
         if (in_array($finishReason, ['SAFETY', 'PROHIBITED_CONTENT', 'BLOCKLIST', 'SPII'], true)) {
-            throw new \RuntimeException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
+            throw new GeminiTextRefusedException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
         }
 
         // Stopped at the output limit: the audio ends mid-sentence. It is asked

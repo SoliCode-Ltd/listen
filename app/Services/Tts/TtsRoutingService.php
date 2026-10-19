@@ -97,11 +97,14 @@ class TtsRoutingService
     /**
      * An HD request, made by Gemini or not at all: when Gemini is not set up or
      * fails, this throws, so the generation fails and its credits are given back.
+     * The exception says whether the failure may pass within the minute, is a
+     * limit on our side that lasts, or is the text itself, so the member is
+     * told which.
      */
     private function synthesizePremium(string $text, string $targetLanguage, array $voiceConfig, ?int $userId): array
     {
         if (! $this->geminiProvider->isAvailable()) {
-            throw new PremiumVoiceUnavailableException('The premium voice engine is not set up (no Gemini API key).');
+            throw new PremiumVoiceUnavailableException('The premium voice engine is not set up (no Gemini API key).', 0, null, PremiumVoiceUnavailableException::OUR_LIMIT);
         }
 
         try {
@@ -116,8 +119,23 @@ class TtsRoutingService
                 'Premium voice failed: '.mb_substr((string) preg_replace('/\s+/u', ' ', $e->getMessage()), 0, 490),
                 0,
                 $e,
+                $this->failureReason($e),
             );
         }
+    }
+
+    /**
+     * The site's daily ceiling, or every key out (the day's quota, the spending
+     * cap, refused keys), lasts; text the engine refused fails again as it is;
+     * anything else may pass within the minute.
+     */
+    private function failureReason(\Throwable $e): string
+    {
+        return match (true) {
+            $e instanceof GeminiTextRefusedException => PremiumVoiceUnavailableException::TEXT_REFUSED,
+            $e instanceof TtsCostLimitException, $e instanceof GeminiKeysOutException => PremiumVoiceUnavailableException::OUR_LIMIT,
+            default => PremiumVoiceUnavailableException::BUSY,
+        };
     }
 
     /**

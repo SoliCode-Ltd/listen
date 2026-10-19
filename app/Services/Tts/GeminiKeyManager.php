@@ -30,6 +30,16 @@ class GeminiKeyManager
     private const CACHE_TTL_DAY = 86400; // 24 hours
     private const CACHE_TTL_MINUTE = 60;
 
+    /** A key stopped by its project's spending cap is set aside this long, then tried again. */
+    private const CACHE_TTL_SPENDING_CAP = 3600;
+
+    /**
+     * What Google says when a project's spending cap or prepaid credits stop
+     * it. Not "billing" alone: every ordinary 429 asks to "check your plan and
+     * billing details".
+     */
+    private const SPENDING_CAP_PATTERN = '/spend(?:ing)?[ _-]?(?:cap|limit)|prepa(?:id|yment)|credits? (?:are |is |have been )?(?:depleted|exhausted|used up)|billing account/i';
+
     /**
      * Get all configured API keys dynamically from .env.
      * Supports unlimited keys with pattern GEMINI_TTS_API_KEY_N.
@@ -220,9 +230,32 @@ class GeminiKeyManager
         ]);
     }
 
+    /**
+     * Out on this model for the day, or out on every model for a while after
+     * its project's spending cap stopped it.
+     */
     public function isOutForToday(string $keyName, string $model): bool
     {
-        return (bool) Cache::get($this->outKey($keyName, $model), false);
+        return (bool) Cache::get($this->outKey($keyName, $model), false)
+            || (bool) Cache::get($this->spendingCapKey($keyName), false);
+    }
+
+    /**
+     * Google stopped this key for its project's spending cap (or used-up
+     * prepaid credits). That lasts until someone raises the cap or the month
+     * turns, and it stops every model on the key, so the key is set aside on
+     * all of them for an hour instead of the minute a rate limit gets. Like a
+     * key out for the day, stock voices still try it last when no key has
+     * room, so they come back as soon as the cap is raised; cloned voices skip
+     * it until the hour is over.
+     */
+    public function markOutForSpendingCap(string $keyName): void
+    {
+        Cache::put($this->spendingCapKey($keyName), true, self::CACHE_TTL_SPENDING_CAP);
+
+        Log::warning('Gemini key stopped by its spending cap; using the other keys and trying it again in an hour.', [
+            'key' => $keyName,
+        ]);
     }
 
     /**
@@ -231,6 +264,20 @@ class GeminiKeyManager
     public static function isDailyQuotaError(int $status, string $body): bool
     {
         return $status === 429 && (bool) preg_match('/per ?day|PerDay|daily/i', $body);
+    }
+
+    /**
+     * A reply that means the key's project hit its spending cap or ran out of
+     * prepaid credits (a 429, or a 403): not the per-minute rate limit.
+     */
+    public static function isSpendingCapError(int $status, string $body): bool
+    {
+        return in_array($status, [403, 429], true) && self::mentionsSpendingCap($body);
+    }
+
+    public static function mentionsSpendingCap(string $text): bool
+    {
+        return (bool) preg_match(self::SPENDING_CAP_PATTERN, $text);
     }
 
     /**
@@ -254,6 +301,11 @@ class GeminiKeyManager
     private function outKey(string $keyName, string $model): string
     {
         return self::CACHE_PREFIX."_dayout_{$model}_{$keyName}";
+    }
+
+    private function spendingCapKey(string $keyName): string
+    {
+        return self::CACHE_PREFIX."_capout_{$keyName}";
     }
 
     /**

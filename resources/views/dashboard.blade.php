@@ -3002,7 +3002,7 @@
                     <h3 class="vc-card-name">{{ $voice->name }}</h3>
                     <span class="vc-status {{ $voice->status }}" role="status">
                       @if($voice->isProcessing())<span class="dot"></span>@endif
-                      {{ __('ui.voice_cloning.status_' . $voice->status) }}
+                      {{ \App\Services\VoiceCloningService::statusLabel($voice) }}
                     </span>
                   </div>
                   <div class="vc-card-meta">
@@ -3029,7 +3029,7 @@
                       <div class="vc-progress-fill" data-vc-progress-fill style="width: {{ $vcInitialProgress }}%"></div>
                     </div>
                     <div class="vc-progress-meta">
-                      <span data-vc-progress-status>{{ __('ui.voice_cloning.status_' . $voice->status) }}</span>
+                      <span data-vc-progress-status>{{ \App\Services\VoiceCloningService::statusLabel($voice) }}</span>
                       <span data-vc-progress-percent>{{ $vcInitialProgress }}%</span>
                     </div>
                     <div class="vc-progress-delay" data-vc-progress-delay></div>
@@ -5406,7 +5406,8 @@
         const isDelayed = Boolean(payload.is_delayed || (['pending', 'validating', 'processing'].includes(status) && elapsedSeconds >= 90));
 
         const statusBadge = card.querySelector('.vc-status');
-        const statusText = statusLabels[status] || status.toUpperCase();
+        // The server's label: a failure on our side is not called a bad take.
+        const statusText = String(payload.status_label || statusLabels[status] || status.toUpperCase());
         // Rewritten only when the status changes, so screen readers hear it once, not on every check.
         if (statusBadge && (statusBadge.textContent.trim() !== statusText || !statusBadge.classList.contains(status))) {
           statusBadge.className = `vc-status ${status}`;
@@ -5487,7 +5488,7 @@
         const languageCode = String(voice?.language_code || 'ar-XA');
         const languageLabel = languageLabels[languageCode] || languageCode;
         const name = escapeHtml(String(voice?.name || `Voice ${voiceId}`));
-        const statusLabel = escapeHtml(statusLabels[status] || status.toUpperCase());
+        const statusLabel = escapeHtml(String(voice?.status_label || statusLabels[status] || status.toUpperCase()));
         const metaLabel = `${escapeHtml(languageLabel)} &middot; ${escapeHtml(sourceLabel)}`;
 
         return `

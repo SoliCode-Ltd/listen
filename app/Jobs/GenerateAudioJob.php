@@ -16,6 +16,7 @@ use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\PlanAccessService;
 use App\Services\TranslationService;
+use App\Services\Tts\GeminiKeysOutException;
 use App\Services\Tts\PremiumVoiceUnavailableException;
 use App\Services\TtsService;
 use App\Services\VoiceCloningService;
@@ -393,22 +394,34 @@ class GenerateAudioJob implements ShouldQueue
     /**
      * What the member is told, kept in English as the developer API shows it
      * (the studio and the extension show it in the member's language, with
-     * GenerationMessage). A cloned voice has no other engine to fall back on,
-     * so a used-up daily limit is said plainly.
+     * GenerationMessage). Only a passing overload promises a minute: a limit
+     * on our side that lasts (the spending cap, every key out for the day, the
+     * site's daily ceiling) is said plainly, with no wait promised, and text the
+     * engine will not read asks for other wording.
      */
     private function failureMessage(AudioGeneration $generation, \Throwable $e): string
     {
         if ($e instanceof TranslationFailedException) {
             return $e->getMessage();
         }
-        if (str_starts_with((string) $generation->voice_name, 'cloned_')
-            && preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
-            return GenerationMessage::stored('ui.backend.cloned_voice_daily_limit');
+        // A cloned voice has no other engine to fall back on.
+        if (str_starts_with((string) $generation->voice_name, 'cloned_')) {
+            if ($e instanceof GeminiKeysOutException) {
+                return GenerationMessage::stored('ui.backend.cloned_voices_our_limit');
+            }
+            if (preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b/i', $e->getMessage())) {
+                return GenerationMessage::stored('ui.backend.premium_voices_busy');
+            }
         }
-        // An HD voice is never swapped for a standard one: when the premium engine
-        // is busy or down, the member is told so (and nothing is charged).
+        // An HD voice is never swapped for a standard one: the member is told
+        // whether the premium engine is busy, held back by a limit on our side,
+        // or would not read the text (and that nothing is charged).
         if ($e instanceof PremiumVoiceUnavailableException) {
-            return GenerationMessage::stored('ui.backend.premium_voices_busy');
+            return GenerationMessage::stored(match ($e->reason) {
+                PremiumVoiceUnavailableException::OUR_LIMIT => 'ui.backend.premium_voices_our_limit',
+                PremiumVoiceUnavailableException::TEXT_REFUSED => 'ui.backend.premium_text_refused',
+                default => 'ui.backend.premium_voices_busy',
+            });
         }
 
         return GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again');
