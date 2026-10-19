@@ -371,6 +371,14 @@
     "message": "تم توليد الصوت في اللوحة الجانبية.",
     "description": "Status after generation"
   },
+  "statusReady": {
+    "message": "صوتك جاهز.",
+    "description": "Status after generation with the side panel off"
+  },
+  "openPlayer": {
+    "message": "شغّله في تبويب جديد",
+    "description": "Opens the voice in the extension's own player"
+  },
   "statusNoText": {
     "message": "أدخل النص السريع أولاً.",
     "description": "Status when no quick text"

@@ -291,6 +291,16 @@ textarea[dir="auto"] {
   border-color: rgba(217, 83, 79, 0.4);
 }
 
+/* A voice made with the side panel off */
+.player-link {
+  text-align: center;
+  text-decoration: none;
+}
+
+.player-link[hidden] {
+  display: none;
+}
+
 /* ===== CHARACTER COUNTER ===== */
 .char-counter {
   display: flex;

@@ -371,6 +371,14 @@
     "message": "Voice generated in side panel.",
     "description": "Status after generation"
   },
+  "statusReady": {
+    "message": "Your voice is ready.",
+    "description": "Status after generation with the side panel off"
+  },
+  "openPlayer": {
+    "message": "Play it in a new tab",
+    "description": "Opens the voice in the extension's own player"
+  },
   "statusNoText": {
     "message": "Enter quick text first.",
     "description": "Status when no quick text"
