@@ -1520,7 +1520,7 @@ return [
         'auth_google_disabled' => 'Google sign-in is currently disabled.',
         'auth_phone_disabled' => 'Phone authentication is currently disabled.',
         'auth_phone_verification_failed' => 'Unable to verify phone sign-in. Please try again.',
-        'auth_firebase_google_disabled' => 'Google sign-in (Firebase) is currently disabled.',
+        'auth_firebase_google_disabled' => 'Google sign-in is currently disabled.',
         'auth_firebase_google_failed' => 'Unable to verify Google sign-in. Please try again.',
         'demo_setup_validated' => 'Setup validated.',
         'demo_translate_note_before' => 'Text will be translated before speaking.',

@@ -5868,7 +5868,7 @@
 
       // The voice service wants 24 kHz mono 16-bit WAV. Converting here means the server
       // never needs ffmpeg or exec(), which many hosts disable.
-      async function toGeminiWav(blob) {
+      async function toCloningWav(blob) {
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         const OfflineCtx = window.OfflineAudioContext || window.webkitOfflineAudioContext;
         if (!blob || !AudioCtx || !OfflineCtx) return blob;
@@ -6216,7 +6216,7 @@
               consentOnly.set('consent_confirmed', '1');
               consentOnly.set('consent_duration', String(consentDuration));
               consentOnly.set('consent_language', document.getElementById('vcConsentLanguage')?.value || 'ar-XA');
-              const consentWav = await toGeminiWav(consentBlob || consentFileInput?.files?.[0]);
+              const consentWav = await toCloningWav(consentBlob || consentFileInput?.files?.[0]);
               consentOnly.set('consent_audio', consentWav, wavName('consent', consentWav));
               const response = await fetch(CONSENT_URL_TEMPLATE.replace('__VOICE_ID__', encodeURIComponent(voiceId)), {
                 method: 'POST',
@@ -6252,12 +6252,12 @@
               ? recordedBlob
               : (document.getElementById('vcFileInput')?.files?.[0] || null);
             if (sampleSource) {
-              const sampleWav = await toGeminiWav(sampleSource);
+              const sampleWav = await toCloningWav(sampleSource);
               formData.set('audio_file', sampleWav, wavName('sample', sampleWav));
             }
             const consentSource = consentBlob || consentFileInput?.files?.[0] || null;
             if (consentSource) {
-              const consentWav = await toGeminiWav(consentSource);
+              const consentWav = await toCloningWav(consentSource);
               formData.set('consent_audio', consentWav, wavName('consent', consentWav));
             }
 

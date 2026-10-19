@@ -955,7 +955,7 @@
       });
     }
 
-    function findPreferredArabicGeminiVoiceKey(voices, language, tier) {
+    function findPreferredArabicHdVoiceKey(voices, language, tier) {
       if (normalizeLanguage(language) !== 'ar' || normalizeTier(tier) !== 'hd') return '';
       const preferredLabels = ['fahad', 'fahd', 'فهد'];
       const match = (Array.isArray(voices) ? voices : []).find((voice) => {
@@ -978,8 +978,8 @@
         || fallbackDefaultVoiceKeyByLanguage?.[voiceLanguageOf(lang)]
         || ''
       ).trim();
-      const preferredArabicGeminiVoiceKey = findPreferredArabicGeminiVoiceKey(voices, lang, tier);
-      const current = String(remembered || defaultVoiceKey || preferredArabicGeminiVoiceKey || '').trim();
+      const preferredArabicHdVoiceKey = findPreferredArabicHdVoiceKey(voices, lang, tier);
+      const current = String(remembered || defaultVoiceKey || preferredArabicHdVoiceKey || '').trim();
       voiceSelect.innerHTML = '';
       if (!voices.length) { voiceSelect.innerHTML = '<option value="">' + i18n.no_speakers + '</option>'; preferredVoiceKeyByLanguageAndTier[preferenceBucket] = ''; return; }
       for (const voice of voices) { const option = document.createElement('option'); option.value = voice.key; option.textContent = voiceDisplayLabel(voice); option.dataset.avatar = voice.avatar || ''; voiceSelect.appendChild(option); }
