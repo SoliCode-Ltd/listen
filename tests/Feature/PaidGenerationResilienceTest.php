@@ -73,6 +73,20 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame(2, $calls->gemini);
     }
 
+    public function test_a_reply_cut_off_at_the_output_limit_is_asked_for_again_not_delivered(): void
+    {
+        $cutOff = Http::response(['candidates' => [[
+            'finishReason' => 'MAX_TOKENS',
+            'content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/l16', 'data' => base64_encode(pack('v*', 0, 600, -600, 0))]]]],
+        ]]]);
+        $calls = $this->fakeGemini([$cutOff, $this->geminiAudio()]);
+
+        $result = app(TtsService::class)->synthesizeAdvanced('Hello there', 'en', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertSame('gemini', $result['provider']);
+        $this->assertSame(2, $calls->gemini, 'the cut-off take was not kept');
+    }
+
     public function test_slow_reply_without_audio_fails_without_retrying(): void
     {
         config(['services.gemini_tts.retry_budget_seconds' => 0]);

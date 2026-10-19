@@ -1300,6 +1300,12 @@ class GeminiTtsProvider implements TtsProviderInterface
             throw new \RuntimeException('Gemini TTS refused the text (finishReason ' . $finishReason . ').');
         }
 
+        // Stopped at the output limit: the audio ends mid-sentence. It is asked
+        // for again rather than delivered (and charged) as if it were complete.
+        if ($finishReason === 'MAX_TOKENS') {
+            throw new TransientGeminiException('Gemini TTS stopped at its output limit (finishReason MAX_TOKENS).');
+        }
+
         $parts = $candidates[0]['content']['parts'] ?? [];
         if (!is_array($parts)) {
             throw new TransientGeminiException('Gemini TTS response contains no parts (finishReason ' . ($finishReason ?: 'none') . ').');
