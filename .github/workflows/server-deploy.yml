@@ -298,7 +298,9 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = php-limits ]; then
-            $S "$FIND; bash -s" < scripts/support/php_limits.sh
+            # From the commit this run was started from: live checks out main, which may not have it yet.
+            git fetch -q --depth=1 origin "$GITHUB_SHA"
+            git show "$GITHUB_SHA:scripts/support/php_limits.sh" | $S "$FIND; bash -s"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
