@@ -25,7 +25,7 @@ use Tests\TestCase;
  * - Auto-blocking users who exceed max accounts per device (browser cookie)
  * - Admin protection (admins never auto-blocked)
  * - Configurable limit via site settings
- * - VPN bypass detection (current request IP cross-check)
+ * - VPN bypass detection (the same browser cookie)
  * - All auth methods covered (email, Google OAuth, Firebase Google, phone)
  */
 class MultiAccountEnforcementTest extends TestCase
@@ -322,19 +322,21 @@ class MultiAccountEnforcementTest extends TestCase
     }
 
     // ──────────────────────────────────────────────────────────────────
-    //  5.  VPN bypass: current request IP catches linked accounts
+    //  5.  VPN bypass: the same browser catches linked accounts
+    //      (the request IP alone no longer links: strangers share it)
     // ──────────────────────────────────────────────────────────────────
 
-    public function test_vpn_user_demo_quota_includes_accounts_sharing_request_ip(): void
+    public function test_vpn_user_demo_quota_includes_accounts_on_the_same_browser(): void
     {
         $this->seedVoice();
         $homeIp = '10.20.30.40';
         $vpnIp = '99.99.99.99';
 
-        // User A registered from home IP, used 260 chars
+        // User A registered from home IP on this browser, used 260 chars
         $userA = User::factory()->create([
             'registration_ip' => $homeIp,
             'last_login_ip' => $homeIp,
+            'registration_device_id' => self::SHARED_DEVICE,
         ]);
         $this->storeDemoUsage($userA, 260);
 
@@ -346,10 +348,11 @@ class MultiAccountEnforcementTest extends TestCase
 
         Cache::flush();
 
-        // User B now turns off VPN and uses demo from home IP (same as user A's registration_ip)
-        // The requestIpLinkedUserIds should catch this
+        // User B now turns off VPN and uses the demo from home, in the same browser
         $response = $this->actingAs($userB)
             ->withServerVariables(['REMOTE_ADDR' => $homeIp])
+            ->withCredentials()
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('demo.quota', []);
 
         $response->assertOk();
@@ -358,7 +361,7 @@ class MultiAccountEnforcementTest extends TestCase
         $response->assertJsonPath('quota.remaining_chars', 40);
     }
 
-    public function test_vpn_user_blocked_when_demo_limit_exceeded_via_request_ip(): void
+    public function test_vpn_user_blocked_when_demo_limit_exceeded_on_the_same_browser(): void
     {
         $voice = $this->seedVoice();
         $homeIp = '10.20.30.50';
@@ -367,6 +370,7 @@ class MultiAccountEnforcementTest extends TestCase
         $userA = User::factory()->create([
             'registration_ip' => $homeIp,
             'last_login_ip' => $homeIp,
+            'registration_device_id' => self::SHARED_DEVICE,
         ]);
         $this->storeDemoUsage($userA, 280);
 
@@ -377,9 +381,11 @@ class MultiAccountEnforcementTest extends TestCase
 
         Cache::flush();
 
-        // User B tries to use demo from home IP — should be denied
+        // User B tries to use demo from home, in the same browser — should be denied
         $response = $this->actingAs($userB)
             ->withServerVariables(['REMOTE_ADDR' => $homeIp])
+            ->withCredentials()
+            ->withCookies(['listen_demo_device' => self::SHARED_DEVICE])
             ->postJsonLocalizedRoute('demo.run', [
                 'text' => str_repeat('x', 30), // 280+30 > 300
                 'target_language' => 'en',

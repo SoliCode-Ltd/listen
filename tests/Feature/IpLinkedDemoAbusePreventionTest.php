@@ -193,8 +193,10 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $response->assertJsonValidationErrors('text');
     }
 
-    public function test_two_accounts_same_login_ip_share_demo_quota(): void
+    public function test_two_accounts_that_only_signed_in_from_one_ip_keep_their_own_quota(): void
     {
+        // Sign-in addresses are shared by strangers (mobile networks, campuses,
+        // offices), so they no longer link accounts; the sign-up address does.
         $voice = $this->seedVoice();
         $sharedIp = '192.168.1.200';
 
@@ -206,17 +208,17 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         Cache::flush();
 
         $response = $this->actingAs($userB)->postJsonLocalizedRoute('demo.run', [
-            'text' => str_repeat('b', 30), // 280+30 > 300
+            'text' => str_repeat('b', 30),
             'target_language' => 'en',
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('text');
+        $response->assertOk();
+        $response->assertJsonPath('quota.used_chars', 0);
     }
 
-    public function test_registration_ip_of_one_matches_login_ip_of_another_shares_quota(): void
+    public function test_signing_in_from_another_accounts_sign_up_ip_does_not_share_quota(): void
     {
         $voice = $this->seedVoice();
         $sharedIp = '172.16.0.50';
@@ -229,17 +231,17 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         Cache::flush();
 
         $response = $this->actingAs($userB)->postJsonLocalizedRoute('demo.run', [
-            'text' => str_repeat('c', 40), // 270+40 > 300
+            'text' => str_repeat('c', 40),
             'target_language' => 'en',
             'voice_tier' => 'standard',
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('text');
+        $response->assertOk();
+        $response->assertJsonPath('quota.used_chars', 0);
     }
 
-    public function test_three_accounts_chained_through_shared_ip_all_share_quota(): void
+    public function test_only_accounts_made_on_the_same_ip_are_chained(): void
     {
         $voice = $this->seedVoice();
 
@@ -251,12 +253,14 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $userB = User::factory()->create(['registration_ip' => '10.0.0.1', 'last_login_ip' => '10.0.0.3']);
         $this->storeDemoUsage($userB, 100);
 
-        // UserC: login=10.0.0.1 (shares IP with A & B via last_login_ip matching their registration_ip)
+        // UserC: only signed in from 10.0.0.1, made elsewhere: not linked.
         $userC = User::factory()->create(['registration_ip' => '10.0.0.4', 'last_login_ip' => '10.0.0.1']);
 
         Cache::flush();
 
-        // UserC's lookup finds A and B via 10.0.0.1 → 150 + 100 = 250, request 60 → 310 > 300
+        $this->actingAs($userB)->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 250);
+
         $response = $this->actingAs($userC)->postJsonLocalizedRoute('demo.run', [
             'text' => str_repeat('d', 60),
             'target_language' => 'en',
@@ -264,8 +268,8 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
             'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
         ]);
 
-        $response->assertStatus(422);
-        $response->assertJsonValidationErrors('text');
+        $response->assertOk();
+        $response->assertJsonPath('quota.used_chars', 0);
     }
 
     public function test_different_ips_do_not_share_quota(): void
@@ -618,6 +622,115 @@ class IpLinkedDemoAbusePreventionTest extends TestCase
         $quota->assertJsonPath('quota.used_chars', 300);
         $quota->assertJsonPath('quota.remaining_chars', 0);
         $quota->assertJsonPath('quota.is_exhausted', true);
+    }
+
+    // ──────────────────────────────────────────────────────────────────
+    //  6.  Shared networks: only accounts made close together are linked
+    // ──────────────────────────────────────────────────────────────────
+
+    public function test_strangers_on_one_network_registered_weeks_apart_do_not_share_an_allowance(): void
+    {
+        $this->seedVoice();
+        $carrierIp = '100.64.10.20'; // one mobile-carrier address shared by many people
+
+        $stranger = User::factory()->create(['registration_ip' => $carrierIp, 'last_login_ip' => $carrierIp]);
+        $this->storeDemoUsage($stranger, 300);
+
+        $this->travel(3)->weeks();
+        $newMember = User::factory()->create(['registration_ip' => $carrierIp, 'last_login_ip' => $carrierIp]);
+
+        $quota = $this->actingAs($newMember)
+            ->withServerVariables(['REMOTE_ADDR' => $carrierIp])
+            ->postJsonLocalizedRoute('demo.quota', []);
+
+        $quota->assertOk();
+        $quota->assertJsonPath('quota.used_chars', 0);
+        $quota->assertJsonPath('quota.remaining_chars', 300);
+    }
+
+    public function test_accounts_made_on_one_network_within_three_days_share_the_allowance(): void
+    {
+        $this->seedVoice();
+        $sharedIp = '100.64.10.21';
+
+        $userA = User::factory()->create(['registration_ip' => $sharedIp]);
+        $this->storeDemoUsage($userA, 260);
+
+        $this->travel(71)->hours();
+        $userB = User::factory()->create(['registration_ip' => $sharedIp]);
+        $this->storeDemoUsage($userB, 20);
+
+        $this->actingAs($userB)->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 280);
+        $this->actingAs($userA)->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 280);
+    }
+
+    public function test_the_address_a_request_comes_from_does_not_pool_strangers(): void
+    {
+        $this->seedVoice();
+        $campusIp = '100.64.10.22';
+
+        $student = User::factory()->create(['registration_ip' => $campusIp, 'last_login_ip' => $campusIp]);
+        $this->storeDemoUsage($student, 300);
+        $visitor = User::factory()->create(['registration_ip' => '198.51.100.40', 'last_login_ip' => '198.51.100.40']);
+
+        $this->actingAs($visitor)
+            ->withServerVariables(['REMOTE_ADDR' => $campusIp])
+            ->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 0);
+    }
+
+    public function test_a_shared_browser_fingerprint_counts_only_for_accounts_made_within_three_days(): void
+    {
+        $this->seedVoice();
+        // Identical phones report the same fingerprint.
+        $fingerprint = 'fp_identical_phone_model_0123456789';
+
+        $owner = User::factory()->create(['registration_ip' => '203.0.113.70']);
+        DemoVoiceGeneration::query()->create([
+            'user_id' => $owner->id,
+            'primary_identity_hash' => 'fp:'.$fingerprint,
+            'input_text' => str_repeat('x', 240),
+            'speech_text' => str_repeat('x', 240),
+            'source_language' => 'en',
+            'target_language' => 'en',
+            'translate' => false,
+            'voice_name' => 'en-US-Wavenet-C',
+            'voice_provider' => 'google_cloud',
+            'voice_tier' => 'standard',
+            'billable_chars' => 240,
+        ]);
+
+        $this->travel(3)->weeks();
+        $stranger = User::factory()->create(['registration_ip' => '198.51.100.70']);
+
+        $this->actingAs($stranger)
+            ->withHeaders(['X-Client-FP' => $fingerprint])
+            ->postJsonLocalizedRoute('demo.quota', [])
+            ->assertJsonPath('quota.used_chars', 0);
+    }
+
+    public function test_the_same_browser_shares_the_allowance_however_far_apart_the_accounts_were_made(): void
+    {
+        $voice = $this->seedVoice();
+        $browser = 'dev_same_browser_weeks_0123456789ab';
+
+        $userA = User::factory()->create(['registration_ip' => '10.2.2.1', 'registration_device_id' => $browser]);
+        $this->storeDemoUsage($userA, 280);
+
+        $this->travel(3)->weeks();
+        $userB = User::factory()->create(['registration_ip' => '10.2.2.2', 'registration_device_id' => $browser]);
+
+        $response = $this->actingAs($userB)->postJsonLocalizedRoute('demo.run', [
+            'text' => str_repeat('y', 30), // 280 + 30 > 300
+            'target_language' => 'en',
+            'voice_tier' => 'standard',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('text');
     }
 
     // ──────────────────────────────────────────────────────────────────

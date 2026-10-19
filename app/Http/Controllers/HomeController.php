@@ -58,6 +58,12 @@ class HomeController extends Controller
     // A request that dies mid-generation must not hold its chars forever.
     private const DEMO_PENDING_TTL_SECONDS = 600;
 
+    // Accounts made on one network address, or with one browser fingerprint,
+    // share the demo only when made this close together (several accounts in a
+    // row). Further apart they are usually strangers on one mobile network,
+    // campus or office, or on identical phones.
+    private const DEMO_LINK_WINDOW_HOURS = 72;
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly LocalizedPricingService $localizedPricingService,
@@ -971,8 +977,9 @@ class HomeController extends Controller
             }
         }
 
-        // Lifetime trial cap — shared across IP-linked and fingerprint-linked accounts,
-        // counting chars that are still being generated for any of them.
+        // Lifetime trial cap — shared across linked accounts (the same browser, or
+        // the same sign-up network or fingerprint within a few days), counting
+        // chars that are still being generated for any of them.
         // Referral reward characters (when present) act as an overflow bucket
         // consumed only AFTER the base lifetime cap is exhausted, so users see
         // their base allowance drain naturally first.
@@ -1452,7 +1459,9 @@ class HomeController extends Controller
     }
 
     /**
-     * The user plus every account that shares an IP, device or fingerprint with them.
+     * The user plus every account linked to them: the same browser (device
+     * cookie), or the same sign-up network address or fingerprint within
+     * DEMO_LINK_WINDOW_HOURS of each other.
      *
      * @return list<int>
      */
@@ -1461,18 +1470,17 @@ class HomeController extends Controller
         $userIds = $this->ipLinkedUserIds($userId);
         $deviceLinkedIds = $this->deviceLinkedUserIds($userId, $request);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
-        $requestIpLinkedIds = $this->requestIpLinkedUserIds($userId, $request);
 
         // Request signature is intentionally excluded — it is a browser-config
         // hash (Chrome version + platform), NOT a unique fingerprint. Including
         // it would pool demo chars across unrelated users who simply share the
-        // same browser version.
+        // same browser version. The address of the current request and sign-in
+        // addresses are left out for the same reason: strangers share them.
 
         return array_values(array_unique(array_merge(
             $userIds,
             $deviceLinkedIds,
-            $fpLinkedIds,
-            $requestIpLinkedIds
+            $fpLinkedIds
         )));
     }
 
@@ -1525,8 +1533,8 @@ class HomeController extends Controller
     }
 
     /**
-     * Find all user IDs that share any known IP with the given user.
-     * Checks both registration_ip and last_login_ip for maximum coverage.
+     * Find all user IDs made from the same network address as the given user
+     * within DEMO_LINK_WINDOW_HOURS of it: several accounts made in a row.
      *
      * @return list<int>
      */
@@ -1534,51 +1542,13 @@ class HomeController extends Controller
     {
         // Not cached: a second account made a minute ago must count at once.
         $user = User::query()->find($userId);
-        if (! $user) {
-            return [$userId];
-        }
-
-        $ips = array_values(array_unique(array_filter([
-            $user->registration_ip,
-            $user->last_login_ip,
-        ])));
-
-        if ($ips === []) {
+        if (! $user || ! filled($user->registration_ip) || ! $user->created_at) {
             return [$userId];
         }
 
         $linkedIds = User::query()
-            ->where(function ($q) use ($ips) {
-                $q->whereIn('registration_ip', $ips)
-                    ->orWhereIn('last_login_ip', $ips);
-            })
-            ->pluck('id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-
-        return $linkedIds !== [] ? $linkedIds : [$userId];
-    }
-
-    /**
-     * Find all user IDs linked via the current request IP.
-     * This catches VPN abuse: user registers with IP A, activates VPN,
-     * creates a second account with IP B, then turns off VPN — the
-     * current request IP (A) links them back together.
-     *
-     * @return list<int>
-     */
-    private function requestIpLinkedUserIds(int $userId, ?Request $request = null): array
-    {
-        $requestIp = $request?->ip();
-        if (! $requestIp || $requestIp === '') {
-            return [$userId];
-        }
-
-        $linkedIds = User::query()
-            ->where(function ($q) use ($requestIp) {
-                $q->where('registration_ip', $requestIp)
-                    ->orWhere('last_login_ip', $requestIp);
-            })
+            ->where('registration_ip', $user->registration_ip)
+            ->whereBetween('created_at', $this->demoLinkWindow($user))
             ->pluck('id')
             ->map(fn ($id) => (int) $id)
             ->all();
@@ -1592,7 +1562,10 @@ class HomeController extends Controller
 
     /**
      * Find all user IDs whose demo generations share the same browser fingerprint.
-     * This catches multi-account abuse even through VPN/IP changes.
+     * This catches multi-account abuse even through VPN/IP changes. Identical
+     * phones share a fingerprint and everyone on one address shares the
+     * address-and-browser fallback, so those count only within
+     * DEMO_LINK_WINDOW_HOURS; the device cookie is this browser's own.
      *
      * @return list<int>
      */
@@ -1612,11 +1585,34 @@ class HomeController extends Controller
             ->map(fn ($id) => (int) $id)
             ->all();
 
+        if ($linkedIds !== [] && ! str_starts_with($fp, 'dc:')) {
+            $user = User::query()->select(['id', 'created_at'])->find($userId);
+            $linkedIds = $user?->created_at
+                ? User::query()
+                    ->whereIn('id', $linkedIds)
+                    ->whereBetween('created_at', $this->demoLinkWindow($user))
+                    ->pluck('id')
+                    ->map(fn ($id) => (int) $id)
+                    ->all()
+                : [];
+        }
+
         if (! in_array($userId, $linkedIds, true)) {
             $linkedIds[] = $userId;
         }
 
         return $linkedIds;
+    }
+
+    /**
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
+     */
+    private function demoLinkWindow(User $user): array
+    {
+        return [
+            $user->created_at->copy()->subHours(self::DEMO_LINK_WINDOW_HOURS),
+            $user->created_at->copy()->addHours(self::DEMO_LINK_WINDOW_HOURS),
+        ];
     }
 
     private function extractClientFingerprint(Request $request): string
