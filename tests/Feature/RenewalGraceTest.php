@@ -445,6 +445,8 @@ class RenewalGraceTest extends TestCase
         $this->assertSame(1, $this->runGraceJob());
 
         $this->assertTrue($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'));
+        // Cancelled without proration: the month it cut short was never paid, so it leaves no credit behind.
+        $this->assertSame(['false'], $this->paramsSent('delete', '/v1/subscriptions/sub_grace', 'prorate'));
         $plan = $this->plan();
         $this->assertSame((int) $this->free->id, (int) $plan->plan_id);
         $this->assertSame('ok', $plan->billing_payment_state);
@@ -834,6 +836,19 @@ class RenewalGraceTest extends TestCase
     private function runGraceJob(): int
     {
         return app(BillingLifecycleService::class)->downgradeExpiredGraceSubscriptions();
+    }
+
+    /**
+     * The value of $param in each request sent to Stripe as $method $path, as sent.
+     *
+     * @return list<mixed>
+     */
+    private function paramsSent(string $method, string $path, string $param): array
+    {
+        return array_values(array_map(
+            fn (array $request): mixed => $request['params'][$param] ?? null,
+            array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] === $method && $request['path'] === $path)
+        ));
     }
 
     /** @return list<string> */

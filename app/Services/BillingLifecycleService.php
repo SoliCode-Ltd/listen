@@ -426,7 +426,11 @@ class BillingLifecycleService
     private function cancelStripeSubscriptionNow(User $user, BillingSubscription $billingSubscription): bool
     {
         try {
-            $billingSubscription->cancelNow();
+            // Without proration: the period this cuts short was never paid, so it
+            // must leave no credit for unused time (a later subscription would get
+            // it as a discount). Cashier prorates by default.
+            $billingSubscription->noProrate()->cancelNow();
+
             return true;
         } catch (\Throwable $exception) {
             Log::warning('Unable to cancel Stripe subscription after grace period.', [
