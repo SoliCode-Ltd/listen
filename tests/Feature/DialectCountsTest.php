@@ -152,7 +152,7 @@ class DialectCountsTest extends TestCase
             '/أكثر من (\d+) مكان/u' => [$places, true],
         ];
         $pages = [
-            ['home', []], ['samples', []], ['developers', []],
+            ['home', []], ['samples', []], ['developers', []], ['pricing', []],
             ['seo.text-to-speech', []], ['seo.text-to-speech-arabic', []], ['seo.ai-text-to-speech', []], ['seo.ai-voice-generator', []],
             ['seo.arabic-dialects', []], ['seo.english-accents', []],
             ['seo.dialect', ['dialect' => 'egyptian']], ['seo.dialect', ['dialect' => 'fusha']],

@@ -37,16 +37,16 @@ class CreditsLeftMessageTest extends TestCase
 
     public function test_with_credits_left_the_studio_says_how_many_are_left_and_how_many_the_text_needs(): void
     {
-        // "Hello there, this is a test." is about 3 seconds: 45 credits.
+        // "Hello there, this is a test." on a premium voice is about 4 seconds: 60 credits.
         $user = $this->apiMember($this->apiPlan(['monthly_chars' => 3000]));
         CreditPeriod::counter($user->id)->update(['total_chars' => 3000 - 10]);
 
         $this->studio($user)->assertStatus(422)->assertJsonPath('errors.content.0',
-            'You have 10 credits left this month and this text needs about 45. Shorten it, or upgrade your plan for more credits.');
+            'You have 10 credits left this month and this text needs about 60. Shorten it, or upgrade your plan for more credits.');
 
         app()->setLocale('ar');
         $this->studio($user)->assertStatus(422)->assertJsonPath('errors.content.0',
-            'تبقّى لك هذا الشهر 10 رصيد، وهذا النص يحتاج حوالي 45 رصيد. اختصر النص أو رقِّ خطتك لتحصل على رصيد أكثر.');
+            'تبقّى لك هذا الشهر 10 رصيد، وهذا النص يحتاج حوالي 60 رصيد. اختصر النص أو رقِّ خطتك لتحصل على رصيد أكثر.');
 
         $this->assertSame(0, AudioGeneration::query()->count(), 'nothing is made or reserved');
         $this->assertSame(3000 - 10, $this->creditsSpent($user));
@@ -57,9 +57,9 @@ class CreditsLeftMessageTest extends TestCase
         $user = $this->apiMember($this->apiPlan(['monthly_chars' => 90000]));
         CreditPeriod::counter($user->id)->update(['total_chars' => 90000 - 1234]);
 
-        // 1,500 characters are about 100 seconds: 1,500 credits.
+        // 1,500 letters on a premium voice are about 125 seconds: 1,875 credits.
         $this->studio($user, str_repeat('a', 1500))->assertStatus(422)
-            ->assertJsonPath('errors.content.0', 'You have 1,234 credits left this month and this text needs about 1,500. Shorten it, or upgrade your plan for more credits.');
+            ->assertJsonPath('errors.content.0', 'You have 1,234 credits left this month and this text needs about 1,875. Shorten it, or upgrade your plan for more credits.');
     }
 
     public function test_with_no_credits_left_they_are_used_up(): void
@@ -81,8 +81,8 @@ class CreditsLeftMessageTest extends TestCase
         CreditPeriod::counter($user->id)->update(['total_chars' => 3000 - 10]);
 
         $this->assertApiError($this->speak($plain, $voice), 402, 'quota_exceeded', 'quota_error')
-            ->assertJsonPath('error.credits_needed', 45)
-            ->assertJsonPath('error.message', 'You have 10 credits left this month and this text needs about 45. Shorten it, or upgrade your plan for more credits.');
+            ->assertJsonPath('error.credits_needed', 60)
+            ->assertJsonPath('error.message', 'You have 10 credits left this month and this text needs about 60. Shorten it, or upgrade your plan for more credits.');
 
         CreditPeriod::counter($user->id)->update(['total_chars' => 3000]);
         $this->assertApiError($this->speak($plain, $voice), 402, 'quota_exceeded')
