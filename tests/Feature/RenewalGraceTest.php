@@ -308,6 +308,27 @@ class RenewalGraceTest extends TestCase
         $this->assertSame([], $this->sentSubjects(), 'A member who has just paid is never told the payment failed.');
     }
 
+    public function test_a_sync_that_read_past_due_before_the_first_failure_was_even_recorded_never_warns_a_member_who_paid(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        // The sync reads Stripe (past due) while the member pays straight away, before any
+        // failed-payment event was handled: the payment's own sync takes the month just paid for.
+        $this->stripe->meanwhile('/v1/subscriptions', function (): void {
+            app(PlanAccessService::class)->assignPlan($this->member, $this->starter, 'active', Carbon::parse(self::NEXT_RENEWAL), Carbon::parse(self::RENEWS_AT));
+        });
+
+        $this->sync();
+
+        $plan = $this->plan();
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertEquals(Carbon::parse(self::RENEWS_AT), $plan->current_period_start);
+        $this->assertEquals(Carbon::parse(self::NEXT_RENEWAL), $plan->current_period_end);
+        $this->assertSame('2026-10-14 10:00', $this->creditKey());
+        $this->assertSame([], $this->sentSubjects(), 'A member who has just paid is never told the payment failed.');
+    }
+
     public function test_a_grace_whose_paid_month_cannot_be_told_pauses_at_once_instead_of_giving_unpaid_credits(): void
     {
         $this->renewalUnderWay();

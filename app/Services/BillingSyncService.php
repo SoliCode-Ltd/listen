@@ -98,9 +98,9 @@ class BillingSyncService
         $periodStart = null;
         $keepPlanAsIs = false;
         $stripeSaysPaid = false;
-        // What the plan row says about a missed payment before Stripe is read. A
-        // webhook that records or settles one meanwhile makes what is read stale.
-        $paymentStateBeforeRead = $this->latestPaymentState($user);
+        // The plan row before Stripe is read (payment state, paid period end): a
+        // webhook that changes it meanwhile makes what is read stale.
+        $rowBeforeRead = RenewalGrace::rowBeforeRead($user);
 
         if ($user->stripe_id) {
             try {
@@ -152,7 +152,7 @@ class BillingSyncService
                             // it, with the dates of the period paid for (never Stripe's new,
                             // unpaid one), until the grace days run out; one who never did (a
                             // free trial's first charge) moves to Free now (RenewalGrace).
-                            $keepPlanAsIs = $this->renewalGrace->forBillingSync($user, $stripeSubscription, $paymentStateBeforeRead);
+                            $keepPlanAsIs = $this->renewalGrace->forBillingSync($user, $stripeSubscription, $rowBeforeRead);
                         } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
                             && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
                             // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.
@@ -229,7 +229,7 @@ class BillingSyncService
         // A missed payment recorded while Stripe was being read: what was read can be
         // from just before it (a renewal still being charged), so it must not undo
         // the grace. Nothing changes now; the next sync reads Stripe again.
-        if ($stripeSaysPaid && $paymentStateBeforeRead !== 'past_due' && $this->latestPaymentState($user) === 'past_due') {
+        if ($stripeSaysPaid && $rowBeforeRead['state'] !== 'past_due' && $this->latestPaymentState($user) === 'past_due') {
             $keepPlanAsIs = true;
             $stripeSaysPaid = false;
         }
