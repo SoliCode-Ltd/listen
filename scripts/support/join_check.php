@@ -229,7 +229,7 @@ $voices = AudioGeneration::query()
     ->limit($limit * 4)
     ->get(['id', 'input_text', 'audio_path', 'duration_seconds', 'settings_snapshot', 'speed', 'dialect', 'tts_model', 'created_at']);
 
-$across = $within = [];
+$across = $within = $retakes = [];
 $joinsMatched = $joinsChecked = 0;
 $rows = [];
 foreach ($voices as $g) {
@@ -246,7 +246,8 @@ foreach ($voices as $g) {
         continue;
     }
     $expected = 0;
-    foreach (GeminiVocalTags::parts((string) $g->input_text) as $part) {
+    $parts = GeminiVocalTags::parts((string) $g->input_text);
+    foreach ($parts as $part) {
         $expected += mb_strlen($part['text']) > $maxChars ? count(TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', $parallel)) : 1;
     }
     if ($expected < 2) {
@@ -283,7 +284,18 @@ foreach ($voices as $g) {
     if ($s === null) {
         continue;
     }
+    // Moods in the text ([whispering] …) change the delivery on purpose: kept apart.
+    $s['moods'] = count($parts) > 1;
     $across[] = $s;
+    // What the piece check (App\Support\PieceCheck) would take again: with three
+    // pieces or more, one over 25% off the voice's pace or 2.5 semitones off its pitch.
+    if (count($pieces) >= 3) {
+        $voicePace = $quantile(array_column($pieces, 'pace'), .5);
+        $voicePitch = $quantile(array_column($pieces, 'pitch'), .5);
+        foreach ($pieces as $p) {
+            $retakes[] = abs($p['pace'] / $voicePace - 1) > 0.25 || abs(12 * log($p['pitch'] / $voicePitch, 2)) > 2.5;
+        }
+    }
     $paces = array_column($pieces, 'pace');
     $pitches = array_column($pieces, 'pitch');
     $levels = array_column($pieces, 'level');
@@ -307,14 +319,15 @@ foreach ($voices as $g) {
         }
     }
     $rows[] = $odd;
-    printf("  #%d %s, %.1f min, %d pieces expected, %d found; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s\n",
-        $g->id, (string) ($g->tts_model ?: '-'), $length / 60, $expected, count($joins) + 1, round(100 * $s['pace']), $s['pitch'], $s['level'],
+    printf("  #%d %s, %.1f min, %d pieces expected, %d found%s; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s\n",
+        $g->id, (string) ($g->tts_model ?: '-'), $length / 60, $expected, count($joins) + 1, $s['moods'] ? ', with moods' : '', round(100 * $s['pace']), $s['pitch'], $s['level'],
         $odd === [] ? '' : ' | '.implode('; ', $odd));
 }
 
 echo "\n== Summary ==\n";
 printf("Long premium voices measured: %d. Joins found as expected in %d of %d.\n", count($across), $joinsMatched, $joinsChecked);
-foreach (['across the pieces of one voice' => $across, 'between the halves of one piece (one take)' => $within] as $label => $list) {
+$plain = array_values(array_filter($across, fn ($s) => ! $s['moods']));
+foreach (['across the pieces of one voice' => $across, '  of those, voices with no moods in the text' => $plain, 'between the halves of one piece (one take)' => $within] as $label => $list) {
     if ($list === []) {
         continue;
     }
@@ -325,3 +338,4 @@ foreach (['across the pieces of one voice' => $across, 'between the halves of on
 }
 printf("Voices with a piece that stands out (pace over 20%%, pitch over 2 semitones or level over 3 dB from the voice's median): %d of %d.\n",
     count(array_filter($rows)), count($rows));
+printf("Pieces the piece check would take again (voices of 3 pieces or more): %d of %d.\n", count(array_filter($retakes)), count($retakes));
