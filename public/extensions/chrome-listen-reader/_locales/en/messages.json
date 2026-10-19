@@ -371,6 +371,14 @@
     "message": "Voice generated in side panel.",
     "description": "Status after generation"
   },
+  "statusReady": {
+    "message": "Your voice is ready.",
+    "description": "Status after generation with the side panel off"
+  },
+  "openPlayer": {
+    "message": "Play it in a new tab",
+    "description": "Opens the voice in the extension's own player"
+  },
   "statusNoText": {
     "message": "Enter quick text first.",
     "description": "Status when no quick text"
@@ -528,7 +536,10 @@
     "message": "Voice generation is taking too long. Please try again."
   },
   "errSidePlayer": {
-    "message": "Could not open the side player on this page. Try a regular website tab."
+    "message": "Your voice is ready, but it could not be played here. You will find it in your dashboard history."
+  },
+  "errSidePlayerPage": {
+    "message": "The side player cannot open on this page, so nothing was made or charged. Try a regular website tab, or turn off “Play voice in side panel”."
   },
   "errNoEndpoint": {
     "message": "The service address is not set."

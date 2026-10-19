@@ -4,9 +4,9 @@ Convert selected text to natural speech on any web page.
 
 FEATURES
 --------
-• Right-click any selected text and choose "Listen Selected Text" to hear it read aloud
+• Right-click any selected text and choose "Listen to the selected text" to hear it read aloud
 • Premium AI-powered text-to-speech with Arabic and English support
-• Side panel audio player with playback controls (play, pause, skip, speed)
+• Side panel audio player with playback controls (play, pause, speed)
 • Configurable language, voice, and translation settings
 • Secure: your API key is stored locally and never shared with third parties
 
@@ -17,7 +17,7 @@ This extension requires the following permissions:
 • storage         — Store your settings and API key locally
 • activeTab       — Read selected text from the current page
 • scripting       — Inject the audio player panel into web pages
-• contextMenus    — Add "Listen Selected Text" to the right-click menu
+• contextMenus    — Add "Listen to the selected text" to the right-click menu
 • tabs            — Identify the active tab for audio delivery
 • alarms          — Schedule periodic config updates
 • host_permissions — Work on any website for text selection and audio playback
@@ -39,7 +39,7 @@ SETUP
 1. Create an account at your Listen server dashboard.
 2. Navigate to Browsers Extension page and generate an API key.
 3. Open the extension popup, paste your API key, and save.
-4. Select text on any page, right-click → "Listen Selected Text".
+4. Select text on any page, right-click → "Listen to the selected text".
 
 SUPPORT
 -------

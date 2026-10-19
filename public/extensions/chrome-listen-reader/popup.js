@@ -33,6 +33,7 @@ const elements = {
   selectionBtn: document.getElementById('selectionBtn'),
   quickBtn: document.getElementById('quickBtn'),
   status: document.getElementById('status'),
+  playerLink: document.getElementById('playerLink'),
   userAvatar: document.getElementById('userAvatar'),
   userName: document.getElementById('userName'),
   userPlan: document.getElementById('userPlan'),
@@ -175,6 +176,23 @@ function setStatus(message, type = '') {
   elements.status.classList.remove('ok', 'error');
   if (type) {
     elements.status.classList.add(type);
+  }
+  // The link to a voice goes with the message that it is ready.
+  setLink(elements.playerLink, '');
+}
+
+// With the side panel on, the voice plays there; with it off, the voice is ready
+// to play in the extension's own player, in a new tab.
+function showVoiceReady(result, panelOn) {
+  if (panelOn) {
+    setStatus(t('statusGenerated', 'Voice generated in side panel.'), 'ok');
+    return;
+  }
+
+  setStatus(t('statusReady', 'Your voice is ready.'), 'ok');
+  const audioUrl = String(result?.audio_url || '').trim();
+  if (audioUrl) {
+    setLink(elements.playerLink, chrome.runtime.getURL(`player.html?${new URLSearchParams({ audio: audioUrl })}`));
   }
 }
 
@@ -738,16 +756,17 @@ async function readSelection() {
   try {
     await syncLanguageToCurrentSelection().catch(() => { });
 
+    const overrides = readSettingsFromForm();
     const response = await requestBackground({
       type: 'READ_CURRENT_SELECTION',
-      overrides: readSettingsFromForm(),
+      overrides,
     });
     if (!response?.ok) {
       throw new Error(response?.message || t('errNoSelection', 'Unable to read selected text.'));
     }
 
     await refreshProfile().catch(() => { });
-    setStatus(t('statusGenerated', 'Voice generated in side panel.'), 'ok');
+    showVoiceReady(response.result, overrides.autoPlay);
   } catch (error) {
     // Refresh profile to show accurate usage even after errors
     await refreshProfile().catch(() => { });
@@ -772,10 +791,11 @@ async function readQuickText() {
 
   setStatus(t('statusGenerating', 'Generating voice...'));
   try {
+    const overrides = readSettingsFromForm();
     const response = await requestBackground({
       type: 'READ_TEXT',
       text,
-      overrides: readSettingsFromForm(),
+      overrides,
     });
 
     if (!response?.ok) {
@@ -783,7 +803,7 @@ async function readQuickText() {
     }
 
     await refreshProfile().catch(() => { });
-    setStatus(t('statusGenerated', 'Voice generated in side panel.'), 'ok');
+    showVoiceReady(response.result, overrides.autoPlay);
   } catch (error) {
     // Refresh profile to show accurate usage even after errors
     await refreshProfile().catch(() => { });
