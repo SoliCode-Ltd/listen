@@ -1324,6 +1324,8 @@ class HomeController extends Controller
                 'topup_minute_price_cents' => $topupMinCents,
                 'is_featured' => (bool) ($plan->is_featured ?? false),
                 'features' => $features,
+                // Lines the admin wrote for this card in this language.
+                'own_lines' => (bool) $plan->pricing_use_custom_text && $plan->getLocalizedFeatures($locale) !== null,
                 'is_pack' => $plan->isPack(),
                 'pack_days' => $plan->isPack() ? $plan->packDays() : null,
                 'can_buy_pack' => $plan->isPack() && $viewerCanBuyPack,

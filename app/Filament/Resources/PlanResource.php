@@ -526,9 +526,10 @@ class PlanResource extends Resource
                             })
                             ->addActionLabel('Add Feature')
                             ->defaultItems(0)
+                            // Drag a line by its handle; the arrows still move it one place.
                             ->reorderable()
                             ->reorderableWithButtons()
-                            ->reorderableWithDragAndDrop(false)
+                            ->itemLabel(fn (array $state): ?string => self::lineLabel($state))
                             ->collapsible(),
                     ]),
                 Forms\Components\Section::make('خصائص الخطة (العربية)')
@@ -585,9 +586,10 @@ class PlanResource extends Resource
                             })
                             ->addActionLabel('إضافة خاصية')
                             ->defaultItems(0)
+                            // Drag a line by its handle; the arrows still move it one place.
                             ->reorderable()
                             ->reorderableWithButtons()
-                            ->reorderableWithDragAndDrop(false)
+                            ->itemLabel(fn (array $state): ?string => self::lineLabel($state))
                             ->collapsible(),
                     ]),
             ]);
@@ -883,8 +885,24 @@ class PlanResource extends Resource
             ->defaultItems(0)
             ->addActionLabel('Add a line')
             ->reorderableWithButtons()
-            ->reorderableWithDragAndDrop(false)
+            ->itemLabel(fn (array $state): ?string => self::lineLabel($state))
             ->live();
+    }
+
+    /**
+     * A line's text in its header, so even a collapsed list can be dragged into order.
+     *
+     * @param  array<string, mixed>  $state
+     */
+    private static function lineLabel(array $state): ?string
+    {
+        $label = trim((string) ($state['label'] ?? ''));
+        $value = trim((string) ($state['value'] ?? ''));
+        if ($label === '') {
+            return null;
+        }
+
+        return $value === '' ? $label : $label.' — '.$value;
     }
 
     private static function pricingPreview(Plan $plan, Get $get): HtmlString
