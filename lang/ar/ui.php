@@ -1789,6 +1789,11 @@ return [
             'language_required' => 'اختر لغة هذا الصوت.',
             'language_invalid' => 'اختر العربية أو إحدى خيارات الإنجليزية.',
         ],
+
+        // When a request fails and the server gives no reason, or never answers.
+        'request_failed' => 'لم تنجح العملية. أعد المحاولة.',
+        'network_error' => 'تعذّر الاتصال. تحقّق من اتصالك بالإنترنت ثم أعد المحاولة.',
+        'delete_failed' => 'تعذّر حذف هذا الصوت. أعد المحاولة.',
     ],
     'pack' => [
         'kicker' => 'باقة لمرة واحدة',

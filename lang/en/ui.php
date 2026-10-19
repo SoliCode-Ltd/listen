@@ -1783,6 +1783,11 @@ return [
             'language_required' => 'Choose the language of this voice.',
             'language_invalid' => 'Choose Arabic or one of the English options.',
         ],
+
+        // When a request fails and the server gives no reason, or never answers.
+        'request_failed' => "That didn't work. Please try again.",
+        'network_error' => "We couldn't connect. Check your internet connection and try again.",
+        'delete_failed' => "This voice couldn't be deleted. Please try again.",
     ],
     'pack' => [
         'kicker' => 'One-time pack',

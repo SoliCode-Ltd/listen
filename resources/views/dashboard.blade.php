@@ -5024,6 +5024,9 @@
       const deleteVoiceText = @json(__('ui.voice_cloning.delete_voice'));
       const deleteConfirmText = @json(__('ui.voice_cloning.delete_confirm'));
       const delayedHintText = @json(__('ui.voice_cloning.processing_delayed'));
+      const requestFailedText = @json(__('ui.voice_cloning.request_failed'));
+      const networkErrorText = @json(__('ui.voice_cloning.network_error'));
+      const deleteFailedText = @json(__('ui.voice_cloning.delete_failed'));
       const languageLabels = {
         'ar-XA': @json(__('ui.voice_cloning.language_ar')),
         'en-US': @json(__('ui.voice_cloning.language_en_us')),
@@ -5058,6 +5061,16 @@
         setTimeout(() => {
           if (alert.isConnected) alert.remove();
         }, 7000);
+      }
+
+      // The reason the server gave, when it gave one: the studio's own `error`, a
+      // `message` it wrote (beside ok/success false, such as an expired session,
+      // or with form errors) or the form errors. Anything else, such as a server
+      // error page, gets the translated fallback.
+      function failureText(data, fallback) {
+        const ownMessage = data?.ok === false || data?.success === false || data?.errors ? data?.message : '';
+        const fieldErrors = Object.values(data?.errors || {}).flat().join(' ');
+        return String(data?.error || ownMessage || fieldErrors || '').trim() || fallback;
       }
 
       function escapeHtml(value) {
@@ -6243,8 +6256,7 @@
                 startPolling(voiceId);
                 return;
               }
-              const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
-              showAlert('error', errorText);
+              showAlert('error', failureText(data, requestFailedText));
               return;
             }
 
@@ -6284,10 +6296,9 @@
               resetCreateFormUi();
               return;
             }
-            const errorText = data?.error || data?.message || Object.values(data?.errors || {}).flat().join(' ') || 'Error';
-            showAlert('error', errorText);
-          } catch (error) {
-            showAlert('error', error?.message || 'Network error');
+            showAlert('error', failureText(data, requestFailedText));
+          } catch (_error) {
+            showAlert('error', networkErrorText);
           } finally {
             if (submitBtn) submitBtn.disabled = false;
             if (submitText) submitText.style.display = '';
@@ -6350,10 +6361,10 @@
               return;
             }
             retryButton.disabled = false;
-            showAlert('error', data?.error || data?.message || 'Error');
-          } catch (error) {
+            showAlert('error', failureText(data, requestFailedText));
+          } catch (_error) {
             retryButton.disabled = false;
-            showAlert('error', error?.message || 'Network error');
+            showAlert('error', networkErrorText);
           }
           return;
         }
@@ -6392,9 +6403,9 @@
             }
             return;
           }
-          showAlert('error', data?.error || 'Failed');
-        } catch (error) {
-          showAlert('error', error?.message || 'Failed');
+          showAlert('error', failureText(data, deleteFailedText));
+        } catch (_error) {
+          showAlert('error', networkErrorText);
         }
       });
 
