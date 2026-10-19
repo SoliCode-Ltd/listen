@@ -1048,6 +1048,7 @@ return [
         'tab_overview' => 'نظرة عامة',
         'tab_plan' => 'الباقة',
         'generated_audio_ready' => 'أحدث صوت تم توليده جاهز للتشغيل.',
+        'generated_audio_charged' => 'مدة الصوت :duration · خُصم :credits رصيد',
         'speaker_prefix' => 'المتحدث:',
         'table_id' => 'رقم',
         'table_title' => 'العنوان',

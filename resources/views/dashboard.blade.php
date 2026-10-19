@@ -3299,6 +3299,7 @@
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
       'instant_preview' => __('ui.dashboard.instant_preview'),
       'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
+      'generated_audio_charged' => __('ui.dashboard.generated_audio_charged'),
       'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
       'performance_style_required' => __('ui.backend.performance_style_required'),
       'emotion_required' => __('ui.backend.emotion_required'),
@@ -3315,7 +3316,9 @@
     ];
   @endphp
   <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
+  <script src="{{ asset('js/audio-estimate.js') }}?v={{ filemtime(public_path('js/audio-estimate.js')) }}"></script>
   <script>
+    window.ListenAudioEstimate?.configure(@json(\App\Support\UsageEstimator::clientConfig()));
     const voiceCatalog = @json($voiceCatalog);
     const clonedVoices = @json(($voiceCloningVisible ?? false) ? ($clonedVoices ?? []) : []);
     const clonedVoiceGroupLabel = @json(($voiceCloningVisible ?? false) ? __('ui.voice_cloning.cloned_voice_group') : '');
@@ -3758,6 +3761,14 @@
       if (generatedAudioMeta) {
         const meta = [`${i18n.speaker_prefix} ${voiceLabel}`];
         if (voiceTier) meta.push(formatTierLabel(voiceTier));
+        // The real length and what it cost, beside the estimate shown before.
+        const seconds = Number(job?.duration_seconds || 0);
+        if (seconds > 0) {
+          meta.push(formatQuotaText(i18n.generated_audio_charged, {
+            duration: Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0'),
+            credits: formatNumber(seconds * {{ \App\Support\Credits::PER_SECOND }}),
+          }));
+        }
         meta.push(i18n.generated_audio_ready);
         generatedAudioMeta.textContent = meta.join(' - ');
       }
@@ -3921,16 +3932,34 @@
       return `${Math.max(0, 100 - Number(percent || 0))}%`;
     }
 
-    // The credits left drop live as the text grows, by about what this voice
-    // will cost: 15 credits a second of audio, about 15 characters a second
-    // (the server's estimate; the real audio length decides the final charge).
+    // The credits left drop live as the text grows, by what this voice will
+    // cost: 15 credits a second of audio, the length estimated as the server
+    // estimates and reserves it (js/audio-estimate.js), from the text, the
+    // voice's tier and the pace. The real audio length decides the final charge.
     let creditLiveShown = null;
+    function estimateTier() {
+      if (document.getElementById('dialogueSelect')?.value === '1') return 'hd';
+      const key = String(voiceSelect?.value || '');
+      if (clonedVoices.some(function (entry) { return String(entry.key) === key; })) return 'hd';
+      const list = voiceCatalog?.[voiceLanguageOf(normalizeLanguage(targetLanguage?.value || 'ar'))];
+      const voice = (Array.isArray(list) ? list : []).find(function (v) { return String(v?.key) === key; });
+
+      return String(voice?.tier || 'standard');
+    }
     function estimateCreditsFor(text) {
-      const value = String(text || '').trim();
-      const length = Array.from(value).length;
-      if (!length) return 0;
-      const words = (value.match(/[\p{L}\p{N}']+/gu) || []).length;
-      return Math.max(3, Math.ceil(Math.max(words / 2.6, length / 15))) * 15;
+      if (!window.ListenAudioEstimate) return 0;
+      const tier = estimateTier();
+      const field = function (id) { return String(document.getElementById(id)?.value || ''); };
+
+      // A standard voice is always read at the normal pace and plainly.
+      return window.ListenAudioEstimate.credits(text, tier === 'hd' ? {
+        tier: tier,
+        speed: Number(field('speed') || 1),
+        performance_style: field('performance_style'),
+        emotion: field('emotion'),
+        dialect: field('dialect'),
+        style_prompt: field('style_prompt'),
+      } : { tier: tier });
     }
     function refreshCreditLive() {
       const box = document.getElementById('creditLive');
@@ -4668,10 +4697,19 @@
       renderVoiceOptions();
       renderDialectOptions();
       applyStudioDefaults();
+      refreshCreditLive();
     });
     voiceSelect?.addEventListener('change', function() {
       rememberCurrentVoiceSelection();
+      refreshCreditLive();
     });
+    // The voice, its tier, the pace and dialogue mode change how long the text takes.
+    document.getElementById('speed')?.addEventListener('input', refreshCreditLive);
+    ['performance_style', 'emotion', 'dialect'].forEach(function (id) {
+      document.getElementById(id)?.addEventListener('change', refreshCreditLive);
+    });
+    // After js/dialogue-mode.js has set the dialogue field from its switch.
+    document.getElementById('dialogueToggle')?.addEventListener('change', function () { setTimeout(refreshCreditLive, 0); });
     translateToggle?.addEventListener('change', function() {
       if (translateSelect) translateSelect.value = translateToggle.checked ? '1' : '0';
       if (translateToggle.checked) {

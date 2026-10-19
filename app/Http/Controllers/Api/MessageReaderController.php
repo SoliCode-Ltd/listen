@@ -209,7 +209,7 @@ class MessageReaderController extends Controller
         }
         $sourceLanguage = preg_match('/[\x{0600}-\x{06FF}]/u', $text) ? 'ar' : 'en';
         // A slower speed makes longer audio, so the reservation allows for it, as in the dashboard.
-        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed'], $requestedTier, $studioOptions);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),

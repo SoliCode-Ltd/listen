@@ -15,6 +15,7 @@ use App\Services\TranslationService;
 use App\Services\TtsService;
 use App\Support\GenerationMessage;
 use App\Support\UsageEstimator;
+use App\Support\VoiceTier;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -40,7 +41,7 @@ class StuckMemberGenerationTest extends TestCase
         $api = $this->reserved($user, 'processing', 90, ['api_key_id' => 999]);
         $counter = $this->counter($user);
         $usedBefore = (int) $counter->total_chars;
-        $reserved = UsageEstimator::estimate(self::TEXT);
+        $reserved = UsageEstimator::estimate(self::TEXT, VoiceTier::STANDARD);
 
         $this->artisan('listen:expire-stuck-generations')->expectsOutputToContain('Expired 2')->assertSuccessful();
         $this->artisan('listen:expire-stuck-generations')->expectsOutputToContain('Expired 0')->assertSuccessful();
@@ -70,7 +71,7 @@ class StuckMemberGenerationTest extends TestCase
         $this->artisan('listen:expire-stuck-generations')->assertSuccessful();
 
         $this->assertSame('failed', $generation->fresh()->status);
-        $this->assertSame(1000 - UsageEstimator::estimate(self::TEXT)['credits'], (int) CharPackWallet::query()->where('user_id', $user->id)->value('chars_used'));
+        $this->assertSame(1000 - UsageEstimator::estimate(self::TEXT, VoiceTier::STANDARD)['credits'], (int) CharPackWallet::query()->where('user_id', $user->id)->value('chars_used'));
     }
 
     public function test_a_late_retry_never_makes_a_generation_the_sweep_failed(): void
@@ -155,7 +156,7 @@ class StuckMemberGenerationTest extends TestCase
         $delete($stuck)->assertOk();
 
         $this->assertNull(AudioGeneration::query()->find($stuck->id));
-        $this->assertSame($usedBefore - UsageEstimator::estimate(self::TEXT)['credits'], (int) $counter->fresh()->total_chars);
+        $this->assertSame($usedBefore - UsageEstimator::estimate(self::TEXT, VoiceTier::STANDARD)['credits'], (int) $counter->fresh()->total_chars);
         $this->assertSame('processing', $recent->fresh()->status);
     }
 
@@ -191,7 +192,7 @@ class StuckMemberGenerationTest extends TestCase
         ], $attributes));
 
         if (! ($attributes['billed_to_pack'] ?? false)) {
-            $estimate = UsageEstimator::estimate(self::TEXT);
+            $estimate = UsageEstimator::estimate(self::TEXT, VoiceTier::STANDARD);
             $counter = $this->counter($user);
             $counter->increment('total_requests');
             $counter->increment('total_chars', $estimate['credits']);

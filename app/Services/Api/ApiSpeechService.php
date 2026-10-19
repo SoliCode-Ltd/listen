@@ -18,7 +18,6 @@ use App\Support\Api\ApiPlanAccess;
 use App\Support\Api\ApiVoiceCatalog;
 use App\Support\AudioEffects;
 use App\Support\AudioFormats;
-use App\Support\Credits;
 use App\Support\DialogueSpeakers;
 use App\Support\GeminiVocalTags;
 use App\Support\PlanFeatures;
@@ -132,7 +131,7 @@ class ApiSpeechService
         $audioEffect = $this->audioEffect($validated, $user, $plan);
         $dialogue = $this->dialogue($validated, $user, $plan, $planTier, $language, $text);
 
-        $estimate = self::estimate($text, (float) $studio['speed']);
+        $estimate = self::estimate($text, (float) $studio['speed'], $tier, $studio);
         $this->assertLength($estimate['chars'], $quotaPlan, $async, $dialogue !== null);
         ApiCapacity::assertRoom($estimate['chars']);
 
@@ -158,22 +157,16 @@ class ApiSpeechService
     }
 
     /**
-     * What the request reserves: the dashboard's estimate from the text, made
-     * longer for a slower speed (speed 0.5 makes audio about twice as long), so
-     * the plan's limit holds for the audio the request really makes.
+     * What the request reserves: the dashboard's estimate from the text for the
+     * voice's tier, pace and studio settings (a slower pace makes longer
+     * audio), so the plan's limit holds for the audio the request really makes.
      *
+     * @param  array<string, mixed>  $studio  performance_style, emotion, dialect and style_prompt
      * @return array{chars:int,words:int,seconds:int,minutes:int,credits:int}
      */
-    public static function estimate(string $text, float $speed = 1.0): array
+    public static function estimate(string $text, float $speed = 1.0, string $tier = VoiceTier::HD, array $studio = []): array
     {
-        $estimate = UsageEstimator::estimate($text);
-        if ($speed > 0 && $speed < 1) {
-            $estimate['seconds'] = (int) ceil($estimate['seconds'] / $speed);
-            $estimate['minutes'] = max(1, (int) ceil($estimate['seconds'] / 60));
-            $estimate['credits'] = Credits::forSeconds($estimate['seconds']);
-        }
-
-        return $estimate;
+        return UsageEstimator::estimate($text, $tier, $speed, $studio);
     }
 
     /**

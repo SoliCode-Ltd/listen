@@ -14,6 +14,7 @@ use App\Services\TtsService;
 use App\Support\CreditPeriod;
 use App\Support\Credits;
 use App\Support\UsageEstimator;
+use App\Support\VoiceTier;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -96,7 +97,7 @@ class CreditLedgerTest extends TestCase
             'voice_name' => 'en-US-ledger',
             'status' => 'processing',
         ]);
-        $estimate = UsageEstimator::estimate($text);
+        $estimate = UsageEstimator::estimate($text, VoiceTier::STANDARD);
         $counter = CreditPeriod::counter((int) $user->id);
         $counter->increment('total_requests');
         $counter->increment('total_chars', $estimate['credits']);

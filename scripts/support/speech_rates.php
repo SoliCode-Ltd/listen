@@ -17,11 +17,12 @@
 
 use App\Support\GeminiVocalTags;
 use App\Support\UsageEstimator;
+use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+$app->make(Kernel::class)->bootstrap();
 if (in_array(DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
     DB::statement('SET SESSION TRANSACTION READ ONLY');
 }
@@ -249,7 +250,7 @@ $solve = function (array $a, array $b): ?array {
 // Fitted to the relative error (iteratively reweighted least squares for the
 // median of |predicted - real| / real), so long voices do not drown out the
 // short ones most members make, and a few odd voices do not pull the fit.
-$fit = function (string $label, array $list, array $columns) use ($solve, $quantile, $fmt): ?array {
+$fit = function (string $label, array $list, array $columns) use ($solve): ?array {
     // Columns that seldom occur in these voices are left out.
     $columns = array_values(array_filter($columns, fn ($c) => $c === 'one' || count(array_filter($list, fn ($r) => $r[$c] > 0)) >= 8));
     if (count($list) < max(20, count($columns) * 5)) {

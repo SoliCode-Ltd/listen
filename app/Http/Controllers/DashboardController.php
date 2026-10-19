@@ -357,7 +357,7 @@ class DashboardController extends Controller
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = SpeechLanguages::detect($text);
         // A slower speed makes longer audio, so the reservation allows for it (as in the developer API).
-        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed'], $requestedTier, $studioOptions);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),

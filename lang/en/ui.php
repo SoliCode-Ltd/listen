@@ -1048,6 +1048,7 @@ return [
         'tab_overview' => 'Overview',
         'tab_plan' => 'Plan',
         'generated_audio_ready' => 'Your latest generated voice is ready to play.',
+        'generated_audio_charged' => ':duration of audio · :credits credits charged',
         'speaker_prefix' => 'Speaker:',
         'table_id' => 'ID',
         'table_title' => 'Title',

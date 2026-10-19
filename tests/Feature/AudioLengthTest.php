@@ -16,6 +16,7 @@ use App\Support\PlanCostEstimate;
 use App\Support\PlanUsageGuard;
 use App\Support\ShareableAudio;
 use App\Support\UsageEstimator;
+use App\Support\VoiceTier;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
@@ -193,7 +194,7 @@ class AudioLengthTest extends TestCase
 
         for ($i = 0; $i < 3; $i++) {
             // What the dashboard reserves when it queues the generation.
-            $estimate = UsageEstimator::estimate('Hello there');
+            $estimate = UsageEstimator::estimate('Hello there', VoiceTier::STANDARD);
             $counter->increment('total_requests');
             $counter->increment('total_chars', $estimate['chars']);
             $counter->addSeconds($estimate['seconds']);

@@ -280,7 +280,7 @@ class GenerateAudioJob implements ShouldQueue
                 );
             }
 
-            $actualEstimate = UsageEstimator::estimate($textForSpeech);
+            $actualEstimate = UsageEstimator::estimate($textForSpeech, $requestedTier, (float) ($studioOptions['speed'] ?? 1.0), $studioOptions);
             // The real length of the saved file; the provider's figure is only a guess from the text.
             // Measured before any effect, so an echo's tail is never charged.
             $measuredSeconds = AudioDuration::wholeSeconds(AudioDuration::ofStoredFile($audio['audio_path'] ?? null));
