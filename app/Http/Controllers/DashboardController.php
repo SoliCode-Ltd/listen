@@ -39,6 +39,9 @@ use Illuminate\Validation\ValidationException;
 
 class DashboardController extends Controller
 {
+    /** Generations the history lists at first, and fetches each time older ones are asked for. */
+    private const HISTORY_PAGE = 500;
+
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly AudioGenerationRecorder $audioGenerationRecorder,
@@ -57,11 +60,12 @@ class DashboardController extends Controller
         $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
         // The latest 500: a long history no longer makes the page slow to build and load
-        // (the counts below are still of every generation).
+        // (the counts below are still of every generation). Older ones come a page at a
+        // time from older(), which goes on from the oldest of these by id.
         $jobs = (clone $baseQuery)
             ->with(['textItem:id,title'])
-            ->latest()
-            ->limit(500)
+            ->latest('id')
+            ->limit(self::HISTORY_PAGE)
             ->get();
 
         $reusePreset = null;
@@ -179,6 +183,8 @@ class DashboardController extends Controller
                 fn (array $line): bool => $line['label'] !== __('ui.pricing.lines.label_card_needed'),
             )),
             'jobs' => $jobs,
+            // Where "Show older voices" goes on from, while there are older ones.
+            'olderJobsBefore' => $stats['total'] > $jobs->count() ? (int) $jobs->min('id') : null,
             'stats' => $stats,
             'activePlan' => $activePlan,
             'planTier' => $planTier,
@@ -540,6 +546,33 @@ class DashboardController extends Controller
             ->all();
 
         return response()->json(['ok' => true, 'jobs' => $jobs])->header('Cache-Control', 'no-store, private');
+    }
+
+    /**
+     * The member's next page of generations older than the given one, newest
+     * first: the studio lists the latest 500, and "Show older voices" fetches
+     * the rest, so no plan's history (Studio Max's without a limit) is cut short.
+     * next_before is where the page after goes on from, null at the oldest.
+     */
+    public function older(Request $request)
+    {
+        $userId = (int) auth()->id();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
+
+        $jobs = $this->userHistoryQuery($userId)
+            ->with('textItem:id,title')
+            ->where('id', '<', max(0, (int) $request->integer('before')))
+            ->latest('id')
+            ->limit(self::HISTORY_PAGE + 1)
+            ->get();
+        $hasMore = $jobs->count() > self::HISTORY_PAGE;
+        $jobs = $jobs->take(self::HISTORY_PAGE);
+
+        return response()->json([
+            'ok' => true,
+            'jobs' => $jobs->map(fn (AudioGeneration $job): array => $this->buildJobPayload($job, $voiceNameMap))->values()->all(),
+            'next_before' => $hasMore ? (int) $jobs->last()->id : null,
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     /**

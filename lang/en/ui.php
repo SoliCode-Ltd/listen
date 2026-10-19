@@ -1081,6 +1081,8 @@ return [
         'voices' => 'voices',
         'prev' => 'Prev',
         'next' => 'Next',
+        'show_older_voices' => 'Show older voices',
+        'older_voices_failed' => 'Older voices could not be loaded. Please try again.',
         'confirm_delete' => 'Are you sure you want to delete this voice?',
         'unable_delete_voice' => 'Unable to delete voice. Please try again.',
         'voice_generation_failed' => 'Voice generation failed. Please try again.',
