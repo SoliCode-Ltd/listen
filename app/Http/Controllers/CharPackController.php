@@ -10,6 +10,7 @@ use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Buying the one-time character pack: by card here, or by InstaPay /
@@ -96,7 +97,17 @@ class CharPackController extends Controller
             return response()->json(['ok' => false, 'message' => __('ui.pack.plan_includes_premium')], 409);
         }
 
-        return $this->respond($card->start($user, $pack, $validated['payment_method']));
+        // One card payment at a time for each member, so a second click is never a second charge.
+        $lock = Cache::lock('billing-pack:'.$user->id, 60);
+        if (! $lock->get()) {
+            return response()->json(['ok' => false, 'message' => __('ui.backend.billing_payment_in_progress')], 409);
+        }
+
+        try {
+            return $this->respond($card->start($user, $pack, $validated['payment_method']));
+        } finally {
+            $lock->release();
+        }
     }
 
     public function confirmCard(Request $request, CharPackCardPayment $card): JsonResponse

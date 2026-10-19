@@ -1606,8 +1606,9 @@ return [
         'api_missing_key' => 'مفتاح API مفقود.',
         'api_invalid_key' => 'مفتاح API غير صالح.',
 
-        // Payments: no free trial over a plan paid by hand.
+        // Payments: no free trial over a plan paid by hand, and one payment at a time.
         'trial_manual_plan_active' => 'التجربة المجانية غير متاحة ما دامت خطتك المدفوعة الحالية فعّالة.',
+        'billing_payment_in_progress' => 'هناك عملية دفع جارية بالفعل. انتظر لحظة ثم حدّث الصفحة.',
     ],
 
     // ===== استنساخ الأصوات =====

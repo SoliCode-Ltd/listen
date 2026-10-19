@@ -22,6 +22,7 @@ use App\Support\DiscountTerms;
 use App\Support\VoiceTier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -386,6 +387,30 @@ class BillingController extends Controller
             ], 422);
         }
 
+        // One payment at a time for each member: a second click or tab never starts
+        // a second subscription while the first one is still going through.
+        $lock = Cache::lock('billing-subscribe:'.$user->id, 60);
+        if (! $lock->get()) {
+            return response()->json([
+                'ok' => false,
+                'message' => __('ui.backend.billing_payment_in_progress'),
+            ], 409);
+        }
+
+        try {
+            return $this->subscribeWhileLocked($request, $user, $validated, $planRecord, $priceId, $prorationDate);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    /**
+     * The payment itself, while the member's payment lock is held (subscribe()).
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function subscribeWhileLocked(Request $request, User $user, array $validated, Plan $planRecord, string $priceId, ?int $prorationDate)
+    {
         $paymentMethod = trim((string) ($validated['payment_method'] ?? ''));
         $saveCard = $validated['save_card'] ?? true;
 
