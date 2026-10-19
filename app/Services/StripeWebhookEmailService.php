@@ -79,8 +79,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Status' => 'Cancellation scheduled',
             'Access Ends' => $periodEnd,
-            'Stripe Subscription ID' => $subscriptionId !== '' ? $subscriptionId : null,
-            'Stripe Customer ID' => trim((string) ($user->stripe_id ?? '')) ?: null,
         ];
 
         $html = $this->renderEmail(
@@ -131,8 +129,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Amount' => $amount,
             'Mode' => ucfirst($mode !== '' ? $mode : 'payment'),
-            'Stripe Customer ID' => $customerId,
-            'Checkout Session ID' => $sessionId,
             'Purchased At' => $this->formatUnixTimestamp(isset($session->created) ? (int) $session->created : null, true),
         ];
 
@@ -184,7 +180,6 @@ class StripeWebhookEmailService
         $isInitialPurchase = $billingReason === 'subscription_create';
         $periodEnd = $this->extractInvoicePeriodEnd($invoice);
         $invoiceNumber = trim((string) ($invoice->number ?? ''));
-        $subscriptionId = trim((string) ($invoice->subscription ?? ''));
         $invoiceUrl = trim((string) ($invoice->hosted_invoice_url ?? ''));
 
         $details = [
@@ -194,9 +189,6 @@ class StripeWebhookEmailService
             'Billing Reason' => $this->normalizeBillingReason($billingReason),
             'Renewal Date' => $periodEnd,
             'Invoice Number' => $invoiceNumber,
-            // 'Invoice ID' => $invoiceId,
-            // 'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
             'Paid At' => $this->formatUnixTimestamp(isset($invoice->status_transitions->paid_at) ? (int) $invoice->status_transitions->paid_at : null, true),
         ];
 
@@ -242,8 +234,6 @@ class StripeWebhookEmailService
             'Status' => $this->formatStatus($status),
             'Current Period Ends' => $this->formatUnixTimestamp(isset($subscription->current_period_end) ? (int) $subscription->current_period_end : null),
             'Trial Ends' => $this->formatUnixTimestamp(isset($subscription->trial_end) ? (int) $subscription->trial_end : null),
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $subject = $status === 'trialing' ? 'Trial started' : 'Subscription activated';
@@ -300,8 +290,6 @@ class StripeWebhookEmailService
                     'Plan' => $planLabel,
                     'Status' => $this->formatStatus($status),
                     'Current Period Ends' => $periodEnd,
-                    'Stripe Subscription ID' => $subscriptionId,
-                    'Stripe Customer ID' => $customerId,
                 ];
                 $html = $this->renderEmail(
                     $user,
@@ -331,8 +319,6 @@ class StripeWebhookEmailService
                 'Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
                 'Access Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -355,8 +341,6 @@ class StripeWebhookEmailService
             $details = [
                 'Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -380,8 +364,6 @@ class StripeWebhookEmailService
                 'Current Plan' => $planLabel,
                 'Status' => $this->formatStatus($status),
                 'Current Period Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -406,8 +388,6 @@ class StripeWebhookEmailService
                 'Status' => $this->formatStatus($status),
                 'Previous Status' => $this->formatStatus($previousStatus),
                 'Current Period Ends' => $periodEnd,
-                'Stripe Subscription ID' => $subscriptionId,
-                'Stripe Customer ID' => $customerId,
             ];
             $html = $this->renderEmail(
                 $user,
@@ -453,8 +433,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Status' => 'Canceled',
             'Canceled At' => $this->formatUnixTimestamp(isset($subscription->canceled_at) ? (int) $subscription->canceled_at : null, true),
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $html = $this->renderEmail(
@@ -501,8 +479,6 @@ class StripeWebhookEmailService
             'Plan' => $planLabel,
             'Trial Ends' => $trialEnd,
             'Amount' => $willCancel ? 'No charge (canceled)' : $amount,
-            'Stripe Subscription ID' => $subscriptionId,
-            'Stripe Customer ID' => $customerId,
         ];
 
         $summary = $willCancel
@@ -540,7 +516,6 @@ class StripeWebhookEmailService
         }
 
         $details = [
-            'Stripe Customer ID' => $customerId,
             'Customer Email' => $customerEmail,
             'Removed At' => now()->format('M j, Y g:i A'),
         ];
@@ -548,7 +523,7 @@ class StripeWebhookEmailService
         $html = $this->renderEmail(
             $user,
             'Billing profile removed',
-            ['Your Stripe customer profile was removed.', 'If this was not expected, contact support and we will help restore billing access.'],
+            ['Your billing profile was removed.', 'If this was not expected, contact support and we will help restore billing access.'],
             $details
         );
 
@@ -576,8 +551,6 @@ class StripeWebhookEmailService
 
         $details = [
             'Refund Amount' => $amount,
-            'Stripe Charge ID' => $chargeId,
-            'Stripe Customer ID' => $customerId,
             'Refunded At' => $this->formatUnixTimestamp(isset($charge->created) ? (int) $charge->created : null, true),
         ];
 
@@ -836,6 +809,9 @@ class StripeWebhookEmailService
         }
 
         return view('emails.stripe-billing', [
+            // These emails are written in English, so they read left to right
+            // whatever language the site was in when they were made.
+            'locale' => 'en',
             'subject' => $subject,
             'user' => $user,
             'summaryLines' => $summaryLines,
