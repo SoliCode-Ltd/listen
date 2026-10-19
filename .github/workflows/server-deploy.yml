@@ -6,7 +6,9 @@ name: Server deploy
 # storage/, vendor/, node_modules/, uploads, or the per-server extension
 # config (public/extensions/*/config.js).
 #   inspect: lists the files that differ from what would be deployed (nothing changes).
-#   deploy:  copies main over the app, then clears and rebuilds caches.
+#   deploy:  copies main over the app, then clears and rebuilds caches (never
+#            the app cache; routes only with route:trans:cache). Any failing
+#            step fails the run, and so does /en or /ar not answering 200.
 #   ffmpeg:  puts a static ffmpeg in storage/app/bin (for the sound
 #            environments and download formats) when the host has none.
 #   migrate: lists the pending migrations, then runs them (php artisan
@@ -46,6 +48,11 @@ on:
 
 permissions:
   contents: read
+
+# One run at a time per server: a second deploy (or migrate) waits for the first.
+concurrency:
+  group: server-deploy-${{ inputs.target }}
+  cancel-in-progress: false
 
 jobs:
   run:
@@ -240,25 +247,51 @@ jobs:
           fi
           if [ "$MODE" != deploy ]; then exit 0; fi
           $S "$FIND; cat > storage/app/listen-deploy/bundle.tgz" < bundle.tgz
-          $S "$FIND; set -e; tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir; \
-            c=0; [ -f bootstrap/cache/config.php ] && c=1; r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1; \
-            php artisan optimize:clear | tail -6; \
-            [ \$c = 1 ] && php artisan config:cache | tail -1; [ \$r = 1 ] && php artisan route:cache | tail -1; \
-            php artisan view:cache | tail -1; php artisan queue:restart | tail -1 || true; \
-            md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'; \
-            rm -f storage/app/listen-deploy/bundle.tgz"
+          # In bash with pipefail, so anything that fails stops the deploy and fails the run.
+          $S "$FIND; bash -s" <<'REMOTE'
+          set -euo pipefail
+          trap 'rm -f storage/app/listen-deploy/bundle.tgz' EXIT
+          # One artisan step: its last lines when it works, all of its output (artisan
+          # prints errors there too) and a FAILED line when it does not.
+          step() {
+            local lines="$1" out; shift
+            if ! out="$(php artisan "$@" 2>&1)"; then
+              printf '%s\n' "$out"; echo "DEPLOY FAILED at: php artisan $*"; exit 1
+            fi
+            printf '%s\n' "$out" | tail -n "$lines"
+          }
+          tar -xzf storage/app/listen-deploy/bundle.tgz --no-same-owner --no-overwrite-dir
+          c=0; [ -f bootstrap/cache/config.php ] && c=1
+          r=0; [ -f bootstrap/cache/routes-v7.php ] && r=1
+          # The app cache stays: it holds the Stripe webhook and email de-duplication,
+          # the daily spend ceilings, rate limits and the keys' "out for today" markers.
+          step 6 optimize:clear --except=cache
+          # The /en and /ar routes have their own cache files (mcamara/laravel-localization).
+          # Clear them every time, and cache routes only with route:trans:cache: plain
+          # route:cache leaves out the language prefix, so every /en and /ar page 404s.
+          step 1 route:trans:clear
+          if [ "$c" = 1 ]; then step 1 config:cache; fi
+          if [ "$r" = 1 ]; then step 1 route:trans:cache; fi
+          step 1 view:cache
+          php artisan queue:restart | tail -1 || true
+          md5sum -c --quiet storage/app/listen-deploy/manifest.md5 >/dev/null 2>&1 && echo 'DEPLOYED: every file matches ${{ inputs.target == 'live' && 'main' || github.ref_name }}' || echo 'WARNING: some files still differ'
+          REMOTE
           rm -f ~/.ssh/id_deploy
       - name: Check the public footer
         env:
           BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
         run: |
+          failed=0
           for path in /ar /en; do
             html="$(curl -s --max-time 30 -L "$BASE$path" || true)"
             code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 -L "$BASE$path" || echo 000)"
             echo "$path: HTTP $code, footer columns: $(printf '%s' "$html" | grep -o 'class="footer-column"' | wc -l), dialect page links in page: $(printf '%s' "$html" | grep -o 'arabic-dialects/[a-z-]*"' | wc -l), hub links: $(printf '%s' "$html" | grep -oE '/(arabic-dialects|english-accents)"' | sort -u | tr '\n' ' ')"
+            # Either home page not loading fails the run, so a broken deploy is not missed.
+            [ "$code" = 200 ] || { echo "::error::$BASE$path answered HTTP $code"; failed=1; }
           done
           # Text the server could not find shows as its key ("ui.pricing.team_title"); list any.
           for path in /ar /en /ar/pricing /en/pricing; do
             keys="$(curl -s --max-time 30 -L "$BASE$path" | grep -oE '>[[:space:]]*ui\.[a-z0-9_]+\.[a-z0-9_.]+' | sed 's/^>[[:space:]]*//' | sort -u | tr '\n' ' ' || true)"
             echo "$path: untranslated keys: ${keys:-none}"
           done
+          exit "$failed"
