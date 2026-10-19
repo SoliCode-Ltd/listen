@@ -35,6 +35,11 @@ foreach (['memory_limit', 'max_execution_time', 'max_input_time', 'upload_max_fi
     $v = ini_get($k);
     echo str_pad($k, 32), $v === false ? '(not set)' : ($v === '' ? '(empty)' : $v), "\n";
 }
+// Whether the app can give itself more while it runs (a voice made after the reply does).
+$memory = ini_get('memory_limit');
+echo str_pad('memory raised while running', 32), @ini_set('memory_limit', '1024M') === false ? 'NOT allowed (fixed by the host)' : 'allowed', "\n";
+@ini_set('memory_limit', (string) $memory);
+echo str_pad('time raised while running', 32), function_exists('set_time_limit') && @set_time_limit(1800) ? 'allowed' : 'NOT allowed', "\n";
 $off = array_map('trim', explode(',', (string) ini_get('disable_functions')));
 foreach (['set_time_limit', 'ignore_user_abort', 'fastcgi_finish_request', 'proc_open'] as $f) {
     echo str_pad($f.'()', 32), function_exists($f) && ! in_array($f, $off, true) ? 'available' : 'NOT available', "\n";

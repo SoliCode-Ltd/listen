@@ -31,7 +31,8 @@ name: Server deploy
 #   settings: the server's own switches in .env (the old .env is kept in
 #            storage/app/listen-deploy): LISTEN_LIVE_ACTIONS true on live and
 #            false on staging, the extension's old shared LISTEN_API_KEY
-#            removed, and on live a local/testing APP_ENV set to production and
+#            removed, .env readable by its owner and the web server only (640),
+#            and on live a local/testing APP_ENV set to production and
 #            APP_DEBUG turned off. Rebuilds the config cache, restarts the
 #            workers, then shows what is in use (never a secret's value), the
 #            PHP limits, the queue workers and the scheduler.
@@ -259,6 +260,8 @@ jobs:
           echo "LISTEN_LIVE_ACTIONS: $(env_of LISTEN_LIVE_ACTIONS)"
           # The extension's old shared key acted as account 1; members' extensions use their own keys.
           if grep -q '^LISTEN_API_KEY=' .env; then sed -i '/^LISTEN_API_KEY=/d' .env; echo "LISTEN_API_KEY: removed"; else echo "LISTEN_API_KEY: was not set"; fi
+          # Its owner and the web server's group only: it was readable by every account on the server.
+          chmod 640 .env 2>/dev/null && echo ".env: owner and web server only (640)" || echo ".env: who can read it was left as it was"
           if [ "$TARGET" = live ]; then
             # local or testing believes payment events nobody signed; debug pages show internals.
             e="$(env_of APP_ENV)"; case "$e" in local|testing) set_env APP_ENV production; echo "APP_ENV: $e -> production";; *) echo "APP_ENV: ${e:-not set} (kept)";; esac
