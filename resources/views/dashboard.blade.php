@@ -4309,6 +4309,7 @@
       }
 
       let data = null;
+      let replyStatus = 0;
       try {
         const baseUrl = parsedSource === 'demo' ? deleteDemoJobBaseUrl : deleteJobBaseUrl;
         const response = await fetch(`${baseUrl}/${parsedJobId}`, {
@@ -4320,9 +4321,10 @@
           },
         });
 
-        data = await response.json().catch(() => ({}));
-        if (!response.ok || data?.ok === false) {
-          throw new Error(extractErrorMessage(data, i18n.unable_delete_voice));
+        replyStatus = response.status;
+        data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.ok === false) {
+          throw new Error(extractErrorMessage(data, i18n.unable_delete_voice, replyStatus));
         }
 
         const deletedId = Number(data?.deleted_id || parsedJobId);
@@ -4333,7 +4335,7 @@
         renderJobsPage();
         showFormMessage(null, '');
       } catch (error) {
-        showFormMessage('error', extractErrorMessage(data, error?.message || i18n.unable_delete_voice));
+        showFormMessage('error', replyStatus ? String(error?.message || i18n.unable_delete_voice) : extractErrorMessage(null, i18n.unable_delete_voice));
       } finally {
         if (triggerBtn instanceof HTMLButtonElement) {
           triggerBtn.disabled = false;
@@ -4383,39 +4385,27 @@
       deleteJob(deleteBtn.getAttribute('data-job-id'), deleteBtn.getAttribute('data-job-source'), deleteBtn);
     });
 
-    function extractErrorMessage(data, fallback = i18n.voice_generation_failed) {
-      // Helper to detect technical/internal error messages
-      const isTechnicalError = (msg) => {
-        if (!msg || typeof msg !== 'string') return false;
-        const patterns = [
-          /maximum execution time/i,
-          /timeout/i,
-          /memory.*exhausted/i,
-          /fatal error/i,
-          /internal server error/i,
-          /500/,
-          /502/,
-          /503/,
-          /504/,
-          /gateway/i,
-          /service unavailable/i,
-        ];
-        return patterns.some(p => p.test(msg));
-      };
+    // What a refused request tells the member, decided by the reply and never by its
+    // wording: a refusal (a 4xx, or ok:false) in the server's own words, even with a
+    // number in them such as a 5000-character limit; the "busy" text only for a server
+    // error without a message of ours, a reply that is not JSON, or no reply at all.
+    function extractErrorMessage(data, fallback = i18n.voice_generation_failed, status = 0) {
+      const isJson = Boolean(data) && typeof data === 'object';
+      const serverTrouble = !isJson || (status >= 500 && data.ok !== false);
+      if (serverTrouble) {
+        return i18n.server_overload || fallback;
+      }
       let message = null;
-      if (data?.message) message = String(data.message);
-      else if (data?.error_message) message = String(data.error_message);
+      if (data.message) message = String(data.message);
+      else if (data.error_message) message = String(data.error_message);
       else {
-        const errors = data?.errors;
+        const errors = data.errors;
         if (errors && typeof errors === 'object') {
           const keys = Object.keys(errors);
           if (keys.length > 0 && Array.isArray(errors[keys[0]]) && errors[keys[0]][0]) {
             message = String(errors[keys[0]][0]);
           }
         }
-      }
-      if (message && isTechnicalError(message)) {
-        return i18n.server_overload || fallback;
       }
       return message || fallback;
     }
@@ -4444,6 +4434,7 @@
       generateBtn.disabled = true;
       renderGenerateButtonContent(i18n.generating, true);
       let data = null;
+      let replyStatus = 0;
       let wasSuccessful = false;
       try {
         const response = await fetch(queueUrl, {
@@ -4451,11 +4442,12 @@
           headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
           body: new FormData(voiceForm),
         });
-        data = await response.json().catch(() => ({}));
+        replyStatus = response.status;
+        data = await response.json().catch(() => null);
         if (data?.job) upsertJobRow(data.job);
         if (data?.usage) updateUsagePanel(data.usage);
         if (data?.stats) updateStats(data.stats);
-        if (!response.ok || data?.ok === false) throw new Error(extractErrorMessage(data));
+        if (!response.ok || !data || data.ok === false) throw new Error(extractErrorMessage(data, i18n.voice_generation_failed, replyStatus));
         wasSuccessful = true;
         if (data?.job?.audio_url) {
           // The player docks at the bottom of the screen: no jump away from the text.
@@ -4469,7 +4461,8 @@
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
       } catch (error) {
-        const message = extractErrorMessage(data, error?.message || i18n.voice_generation_failed);
+        // No reply at all (offline, a dropped connection) is never shown in the browser's own words.
+        const message = replyStatus ? String(error?.message || i18n.voice_generation_failed) : extractErrorMessage(null);
         showFormMessage('error', message);
         // Check if server returned a rate limit with retry seconds
         const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);

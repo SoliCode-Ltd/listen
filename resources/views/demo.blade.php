@@ -550,25 +550,9 @@
       errorUpgrade.hidden = !noticeUpgrade;
     }
 
+    // Shown as given: callEndpoint has already put a server error in friendly words.
     function setError(message = '') {
       if (!message) { noticeError = ''; renderNotice(); return; }
-      // Sanitize technical error messages
-      const technicalPatterns = [
-        /maximum execution time/i,
-        /timeout/i,
-        /memory.*exhausted/i,
-        /fatal error/i,
-        /internal server error/i,
-        /500/,
-        /502/,
-        /503/,
-        /504/,
-        /gateway/i,
-        /service unavailable/i,
-      ];
-      if (technicalPatterns.some(p => p.test(message))) {
-        message = i18n.server_overload || i18n.preview_failed;
-      }
       noticeError = message;
       renderNotice();
       scrollFeedbackIntoView(errorBox);
@@ -1108,12 +1092,26 @@
         headers['X-Client-FP'] = clientFingerprint;
       }
 
-      const res = await fetch(endpoint, { method: 'POST', headers, body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data?.ok === false) {
+      let res;
+      try {
+        res = await fetch(endpoint, { method: 'POST', headers, body: fd });
+      } catch (_networkError) {
+        // No reply at all (offline, a dropped connection): never the browser's own words.
+        const error = new Error(i18n.server_overload || i18n.request_failed);
+        error.payload = null;
+        throw error;
+      }
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.ok === false) {
+        // Decided by the reply, never by its wording: a refusal (a 4xx, or ok:false) in the
+        // server's own words, even with a number in them such as a 1,500 allowance; the
+        // "busy" text only for a server error without a message of ours, or a reply that is not JSON.
+        const serverTrouble = !data || (res.status >= 500 && data.ok !== false);
         const firstError = data?.errors && typeof data.errors === 'object' ? Object.values(data.errors)[0] : null;
         const firstErrorText = Array.isArray(firstError) ? String(firstError[0]||'') : '';
-        const error = new Error(String(data?.message || firstErrorText || i18n.request_failed));
+        const error = new Error(serverTrouble
+          ? (i18n.server_overload || i18n.request_failed)
+          : String(data.message || firstErrorText || i18n.request_failed));
         error.payload = data;
         throw error;
       }
