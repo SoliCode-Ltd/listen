@@ -641,7 +641,10 @@ class GeminiTtsProvider implements TtsProviderInterface
 
     /**
      * Send the pieces in parallel batches. A piece that fails is sent again
-     * on its own, with the usual retries and key rotation.
+     * on its own, with the usual retries; one that hit its key's limit (or a
+     * key Google refused) is sent on another key, not the same one again. The
+     * retry budget runs from the start of each batch, so a long text's earlier
+     * batches never use it up for a later piece.
      *
      * @param  array<int, array<string, mixed>>  $payloads
      * @return array<int, array{bytes:string,mime_type:?string}>
@@ -652,11 +655,13 @@ class GeminiTtsProvider implements TtsProviderInterface
         $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
         $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
         $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
-        $keyInfo = $this->currentKeyInfo ?? $this->getAvailableKey();
-        $startedAt = microtime(true);
         $parts = [];
+        $answeredBy = [];
 
         foreach (array_chunk($payloads, $parallel, true) as $batch) {
+            // The key in use now: after a piece hit a key's limit, the next one.
+            $keyInfo = $this->currentKeyInfo ?? $this->getAvailableKey();
+            $startedAt = microtime(true);
             $responses = Http::pool(function (Pool $pool) use ($batch, $endpoint, $timeout, $verifySsl, $keyInfo) {
                 foreach ($batch as $index => $payload) {
                     $pool->as('part' . $index)
@@ -677,6 +682,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 if ($response instanceof Response && $response->ok() && is_array($response->json())) {
                     try {
                         $parts[$index] = $this->extractAudioFromResponse($response->json());
+                        $answeredBy[$index] = $keyInfo['name'];
                         continue;
                     } catch (TransientGeminiException $e) {
                         $error = $e->getMessage();
@@ -692,21 +698,60 @@ class GeminiTtsProvider implements TtsProviderInterface
                     'elapsed_seconds' => round($elapsed, 1),
                     'error' => mb_substr((string) $error, 0, 300),
                 ]);
-                if ($elapsed >= $retryBudgetSeconds && !($response instanceof Response && $response->status() === 429)) {
+                // Only the key was at fault: the piece is sent on another key, whatever the time.
+                $keyAtFault = $response instanceof Response && $this->setKeyAside($response, $keyInfo, $endpoint);
+                if (! $keyAtFault && $elapsed >= $retryBudgetSeconds) {
                     throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
                 }
 
                 $parts[$index] = $this->requestAudio($endpoint, $payload);
+                $answeredBy[$index] = ($this->currentKeyInfo ?? $keyInfo)['name'];
             }
         }
 
-        for ($i = 1; $i < count($payloads); $i++) {
-            $this->getKeyManager()->recordUsage($keyInfo['name'], 0);
+        // One request for each piece, counted on the key that answered it; synthesize()
+        // counts one request of the key in use at the end, with the characters.
+        $counted = array_search(($this->currentKeyInfo ?? [])['name'] ?? null, $answeredBy, true);
+        if ($counted !== false) {
+            unset($answeredBy[$counted]);
+        }
+        foreach ($answeredBy as $keyName) {
+            $this->getKeyManager()->recordUsage($keyName, 0);
         }
 
         ksort($parts);
 
         return $parts;
+    }
+
+    /**
+     * A piece came back with its key's limit (429) or with the key refused: the
+     * key is set aside (for the minute, or for the day after a daily quota or a
+     * refusal) and the next request goes to another key, when there is one.
+     * False for any other error.
+     */
+    private function setKeyAside(Response $response, array $keyInfo, string $endpoint): bool
+    {
+        $status = $response->status();
+        $body = (string) $response->body();
+        $badKey = GeminiKeyManager::isKeyProblem($status, $body);
+        if ($status !== 429 && ! $badKey) {
+            return false;
+        }
+
+        if ($badKey || GeminiKeyManager::isDailyQuotaError($status, $body)) {
+            $this->getKeyManager()->markOutForToday(
+                $keyInfo['name'],
+                GeminiKeyManager::modelFromPath($endpoint, (string) ($this->currentModel ?? GeminiTtsModel::resolve())),
+            );
+        }
+
+        // Once for the batch: its other pieces went on the same key.
+        if (($this->currentKeyInfo['name'] ?? null) === $keyInfo['name'] && count($this->getKeyManager()->getAllKeys()) > 1) {
+            $this->rotateToNextKey();
+        }
+
+        return true;
     }
 
     /**

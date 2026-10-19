@@ -83,6 +83,61 @@ class GeminiKeyRotationTest extends TestCase
         $this->assertSame(['k2'], $calls, 'later requests skip the cut-off key');
     }
 
+    public function test_a_piece_that_hits_its_keys_limit_is_sent_on_another_key_not_the_same_one(): void
+    {
+        Storage::fake('public');
+        config([
+            'services.gemini_tts.api_key' => '', 'services.gemini_tts.dialect_rewrite' => false,
+            'services.gemini_tts.retry_pause_ms' => 0, 'services.gemini_tts.max_chars_per_request' => 200,
+        ]);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $manager = $this->threeKeys();
+        $calls = ['k1' => 0, 'k2' => 0, 'k3' => 0];
+        Http::fake(function ($request) use (&$calls) {
+            $key = $request->header('x-goog-api-key')[0] ?? '';
+            $calls[$key]++;
+
+            return $key === 'k1'
+                ? Http::response(['error' => ['code' => 429, 'message' => 'Rate limit exceeded: requests per minute.', 'status' => 'RESOURCE_EXHAUSTED']], 429)
+                : Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;rate=24000', 'data' => base64_encode(str_repeat("\0", 4800))]]]]]]]);
+        });
+        // Three pieces, sent together on the first key.
+        $sentence = trim(str_repeat('The quick brown fox jumps over the lazy dog. ', 3));
+        $text = implode("\n", [$sentence, $sentence, $sentence]);
+
+        $result = app(GeminiTtsProvider::class)->synthesize($text, 'en', ['voice_name' => 'Kore']);
+
+        Storage::disk('public')->assertExists($result['audio_path']);
+        $this->assertSame(['k1' => 3, 'k2' => 3, 'k3' => 0], $calls, 'each piece went once to the limited key, then to the next one');
+        $this->assertSame($manager->getKeyStats('GEMINI_TTS_API_KEY')['rpm_limit'], $manager->getKeyStats('GEMINI_TTS_API_KEY')['rpm_used'], 'the limited key is set aside for the minute');
+        $this->assertSame(3, $manager->getKeyStats('GEMINI_TTS_API_KEY_2')['rpm_used'], 'the usage is counted on the key that answered');
+    }
+
+    public function test_a_keys_minute_counters_start_again_after_the_minute_under_steady_use(): void
+    {
+        $manager = new GeminiKeyManager;
+
+        // A request every half minute: each one used to restart the minute.
+        $manager->recordUsage('GEMINI_TTS_API_KEY', 400);
+        $this->travel(30)->seconds();
+        $manager->recordUsage('GEMINI_TTS_API_KEY', 400);
+        $this->travel(29)->seconds();
+        $manager->recordUsage('GEMINI_TTS_API_KEY', 400);
+
+        $stats = $manager->getKeyStats('GEMINI_TTS_API_KEY');
+        $this->assertSame(3, $stats['rpm_used']);
+        $this->assertSame(300, $stats['tpm_used']);
+
+        $this->travel(2)->seconds();
+        $stats = $manager->getKeyStats('GEMINI_TTS_API_KEY');
+        $this->assertSame(0, $stats['rpm_used'], 'a minute after the first request the window is over');
+        $this->assertSame(0, $stats['tpm_used']);
+        $this->assertSame(3, $stats['rpd_used'], 'the day still counts all three');
+
+        $manager->recordUsage('GEMINI_TTS_API_KEY', 400);
+        $this->assertSame(1, $manager->getKeyStats('GEMINI_TTS_API_KEY')['rpm_used'], 'a new minute starts');
+    }
+
     public function test_a_key_google_refuses_is_skipped_and_the_member_still_gets_audio(): void
     {
         Storage::fake('public');

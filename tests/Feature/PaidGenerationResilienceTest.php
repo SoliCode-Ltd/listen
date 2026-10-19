@@ -336,6 +336,36 @@ class PaidGenerationResilienceTest extends TestCase
         $this->assertSame($calls->geminiTexts[1], $calls->geminiTexts[2]);
     }
 
+    public function test_a_slow_first_batch_does_not_use_up_a_later_pieces_retries(): void
+    {
+        config([
+            'services.gemini_tts.model' => 'gemini-3.8-flash-tts',
+            'services.gemini_tts.max_chars_per_request' => 200,
+            'services.gemini_tts.max_parallel_requests' => 1,
+            'services.gemini_tts.retry_budget_seconds' => 1,
+        ]);
+        $sent = ['alpha' => 0, 'bravo' => 0];
+        Http::fake(function ($request) use (&$sent) {
+            $text = (string) ($request->data()['contents'][0]['parts'][0]['text'] ?? '');
+            $piece = str_contains($text, 'alpha') ? 'alpha' : 'bravo';
+            $sent[$piece]++;
+            if ($piece === 'alpha') {
+                // The first batch is slow, past the whole retry budget.
+                usleep(1_100_000);
+            } elseif ($sent['bravo'] === 1) {
+                return Http::response(['error' => ['message' => 'Internal error']], 500);
+            }
+
+            return $this->geminiAudio();
+        });
+        $text = trim(str_repeat('This is the alpha part of the story. ', 4))."\n".trim(str_repeat('This is the bravo part of the story. ', 4));
+
+        $result = app(TtsService::class)->synthesizeAdvanced($text, 'en', $this->hdOptions(), $this->starterPlan());
+
+        $this->assertSame('gemini', $result['provider']);
+        $this->assertSame(['alpha' => 1, 'bravo' => 2], $sent, 'the second batch still got its retry');
+    }
+
     private function fakeGemini(array $geminiResponses): \stdClass
     {
         $calls = new \stdClass;

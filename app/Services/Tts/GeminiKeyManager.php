@@ -388,18 +388,23 @@ class GeminiKeyManager
         return (int) Cache::get($this->cacheKey('rpd_' . $today, $keyName), 0);
     }
 
+    /**
+     * A fixed one-minute window from the first request in it. Writing the count
+     * again would restart the minute on every use, so under steady traffic a
+     * key never looked free again and every request piled onto the first key.
+     */
     private function incrementRpm(string $keyName): void
     {
         $cacheKey = $this->cacheKey('rpm', $keyName);
-        $current = (int) Cache::get($cacheKey, 0);
-        Cache::put($cacheKey, $current + 1, self::CACHE_TTL_MINUTE);
+        Cache::add($cacheKey, 0, self::CACHE_TTL_MINUTE);
+        Cache::increment($cacheKey);
     }
 
     private function incrementTpm(string $keyName, int $tokens): void
     {
         $cacheKey = $this->cacheKey('tpm', $keyName);
-        $current = (int) Cache::get($cacheKey, 0);
-        Cache::put($cacheKey, $current + $tokens, self::CACHE_TTL_MINUTE);
+        Cache::add($cacheKey, 0, self::CACHE_TTL_MINUTE);
+        Cache::increment($cacheKey, $tokens);
     }
 
     private function incrementRpd(string $keyName): void
