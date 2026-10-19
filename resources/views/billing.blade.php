@@ -1509,11 +1509,12 @@
         } else {
           const quota = (trialOffer.plan_quotas || {})[String(trial.plan?.slug || '')] || trialOffer.quota || {};
           trialNote.hidden = false;
+          // 0-9 with commas in both languages, as the server writes numbers.
           trialNote.textContent = String(i18n.trial_note || '')
             .replace(':quota', String(quota.name || trialOffer.quota_plan_name || ''))
-            .replace(':chars', Number(quota.chars || 0).toLocaleString())
-            .replace(':per_request', Number(quota.per_request || 0).toLocaleString())
-            .replace(':minutes', Number(quota.minutes || 0).toLocaleString());
+            .replace(':chars', Number(quota.chars || 0).toLocaleString('en-US'))
+            .replace(':per_request', Number(quota.per_request || 0).toLocaleString('en-US'))
+            .replace(':minutes', Number(quota.minutes || 0).toLocaleString('en-US'));
         }
       }
     }
@@ -1539,7 +1540,8 @@
         plan: plan,
         amount: `\u2066${amount}\u2069`,
         zeroPlain: zeroAmount(amount),
-        date: end.toLocaleDateString(document.documentElement.lang || undefined, { year: 'numeric', month: 'long', day: 'numeric' }),
+        // Arabic month names with 0-9, as the dates the server writes.
+        date: end.toLocaleDateString(isArabicLocale ? 'ar-u-nu-latn' : (document.documentElement.lang || undefined), { year: 'numeric', month: 'long', day: 'numeric' }),
       };
     }
 

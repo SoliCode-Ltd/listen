@@ -1339,7 +1339,8 @@
     th, td {
       padding: 1.1rem .85rem;
       border-bottom: 1px solid color-mix(in oklab, var(--line) 40%, transparent);
-      text-align: left;
+      /* The reading side: left in English, right in Arabic. */
+      text-align: start;
       vertical-align: middle;
     }
     th {
@@ -3495,8 +3496,9 @@
     let jobsCurrentPage = 1;
     const jobsPerPage = 10;
 
+    // 0-9 with commas in both languages, as the server writes numbers (number_format).
     function formatNumber(value) {
-      return new Intl.NumberFormat(pageLocale === 'ar' ? 'ar' : 'en-US').format(Number(value || 0));
+      return new Intl.NumberFormat('en-US').format(Number(value || 0));
     }
 
     function normalizeLanguage(value) {
@@ -4808,7 +4810,7 @@
       if (!contentInput || !charCountEl || !charCounter) return;
       // Every character is charged, spaces and line breaks too (as the server counts them).
       const length = Array.from(contentInput.value.trim()).length;
-      charCountEl.textContent = length.toLocaleString();
+      charCountEl.textContent = formatNumber(length);
       const fill = document.getElementById('charCounterFill');
       if (fill) fill.style.width = Math.min(100, (length / Math.max(1, maxCharsPerRequest)) * 100) + '%';
       refreshCreditLive();
@@ -5434,7 +5436,8 @@
         const sourceType = String(voice?.source_type || 'upload').toLowerCase();
         const sourceLabel = sourceTypeLabels[sourceType] || sourceTypeLabels.upload;
         const createdTs = Number(voice?.created_at_ts || Math.floor(Date.now() / 1000));
-        const createdLabel = new Date(createdTs * 1000).toLocaleDateString(pageLocale.startsWith('ar') ? 'ar-EG' : 'en-US', {
+        // Arabic month names with 0-9, as the cards the server writes.
+        const createdLabel = new Date(createdTs * 1000).toLocaleDateString(pageLocale.startsWith('ar') ? 'ar-EG-u-nu-latn' : 'en-US', {
           year: 'numeric',
           month: 'short',
           day: '2-digit',

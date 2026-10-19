@@ -116,7 +116,8 @@
               @if(auth()->user()->google_avatar)
                 <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
               @else
-                {{ strtoupper(substr(preg_replace('/[^a-zA-Z]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
+                {{-- The name's first letter in any script (أحمد → أ). --}}
+                {{ mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
               @endif
             </div>
             <span class="user-name">{{ auth()->user()->name }}</span>
@@ -128,7 +129,7 @@
                 @if(auth()->user()->google_avatar)
                   <img src="{{ auth()->user()->google_avatar }}" alt="{{ auth()->user()->name }}" />
                 @else
-                  {{ strtoupper(substr(preg_replace('/[^a-zA-Z]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
+                  {{ mb_strtoupper(mb_substr(preg_replace('/[^\p{L}]/u', '', auth()->user()->name ?? '') ?: 'U', 0, 1)) }}
                 @endif
               </div>
               <div class="dropdown-user-info">

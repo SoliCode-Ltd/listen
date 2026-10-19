@@ -184,9 +184,10 @@
     try { localStorage.setItem(DISMISS_KEY, v ? '1' : '0'); } catch (e) {}
   }
 
+  // 0-9 with commas in both languages, as the popup's own numbers (number_format).
   function formatNumber(n) {
     const num = Number(n || 0);
-    try { return new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-US').format(num); }
+    try { return new Intl.NumberFormat('en-US').format(num); }
     catch (e) { return String(num); }
   }
 
