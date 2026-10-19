@@ -58,11 +58,13 @@ class ShareableAudio
 
     /**
      * Packages a take from its file, so a long one is never held in memory:
-     * a WAV is encoded to a new MP3 temp file (the caller removes it); an MP3,
-     * or a WAV that cannot be converted, is handed back as it is.
+     * a WAV is brought to the common loudness and encoded to a new MP3 temp
+     * file (the caller removes it); an MP3, or a WAV that cannot be converted,
+     * is handed back as it is (not levelled: that would mean encoding it twice).
      *
      * $pieces says where each piece of a long text sits in the file (its first
-     * frame, the frame after its last one, and its part of the script).
+     * frame, the frame after its last one, and its part of the script), so the
+     * pieces can be levelled to each other.
      *
      * @param  array<int, array<int, int>>  $pieces
      * @return array{path: string, extension: string}
@@ -92,7 +94,11 @@ class ShareableAudio
         // (members pay by the second: a take once ended in 3 minutes of hiss),
         // keeping a natural 0.2 s lead and 0.35 s tail; anything shorter is
         // left alone. If that fails (or runs out of time), the take is encoded as it came.
-        $attempts = $voice !== null ? [['atrim=start_sample='.$voice[0].':end_sample='.$voice[1]], []] : [[]];
+        $trim = $voice !== null ? ['atrim=start_sample='.$voice[0].':end_sample='.$voice[1]] : [];
+        // Every take is brought to the same loudness here, once (SpeechLoudness);
+        // a run that fails is tried without it, then as the take came.
+        $level = $voice !== null && $pcm !== null ? SpeechLoudness::filters($ffmpeg, $path, $pcm, $voice, $pieces, self::timeout($seconds)) : [];
+        $attempts = array_values(array_unique([array_merge($trim, $level), $trim, []], SORT_REGULAR));
         foreach ($attempts as $filters) {
             try {
                 $process = new Process(array_merge(
@@ -177,12 +183,12 @@ class ShareableAudio
 
     /**
      * The part of a take that is kept: from 0.2 s before the first word to
-     * 0.35 s after the last one, in frames. Only the quiet edges are read,
-     * a few blocks from each end. Null when the take has no word (all quiet:
-     * it is kept whole).
+     * 0.35 s after the last one, in frames, then where the first word starts
+     * and the last one ends. Only the quiet edges are read, a few blocks from
+     * each end. Null when the take has no word (all quiet: it is kept whole).
      *
      * @param  array{offset: int, length: int, rate: int, channels: int}  $pcm
-     * @return array{0: int, 1: int}|null
+     * @return array{0: int, 1: int, 2: int, 3: int}|null
      */
     public static function voice(string $path, array $pcm): ?array
     {
@@ -208,6 +214,8 @@ class ShareableAudio
         return [
             max(0, $first - (int) round(self::LEAD_SECONDS * $pcm['rate'])),
             min($frames, $last + (int) round(self::TAIL_SECONDS * $pcm['rate'])),
+            $first,
+            $last,
         ];
     }
 
