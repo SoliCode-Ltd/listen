@@ -2,9 +2,13 @@
 
 namespace App\Services\Auth;
 
+use App\Mail\NewsletterMail;
+use App\Models\Newsletter;
 use App\Models\User;
+use App\Services\Newsletter\NewsletterRenderer;
 use App\Services\Newsletter\PaidWelcomeEmail;
 use App\Support\EmailVerification;
+use App\Support\TitanMailbox;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -13,8 +17,9 @@ use Illuminate\Support\Facades\URL;
 use function Illuminate\Support\defer;
 
 /**
- * The email with the link that confirms a member's address: plain text, like
- * the billing emails, in the language of the page the member was on. It goes
+ * The email with the link that confirms a member's address, in the site's email
+ * design (the newsletter's, as the paid welcome email), in the language of the
+ * page the member was on. It goes
  * out at sign-up and when the member asks for a new link. That is the
  * member's own request, so staging sends it too (App\Support\LiveServer only
  * holds back the emails scheduled jobs send). A failure never stops sign-up:
@@ -53,13 +58,8 @@ class EmailVerificationMailer
         $locale = $locale === 'ar' ? 'ar' : 'en';
 
         try {
-            $body = $this->body($user, $this->verificationUrl($user), $locale);
-            $subject = __('ui.verify_email.mail_subject', [], $locale);
             $name = trim((string) $user->name);
-
-            Mail::raw($body, function ($message) use ($address, $name, $subject): void {
-                $message->to($address, $name !== '' ? $name : null)->subject($subject);
-            });
+            Mail::to($address, $name !== '' ? $name : null)->send($this->mail($user, $this->verificationUrl($user), $locale));
         } catch (\Throwable $e) {
             Cache::forget(self::sentKey((int) $user->id));
             Log::warning('The email confirmation link was not sent.', [
@@ -120,25 +120,43 @@ class EmailVerificationMailer
             && ! PaidWelcomeEmail::isPhoneSignupAddress($email);
     }
 
-    private function body(User $user, string $url, string $locale): string
+    /**
+     * The email in the newsletter's design (resources/views/mail/newsletter.blade.php),
+     * as the paid welcome email is, in the member's language: a button that opens the
+     * link, and the link itself in the plain-text part. No unsubscribe link: the member
+     * asked for it.
+     */
+    public function mail(User $user, string $url, string $locale): NewsletterMail
     {
-        $name = trim((string) $user->name);
+        $locale = $locale === 'ar' ? Newsletter::LANGUAGE_AR : Newsletter::LANGUAGE_EN;
+        $text = fn (string $key, array $replace = []): string => (string) __('ui.verify_email.'.$key, $replace, $locale);
+        $suffix = '_'.$locale;
 
-        return implode("\n", [
-            $name !== ''
-                ? __('ui.verify_email.mail_greeting', ['name' => $name], $locale)
-                : __('ui.verify_email.mail_greeting_anonymous', [], $locale),
-            '',
-            __('ui.verify_email.mail_intro', [], $locale),
-            '',
-            $url,
-            '',
-            __('ui.verify_email.mail_expiry', ['days' => EmailVerification::LINK_DAYS], $locale),
-            '',
-            __('ui.verify_email.mail_ignore', [], $locale),
-            '',
-            __('ui.verify_email.mail_thanks', [], $locale),
-            __('ui.verify_email.mail_signature', [], $locale),
+        $newsletter = new Newsletter([
+            'language' => $locale,
+            'subject'.$suffix => $text('mail_subject'),
+            'preheader'.$suffix => $text('mail_preheader'),
+            'headline'.$suffix => $text('mail_headline'),
+            'body'.$suffix => implode("\n\n", [
+                $text('mail_intro'),
+                $text('mail_expiry', ['days' => EmailVerification::LINK_DAYS]),
+                $text('mail_ignore'),
+            ]),
+            'cta_label'.$suffix => $text('mail_button'),
+            'cta_url'.$suffix => $url,
+            'footer'.$suffix => $text('mail_footer'),
         ]);
+
+        $renderer = app(NewsletterRenderer::class);
+        $recipient = ['name' => (string) $user->name];
+
+        return new NewsletterMail(
+            htmlBody: $renderer->html($newsletter, $locale, $recipient),
+            textBody: $renderer->text($newsletter, $locale, $recipient),
+            subjectLine: $renderer->subject($newsletter, $locale),
+            fromAddress: (string) config('mail.from.address'),
+            fromName: (string) config('mail.from.name'),
+            replyToAddress: TitanMailbox::ADDRESS,
+        );
     }
 }

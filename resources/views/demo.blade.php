@@ -696,6 +696,7 @@
 
     // Browser fingerprint for quota abuse prevention
     const fingerprintComponents = {};
+    const deviceSignals = { id: '', touch: false };
 
     async function sha256(str) {
       if (!window.crypto?.subtle || !window.TextEncoder) return str;
@@ -833,6 +834,16 @@
       ].join('|');
     }
 
+    // The kind of browser and system, without version numbers.
+    function browserFamily() {
+      const ua = navigator.userAgent || '';
+      const browser = /Edg\//.test(ua) ? 'edge' : /OPR\/|Opera/.test(ua) ? 'opera' : /Firefox\//.test(ua) ? 'firefox'
+        : /Chrome\/|CriOS\//.test(ua) ? 'chrome' : /Safari\//.test(ua) ? 'safari' : 'other';
+      const system = /Windows/.test(ua) ? 'windows' : /Android/.test(ua) ? 'android' : /iPhone|iPad|iPod/.test(ua) ? 'ios'
+        : /Mac OS X|Macintosh/.test(ua) ? 'mac' : /CrOS/.test(ua) ? 'chromeos' : /Linux/.test(ua) ? 'linux' : 'other';
+      return browser + ':' + system;
+    }
+
     function detectWebDriver() {
       return !!(navigator.webdriver || window.callPhantom || window._phantom || window.__nightmare || document.__selenium_evaluate || document.__webdriver_evaluate || document.__driver_evaluate);
     }
@@ -857,6 +868,22 @@
       fingerprintComponents.fonts = await sha256(fonts);
       fingerprintComponents.audio = await sha256(audio);
       fingerprintComponents.webdriver = detectWebDriver() ? 'true' : 'false';
+
+      // The device itself, the same in an incognito window (App\Services\DemoLinkedAccounts):
+      // not the window's size, the zoom, the sound test (it can time out) or the
+      // browser's version, which change by themselves.
+      deviceSignals.touch = (navigator.maxTouchPoints || 0) > 0 || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent || '');
+      deviceSignals.id = await sha256([
+        fingerprintComponents.canvas,
+        fingerprintComponents.webgl,
+        fingerprintComponents.fonts,
+        String(navigator.hardwareConcurrency || ''),
+        String(navigator.deviceMemory || ''),
+        String(navigator.maxTouchPoints || ''),
+        navigator.platform || '',
+        Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+        browserFamily(),
+      ].join('|'));
 
       // Build primary fingerprint (combination of most stable signals)
       const raw = [
@@ -1094,6 +1121,10 @@
       const headers = { ...csrfHeaders };
       if (clientFingerprint) {
         headers['X-Client-FP'] = clientFingerprint;
+      }
+      if (deviceSignals.id) {
+        headers['X-Client-Device'] = deviceSignals.id;
+        headers['X-Client-Device-Touch'] = deviceSignals.touch ? '1' : '0';
       }
 
       let res;

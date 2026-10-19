@@ -6,6 +6,7 @@ use App\Models\ReferralCampaign;
 use App\Models\ReferralConversion;
 use App\Models\User;
 use App\Models\UserReferralProfile;
+use App\Services\DemoLinkedAccounts;
 
 /**
  * Evaluates fraud indicators for a referred user prior to approving a conversion.
@@ -79,6 +80,9 @@ class ReferralAbuseGuard
 
         if (! empty(array_intersect($referrerDevices, $referredDevices))) {
             $indicators[] = 'shared_device_id';
+        } elseif (in_array((int) $referrer->id, app(DemoLinkedAccounts::class)->linkedUserIds($referred), true)) {
+            // The same device in another window (an incognito one, say), or a browser shared through another account.
+            $indicators[] = 'shared_device';
         }
 
         // Rapid signup pattern: referred user signed up very shortly after

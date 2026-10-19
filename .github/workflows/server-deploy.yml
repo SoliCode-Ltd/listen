@@ -57,6 +57,23 @@ name: Server deploy
 #            by itself against today's word list and rule (member ids and words
 #            only, never a text). wording-blocks-apply unblocks the accounts
 #            today's rule would not have blocked; admin blocks are left alone.
+#   promises: read-only (READ ONLY database session). What the site promises
+#            members, from this server's own data: every plan's limits and
+#            switches and the lines its pricing card shows in English and
+#            Arabic, the named site settings members read (never a key or a
+#            password) and the config those promises depend on; then the text
+#            of the public pages that show them. No member data.
+#   demo-links: read-only (READ ONLY database session). For one member (input
+#            "member": an email or a member id): how they signed up, their demo
+#            use, and every account sharing a browser, a demo fingerprint or an
+#            address with them, and whether the demo's linking rules count it.
+#            Addresses, cookies and fingerprints only as short hashes.
+#   email-check: read-only (READ ONLY database session). Whether the site's
+#            email goes out (the mailer in use, never a password), the sign-ups
+#            since confirmation links began and how many confirmed, log lines
+#            about links that failed to send (addresses masked), and for one
+#            member (input "member": an email or a member id) how they signed
+#            up and whether free use waits for them. Prints member ids only.
 #   page-check: staging only. Shows the pages members use inside the app,
 #            in English and Arabic, as a free and a paying test member, and
 #            fails on an error, a wrong status or text shown as its key
@@ -73,10 +90,14 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
+        type: string
+        default: ""
+      member:
+        description: "email-check and demo-links: a member's email or member id"
         type: string
         default: ""
 
@@ -112,6 +133,7 @@ jobs:
           TARGET: ${{ inputs.target }}
           MODE: ${{ inputs.mode }}
           CUSTOMER: ${{ inputs.customer }}
+          MEMBER: ${{ inputs.member }}
           LIVE_HOST: ${{ secrets.LIVE_SSH_HOST }}
           LIVE_USER: ${{ secrets.LIVE_SSH_USER }}
           LIVE_KEY: ${{ secrets.LIVE_SSH_KEY }}
@@ -332,6 +354,23 @@ jobs:
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
+          if [ "$MODE" = promises ]; then
+            tool promises_inspect.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = demo-links ]; then
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]+$' || { echo "member must be an email or a member id"; exit 1; }
+            tool demo_link_check.php | $S "$FIND; MEMBER='$MEMBER' php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = email-check ]; then
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            tool email_check.php | $S "$FIND; MEMBER='$MEMBER' php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
           if [ "$MODE" = page-check ]; then
             [ "$TARGET" = staging ] || { echo "page-check runs on staging only"; exit 1; }
             failed=0
@@ -413,3 +452,29 @@ jobs:
             echo "$path: untranslated keys: ${keys:-none}"
           done
           exit "$failed"
+      - name: The public pages' text
+        if: inputs.mode == 'promises'
+        env:
+          BASE: ${{ inputs.target == 'live' && 'https://listenai.studio' || 'https://phplaravel-1516130-6707450.cloudwaysapps.com' }}
+        run: |
+          for path in /en /ar /en/pricing /ar/pricing /en/developers /en/browsers-extension /ar/browsers-extension /en/voice-samples; do
+            echo "===== $path ====="
+            curl -s --max-time 30 -L "$BASE$path" | python3 -c '
+          import re, sys
+          from html.parser import HTMLParser
+          class Text(HTMLParser):
+              skip = {"script", "style", "noscript", "svg", "template"}
+              def __init__(self):
+                  super().__init__(); self.depth = 0; self.out = []
+              def handle_starttag(self, tag, attrs):
+                  if tag in self.skip: self.depth += 1
+                  elif tag in ("p", "li", "h1", "h2", "h3", "h4", "div", "br", "tr", "section", "button", "a"): self.out.append("\n")
+              def handle_endtag(self, tag):
+                  if tag in self.skip and self.depth: self.depth -= 1
+              def handle_data(self, data):
+                  if not self.depth: self.out.append(data)
+          t = Text(); t.feed(sys.stdin.read())
+          lines = [re.sub(r"\s+", " ", l).strip() for l in "".join(t.out).split("\n")]
+          print("\n".join(l for l in lines if l)[:20000])
+          '
+          done
