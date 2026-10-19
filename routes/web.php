@@ -222,6 +222,12 @@ Route::group([
         Route::post('/referral/share', [\App\Http\Controllers\ReferralController::class, 'share'])->name('referral.share');
     });
 
+    // What an open studio page asks while it works, every few seconds: these only
+    // read, so they skip the billing sync the pages run.
+    Route::middleware(['auth'])->group(function () {
+        Route::get('/dashboard/jobs/{job}', [DashboardController::class, 'show'])->whereNumber('job')->name('dashboard.jobs.show');
+    });
+
     Route::middleware(['auth', 'subscription.sync'])->group(function () {
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 

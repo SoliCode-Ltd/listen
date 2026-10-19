@@ -3342,6 +3342,7 @@
     const queueUrl = '{{ route('dashboard.queue') }}';
     const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
+    const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
     const csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
@@ -3388,6 +3389,8 @@
     const emotionSelect = document.getElementById('emotion');
     let feedbackScrollFrame = null;
     let allJobs = [];
+    // The voice whose "being made" note the form shows, cleared once it is ready.
+    let beingMadeNoteJobId = 0;
 
     // Cooldown state for rate limiting with good UX
     let cooldownEndTime = 0;
@@ -3616,6 +3619,7 @@
 
     function showFormMessage(type, message) {
       if (!formMessage) return;
+      beingMadeNoteJobId = 0;
       if (!message) { formMessage.innerHTML = ''; return; }
       const cls = type === 'error' ? 'error' : 'note';
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
@@ -4188,6 +4192,109 @@
       }
     }
 
+    // Voices still being made (a long text is made after the reply) are checked on
+    // until they finish: every 2 seconds at first, slowing to every 6, for at most
+    // 20 minutes, and not while the tab is hidden. A finished one plays in the
+    // docked player, as a voice made in the request does.
+    const JOB_CHECK_FIRST_MS = 2000;
+    const JOB_CHECK_SLOWEST_MS = 6000;
+    const JOB_CHECK_FOR_MS = 20 * 60 * 1000;
+    const jobChecks = new Map();
+
+    function isJobRunning(job) {
+      return ['queued', 'processing'].includes(String(job?.status || '').toLowerCase());
+    }
+
+    function watchJob(jobId) {
+      const id = Number(jobId || 0);
+      if (!id || jobChecks.has(id)) return;
+      jobChecks.set(id, {
+        delay: JOB_CHECK_FIRST_MS,
+        until: Date.now() + JOB_CHECK_FOR_MS,
+        timer: null,
+        waitingForTab: false,
+      });
+      scheduleJobCheck(id, JOB_CHECK_FIRST_MS);
+    }
+
+    function scheduleJobCheck(id, delay) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      clearTimeout(check.timer);
+      check.timer = setTimeout(function() { checkJob(id); }, delay);
+    }
+
+    function stopWatchingJob(id) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      clearTimeout(check.timer);
+      jobChecks.delete(id);
+    }
+
+    async function checkJob(id) {
+      const check = jobChecks.get(id);
+      if (!check) return;
+      // A hidden tab waits: the check runs again as soon as the tab is shown.
+      if (document.hidden) {
+        check.waitingForTab = true;
+        return;
+      }
+
+      let status = 0;
+      let data = null;
+      try {
+        const response = await fetch(jobStatusUrlTemplate.replace('__JOB_ID__', encodeURIComponent(String(id))), {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        status = response.status;
+        data = response.ok ? await response.json().catch(() => null) : null;
+      } catch (error) {
+        // No connection for a moment: checked again below.
+      }
+      if (jobChecks.get(id) !== check) return;
+
+      // Deleted meanwhile, or signed out: there is nothing more to check.
+      if ([401, 403, 404].includes(status)) {
+        stopWatchingJob(id);
+        return;
+      }
+      const job = data?.job;
+      if (job && !isJobRunning(job)) {
+        stopWatchingJob(id);
+        finishJob(job, data);
+        return;
+      }
+      if (Date.now() >= check.until) {
+        stopWatchingJob(id);
+        return;
+      }
+      check.delay = Math.min(JOB_CHECK_SLOWEST_MS, Math.round(check.delay * 1.5));
+      scheduleJobCheck(id, check.delay);
+    }
+
+    // A voice that finished while the page waited is shown as one made in the request is.
+    function finishJob(job, data) {
+      upsertJobRow(job);
+      if (data?.usage) updateUsagePanel(data.usage);
+      if (data?.stats) updateStats(data.stats);
+      if (String(job.status) === 'done' && job.audio_url) {
+        if (beingMadeNoteJobId === Number(job.id)) showFormMessage(null, '');
+        showGeneratedPreview(job);
+      } else if (String(job.status) === 'failed') {
+        showFormMessage('error', job.error_message || i18n.voice_generation_failed);
+      }
+    }
+
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) return;
+      jobChecks.forEach(function(check, id) {
+        if (!check.waitingForTab) return;
+        check.waitingForTab = false;
+        scheduleJobCheck(id, 0);
+      });
+    });
+
     async function deleteJob(jobId, source, triggerBtn) {
       const parsedJobId = Number(jobId || 0);
       if (!parsedJobId) return;
@@ -4353,6 +4460,11 @@
         if (data?.job?.audio_url) {
           // The player docks at the bottom of the screen: no jump away from the text.
           showGeneratedPreview(data.job);
+        } else if (data?.job && isJobRunning(data.job)) {
+          // A long text is made after the reply: the page checks on it and plays it when ready.
+          showFormMessage('note', data.message || i18n.status_processing);
+          beingMadeNoteJobId = Number(data.job.id);
+          watchJob(data.job.id);
         }
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
@@ -4448,6 +4560,8 @@
     updateTranslateHint();
     loadJobsFromTable();
     renderJobsPage();
+    // Voices still being made when the page opened are checked on too.
+    allJobs.filter((job) => !isDemoHistoryJob(job) && isJobRunning(job)).forEach((job) => watchJob(job.id));
 
     // Dialogue mode (js/dialogue-mode.js): two speakers, each with a premium voice
     // and their own dialect or accent.

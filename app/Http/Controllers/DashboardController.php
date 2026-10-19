@@ -472,6 +472,32 @@ class DashboardController extends Controller
         );
     }
 
+    /**
+     * One of the member's own generations, as the history shows it: the page
+     * checks on a voice still being made until it is done or failed. Once it has
+     * finished, the usage and the counts come with it, as they have changed.
+     */
+    public function show(Request $request, AudioGeneration $job)
+    {
+        $userId = (int) auth()->id();
+        if ((int) $job->user_id !== $userId) {
+            abort(404);
+        }
+
+        $payload = [
+            'ok' => true,
+            'job' => $this->buildJobPayload($job, $this->voiceNameMapForUser($userId)),
+        ];
+        if (in_array($job->status, ['done', 'failed'], true)) {
+            $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
+            $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
+            $payload['usage'] = UsageSnapshot::for($userId, $quotaPlan, CreditPeriod::counter($userId));
+            $payload['stats'] = $this->historyStats($userId);
+        }
+
+        return response()->json($payload)->header('Cache-Control', 'no-store, private');
+    }
+
     public function destroy(Request $request, AudioGeneration $job)
     {
         $userId = (int) auth()->id();
@@ -858,6 +884,23 @@ class DashboardController extends Controller
             'emotion' => $emotion !== '' ? $emotion : 'neutral',
             'speed' => isset($options['speed']) ? (float) $options['speed'] : 1.0,
             'pitch' => isset($options['pitch']) ? (float) $options['pitch'] : 0.0,
+        ];
+    }
+
+    /**
+     * The history's counts, as the page shows them.
+     *
+     * @return array{processing:int, done:int, failed:int, total:int}
+     */
+    private function historyStats(int $userId): array
+    {
+        $baseQuery = $this->userHistoryQuery($userId);
+
+        return [
+            'processing' => (clone $baseQuery)->whereIn('status', ['queued', 'processing'])->count(),
+            'done' => (clone $baseQuery)->where('status', 'done')->count(),
+            'failed' => (clone $baseQuery)->where('status', 'failed')->count(),
+            'total' => (clone $baseQuery)->count(),
         ];
     }
 
