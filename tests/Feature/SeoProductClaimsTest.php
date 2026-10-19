@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Plan;
+use App\Models\User;
 use App\Support\SeoDialectPages;
 use App\Support\SeoEnglishPages;
 use App\Support\SeoHelper;
@@ -42,6 +43,26 @@ class SeoProductClaimsTest extends TestCase
             $html = $this->page($locale, $route, $params)->assertOk()->getContent();
             $this->assertDoesNotMatchRegularExpression('/free account|free plan|free to try|Free forever|حساب مجاني|حسابك المجاني|الخطة المجانية|جرّبه مجاناً/iu', $html, $route.' '.$locale);
         }
+    }
+
+    public function test_downloads_are_promised_on_paid_plans_only(): void
+    {
+        // A demo clip's download button opens billing instead.
+        $this->actingAs(User::factory()->create());
+        $this->page('en', 'demo.page')->assertOk()->assertSee('data-download-redirect-url="'.route('billing.page'), false);
+        auth()->logout();
+
+        foreach ([['seo.dialect', ['dialect' => 'egyptian']], ['seo.accent', ['accent' => 'british']]] as [$route, $params]) {
+            $this->page('en', $route, $params)->assertOk()
+                ->assertSee('On every paid plan, each clip downloads as MP3.')
+                ->assertDontSee('Every clip downloads as MP3.');
+            $this->page('ar', $route, $params)->assertOk()
+                ->assertSee('في كل باقة مدفوعة يمكنك تحميل كل مقطع بصيغة MP3.');
+        }
+        $this->page('en', 'seo.text-to-speech')->assertOk()
+            ->assertSee('Sign up and choose a paid plan, paste your text, pick a language, voice and dialect, then generate and download the MP3.');
+        $this->page('ar', 'seo.text-to-speech')->assertOk()->assertSee('سجّل حساباً واختر باقة مدفوعة، الصق النص');
+        $this->page('ar', 'seo.text-to-speech-arabic')->assertOk()->assertSee('أنشئ حساباً واختر باقة مدفوعة، الصق النص');
     }
 
     public function test_pages_promise_every_major_dialect_not_every_dialect(): void
