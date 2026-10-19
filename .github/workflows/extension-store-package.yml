@@ -82,12 +82,7 @@ jobs:
           with open('build/manifest.json', 'w', encoding='utf-8') as f:
               json.dump(manifest, f, indent=2, ensure_ascii=False)
               f.write('\n')
-          print('Package version:', manifest['version'])
-          from itertools import zip_longest
-          def parts(v): return [int(p) for p in v.split('.')]
-          a, b = parts(manifest['version']), parts(published.get('version', '0'))
-          newer = [x for x in zip_longest(a, b, fillvalue=0) if x[0] != x[1]]
-          assert newer and newer[0][0] > newer[0][1], 'the package must be a newer version than the store has'
+          print('Package version:', manifest['version'], '(the store has', published.get('version'), ')')
           for key in ('permissions', 'host_permissions', 'optional_permissions', 'content_scripts'):
               if json.dumps(published.get(key), sort_keys=True) != json.dumps(manifest.get(key), sort_keys=True):
                   print(f'::warning::{key} differs from the published package: {published.get(key)} -> {manifest.get(key)}')
@@ -103,6 +98,7 @@ jobs:
                       out[os.path.relpath(p, root)] = hashlib.sha256(open(p, 'rb').read()).hexdigest()
               return out
           old, new = files('published'), files('build')
+          changed = []
           for name in sorted(set(old) | set(new)):
               if name not in old:
                   print('  new      ', name)
@@ -110,6 +106,34 @@ jobs:
                   print('  removed  ', name)
               elif old[name] != new[name]:
                   print('  changed  ', name)
+                  changed.append(name)
+          # What the code changes are, so nothing only the store has is lost.
+          import difflib
+          for name in changed:
+              if name.endswith(('.js', '.json', '.html', '.css', '.txt')):
+                  def text(root):
+                      raw = open(os.path.join(root, name), encoding='utf-8-sig', errors='replace').read()
+                      if name.endswith('.json'):
+                          import json
+                          try:
+                              raw = json.dumps(json.loads(raw), indent=2, ensure_ascii=False, sort_keys=True)
+                          except ValueError:
+                              pass
+                      return raw.splitlines()
+                  a, b = text('published'), text('build')
+                  lines = list(difflib.unified_diff(a, b, 'store/' + name, 'new/' + name, n=1, lineterm=''))
+                  print('\n'.join(lines[:400]))
+                  if len(lines) > 400:
+                      print(f'  ... {len(lines) - 400} more diff lines in {name}')
+          PY
+          python3 - <<'PY'
+          import json
+          from itertools import zip_longest
+          def parts(v): return [int(p) for p in v.split('.')]
+          new = json.load(open('build/manifest.json'))['version']
+          old = json.load(open('published/manifest.json', encoding='utf-8-sig')).get('version', '0')
+          first = next((x for x in zip_longest(parts(new), parts(old), fillvalue=0) if x[0] != x[1]), None)
+          assert first and first[0] > first[1], f'the package ({new}) must be a newer version than the store has ({old})'
           PY
           version="$(python3 -c "import json; print(json.load(open('build/manifest.json'))['version'])")"
           zip_name="listen-extension-$version-store.zip"
