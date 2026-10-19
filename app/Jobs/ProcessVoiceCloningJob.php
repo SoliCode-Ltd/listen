@@ -163,6 +163,8 @@ class ProcessVoiceCloningJob implements ShouldQueue
         ]);
 
         app(GenerationErrorRecorder::class)->voiceCloningFailed($clonedVoice, $reason, $code, $httpStatus);
+        // A failure on our side does not use up one of the member's attempts this hour.
+        VoiceCloningService::giveBackAttempt($clonedVoice);
 
         Log::warning('Voice cloning failed.', [
             'cloned_voice_id' => $clonedVoice->id,

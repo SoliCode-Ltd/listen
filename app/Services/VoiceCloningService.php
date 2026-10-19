@@ -23,6 +23,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -40,6 +41,12 @@ class VoiceCloningService
 
     /** A take up to this size (about 8 minutes of MP3) is also handed back as bytes. */
     private const AUDIO_CONTENT_MAX_BYTES = 10_000_000;
+
+    /** Failures the recordings caused: the member records again, and the attempt counts. */
+    private const RECORDING_FAILURES = ['consent', 'consent_phrase', 'duration', 'audio'];
+
+    /** Failures on our side or the provider's: the recordings are fine, and the attempt is given back. */
+    private const OUR_SIDE_FAILURES = ['quota', 'key', 'region', 'network', 'server'];
 
     /**
      * Text models that can rewrite a script into another dialect.
@@ -1196,6 +1203,7 @@ class VoiceCloningService
             'cloned_voice_id' => $voice->id,
             'user_id' => $voice->user_id,
         ]);
+        self::giveBackAttempt($voice);
 
         return true;
     }
@@ -1290,6 +1298,42 @@ class VoiceCloningService
             'en-GB' => self::CONSENT_SCRIPTS['en-GB'],
             'en-AU' => self::CONSENT_SCRIPTS['en-AU'],
         ];
+    }
+
+    /**
+     * A failed voice says "Needs another take" only when the recording was the
+     * problem; a failure on our side, or one we could not tell, is not put on
+     * the member.
+     */
+    public static function statusLabel(ClonedVoice $voice): string
+    {
+        return $voice->isFailed() && ! in_array((string) data_get($voice->metadata, 'failure_code'), self::RECORDING_FAILURES, true)
+            ? __('ui.voice_cloning.status_failed_ours')
+            : __('ui.voice_cloning.status_'.$voice->status);
+    }
+
+    /** The member's attempts this hour (a new voice, a retry, a new consent sentence: VoiceCloningController). */
+    public static function attemptsKey(int $userId): string
+    {
+        return "voice_cloning:{$userId}";
+    }
+
+    /**
+     * An attempt that failed on our side (a limit, a refused key, the server's
+     * country, the connection, the provider's error) is given back: the hourly
+     * limit is for the member's own takes, not for our outages.
+     */
+    public static function giveBackAttempt(ClonedVoice $voice): void
+    {
+        if (! in_array((string) data_get($voice->metadata, 'failure_code'), self::OUR_SIDE_FAILURES, true)) {
+            return;
+        }
+
+        $key = self::attemptsKey((int) $voice->user_id);
+        // Once the hour is over there is nothing left to give back.
+        if ((int) RateLimiter::attempts($key) > 0) {
+            RateLimiter::decrement($key, 3600);
+        }
     }
 
     public static function publicFailureMessage(ClonedVoice $voice): string
@@ -1929,7 +1973,8 @@ class VoiceCloningService
         if (str_contains($haystack, 'api key') || str_contains($haystack, 'api_key') || $status === 401 || ($status === 403 && str_contains($haystack, 'permission'))) {
             return 'key';
         }
-        if ($status === 429 || str_contains($haystack, 'quota') || str_contains($haystack, 'resource_exhausted') || str_contains($haystack, 'rate limit')) {
+        // A rate limit or the project's spending cap: a limit on our side, never the recordings.
+        if ($status === 429 || str_contains($haystack, 'quota') || str_contains($haystack, 'resource_exhausted') || str_contains($haystack, 'rate limit') || GeminiKeyManager::mentionsSpendingCap($message)) {
             return 'quota';
         }
         if (str_contains($haystack, 'consent') || str_contains($haystack, 'speaker') || str_contains($haystack, 'verif')) {

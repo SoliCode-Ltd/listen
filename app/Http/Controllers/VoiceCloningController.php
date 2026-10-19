@@ -228,6 +228,7 @@ class VoiceCloningController extends Controller
             'id' => $clonedVoice->id,
             'name' => $clonedVoice->name,
             'status' => $clonedVoice->status,
+            'status_label' => VoiceCloningService::statusLabel($clonedVoice),
             'progress_percent' => VoiceCloningService::progressPercent((string) $clonedVoice->status, $elapsedSeconds),
             'elapsed_seconds' => $elapsedSeconds,
             'is_delayed' => $clonedVoice->isProcessing() && $elapsedSeconds >= 90,
@@ -460,16 +461,17 @@ class VoiceCloningController extends Controller
 
     /**
      * Every attempt (a new voice, a retry, a new consent sentence) has the
-     * provider build a voice, so they share one limit of 5 an hour.
+     * provider build a voice, so they share one limit of 5 an hour. One that
+     * fails on our side is given back (VoiceCloningService::giveBackAttempt).
      */
     private function tooManyCloningAttempts(int $userId): bool
     {
-        return RateLimiter::tooManyAttempts("voice_cloning:{$userId}", 5);
+        return RateLimiter::tooManyAttempts(VoiceCloningService::attemptsKey($userId), 5);
     }
 
     private function countCloningAttempt(int $userId): void
     {
-        RateLimiter::hit("voice_cloning:{$userId}", 3600);
+        RateLimiter::hit(VoiceCloningService::attemptsKey($userId), 3600);
     }
 
     private function limitReachedMessage(int $userId, int $maxVoices): string
