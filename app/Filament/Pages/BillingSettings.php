@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\TrialEligibilityService;
+use App\Services\StripeProductSyncService;
 use Filament\Forms;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -334,6 +335,7 @@ class BillingSettings extends Page implements HasForms
     {
         $data = $this->form->getState();
         $group = 'billing';
+        $yearlyDiscountBefore = SiteSetting::yearlyDiscountPercent();
         // Save yearly discount
         if (array_key_exists('yearly_discount_percentage', $data)) {
             SiteSetting::set('billing_yearly_discount_percentage', (string) max(0, min(99, (int) $data['yearly_discount_percentage'])), $group);
@@ -429,6 +431,59 @@ class BillingSettings extends Page implements HasForms
 
         Notification::make()
             ->title('Billing settings saved')
+            ->success()
+            ->send();
+
+        // The site shows the new yearly price at once; Stripe charges it only once
+        // each plan has a yearly price at the new discount.
+        if (SiteSetting::yearlyDiscountPercent() !== $yearlyDiscountBefore) {
+            $this->syncYearlyPrices();
+        }
+    }
+
+    /**
+     * Gives every plan its Stripe yearly price at the new discount (the live
+     * site only: StripeProductSyncService leaves Stripe alone elsewhere), and
+     * says which plans did not get it.
+     */
+    private function syncYearlyPrices(): void
+    {
+        $sync = app(StripeProductSyncService::class);
+        if (! $sync->isConfigured()) {
+            return;
+        }
+
+        try {
+            $result = $sync->syncAllPlans();
+        } catch (\Throwable $e) {
+            $result = ['synced' => 0, 'failed' => 1, 'skipped' => 0, 'errors' => ['all plans' => $e->getMessage()]];
+        }
+
+        if ($result['failed'] > 0) {
+            Notification::make()
+                ->title('Yearly prices: the Stripe sync failed')
+                ->body(collect($result['errors'])->map(fn ($error, $slug): string => $slug.': '.$error)->implode("\n")
+                    ."\nYearly checkouts on these plans may still charge the old price. Use \"Sync Stripe\" on each plan to try again.")
+                ->danger()
+                ->persistent()
+                ->send();
+
+            return;
+        }
+
+        if ($result['skipped'] > 0) {
+            Notification::make()
+                ->title('Yearly prices not changed in Stripe')
+                ->body(StripeProductSyncService::SKIPPED_MESSAGE)
+                ->warning()
+                ->send();
+
+            return;
+        }
+
+        Notification::make()
+            ->title('Yearly prices synced to Stripe')
+            ->body('Plans synced: '.$result['synced'].'. New yearly checkouts are charged at the new discount.')
             ->success()
             ->send();
     }

@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Filament\Pages\BillingSettings;
 use App\Filament\Resources\PlanResource\Pages\EditPlan;
 use App\Models\Plan;
+use App\Models\SiteSetting;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -139,6 +141,53 @@ class BillingAdminTest extends TestCase
         $this->assertSame(120000, (int) $this->creator->fresh()->max_chars_per_request);
     }
 
+    public function test_changing_the_yearly_discount_gives_every_plan_its_new_yearly_price_in_stripe(): void
+    {
+        $this->stripeConfigured();
+
+        $this->billingSettings()
+            ->fillForm(['yearly_discount_percentage' => 30])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Yearly prices synced to Stripe');
+
+        // 12 months at 30% off; the old yearly price is archived, the monthly one kept.
+        $this->creator->refresh();
+        $this->assertSame('price_year_15960', $this->creator->stripe_price_yearly);
+        $this->assertSame('price_month_1900', $this->creator->stripe_price_monthly);
+        $this->assertFalse($this->stripe->prices['price_year_18240']['active']);
+    }
+
+    public function test_a_failed_yearly_price_sync_is_reported(): void
+    {
+        $this->stripeConfigured();
+        $this->stripe->failWith = 'Stripe is having trouble.';
+
+        $this->billingSettings()
+            ->fillForm(['yearly_discount_percentage' => 30])
+            ->call('save')
+            ->assertHasNoFormErrors()
+            ->assertNotified('Yearly prices: the Stripe sync failed');
+
+        // The discount itself is saved.
+        $this->assertSame(30, SiteSetting::yearlyDiscountPercent());
+    }
+
+    public function test_the_yearly_prices_are_left_alone_when_the_discount_is_not_changed_or_off_the_live_site(): void
+    {
+        $this->stripeConfigured();
+
+        $this->billingSettings()->call('save')->assertHasNoFormErrors();
+        $this->assertSame([], $this->stripe->requests);
+
+        config(['listen.live_actions' => false]);
+        $this->billingSettings()
+            ->fillForm(['yearly_discount_percentage' => 30])
+            ->call('save')
+            ->assertNotified('Yearly prices not changed in Stripe');
+        $this->assertSame([], $this->stripe->requests);
+    }
+
     private function stripeConfigured(): void
     {
         config(['services.stripe.secret' => 'sk_test_fake', 'cashier.secret' => 'sk_test_fake']);
@@ -147,5 +196,10 @@ class BillingAdminTest extends TestCase
     private function editCreator(): \Livewire\Features\SupportTesting\Testable
     {
         return Livewire::test(EditPlan::class, ['record' => $this->creator->getRouteKey()]);
+    }
+
+    private function billingSettings(): \Livewire\Features\SupportTesting\Testable
+    {
+        return Livewire::test(BillingSettings::class);
     }
 }
