@@ -755,7 +755,7 @@ return [
             'c3_title' => 'Preference Cookies',
             'c3_body' => 'Remember your language, theme, and interface preferences.',
             'c4_title' => 'Payment & Security Cookies',
-            'c4_body' => 'Support secure billing flows and fraud prevention controls.',
+            'c4_body' => 'Support secure billing flows and fraud prevention controls, including a device cookie and a fingerprint of your device (kept in a cookie and in your browser\'s storage), so the free demo is used only once per device and our limits cannot be dodged with extra accounts.',
             's2_1' => 'Essential cookies: Required for the website to function properly.',
             's2_2' => 'Preference cookies: Remember your settings and preferences.',
             's2_3' => 'Analytics cookies: Help us understand how visitors use our site.',

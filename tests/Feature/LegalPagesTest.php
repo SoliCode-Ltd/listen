@@ -46,6 +46,16 @@ class LegalPagesTest extends TestCase
             ->assertDontSee('من خلال لوحة التحكم');
     }
 
+    public function test_the_cookie_policy_names_the_free_demos_device_cookie_and_fingerprint(): void
+    {
+        $this->page('en', 'legal.cookies')
+            ->assertSee('Effective date: October 19, 2026')
+            ->assertSee('including a device cookie and a fingerprint of your device (kept in a cookie and in your browser&#039;s storage), so the free demo is used only once per device', false);
+        $this->page('ar', 'legal.cookies')
+            ->assertSee('تاريخ السريان: 19 أكتوبر 2026')
+            ->assertSee('ومنها ملف تعريف ارتباط للجهاز وبصمة لجهازك (تُحفظ في ملف تعريف ارتباط وفي مساحة التخزين بمتصفحك)');
+    }
+
     public function test_the_legal_pages_give_the_sites_own_mailbox(): void
     {
         foreach (['legal.privacy', 'legal.terms', 'legal.cookies'] as $route) {
