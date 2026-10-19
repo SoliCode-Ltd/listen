@@ -360,6 +360,7 @@ return [
             'label_audio_kept' => 'سجل الأصوات',
             'label_dialogue' => 'حوار بأكثر من متحدث',
             'label_custom_prompt' => 'توجيه مخصص للأداء',
+            'label_sound_environments' => 'البيئات الصوتية',
             'label_developer_api' => 'واجهة المطورين',
             'label_voice_cloning' => 'استنساخ الأصوات',
             'label_download_formats' => 'صيغ التحميل',

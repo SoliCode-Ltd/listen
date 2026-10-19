@@ -768,14 +768,15 @@
         default => '<path d="M20 6 9 17l-5-5"/>',
       };
 
-      // The comparison table is built from the plans' own card data (Admin → Plans):
-      // nothing in it is typed twice. Every line on the cards, with each plan's value,
-      // and the credits each card shows under its minutes.
+      // The comparison table is written from the plans' own settings (Admin → Plans),
+      // not from their card text, which each plan may word in its own way: every row
+      // is one line with each plan's value, the admin's extra lines, and the credits
+      // each card shows under its minutes.
       $includedMark = __('ui.pricing.included_mark');
       $minutesLabel = __('ui.pricing.lines.label_voice_minutes');
       $creditsLabel = __('ui.pricing.compare_credits');
       $comparePlans = array_values(array_filter($pricingPlans, fn ($p) => empty($p['is_pack'])));
-      // One row per line even when a plan spells its label a little differently
+      // One row per line even when a plan spells an extra line's label a little differently
       // ("التوليدات يومياً" / "التوليدات يوميا"): the row takes the site's own label when
       // there is one, else the first plan's.
       $compareLabels = [];
@@ -784,7 +785,7 @@
       }
       $compareRows = [];
       foreach ($comparePlans as $comparePlan) {
-        foreach ($comparePlan['features'] as $line) {
+        foreach ($comparePlan['compare_lines'] as $line) {
           $label = trim((string) ($line['label'] ?? ''));
           if ($label !== '') {
             $label = $compareLabels[\App\Support\PlanPricingLines::labelKey($label)] ??= $label;

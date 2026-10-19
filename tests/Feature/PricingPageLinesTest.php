@@ -8,6 +8,7 @@ use App\Filament\Resources\PlanResource\Pages\ViewPlan;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
+use App\Support\AudioEffects;
 use App\Support\PlanPricingLines;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -307,6 +308,50 @@ class PricingPageLinesTest extends TestCase
         $this->assertNotSame(PlanPricingLines::labelKey('Daily generations'), PlanPricingLines::labelKey('Monthly generations'));
     }
 
+    public function test_the_table_compares_the_plans_settings_whatever_their_cards_say(): void
+    {
+        // As on the live plans: each card shows the admin's own text, and Basic's labels
+        // are worded differently from the others', which split one line into two
+        // half-empty rows.
+        Plan::query()->where('slug', 'basic')->delete();
+        $this->premiumPlan(['slug' => 'basic', 'name' => 'Basic', 'price_cents' => 400, 'daily_requests' => 15, 'pricing_use_custom_text' => true,
+            'features_en' => [['label' => 'Generations per day', 'value' => '15', 'icon' => 'activity']],
+            'features_ar' => [['label' => 'التوليدات يومياً', 'value' => '15', 'icon' => 'activity']],
+        ]);
+        $this->premiumPlan(['slug' => 'starter', 'name' => 'Starter', 'price_cents' => 900, 'daily_requests' => 100, 'pricing_use_custom_text' => true,
+            'sound_effects_enabled' => true,
+            'features_en' => [['label' => 'Requests per day', 'value' => '100', 'icon' => 'activity']],
+            'features_ar' => [['label' => 'الطلبات يومياً', 'value' => '100', 'icon' => 'activity']],
+        ]);
+
+        foreach (['en' => 'Requests per day', 'ar' => 'الطلبات يومياً'] as $locale => $starterLabel) {
+            app()->setLocale($locale);
+            $rows = $this->compareRows();
+
+            $this->assertSame(['15', '100'], $rows[__('ui.pricing.lines.label_daily_requests')] ?? [], $locale.': '.implode(' | ', array_keys($rows)));
+            $this->assertArrayNotHasKey($starterLabel, $rows, $locale);
+            // The lines neither card mentions are there too, from each plan's settings.
+            $this->assertSame([__('ui.pricing.lines.chars', ['count' => '5,000']), __('ui.pricing.lines.chars', ['count' => '5,000'])], $rows[__('ui.pricing.lines.label_max_chars_per_request')] ?? [], $locale);
+            // Sound environments keep their row, ticked where the plan has them.
+            $this->assertSame(['—', AudioEffects::available() ? '✓' : '—'], $rows[__('ui.pricing.lines.label_sound_environments')] ?? ['—', '—'], $locale);
+            // The card still shows the admin's own text.
+            $this->getLocalizedRoute('pricing')->assertSee('<span class="feature-value">100</span>', false)->assertSee($starterLabel);
+        }
+    }
+
+    public function test_sound_environments_are_a_line_of_their_own(): void
+    {
+        $plan = $this->premiumPlan(['sound_effects_enabled' => true]);
+        $shown = AudioEffects::available() ? '✓' : null;
+
+        $this->assertSame($shown, $this->lines($plan, 'en')['Sound environments'] ?? null);
+        $this->assertSame($shown, $this->lines($plan, 'ar')['البيئات الصوتية'] ?? null);
+
+        $plan->update(['sound_effects_enabled' => false]);
+        $this->assertArrayNotHasKey('Sound environments', $this->lines($plan->fresh(), 'en'));
+        $this->assertSame('Hidden: this plan does not include sound environments.', PlanPricingLines::whyHidden($plan->fresh(), 'sound_environments'));
+    }
+
     // ──────────────────────────────────────────────────────────────────
     //  Admin form
     // ──────────────────────────────────────────────────────────────────
@@ -391,6 +436,32 @@ class PricingPageLinesTest extends TestCase
     private function lines(Plan $plan, string $locale): array
     {
         return collect(PlanPricingLines::forPlan($plan, $locale))->pluck('value', 'label')->all();
+    }
+
+    /**
+     * The pricing page's comparison table, in the current language: each row's
+     * label with every plan's cell ("✓" for a tick, "—" for not included).
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function compareRows(): array
+    {
+        $html = $this->getLocalizedRoute('pricing')->assertOk()->getContent();
+        $start = strpos($html, 'class="compare-table"');
+        $this->assertNotFalse($start, 'the page has the comparison table');
+        $table = substr($html, $start, strpos($html, '</table>', $start) - $start);
+
+        $rows = [];
+        preg_match_all('#<tr>\s*<th scope="row">(.*?)</th>(.*?)</tr>#s', $table, $found, PREG_SET_ORDER);
+        foreach ($found as [, $label, $cells]) {
+            preg_match_all('#<td[^>]*>(.*?)</td>#s', $cells, $values);
+            $rows[html_entity_decode(trim(strip_tags($label)))] = array_map(
+                fn (string $cell): string => str_contains($cell, 'compare-tick') ? '✓' : html_entity_decode(trim(strip_tags($cell))),
+                $values[1],
+            );
+        }
+
+        return $rows;
     }
 
     /**

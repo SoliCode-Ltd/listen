@@ -359,6 +359,7 @@ return [
             'label_audio_kept' => 'Audio history',
             'label_dialogue' => 'Multi-speaker dialogue',
             'label_custom_prompt' => 'Custom voice direction',
+            'label_sound_environments' => 'Sound environments',
             'label_developer_api' => 'Developer API',
             'label_voice_cloning' => 'Voice cloning',
             'label_download_formats' => 'Download formats',

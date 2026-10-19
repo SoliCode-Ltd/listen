@@ -31,6 +31,7 @@ final class PlanPricingLines
         'audio_kept' => ['clock', true],
         'dialogue' => ['users', true],
         'custom_prompt' => ['sliders', true],
+        'sound_environments' => ['sliders', true],
         'voice_cloning' => ['star', true],
         'download_formats' => ['download', true],
         // Shown on every plan that includes the developer API (Plans → Developer API).
@@ -143,6 +144,28 @@ final class PlanPricingLines
     }
 
     /**
+     * What the comparison table lists for the plan in this language: the lines
+     * shown by default, written from the plan's settings, and the admin's extra
+     * lines. Never the hand-written card text, which each plan may word in its
+     * own way: a row is then the same line on every plan.
+     *
+     * @return array<int, array{label:string, value:string, icon:string}>
+     */
+    public static function forComparison(Plan $plan, string $locale): array
+    {
+        $locale = self::locale($locale);
+
+        $automatic = self::isDemoOnlyFreePlan($plan)
+            ? self::demoLines($locale)
+            : self::automatic($plan, $locale, self::defaultShown());
+
+        return array_merge(
+            $automatic,
+            self::extraLines($plan->{'pricing_extra_lines_'.$locale} ?? [], $locale),
+        );
+    }
+
+    /**
      * New members get no monthly characters on the free plan, only the demo,
      * so its card describes the demo instead of a monthly allowance.
      */
@@ -228,6 +251,10 @@ final class PlanPricingLines
             'dialogue' => $plan->dialogue_enabled ? self::t('included', $locale) : null,
             // The same rule as the studio and the developer API (Plan::allowsCustomPrompt).
             'custom_prompt' => $premium && $plan->allowsCustomPrompt() ? self::t('included', $locale) : null,
+            // As in the studio: the plan includes them and this server can make them (ffmpeg).
+            'sound_environments' => PlanFeatures::planOffers($plan, PlanFeatures::EFFECTS) && AudioEffects::available()
+                ? self::t('included', $locale)
+                : null,
             'voice_cloning' => self::cloningOpen($plan)
                 ? trans_choice('ui.pricing.lines.cloning_voices', VoiceCloningService::maxVoicesForPlan($plan), [], $locale)
                 : null,
@@ -260,6 +287,9 @@ final class PlanPricingLines
             'max_chars_per_request' => 'Hidden: no maximum is set.',
             'dialogue' => 'Hidden: this plan does not include dialogue.',
             'custom_prompt' => $premium ? 'Hidden: this plan does not include custom direction.' : 'Hidden: only the premium voice takes custom direction.',
+            'sound_environments' => AudioEffects::available()
+                ? 'Hidden: this plan does not include sound environments.'
+                : 'Hidden: this server cannot make sound environments (ffmpeg is missing).',
             'voice_cloning' => ! VoiceCloningService::planAllows($plan)
                 ? 'Hidden: this plan does not include voice cloning (or cloning is switched off site-wide).'
                 : 'Hidden: voice cloning is still a private preview, so members on this plan cannot use it yet.',
