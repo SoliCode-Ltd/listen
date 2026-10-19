@@ -21,6 +21,10 @@ class GeminiKeyRotationTest extends TestCase
 
     private const DAILY = ['error' => ['code' => 429, 'message' => 'Rate limit exceeded for model gemini-3.8-flash-tts (limit: 100 requests per day on Tier 1).', 'status' => 'RESOURCE_EXHAUSTED']];
 
+    private const SPENDING_CAP = ['error' => ['code' => 429, 'message' => 'Your project has exceeded its monthly spending cap.', 'status' => 'RESOURCE_EXHAUSTED']];
+
+    private const PER_MINUTE = ['error' => ['code' => 429, 'message' => 'You exceeded your current quota, please check your plan and billing details. Please retry in 20s.', 'status' => 'RESOURCE_EXHAUSTED']];
+
     private function threeKeys(): GeminiKeyManager
     {
         $manager = \Mockery::mock(GeminiKeyManager::class)->makePartial();
@@ -54,6 +58,61 @@ class GeminiKeyRotationTest extends TestCase
         $this->assertTrue(GeminiKeyManager::isDailyQuotaError(429, json_encode(self::DAILY)));
         $this->assertFalse(GeminiKeyManager::isDailyQuotaError(429, '{"error":{"message":"Rate limit exceeded: requests per minute"}}'));
         $this->assertFalse(GeminiKeyManager::isDailyQuotaError(500, 'per day'));
+    }
+
+    public function test_a_spending_cap_is_told_apart_from_an_ordinary_rate_limit(): void
+    {
+        $this->assertTrue(GeminiKeyManager::isSpendingCapError(429, json_encode(self::SPENDING_CAP)));
+        $this->assertTrue(GeminiKeyManager::isSpendingCapError(429, '{"error":{"message":"Your prepayment credits are depleted.","status":"RESOURCE_EXHAUSTED"}}'));
+        $this->assertTrue(GeminiKeyManager::isSpendingCapError(403, '{"error":{"message":"The billing account for the project is closed."}}'));
+
+        // Every ordinary 429 asks to check the plan and billing details: that is not a cap.
+        $this->assertFalse(GeminiKeyManager::isSpendingCapError(429, json_encode(self::PER_MINUTE)));
+        $this->assertFalse(GeminiKeyManager::isSpendingCapError(429, json_encode(self::DAILY)));
+        $this->assertFalse(GeminiKeyManager::isSpendingCapError(500, json_encode(self::SPENDING_CAP)));
+    }
+
+    public function test_a_key_stopped_by_its_spending_cap_is_out_on_every_model_for_an_hour(): void
+    {
+        $manager = $this->threeKeys();
+
+        $manager->markOutForSpendingCap('GEMINI_TTS_API_KEY');
+
+        foreach ([GeminiTtsModel::FLASH, GeminiTtsModel::CURRENT, 'gemini-3.5-flash'] as $model) {
+            $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', $model), $model);
+            $this->assertSame('GEMINI_TTS_API_KEY_2', $manager->getAvailableKey($model)['name'], $model);
+        }
+        $this->assertSame(['GEMINI_TTS_API_KEY_2', 'GEMINI_TTS_API_KEY_3', 'GEMINI_TTS_API_KEY'], array_column($manager->keysInOrder(GeminiTtsModel::FLASH), 'name'), 'a capped key goes last');
+
+        $this->travel(59)->minutes();
+        $this->assertTrue($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH), 'not tried again within the hour');
+        $this->travel(2)->minutes();
+        $this->assertFalse($manager->isOutForToday('GEMINI_TTS_API_KEY', GeminiTtsModel::FLASH), 'tried again after it, in case the cap was raised');
+    }
+
+    public function test_stock_voice_moves_on_from_a_capped_key_and_stays_off_it(): void
+    {
+        Storage::fake('public');
+        config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
+        SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
+        $this->threeKeys();
+        $calls = [];
+        Http::fake(function ($request) use (&$calls) {
+            $key = $request->header('x-goog-api-key')[0] ?? '';
+            $calls[] = $key;
+
+            return $key === 'k1'
+                ? Http::response(self::SPENDING_CAP, 429)
+                : Http::response(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;rate=24000', 'data' => base64_encode(str_repeat("\0", 4800))]]]]]]]);
+        });
+
+        app(GeminiTtsProvider::class)->synthesize('مرحبا بكم', 'ar', ['voice_name' => 'Kore']);
+        $this->assertSame(['k1', 'k2'], $calls, 'the member gets audio from the next key');
+
+        $calls = [];
+        $this->travel(5)->minutes();
+        app(GeminiTtsProvider::class)->synthesize('أهلا وسهلا', 'ar', ['voice_name' => 'Kore']);
+        $this->assertSame(['k2'], $calls, 'later requests do not try the capped key first');
     }
 
     public function test_stock_voice_moves_on_from_a_key_out_for_the_day_and_stays_off_it(): void

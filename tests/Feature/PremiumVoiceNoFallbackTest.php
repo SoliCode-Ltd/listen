@@ -102,9 +102,10 @@ class PremiumVoiceNoFallbackTest extends TestCase
         $this->geminiKeys(0);
         $user = $this->paidMember();
 
+        // Not set up is not a busy minute: the member is not told to wait one.
         $this->generate($user)
             ->assertStatus(422)
-            ->assertJsonPath('message', trans('ui.backend.premium_voices_busy', [], 'en'));
+            ->assertJsonPath('message', trans('ui.backend.premium_voices_our_limit', [], 'en'));
 
         $this->assertSame(0, $this->geminiCalls);
         $this->assertSame(0, $this->googleCalls);

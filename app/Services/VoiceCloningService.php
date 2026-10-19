@@ -7,6 +7,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\Tts\GeminiKeyManager;
+use App\Services\Tts\GeminiKeysOutException;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
@@ -286,6 +287,12 @@ class VoiceCloningService
             }
         }
 
+        // Every key is out (the day's quota, the spending cap, a refused key):
+        // that lasts, so the member is not told to try again in a minute.
+        if ($keyNames !== [] && array_filter($keyNames, $usable) === []) {
+            throw new GeminiKeysOutException('Cloned voice synthesis failed: every Gemini key is out for now.', 0, $last);
+        }
+
         throw $last ?? new \RuntimeException('Cloned voice synthesis failed: no Gemini key has room today (rate limit).');
     }
 
@@ -327,11 +334,13 @@ class VoiceCloningService
     }
 
     /**
-     * Out of quota, or the voice id is not in this key's project.
+     * Out of quota (or stopped by the project's spending cap), or the voice id
+     * is not in this key's project.
      */
     public static function isQuotaOrMissing(string $message): bool
     {
-        return (bool) preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b|\b404\b|\b403\b|not found|NOT_FOUND|PERMISSION_DENIED|API_KEY_INVALID|API key not valid|API key expired/i', $message);
+        return (bool) preg_match('/rate limit|quota|RESOURCE_EXHAUSTED|\b429\b|\b404\b|\b403\b|not found|NOT_FOUND|PERMISSION_DENIED|API_KEY_INVALID|API key not valid|API key expired/i', $message)
+            || GeminiKeyManager::mentionsSpendingCap($message);
     }
 
     /**
@@ -1504,6 +1513,10 @@ class VoiceCloningService
             $badKey = GeminiKeyManager::isKeyProblem($response->status(), (string) $response->body());
             if ((GeminiKeyManager::isDailyQuotaError($response->status(), (string) $response->body()) || $badKey) && filled($keyInfo['name'] ?? null)) {
                 app(GeminiKeyManager::class)->markOutForToday((string) $keyInfo['name'], $model);
+            }
+            // A spending cap stops every model on the key, and not for a minute.
+            if (GeminiKeyManager::isSpendingCapError($response->status(), (string) $response->body()) && filled($keyInfo['name'] ?? null)) {
+                app(GeminiKeyManager::class)->markOutForSpendingCap((string) $keyInfo['name']);
             }
             if ($badKey && $index !== array_key_last($keys)) {
                 Log::error('Gemini key refused by Google; using the other keys.', ['key' => $keyInfo['name'] ?? null, 'status' => $response->status()]);
