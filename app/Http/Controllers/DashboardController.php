@@ -274,6 +274,14 @@ class DashboardController extends Controller
         $performanceStyleValues = TtsStudioConfig::performanceStyleValues();
         $emotionValues = TtsStudioConfig::emotionValues();
 
+        // The page counts a line break as one character, but its form sends it as \r\n:
+        // read as the page counted it, the text is checked, charged and spoken the same.
+        foreach (['content', 'text'] as $field) {
+            if (is_string($request->input($field))) {
+                $request->merge([$field => str_replace(["\r\n", "\r"], "\n", $request->input($field))]);
+            }
+        }
+
         $validated = $request->validate([
             'title' => ['nullable', 'string', 'max:255'],
             'content' => ['nullable', 'string', 'max:50000', 'required_without:text', new DoesNotContainProfanity(app(ProfanityFilter::class))],

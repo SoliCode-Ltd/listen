@@ -530,6 +530,7 @@ class HomeController extends Controller
     public function demo(Request $request)
     {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         try {
             $maxChars = $this->demoCharAllowance($request);
@@ -648,6 +649,7 @@ class HomeController extends Controller
         TtsService $ttsService,
     ) {
         $this->syncCurrentUserDeviceIdentity($request);
+        $this->readTextAsCounted($request);
 
         $maxChars = $this->demoCharAllowance($request);
         $demoPlan = $this->planAccessService->freePlan();
@@ -1370,6 +1372,17 @@ class HomeController extends Controller
     private function demoCharAllowance(Request $request): int
     {
         return DemoAllowance::chars();
+    }
+
+    /**
+     * The page counts a line break as one character, but its form sends it as
+     * \r\n: read as the page counted it, the text is checked, charged and spoken the same.
+     */
+    private function readTextAsCounted(Request $request): void
+    {
+        if (is_string($request->input('text'))) {
+            $request->merge(['text' => str_replace(["\r\n", "\r"], "\n", $request->input('text'))]);
+        }
     }
 
     private function demoLimitExceededMessage(Request $request, int $maxChars): string
