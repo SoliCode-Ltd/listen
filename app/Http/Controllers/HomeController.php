@@ -13,6 +13,7 @@ use App\Services\Auth\EmailVerificationMailer;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\TrialEligibilityService;
 use App\Services\DemoFraudService;
+use App\Services\DemoLinkedAccounts;
 use App\Services\GenerationErrorRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
@@ -1469,15 +1470,19 @@ class HomeController extends Controller
 
     /**
      * The user plus every account linked to them: the same browser (device
-     * cookie), or the same sign-up network address or fingerprint within
-     * DEMO_LINK_WINDOW_HOURS of each other.
+     * cookie) or the same device (an incognito window keeps it), through
+     * App\Services\DemoLinkedAccounts, or the same sign-up network address
+     * or older fingerprint within DEMO_LINK_WINDOW_HOURS of each other.
      *
      * @return list<int>
      */
     private function demoLinkedUserIds(int $userId, ?Request $request = null): array
     {
         $userIds = $this->ipLinkedUserIds($userId);
-        $deviceLinkedIds = $this->deviceLinkedUserIds($userId, $request);
+        $member = User::query()->find($userId);
+        $deviceLinkedIds = $member
+            ? app(DemoLinkedAccounts::class)->linkedUserIds($member, $request)
+            : $this->deviceLinkedUserIds($userId, $request);
         $fpLinkedIds = $this->fingerprintLinkedUserIds($userId, $request);
 
         // Request signature is intentionally excluded — it is a browser-config
@@ -1688,6 +1693,10 @@ class HomeController extends Controller
         if (! $user instanceof User) {
             return;
         }
+
+        // Every browser and device the member uses the demo from, so a new account
+        // in an incognito window on the same device shares this one's demo.
+        app(DemoLinkedAccounts::class)->record($user, $request);
 
         $updates = [];
         $deviceId = $this->demoDeviceIdFromRequest($request);
