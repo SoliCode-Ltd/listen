@@ -137,15 +137,14 @@ class BillingSyncService
                 }
             } catch (ApiErrorException $exception) {
                 if ($this->isMissingStripeCustomerError($exception)) {
-                    $this->resetBillingStateForMissingCustomer($user);
-                    $targetPlan = $freePlan;
-                    $periodEnd = now()->addMonth();
-
-                    $user->forceFill([
-                        'stripe_id' => null,
-                        'pm_type' => null,
-                        'pm_last_four' => null,
-                    ])->save();
+                    // What a key for the wrong Stripe account or mode says about every
+                    // member. A customer really deleted comes back marked deleted (above),
+                    // so nobody's billing links or plan are taken away here.
+                    Log::error('Stripe does not know this member\'s customer, so their plan and billing links were kept. Check the Stripe keys.', [
+                        'user_id' => $user->id,
+                        'stripe_id' => $user->stripe_id,
+                        'error' => $exception->getMessage(),
+                    ]);
                 } else {
                     Log::warning('Billing sync failed when contacting Stripe API.', [
                         'user_id' => $user->id,
@@ -153,11 +152,19 @@ class BillingSyncService
                         'error' => $exception->getMessage(),
                     ]);
                 }
+
+                // Nothing was read, so nothing changes: the plan and its dates stay as they are.
+                $this->markChecked($user);
+
+                return;
             } catch (\Throwable $exception) {
                 Log::warning('Billing sync failed unexpectedly.', [
                     'user_id' => $user->id,
                     'error' => $exception->getMessage(),
                 ]);
+                $this->markChecked($user);
+
+                return;
             }
         } elseif ($currentPlan && (int) $currentPlan->price_cents > 0) {
             // No Stripe customer, so the plan was paid by hand or given by the team:
@@ -169,6 +176,11 @@ class BillingSyncService
             $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
         }
 
+        $this->markChecked($user);
+    }
+
+    private function markChecked(User $user): void
+    {
         $user->forceFill([
             'subscription_status_checked_at' => now(),
         ])->save();
