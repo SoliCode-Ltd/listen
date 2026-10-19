@@ -198,6 +198,29 @@ class PaidWelcomeEmailTest extends TestCase
         $this->assertSame('Thanks for choosing the plan.', PaidWelcomeEmail::withPlan('Thanks for choosing the {plan} plan.', null, 'en'));
     }
 
+    public function test_off_the_live_site_members_are_not_emailed_but_a_test_copy_is(): void
+    {
+        config(['listen.live_actions' => false]);
+        $user = User::factory()->create(['email' => 'copy@example.test']);
+
+        Subscription::create(['user_id' => $user->id, 'plan_id' => $this->paid->id, 'status' => 'active']);
+        $this->app->terminate();
+        Mail::assertNothingSent();
+
+        try {
+            app(PaidWelcomeEmail::class)->send($user);
+            $this->fail('A member must not be emailed from a server that is not the live site.');
+        } catch (\RuntimeException $e) {
+            $this->assertStringContainsString('not the live site', $e->getMessage());
+        }
+        Mail::assertNothingSent();
+        $this->assertNull($user->fresh()->paid_welcome_sent_at);
+
+        app(PaidWelcomeEmail::class)->send($user, 'owner@example.test');
+        Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => $mail->hasTo('owner@example.test'));
+        Mail::assertSent(NewsletterMail::class, 1);
+    }
+
     public function test_the_page_sits_under_newsletter(): void
     {
         $this->actingAs(User::factory()->create(['is_admin' => true]));

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\BillingSubscription;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\LiveServer;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
@@ -594,6 +595,14 @@ class StripeWebhookEmailService
     {
         $email = trim((string) $user->email);
         if ($email === '') {
+            return;
+        }
+
+        // Staging runs on a copy of live members (with the live Stripe keys):
+        // only the live site emails them.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('billing email "'.$subject.'"', ['user_id' => $user->id]);
+
             return;
         }
 

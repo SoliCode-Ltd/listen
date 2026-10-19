@@ -8,6 +8,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
 use App\Services\PlanAccessService;
+use App\Support\LiveServer;
 use App\Support\TitanMailbox;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -106,6 +107,13 @@ class PaidWelcomeEmail
             return;
         }
 
+        // Staging runs on a copy of live members: only the live site emails them.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('paid welcome email', ['user_id' => $user->id]);
+
+            return;
+        }
+
         $userId = (int) $user->id;
         dispatch(function () use ($userId): void {
             $fresh = User::query()->find($userId);
@@ -129,9 +137,16 @@ class PaidWelcomeEmail
     /**
      * Sends the welcome email to a member and records when. With $testTo it goes
      * to that address instead, using the member's name, and records nothing.
+     * Members are emailed from the live site only; a test copy can go anywhere.
      */
     public function send(User $user, ?string $testTo = null): void
     {
+        if ($testTo === null && ! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('paid welcome email', ['user_id' => $user->id]);
+
+            throw new RuntimeException('Not sent: this is not the live site, and only the live site emails members. A test copy to your own address works here.');
+        }
+
         $to = strtolower(trim((string) ($testTo ?? $user->email)));
         if (! filter_var($to, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('There is no valid email address to send to.');
