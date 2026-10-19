@@ -54,8 +54,7 @@ class VoiceCloningController extends Controller
         }
 
         // Rate limiting: max 5 clone requests per hour per user
-        $rateLimitKey = "voice_cloning:{$userId}";
-        if (RateLimiter::tooManyAttempts($rateLimitKey, 5)) {
+        if ($this->tooManyCloningAttempts($userId)) {
             return $this->jsonError(__('ui.voice_cloning.rate_limited'), 429);
         }
 
@@ -186,7 +185,7 @@ class VoiceCloningController extends Controller
             ],
         ]);
 
-        RateLimiter::hit($rateLimitKey, 3600);
+        $this->countCloningAttempt($userId);
 
         // Run after the response is sent so the studio can poll immediately,
         // even when no queue worker is consuming the database queue.
@@ -270,6 +269,9 @@ class VoiceCloningController extends Controller
         if (! VoiceCloningService::canReplaceConsent($clonedVoice)) {
             return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
         }
+        if ($this->tooManyCloningAttempts($userId)) {
+            return $this->jsonError(__('ui.voice_cloning.rate_limited'), 429);
+        }
 
         VoiceCloningService::failStalledForUser($userId);
         $activeCount = VoiceCloningService::slotsInUse($userId);
@@ -339,6 +341,7 @@ class VoiceCloningController extends Controller
             Storage::disk('local')->delete($oldConsent);
         }
 
+        $this->countCloningAttempt($userId);
         ProcessVoiceCloningJob::dispatch($clonedVoice->id)->afterResponse();
 
         return response()->json([
@@ -383,6 +386,9 @@ class VoiceCloningController extends Controller
         if (! VoiceCloningService::canRetry($clonedVoice)) {
             return $this->jsonError(__('ui.voice_cloning.retry_not_possible'), 422);
         }
+        if ($this->tooManyCloningAttempts($userId)) {
+            return $this->jsonError(__('ui.voice_cloning.rate_limited'), 429);
+        }
 
         VoiceCloningService::failStalledForUser($userId);
         $activeCount = VoiceCloningService::slotsInUse($userId);
@@ -401,6 +407,7 @@ class VoiceCloningController extends Controller
         ]);
         $clonedVoice->refresh();
 
+        $this->countCloningAttempt($userId);
         ProcessVoiceCloningJob::dispatch($clonedVoice->id)->afterResponse();
 
         return response()->json([
@@ -449,6 +456,20 @@ class VoiceCloningController extends Controller
 
         return redirect()->to(route('dashboard') . '#voiceCloningSection')
             ->with('success', __('ui.voice_cloning.deleted_success'));
+    }
+
+    /**
+     * Every attempt (a new voice, a retry, a new consent sentence) has the
+     * provider build a voice, so they share one limit of 5 an hour.
+     */
+    private function tooManyCloningAttempts(int $userId): bool
+    {
+        return RateLimiter::tooManyAttempts("voice_cloning:{$userId}", 5);
+    }
+
+    private function countCloningAttempt(int $userId): void
+    {
+        RateLimiter::hit("voice_cloning:{$userId}", 3600);
     }
 
     private function limitReachedMessage(int $userId, int $maxVoices): string
