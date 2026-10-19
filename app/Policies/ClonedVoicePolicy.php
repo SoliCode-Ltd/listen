@@ -40,8 +40,7 @@ class ClonedVoicePolicy
     }
 
     /**
-     * A finished clone stays on the account so it keeps its plan slot.
-     * Voices that never succeeded can still be removed.
+     * The owner can remove their own voice at any time, finished ones too.
      */
     public function delete(User $user, ClonedVoice $clonedVoice): bool
     {

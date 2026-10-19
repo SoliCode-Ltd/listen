@@ -422,7 +422,8 @@ class VoiceCloningController extends Controller
     }
 
     /**
-     * Delete a cloned voice.
+     * Delete a cloned voice, finished ones included, the same way the admin
+     * does: its copies at the provider, both recordings, and the row.
      */
     public function destroy(Request $request, int $id)
     {
@@ -432,27 +433,7 @@ class VoiceCloningController extends Controller
 
         $clonedVoice = ClonedVoice::forUser((int) auth()->id())->findOrFail($id);
 
-        if (! VoiceCloningService::canUserDelete($clonedVoice)) {
-            $message = __('ui.voice_cloning.delete_ready_blocked');
-            if ($request->expectsJson()) {
-                return $this->jsonError($message, 422);
-            }
-
-            return redirect()->to(route('dashboard').'#voiceCloningSection')
-                ->with('error', $message);
-        }
-
-        app(VoiceCloningService::class)->deleteReplicatedVoice($clonedVoice->provider_voice_key);
-
-        // Clean up stored audio files
-        if (filled($clonedVoice->source_audio_path)) {
-            Storage::disk('local')->delete($clonedVoice->source_audio_path);
-        }
-        if (filled($clonedVoice->consent_audio_path)) {
-            Storage::disk('local')->delete($clonedVoice->consent_audio_path);
-        }
-
-        $clonedVoice->delete();
+        app(VoiceCloningService::class)->purge($clonedVoice);
 
         if ($request->expectsJson()) {
             return response()->json([

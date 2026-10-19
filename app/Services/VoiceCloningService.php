@@ -1313,12 +1313,13 @@ class VoiceCloningService
     }
 
     /**
-     * Finished clones keep their plan slot. Anything that has not
-     * succeeded can be removed by the owner.
+     * The owner can remove any of their voices, finished ones too: the person
+     * whose voice it is can withdraw their consent at any time, without
+     * asking support. Removing it frees its plan slot.
      */
     public static function canUserDelete(ClonedVoice $voice): bool
     {
-        return $voice->status !== 'ready';
+        return true;
     }
 
     /**
