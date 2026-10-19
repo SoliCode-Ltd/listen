@@ -6,8 +6,8 @@ name: Listening test
 # length, the pauses inside long texts; scripts/tts/listening_measure.py) and
 # keeps the recordings with the run, so a change to how the voices sound can
 # be heard and measured before and after. It uses the speech quota staging
-# shares with live (about 30 requests a run): run it by hand only, when the
-# owner has said yes. It never runs on live.
+# shares with live (about 30 requests a run, or only the cases picked): run it
+# by hand only, when the owner has said yes. It never runs on live.
 
 on:
   workflow_dispatch:
@@ -15,9 +15,14 @@ on:
       label:
         description: A name for this set of recordings (before, after, ...)
         default: before
+      cases:
+        description: "Only these cases, by number (e.g. 05,06,15,19-22); empty for all"
+        type: string
+        default: ""
 
 env:
   LABEL: ${{ inputs.label }}
+  CASES: ${{ inputs.cases }}
 
 permissions:
   contents: read
@@ -40,9 +45,19 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import base64, json
+          import base64, json, os, re
           cases = json.load(open('scripts/tts/listening_cases.json', encoding='utf-8'))
           assert cases and all('id' in c and 'request' in c for c in cases)
+          # The cases picked by number: "05,06,19-22".
+          picked = set()
+          for item in filter(None, re.split(r'[\s,]+', os.environ.get('CASES', ''))):
+              low, _, high = item.partition('-')
+              assert low.isdigit() and (high == '' or high.isdigit()), f'not a case number: {item}'
+              picked.update(range(int(low), int(high or low) + 1))
+          if picked:
+              cases = [c for c in cases if int(c['id'][:2]) in picked]
+              assert cases, 'no case has those numbers'
+          print(len(cases), 'case(s):', ', '.join(c['id'] for c in cases))
           script = open('scripts/tts/listening_test.php', encoding='utf-8').read()
           assert '__CASES__' in script
           open('listen.php', 'w', encoding='utf-8').write(script.replace('__CASES__', base64.b64encode(json.dumps(cases).encode()).decode()))

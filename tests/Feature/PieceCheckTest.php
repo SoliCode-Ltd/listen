@@ -141,6 +141,10 @@ class PieceCheckTest extends TestCase
         $history = ['paces' => [], 'pitches' => []];
         $report = PieceCheck::emptyReport();
         $this->assertSame($takes, PieceCheck::review($takes, $texts, fn () => $this->fail('nothing to take again'), $history, $report));
+        // How far the kept pieces stray from the voice, kept with the voice.
+        $this->assertNotNull($report['pitch_spread']);
+        $this->assertLessThan(PieceCheck::PITCH_SEMITONES, $report['pitch_spread']);
+        $this->assertLessThan(PieceCheck::PACE_DIFFERENCE, $report['pace_spread']);
 
         $takes[2] = ['bytes' => $this->wav(substr($pieces[2], 0, 24000 * 2))];
         $history = ['paces' => [], 'pitches' => []];

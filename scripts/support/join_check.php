@@ -14,6 +14,7 @@
  * voice ids, never a text. Writes nothing.
  *
  *   ssh user@host 'cd ~/public_html && LIMIT=60 php' < scripts/support/join_check.php
+ *   ssh user@host 'cd ~/public_html && MEMBER=someone@example.com php' < scripts/support/join_check.php
  */
 
 use App\Models\AudioGeneration;
@@ -218,13 +219,20 @@ $quantile = function (array $values, float $q): float {
     return $values[(int) floor($pos)] + ($values[(int) ceil($pos)] - $values[(int) floor($pos)]) * ($pos - floor($pos));
 };
 
+// MEMBER (an email or a member id): only that member's voices, e.g. the listening test's on staging.
+$member = trim((string) getenv('MEMBER'));
+$memberId = $member === '' ? null : (ctype_digit($member) ? (int) $member : (int) DB::table('users')->where('email', $member)->value('id'));
+if ($member !== '') {
+    echo $memberId ? "Only member {$memberId}'s voices.\n" : "No such member.\n";
+}
 $voices = AudioGeneration::query()
     ->where('status', 'done')
     ->where('voice_tier', 'hd')
     ->where('tts_provider', 'gemini')
     ->where('is_dialogue', false)
-    ->where('duration_seconds', '>=', 75)
+    ->where('duration_seconds', '>=', $member === '' ? 75 : 30)
     ->whereNotNull('audio_path')
+    ->when($member !== '', fn ($q) => $q->where('user_id', $memberId ?: 0))
     ->orderByDesc('id')
     ->limit($limit * 4)
     ->get(['id', 'input_text', 'audio_path', 'duration_seconds', 'settings_snapshot', 'speed', 'dialect', 'tts_model', 'created_at']);
@@ -319,9 +327,14 @@ foreach ($voices as $g) {
         }
     }
     $rows[] = $odd;
-    printf("  #%d %s, %.1f min, %d pieces expected, %d found%s; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s\n",
+    // What the piece check did while the voice was made, if it ran (settings_snapshot.pieces_check).
+    $checked = is_array($snapshot['pieces_check'] ?? null) ? $snapshot['pieces_check'] : null;
+    $checkedText = $checked === null ? '' : sprintf('; checked when made: %d taken again of %d, %d retakes kept%s',
+        $checked['retaken'] ?? 0, $checked['pieces'] ?? 0, $checked['kept_retake'] ?? 0,
+        ($checked['reasons'] ?? []) === [] ? '' : ' ('.implode(', ', array_map(fn ($r, $n) => "{$r} {$n}", array_keys($checked['reasons']), $checked['reasons'])).')');
+    printf("  #%d %s, %.1f min, %d pieces expected, %d found%s; pace spread %d%%, pitch spread %.1f st, level spread %.1f dB%s%s\n",
         $g->id, (string) ($g->tts_model ?: '-'), $length / 60, $expected, count($joins) + 1, $s['moods'] ? ', with moods' : '', round(100 * $s['pace']), $s['pitch'], $s['level'],
-        $odd === [] ? '' : ' | '.implode('; ', $odd));
+        $checkedText, $odd === [] ? '' : ' | '.implode('; ', $odd));
 }
 
 echo "\n== Summary ==\n";

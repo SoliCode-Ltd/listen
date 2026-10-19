@@ -153,6 +153,8 @@ foreach ($cases as $case) {
                 'provider' => $generation->tts_provider,
                 'model' => $generation->tts_model,
                 'error' => $generation->error_message ? mb_substr((string) $generation->error_message, 0, 300) : null,
+                // A long voice's pieces: how many were taken again, why, and how far the kept ones stray (PieceCheck).
+                'pieces_check' => ($generation->settings_snapshot ?? [])['pieces_check'] ?? null,
             ];
             $path = (string) $generation->audio_path;
             if ($generation->status === 'done' && $path !== '' && Storage::disk('public')->exists($path)) {

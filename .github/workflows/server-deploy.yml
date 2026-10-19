@@ -108,7 +108,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check and demo-links: a member's email or member id"
+        description: "email-check, demo-links and join-check: a member's email or member id"
         type: string
         default: ""
 
@@ -371,7 +371,8 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = join-check ]; then
-            tool join_check.php | $S "$FIND; LIMIT=40 nice php"
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            tool join_check.php | $S "$FIND; LIMIT=40 MEMBER='$MEMBER' nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

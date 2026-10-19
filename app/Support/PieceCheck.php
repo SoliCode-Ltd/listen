@@ -250,13 +250,27 @@ final class PieceCheck
             }
         }
 
+        // How far the kept pieces are from their direction's median so far: the worst one, in semitones and as a share of pace.
+        foreach (['pitch_spread' => 'pitches', 'pace_spread' => 'paces'] as $key => $list) {
+            $worst = null;
+            foreach ($history[$list] as $values) {
+                if (count($values) >= self::PIECES_TO_JUDGE_BY && ($median = self::median($values)) > 0) {
+                    foreach ($values as $v) {
+                        $off = $list === 'pitches' ? abs(12 * log($v / $median, 2)) : abs($v / $median - 1);
+                        $worst = max($worst ?? 0.0, $off);
+                    }
+                }
+            }
+            $report[$key] = $worst === null ? null : round($worst, 2);
+        }
+
         return $takes;
     }
 
-    /** @return array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>} */
+    /** @return array{pieces: int, retaken: int, kept_retake: int, reasons: array<string, int>, pitch_spread: ?float, pace_spread: ?float} */
     public static function emptyReport(): array
     {
-        return ['pieces' => 0, 'retaken' => 0, 'kept_retake' => 0, 'reasons' => []];
+        return ['pieces' => 0, 'retaken' => 0, 'kept_retake' => 0, 'reasons' => [], 'pitch_spread' => null, 'pace_spread' => null];
     }
 
     /** How far a take is from what its text needs and from the voice: smaller is better. */
