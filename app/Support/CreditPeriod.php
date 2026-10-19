@@ -229,7 +229,9 @@ final class CreditPeriod
                         ->whereExists(fn ($card) => $card->selectRaw('1')
                             ->from((new BillingSubscription)->getTable())
                             ->where('user_id', $userId)
-                            ->whereIn('stripe_status', ['active', 'trialing'])));
+                            ->whereIn('stripe_status', ['active', 'trialing'])
+                            // Not one cancelled to end with this period.
+                            ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', $at))));
             })
             ->latest('id')
             ->with('plan')
