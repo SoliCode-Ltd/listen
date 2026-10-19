@@ -231,6 +231,9 @@ class GenerateAudioJob implements ShouldQueue
                     'emotion' => $studioOptions['emotion'],
                     'speed' => $studioOptions['speed'],
                     'pitch' => $studioOptions['pitch'],
+                    // The studio and the extension: the same text made again is a new take.
+                    // A developer API request may still get the saved copy.
+                    'fresh_take' => $generation->api_key_id === null,
                 ];
 
                 // Add dialogue speakers if applicable
