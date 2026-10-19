@@ -1272,6 +1272,9 @@ return [
             'Use <short pause> or <long pause> for a moment of silence. Punctuation (… , .) also shapes the pacing.',
             'Standard voices skip tags, so they are never read aloud.',
         ],
+
+        // Generate: a reply that never came is looked for, and the same text is not sent twice meanwhile.
+        'voice_may_still_be_finishing' => 'Your voice may still be finishing. It will appear in your history in a moment — please don\'t generate it again.',
     ],
 
     // ===== AUTH =====

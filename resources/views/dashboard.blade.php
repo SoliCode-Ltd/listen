@@ -3317,6 +3317,7 @@
       'preparing_next' => __('ui.dashboard.preparing_next'),
       'demo_paid_tag' => app()->getLocale() === 'ar' ? 'ديمو مجاني' : 'Free Demo',
       'demo_history_locked' => app()->getLocale() === 'ar' ? 'عنصر من الديمو' : 'Demo entry',
+      'voice_may_still_be_finishing' => __('ui.dashboard.voice_may_still_be_finishing'),
     ];
   @endphp
   <script src="{{ asset('js/dialogue-mode.js') }}?v={{ filemtime(public_path('js/dialogue-mode.js')) }}"></script>
@@ -3343,6 +3344,7 @@
     const deleteJobBaseUrl = '{{ route('dashboard.jobs.destroy', ['job' => '__JOB_ID__']) }}'.replace('/__JOB_ID__', '');
     const deleteDemoJobBaseUrl = '{{ route('dashboard.demo-jobs.destroy', ['generation' => '__GEN_ID__']) }}'.replace('/__GEN_ID__', '');
     const jobStatusUrlTemplate = '{{ route('dashboard.jobs.show', ['job' => '__JOB_ID__']) }}';
+    const latestJobsUrl = '{{ route('dashboard.jobs.latest') }}';
     const csrfToken = '{{ csrf_token() }}';
 
     const voiceForm = document.getElementById('voiceForm');
@@ -3396,6 +3398,8 @@
     let cooldownEndTime = 0;
     let cooldownIntervalId = null;
     const COOLDOWN_SECONDS = 5; // Seconds to wait between generations
+    // One Generate request at a time: a double click or a second Enter never sends (or charges) twice.
+    let generateInFlight = false;
 
     function renderGenerateButtonContent(label, loading = false) {
       if (!generateBtn) return;
@@ -4205,16 +4209,24 @@
       return ['queued', 'processing'].includes(String(job?.status || '').toLowerCase());
     }
 
-    function watchJob(jobId) {
+    // options.now checks at once; options.onFinish(job) runs when the checks end (job is null when it never finished).
+    function watchJob(jobId, options = {}) {
       const id = Number(jobId || 0);
-      if (!id || jobChecks.has(id)) return;
+      if (!id) return;
+      const onFinish = typeof options.onFinish === 'function' ? options.onFinish : null;
+      const watching = jobChecks.get(id);
+      if (watching) {
+        if (onFinish) watching.onFinish = onFinish;
+        return;
+      }
       jobChecks.set(id, {
         delay: JOB_CHECK_FIRST_MS,
         until: Date.now() + JOB_CHECK_FOR_MS,
         timer: null,
         waitingForTab: false,
+        onFinish,
       });
-      scheduleJobCheck(id, JOB_CHECK_FIRST_MS);
+      scheduleJobCheck(id, options.now ? 0 : JOB_CHECK_FIRST_MS);
     }
 
     function scheduleJobCheck(id, delay) {
@@ -4224,11 +4236,14 @@
       check.timer = setTimeout(function() { checkJob(id); }, delay);
     }
 
-    function stopWatchingJob(id) {
+    // Ends the checks; a voice that finished is shown first.
+    function stopWatchingJob(id, finished = null, data = null) {
       const check = jobChecks.get(id);
       if (!check) return;
       clearTimeout(check.timer);
       jobChecks.delete(id);
+      if (finished) finishJob(finished, data);
+      if (check.onFinish) check.onFinish(finished);
     }
 
     async function checkJob(id) {
@@ -4261,8 +4276,7 @@
       }
       const job = data?.job;
       if (job && !isJobRunning(job)) {
-        stopWatchingJob(id);
-        finishJob(job, data);
+        stopWatchingJob(id, job, data);
         return;
       }
       if (Date.now() >= check.until) {
@@ -4293,6 +4307,88 @@
         check.waitingForTab = false;
         scheduleJobCheck(id, 0);
       });
+    });
+
+    // A Generate whose reply never came (the gateway gave up waiting, or the connection
+    // dropped) may still be made, and charged, on the server. The page looks for that
+    // voice for a few minutes and shows it when it comes, and the same text is not sent
+    // again until it knows: a retry would make and charge it twice.
+    const LOST_REPLY_CHECK_FOR_MS = 3 * 60 * 1000;
+    const LOST_REPLY_CHECK_EVERY_MS = 3000;
+    let lostReplyCheck = null;
+
+    // No reply, or a gateway or proxy that stopped waiting for one (502, 504, 520-524).
+    function replyWasLost(status) {
+      return status === 0 || status === 502 || status === 504 || (status >= 520 && status <= 524);
+    }
+
+    function newestOwnJobId() {
+      return allJobs.reduce((newest, job) => (isDemoHistoryJob(job) ? newest : Math.max(newest, Number(job?.id || 0))), 0);
+    }
+
+    // The history names a voice by its first 42 characters: enough to tell this text's
+    // voice from one made meanwhile elsewhere (the extension, another tab).
+    function jobIsForText(job, text) {
+      const squeeze = (value) => String(value || '').replace(/\s+/gu, '');
+      const excerpt = squeeze(job?.text_excerpt);
+      return excerpt !== '' && squeeze(text).startsWith(excerpt);
+    }
+
+    function startLostReplyCheck(text, afterJobId) {
+      const check = { text, afterJobId, until: Date.now() + LOST_REPLY_CHECK_FOR_MS };
+      lostReplyCheck = check;
+      showFormMessage('note', i18n.voice_may_still_be_finishing);
+      lookForLostReply(check);
+    }
+
+    async function lookForLostReply(check) {
+      if (lostReplyCheck !== check) return;
+      let jobs = [];
+      try {
+        const response = await fetch(`${latestJobsUrl}?after=${encodeURIComponent(String(check.afterJobId))}`, {
+          headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+          cache: 'no-store',
+        });
+        const data = response.ok ? await response.json().catch(() => null) : null;
+        jobs = Array.isArray(data?.jobs) ? data.jobs : [];
+      } catch (error) {
+        // Still no connection: looked for again below.
+      }
+      if (lostReplyCheck !== check) return;
+
+      const job = jobs.find((candidate) => jobIsForText(candidate, check.text));
+      if (job) {
+        upsertJobRow(job);
+        // Its note gives way to the voice once it is ready.
+        if (formMessage?.textContent === i18n.voice_may_still_be_finishing) beingMadeNoteJobId = Number(job.id);
+        // Done, failed or still being made: shown as its reply would have shown it.
+        watchJob(job.id, { now: true, onFinish: () => settleLostReplyCheck(check) });
+        return;
+      }
+      if (Date.now() >= check.until) {
+        // Nothing came of it: the request never reached the server, so Generate is safe again.
+        settleLostReplyCheck(check);
+        showFormMessage('error', i18n.server_overload);
+        return;
+      }
+      setTimeout(() => lookForLostReply(check), LOST_REPLY_CHECK_EVERY_MS);
+    }
+
+    function settleLostReplyCheck(check) {
+      if (lostReplyCheck !== check) return;
+      lostReplyCheck = null;
+      if (generateBtn && !generateInFlight && getRemainingCooldown() <= 0) {
+        generateBtn.disabled = false;
+        renderGenerateButtonContent(i18n.generate_voice_now);
+      }
+    }
+
+    // While the page looks for it, Generate stays off for that text only.
+    contentInput?.addEventListener('input', function() {
+      if (!lostReplyCheck || !generateBtn || generateInFlight || getRemainingCooldown() > 0) return;
+      const sameText = String(contentInput.value || '').trim() === lostReplyCheck.text;
+      generateBtn.disabled = sameText;
+      renderGenerateButtonContent(sameText ? i18n.generating : i18n.generate_voice_now, sameText);
     });
 
     async function deleteJob(jobId, source, triggerBtn) {
@@ -4413,6 +4509,7 @@
     async function submitVoiceForm(event) {
       event.preventDefault();
       if (!voiceForm || !generateBtn) return;
+      if (generateInFlight) return;
       // No plan and no characters: the options are shown, generating needs a plan.
       if (@json((bool) ($planShowcase ?? false))) {
         showFormMessage('error', @json(__('ui.pack.showcase_note')));
@@ -4429,19 +4526,38 @@
       if (!isTranslateEnabled()) {
         syncLanguageToCurrentTextWhenTranslationOff();
       }
+      const submittedText = String(contentInput?.value || '').trim();
+      // Its last reply was lost and the page is still finding out whether it was made:
+      // the same text is not sent (and charged) again meanwhile.
+      if (lostReplyCheck && lostReplyCheck.text === submittedText) {
+        showFormMessage('note', i18n.voice_may_still_be_finishing);
+        return;
+      }
       showFormMessage(null, '');
       const defaultText = i18n.generate_voice_now;
+      generateInFlight = true;
       generateBtn.disabled = true;
       renderGenerateButtonContent(i18n.generating, true);
+      const newestJobIdBefore = newestOwnJobId();
       let data = null;
       let replyStatus = 0;
       let wasSuccessful = false;
       try {
-        const response = await fetch(queueUrl, {
-          method: 'POST',
-          headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-          body: new FormData(voiceForm),
-        });
+        let response = null;
+        try {
+          response = await fetch(queueUrl, {
+            method: 'POST',
+            headers: { 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: new FormData(voiceForm),
+          });
+        } catch (networkError) {
+          // No reply at all: looked for below, as after a gateway timeout.
+        }
+        if (replyWasLost(response ? response.status : 0)) {
+          // Not called a failure: the voice may still come, so the page looks for it.
+          startLostReplyCheck(submittedText, newestJobIdBefore);
+          return;
+        }
         replyStatus = response.status;
         data = await response.json().catch(() => null);
         if (data?.job) upsertJobRow(data.job);
@@ -4461,8 +4577,7 @@
         // Start cooldown after successful generation
         startCooldownCountdown(COOLDOWN_SECONDS);
       } catch (error) {
-        // No reply at all (offline, a dropped connection) is never shown in the browser's own words.
-        const message = replyStatus ? String(error?.message || i18n.voice_generation_failed) : extractErrorMessage(null);
+        const message = String(error?.message || i18n.voice_generation_failed);
         showFormMessage('error', message);
         // Check if server returned a rate limit with retry seconds
         const secondsMatch = message.match(/(\d+)\s*(second|ثانية|ثواني)/i);
@@ -4473,6 +4588,8 @@
           generateBtn.disabled = false;
           renderGenerateButtonContent(defaultText);
         }
+      } finally {
+        generateInFlight = false;
       }
     }
 

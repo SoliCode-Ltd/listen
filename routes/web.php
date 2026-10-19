@@ -225,6 +225,7 @@ Route::group([
     // What an open studio page asks while it works, every few seconds: these only
     // read, so they skip the billing sync the pages run.
     Route::middleware(['auth'])->group(function () {
+        Route::get('/dashboard/jobs/latest', [DashboardController::class, 'latest'])->name('dashboard.jobs.latest');
         Route::get('/dashboard/jobs/{job}', [DashboardController::class, 'show'])->whereNumber('job')->name('dashboard.jobs.show');
     });
 

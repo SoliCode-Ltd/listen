@@ -498,6 +498,30 @@ class DashboardController extends Controller
         return response()->json($payload)->header('Cache-Control', 'no-store, private');
     }
 
+    /**
+     * The member's newest few generations made after the given one, newest
+     * first. When a Generate reply never came (a gateway timeout, a dropped
+     * connection), the page finds the voice that request made, instead of the
+     * member making and paying for it twice.
+     */
+    public function latest(Request $request)
+    {
+        $userId = (int) auth()->id();
+        $voiceNameMap = $this->voiceNameMapForUser($userId);
+
+        $jobs = $this->userHistoryQuery($userId)
+            ->with('textItem:id,title')
+            ->where('id', '>', max(0, (int) $request->integer('after')))
+            ->latest('id')
+            ->limit(5)
+            ->get()
+            ->map(fn (AudioGeneration $job): array => $this->buildJobPayload($job, $voiceNameMap))
+            ->values()
+            ->all();
+
+        return response()->json(['ok' => true, 'jobs' => $jobs])->header('Cache-Control', 'no-store, private');
+    }
+
     public function destroy(Request $request, AudioGeneration $job)
     {
         $userId = (int) auth()->id();
