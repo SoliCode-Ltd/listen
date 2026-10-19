@@ -9,6 +9,7 @@ use App\Support\SpeechLanguages;
 use App\Support\EnglishAccents;
 use App\Support\GeminiTtsModel;
 use App\Support\GeminiVocalTags;
+use App\Support\PaceAndPitch;
 use App\Support\ShareableAudio;
 use App\Support\TextChunker;
 use App\Support\TtsStudioConfig;
@@ -1506,26 +1507,15 @@ class GeminiTtsProvider implements TtsProviderInterface
             $prompt .= $styleDesc;
         }
 
-        // Add speed instruction (Gemini uses prompt-based control, not API parameters)
-        if ($speed <= 0.6) {
-            $prompt .= ' Speak very slowly and deliberately, taking pauses between phrases.';
-        } elseif ($speed < 0.85) {
-            $prompt .= ' Speak at a slow, measured pace.';
-        } elseif ($speed > 1.5) {
-            $prompt .= ' Speak very quickly with rapid, energetic pacing.';
-        } elseif ($speed > 1.2) {
-            $prompt .= ' Speak at a faster pace with energetic delivery.';
+        // Speed and pitch are written directions (Gemini has no such API parameters),
+        // one for every step of the studio's sliders; 1.0x and 0 send nothing.
+        $pace = PaceAndPitch::speed($speed);
+        if ($pace !== '') {
+            $prompt .= ' '.$pace;
         }
-
-        // Add pitch instruction (Gemini uses prompt-based control, not API parameters)
-        if ($pitch <= -10) {
-            $prompt .= ' Use a very deep, low-pitched voice.';
-        } elseif ($pitch < -3) {
-            $prompt .= ' Use a deeper, lower-pitched voice.';
-        } elseif ($pitch >= 10) {
-            $prompt .= ' Use a very high-pitched, bright voice.';
-        } elseif ($pitch > 3) {
-            $prompt .= ' Use a higher-pitched, brighter voice.';
+        $tone = PaceAndPitch::pitch($pitch);
+        if ($tone !== '') {
+            $prompt .= ' '.$tone;
         }
 
         // Fallback if prompt is empty

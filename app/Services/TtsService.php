@@ -6,6 +6,7 @@ use App\Models\Plan;
 use App\Services\Tts\ArabicVoiceMapper;
 use App\Services\Tts\TtsRoutingService;
 use App\Support\GeminiTtsModel;
+use App\Support\PaceAndPitch;
 use App\Support\StandardVoiceEngine;
 use App\Support\TtsStudioConfig;
 use App\Support\VoiceCatalog;
@@ -239,6 +240,12 @@ class TtsService
             $model = GeminiTtsModel::resolve();
             if ($model !== GeminiTtsModel::CURRENT) {
                 $parts[] = 'model:'.$model;
+            }
+
+            // Every speed and pitch step but 1.0x and 0 now has its own direction
+            // (0.9x, 1.1x and 1.2x used to sound like 1.0x), so older recordings are not reused.
+            if (PaceAndPitch::speed((float) ($config['speed'] ?? 1.0)) !== '' || PaceAndPitch::pitch((float) ($config['pitch'] ?? 0.0)) !== '') {
+                $parts[] = 'pace:graded';
             }
         }
 

@@ -10,6 +10,7 @@ use App\Services\Tts\GeminiKeyManager;
 use App\Support\ArabicDialects;
 use App\Support\EnglishAccents;
 use App\Support\GeminiVocalTags;
+use App\Support\PaceAndPitch;
 use App\Support\TextChunker;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Http\Client\ConnectionException;
@@ -617,17 +618,11 @@ class VoiceCloningService
             $parts[] = 'Emotional tone: '.str_replace(['_', '-'], ' ', $emotion).'.';
         }
 
-        if ($speed > 0 && abs($speed - 1) >= 0.15) {
-            $parts[] = $speed < 1 ? 'Speak a little more slowly.' : 'Speak a little more quickly.';
-        }
+        // The same graded directions as the stock voices: every step but 1.0x and 0.
+        $parts[] = PaceAndPitch::speed($speed);
+        $parts[] = PaceAndPitch::pitch($pitch);
 
-        if ($pitch <= -3) {
-            $parts[] = 'Use a deeper, lower-pitched voice.';
-        } elseif ($pitch >= 3) {
-            $parts[] = 'Use a higher-pitched, brighter voice.';
-        }
-
-        return trim(implode(' ', $parts));
+        return trim(implode(' ', array_filter($parts, fn (string $part): bool => $part !== '')));
     }
 
     private function clonedAccentInstruction(?string $dialect): string
