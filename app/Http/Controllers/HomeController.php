@@ -345,10 +345,13 @@ class HomeController extends Controller
             $activePlanSlug = (string) ($activePlan?->slug ?? 'free');
         }
 
+        // Once per page: a visitor's country can take a few seconds to look up.
+        $countryContext = $this->localizedPricingService->resolveCountryContext($request);
+
         return view('pricing', [
-            'pricingPlans' => $this->pricingPlans(),
+            'pricingPlans' => $this->pricingPlans($countryContext),
             'activePlanSlug' => $activePlanSlug,
-            'countryContext' => $this->localizedPricingService->resolveCountryContext($request),
+            'countryContext' => $countryContext,
             'yearlyDiscountPercent' => SiteSetting::yearlyDiscountPercent(),
             'trialPromo' => app(TrialEligibilityService::class)->promoFor($request->user()),
         ]);
@@ -1196,9 +1199,10 @@ class HomeController extends Controller
     }
 
     /**
+     * @param  array<string, mixed>  $countryContext
      * @return array<int, array<string, mixed>>
      */
-    private function pricingPlans(): array
+    private function pricingPlans(array $countryContext): array
     {
         $plans = Plan::query()
             ->where('is_active', true)
@@ -1206,7 +1210,6 @@ class HomeController extends Controller
             ->get();
 
         $locale = app()->getLocale();
-        $countryContext = $this->localizedPricingService->resolveCountryContext(request());
 
         $packs = app(CharPackService::class);
         $viewer = auth()->user();
@@ -1321,6 +1324,10 @@ class HomeController extends Controller
                     $locale
                 ),
                 'display_is_manual' => $manualMethod !== null,
+                // What a card is really charged (Stripe prices are in US dollars), shown
+                // beside a price in another currency: a month, and a month of the yearly price.
+                'usd_price_monthly_formatted' => (string) $stripeMonthlyQuote['base_usd_formatted'],
+                'usd_price_yearly_monthly_formatted' => $this->localizedPricingService->formatAmount((int) round($yearlyCents / 12), LocalizedPricingService::CURRENCY_USD, $locale),
                 'monthly_minutes' => (int) $plan->monthly_minutes,
                 'monthly_chars' => (int) $plan->monthly_chars,
                 'monthly_requests' => (int) $plan->monthly_requests,

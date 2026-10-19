@@ -101,6 +101,15 @@
       font-size: .74rem;
       font-weight: 700;
     }
+    /* Under the switch when prices show in another currency: what cards are charged in. */
+    .currency-note {
+      max-width: 62ch;
+      margin: 1rem auto 0;
+      color: var(--muted);
+      font-size: .86rem;
+      line-height: 1.55;
+      text-wrap: pretty;
+    }
 
     /* ── Plan cards ──
        Monthly plans in one aligned row (CSS subgrid: every card's badge, name, price,
@@ -208,6 +217,7 @@
       font-variant-numeric: tabular-nums;
     }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
+    .price-usd { color: var(--muted); font-size: .84rem; font-weight: 600; }
     .price-note { color: var(--muted); font-size: .84rem; min-height: 0; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
@@ -748,6 +758,16 @@
       if ($mainPlans === []) {
         $mainPlans = $pricingPlans;
       }
+      // Prices in another currency are a guide: cards are charged each plan's price in US
+      // dollars. Egypt's prices in pounds are what paying in pounds costs; only a card
+      // payment is in dollars.
+      $shownPlan = reset($mainPlans) ?: [];
+      $shownCurrency = (string) ($shownPlan['display_currency'] ?? 'USD');
+      $currencyNote = match (true) {
+        $shownCurrency === 'USD' => '',
+        !empty($shownPlan['display_is_manual']) => __('ui.pricing.currency_note_egp'),
+        default => __('ui.pricing.currency_note', ['currency' => $shownCurrency]),
+      };
       // "$9.00" reads as "$9"; "$86.40" keeps its cents.
       $wholePrice = static fn (string $price): string => (string) preg_replace('/[.,]00(?=\D*$)/u', '', $price);
       // The icon drawn beside each line, on the cards and in the comparison table.
@@ -857,6 +877,9 @@
           </button>
         </div>
       </div>
+      @if($currencyNote !== '')
+        <p class="currency-note">{{ $currencyNote }}</p>
+      @endif
     </section>
 
     @php $planCount = min(6, max(1, count($mainPlans))); @endphp
@@ -1030,6 +1053,10 @@
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
+
+          // A price in another currency: the US-dollar price a card is charged, for the cycle shown.
+          var usd = card.querySelector('.price-usd');
+          if (usd) usd.textContent = String(usd.getAttribute(isYearly ? 'data-yearly' : 'data-monthly') || '');
 
           // How long the discount lasts and the regular price after it, for the cycle shown.
           var terms = card.querySelector('.discount-terms');
