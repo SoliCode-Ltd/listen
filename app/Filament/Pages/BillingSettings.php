@@ -138,7 +138,7 @@ class BillingSettings extends Page implements HasForms
                             ->minValue(0)
                             ->maxValue(90)
                             ->default(7)
-                            ->helperText('Days after cancellation before access is revoked.'),
+                            ->helperText('Days a member keeps their paid plan after a renewal payment fails. If it is still unpaid then, the subscription is canceled and they move to the free plan. The first payment after a free trial gets no grace days.'),
                         Forms\Components\Toggle::make('webhook_emails_enabled')
                             ->label('Webhook Email Notifications')
                             ->helperText('Send email notifications on subscription lifecycle events.'),

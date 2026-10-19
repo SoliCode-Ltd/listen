@@ -655,6 +655,7 @@ return [
         'manual_active_notice' => 'You paid by InstaPay or Vodafone Cash. Your plan is active until :date and does not renew by itself. Renew before then to keep it.',
         'manual_expired_notice' => 'Your paid period ended on :date, so your account has no active plan now. Renew to get your plan back.',
         'manual_pending_notice' => 'We received your payment for :plan. It will be active as soon as we confirm it.',
+        'payment_grace_notice' => "We couldn't take your latest payment. Your :plan plan stays on until :date, with all its paid features. Update your card below and we'll charge the overdue payment straight away. If it's still unpaid on :date, your subscription will be canceled and your account will move to the free plan.",
         'granted_active_notice' => 'The Listen team added the :plan plan to your account. It stays active until :date, then ends by itself: it doesn\'t renew and nothing is charged. To keep it after that, subscribe before then.',
         'granted_open_notice' => 'The Listen team added the :plan plan to your account. It doesn\'t renew and nothing is charged.',
         'granted_expired_notice' => 'The :plan plan the Listen team added to your account ended on :date. Subscribe to keep using it.',

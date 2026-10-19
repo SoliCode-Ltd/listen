@@ -7,6 +7,7 @@ use App\Models\ManualPaymentRequest;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\StripePricePlans;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +19,7 @@ class BillingSyncService
     public function __construct(
         private readonly PlanAccessService $planAccessService,
         private readonly StripePricePlans $stripePrices,
+        private readonly RenewalGrace $renewalGrace,
     ) {}
 
     public function syncIfStale(User $user, bool $force = false): void
@@ -95,6 +97,10 @@ class BillingSyncService
         $periodEnd = now()->addMonth();
         $periodStart = null;
         $keepPlanAsIs = false;
+        $stripeSaysPaid = false;
+        // What the plan row says about a missed payment before Stripe is read. A
+        // webhook that records or settles one meanwhile makes what is read stale.
+        $paymentStateBeforeRead = $this->latestPaymentState($user);
 
         if ($user->stripe_id) {
             try {
@@ -140,6 +146,13 @@ class BillingSyncService
                                 ?? $stripeSubscription->items->data[0]->current_period_start
                                 ?? 0);
                             $periodStart = $periodStartTs > 0 ? Carbon::createFromTimestamp($periodStartTs) : null;
+                            $stripeSaysPaid = true;
+                        } elseif (in_array($selectedStatus, ['past_due', 'unpaid'], true)) {
+                            // A payment is missing. A member who paid for the plan before keeps
+                            // it, with the dates of the period paid for (never Stripe's new,
+                            // unpaid one), until the grace days run out; one who never did (a
+                            // free trial's first charge) moves to Free now (RenewalGrace).
+                            $keepPlanAsIs = $this->renewalGrace->forBillingSync($user, $stripeSubscription, $paymentStateBeforeRead);
                         } elseif (in_array($selectedStatus, ['incomplete', 'incomplete_expired', 'canceled'], true)
                             && $this->keepsPlanGivenByHand($user, $currentPlan, $onlyDeclined)) {
                             // Nothing live in Stripe: a declined card never moves a plan paid by hand to Free.
@@ -213,11 +226,32 @@ class BillingSyncService
             $keepPlanAsIs = true;
         }
 
+        // A missed payment recorded while Stripe was being read: what was read can be
+        // from just before it (a renewal still being charged), so it must not undo
+        // the grace. Nothing changes now; the next sync reads Stripe again.
+        if ($stripeSaysPaid && $paymentStateBeforeRead !== 'past_due' && $this->latestPaymentState($user) === 'past_due') {
+            $keepPlanAsIs = true;
+            $stripeSaysPaid = false;
+        }
+
         if (! $keepPlanAsIs) {
             $this->planAccessService->assignPlan($user, $targetPlan, 'active', $periodEnd, $periodStart);
         }
 
+        // Paid again: once the plan has taken Stripe's paid period, any missed
+        // payment (and its grace) is over.
+        if ($stripeSaysPaid) {
+            $this->renewalGrace->settle($user);
+        }
+
         $this->markChecked($user);
+    }
+
+    private function latestPaymentState(User $user): ?string
+    {
+        $state = Subscription::query()->where('user_id', $user->id)->latest('id')->value('billing_payment_state');
+
+        return $state !== null ? (string) $state : null;
     }
 
     private function markChecked(User $user): void

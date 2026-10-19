@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Services\Billing\RenewalGrace;
 use App\Services\Billing\SavedPaymentMethodRecorder;
 use App\Services\Billing\StripePricePlans;
 use App\Services\Billing\TrialEligibilityService;
@@ -111,7 +112,15 @@ class BillingController extends Controller
             ]);
         }
 
-        $manual = $stripeValid ? null : $this->manualSubscriptionState($user);
+        // A card plan behind on payment is not a plan paid by hand: during its grace
+        // days it is still on, and the page says until when (RenewalGrace).
+        $local = Subscription::query()->where('user_id', $userId)->where('status', 'active')->latest('id')->with('plan')->first();
+        $inGrace = RenewalGrace::keeps($local);
+        $cardPaymentMissing = $local !== null
+            && (string) $local->billing_payment_state === 'past_due'
+            && $subscription !== null && ! $subscription->ended()
+            && in_array(strtolower((string) $subscription->stripe_status), ['past_due', 'unpaid'], true);
+        $manual = $stripeValid || $inGrace || $cardPaymentMissing ? null : $this->manualSubscriptionState($user);
         $hasStripeCustomer = $user->hasStripeId();
 
         $periodEnd = null;
@@ -155,6 +164,10 @@ class BillingController extends Controller
             'subscriptionRenewsAt' => $periodEnd ? $this->formatCarbonDate($periodEnd) : null,
             'upcomingCharge' => $upcomingCharge,
             'trialNotice' => $this->trialNotice($user, $locale),
+            'paymentGraceNotice' => $inGrace ? __('ui.manage_subscription.payment_grace_notice', [
+                'plan' => $local->plan->getLocalizedName($locale) ?: (string) $local->plan->name,
+                'date' => $this->formatCarbonDate($local->billing_grace_ends_at),
+            ]) : null,
             'manual' => $manual,
         ]);
     }

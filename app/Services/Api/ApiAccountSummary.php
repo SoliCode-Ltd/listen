@@ -68,10 +68,13 @@ class ApiAccountSummary
             'plan_name' => $plan ? ($plan->getLocalizedName(app()->getLocale()) ?: (string) $plan->name) : __('ui.dashboard.free_plan'),
             'usage' => $usage,
             'is_pack' => $isPack,
-            'resets_at' => $credit['ends_at'],
+            // While a failed renewal's grace keeps the plan on, its credits run until
+            // the renewal is paid or, at the latest, until the grace ends.
+            'resets_at' => $credit['grace_ends_at'] ?? $credit['ends_at'],
             // When this credit period ends with the plan itself and nothing renews it
-            // (a plan paid by hand or given by the team), the box says until when it runs.
-            'plan_ends' => self::planEndsWithPeriod($userId, $credit),
+            // (a plan paid by hand or given by the team, or a renewal not paid during
+            // its grace days), the box says until when it runs.
+            'plan_ends' => $credit['grace_ends_at'] !== null || self::planEndsWithPeriod($userId, $credit),
             'active_keys' => $keys->whereNull('revoked_at')->values(),
             'revoked_keys' => $keys->whereNotNull('revoked_at')->take(10)->values(),
             'month_usage' => $monthUsage,
@@ -97,7 +100,7 @@ class ApiAccountSummary
     }
 
     /**
-     * @param  array{ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon}  $credit
+     * @param  array{ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon, grace_ends_at: ?Carbon}  $credit
      */
     private static function planEndsWithPeriod(int $userId, array $credit): bool
     {
@@ -105,10 +108,11 @@ class ApiAccountSummary
             return false;
         }
 
-        // A card subscription renews by itself until it is cancelled.
+        // A card subscription renews by itself until it is cancelled. One behind on
+        // payment does not: it is cancelled when its grace days run out, unless paid.
         return ! BillingSubscription::query()
             ->where('user_id', $userId)
-            ->whereIn('stripe_status', ['active', 'trialing', 'past_due'])
+            ->whereIn('stripe_status', ['active', 'trialing'])
             ->whereNull('ends_at')
             ->exists();
     }

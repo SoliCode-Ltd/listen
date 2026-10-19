@@ -11,6 +11,7 @@ use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
+use App\Services\Billing\RenewalGrace;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -34,6 +35,11 @@ use Illuminate\Support\Facades\Schema;
  * the switch counts by calendar month until it ends, exactly as before the
  * switch (a fresh count on the 1st), so the switch gives nobody new credits
  * and takes none away; the plan's own dates start with the next one.
+ *
+ * While a failed renewal's grace days run (App\Services\Billing\RenewalGrace),
+ * the credits stay in the period that was paid for, counted as at its last
+ * moment: the same key and counter whatever the clock or the calendar says,
+ * and no fresh allowance until the renewal is paid.
  */
 final class CreditPeriod
 {
@@ -50,16 +56,32 @@ final class CreditPeriod
     private static bool $startingAfresh = false;
 
     /**
-     * The member's credit period at a moment (now by default).
+     * The member's credit period at a moment (now by default). grace_ends_at is
+     * set while a failed renewal's grace keeps the plan on: the period then
+     * lasts until the renewal is paid or, at the latest, until that moment.
      *
-     * @return array{key: string, starts_at: Carbon, ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon}
+     * @return array{key: string, starts_at: Carbon, ends_at: Carbon, follows_plan: bool, plan_ends_at: ?Carbon, grace_ends_at: ?Carbon}
      */
     public static function current(int $userId, ?\DateTimeInterface $at = null): array
     {
         $at = $at !== null ? Carbon::instance($at)->utc() : now()->utc();
         $switchedAt = self::switchedAt();
+        $subscription = self::paidSubscription($userId, $at);
 
-        return self::periodOf($switchedAt !== null ? self::paidSubscription($userId, $at) : null, $at, $switchedAt);
+        // The grace days of a failed renewal: counted as at the last moment of
+        // the period paid for, which the plan's dates were kept on.
+        $graceEndsAt = null;
+        $countAt = $at;
+        if ($subscription !== null && RenewalGrace::keeps($subscription, $at)) {
+            $graceEndsAt = Carbon::instance($subscription->billing_grace_ends_at)->utc();
+            $paidUntil = $subscription->current_period_end !== null ? Carbon::instance($subscription->current_period_end)->utc() : null;
+            if ($paidUntil !== null && $paidUntil->lte($at)) {
+                $countAt = $paidUntil->copy()->subSecond();
+            }
+        }
+
+        return self::periodOf($switchedAt !== null ? $subscription : null, $countAt, $switchedAt)
+            + ['grace_ends_at' => $graceEndsAt];
     }
 
     /** The member's usage row for their current credit period (made when missing). */
@@ -231,7 +253,9 @@ final class CreditPeriod
                             ->where('user_id', $userId)
                             ->whereIn('stripe_status', ['active', 'trialing'])
                             // Not one cancelled to end with this period.
-                            ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', $at))));
+                            ->where(fn ($ends) => $ends->whereNull('ends_at')->orWhere('ends_at', '>', $at))))
+                    // A failed renewal's grace days, as in PlanAccessService.
+                    ->orWhere(fn ($grace) => RenewalGrace::whereKept($grace, $at));
             })
             ->latest('id')
             ->with('plan')
