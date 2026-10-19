@@ -53,9 +53,12 @@ class DashboardController extends Controller
         $voiceNameMap = $this->voiceNameMapForUser($userId);
         $demoHistoryJobs = $this->buildDemoHistoryJobs($userId, $activePlan, $voiceNameMap);
 
+        // The latest 500: a long history no longer makes the page slow to build and load
+        // (the counts below are still of every generation).
         $jobs = (clone $baseQuery)
             ->with(['textItem:id,title'])
             ->latest()
+            ->limit(500)
             ->get();
 
         $reusePreset = null;

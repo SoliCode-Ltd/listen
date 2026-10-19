@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\VoiceCatalog;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -35,4 +36,11 @@ class Voice extends Model
         'supported_emotions' => 'array',
         'metadata' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        // VoiceCatalog keeps the voices it read for the request: a change is seen at once.
+        static::saved(fn () => VoiceCatalog::forgetVoiceMeta());
+        static::deleted(fn () => VoiceCatalog::forgetVoiceMeta());
+    }
 }
