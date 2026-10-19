@@ -1,0 +1,186 @@
+[
+  {
+    "id": "01-loudness-ar-egyptian",
+    "listen_for": "Level against the other short takes; the same text as 11 without a direction.",
+    "voice": "ar-Gemini-HD-Puck",
+    "request": {
+      "content": "أهلاً بيك! النهارده هنتكلم عن طريقة سهلة تعمل بيها قهوة الصبح في البيت، من غير ما تحتاج أي أدوات غالية.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-EG"
+    }
+  },
+  {
+    "id": "02-loudness-en-american",
+    "listen_for": "Level against the other short takes; the 1.0x pace and pitch 0 for 07 to 10.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US"
+    }
+  },
+  {
+    "id": "03-loudness-ar-lebanese",
+    "listen_for": "Level against the other short takes.",
+    "voice": "ar-Gemini-HD-Erinome",
+    "request": {
+      "content": "مرحبا، كيفك اليوم؟ بدي خبرك عن مطعم صغير بآخر الشارع، أكلاته طيبة كتير وأسعاره منيحة.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-LB"
+    }
+  },
+  {
+    "id": "04-standard-voice-en",
+    "listen_for": "A free (standard) voice: clarity, no compression swirl, level against the premium takes.",
+    "voice": "",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "standard"
+    }
+  },
+  {
+    "id": "05-long-text-en",
+    "listen_for": "A text read in pieces: no jump in level and natural pauses where the pieces meet.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Every morning starts the same way in our house. The kettle goes on before anyone speaks, the curtains open, and the cat waits by the door as if it has been there all night. It is a small ritual, but it sets the pace for everything that follows.\n\nThe first habit is simple: drink a glass of water before your coffee. After a night of sleep, your body is a little dry, and that glass wakes you up more gently than any alarm. Keep the glass by the sink, so you see it, and you will not forget it.\n\nThe second habit is a short walk. Ten minutes is enough. Walk to the corner shop, around the block, or just up and down the garden. You will notice the light, the sounds of the street, and the people who are already on their way to work. By the time you come back, your head is clearer, and the day ahead feels possible.\n\nThe third habit is the hardest, because it asks you to do nothing at all. Before you open your phone, sit for two minutes and think about the one thing that matters most today. Not the ten things on your list, just one. Write it on a piece of paper if it helps. When the day gets busy, and it will, that one thing is the line you come back to.\n\nNone of these habits is new, and none of them costs anything. What makes them work is doing them every day, in the same order, until they stop feeling like a plan and start feeling like the way your mornings simply are. Try them for a week, and see how your evenings change too.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US"
+    }
+  },
+  {
+    "id": "06-long-text-ar-egyptian",
+    "listen_for": "A long Arabic text read in pieces: no jump in level and natural pauses where the pieces meet.",
+    "voice": "ar-Gemini-HD-Puck",
+    "request": {
+      "content": "كل يوم الصبح بيبدأ بنفس الطريقة في بيتنا. البراد بيتحط على النار قبل ما حد يتكلم، والستاير بتتفتح، والقطة بتستنى جنب الباب كأنها قاعدة هناك طول الليل. دي حاجة صغيرة، بس هي اللي بتحدد إيقاع اليوم كله.\n\nأول عادة سهلة جداً: اشرب كوباية مية قبل القهوة. بعد النوم جسمك بيبقى ناشف شوية، والكوباية دي بتصحيك بهدوء أكتر من أي منبه. سيب الكوباية جنب الحوض عشان تشوفها، وساعتها مش هتنساها أبداً.\n\nتاني عادة هي مشوار قصير. عشر دقايق كفاية. امشي لحد المحل اللي على الناصية، أو لف حوالين البيت، أو حتى اتمشى في الجنينة. هتاخد بالك من النور، ومن أصوات الشارع، ومن الناس اللي نازلة شغلها بدري. ولما ترجع، دماغك هتبقى أصفى، واليوم اللي جاي هيبان أسهل.\n\nتالت عادة هي الأصعب، عشان مطلوب منك فيها إنك متعملش أي حاجة. قبل ما تفتح الموبايل، اقعد دقيقتين وفكر في أهم حاجة لازم تحصل النهارده. مش عشر حاجات، حاجة واحدة بس. اكتبها في ورقة لو ده هيساعدك. ولما اليوم يزحم، وهو أكيد هيزحم، الحاجة دي هي اللي ترجعلها.\n\nولا عادة من دول جديدة، ولا واحدة فيهم بتكلف أي فلوس. اللي بيخليهم ينفعوا إنك تعملهم كل يوم بنفس الترتيب، لحد ما يبطلوا يبقوا خطة ويبقوا ببساطة شكل الصبح بتاعك. جربهم أسبوع، وشوف المسا بتاعك هيتغير إزاي.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-EG"
+    }
+  },
+  {
+    "id": "07-speed-0.9",
+    "listen_for": "Slightly slower than 02 (same text and voice).",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US",
+      "speed": 0.9
+    }
+  },
+  {
+    "id": "08-speed-1.1",
+    "listen_for": "Slightly faster than 02.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US",
+      "speed": 1.1
+    }
+  },
+  {
+    "id": "09-speed-1.2",
+    "listen_for": "Faster than 08.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US",
+      "speed": 1.2
+    }
+  },
+  {
+    "id": "10-pitch-plus-2",
+    "listen_for": "A little higher than 02.",
+    "voice": "en-Gemini-HD-Callirrhoe",
+    "request": {
+      "content": "Good morning, and welcome to the show. Today we look at three small habits that make a long day feel lighter.",
+      "target_language": "en",
+      "voice_tier": "hd",
+      "dialect": "en-US",
+      "pitch": 2
+    }
+  },
+  {
+    "id": "11-own-direction-keeps-dialect",
+    "listen_for": "The member's own direction (slow, soft) AND still the Egyptian accent picked, as in 01.",
+    "voice": "ar-Gemini-HD-Puck",
+    "request": {
+      "content": "أهلاً بيك! النهارده هنتكلم عن طريقة سهلة تعمل بيها قهوة الصبح في البيت، من غير ما تحتاج أي أدوات غالية.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-EG",
+      "style_prompt": "Read this slowly and softly, like a bedtime story for a child."
+    }
+  },
+  {
+    "id": "12-fusha-formal",
+    "listen_for": "Clear, formal Modern Standard Arabic, with no regional accent.",
+    "voice": "ar-Gemini-HD-Puck",
+    "request": {
+      "content": "مرحباً بكم في نشرة الأخبار. نبدأ اليوم بالحديث عن حالة الطقس، إذ يُتوقع أن تكون الأجواء معتدلة في معظم المناطق، مع فرصة لهطول أمطار خفيفة مساءً.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-XA"
+    }
+  },
+  {
+    "id": "13-dialogue-mood-on-one-line",
+    "listen_for": "Only Karim's second line is angry; Layla and his other line stay calm.",
+    "voice": "ar-Gemini-HD-Erinome",
+    "dialogue": [
+      {
+        "name": "ليلى",
+        "voice": "ar-Gemini-HD-Erinome",
+        "dialect": "ar-EG"
+      },
+      {
+        "name": "كريم",
+        "voice": "ar-Gemini-HD-Puck",
+        "dialect": "ar-EG"
+      }
+    ],
+    "request": {
+      "content": "ليلى: صباح الخير يا كريم، عامل إيه النهارده؟\nكريم: الحمد لله، كله تمام.\nليلى: طب ليه شكلك متضايق كده؟\nكريم: [angry] العربية عطلت تاني، وأنا متأخر على الشغل!\nليلى: معلش، خلينا نشوف حل مع بعض.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-EG",
+      "is_dialogue": true
+    }
+  },
+  {
+    "id": "14-long-dialogue",
+    "listen_for": "A dialogue longer than 2,400 characters: refused before; made in pieces after, with the same two voices all through.",
+    "voice": "ar-Gemini-HD-Erinome",
+    "dialogue": [
+      {
+        "name": "ليلى",
+        "voice": "ar-Gemini-HD-Erinome",
+        "dialect": "ar-EG"
+      },
+      {
+        "name": "كريم",
+        "voice": "ar-Gemini-HD-Puck",
+        "dialect": "ar-EG"
+      }
+    ],
+    "request": {
+      "content": "ليلى: صباح الخير يا كريم، عامل إيه النهارده؟ شكلك صاحي بدري على غير عادتك.\nكريم: صباح النور يا ليلى. أيوه، النهارده عندي اجتماع مهم الساعة تسعة، وكان لازم أجهز العرض كويس.\nليلى: اجتماع إيه ده؟ مع العميل الجديد اللي كلمتني عنه الأسبوع اللي فات؟\nكريم: بالظبط. شركة كبيرة عايزة تعمل حملة إعلانية في رمضان، وعايزين يشوفوا أفكارنا قبل ما يقرروا.\nليلى: حلو أوي. وانت حضرت إيه بالظبط؟\nكريم: عملت تلات أفكار. الأولى عن العيلة اللي بتتجمع على الفطار، والتانية عن الشباب اللي بيساعدوا الناس في الشارع، والتالتة عن الذكريات القديمة بتاعة رمضان زمان.\nليلى: أنا بحب التالتة أوي. الناس دايماً بتحن للماضي، وده بيلمس قلوبهم.\nكريم: عندك حق، بس خايف تبقى حزينة شوية. العميل عايز حاجة فيها فرحة وأمل.\nليلى: ممكن تخليها فيها الاتنين. تبدأ بذكرى قديمة، وبعدين تنقل لنفس العيلة النهارده وهي بتعمل نفس الحاجة مع ولادها.\nكريم: فكرة جميلة! كده يبقى فيه حنين وفي نفس الوقت فيه استمرار للحاجات الحلوة.\nليلى: وكمان ممكن تستخدم نفس الأغنية القديمة بس بتوزيع جديد، عشان تربط بين الزمنين.\nكريم: ده بالظبط اللي كان ناقصني. أنا كنت حاسس إن الفكرة محتاجة حاجة تربطها ببعض.\nليلى: طب والميزانية؟ الحملة دي محتاجة تصوير كتير ولا هتكتفوا بإعلان واحد؟\nكريم: هما عايزين إعلان رئيسي طويل، وبعدين حاجات قصيرة للسوشيال ميديا طول الشهر.\nليلى: يبقى لازم تفكر من دلوقتي في الحاجات القصيرة دي. ممكن تبقى مشاهد صغيرة من نفس القصة.\nكريم: فعلاً، وكده الناس هتستنى كل يوم مشهد جديد، كأنه مسلسل صغير.\nليلى: بالظبط كده. وأنا متأكدة إن العميل هيحب الفكرة دي جداً.\nكريم: إن شاء الله. شكراً يا ليلى، كلامك فرق معايا كتير النهارده.\nليلى: العفو يا كريم، ربنا يوفقك. وابقى طمني بعد الاجتماع على طول.\nكريم: أكيد، أول ما أخلص هكلمك وأحكيلك كل حاجة بالتفصيل.\nليلى: وماتنساش تاكل حاجة قبل ما تنزل، عشان الاجتماعات دي بتطول.\nكريم: هاخد ساندوتش معايا في السكة. يلا، سلام دلوقتي.\nليلى: مع السلامة، وبالتوفيق.\nكريم: الله يسلمك. وانتي كمان يومك يبقى حلو.\nليلى: يارب. يلا متتأخرش، الساعة قربت على تمانية ونص.\nكريم: لا، لسه بدري. المكتب قريب، ربع ساعة بالعربية.\nليلى: العربية؟ مش انت قلت امبارح إنها محتاجة تتصلح؟\nكريم: يا خبر! عندك حق، نسيت خالص. يبقى هاخد تاكسي.\nليلى: شفت؟ كويس إني فكرتك. يلا اطلب التاكسي من دلوقتي.\nكريم: طلبته خلاص، هيوصل كمان خمس دقايق. على فكرة، ممكن تيجي معايا الاجتماع؟ رأيك هيفرق جداً.\nليلى: أنا؟ بس أنا مش مجهزة أي حاجة، وكمان عندي شغل كتير النهارده.\nكريم: مش محتاجة تجهزي حاجة، كفاية إنك تحكي الفكرة اللي قلتيها دلوقتي بطريقتك.\nليلى: ماشي، بس هقعد ساكتة أغلب الوقت، وأتكلم بس لو حد سألني.\nكريم: اتفقنا. وبعد الاجتماع أعزمك على غدا في المطعم اللي بتحبيه.\nليلى: ده عرض مايترفضش! بس لازم نرجع بدري، عندي مكالمة مهمة الساعة أربعة.\nكريم: أكيد هنرجع قبلها. الاجتماع مش هيطول أكتر من ساعة، والمطعم قريب من المكتب.\nليلى: تمام. هلبس بسرعة وأنزل معاك. استناني عند الباب.\nكريم: أنا مستنيكي. ومتنسيش الشاحن بتاعك، الموبايل بتاعك دايماً بيفصل في نص اليوم.\nليلى: يا سلام، انت فاكر كل حاجة النهارده إلا العربية!\nكريم: هههه، عندك حق. كل واحد فينا بينسى حاجة. المهم إننا بنفكر بعض.\nليلى: بالظبط. يلا، التاكسي وصل، أنا شايفاه من الشباك.",
+      "target_language": "ar",
+      "voice_tier": "hd",
+      "dialect": "ar-EG",
+      "is_dialogue": true
+    }
+  }
+]
