@@ -359,9 +359,16 @@ class HomeController extends Controller
 
     public function startFreeTrial(Request $request)
     {
+        $trials = app(TrialEligibilityService::class);
+        // With trials switched off there is no trial to start: the plans page says so,
+        // instead of a sign-up that ends at the paid checkout.
+        if (! $trials->enabled()) {
+            return redirect()->route('pricing')->with('notice', __('ui.backend.trial_disabled'));
+        }
+
         $cycle = $request->query('billing_cycle') === 'yearly' ? 'yearly' : 'monthly';
         $query = ['billing_cycle' => $cycle, 'payment_method' => 'stripe'];
-        $plan = app(TrialEligibilityService::class)->trialPlan((string) $request->query('plan', ''), $cycle);
+        $plan = $trials->trialPlan((string) $request->query('plan', ''), $cycle);
         if ($plan) {
             $query = ['plan' => $plan->slug] + $query;
         }

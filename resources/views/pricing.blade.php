@@ -623,6 +623,20 @@
     .faq-item[open] .faq-toggle { transform: rotate(45deg); background: color-mix(in oklab, var(--text) 5%, transparent); }
     .faq-item p { margin: 0; padding: 0 0 1.5rem; padding-inline-end: 3.5rem; color: var(--muted); font-size: .97rem; line-height: 1.7; max-width: 68ch; }
 
+    /* Why a link brought the visitor here instead: a trial or a pack that is not on offer. */
+    .page-notice {
+      display: block;
+      width: fit-content;
+      margin: 0 auto 1.25rem;
+      padding: .6rem 1.1rem;
+      border-radius: var(--radius-full);
+      border: 1px solid var(--line);
+      background: var(--surface2);
+      color: var(--text);
+      font-size: .92rem;
+      font-weight: 600;
+    }
+
     .trial-pill {
       display: inline-flex;
       align-items: center;
@@ -852,6 +866,9 @@
       $pricingHiddenLabels = array_merge(array_keys($commonLines), [__('ui.pricing.lines.label_voice_minutes')]);
     @endphp
     <section class="page-hero reveal">
+      @if(session('notice'))
+        <p class="page-notice" role="status">{{ session('notice') }}</p>
+      @endif
       @if(!empty($trialPromo['show']))
         <div class="trial-pill">
           <span class="trial-pill-icon" aria-hidden="true">
