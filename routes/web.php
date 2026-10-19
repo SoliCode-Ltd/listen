@@ -17,8 +17,21 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Route;
 use Mcamara\LaravelLocalization\Facades\LaravelLocalization;
 
+// Audio files need no session, cookies or form token: playing one starts
+// sooner, a player or the extension asking without cookies no longer makes
+// a new session each time, and caches keep the file (a reply that sets a
+// cookie is never cached).
 Route::get('/media/{path}', [MediaController::class, 'show'])
     ->where('path', '.*')
+    ->withoutMiddleware([
+        \Illuminate\Cookie\Middleware\EncryptCookies::class,
+        \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+        \Illuminate\Session\Middleware\StartSession::class,
+        \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+        \Illuminate\Foundation\Http\Middleware\ValidateCsrfToken::class,
+        \App\Http\Middleware\EnsureUserIsNotBlocked::class,
+        \App\Http\Middleware\CaptureAdClickId::class,
+    ])
     ->name('media.file');
 
 // A member's own audio in a file type the browser cannot make (M4A, OGG, FLAC).
