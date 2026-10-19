@@ -1507,6 +1507,7 @@ return [
         'auth_social_default_name' => 'Google User',
         'auth_method_disabled' => 'This authentication method is currently disabled.',
         'auth_email_disabled' => 'Email/password authentication is currently disabled.',
+        'auth_disposable_email' => "This looks like a temporary email address. Please sign up with one you'll keep using.",
         'auth_google_disabled' => 'Google sign-in is currently disabled.',
         'auth_phone_disabled' => 'Phone authentication is currently disabled.',
         'auth_phone_verification_failed' => 'Unable to verify phone sign-in. Please try again.',

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\Auth\PhoneAuthBridgeRequest;
 use App\Models\User;
+use App\Rules\NotDisposableEmail;
 use App\Services\BlockedUserService;
 use App\Services\MultiAccountEnforcementService;
 use App\Services\Auth\AuthSettingsService;
@@ -176,7 +177,7 @@ class AuthController extends Controller
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
-            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email', new NotDisposableEmail],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ]);
 
