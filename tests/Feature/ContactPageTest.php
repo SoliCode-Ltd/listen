@@ -75,6 +75,32 @@ class ContactPageTest extends TestCase
         Mail::shouldHaveReceived('raw')->once();
     }
 
+    public function test_a_submission_address_saved_empty_falls_back_so_someone_can_reply(): void
+    {
+        // Mail::fake() ignores Mail::raw(), so this reads the test mailer's outbox (MAIL_MAILER=array): nothing is sent.
+        config(['mail.from.address' => 'help@example.com']);
+        // As the admin form saves a field left empty.
+        SiteSetting::set('contact_submission_email', '', 'contact');
+        SiteSetting::set('contact_email', 'team@example.com', 'contact');
+        $send = fn () => $this->postLocalizedRoute('contact.submit', [
+            'name' => 'Sara',
+            'email' => 'sara@example.com',
+            'subject' => 'A plan for my team',
+            'message' => 'We make about ten hours of audio a month.',
+        ])->assertSessionHas('success');
+
+        $send();
+        SiteSetting::set('contact_email', '  ', 'contact');
+        $send();
+
+        $sent = app('mailer')->getSymfonyTransport()->messages();
+        $this->assertSame(
+            [['team@example.com'], ['help@example.com']],
+            $sent->map(fn ($message): array => array_map(fn ($address): string => $address->getAddress(), $message->getOriginalMessage()->getTo()))->all(),
+        );
+        $this->assertSame('sara@example.com', $sent->first()->getOriginalMessage()->getReplyTo()[0]->getAddress());
+    }
+
     public function test_contact_form_submission_supports_json_requests(): void
     {
         Mail::spy();
