@@ -46,6 +46,20 @@ class Subscription extends Model
 
     protected static function booted(): void
     {
+        // A change of plan carries the member's credits on (App\Support\CreditPeriod).
+        // Before the row is written, so nothing sees the new period without them.
+        static::saving(function (Subscription $subscription): void {
+            try {
+                \App\Support\CreditPeriod::carryOverPlanChange($subscription);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Carrying credits over a plan change failed.', [
+                    'subscription_id' => $subscription->id,
+                    'user_id' => $subscription->user_id,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        });
+
         // When any subscription row transitions into an active paid plan
         // (whether through Stripe webhook, manual payment approval, admin
         // edit, or programmatic assignment), evaluate the referral program.
