@@ -64,6 +64,10 @@ class ApiUsageMeter
         ];
 
         $recorded = DB::transaction(function () use ($userId, $apiKey, $quotaPlan, $estimate, $period, $billToPack, $reservation, $record) {
+            // The member's generations first, then the usage row, as the studio's
+            // reserve, the job and the refunds do: one order, so a studio request
+            // and an API request at the same moment never wait on each other.
+            AudioGeneration::query()->where('user_id', $userId)->lockForUpdate()->max('id');
             $counter = UsageCounter::query()
                 ->where('user_id', $userId)
                 ->where('period_ym', $period)
@@ -114,7 +118,7 @@ class ApiUsageMeter
             ApiKeyUsage::apply((int) $apiKey->id, $period, 1, (int) $estimate['credits']);
 
             return $record($reservation);
-        });
+        }, 3);
 
         return [$reservation, $recorded];
     }
