@@ -105,7 +105,9 @@ class AudioLengthTest extends TestCase
 
     public function test_provider_figure_is_kept_when_the_file_cannot_be_read(): void
     {
-        $this->fakeSpeech(['audio_path' => 'audio/gone.mp3', 'duration_seconds' => 9, 'provider' => 'fake']);
+        // Saved, but its length cannot be read from it (a file that is not there fails the generation).
+        Storage::disk('public')->put('audio/unreadable.mp3', 'not audio');
+        $this->fakeSpeech(['audio_path' => 'audio/unreadable.mp3', 'duration_seconds' => 9, 'provider' => 'fake']);
 
         $user = User::factory()->create();
         $generation = AudioGeneration::create($this->audioRow($user, ['status' => 'queued']));

@@ -367,7 +367,11 @@ class TtsService
             $disk->makeDirectory('audio');
         }
 
-        $disk->put($filename, $binary);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $binary)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         return [
             'audio_path' => $filename,
@@ -531,7 +535,8 @@ class TtsService
 
         foreach ($extensions as $extension) {
             $path = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
-            if ($disk->exists($path)) {
+            // An empty file (a copy cut short) is not a saved voice: it is made again.
+            if ($disk->exists($path) && $disk->size($path) > 0) {
                 return $path;
             }
         }
@@ -549,12 +554,18 @@ class TtsService
 
         $cachePath = "audio/cache/{$targetLanguage}_{$hash}.{$extension}";
 
-        if (! $disk->exists($cachePath)) {
+        if (! $disk->exists($cachePath) || $disk->size($cachePath) === 0) {
             $dir = dirname($disk->path($cachePath));
             if (! is_dir($dir)) {
                 mkdir($dir, 0775, true);
             }
-            $disk->copy($sourcePath, $cachePath);
+            // The cache is only a shortcut: when the copy fails, the voice is used
+            // from where it was saved, and a copy cut short is not kept for later.
+            if (! $disk->copy($sourcePath, $cachePath)) {
+                $disk->delete($cachePath);
+
+                return $sourcePath;
+            }
         }
 
         return $cachePath;

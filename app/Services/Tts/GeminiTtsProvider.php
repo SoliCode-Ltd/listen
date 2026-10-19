@@ -1343,7 +1343,11 @@ class GeminiTtsProvider implements TtsProviderInterface
             $disk->makeDirectory('audio');
         }
 
-        $disk->put($filename, $audioData);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $audioData)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         return $filename;
     }

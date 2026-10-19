@@ -35,6 +35,7 @@ use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 
 class GenerateAudioJob implements ShouldQueue
 {
@@ -220,6 +221,11 @@ class GenerateAudioJob implements ShouldQueue
             $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
             if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
                 $audio['audio_path'] = $effected;
+            }
+            // Charged only for a voice the member can play: a file that was never
+            // saved (or was saved empty) fails the generation, which gives the credits back.
+            if (! self::audioIsSaved($audio['audio_path'] ?? null)) {
+                throw new \RuntimeException('The voice file is missing or empty ('.($audio['audio_path'] ?? 'no path').').');
             }
             $actualSeconds = $measuredSeconds ?? (int) ($audio['duration_seconds'] ?? $actualEstimate['seconds']);
             $actualChars = $actualEstimate['chars'];
@@ -436,6 +442,17 @@ class GenerateAudioJob implements ShouldQueue
             'credits' => $reservation['credits'],
             'seconds' => $reservation['seconds'],
         ];
+    }
+
+    /** The voice file is on the public disk, with something in it. */
+    private static function audioIsSaved(mixed $path): bool
+    {
+        if (! is_string($path) || trim($path) === '') {
+            return false;
+        }
+        $disk = Storage::disk('public');
+
+        return $disk->exists($path) && (int) $disk->size($path) > 0;
     }
 
     private function usagePeriod(AudioGeneration $generation): string

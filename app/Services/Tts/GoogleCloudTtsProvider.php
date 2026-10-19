@@ -131,7 +131,11 @@ class GoogleCloudTtsProvider implements TtsProviderInterface
             $disk->makeDirectory('audio');
         }
 
-        $disk->put($filename, $binary);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! $disk->put($filename, $binary)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         $latencyMs = (int) round((microtime(true) - $startTime) * 1000);
         $charCount = mb_strlen($text);

@@ -380,7 +380,11 @@ class VoiceCloningService
         $audioContent = $packaged['bytes'];
         $extension = $packaged['extension'];
         $filename = 'audio/cloned/'.now()->format('Ymd').'/'.Str::uuid().'.'.$extension;
-        Storage::disk('public')->put($filename, $audioContent);
+        // The public disk reports a failed write instead of throwing: without this
+        // the generation would point at a file that is not there.
+        if (! Storage::disk('public')->put($filename, $audioContent)) {
+            throw new \RuntimeException('The voice file could not be saved.');
+        }
 
         return [
             'audio_content' => $audioContent,
