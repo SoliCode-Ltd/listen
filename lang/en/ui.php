@@ -622,6 +622,9 @@ return [
         'card_updated_successfully' => 'Card updated successfully!',
         'canceling' => 'Canceling...',
         'confirm_cancel_prompt' => 'Are you sure you want to cancel renewal for this subscription?',
+        // A failed renewal's grace days: the renewal was never paid, so cancelling ends the plan now.
+        'confirm_cancel_unpaid_prompt' => "Cancel your subscription now? We couldn't take your latest payment, so your plan ends straight away and your account moves to the free plan. Nothing more will be charged.",
+        'cancel_unpaid_note' => "We couldn't take your latest payment, so cancelling ends your plan straight away: your account moves to the free plan and nothing more is charged.",
         'cancellation_failed' => 'Failed to cancel subscription. Please try again.',
         'subscription_canceled_success' => 'Subscription cancellation scheduled successfully.',
         'cancellation_scheduled' => 'Cancellation scheduled',
@@ -1652,6 +1655,7 @@ return [
         'billing_no_active_subscription' => 'No active subscription found.',
         'billing_cancel_failed' => 'Failed to cancel subscription.',
         'billing_cancellation_scheduled' => 'Cancellation scheduled. Your plan stays active until the end of the billing period.',
+        'billing_canceled_unpaid' => 'Your subscription is canceled. Your account is on the free plan now, and nothing more will be charged.',
         'billing_invalid_payment_method' => 'Invalid payment method.',
         'billing_only_cards_supported' => 'Only card payments are supported.',
         'billing_invalid_plan' => 'The selected plan is not available.',

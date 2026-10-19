@@ -463,11 +463,14 @@ class RenewalGraceTest extends TestCase
         $this->assertSame('free', $this->activePlanSlug());
 
         $this->stripe->answer('delete', '/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'canceled']);
+        $this->stripeHasTheOpenRenewal();
         $this->assertSame(1, $this->runGraceJob());
 
         $this->assertTrue($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'));
         // Cancelled without proration: the month it cut short was never paid, so it leaves no credit behind.
         $this->assertSame(['false'], $this->paramsSent('delete', '/v1/subscriptions/sub_grace', 'prorate'));
+        // And its renewal can no longer be paid for a month the member does not get.
+        $this->assertSame(1, $this->timesSent('post', '/v1/invoices/in_renewal/void'));
         $plan = $this->plan();
         $this->assertSame((int) $this->free->id, (int) $plan->plan_id);
         $this->assertSame('ok', $plan->billing_payment_state);
@@ -867,12 +870,95 @@ class RenewalGraceTest extends TestCase
             ], 'ar'));
     }
 
+    public function test_a_member_can_cancel_during_the_grace_and_the_unpaid_plan_ends_at_once(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->sentEmails();
+
+        // The page offers it and says what it does, before and when it is pressed.
+        $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
+        $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee('id="cancelBtn"', false)
+            ->assertSee(__('ui.manage_subscription.cancel_unpaid_note'))
+            ->assertSee('data-confirm="'.e(__('ui.manage_subscription.confirm_cancel_unpaid_prompt')).'"', false);
+        app()->setLocale('ar');
+        $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')
+            ->assertOk()
+            ->assertSee(__('ui.manage_subscription.cancel_unpaid_note', [], 'ar'))
+            ->assertSee(__('ui.manage_subscription.confirm_cancel_unpaid_prompt', [], 'ar'));
+        app()->setLocale('en');
+
+        $this->stripe->answer('delete', '/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'canceled']);
+        $this->stripeHasTheOpenRenewal();
+        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('ended', true)
+            ->assertJsonPath('message', __('ui.backend.billing_canceled_unpaid'));
+
+        // Ended in Stripe now, without proration, and the unpaid renewal voided: once each.
+        $this->assertSame(['false'], $this->paramsSent('delete', '/v1/subscriptions/sub_grace', 'prorate'));
+        $this->assertSame(1, $this->timesSent('post', '/v1/invoices/in_renewal/void'));
+        // The new month was never paid: on Free now.
+        $plan = $this->plan();
+        $this->assertSame((int) $this->free->id, (int) $plan->plan_id);
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertSame('free', $this->activePlanSlug());
+        $this->assertSame(['Your subscription was canceled'], $this->sentSubjects());
+        $this->assertStringContainsString('You canceled your subscription while its latest payment was still unpaid', $this->lastBody());
+        $this->assertStringNotContainsString('Grace Period Ended', $this->lastBody());
+
+        // Stripe's word that it ended sends nothing more, and the grace job finds nothing left.
+        $ended = ['ended_at' => now()->getTimestamp(), 'canceled_at' => now()->getTimestamp()];
+        $this->stripeHas('canceled', extra: $ended);
+        $this->webhook('evt_sub_deleted', 'customer.subscription.deleted', $ended + $this->stripeSubscription('canceled'))->assertOk();
+        $this->assertSame([], $this->sentSubjects());
+        $this->travelTo(Carbon::parse('2026-10-21 12:00:00'));
+        $this->assertSame(0, $this->runGraceJob());
+        $this->assertSame(1, $this->timesSent('delete', '/v1/subscriptions/sub_grace'));
+    }
+
+    public function test_on_staging_cancelling_during_the_grace_never_writes_to_stripe_or_emails(): void
+    {
+        config(['listen.live_actions' => false]);
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
+        $this->stripe->requests = [];
+
+        $this->actingAs($this->member)->postJsonLocalizedRoute('billing.cancel')
+            ->assertOk()
+            ->assertJsonPath('ended', true);
+
+        $this->assertSame([], array_values(array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] !== 'get')));
+        $this->assertSame([], $this->sentSubjects());
+        // Its own copy of the member ends on Free, as on the live site.
+        $this->assertSame('free', $this->activePlanSlug());
+    }
+
     /** Stripe cancels the subscription now, and says so (customer.subscription.deleted). */
     private function stripeEndedIt(): void
     {
         $ended = ['ended_at' => now()->getTimestamp(), 'canceled_at' => now()->getTimestamp()];
         $this->stripeHas('canceled', extra: $ended);
         $this->webhook('evt_sub_deleted', 'customer.subscription.deleted', $ended + $this->stripeSubscription('canceled'))->assertOk();
+    }
+
+    /** The unpaid renewal is the subscription's open invoice, and Stripe can void it. */
+    private function stripeHasTheOpenRenewal(): void
+    {
+        $this->stripe->answer('get', '/v1/invoices', ['object' => 'list', 'has_more' => false, 'url' => '/v1/invoices', 'data' => [$this->renewalInvoice()]]);
+        $this->stripe->answer('post', '/v1/invoices/in_renewal/void', ['status' => 'void'] + $this->renewalInvoice());
+    }
+
+    private function timesSent(string $method, string $path): int
+    {
+        return count(array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] === $method && $request['path'] === $path));
     }
 
     /**
