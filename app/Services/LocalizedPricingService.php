@@ -18,6 +18,12 @@ class LocalizedPricingService
 
     public const CURRENCY_USD = 'USD';
 
+    /** The last complete set of dollar exchange rates, kept until a complete one replaces it. */
+    private const FX_RATES_CACHE_KEY = 'billing:usd_fx_rates:v3';
+
+    /** Set while the rates need no new check: an hour after a complete answer, minutes after any other. */
+    private const FX_CHECKED_CACHE_KEY = 'billing:usd_fx_rates:checked';
+
     /**
      * Fast local mapping for common countries. Remote lookup is used as fallback.
      *
@@ -186,11 +192,8 @@ class LocalizedPricingService
             return $this->buildContext($ipLookupCountry, 'ip_lookup', false);
         }
 
-        $publicIpCountry = $this->countryFromPublicIpLookup();
-        if ($publicIpCountry !== null) {
-            return $this->buildContext($publicIpCountry, 'public_ip_lookup', false);
-        }
-
+        // The server's own address is looked up only in local development (above): for a
+        // visitor it would give everyone whose lookup failed the server's country.
         $acceptLanguageCountry = $this->countryFromAcceptLanguage($request);
         if ($acceptLanguageCountry !== null) {
             return $this->buildContext($acceptLanguageCountry, 'accept_language', false);
@@ -445,6 +448,11 @@ class LocalizedPricingService
         ?string $locale = null,
     ): array {
         $currency = $this->displayCurrencyForCountryContext($countryContext);
+        // Without a rate the price stays in dollars: the dollar amount under another
+        // currency's name ("MAD 4.00") would be wrong.
+        if ($this->exchangeRateForCurrency($currency) <= 0) {
+            $currency = self::CURRENCY_USD;
+        }
         $convertedMinor = $this->convertUsdMinorToCurrency($usdAmountMinor, $currency);
         $quote = $this->buildQuote($convertedMinor, $currency, $cycle, $method, $locale);
 
@@ -703,11 +711,7 @@ class LocalizedPricingService
             }
         }
 
-        $rates = Cache::remember('billing:usd_fx_rates:v2', now()->addHours(1), function (): array {
-            return $this->fetchUsdRates();
-        });
-
-        $liveRate = (float) ($rates[$currency] ?? 0);
+        $liveRate = (float) ($this->usdRates()[$currency] ?? 0);
         if ($liveRate > 0) {
             return $liveRate;
         }
@@ -1002,12 +1006,41 @@ class LocalizedPricingService
     }
 
     /**
+     * Today's dollar exchange rates: the last complete set, checked again every
+     * hour. A failed answer never replaces it, and the second service's answer
+     * (no Arab currencies) only updates the rates it has. Until a first complete
+     * set comes, the table above is used and the services are asked again soon.
+     *
      * @return array<string, float>
+     */
+    private function usdRates(): array
+    {
+        $rates = Cache::get(self::FX_RATES_CACHE_KEY);
+        $rates = is_array($rates) ? $rates : [];
+        if (Cache::has(self::FX_CHECKED_CACHE_KEY)) {
+            return $rates;
+        }
+
+        [$fresh, $complete] = $this->fetchUsdRates();
+        if ($complete || ($rates !== [] && $fresh !== [])) {
+            $rates = $complete ? $fresh : array_merge($rates, $fresh);
+            Cache::forever(self::FX_RATES_CACHE_KEY, $rates);
+        }
+        Cache::put(self::FX_CHECKED_CACHE_KEY, true, $complete ? now()->addHour() : now()->addMinutes(10));
+
+        return $rates;
+    }
+
+    /**
+     * The first service has every currency; the second only the euro area's
+     * reference rates, without the Arab currencies, so its answer is partial.
+     *
+     * @return array{0: array<string, float>, 1: bool} the rates, and whether they are a complete set
      */
     private function fetchUsdRates(): array
     {
         $providers = [
-            static function (): array {
+            'complete' => static function (): array {
                 $response = Http::timeout(3)
                     ->acceptJson()
                     ->get('https://open.er-api.com/v6/latest/USD');
@@ -1022,7 +1055,7 @@ class LocalizedPricingService
                     ? array_map(static fn ($value): float => (float) $value, $rates)
                     : [];
             },
-            static function (): array {
+            'partial' => static function (): array {
                 $response = Http::timeout(3)
                     ->acceptJson()
                     ->get('https://api.frankfurter.app/latest?from=USD');
@@ -1043,18 +1076,18 @@ class LocalizedPricingService
             },
         ];
 
-        foreach ($providers as $provider) {
+        foreach ($providers as $kind => $provider) {
             try {
                 $rates = $provider();
                 if ($rates !== []) {
-                    return $rates;
+                    return [$rates, $kind === 'complete'];
                 }
             } catch (\Throwable) {
                 continue;
             }
         }
 
-        return [];
+        return [[], false];
     }
 
     private function lookupCountryFromProviders(?string $ip = null): ?string

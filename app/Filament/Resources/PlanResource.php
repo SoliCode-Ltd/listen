@@ -235,7 +235,7 @@ class PlanResource extends Resource
                             ])
                             ->required()
                             ->default('standard')
-                            ->helperText('Sets the developer API\'s default limits when the plan sets none (see Developer API below). High, priority and highest show "priority processing" on the pricing card; only High also uses the faster queue for background generations.'),
+                            ->helperText('Sets the developer API\'s default limits when the plan sets none (see Developer API below). High, priority and highest also send the API\'s and the extension\'s background generations to the faster queue; the studio is as fast on every plan.'),
                         Forms\Components\Toggle::make('commercial_use_allowed')
                             ->label('Commercial Use Allowed')
                             ->helperText('Whether users can use generated audio commercially'),

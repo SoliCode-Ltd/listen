@@ -366,6 +366,27 @@ class CreatorTrialFlowTest extends TestCase
             ->assertDontSee('7 days free', false);
     }
 
+    public function test_an_old_trial_link_while_trials_are_off_says_so_on_the_plans_page(): void
+    {
+        SiteSetting::set('billing_trial_enabled', '0', 'billing');
+        $user = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $link = fn () => $this->withoutMiddleware([
+            \Mcamara\LaravelLocalization\Middleware\LocaleSessionRedirect::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationRedirectFilter::class,
+            \Mcamara\LaravelLocalization\Middleware\LaravelLocalizationViewPath::class,
+        ])->get($this->localizedRoute('trial.start').'?plan=creator');
+
+        // A guest is not sent through sign-up to the paid checkout, and nor is a member.
+        $link()->assertRedirect(route('pricing'))->assertSessionHas('notice', __('ui.backend.trial_disabled'));
+        $this->assertNull(session('url.intended'));
+        $this->actingAs($user);
+        $link()->assertRedirect(route('pricing'));
+
+        $this->getLocalizedRoute('pricing')->assertOk()
+            ->assertSee('<p class="page-notice" role="status">'.e(__('ui.backend.trial_disabled')).'</p>', false);
+        $this->assertNotSame(__('ui.backend.trial_disabled', [], 'en'), __('ui.backend.trial_disabled', [], 'ar'));
+    }
+
     public function test_yearly_plans_get_the_same_trial_and_charge_the_yearly_price_after_it(): void
     {
         Plan::query()->where('slug', 'creator')->update(['stripe_price_yearly' => 'price_creator_year']);

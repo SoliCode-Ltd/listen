@@ -29,6 +29,11 @@ class CharPackController extends Controller
      */
     public function start(Request $request)
     {
+        // No pack on sale: nothing to sign up for, so the plans page says so.
+        if (! $this->packs->offeredPack()) {
+            return redirect()->route('pricing')->with('notice', __('ui.pack.not_available'));
+        }
+
         if (! $request->user()) {
             $request->session()->put('url.intended', route('billing.pack'));
 

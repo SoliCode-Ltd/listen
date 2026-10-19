@@ -549,6 +549,20 @@ class PremiumPackTest extends TestCase
         $this->assertSame(route('billing.pack'), session('url.intended'));
     }
 
+    public function test_without_a_pack_on_sale_the_pack_link_says_so_on_the_plans_page(): void
+    {
+        // As on the live site: no pack is sold.
+        $this->pack->update(['is_active' => false]);
+
+        // Nobody is asked to sign up for a pack that does not exist.
+        $this->getLocalizedRoute('pack.start')->assertRedirect(route('pricing'))->assertSessionHas('notice', __('ui.pack.not_available'));
+        $this->assertNull(session('url.intended'));
+        $this->actingAs($this->member())->getLocalizedRoute('pack.start')->assertRedirect(route('pricing'));
+
+        $this->getLocalizedRoute('pricing')->assertOk()
+            ->assertSee('<p class="page-notice" role="status">'.e(__('ui.pack.not_available')).'</p>', false);
+    }
+
     public function test_the_pricing_page_shows_only_the_monthly_plans_as_cards(): void
     {
         // The plan to try the voices and the one-time pack are not cards on the pricing page;

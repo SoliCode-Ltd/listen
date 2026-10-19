@@ -278,8 +278,9 @@ class ApiSpeechService
         ApiCapacity::record((int) $spec['estimate']['chars']);
 
         if ($async) {
-            // The same queues as the browser extension's background generations.
-            $queue = strtolower((string) ($plan?->processing_priority ?? 'standard')) === 'high' ? 'high' : 'default';
+            // The same queues as the browser extension's background generations: "priority"
+            // and "highest" rank above "high", so they never get the slower default queue.
+            $queue = in_array(strtolower((string) ($plan?->processing_priority ?? 'standard')), ['high', 'priority', 'highest'], true) ? 'high' : 'default';
             try {
                 GenerateAudioJob::dispatch($job->id)->onQueue($queue);
             } catch (\Throwable $e) {
