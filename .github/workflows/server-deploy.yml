@@ -298,6 +298,7 @@ jobs:
           $line('Acts on real customers (live-site switch)', App\Support\LiveServer::allowsCustomerActions());
           $line('Stripe webhook signing secret', trim((string) config('services.stripe.webhook_secret')) !== '' ? 'set' : 'MISSING');
           $line('Throwaway inboxes refused at sign-up', (bool) config('disposable_email.enabled', true));
+          $line('Free use waits for a confirmed email', (bool) config('listen.demo.require_verified_email', true));
           $line('Queue / retry_after (seconds)', config('queue.default').' / '.config('queue.connections.database.retry_after'));
           $line('Texts made after the reply from (characters)', (string) config('listen.audio.force_async_chars'));
           $line('PHP (command line) max_execution_time', (string) ini_get('max_execution_time'));

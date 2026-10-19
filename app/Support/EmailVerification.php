@@ -31,10 +31,15 @@ final class EmailVerification
     }
 
     /**
-     * Whether the account must confirm its email before it spends a free allowance.
+     * Whether the account must confirm its email before it spends a free
+     * allowance. LISTEN_REQUIRE_VERIFIED_EMAIL=false stops the wait for every
+     * account, for when the site's email cannot be delivered.
      */
     public static function requiredForFreeUse(?User $user): bool
     {
-        return $user !== null && ! self::isVerified($user) && ! PaidMember::is($user);
+        return $user !== null
+            && (bool) config('listen.demo.require_verified_email', true)
+            && ! self::isVerified($user)
+            && ! PaidMember::is($user);
     }
 }

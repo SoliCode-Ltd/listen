@@ -121,6 +121,17 @@ class FreeUseEmailVerificationTest extends TestCase
         $this->assertSame(1, $this->speechCalls);
     }
 
+    public function test_the_wait_can_be_switched_off_when_email_cannot_be_delivered(): void
+    {
+        config(['listen.demo.require_verified_email' => false]);
+        $member = $this->unconfirmed('member@example.com');
+
+        $this->assertFalse(EmailVerification::requiredForFreeUse($member));
+        $this->actingAs($member)->postJsonLocalizedRoute('demo.run', $this->demoText())->assertOk()->assertJsonPath('ok', true);
+        $this->actingAs($member)->postJsonLocalizedRoute('demo.preview', $this->demoText())->assertOk()->assertJsonPath('ok', true);
+        $this->assertSame(1, DemoVoiceGeneration::query()->where('user_id', $member->id)->count());
+    }
+
     public function test_signing_up_then_confirming_opens_the_demo(): void
     {
         $this->postLocalizedRoute('register.submit', [

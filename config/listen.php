@@ -74,6 +74,10 @@ return [
     ],
 
     'demo' => [
+        // A free allowance (the demo, the free plan's credits, a gift) waits for a
+        // confirmed email (App\Support\EmailVerification). false stops waiting,
+        // for when the site's email cannot be delivered.
+        'require_verified_email' => (bool) env('LISTEN_REQUIRE_VERIFIED_EMAIL', true),
         'guest_char_allowance' => (int) env('DEMO_GUEST_CHAR_ALLOWANCE', 300),
         'user_char_allowance' => (int) env('DEMO_USER_CHAR_ALLOWANCE', 30000),
         'check' => [
