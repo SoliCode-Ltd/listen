@@ -126,6 +126,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('price_dollars')
                             ->label('Monthly Price ($)')
                             ->numeric()
+                            ->minValue(0)
                             ->live(onBlur: true)
                             ->prefix('$')
                             ->step('0.01')
@@ -246,6 +247,8 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('monthly_chars')
                             ->label(fn (Get $get): string => $get('kind') === Plan::KIND_PACK ? 'Credits in the pack' : 'Monthly credits')
                             ->numeric()
+                            // A paid plan with no credits would stop every member on it at once.
+                            ->minValue(fn (Get $get): int => is_numeric($get('price_dollars')) && (float) $get('price_dollars') > 0 ? 1 : 0)
                             ->required()
                             ->live(debounce: 600)
                             ->afterStateUpdated(fn (Set $set, $state) => $set('monthly_minutes', \App\Support\Credits::minutesFor((int) $state)))
@@ -268,6 +271,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('monthly_requests')
                             ->label('Monthly Requests')
                             ->numeric()
+                            ->minValue(0)
                             ->required()
                             ->default(0)
                             ->helperText('0 = unlimited requests'),
@@ -289,6 +293,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('recent_voices_days')
                             ->label('Recent Voices Retention (days)')
                             ->numeric()
+                            ->minValue(0)
                             ->default(7)
                             ->helperText('How many days generated voices are retained. 0 = unlimited.'),
                     ]),
@@ -302,6 +307,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('overage_price_dollars')
                             ->label('Overage Price per 1M chars ($)')
                             ->numeric()
+                            ->minValue(0)
                             ->prefix('$')
                             ->step('0.01')
                             ->dehydrated(false) // Virtual field — handled manually
@@ -316,6 +322,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('topup_char_price_dollars')
                             ->label('Top-Up Price per 1K chars ($)')
                             ->numeric()
+                            ->minValue(0)
                             ->prefix('$')
                             ->step('0.01')
                             ->dehydrated(false)
@@ -330,6 +337,7 @@ class PlanResource extends Resource
                         Forms\Components\TextInput::make('topup_minute_price_dollars')
                             ->label('Top-Up Price per Minute ($)')
                             ->numeric()
+                            ->minValue(0)
                             ->prefix('$')
                             ->step('0.01')
                             ->dehydrated(false)
@@ -749,13 +757,11 @@ class PlanResource extends Resource
                     ->action(function (Plan $record) {
                         try {
                             $syncService = app(StripeProductSyncService::class);
-                            $syncService->syncPlan($record);
-
-                            Notification::make()
-                                ->title('Stripe Sync Successful')
-                                ->body("Plan '{$record->name}' has been synced to Stripe.")
-                                ->success()
-                                ->send();
+                            self::stripeSyncNotice(
+                                $syncService->syncPlan($record),
+                                'Stripe Sync Successful',
+                                "Plan '{$record->name}' has been synced to Stripe.",
+                            )->send();
                         } catch (\Exception $e) {
                             Notification::make()
                                 ->title('Stripe Sync Failed')
@@ -778,21 +784,24 @@ class PlanResource extends Resource
                             $syncService = app(StripeProductSyncService::class);
                             $success = 0;
                             $failed = 0;
+                            $skipped = 0;
 
                             foreach ($records as $plan) {
                                 try {
-                                    $syncService->syncPlan($plan);
-                                    $success++;
+                                    $result = $syncService->syncPlan($plan);
+                                    if ($result['success']) {
+                                        $success++;
+                                    } elseif (! empty($result['skipped'])) {
+                                        $skipped++;
+                                    } else {
+                                        $failed++;
+                                    }
                                 } catch (\Exception $e) {
                                     $failed++;
                                 }
                             }
 
-                            Notification::make()
-                                ->title('Stripe Sync Complete')
-                                ->body("Synced: {$success}, Failed: {$failed}")
-                                ->success()
-                                ->send();
+                            self::stripeSyncCountsNotice($success, $failed, $skipped)->send();
                         }),
                 ]),
             ]);
@@ -927,6 +936,46 @@ class PlanResource extends Resource
         }
 
         return new HtmlString('<div style="display:flex;flex-wrap:wrap;gap:2rem">'.$columns.'</div>');
+    }
+
+    /**
+     * What a plan's Stripe sync really did (StripeProductSyncService::syncPlan()):
+     * synced, left alone because this is not the live site, or failed.
+     *
+     * @param  array{success: bool, message: string, skipped?: bool}  $result
+     */
+    public static function stripeSyncNotice(array $result, string $syncedTitle, string $syncedBody): Notification
+    {
+        if ($result['success']) {
+            return Notification::make()->title($syncedTitle)->body($syncedBody)->success();
+        }
+
+        if (! empty($result['skipped'])) {
+            return Notification::make()->title('Stripe not changed')->body($result['message'])->warning();
+        }
+
+        return Notification::make()
+            ->title('Stripe Sync Failed')
+            ->body($result['message'].' Stripe may not match the plan yet: use "Sync Stripe" on the plan to try again.')
+            ->danger()
+            ->persistent();
+    }
+
+    /** The same for several plans at once. */
+    public static function stripeSyncCountsNotice(int $synced, int $failed, int $skipped): Notification
+    {
+        $body = "Synced: {$synced}, Failed: {$failed}";
+        if ($skipped > 0) {
+            $body .= ", Not changed (not the live site): {$skipped}";
+        }
+
+        $notice = Notification::make()->title('Stripe Sync Complete')->body($body);
+
+        return match (true) {
+            $failed > 0 => $notice->danger()->persistent(),
+            $skipped > 0 => $notice->warning(),
+            default => $notice->success(),
+        };
     }
 
     /**

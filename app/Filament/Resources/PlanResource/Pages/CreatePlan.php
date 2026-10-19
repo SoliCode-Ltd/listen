@@ -60,12 +60,12 @@ class CreatePlan extends CreateRecord
             try {
                 $syncService = app(StripeProductSyncService::class);
                 if ($syncService->isConfigured()) {
-                    $syncService->syncPlan($this->record);
-                    Notification::make()
-                        ->title('Stripe Synced')
-                        ->body('Plan automatically synced to Stripe.')
-                        ->success()
-                        ->send();
+                    // The plan is saved either way; the notice says what Stripe got.
+                    PlanResource::stripeSyncNotice(
+                        $syncService->syncPlan($this->record),
+                        'Stripe Synced',
+                        'Plan automatically synced to Stripe.',
+                    )->send();
                 }
             } catch (\Exception $e) {
                 Notification::make()
