@@ -343,7 +343,8 @@ class TtsService
                 'ssmlGender' => $this->resolveSsmlGender($voice),
             ],
             'audioConfig' => [
-                'audioEncoding' => strtoupper((string) config('services.google_tts.audio_encoding', 'MP3')),
+                // This older path stores what the engine sends as .mp3, so it asks for MP3.
+                'audioEncoding' => 'MP3',
                 'speakingRate' => (float) config('services.google_tts.speaking_rate', 1.0),
                 'pitch' => (float) config('services.google_tts.pitch', 0.0),
             ],

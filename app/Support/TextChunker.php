@@ -16,9 +16,22 @@ class TextChunker
      */
     public static function split(string $text, int $max, callable $measure, int $together = 0): array
     {
+        return array_column(self::pieces($text, $max, $measure, $together), 'text');
+    }
+
+    /**
+     * The same pieces as split(), each with what came after it in the text:
+     * "\n" (a line break), " " (a space, or a word cut in two) or "" (the end).
+     * The pause between two pieces follows from it.
+     *
+     * @param  callable(string):int  $measure
+     * @return array<int, array{text: string, gap: string}>
+     */
+    public static function pieces(string $text, int $max, callable $measure, int $together = 0): array
+    {
         $text = trim($text);
         if ($measure($text) <= $max) {
-            return [$text];
+            return [['text' => $text, 'gap' => '']];
         }
 
         $pieces = [];
@@ -70,7 +83,14 @@ class TextChunker
             }
         }
 
-        return array_column(array_merge(array_slice($chunks, 0, $full), $even ?? $last), 'text');
+        // Each chunk knows the space before it: that is what came after the one before.
+        $chunks = array_merge(array_slice($chunks, 0, $full), $even ?? $last);
+        $out = [];
+        foreach ($chunks as $i => $chunk) {
+            $out[] = ['text' => $chunk['text'], 'gap' => isset($chunks[$i + 1]) ? $chunks[$i + 1]['gap'] : ''];
+        }
+
+        return $out;
     }
 
     /**
@@ -96,26 +116,27 @@ class TextChunker
 
     /**
      * Join the pieces in order into chunks no bigger than the limit, each
-     * with the number of pieces in it, or null when a piece alone is bigger.
+     * with the number of pieces in it and the space before it, or null when a
+     * piece alone is bigger.
      *
      * @param  array<int, array{0:string,1:string}>  $pieces
-     * @return array<int, array{text:string,pieces:int}>|null
+     * @return array<int, array{text:string,pieces:int,gap:string}>|null
      */
     private static function fill(array $pieces, int $limit, callable $measure): ?array
     {
         $chunks = [];
-        $current = ['text' => '', 'pieces' => 0];
+        $current = ['text' => '', 'pieces' => 0, 'gap' => ''];
         foreach ($pieces as [$gap, $piece]) {
             if ($measure($piece) > $limit) {
                 return null;
             }
             $candidate = $current['pieces'] === 0 ? $piece : $current['text'].$gap.$piece;
             if ($measure($candidate) <= $limit) {
-                $current = ['text' => $candidate, 'pieces' => $current['pieces'] + 1];
+                $current = ['text' => $candidate, 'pieces' => $current['pieces'] + 1, 'gap' => $current['pieces'] === 0 ? $gap : $current['gap']];
                 continue;
             }
             $chunks[] = $current;
-            $current = ['text' => $piece, 'pieces' => 1];
+            $current = ['text' => $piece, 'pieces' => 1, 'gap' => $gap];
         }
         if ($current['pieces'] > 0) {
             $chunks[] = $current;

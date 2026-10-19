@@ -69,6 +69,52 @@ class ShareableAudioTest extends TestCase
         $this->assertGreaterThan(0.15, $this->mp3Seconds($packaged['bytes']));
     }
 
+    public function test_a_trim_that_runs_out_of_time_is_tried_again_as_the_take_came(): void
+    {
+        $this->requireFfmpeg();
+        $wav = $this->wav('aevalsrc=0:d=0.5[a];sine=frequency=220:duration=1[b];aevalsrc=0:d=0.5[c];[a][b][c]concat=n=3:v=0:a=1');
+        $real = (string) AudioFormats::ffmpegPath();
+        // An ffmpeg that hangs on every trimmed run, with a 1 s time limit.
+        $dir = sys_get_temp_dir().'/listen-slow-ffmpeg-'.bin2hex(random_bytes(4));
+        mkdir($dir);
+        file_put_contents($dir.'/ffmpeg', "#!/bin/sh\ncase \"\$*\" in *atrim*) exec sleep 8;; esac\nexec ".escapeshellarg($real)." \"\$@\"\n");
+        chmod($dir.'/ffmpeg', 0755);
+        config(['services.gemini_tts.ffmpeg_path' => $dir.'/ffmpeg', 'listen.audio.encode_timeout_seconds' => 1]);
+
+        try {
+            $started = microtime(true);
+            $packaged = ShareableAudio::package($wav);
+            $took = microtime(true) - $started;
+        } finally {
+            config(['services.gemini_tts.ffmpeg_path' => $real]);
+            unlink($dir.'/ffmpeg');
+            rmdir($dir);
+        }
+
+        $this->assertSame('mp3', $packaged['extension'], 'a timeout no longer leaves the take as WAV');
+        $this->assertLessThan(7, $took, 'the stuck runs were stopped at their time limit');
+        $this->assertEqualsWithDelta(2.0, $this->mp3Seconds($packaged['bytes']), 0.15, 'encoded whole, as it came');
+    }
+
+    public function test_the_time_limit_grows_with_the_take(): void
+    {
+        config(['listen.audio.encode_timeout_seconds' => 30]);
+
+        $this->assertSame(31.0, ShareableAudio::timeout(10));
+        $this->assertSame(390.0, ShareableAudio::timeout(3600), 'an hour may take 6 minutes before it is encoded as it came');
+    }
+
+    public function test_without_ffmpeg_a_wav_is_kept_as_it_came(): void
+    {
+        config(['services.gemini_tts.ffmpeg_path' => 'none']);
+        $wav = $this->silentWav();
+
+        $packaged = ShareableAudio::package($wav);
+
+        $this->assertSame('wav', $packaged['extension']);
+        $this->assertSame($wav, $packaged['bytes']);
+    }
+
     public function test_an_mp3_is_left_unchanged(): void
     {
         $mp3 = "ID3\x03\x00\x00\x00\x00\x00\x00";

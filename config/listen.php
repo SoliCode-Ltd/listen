@@ -8,6 +8,9 @@ return [
         // In sync mode, texts at least this long are made after the reply, in the same
         // process (no worker needed), and the studio and the extension check on them. 0: never.
         'force_async_chars' => (int) env('LISTEN_AUDIO_FORCE_ASYNC_CHARS', 2500),
+        // Seconds ffmpeg may take to package a take, plus a tenth of the take's length
+        // (an hour of audio may take 6 minutes before it is encoded as it came instead).
+        'encode_timeout_seconds' => (int) env('LISTEN_AUDIO_ENCODE_TIMEOUT', 30),
     ],
 
     'voice' => [
