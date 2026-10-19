@@ -4,6 +4,7 @@ namespace App\Support;
 
 use App\Models\SiteSetting;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use RuntimeException;
 
@@ -25,7 +26,15 @@ class TitanMailbox
             return;
         }
 
-        self::apply();
+        // This runs on every page: a saved password that can no longer be
+        // read (the app key changed) must stop email, not the whole site.
+        try {
+            self::apply();
+        } catch (RuntimeException $e) {
+            Log::error($e->getMessage());
+
+            return;
+        }
         config(['mail.default' => 'titan']);
     }
 
