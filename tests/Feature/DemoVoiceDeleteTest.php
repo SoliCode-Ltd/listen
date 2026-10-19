@@ -108,6 +108,21 @@ class DemoVoiceDeleteTest extends TestCase
             ->assertViewHas('demoHistoryJobs', fn (array $jobs): bool => array_column($jobs, 'id') === [$kept->id]);
     }
 
+    public function test_a_deleted_demo_voice_can_no_longer_be_reused_by_its_link(): void
+    {
+        $member = User::factory()->create(['subscription_status_checked_at' => now()]);
+        $demo = $this->demoVoice($member, 40, 'audio/demo/20261019_120000_reuse.mp3');
+        $reuse = fn () => $this->actingAs($member)
+            ->withoutMiddleware([LocaleSessionRedirect::class, LaravelLocalizationRedirectFilter::class, LaravelLocalizationViewPath::class])
+            ->get($this->localizedRoute('dashboard').'?reuse_demo='.$demo->id);
+
+        $reuse()->assertOk()->assertViewHas('reusePreset', fn ($preset): bool => is_array($preset) && ($preset['content'] ?? null) === str_repeat('x', 40));
+
+        $this->deleteDemo($member, $demo)->assertOk();
+
+        $reuse()->assertOk()->assertViewHas('reusePreset', null);
+    }
+
     public function test_another_members_demo_voice_cannot_be_deleted(): void
     {
         $owner = User::factory()->create(['subscription_status_checked_at' => now()]);

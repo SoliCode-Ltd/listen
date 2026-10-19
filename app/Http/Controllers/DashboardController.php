@@ -89,6 +89,10 @@ class DashboardController extends Controller
                     ->where('user_id', $userId)
                     ->whereKey($reuseDemoId)
                     ->first();
+                // A demo voice the member deleted is gone for them, its text included.
+                if (filled(data_get($reuseDemoSource?->metadata, 'deleted_by_member_at'))) {
+                    $reuseDemoSource = null;
+                }
                 $reusePreset = $this->buildDemoReusePreset($reuseDemoSource);
             }
         }
