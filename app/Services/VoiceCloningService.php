@@ -598,14 +598,15 @@ class VoiceCloningService
         float $pitch = 0.0,
     ): string {
         $parts = [];
-        $accent = $this->clonedAccentInstruction($dialect);
-        if ($accent !== '') {
-            $parts[] = $accent;
-        }
-
+        // The member's own words lead, as for the stock voices; the accent they picked follows.
         $custom = trim((string) $customPrompt);
         if ($custom !== '') {
             $parts[] = $custom;
+        }
+
+        $accent = $this->clonedAccentInstruction($dialect);
+        if ($accent !== '') {
+            $parts[] = $accent;
         }
 
         $performance = strtolower(trim($performanceStyle));

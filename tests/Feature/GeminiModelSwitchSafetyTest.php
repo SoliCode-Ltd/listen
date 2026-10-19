@@ -118,7 +118,12 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->assertCount(2, $captured->requests);
         $part = $captured->requests[1]['body']['contents'][0]['parts'][0];
         $this->assertSame(self::TRANSCRIPT_AR, $part['text']);
-        $this->assertSame($prompt, $part['speech_metadata']['style']);
+        // The member's words lead, then the dialect (and speed) they picked, no longer lost;
+        // the built style, emotion and pitch are left to their words.
+        $this->assertStringStartsWith($prompt.' Voice dialect: Egyptian Arabic.', $part['speech_metadata']['style']);
+        $this->assertStringContainsString('Cairene Egyptian', $part['speech_metadata']['style']);
+        $this->assertStringNotContainsString('Emotional tone', $part['speech_metadata']['style']);
+        $this->assertStringNotContainsString('lower-pitched', $part['speech_metadata']['style']);
     }
 
     public function test_dialogue_cast_and_custom_prompt_change_the_request(): void
@@ -149,7 +154,8 @@ class GeminiModelSwitchSafetyTest extends TestCase
         $this->assertSame('كويس', $captured->requests[0]['body']['contents'][0]['parts'][1]['text']);
         $this->assertStringContainsString('Cairene Egyptian', $captured->requests[0]['body']['contents'][0]['parts'][0]['speech_metadata']['style']);
         $this->assertSame('Puck', $captured->requests[1]['body']['generationConfig']['speechConfig']['multiSpeakerVoiceConfig']['speakerVoiceConfigs'][1]['voiceConfig']['prebuiltVoiceConfig']['voiceName']);
-        $this->assertSame('Keep both voices warm and close.', $captured->requests[2]['body']['contents'][0]['parts'][0]['speech_metadata']['style']);
+        // The member's words lead, followed by the script's dialect (and speed).
+        $this->assertStringStartsWith('Keep both voices warm and close. Voice dialect: Egyptian Arabic.', $captured->requests[2]['body']['contents'][0]['parts'][0]['speech_metadata']['style']);
         $this->assertStringNotContainsString('Sara:', $captured->requests[2]['body']['contents'][0]['parts'][0]['text']);
     }
 

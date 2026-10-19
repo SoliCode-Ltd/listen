@@ -598,12 +598,13 @@ class GeminiTtsProvider implements TtsProviderInterface
             isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? $voiceConfig['dialect'] : null,
         );
 
-        // Use custom style_prompt if provided, otherwise build from dialect, emotion, style, speed, and pitch
+        // The member's own style_prompt (then the dialect and speed they picked), otherwise
+        // a direction built from dialect, emotion, style, speed, and pitch.
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $dialect = isset($voiceConfig['dialect']) && is_string($voiceConfig['dialect']) ? trim($voiceConfig['dialect']) : null;
         $pitch = (float) ($voiceConfig['pitch'] ?? 0.0);
         $stylePrompt = $customPrompt !== ''
-            ? $customPrompt
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -840,7 +841,7 @@ class GeminiTtsProvider implements TtsProviderInterface
 
         $customPrompt = trim((string) ($voiceConfig['style_prompt'] ?? ''));
         $stylePrompt = $customPrompt !== ''
-            ? $customPrompt
+            ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $dialect, GeminiTtsModel::usesStructuredSpeech($model))
             : $this->buildStylePrompt(
                 $performanceStyle,
                 $emotion,
@@ -861,7 +862,7 @@ class GeminiTtsProvider implements TtsProviderInterface
                 continue;
             }
             $speakerStyle = $customPrompt !== ''
-                ? trim($customPrompt.' '.$this->buildStylePrompt('neutral', 'neutral', $targetLanguage, 1.0, $own, 0.0, $structured))
+                ? $this->ownDirection($customPrompt, $targetLanguage, $speed, $own, $structured)
                 : $this->buildStylePrompt($performanceStyle, $emotion, $targetLanguage, $speed, $own, $pitch, $structured);
             $speakerStyle = GeminiVocalTags::withCues($speakerStyle, $voiceConfig['vocal_cues'] ?? []);
             $speakerStyles[$name] = $structured ? GeminiVocalTags::forPerformance($text, $speakerStyle)['style'] : $speakerStyle;
@@ -1460,8 +1461,10 @@ class GeminiTtsProvider implements TtsProviderInterface
      *
      * Note: Gemini TTS doesn't have explicit speed/pitch API parameters like Google Cloud TTS.
      * Instead, these are controlled via natural language instructions in the prompt.
+     *
+     * Without $withFallback, nothing picked gives an empty direction (see ownDirection()).
      */
-    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false): string
+    private function buildStylePrompt(string $style, string $emotion, string $targetLanguage, float $speed, ?string $dialect = null, float $pitch = 0.0, bool $structuredSpeech = false, bool $withFallback = true): string
     {
         $style = strtolower(trim($style));
         $emotion = strtolower(trim($emotion));
@@ -1519,7 +1522,7 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         // Fallback if prompt is empty
-        if (trim($prompt) === '') {
+        if ($withFallback && trim($prompt) === '') {
             $prompt = $isArabic
                 ? 'Read the following Arabic text naturally with clear pronunciation and a balanced, professional tone.'
                 : 'Read the following text naturally with clear pronunciation and a balanced, professional tone.';
@@ -1553,6 +1556,18 @@ class GeminiTtsProvider implements TtsProviderInterface
         }
 
         return trim($prompt);
+    }
+
+    /**
+     * A member's own direction leads, as they wrote it; the dialect (or accent) and
+     * the speed they picked follow it, so writing their own words no longer loses
+     * those choices. Style, emotion and pitch are left to their words.
+     */
+    private function ownDirection(string $customPrompt, string $targetLanguage, float $speed, ?string $dialect, bool $structuredSpeech): string
+    {
+        $picked = $this->buildStylePrompt('', 'neutral', $targetLanguage, $speed, $dialect, 0.0, $structuredSpeech, false);
+
+        return trim(trim($customPrompt).' '.$picked);
     }
 
     /**

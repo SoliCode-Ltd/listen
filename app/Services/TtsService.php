@@ -211,6 +211,10 @@ class TtsService
         $stylePrompt = trim((string) ($config['style_prompt'] ?? ''));
         if ($stylePrompt !== '') {
             $parts[] = 'prompt:'.$stylePrompt;
+            // The member's own direction is now followed by the dialect and speed they picked.
+            if ($provider === 'gemini') {
+                $parts[] = 'prompt:with-choices';
+            }
         }
 
         $speakers = $config['speakers'] ?? null;
