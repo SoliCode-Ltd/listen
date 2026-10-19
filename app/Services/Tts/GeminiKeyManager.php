@@ -2,6 +2,7 @@
 
 namespace App\Services\Tts;
 
+use App\Support\EnvFile;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -315,10 +316,10 @@ class GeminiKeyManager
 
         $newKeyName = $maxIndex === 1 ? 'GEMINI_TTS_API_KEY' : "GEMINI_TTS_API_KEY_{$maxIndex}";
 
-        // Append to .env
+        // Append to .env (checked, with a copy of the old file kept: see EnvFile)
         $envContent = File::get($envPath);
-        $envContent .= "\n{$newKeyName}={$apiKey}";
-        File::put($envPath, $envContent);
+        $envContent .= "\n{$newKeyName}=".EnvFile::value($apiKey);
+        EnvFile::write($envPath, $envContent);
 
         Log::info('New Gemini API key added', ['name' => $newKeyName]);
 
@@ -342,7 +343,7 @@ class GeminiKeyManager
         // Clean up double line breaks
         $newContent = preg_replace('/\n{3,}/', "\n\n", $newContent);
         
-        File::put($envPath, trim($newContent) . "\n");
+        EnvFile::write($envPath, trim($newContent) . "\n");
 
         // Clear cached stats for this key
         $this->clearKeyCache($keyName);
