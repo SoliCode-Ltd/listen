@@ -6,10 +6,12 @@ use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Support\StripeInvoice;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Laravel\Cashier\Cashier;
 
 class BillingLifecycleService
 {
@@ -109,15 +111,33 @@ class BillingLifecycleService
             ->exists();
     }
 
-    public function handlePaymentFailed(?string $stripeCustomerId): void
+    /**
+     * A card payment failed (invoice.payment_failed). The member's plan is marked
+     * past due, with a grace period, only when the invoice is for their own card
+     * subscription and Stripe still says that subscription is behind on payment.
+     * A declined plan change or first payment, an invoice paid since (a late
+     * event) and a plan paid by InstaPay / Vodafone Cash never are.
+     */
+    public function handlePaymentFailed(object $invoice): void
     {
-        $user = $this->findUserByStripeCustomerId($stripeCustomerId);
+        $user = $this->findUserByStripeCustomerId((string) ($invoice->customer ?? ''));
         if (! $user) {
             return;
         }
 
         $subscription = $this->latestPaidLocalSubscription($user);
-        if (! $subscription) {
+        if (! $subscription || $subscription->billing_payment_state === 'manual_override') {
+            return;
+        }
+
+        // A declined plan change is voided and leaves the plan as it was; a declined
+        // first payment is for a subscription the member never had. Neither is a
+        // payment missing on the plan they have now.
+        if (in_array(StripeInvoice::billingReason($invoice), ['subscription_update', 'subscription_create'], true)) {
+            return;
+        }
+
+        if (! $this->stripeSaysBehindOnPayment($user, StripeInvoice::subscriptionId($invoice))) {
             return;
         }
 
@@ -242,6 +262,31 @@ class BillingLifecycleService
         }
 
         $this->billingSyncService->syncIfStale($user, true);
+    }
+
+    /**
+     * Whether the subscription is the member's own and Stripe, asked now, says
+     * it is behind on payment. After a late event for an invoice that has been
+     * paid since, Stripe says it is active again. If Stripe cannot be read, the
+     * error goes up so the webhook is sent again later.
+     */
+    private function stripeSaysBehindOnPayment(User $user, string $stripeSubscriptionId): bool
+    {
+        if ($stripeSubscriptionId === '') {
+            return false;
+        }
+
+        $ours = BillingSubscription::query()
+            ->where('user_id', $user->id)
+            ->where('stripe_id', $stripeSubscriptionId)
+            ->exists();
+        if (! $ours) {
+            return false;
+        }
+
+        $live = Cashier::stripe()->subscriptions->retrieve($stripeSubscriptionId, []);
+
+        return in_array(strtolower((string) ($live->status ?? '')), ['past_due', 'unpaid'], true);
     }
 
     private function latestPaidLocalSubscription(User $user): ?Subscription
