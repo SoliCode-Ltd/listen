@@ -39,7 +39,6 @@ class PricingPageLinesTest extends TestCase
             'Max text per generation' => '5,000 characters',
             'Generations per month' => 'Unlimited',
             'Emotion, style & accent' => 'Full control',
-            'Processing priority' => 'High',
             'Commercial use' => 'Allowed',
             'Audio history' => '30 days',
             'Multi-speaker dialogue' => '✓',
@@ -53,7 +52,6 @@ class PricingPageLinesTest extends TestCase
             'أقصى نص في المرة الواحدة' => '5,000 حرف',
             'التوليدات شهريًا' => 'غير محدود',
             'المشاعر والأسلوب واللهجة' => 'تحكم كامل',
-            'أولوية المعالجة' => 'عالية',
             'الاستخدام التجاري' => 'مسموح',
             'سجل الأصوات' => '30 يومًا',
             'حوار بأكثر من متحدث' => '✓',
@@ -81,7 +79,6 @@ class PricingPageLinesTest extends TestCase
             'Voice usage minutes' => '138 min',
             'Max text per generation' => '1,200 characters',
             'Generations per month' => '50',
-            'Processing priority' => 'Standard',
             'Commercial use' => 'Personal only',
             'Audio history' => '7 days',
             'Download formats' => 'MP3',
@@ -137,6 +134,31 @@ class PricingPageLinesTest extends TestCase
         $plan->update(['pricing_lines' => ['topup' => true]]);
         $this->assertSame('$24 per 1M credits', $this->lines($plan->fresh(), 'en')['Credit top-up']);
         $this->assertSame('$24 لكل مليون رصيد', $this->lines($plan->fresh(), 'ar')['تعبئة رصيد']);
+    }
+
+    public function test_nothing_on_the_page_promises_faster_processing(): void
+    {
+        // The studio makes every plan's audio as fast, so the priority is not on the
+        // card unless the admin ticks it.
+        $plan = $this->premiumPlan(['slug' => 'pro', 'name' => 'Pro', 'processing_priority' => 'highest']);
+        $this->assertArrayNotHasKey('Processing priority', $this->lines($plan, 'en'));
+        $this->assertNotContains('processing_priority', PlanPricingLines::defaultShown());
+
+        foreach (['en' => ['faster processing', 'priority processing'], 'ar' => ['معالجة أسرع', 'معالجة ذات أولوية']] as $locale => $claims) {
+            app()->setLocale($locale);
+            $html = $this->getLocalizedRoute('pricing')->assertOk()
+                ->assertSee(__('ui.pricing.hero_subtitle'))
+                // Pro's own description, when the admin wrote none.
+                ->assertSee(__('ui.pricing.plan_desc_pro'))
+                ->assertDontSee(__('ui.pricing.lines.label_processing_priority'))
+                ->getContent();
+            foreach ($claims as $claim) {
+                $this->assertStringNotContainsStringIgnoringCase($claim, $html, $locale);
+            }
+        }
+
+        $plan->update(['pricing_lines' => ['processing_priority' => true]]);
+        $this->assertSame('High', $this->lines($plan->fresh(), 'en')['Processing priority']);
     }
 
     public function test_extra_lines_follow_the_automatic_ones(): void

@@ -26,7 +26,9 @@ final class PlanPricingLines
         'monthly_requests' => ['activity', true],
         'daily_requests' => ['activity', true],
         'voice_controls' => ['heart', true],
-        'processing_priority' => ['bolt', true],
+        // Off by default: the studio makes every plan's audio as fast; the priority only
+        // picks the queue of the API's and the extension's background generations.
+        'processing_priority' => ['bolt', false],
         'commercial_use' => ['lock', true],
         'audio_kept' => ['clock', true],
         'dialogue' => ['users', true],
@@ -70,6 +72,7 @@ final class PlanPricingLines
             $options[$key] = self::t('label_'.$key, 'en');
         }
         $options['topup'] .= ' (members cannot buy top-ups yet)';
+        $options['processing_priority'] .= ' (the studio is as fast on every plan)';
 
         return $options;
     }

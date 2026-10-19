@@ -270,7 +270,8 @@ class MessageReaderController extends Controller
         $job = $recorded['job'];
 
         if ($runAsync) {
-            $queueName = strtolower((string) ($activePlan?->processing_priority ?? 'standard')) === 'high'
+            // "Priority" and "highest" rank above "high": never the slower default queue.
+            $queueName = in_array(strtolower((string) ($activePlan?->processing_priority ?? 'standard')), ['high', 'priority', 'highest'], true)
                 ? 'high'
                 : 'default';
 

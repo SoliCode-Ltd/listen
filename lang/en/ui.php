@@ -211,7 +211,7 @@ return [
     // ===== PRICING PAGE =====
     'pricing' => [
         'hero_title' => 'Simple plans for every voice project',
-        'hero_subtitle' => 'Pick a plan by the minutes of audio you need each month. Higher plans add longer texts and faster processing.',
+        'hero_subtitle' => 'Pick a plan by the minutes of audio you need each month. Higher plans add longer texts and more features.',
         'monthly' => 'Monthly',
         'yearly' => 'Yearly',
         'annual_saves' => 'Annual plan saves 20%',
@@ -223,7 +223,7 @@ return [
         'plan_desc_free' => 'Try the voices before choosing a plan',
         'plan_desc_starter' => 'Full voice controls for everyday use',
         'plan_desc_creator' => ' Voice generation for creators',
-        'plan_desc_pro' => 'High-volume production with priority processing',
+        'plan_desc_pro' => 'High-volume production with dialogue mode',
         'plan_desc_studio_max' => 'Maximum power with dialogue mode & unlimited retention',
         'per_month_short' => '/mo',
         'characters_per_month' => 'credits/month',
