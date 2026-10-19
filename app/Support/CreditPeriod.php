@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AudioGeneration;
+use App\Models\BillingSubscription;
 use App\Models\SiteSetting;
 use App\Models\Subscription;
 use App\Models\UsageCounter;
@@ -33,6 +34,9 @@ final class CreditPeriod
 
     /** A first stretch of a plan period shorter than this belongs to the month after it. */
     private const SHORTEST_DAYS = 7;
+
+    /** How long after its end a card plan whose renewal is on its way still counts. */
+    private const RENEWAL_GRACE_HOURS = 2;
 
     /**
      * The member's credit period at a moment (now by default).
@@ -130,9 +134,18 @@ final class CreditPeriod
         $subscription = Subscription::query()
             ->where('user_id', $userId)
             ->where('status', 'active')
-            ->where(function ($query) use ($at) {
+            ->where(function ($query) use ($at, $userId) {
                 $query->whereNull('current_period_end')
-                    ->orWhere('current_period_end', '>=', $at);
+                    ->orWhere('current_period_end', '>=', $at)
+                    // A card renewal reaches us a little after the period ends: while
+                    // the card subscription is live, the plan (and so its credit
+                    // month) carries on for a short while, as in PlanAccessService.
+                    ->orWhere(fn ($renewing) => $renewing
+                        ->where('current_period_end', '>=', $at->copy()->subHours(self::RENEWAL_GRACE_HOURS))
+                        ->whereExists(fn ($card) => $card->selectRaw('1')
+                            ->from((new BillingSubscription)->getTable())
+                            ->where('user_id', $userId)
+                            ->whereIn('stripe_status', ['active', 'trialing'])));
             })
             ->latest('id')
             ->with('plan')

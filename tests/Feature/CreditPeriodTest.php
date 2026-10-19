@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\BillingSubscription;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Models\User;
@@ -76,6 +77,34 @@ class CreditPeriodTest extends TestCase
 
         // The free plan stays on calendar months.
         $this->assertSame('2026-11', CreditPeriod::current(User::factory()->create()->id)['key']);
+    }
+
+    public function test_a_card_renewal_seen_late_keeps_the_plans_credit_month_for_two_hours(): void
+    {
+        $this->switchOn('2026-10-01 00:00:00');
+        $card = User::factory()->create();
+        $this->travelTo(Carbon::parse('2026-10-14 08:40:00'));
+        $this->onPlan($card, $this->creator, '2026-10-14 08:37:00', '2026-11-14 08:37:00');
+        BillingSubscription::query()->create([
+            'user_id' => $card->id, 'type' => 'default', 'stripe_id' => 'sub_renewing', 'stripe_status' => 'active',
+        ]);
+        $this->spend($card, 5000);
+
+        // Stripe has renewed, but the renewal has not reached us yet: the period carries on.
+        $this->travelTo(Carbon::parse('2026-11-14 09:30:00'));
+        $this->assertSame('2026-10-14 08:37', CreditPeriod::current($card->id)['key']);
+        $this->assertSame(5000, CreditPeriod::counter($card->id)->total_chars);
+
+        // Two hours on, with still no renewal, it is over.
+        $this->travelTo(Carbon::parse('2026-11-14 10:40:00'));
+        $this->assertSame('2026-11', CreditPeriod::current($card->id)['key']);
+
+        // A plan with no live card subscription ends on time.
+        $manual = User::factory()->create();
+        $this->travelTo(Carbon::parse('2026-10-14 08:40:00'));
+        $this->onPlan($manual, $this->creator, '2026-10-14 08:37:00', '2026-11-14 08:37:00');
+        $this->travelTo(Carbon::parse('2026-11-14 09:30:00'));
+        $this->assertSame('2026-11', CreditPeriod::current($manual->id)['key']);
     }
 
     private function switchOn(string $at): void
