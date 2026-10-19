@@ -1415,17 +1415,13 @@
       text-align: center;
       justify-content: center;
     }
-    .key-inline-actions {
-      display: flex;
-      justify-content: flex-end;
-      margin-top: .65rem;
-    }
-    .key-inline-actions .btn {
-      width: 100%;
-      justify-content: center;
-    }
     .mini-message {
       margin-top: .65rem;
+    }
+    .key-copy-hint {
+      margin-bottom: 0;
+      font-size: .85rem;
+      color: var(--muted);
     }
 
     .dashboard-shell {
@@ -2797,17 +2793,8 @@
             </span>
           </div>
           @if($extensionApiState['has_api_key'])
-          <div class="key-inline-actions">
-            <button
-              type="button"
-              class="btn"
-              id="copyExtensionKeyBtn"
-              data-copy-value="{{ $extensionApiState['masked_key'] }}"
-            >
-              {{ __('ui.extension.copy_to_clipboard') }}
-            </button>
-          </div>
-          <div id="extensionKeyMessage" class="mini-message"></div>
+            {{-- Only the key's last characters are kept, so it can be copied only on the extension page, right after it is made. --}}
+            <p class="mini-message key-copy-hint">{{ __('ui.dashboard.extension_key_copy_hint', ['button' => __('ui.dashboard.manage_extension_key')]) }}</p>
           @endif
         </div>
 
@@ -3305,8 +3292,6 @@
       'generate_voice_now' => __('ui.dashboard.generate_voice_now'),
       'generating' => __('ui.dashboard.generating'),
       'voice_generated_success' => __('ui.dashboard.voice_generated_success'),
-      'copied' => __('ui.extension.copied'),
-      'copy_failed' => __('ui.extension.copy_failed'),
       'instant_preview' => __('ui.dashboard.instant_preview'),
       'generated_audio_ready' => __('ui.dashboard.generated_audio_ready'),
       'speaker_prefix' => __('ui.dashboard.speaker_prefix'),
@@ -3378,8 +3363,6 @@
     const statFailed = document.getElementById('statFailed');
     const jobsCount = document.getElementById('jobsCount');
     const jobsPagination = document.getElementById('jobsPagination');
-    const copyExtensionKeyBtn = document.getElementById('copyExtensionKeyBtn');
-    const extensionKeyMessage = document.getElementById('extensionKeyMessage');
     const dashboardNavLinks = Array.from(document.querySelectorAll('[data-dashboard-nav]'));
     const dashboardSections = Array.from(document.querySelectorAll('[data-dashboard-section]'));
     const validDashboardSectionIds = dashboardSections.map(function(section) { return section.id; });
@@ -3725,16 +3708,6 @@
           inline: 'nearest',
         });
       });
-    }
-
-    function showExtensionKeyMessage(type, message) {
-      if (!extensionKeyMessage) return;
-      if (!message) {
-        extensionKeyMessage.innerHTML = '';
-        return;
-      }
-      const cls = type === 'error' ? 'error' : 'note';
-      extensionKeyMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
     }
 
     function hideGeneratedPreview() {
@@ -4900,21 +4873,6 @@
       if (!match) return;
       window.openClonedVoiceInGenerator(match);
     })();
-
-    copyExtensionKeyBtn?.addEventListener('click', async function() {
-      const raw = String(copyExtensionKeyBtn.getAttribute('data-copy-value') || '').trim();
-      if (!raw) {
-        showExtensionKeyMessage('error', i18n.copy_failed);
-        return;
-      }
-
-      try {
-        await navigator.clipboard.writeText(raw);
-        showExtensionKeyMessage('ok', i18n.copied);
-      } catch (error) {
-        showExtensionKeyMessage('error', i18n.copy_failed);
-      }
-    });
   </script>
   @if(($voiceCloningVisible ?? false) && ($voiceCloningEnabledGlobally ?? false))
   <script>

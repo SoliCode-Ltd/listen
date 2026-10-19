@@ -1285,6 +1285,9 @@ return [
         'voice_may_still_be_finishing' => 'Your voice may still be finishing. It will appear in your history in a moment — please don\'t generate it again.',
         'page_expired' => 'This page has been open a long time and has expired. Reload it to carry on.',
         'reload_page' => 'Reload page',
+
+        // The extension key: the full key is shown once, when it is made.
+        'extension_key_copy_hint' => "The full key is shown only once, when it's created, so it can't be copied here. Need it again? Create a new key with :button.",
     ],
 
     // ===== AUTH =====
