@@ -14,6 +14,17 @@ return [
     ],
 
     /*
+    | What this server may do to real customers by itself: cancel or change
+    | Stripe subscriptions and prices, and send reminder or welcome emails from
+    | scheduled jobs (App\Support\LiveServer). Staging runs the live Stripe keys
+    | on a copy of live members, so it must never do these. Unset: on only when
+    | APP_URL is the live site (live_host). LISTEN_LIVE_ACTIONS=true or false
+    | decides it outright.
+    */
+    'live_actions' => env('LISTEN_LIVE_ACTIONS'),
+    'live_host' => (string) env('LISTEN_LIVE_HOST', 'listenai.studio'),
+
+    /*
     |--------------------------------------------------------------------------
     | TTS Architecture (Hybrid Mode)
     |--------------------------------------------------------------------------
