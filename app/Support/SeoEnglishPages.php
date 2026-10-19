@@ -365,10 +365,10 @@ final class SeoEnglishPages
             return [
                 'eyebrow' => 'اللكنات الإنجليزية',
                 'h1' => 'تحويل النص إلى صوت إنجليزي بكل اللكنات',
-                'intro' => 'منصة إسمع تتكلم الإنجليزية بـ'.$count.' لكنة من '.$countries.' دولة: الأمريكية والبريطانية والأسترالية والكندية والأيرلندية والهندية وغيرها، بالإضافة إلى الإنجليزية بلكنة عربية. اكتب بالإنجليزية أو بالعربية مع الترجمة واختر اللكنة.',
+                'intro' => 'منصة إسمع تتكلم الإنجليزية بـ'.$count.' لكنة من '.$countries.' دولة: الأمريكية والبريطانية والأسترالية والكندية والأيرلندية والهندية وغيرها، ومنها الإنجليزية بلكنة عربية. اكتب بالإنجليزية أو بالعربية مع الترجمة واختر اللكنة.',
                 'faq_title' => 'الأسئلة الشائعة',
                 'faqs' => [
-                    ['question' => 'كم لكنة إنجليزية تدعمها منصة إسمع؟', 'answer' => $count.' لكنة من '.$countries.' دولة، بالإضافة إلى الإنجليزية بلكنة عربية.'],
+                    ['question' => 'كم لكنة إنجليزية تدعمها منصة إسمع؟', 'answer' => $count.' لكنة من '.$countries.' دولة، منها الإنجليزية بلكنة عربية.'],
                     ['question' => 'هل يمكنني الكتابة بالعربية والحصول على صوت إنجليزي؟', 'answer' => 'نعم، فعّل الترجمة في الاستوديو فيُترجم النص ثم يُحوَّل إلى صوت إنجليزي.'],
                     ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللكنات في العرض التجريبي.'],
                 ],
@@ -381,10 +381,10 @@ final class SeoEnglishPages
         return [
             'eyebrow' => 'English accents',
             'h1' => 'English Text to Speech in Every Major Accent',
-            'intro' => 'Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, plus English with an Arabic accent. Write in English, or in Arabic with translation, and pick the accent.',
+            'intro' => 'Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, including English with an Arabic accent. Write in English, or in Arabic with translation, and pick the accent.',
             'faq_title' => 'Frequently asked questions',
             'faqs' => [
-                ['question' => 'How many English accents does Listen support?', 'answer' => $count.' accents from '.$countries.' countries, plus English with an Arabic accent.'],
+                ['question' => 'How many English accents does Listen support?', 'answer' => $count.' accents from '.$countries.' countries, including English with an Arabic accent.'],
                 ['question' => 'Can I write in Arabic and get English audio?', 'answer' => 'Yes. Turn on translation in the studio and your script is translated, then spoken in English.'],
                 ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and accents in the demo.'],
             ],

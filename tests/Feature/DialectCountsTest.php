@@ -53,6 +53,23 @@ class DialectCountsTest extends TestCase
             ->assertDontSee('دولة عربية');
     }
 
+    public function test_the_accent_hub_counts_english_with_an_arabic_accent_among_the_accents(): void
+    {
+        $count = count(EnglishAccents::ALL);
+        $countries = count(array_unique(array_filter(array_column(EnglishAccents::ALL, 'country'), fn (string $country): bool => $country !== 'AR')));
+        $this->assertSame('AR', EnglishAccents::ALL['en-AR']['country'], 'English with an Arabic accent is one of the catalog rows');
+        $this->assertSame(count(EnglishAccents::COUNTRIES) - 1, $countries);
+
+        $this->page('en', 'seo.english-accents')->assertOk()
+            ->assertSee('Listen speaks English in '.$count.' accents from '.$countries.' countries: American, British, Australian, Canadian, Irish, Indian and more, including English with an Arabic accent.')
+            ->assertSee($count.' accents from '.$countries.' countries, including English with an Arabic accent.')
+            ->assertDontSee('plus English with an Arabic accent');
+        $this->page('ar', 'seo.english-accents')->assertOk()
+            ->assertSee('وغيرها، ومنها الإنجليزية بلكنة عربية.')
+            ->assertSee($count.' لكنة من '.$countries.' دولة، منها الإنجليزية بلكنة عربية.')
+            ->assertDontSee('بالإضافة إلى الإنجليزية بلكنة عربية');
+    }
+
     public function test_every_number_written_in_the_language_files_matches_the_catalogs(): void
     {
         $arabic = [
