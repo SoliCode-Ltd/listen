@@ -72,13 +72,13 @@ class ApiTextToSpeechTest extends TestCase
     {
         return [
             'shorter than the estimate' => [2, 30],
-            'as long as the estimate' => [3, 45],
+            'as long as the estimate' => [4, 60],
             'longer than the estimate' => [7, 105],
         ];
     }
 
     /**
-     * Credits are reserved from the text (3 seconds, 45 credits, for this one)
+     * Credits are reserved from the text (4 seconds, 60 credits, for this one)
      * and then corrected to the audio really made: 15 credits a second, on the
      * account's usage and on the key's own monthly figures alike.
      */
@@ -95,7 +95,7 @@ class ApiTextToSpeechTest extends TestCase
             ->assertHeader('X-Credits-Used', (string) $credits)
             ->assertHeader('X-Credits-Remaining', (string) (90000 - $credits));
 
-        $this->assertSame(45, AudioGeneration::query()->sole()->settings_snapshot['reservation']['credits'], 'reserved from the text');
+        $this->assertSame(60, AudioGeneration::query()->sole()->settings_snapshot['reservation']['credits'], 'reserved from the text');
         $this->assertSame($credits, $this->creditsSpent($user));
         $this->assertSame($seconds, $this->secondsCounted($user));
         $this->assertSame(1, $this->requestsCounted($user));

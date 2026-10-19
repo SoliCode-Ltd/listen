@@ -250,7 +250,7 @@ class PremiumPackTest extends TestCase
             'target_language' => 'en',
             'voice_key' => VoiceCatalog::keyFromId((int) $this->premiumVoice()->id),
         ])->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.pack_not_enough', ['remaining' => '200', 'needed' => '405']));
+            ->assertJsonPath('errors.content.0', __('ui.backend.pack_not_enough', ['remaining' => '200', 'needed' => '510']));
 
         $this->assertSame([], $this->spoken);
     }

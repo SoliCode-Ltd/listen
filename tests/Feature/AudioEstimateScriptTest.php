@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Plan;
 use App\Models\User;
 use App\Support\UsageEstimator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -100,6 +101,25 @@ Line two, after a blank line.
             $this->assertSame($server['seconds'], $results[$i]['seconds'], $label);
             $this->assertSame($server['credits'], $results[$i]['credits'], $label);
         }
+    }
+
+    public function test_the_extension_estimates_with_the_same_script_and_the_servers_numbers(): void
+    {
+        $this->assertFileEquals(public_path('js/audio-estimate.js'), public_path('extensions/chrome-listen-reader/audio-estimate.js'),
+            'the extension carries the site\'s script unchanged');
+        $popup = (string) file_get_contents(public_path('extensions/chrome-listen-reader/popup.html'));
+        $this->assertNotFalse(strpos($popup, '<script src="audio-estimate.js"></script>'));
+        $this->assertLessThan(strpos($popup, 'src="popup.js"'), strpos($popup, 'src="audio-estimate.js"'), 'loaded before the popup uses it');
+
+        Plan::query()->firstOrCreate(['slug' => 'free'], [
+            'name' => 'Free', 'price_cents' => 0, 'monthly_minutes' => 10, 'monthly_chars' => 10000,
+            'monthly_requests' => 60, 'max_chars_per_request' => 1200, 'voice_tier' => 'standard',
+            'tts_provider_policy' => 'google_cloud', 'dialogue_enabled' => false, 'custom_prompt_enabled' => false, 'is_active' => true,
+        ]);
+        $key = User::factory()->create(['email_verified_at' => now()])->issueApiKey();
+        $this->getJson('/api/reader/profile?api_key='.$key)
+            ->assertOk()
+            ->assertJsonPath('profile.estimate', json_decode(json_encode(UsageEstimator::clientConfig()), true));
     }
 
     public function test_the_studio_loads_the_script_with_the_servers_numbers(): void

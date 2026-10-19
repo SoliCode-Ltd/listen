@@ -80,13 +80,13 @@ class StudioReservationTest extends TestCase
 
     public function test_a_slower_speed_reserves_for_the_longer_audio(): void
     {
-        // "Hello there" is about 3 seconds (45 credits); at half speed about 6 (90).
-        $user = $this->member(['monthly_chars' => 60, 'voice_tier' => 'hd']);
+        // "Hello there" on a premium voice is about 2 seconds (30 credits); at half speed about 3 (45).
+        $user = $this->member(['monthly_chars' => 40, 'voice_tier' => 'hd']);
         $this->fakeSpeech();
 
         $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])
             ->assertStatus(422)
-            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '60', 'needed' => '90']));
+            ->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '40', 'needed' => '45']));
         $this->assertSame(0, AudioGeneration::query()->count(), 'nothing is made or reserved');
         $this->assertSame(0, (int) CreditPeriod::counter((int) $user->id)->total_chars);
 
@@ -101,8 +101,8 @@ class StudioReservationTest extends TestCase
         $this->generate($user, ['voice_tier' => 'hd', 'voice_key' => $this->premiumKey(), 'speed' => 0.5])->assertStatus(422);
 
         $reservation = AudioGeneration::query()->latest('id')->value('settings_snapshot')['reservation'] ?? null;
-        $this->assertSame(90, $reservation['credits'] ?? null, 'what was reserved is kept on the generation');
-        $this->assertSame(6, $reservation['seconds'] ?? null);
+        $this->assertSame(45, $reservation['credits'] ?? null, 'what was reserved is kept on the generation');
+        $this->assertSame(3, $reservation['seconds'] ?? null);
         $counter = CreditPeriod::counter((int) $user->id);
         $this->assertSame(0, (int) $counter->total_chars, 'all of it given back');
         $this->assertSame(0, (int) $counter->total_seconds);
@@ -111,7 +111,7 @@ class StudioReservationTest extends TestCase
 
     public function test_the_extension_reserves_for_the_speed_too(): void
     {
-        $user = $this->member(['monthly_chars' => 60, 'voice_tier' => 'hd']);
+        $user = $this->member(['monthly_chars' => 40, 'voice_tier' => 'hd']);
         $this->fakeSpeech();
         $key = 'lk_live_'.str_repeat('s', 32);
         $user->forceFill(['api_key_hash' => User::hashApiKey($key)])->save();
@@ -123,7 +123,7 @@ class StudioReservationTest extends TestCase
             'voice_key' => $this->premiumKey(),
             'speed' => 0.5,
             'prefer_sync' => true,
-        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '60', 'needed' => '90']));
+        ])->assertStatus(422)->assertJsonPath('errors.content.0', __('ui.backend.monthly_chars_not_enough', ['remaining' => '40', 'needed' => '45']));
 
         $this->assertSame(0, AudioGeneration::query()->count());
     }

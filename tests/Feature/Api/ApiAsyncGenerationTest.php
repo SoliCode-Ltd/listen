@@ -61,7 +61,7 @@ class ApiAsyncGenerationTest extends TestCase
             'title' => 'Chapter one',
             'text' => 'Hello there, this is a test.',
             'character_count' => 28,
-            'credits_used' => 45,
+            'credits_used' => 60,
             'duration_seconds' => null,
             'audio_url' => null,
             'error' => null,
@@ -70,8 +70,8 @@ class ApiAsyncGenerationTest extends TestCase
             'text', 'character_count', 'credits_used', 'duration_seconds', 'audio_url', 'error',
         ])));
 
-        $this->assertSame([45, 1, 3], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)], 'reserved now');
-        $this->assertSame([45, 1], [$this->keyCreditsSpent($key), $this->keyRequestsCounted($key)]);
+        $this->assertSame([60, 1, 4], [$this->creditsSpent($user), $this->requestsCounted($user), $this->secondsCounted($user)], 'reserved now');
+        $this->assertSame([60, 1], [$this->keyCreditsSpent($key), $this->keyRequestsCounted($key)]);
         $this->assertSame(['default'], DB::table('jobs')->pluck('queue')->all());
         $this->assertSame(0, $this->speechCalls->gemini, 'nothing is generated before a worker runs');
 

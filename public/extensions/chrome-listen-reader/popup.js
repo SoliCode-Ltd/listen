@@ -360,8 +360,23 @@ function updateStudioPanel() {
   elements.studioPanel.style.display = profileData?.plan && isPremium ? 'block' : 'none';
 }
 
-// About what a text costs, the same estimate as the dashboard (15 credits a second of audio).
+// About what a text costs: the estimate the server reserves (audio-estimate.js, a copy
+// of the site's js/audio-estimate.js), with the numbers the profile sends, for the
+// plan's voices and the premium studio settings. 15 credits a second of audio.
 function estimateCreditsFor(text) {
+  const estimate = globalThis.ListenAudioEstimate;
+  if (estimate && profileData?.estimate) {
+    estimate.configure(profileData.estimate);
+    const tier = String(profileData?.plan?.voice_tier || 'standard');
+
+    return estimate.credits(text, tier === 'hd' ? {
+      tier,
+      performance_style: String(elements.performanceStyle?.value || ''),
+      emotion: String(elements.emotion?.value || ''),
+      dialect: String(elements.dialect?.value || ''),
+    } : { tier });
+  }
+  // A site that does not send its numbers yet: its older estimate.
   const value = String(text || '').trim();
   const length = Array.from(value).length;
   if (!length) return 0;
@@ -961,6 +976,10 @@ if (elements.quickText) {
 }
 
 // Studio panel controls
+// The premium settings change how long the text takes, and so its estimate.
+[elements.performanceStyle, elements.emotion, elements.dialect].forEach((select) => {
+  select?.addEventListener('change', () => updateCharCounter());
+});
 if (elements.performanceStyle) {
   elements.performanceStyle.addEventListener('change', () => persistSettingsSilently().catch(() => {}));
 }

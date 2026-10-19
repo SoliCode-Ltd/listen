@@ -23,6 +23,7 @@ use App\Support\GenerationMessage;
 use App\Support\PlanUsageGuard;
 use App\Support\VoiceCloningAccess;
 use App\Support\TtsStudioConfig;
+use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
@@ -91,6 +92,8 @@ class MessageReaderController extends Controller
                     'voice_cloning_enabled' => VoiceCloningAccess::allows($user, $activePlan),
                 ],
                 'usage' => ['period' => $counter->period_ym] + $usage,
+                // The numbers the popup estimates a text's length and cost with, as the studio does.
+                'estimate' => UsageEstimator::clientConfig(),
                 'links' => [
                     'dashboard' => $this->localizedUrl('dashboard', $locale),
                     'pricing' => $this->localizedUrl('pricing', $locale),
