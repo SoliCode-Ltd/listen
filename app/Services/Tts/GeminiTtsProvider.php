@@ -922,7 +922,7 @@ class GeminiTtsProvider implements TtsProviderInterface
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => trim($stylePrompt."\n\n".$text)],
+                        ['text' => $this->legacyPrompt($stylePrompt, $text)],
                     ],
                 ],
             ],
@@ -938,6 +938,36 @@ class GeminiTtsProvider implements TtsProviderInterface
                 ],
             ],
         ];
+    }
+
+    /**
+     * The older prompt model reads the direction and the script as one block of
+     * text. The direction is written as director's notes under their own heading,
+     * set apart from the transcript, so the voice performs it instead of reading it
+     * aloud. A dialogue speaker with their own dialect gets a speaker note: never a
+     * "Name: ..." line, which the model takes for a line of the script.
+     *
+     * @param  array<string, string>  $speakerNotes  direction per speaker name
+     */
+    private function legacyPrompt(string $direction, string $transcript, array $speakerNotes = []): string
+    {
+        $direction = trim($direction);
+        if ($direction === '' && $speakerNotes === []) {
+            return trim($transcript);
+        }
+
+        $notes = "### DIRECTOR'S NOTES\nThese notes direct the performance. Never read them aloud; read aloud only the transcript below, exactly as written.";
+        if ($direction !== '') {
+            $notes .= "\n".$direction;
+        }
+        if ($speakerNotes !== []) {
+            $notes .= "\n\n### SPEAKER NOTES";
+            foreach ($speakerNotes as $name => $note) {
+                $notes .= "\n- For the lines of {$name} only, never read aloud — ".trim((string) $note);
+            }
+        }
+
+        return $notes."\n\n### TRANSCRIPT\n".trim($transcript);
     }
 
     /**
@@ -972,13 +1002,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             ];
         }
 
-        $legacyDirections = '';
-        foreach ($speakerStyles as $name => $style) {
-            $legacyDirections .= "\n{$name}: {$style}";
-        }
+        // The older model gets director's and speaker notes set apart from the script.
         $parts = GeminiTtsModel::usesStructuredSpeech($model)
             ? $this->structuredDialogueParts($text, $speakers, $stylePrompt, $speakerStyles)
-            : [['text' => trim($stylePrompt.$legacyDirections."\n\n".$text)]];
+            : [['text' => $this->legacyPrompt($stylePrompt, $text, $speakerStyles)]];
 
         $speechConfig = [
             'multiSpeakerVoiceConfig' => [
