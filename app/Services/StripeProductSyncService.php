@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Plan;
 use App\Models\SiteSetting;
 use App\Services\Billing\StripePricePlans;
+use App\Support\LiveServer;
 use Illuminate\Support\Facades\Log;
 use Stripe\Exception\ApiErrorException;
 use Stripe\Price;
@@ -26,6 +27,9 @@ class StripeProductSyncService
      * brand they bought from, with the company Stripe has verified.
      */
     public const STATEMENT_DESCRIPTOR = 'LISTEN BY SOLICODE';
+
+    /** What a sync says on a server that is not the live site (staging runs the live keys). */
+    public const SKIPPED_MESSAGE = 'Skipped: not the live site. Stripe was left as it is; the live site keeps its own products and prices.';
 
     private ?StripeClient $stripe = null;
 
@@ -51,9 +55,11 @@ class StripeProductSyncService
 
     /**
      * Sync a plan with Stripe (create product + prices + coupon).
+     * Off the live site nothing is changed in Stripe: the result is not a
+     * success and says "skipped" (skipped => true).
      *
      * @param Plan $plan
-     * @return array{success: bool, message: string, product_id?: string, price_monthly?: string, price_yearly?: string}
+     * @return array{success: bool, message: string, skipped?: bool, product_id?: string, price_monthly?: string, price_yearly?: string}
      */
     public function syncPlan(Plan $plan): array
     {
@@ -77,6 +83,18 @@ class StripeProductSyncService
             return [
                 'success' => true,
                 'message' => 'Packs are charged once and do not need Stripe prices.',
+            ];
+        }
+
+        // Staging runs the live Stripe keys on a copy of live plans: archiving a
+        // price there would break the live checkout for that plan.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('Stripe product, price and coupon sync', ['plan_slug' => $plan->slug]);
+
+            return [
+                'success' => false,
+                'skipped' => true,
+                'message' => self::SKIPPED_MESSAGE,
             ];
         }
 
@@ -402,9 +420,10 @@ class StripeProductSyncService
     }
 
     /**
-     * Sync all active paid plans with Stripe.
+     * Sync all active paid plans with Stripe. Plans left out because this is
+     * not the live site count as skipped, not failed.
      *
-     * @return array{synced: int, failed: int, errors: array}
+     * @return array{synced: int, failed: int, skipped: int, errors: array}
      */
     public function syncAllPlans(): array
     {
@@ -414,12 +433,15 @@ class StripeProductSyncService
 
         $synced = 0;
         $failed = 0;
+        $skipped = 0;
         $errors = [];
 
         foreach ($plans as $plan) {
             $result = $this->syncPlan($plan);
             if ($result['success']) {
                 $synced++;
+            } elseif (! empty($result['skipped'])) {
+                $skipped++;
             } else {
                 $failed++;
                 $errors[$plan->slug] = $result['message'];
@@ -429,6 +451,7 @@ class StripeProductSyncService
         return [
             'synced' => $synced,
             'failed' => $failed,
+            'skipped' => $skipped,
             'errors' => $errors,
         ];
     }

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Plan;
 use App\Services\StripeProductSyncService;
+use App\Support\LiveServer;
 use Illuminate\Console\Command;
 
 class SyncStripePlansCommand extends Command
@@ -34,6 +35,16 @@ class SyncStripePlansCommand extends Command
         if (!$syncService->isConfigured()) {
             $this->error('Stripe is not configured. Please set STRIPE_SECRET in your .env file.');
             return Command::FAILURE;
+        }
+
+        // Staging runs the live Stripe keys on a copy of live plans: only the live
+        // site creates or archives Stripe products, prices and coupons.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('stripe:sync-plans');
+            $this->warn(StripeProductSyncService::SKIPPED_MESSAGE);
+            $this->line('Nothing was synced: run it on the live site.');
+
+            return Command::SUCCESS;
         }
 
         $this->info('🔄 Stripe Plan Sync');
