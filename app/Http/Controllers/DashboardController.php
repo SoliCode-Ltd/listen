@@ -519,8 +519,23 @@ class DashboardController extends Controller
             abort(404);
         }
 
+        // The row stays: the demo allowance adds up the member's demo rows, so
+        // deleting one must not give its characters back. Without its audio it
+        // drops out of the member's history (which lists only rows with audio),
+        // and the file goes too unless another row still plays it.
         $deletedId = (int) $generation->id;
-        $generation->delete();
+        $audioPath = trim((string) $generation->audio_path);
+        $metadata = is_array($generation->metadata) ? $generation->metadata : [];
+        $generation->forceFill([
+            'audio_path' => null,
+            'metadata' => $metadata + ['deleted_by_member_at' => now()->toIso8601String()],
+        ])->save();
+
+        if ($audioPath !== ''
+            && ! DemoVoiceGeneration::query()->where('audio_path', $audioPath)->exists()
+            && ! AudioGeneration::query()->where('audio_path', $audioPath)->exists()) {
+            \Illuminate\Support\Facades\Storage::disk('public')->delete($audioPath);
+        }
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
