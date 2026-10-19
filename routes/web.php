@@ -136,8 +136,9 @@ Route::get('/favicon.ico', function () {
     return redirect()->away($target, 301);
 })->name('favicon');
 
+// A signed link: the controller checks the signature itself, so the https links
+// in emails still work when the proxy hands the request over as http.
 Route::get('/newsletter/unsubscribe', NewsletterUnsubscribeController::class)
-    ->middleware('signed')
     ->name('newsletter.unsubscribe');
 
 Route::group([
