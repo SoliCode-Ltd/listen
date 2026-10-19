@@ -135,7 +135,9 @@ class HomeVoiceSamplesTest extends TestCase
         $arabic->assertOk();
         $arabic->assertSee('id="cloneAnnounceTitle"', false);
         $arabic->assertSee('استنساخ الصوت متاح الآن', false);
-        $arabic->assertSee('سجّل صوتك، ثم استخدمه في كل توليد بأي لهجة تختارها.', false);
+        $arabic->assertSee('سجّل صوتك، ثم استخدمه في توليداتك بأي لهجة تختارها.', false);
+        // A cloned voice cannot be a dialogue speaker, so not every generation.
+        $arabic->assertDontSee('في كل توليد', false);
         $arabic->assertSee('اختر باقتك', false);
         $arabic->assertSee('href="'.route('pricing').'"', false);
         $arabic->assertDontSee('صار جاهزاً', false);
@@ -149,7 +151,8 @@ class HomeVoiceSamplesTest extends TestCase
         $english = $this->getLocalizedRoute('home');
         $english->assertOk();
         $english->assertSee('Voice cloning is now available.', false);
-        $english->assertSee('Record your voice, then use it in every generation, in any dialect you choose.', false);
+        $english->assertSee('Record your voice, then use it in your generations, in any dialect you choose.', false);
+        $english->assertDontSee('every generation', false);
         $english->assertSee('Choose your plan', false);
         $english->assertSee('href="'.route('pricing').'"', false);
         $englishSection = $this->announcementHtml($english->getContent());

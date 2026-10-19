@@ -204,7 +204,7 @@ return [
         'cta_subtitle' => 'Hear the voices first, then choose the plan that fits your work.',
         'get_started_free' => 'Get started',
         'clone_announce_title' => 'Voice cloning is now available.',
-        'clone_announce_body' => 'Record your voice, then use it in every generation, in any dialect you choose.',
+        'clone_announce_body' => 'Record your voice, then use it in your generations, in any dialect you choose.',
         'clone_announce_cta' => 'Choose your plan',
     ],
 
