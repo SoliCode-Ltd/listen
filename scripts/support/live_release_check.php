@@ -123,6 +123,14 @@ $section('Settings', function () use ($root, $line, $problem) {
     if (config('app.debug')) {
         $problem('APP_DEBUG is on in live.');
     }
+    // With APP_ENV local or testing, a payment event nobody signed is believed.
+    if (in_array(config('app.env'), ['local', 'testing'], true)) {
+        $problem('APP_ENV is '.config('app.env').': set it to production, or unsigned payment events are accepted.');
+    }
+    $line('Stripe webhook signing secret', trim((string) config('services.stripe.webhook_secret', '')) !== '' ? 'set' : 'MISSING');
+    if (trim((string) config('services.stripe.webhook_secret', '')) === '') {
+        $problem('STRIPE_WEBHOOK_SECRET is empty: Stripe\'s payment events are refused (503).');
+    }
     $line('App timezone / now (UTC)', config('app.timezone').' / '.now()->toDateTimeString());
     $line('Daily limit time zone', (string) config('listen.billing.daily_limit_timezone', '(not set: code falls back to Africa/Cairo)'));
     if (method_exists(PlanUsageGuard::class, 'startOfMemberDay')) {
