@@ -43,6 +43,8 @@
 
     {{-- ── Studio workspace: laid out like the dashboard generator ── --}}
     <section class="studio-workspace">
+      {{-- An email sign-up confirms its address first: what to do, with a button for a new link. --}}
+      @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.notice_title')])
       {{-- Quota --}}
       <div class="s-card reveal" id="quotaBox" style="padding:1rem 1.25rem">
         <div class="quota-panel">
@@ -394,6 +396,8 @@
     const demoQuota = @json($demoQuota ?? null);
     const trialAllowanceChars = Number(@json((int) $trialAllowanceChars));
     const i18n = @json($demoI18n);
+    // Until the email is confirmed, the notice above takes the place of Generate.
+    const emailVerificationRequired = @json(! empty($verifyEmail));
     const pageLocale = document.documentElement.lang || 'en';
     const isArabicPageLocale = String(pageLocale).toLowerCase().startsWith('ar');
 
@@ -615,7 +619,7 @@
         return;
       }
 
-      const shouldDisable = isQuotaRefreshing || isGenerating || Boolean(currentQuota.is_exhausted);
+      const shouldDisable = emailVerificationRequired || isQuotaRefreshing || isGenerating || Boolean(currentQuota.is_exhausted);
       previewBtn.disabled = shouldDisable;
       setPreviewButtonMarkup(previewButtonIcon, i18n.generate_voice);
     }

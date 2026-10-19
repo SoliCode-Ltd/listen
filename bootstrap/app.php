@@ -60,6 +60,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'subscription.sync' => \App\Http\Middleware\SyncSubscriptionStatus::class,
             'demo.free' => \App\Http\Middleware\EnsureFreeDemoAccess::class,
+            'demo.verified' => \App\Http\Middleware\EnsureDemoEmailVerified::class,
             'user.not_blocked' => \App\Http\Middleware\EnsureUserIsNotBlocked::class,
             'auth.method' => \App\Http\Middleware\EnsureAuthMethodEnabled::class,
             'referral.capture' => \App\Http\Middleware\CaptureReferralVisit::class,

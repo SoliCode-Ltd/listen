@@ -12,8 +12,9 @@ use Illuminate\Support\ServiceProvider;
 
 /**
  * Named rate limiters for the public entry points that had none: sign-in and
- * sign-up (password guessing, bot signups), the contact form (inbox flooding)
- * and the browser-extension API (key guessing, runaway clients).
+ * sign-up (password guessing, bot signups), the contact form and a new
+ * email-confirmation link (inbox flooding) and the browser-extension API (key
+ * guessing, runaway clients).
  *
  * Limits are generous for real people; a blocked request gets the same kind of
  * response the page already handles (form error or JSON message), not a bare 429 page.
@@ -38,6 +39,14 @@ class RateLimitServiceProvider extends ServiceProvider
         // Phone and Firebase/Google sign-in endpoints (JSON).
         RateLimiter::for('auth-bridge', fn (Request $request) => [
             Limit::perMinute(15)->by('auth-bridge:'.$request->ip())->response($this->formResponse()),
+        ]);
+
+        // A new email-confirmation link: a few an hour for each member and for
+        // each network address, so the button cannot flood anyone's inbox.
+        RateLimiter::for('verify-email', fn (Request $request) => [
+            Limit::perHour(3)->by('verify-email-user:'.($request->user()?->getAuthIdentifier() ?? $request->ip()))
+                ->response($this->verifyEmailResponse()),
+            Limit::perHour(10)->by('verify-email-ip:'.$request->ip())->response($this->verifyEmailResponse()),
         ]);
 
         RateLimiter::for('contact', fn (Request $request) => [
@@ -91,6 +100,25 @@ class RateLimitServiceProvider extends ServiceProvider
                 ? Limit::perMinute(ApiPlanAccess::requestsPerMinute($plan))->by('v1-generate:'.$apiKey->user_id)
                 : Limit::perMinute(ApiPlanAccess::readsPerMinute($plan))->by('v1-read:'.$apiKey->user_id);
         });
+    }
+
+    /**
+     * In minutes: an hourly limit can mean a wait of up to an hour. The page
+     * shows the message where it shows the result of a new link.
+     */
+    private function verifyEmailResponse(): \Closure
+    {
+        return function (Request $request, array $headers) {
+            $minutes = max(1, (int) ceil(((int) ($headers['Retry-After'] ?? 60)) / 60));
+            $message = trans_choice('ui.verify_email.resend_too_many', $minutes, ['count' => $minutes]);
+
+            if ($request->expectsJson()) {
+                return response()->json(['ok' => false, 'message' => $message], 429, $headers);
+            }
+
+            return redirect()->back(fallback: route('demo.page'))
+                ->with('verify_email_notice', ['type' => 'error', 'message' => $message]);
+        };
     }
 
     private function formResponse(): \Closure
