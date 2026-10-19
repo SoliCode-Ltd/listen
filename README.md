@@ -115,6 +115,13 @@ STRIPE_WEBHOOK_SECRET=
 # In sync mode, texts at least this long are still queued.
 LISTEN_AUDIO_PROCESSING=sync
 LISTEN_AUDIO_FORCE_ASYNC_CHARS=2500
+
+# Live-only actions: cancelling or changing Stripe subscriptions and prices,
+# and reminder or welcome emails sent by scheduled jobs. Unset, only a server
+# whose APP_URL is on listenai.studio does them. Set true on live and false on
+# staging (which runs the live Stripe keys on a copy of live members) to make
+# it explicit.
+LISTEN_LIVE_ACTIONS=
 ```
 
 `LISTEN_TTS_MODE` accepts `google` (Google Cloud only) or `hybrid` (Free plans stay on Google Cloud, paid plans use Gemini, with fallback to Google Cloud when Gemini fails).
@@ -207,13 +214,15 @@ Other commands:
 | `listen:audit-blocked` | Audit blocked accounts |
 | `listen:multi-account-backfill` | Backfill multi-account blocks |
 
-When `LISTEN_AUDIO_PROCESSING=queue`, keep a worker running:
+Keep a queue worker running in production, whatever `LISTEN_AUDIO_PROCESSING` says: the extension and the developer API queue their background generations, the paid welcome email is queued, and with `LISTEN_AUDIO_PROCESSING=queue` every generation is. On Cloudways, add it under Supervisor with two processes:
 
 ```bash
-php artisan queue:listen --tries=1 --timeout=0
+php artisan queue:work database --queue=high,default --tries=3 --timeout=150 --max-time=3600
 ```
 
-`composer dev` already does this locally.
+Generations for plans whose processing priority is `high` go to the `high` queue, which the workers always take first. `--timeout=150` is the generation job's own limit and stays below the queue's `retry_after` (`DB_QUEUE_RETRY_AFTER`, 180 seconds), so a job is never handed to a second worker while the first is still on it. `--max-time=3600` restarts each worker every hour, and Supervisor starts it again. A deploy runs `queue:restart`, so the workers pick up the new code. Locally, `composer dev` starts a worker for the default queue only; run the command above to include `high`.
+
+Routes: cache them only with `php artisan route:trans:cache`, and clear them with `php artisan route:trans:clear`. The `/en` and `/ar` pages come from `mcamara/laravel-localization`, which keeps one route cache per language. Plain `php artisan route:cache`, and `php artisan optimize` (which runs it), cache the routes without the language prefix, and every `/en` and `/ar` page then answers 404. The Server deploy workflow rebuilds routes this way, and clears the other caches with `php artisan optimize:clear --except=cache`, so the app cache (Stripe webhook de-duplication, daily spend ceilings, rate limits) survives a deploy.
 
 ## Tests
 
