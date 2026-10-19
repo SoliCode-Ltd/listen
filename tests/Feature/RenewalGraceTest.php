@@ -249,8 +249,8 @@ class RenewalGraceTest extends TestCase
 
         $this->assertSame('past_due', $this->plan()->billing_payment_state);
         $this->assertKeptOnThePaidMonth(4000);
-        // Read from the failed renewal invoice.
-        $this->assertTrue($this->stripe->sent('get', '/v1/invoices/in_renewal'));
+        // Read from the failed renewal invoice, once.
+        $this->assertCount(1, $this->paramsSent('get', '/v1/invoices/in_renewal', 'expand'));
 
         // The failed invoice that comes after changes nothing.
         $this->paymentFailed()->assertOk();
@@ -303,6 +303,27 @@ class RenewalGraceTest extends TestCase
         $plan = $this->plan();
         $this->assertSame('ok', $plan->billing_payment_state);
         $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertEquals(Carbon::parse(self::NEXT_RENEWAL), $plan->current_period_end);
+        $this->assertSame('2026-10-14 10:00', $this->creditKey());
+        $this->assertSame([], $this->sentSubjects(), 'A member who has just paid is never told the payment failed.');
+    }
+
+    public function test_a_sync_that_read_past_due_before_the_first_failure_was_even_recorded_never_warns_a_member_who_paid(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        // The sync reads Stripe (past due) while the member pays straight away, before any
+        // failed-payment event was handled: the payment's own sync takes the month just paid for.
+        $this->stripe->meanwhile('/v1/subscriptions', function (): void {
+            app(PlanAccessService::class)->assignPlan($this->member, $this->starter, 'active', Carbon::parse(self::NEXT_RENEWAL), Carbon::parse(self::RENEWS_AT));
+        });
+
+        $this->sync();
+
+        $plan = $this->plan();
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertEquals(Carbon::parse(self::RENEWS_AT), $plan->current_period_start);
         $this->assertEquals(Carbon::parse(self::NEXT_RENEWAL), $plan->current_period_end);
         $this->assertSame('2026-10-14 10:00', $this->creditKey());
         $this->assertSame([], $this->sentSubjects(), 'A member who has just paid is never told the payment failed.');
@@ -445,6 +466,8 @@ class RenewalGraceTest extends TestCase
         $this->assertSame(1, $this->runGraceJob());
 
         $this->assertTrue($this->stripe->sent('delete', '/v1/subscriptions/sub_grace'));
+        // Cancelled without proration: the month it cut short was never paid, so it leaves no credit behind.
+        $this->assertSame(['false'], $this->paramsSent('delete', '/v1/subscriptions/sub_grace', 'prorate'));
         $plan = $this->plan();
         $this->assertSame((int) $this->free->id, (int) $plan->plan_id);
         $this->assertSame('ok', $plan->billing_payment_state);
@@ -579,6 +602,32 @@ class RenewalGraceTest extends TestCase
         $this->assertNoGrace();
     }
 
+    public function test_a_failed_invoice_that_is_not_a_renewal_leaves_the_plan_as_it_is_through_a_sync(): void
+    {
+        // In the month paid for, a plan change made in Stripe charged the difference at once and
+        // the card was declined: Stripe says past due, with that change's invoice open.
+        $this->travelTo(Carbon::parse('2026-10-05 12:00:00'));
+        $this->stripeHas('past_due', self::PAID_FROM, self::RENEWS_AT, ['latest_invoice' => 'in_change']);
+        $this->stripe->answer('get', '/v1/invoices/in_change', [
+            'id' => 'in_change', 'object' => 'invoice', 'customer' => 'cus_grace', 'currency' => 'usd', 'status' => 'open',
+            'billing_reason' => 'subscription_update', 'amount_due' => 450, 'amount_paid' => 0,
+            'period_start' => Carbon::parse('2026-10-05 11:55:00')->getTimestamp(), 'period_end' => Carbon::parse('2026-10-05 11:55:00')->getTimestamp(),
+            'parent' => ['type' => 'subscription_details', 'subscription_details' => ['subscription' => 'sub_grace']],
+        ]);
+        $this->stripe->answer('get', '/v1/invoices', ['object' => 'list', 'data' => [], 'has_more' => false, 'url' => '/v1/invoices']);
+
+        $this->sync();
+        $this->paymentFailed('evt_change_declined', ['id' => 'in_change', 'billing_reason' => 'subscription_update'])->assertOk();
+        $this->sync();
+
+        // As the failed-payment webhook does: no grace, no warning, and the plan, its dates and its credits as they were.
+        $plan = $this->plan();
+        $this->assertSame('ok', $plan->billing_payment_state);
+        $this->assertNull($plan->billing_grace_ends_at);
+        $this->assertSame([], $this->sentSubjects());
+        $this->assertKeptOnThePaidMonth(4000);
+    }
+
     public function test_a_plan_paid_by_hand_is_never_touched(): void
     {
         $this->plan()->forceFill(['billing_payment_state' => 'manual_override'])->save();
@@ -628,6 +677,47 @@ class RenewalGraceTest extends TestCase
         $this->actingAs($this->member)->getLocalizedRoute('manage-subscription.page')
             ->assertOk()
             ->assertDontSee('id="paymentGraceNotice"', false);
+    }
+
+    public function test_checkout_during_the_grace_never_replaces_the_subscription_and_sends_the_member_to_pay_it(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-14 11:05:00'));
+        $this->stripeHas('past_due');
+        $this->paymentFailed()->assertOk();
+        $this->sync();
+        $graceEnds = $this->plan()->billing_grace_ends_at;
+        // What checkout would use to replace the subscription: a new card, and the open renewal invoice to void.
+        $this->stripe->answer('get', '/v1/payment_methods/pm_new', ['id' => 'pm_new', 'object' => 'payment_method', 'type' => 'card', 'customer' => 'cus_grace', 'card' => ['brand' => 'visa', 'last4' => '4242']]);
+        $this->stripe->answer('delete', '/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'canceled']);
+        $this->stripe->answer('get', '/v1/invoices', ['object' => 'list', 'has_more' => false, 'url' => '/v1/invoices', 'data' => [$this->renewalInvoice()]]);
+        $this->stripe->answer('post', '/v1/invoices/in_renewal/void', ['status' => 'void'] + $this->renewalInvoice());
+        $this->stripe->requests = [];
+
+        $this->travelTo(Carbon::parse('2026-10-16 09:00:00'));
+        $notice = __('ui.billing.pay_overdue_first', ['date' => '21 Oct 2026']);
+        // The checkout page says so before any card is typed in.
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee($notice);
+
+        $response = $this->actingAs($this->member)->postJsonLocalizedRoute('billing.subscribe', [
+            'plan' => 'starter', 'billing_cycle' => 'monthly', 'payment_method' => 'pm_new', 'save_card' => false,
+        ]);
+
+        $response->assertStatus(409)
+            ->assertJsonPath('ok', false)
+            ->assertJsonPath('payment_overdue', true)
+            ->assertJsonPath('message', $notice);
+        $this->assertStringEndsWith('/manage-subscription', (string) $response->json('manage_url'));
+        // Nothing was cancelled, voided or charged: the subscription and its open invoice are as they were.
+        $this->assertSame([], array_values(array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] !== 'get')));
+        $this->assertSame('past_due', BillingSubscription::query()->where('stripe_id', 'sub_grace')->value('stripe_status'));
+        $this->assertEquals($graceEnds, $this->plan()->billing_grace_ends_at);
+        $this->assertKeptOnThePaidMonth(4000);
+
+        // In Arabic too.
+        app()->setLocale('ar');
+        $this->actingAs($this->member)->getLocalizedRoute('billing.page')->assertOk()->assertSee(__('ui.billing.pay_overdue_first', [
+            'date' => Carbon::parse('2026-10-21 11:05:00')->locale('ar')->translatedFormat('j M Y'),
+        ], 'ar'));
     }
 
     public function test_newsletters_count_a_member_in_their_grace_days_as_paid(): void
@@ -793,6 +883,19 @@ class RenewalGraceTest extends TestCase
     private function runGraceJob(): int
     {
         return app(BillingLifecycleService::class)->downgradeExpiredGraceSubscriptions();
+    }
+
+    /**
+     * The value of $param in each request sent to Stripe as $method $path, as sent.
+     *
+     * @return list<mixed>
+     */
+    private function paramsSent(string $method, string $path, string $param): array
+    {
+        return array_values(array_map(
+            fn (array $request): mixed => $request['params'][$param] ?? null,
+            array_filter($this->stripe->requests, fn (array $request): bool => $request['method'] === $method && $request['path'] === $path)
+        ));
     }
 
     /** @return list<string> */

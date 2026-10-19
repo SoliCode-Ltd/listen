@@ -181,26 +181,41 @@ class RenewalGrace
     }
 
     /**
+     * The member's plan row as a billing sync finds it before reading Stripe:
+     * its payment state and the end of its paid period. A webhook handled while
+     * Stripe is read (a missed payment recorded or settled, a payment taken)
+     * changes one of them, and makes what the sync read stale.
+     *
+     * @return array{state: ?string, period_end: ?int}
+     */
+    public static function rowBeforeRead(User $user): array
+    {
+        return self::rowState(Subscription::query()->where('user_id', $user->id)->latest('id')->first());
+    }
+
+    /**
      * For the billing sync, when Stripe says the member's subscription is
      * behind on payment: whether their plan stays exactly as it is (the grace
      * keeps it, or it ran out and waits for the grace job), or moves to Free.
-     * A missed payment seen here first is recorded, and the member warned.
+     * A missed renewal seen here first is recorded, and the member warned.
      *
-     * @param  string|null  $stateBeforeRead  the plan row's billing_payment_state before Stripe was read
+     * @param  array{state: ?string, period_end: ?int}|null  $rowBeforeRead  rowBeforeRead(), taken before Stripe was read
      *
      * @throws \Stripe\Exception\ApiErrorException when Stripe could not be read: nothing was recorded
      */
-    public function forBillingSync(User $user, object $stripeSubscription, ?string $stateBeforeRead = null): bool
+    public function forBillingSync(User $user, object $stripeSubscription, ?array $rowBeforeRead = null): bool
     {
         $plan = Subscription::query()->where('user_id', $user->id)->latest('id')->with('plan')->first();
         if (! $plan || (string) $plan->status !== 'active') {
             return false;
         }
 
-        // Paid by hand, or the missed payment settled (paid), since Stripe was read:
-        // what was read can be from before that, so the plan stays as it is.
+        // Paid by hand, or the plan row changed while Stripe was being read (the
+        // payment was taken or settled, or a webhook recorded the missed payment):
+        // what was read can be from before that, so nothing is recorded and the
+        // plan stays as it is. The next sync reads Stripe again.
         $state = (string) $plan->billing_payment_state;
-        if ($state === 'manual_override' || ($stateBeforeRead === 'past_due' && $state !== 'past_due')) {
+        if ($state === 'manual_override' || ($rowBeforeRead !== null && $rowBeforeRead !== self::rowState($plan))) {
             return true;
         }
 
@@ -209,7 +224,18 @@ class RenewalGrace
             return false;
         }
 
-        $outcome = $this->begin($plan, $stripeSubscription);
+        $invoice = null;
+        if (! $recordedBefore) {
+            // Only a renewal that could not be charged is a payment missing on the plan
+            // the member has. Another invoice (a plan change or a first payment that
+            // failed) leaves the plan exactly as it is, as the failed-payment webhook does.
+            $invoice = $this->latestInvoice($stripeSubscription, null);
+            if ($invoice === null || StripeInvoice::billingReason($invoice) !== 'subscription_cycle') {
+                return true;
+            }
+        }
+
+        $outcome = $this->begin($plan, $stripeSubscription, $invoice);
         if (! $recordedBefore) {
             $this->warn($user, $plan);
         }
@@ -464,6 +490,15 @@ class RenewalGrace
         }
 
         return $start > 0 ? Carbon::createFromTimestamp($start) : null;
+    }
+
+    /** @return array{state: ?string, period_end: ?int} */
+    private static function rowState(?Subscription $row): array
+    {
+        return [
+            'state' => $row?->billing_payment_state !== null ? (string) $row->billing_payment_state : null,
+            'period_end' => $row?->current_period_end?->getTimestamp(),
+        ];
     }
 
     /** Whether the row holds a paid plan (not the free plan, nor a pack). */
