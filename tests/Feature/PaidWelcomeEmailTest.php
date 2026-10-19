@@ -221,6 +221,41 @@ class PaidWelcomeEmailTest extends TestCase
         Mail::assertSent(NewsletterMail::class, 1);
     }
 
+    public function test_name_in_the_subject_is_the_members_first_name(): void
+    {
+        app(PaidWelcomeEmail::class)->save(['subject_en' => 'Welcome aboard, {name}', 'subject_ar' => 'أهلاً {name}']);
+        $user = User::factory()->create(['name' => 'Sara Ali', 'email' => 'sara@example.test']);
+        Subscription::create(['user_id' => $user->id, 'plan_id' => $this->paid->id, 'status' => 'active']);
+        $this->app->terminate();
+
+        Mail::assertSent(NewsletterMail::class, fn (NewsletterMail $mail): bool => str_contains($mail->subjectLine, 'Welcome aboard, Sara')
+            && str_contains($mail->subjectLine, 'أهلاً Sara')
+            && ! str_contains($mail->subjectLine, '{name}')
+            && ! str_contains($mail->htmlBody, '{name}'));
+        $this->assertSame('Hi there', PaidWelcomeEmail::withName('Hi {name} there', ''));
+    }
+
+    public function test_phone_signups_internal_addresses_are_never_emailed(): void
+    {
+        $user = User::factory()->create(['email' => 'phone+201000000000@users.listen.local']);
+
+        Subscription::create(['user_id' => $user->id, 'plan_id' => $this->paid->id, 'status' => 'active']);
+        $this->app->terminate();
+        Mail::assertNothingSent();
+
+        try {
+            app(PaidWelcomeEmail::class)->send($user);
+            $this->fail('A phone sign-up has no email address to send to.');
+        } catch (\InvalidArgumentException $e) {
+            $this->assertStringContainsString('phone number', $e->getMessage());
+        }
+        Mail::assertNothingSent();
+
+        // A test copy with their name still goes to the address typed in.
+        app(PaidWelcomeEmail::class)->send($user, 'owner@example.test');
+        Mail::assertSent(NewsletterMail::class, 1);
+    }
+
     public function test_the_page_sits_under_newsletter(): void
     {
         $this->actingAs(User::factory()->create(['is_admin' => true]));

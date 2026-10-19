@@ -158,6 +158,15 @@ class BillingEmailsTest extends TestCase
         $this->assertCount(1, $this->sentEmails());
     }
 
+    public function test_phone_signups_internal_addresses_get_no_billing_email(): void
+    {
+        $this->member->forceFill(['email' => 'phone+201000000000@users.listen.local'])->save();
+
+        app(StripeWebhookEmailService::class)->sendForEvent($this->cancelledEvent('sub_phone'));
+
+        $this->assertCount(0, $this->sentEmails());
+    }
+
     /**
      * @return Collection<int, \Symfony\Component\Mailer\SentMessage>
      */

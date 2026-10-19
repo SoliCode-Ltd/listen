@@ -600,7 +600,8 @@ class StripeWebhookEmailService
     private function sendMail(User $user, string $subject, string $html): void
     {
         $email = trim((string) $user->email);
-        if ($email === '') {
+        // Phone sign-ups have an internal address (…@users.listen.local) that takes no mail.
+        if ($email === '' || str_ends_with(strtolower($email), '@users.listen.local')) {
             return;
         }
 

@@ -103,7 +103,7 @@ class PaidWelcomeEmail
      */
     public function queueWelcome(User $user): void
     {
-        if ($user->isBlocked() || ! $this->enabled()) {
+        if ($user->isBlocked() || ! $this->enabled() || self::isPhoneSignupAddress((string) $user->email)) {
             return;
         }
 
@@ -151,9 +151,15 @@ class PaidWelcomeEmail
         if (! filter_var($to, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('There is no valid email address to send to.');
         }
+        if (self::isPhoneSignupAddress($to)) {
+            throw new InvalidArgumentException('This member signed up with a phone number, so there is no email address to send to.');
+        }
 
         $plan = app(PlanAccessService::class)->resolveActivePlanForUserId((int) $user->id);
         $newsletter = $this->asNewsletter($this->settings(), $plan);
+        // {name} in the subject is the member's first name, as in the rest of the email.
+        $newsletter->subject_en = self::withName((string) $newsletter->subject_en, (string) $user->name);
+        $newsletter->subject_ar = self::withName((string) $newsletter->subject_ar, (string) $user->name);
         $renderer = app(NewsletterRenderer::class);
         // No email on the recipient: this is a welcome, not a newsletter, so no unsubscribe link.
         $recipient = ['name' => (string) $user->name, 'no_greeting' => true];
@@ -186,6 +192,24 @@ class PaidWelcomeEmail
         if ($testTo === null && self::canTrack()) {
             $user->forceFill(['paid_welcome_sent_at' => now()])->saveQuietly();
         }
+    }
+
+    /**
+     * {name} becomes the member's first name, as NewsletterRenderer fills it in
+     * the headline and message.
+     */
+    public static function withName(string $text, string $memberName): string
+    {
+        $parts = preg_split('/\s+/u', trim($memberName)) ?: [];
+        $text = str_replace('{name}', (string) ($parts[0] ?? ''), $text);
+
+        return preg_replace('/[ \t]{2,}/', ' ', $text) ?? $text;
+    }
+
+    /** Phone sign-ups get an internal address (…@users.listen.local) that takes no mail. */
+    public static function isPhoneSignupAddress(string $email): bool
+    {
+        return str_ends_with(strtolower(trim($email)), '@users.listen.local');
     }
 
     public static function withPlan(string $text, ?Plan $plan, string $lang): string
