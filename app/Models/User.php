@@ -40,6 +40,10 @@ class User extends Authenticatable implements FilamentUser
     /**
      * The attributes that are mass assignable.
      *
+     * The admin flag, blocking and the multi-account whitelist are left out on
+     * purpose, so no form or request can ever set them: code that changes them
+     * does it with forceFill (BlockedUserService, the admin user form).
+     *
      * @var list<string>
      */
     protected $fillable = [
@@ -60,14 +64,6 @@ class User extends Authenticatable implements FilamentUser
         'api_key_last4',
         'api_key_created_at',
         'subscription_status_checked_at',
-        'is_admin',
-        'is_blocked',
-        'multi_account_whitelisted',
-        'blocked_at',
-        'blocked_reason',
-        'blocked_reason_ar',
-        'blocked_reason_en',
-        'blocked_by',
         'email_verified_at',
         'free_monthly_chars',
     ];
