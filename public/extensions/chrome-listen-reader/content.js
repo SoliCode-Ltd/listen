@@ -23,12 +23,12 @@
   const PANEL_ID = '__listen_side_player';
   const STYLE_ID = '__listen_side_player_style';
 
+  // Each speed plays at the rate its label says.
   const SPEED_OPTIONS = [
     { label: '1x', playbackRate: 1.0 },
-    // Keep labels familiar, but tune effective rates for clarity.
-    { label: '1.25x', playbackRate: 1.08 },
-    { label: '1.5x', playbackRate: 1.16 },
-    { label: '2x', playbackRate: 1.28 },
+    { label: '1.25x', playbackRate: 1.25 },
+    { label: '1.5x', playbackRate: 1.5 },
+    { label: '2x', playbackRate: 2.0 },
   ];
 
   const state = {
@@ -430,7 +430,7 @@
       return;
     }
 
-    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.9, 1.4);
+    const preferred = clamp(Number(currentSpeedOption().playbackRate || 1), 0.5, 2);
 
     if ('preservesPitch' in state.audio) {
       state.audio.preservesPitch = true;
