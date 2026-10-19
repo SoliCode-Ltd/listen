@@ -817,6 +817,9 @@ return [
         'copied' => 'تم النسخ إلى الحافظة.',
         'copy_failed' => 'تعذّر النسخ. يرجى النسخ يدوياً.',
         'created_prefix' => 'تم الإنشاء',
+
+        // Revoking the key stops the extension at once, so it is asked first.
+        'revoke_confirm' => 'هل تريد إلغاء هذا المفتاح؟ ستتوقف الإضافة عن العمل حتى تُنشئ مفتاحاً جديداً وتلصقه فيها.',
     ],
 
     // ===== DEMO PAGE =====

@@ -816,6 +816,9 @@ return [
         'copied' => 'Copied to clipboard.',
         'copy_failed' => 'Copy failed. Please copy manually.',
         'created_prefix' => 'created',
+
+        // Revoking the key stops the extension at once, so it is asked first.
+        'revoke_confirm' => 'Revoke this key? The extension stops working until you create a new key and paste it in.',
     ],
 
     // ===== DEMO PAGE =====
