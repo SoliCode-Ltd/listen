@@ -1614,9 +1614,10 @@ return [
         // Social sign-in that did not confirm the email, for an address that already has an account.
         'auth_social_unverified_email' => 'This email already has an account. Sign in with your email and password.',
 
-        // Voice generation: premium voices never fall back to a standard voice, stuck voices are given back.
+        // Voice generation: premium voices never fall back to a standard voice, stuck voices are given back, Generate has a rate limit.
         'premium_voices_busy' => 'Our premium voices are busy right now. Nothing was charged — please try again in a minute.',
         'generation_stuck_refunded' => 'This voice took too long, so we stopped it. Nothing was charged — please try again.',
+        'generate_too_many_requests' => 'You are generating very quickly. Please wait :seconds seconds and try again.',
     ],
 
     // ===== VOICE CLONING =====

@@ -226,8 +226,8 @@ Route::group([
         Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
         Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-        Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->name('dashboard.queue');
-        Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->name('dashboard.generate');
+        Route::post('/dashboard/queue', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.queue');
+        Route::post('/dashboard/generate', [DashboardController::class, 'queue'])->middleware('throttle:studio-generate')->name('dashboard.generate');
         Route::delete('/dashboard/jobs/{job}', [DashboardController::class, 'destroy'])->name('dashboard.jobs.destroy');
         Route::delete('/dashboard/demo-jobs/{generation}', [DashboardController::class, 'destroyDemo'])->name('dashboard.demo-jobs.destroy');
         Route::put('/dashboard/favorite-voices', [\App\Http\Controllers\FavoriteVoicesController::class, 'update'])->name('dashboard.favorite-voices');

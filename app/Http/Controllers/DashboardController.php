@@ -8,10 +8,10 @@ use App\Models\ClonedVoice;
 use App\Models\DemoVoiceGeneration;
 use App\Models\Plan;
 use App\Rules\DoesNotContainProfanity;
+use App\Services\Api\ApiSpeechService;
 use App\Services\AudioGenerationRecorder;
 use App\Services\Billing\CharPackService;
 use App\Services\Billing\MemberUsageMeter;
-use App\Services\Billing\TrialUsageRecorder;
 use App\Services\LocalizedPricingService;
 use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
@@ -26,7 +26,6 @@ use App\Support\CreditPeriod;
 use App\Support\PlanUsageGuard;
 use App\Support\SpeechLanguages;
 use App\Support\TtsStudioConfig;
-use App\Support\UsageEstimator;
 use App\Support\UsageSnapshot;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
@@ -235,7 +234,6 @@ class DashboardController extends Controller
         $userId = (int) auth()->id();
         $activePlan = $this->planAccessService->resolveAccessPlanForUserId($userId);
         $quotaPlan = $this->planAccessService->resolveQuotaPlanForUserId($userId, $activePlan);
-        $billToPack = CharPackService::billsToPack($quotaPlan);
         $planTier = $this->planAccessService->resolveTierForPlan($activePlan);
         $maxChars = PlanUsageGuard::maxCharsPerRequest($quotaPlan);
         $dialogueEnabled = (bool) ($activePlan?->dialogue_enabled ?? false)
@@ -340,84 +338,62 @@ class DashboardController extends Controller
 
         $text = trim((string) ($validated['content'] ?? $validated['text'] ?? ''));
         $sourceLanguage = SpeechLanguages::detect($text);
-        $estimate = UsageEstimator::estimate($text);
+        // A slower speed makes longer audio, so the reservation allows for it (as in the developer API).
+        $estimate = ApiSpeechService::estimate($text, (float) $studioOptions['speed']);
         if ($estimate['chars'] > $maxChars) {
             throw ValidationException::withMessages([
                 'content' => __('ui.backend.dashboard_request_limit', ['max' => $maxChars]),
             ]);
         }
 
-        $counter = CreditPeriod::counter($userId);
-
-        PlanUsageGuard::assertWithinDailyLimit($quotaPlan, $userId);
-
-        if ($billToPack) {
-            // Takes the pack characters now; given back below if the generation fails.
-            app(CharPackService::class)->reserve($userId, $estimate['credits']);
-        } else {
-            PlanUsageGuard::assertWithinLimits($quotaPlan, $counter, $estimate);
-        }
-
-        try {
-            $recorded = $this->audioGenerationRecorder->createForUser(
-                $userId,
-                [
-                    'source_type' => 'message',
-                    'title' => $validated['title'] ?? null,
-                    'content' => $text,
-                    'language' => $sourceLanguage,
-                    'status' => 'processing',
-                    'received_at' => now(),
-                ],
-                [
-                    'input_text' => $text,
-                    'source_language' => $sourceLanguage,
-                    'target_language' => $validated['target_language'],
-                    'voice_tier' => $requestedTier,
-                    'voice_name' => $voiceName,
-                    'tts_provider' => $voiceProvider,
-                    'translate' => (bool) ($validated['translate'] ?? false),
-                    'duration_seconds' => $estimate['seconds'],
-                    'status' => 'processing',
-                    'dialect' => $studioOptions['dialect'],
-                    'performance_style' => $studioOptions['performance_style'],
-                    'style_prompt' => $studioOptions['style_prompt'],
-                    'emotion' => $studioOptions['emotion'],
-                    'speed' => $studioOptions['speed'],
-                    'pitch' => $studioOptions['pitch'],
-                    // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
-                    'audio_effect' => PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::EFFECTS) && AudioEffects::available()
-                        ? ($validated['audio_effect'] ?? null)
-                        : null,
-                    'is_dialogue' => $dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false),
-                    'dialogue_metadata' => ($dialogueEnabled
-                        && $requestedTier !== VoiceTier::STANDARD
-                        && ($validated['is_dialogue'] ?? false)
-                        && ! empty($validated['dialogue_speakers']))
-                        ? ['speakers' => $validated['dialogue_speakers']]
-                        : null,
-                    'billed_to_pack' => $billToPack,
-                    'usage_period' => $counter->period_ym,
-                ],
-            );
-        } catch (\Throwable $e) {
-            if ($billToPack) {
-                app(CharPackService::class)->release($userId, $estimate['credits']);
-            }
-            throw $e;
-        }
+        // The limits are checked and the credits reserved in one locked step, with the
+        // generation saved inside it: two requests at once cannot both spend the last
+        // credits. GenerateAudioJob reconciles them on success, or gives them back.
+        $recorded = app(MemberUsageMeter::class)->reserve($userId, $quotaPlan, $estimate, fn (array $reservation): array => $this->audioGenerationRecorder->createForUser(
+            $userId,
+            [
+                'source_type' => 'message',
+                'title' => $validated['title'] ?? null,
+                'content' => $text,
+                'language' => $sourceLanguage,
+                'status' => 'processing',
+                'received_at' => now(),
+            ],
+            [
+                'input_text' => $text,
+                'source_language' => $sourceLanguage,
+                'target_language' => $validated['target_language'],
+                'voice_tier' => $requestedTier,
+                'voice_name' => $voiceName,
+                'tts_provider' => $voiceProvider,
+                'translate' => (bool) ($validated['translate'] ?? false),
+                'duration_seconds' => $estimate['seconds'],
+                'status' => 'processing',
+                'dialect' => $studioOptions['dialect'],
+                'performance_style' => $studioOptions['performance_style'],
+                'style_prompt' => $studioOptions['style_prompt'],
+                'emotion' => $studioOptions['emotion'],
+                'speed' => $studioOptions['speed'],
+                'pitch' => $studioOptions['pitch'],
+                // Only on plans with sound environments (or a member given them for a while), and only when this server can add them.
+                'audio_effect' => PlanFeatures::userHas($request->user(), $activePlan, PlanFeatures::EFFECTS) && AudioEffects::available()
+                    ? ($validated['audio_effect'] ?? null)
+                    : null,
+                'is_dialogue' => $dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false),
+                'dialogue_metadata' => ($dialogueEnabled
+                    && $requestedTier !== VoiceTier::STANDARD
+                    && ($validated['is_dialogue'] ?? false)
+                    && ! empty($validated['dialogue_speakers']))
+                    ? ['speakers' => $validated['dialogue_speakers']]
+                    : null,
+                'billed_to_pack' => $reservation['billed_to_pack'],
+                'usage_period' => $reservation['period'],
+            ],
+        ));
 
         $job = $recorded['job'];
-
-        // Reserve usage at queue time; GenerateAudioJob reconciles on success/final failure.
-        if (! $billToPack) {
-            $counter->increment('total_requests');
-            $counter->increment('total_chars', $estimate['credits']);
-            $counter->addSeconds($estimate['seconds']);
-            app(TrialUsageRecorder::class)->add($userId, $estimate);
-        }
 
         try {
             // Dashboard flow is intentionally synchronous for immediate UX.
@@ -431,7 +407,7 @@ class DashboardController extends Controller
         app(MemberUsageMeter::class)->failAndRefund((int) $job->id, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), ['processing']);
 
         $job->refresh();
-        $counter->refresh();
+        $counter = CreditPeriod::counter($userId);
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
