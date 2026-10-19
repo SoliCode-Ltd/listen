@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Support\AudioFiles;
 use App\Support\VoiceCatalog;
 use App\Support\VoiceTier;
 
@@ -90,6 +91,25 @@ class AudioGeneration extends Model
     public function displayNumber(): int
     {
         return (int) ($this->user_sequence_number ?: $this->id);
+    }
+
+    /**
+     * Deletes the generation as its member does (the studio and the developer API),
+     * with what it leaves behind: its audio, the speech cache's copy of it
+     * (GenerateAudioJob keeps that address) and its text, each unless another
+     * voice still uses it.
+     */
+    public function deleteWithAudio(): void
+    {
+        $files = [$this->audio_path, ($this->settings_snapshot ?? [])['cache_copy'] ?? null];
+        $textItemId = (int) $this->text_item_id;
+
+        $this->delete();
+
+        AudioFiles::deleteUnused($files);
+        if ($textItemId > 0 && ! self::query()->where('text_item_id', $textItemId)->exists()) {
+            TextItem::query()->whereKey($textItemId)->delete();
+        }
     }
 
     /**

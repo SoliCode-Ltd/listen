@@ -288,6 +288,11 @@ class GenerateAudioJob implements ShouldQueue
             // A sound environment for the whole recording, added to a copy of the clean voice.
             $effect = (string) (($generation->settings_snapshot ?? [])['audio_effect'] ?? '');
             if ($effect !== '' && ! empty($audio['audio_path']) && ($effected = AudioEffects::apply((string) $audio['audio_path'], $effect)) !== null) {
+                // Nothing plays the clean take now, and it would stay at an address of its
+                // own: it goes, as in the demo. The speech cache's copy is shared, so it stays.
+                if (! str_starts_with((string) $audio['audio_path'], 'audio/cache/')) {
+                    Storage::disk('public')->delete((string) $audio['audio_path']);
+                }
                 $audio['audio_path'] = $effected;
             }
             // Charged only for a voice the member can play: a file that was never
@@ -309,6 +314,12 @@ class GenerateAudioJob implements ShouldQueue
                     return false;
                 }
 
+                $snapshot = (array) ($locked->settings_snapshot ?? []);
+                if (! empty($audio['cache_path'])) {
+                    // The speech cache's copy of this take (TtsService): deleted with the voice.
+                    $snapshot['cache_copy'] = (string) $audio['cache_path'];
+                }
+
                 $locked->update([
                     'audio_path' => $audio['audio_path'],
                     'duration_seconds' => $actualSeconds,
@@ -322,6 +333,7 @@ class GenerateAudioJob implements ShouldQueue
                     'tts_fallback_used' => $audio['fallback_used'] ?? false,
                     'tts_cost_estimate_usd' => $audio['cost_estimate_usd'] ?? null,
                     'billable_chars' => $actualChars,
+                    'settings_snapshot' => $snapshot !== [] ? $snapshot : null,
                 ]);
 
                 $this->applyUsageDelta(

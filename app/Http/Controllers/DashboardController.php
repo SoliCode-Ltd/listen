@@ -18,6 +18,7 @@ use App\Services\PlanAccessService;
 use App\Services\ProfanityFilter;
 use App\Services\VoiceCloningService;
 use App\Support\AudioEffects;
+use App\Support\AudioFiles;
 use App\Support\AudioUrl;
 use App\Support\DialogueSpeakers;
 use App\Support\EmailVerification;
@@ -567,7 +568,8 @@ class DashboardController extends Controller
         }
 
         $deletedId = (int) $job->id;
-        $job->delete();
+        // Its audio goes too: until a file is deleted, anyone with its address can play it.
+        $job->deleteWithAudio();
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [
@@ -598,20 +600,20 @@ class DashboardController extends Controller
         // The row stays: the demo allowance adds up the member's demo rows, so
         // deleting one must not give its characters back. Without its audio it
         // drops out of the member's history (which lists only rows with audio),
-        // and the file goes too unless another row still plays it.
+        // its texts are emptied, and its files go too (the speech cache's copy
+        // made from it included) unless another row still plays them.
         $deletedId = (int) $generation->id;
         $audioPath = trim((string) $generation->audio_path);
         $metadata = is_array($generation->metadata) ? $generation->metadata : [];
         $generation->forceFill([
             'audio_path' => null,
+            'input_text' => '',
+            'speech_text' => null,
+            'style_prompt' => null,
             'metadata' => $metadata + ['deleted_by_member_at' => now()->toIso8601String()],
         ])->save();
 
-        if ($audioPath !== ''
-            && ! DemoVoiceGeneration::query()->where('audio_path', $audioPath)->exists()
-            && ! AudioGeneration::query()->where('audio_path', $audioPath)->exists()) {
-            \Illuminate\Support\Facades\Storage::disk('public')->delete($audioPath);
-        }
+        AudioFiles::deleteUnused([$audioPath, $metadata['cache_copy'] ?? null]);
 
         $baseQuery = $this->userHistoryQuery($userId);
         $stats = [

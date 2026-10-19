@@ -103,8 +103,8 @@ class HistoryController extends Controller
         }
 
         $id = (int) $generation->id;
-        // As the dashboard's delete: the row goes; credits already spent stay spent.
-        $generation->delete();
+        // As the dashboard's delete: the row, its audio and its text go; credits already spent stay spent.
+        $generation->deleteWithAudio();
 
         return response()->json(['history_item_id' => $id, 'deleted' => true]);
     }
