@@ -2836,6 +2836,8 @@
           <h1><span class="grad-text">{{ __('ui.dashboard.recent_voices') }}</span></h1>
           <span class="jobs-count" id="jobsCount"></span>
         </div>
+        {{-- What happened in the history (a delete that failed), where the member is, and read out. --}}
+        <div id="jobsMessage" aria-live="polite"></div>
         <div style="overflow-x: auto;">
           <table>
             <thead>
@@ -3349,6 +3351,7 @@
 
     const voiceForm = document.getElementById('voiceForm');
     const formMessage = document.getElementById('formMessage');
+    const jobsMessage = document.getElementById('jobsMessage');
     const generateBtn = document.getElementById('generateBtn');
     const targetLanguage = document.getElementById('target_language');
     const voiceSelect = document.getElementById('voice_key');
@@ -3628,6 +3631,15 @@
       const cls = type === 'error' ? 'error' : 'note';
       formMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
       scrollFeedbackIntoView(formMessage);
+    }
+
+    // The history's own messages: the form's are hidden while the history is shown.
+    function showJobsMessage(type, message) {
+      if (!jobsMessage) return;
+      if (!message) { jobsMessage.innerHTML = ''; return; }
+      const cls = type === 'error' ? 'error' : 'note';
+      jobsMessage.innerHTML = `<div class="${cls}">${escapeHtml(message)}</div>`;
+      scrollFeedbackIntoView(jobsMessage);
     }
 
     function scrollFeedbackIntoView(element) {
@@ -4429,9 +4441,9 @@
         const totalPages = Math.ceil(allJobs.length / jobsPerPage) || 1;
         jobsCurrentPage = Math.min(jobsCurrentPage, totalPages);
         renderJobsPage();
-        showFormMessage(null, '');
+        showJobsMessage(null, '');
       } catch (error) {
-        showFormMessage('error', replyStatus ? String(error?.message || i18n.unable_delete_voice) : extractErrorMessage(null, i18n.unable_delete_voice));
+        showJobsMessage('error', replyStatus ? String(error?.message || i18n.unable_delete_voice) : extractErrorMessage(null, i18n.unable_delete_voice));
       } finally {
         if (triggerBtn instanceof HTMLButtonElement) {
           triggerBtn.disabled = false;
