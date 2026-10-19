@@ -22,6 +22,8 @@ for f in /etc/php/*/fpm/pool.d/*.conf /etc/php-fpm.d/*.conf; do
   grep -E '^[[:space:]]*(user|group|request_terminate_timeout|pm(\.[a-z_]+)?|php_(admin_)?(value|flag)\[(memory_limit|max_execution_time|max_input_time|max_input_vars|upload_max_filesize|post_max_size|max_file_uploads|opcache\.[a-z_]+)\])[[:space:]]*=' "$f" | sed 's/^[[:space:]]*/    /' || true
 done
 [ "$found" = 1 ] || echo "  none readable"
+echo "== Cron lines that start Laravel (scheduled jobs and queue workers) =="
+crontab -l 2>/dev/null | grep -E 'artisan' | sed 's/^/  /' || echo "  none in this user's crontab"
 echo "== .user.ini files in the app =="
 for f in .user.ini public/.user.ini; do [ -f "$f" ] && { echo "  $f:"; sed 's/^/    /' "$f"; }; done; true
 echo "== What the web server's PHP uses (a one-off page under a random name, deleted straight after) =="
