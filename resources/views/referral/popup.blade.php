@@ -6,7 +6,14 @@
   $dir = $isArabicLocale ? 'rtl' : 'ltr';
   $brandLabel = $isArabicLocale ? 'منصة إسمع' : 'Listen Studio';
   $campaign = ReferralCampaign::active();
-  $rewardAmount = (int) ($campaign?->reward_chars ?? 1000);
+  $rewardAmount = (int) ($campaign?->reward_chars ?? 0);
+  // What the friend has to do for the reward: the campaign's qualification step.
+  $descriptionKey = match ((string) $campaign?->qualification_step) {
+      ReferralCampaign::QUALIFICATION_SIGNUP => 'ui.referral.popup_description_signup',
+      ReferralCampaign::QUALIFICATION_EMAIL_VERIFIED => 'ui.referral.popup_description_email_verified',
+      ReferralCampaign::QUALIFICATION_FIRST_DEMO => 'ui.referral.popup_description_first_demo',
+      default => 'ui.referral.popup_description_paid_plan',
+  };
 
   $authUser = auth()->user();
   $initialLink = '';
@@ -76,7 +83,7 @@
         {{ str_replace('{reward_amount}', number_format($rewardAmount), __('ui.referral.popup_title')) }}
       </h2>
       <p class="ref-modal__desc" data-ref-desc>
-        {{ str_replace('{reward_amount}', number_format($rewardAmount), __('ui.referral.popup_description')) }}
+        {{ str_replace('{reward_amount}', number_format($rewardAmount), __($descriptionKey)) }}
       </p>
       <ul class="ref-modal__chips" aria-hidden="false">
         <li class="ref-chip"><svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>{{ str_replace('{reward_amount}', number_format($rewardAmount), __('ui.referral.popup_benefit_1')) }}</li>

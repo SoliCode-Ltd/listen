@@ -1539,10 +1539,14 @@ return [
     'referral' => [
         'popup_badge' => 'Listen Studio Rewards',
         'popup_title' => 'Invite friends and get {reward_amount} extra premium voice characters',
-        'popup_description' => 'Copy your link and share it — when your friend signs up and starts the demo, we add {reward_amount} characters instantly to your demo balance.',
-        'popup_benefit_1' => 'Instant reward for you',
+        // What earns the reward is the running campaign's qualification step; a reward can wait for a review.
+        'popup_description_signup' => 'Copy your link and share it. When a friend signs up with it, we add {reward_amount} characters to your demo balance. A reward can wait for a review by our team first.',
+        'popup_description_email_verified' => 'Copy your link and share it. When a friend signs up with it and confirms their email address, we add {reward_amount} characters to your demo balance. A reward can wait for a review by our team first.',
+        'popup_description_first_demo' => 'Copy your link and share it. When a friend signs up with it and makes their first voice in the demo, we add {reward_amount} characters to your demo balance. A reward can wait for a review by our team first.',
+        'popup_description_paid_plan' => 'Copy your link and share it. When a friend signs up with it and starts a paid plan, we add {reward_amount} characters to your demo balance. A reward can wait for a review by our team first.',
+        'popup_benefit_1' => 'A reward for you',
         'popup_benefit_2' => 'A premium experience for your friend',
-        'popup_benefit_3' => 'Everything happens automatically',
+        'popup_benefit_3' => 'Added automatically, or after a review',
         'popup_close_aria' => 'Close referral popup',
         'banner_text' => 'Invite friends — earn {reward_amount} bonus demo characters.',
         'banner_cta' => 'Invite',
