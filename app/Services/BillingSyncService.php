@@ -26,7 +26,7 @@ class BillingSyncService
         $lastCheckedAt = $user->subscription_status_checked_at;
 
         if (! $force && $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes))
-            && ! $this->renewalDue($user, $lastCheckedAt)) {
+            && ! self::renewalDue($user, $lastCheckedAt)) {
             return;
         }
 
@@ -34,11 +34,29 @@ class BillingSyncService
     }
 
     /**
+     * When the member's billing should next be read from Stripe: 'now' when a
+     * paid period ended after the last check (the plan they see depends on the
+     * renewal), 'soon' when the last check is older than the sync interval,
+     * null while it is fresh.
+     */
+    public static function syncDue(User $user): ?string
+    {
+        $lastCheckedAt = $user->subscription_status_checked_at;
+        if ($lastCheckedAt && self::renewalDue($user, $lastCheckedAt)) {
+            return 'now';
+        }
+
+        $ttlMinutes = max(1, (int) config('listen.billing.subscription_sync_ttl_minutes', 10));
+
+        return $lastCheckedAt && $lastCheckedAt->gt(now()->subMinutes($ttlMinutes)) ? null : 'soon';
+    }
+
+    /**
      * A card member's paid period ended (in the last two days) after Stripe was
      * last asked: the renewal is looked up now, not when the check goes stale,
      * so the member never sits on Free while it has gone through.
      */
-    private function renewalDue(User $user, Carbon $lastCheckedAt): bool
+    private static function renewalDue(User $user, Carbon $lastCheckedAt): bool
     {
         if (! $user->stripe_id) {
             return false;
