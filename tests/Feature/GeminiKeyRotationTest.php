@@ -58,6 +58,8 @@ class GeminiKeyRotationTest extends TestCase
 
     public function test_stock_voice_moves_on_from_a_key_out_for_the_day_and_stays_off_it(): void
     {
+        // Midday in California: the five minutes below never cross the provider's midnight reset.
+        $this->travelTo(\Illuminate\Support\Carbon::parse('2026-10-14 12:00:00', 'America/Los_Angeles'));
         Storage::fake('public');
         config(['services.gemini_tts.api_key' => '', 'services.gemini_tts.voice_retry_pause' => false, 'services.gemini_tts.dialect_rewrite' => false]);
         SiteSetting::set(GeminiTtsModel::SETTING_KEY, GeminiTtsModel::FLASH, 'tts');
