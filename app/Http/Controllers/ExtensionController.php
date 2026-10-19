@@ -6,6 +6,7 @@ use App\Models\SiteSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use ZipArchive;
 
@@ -128,10 +129,34 @@ class ExtensionController extends Controller
             mkdir($targetDir, 0775, true);
         }
 
-        $buildDir = $targetDir.'/build/chrome-listen-reader';
-        if (is_dir($buildDir)) {
+        // Each download is built in a folder of its own, so two at once never delete
+        // or overwrite each other's files: the folder goes once the zip is made, and
+        // the zip once it has been sent.
+        $buildId = (string) Str::uuid();
+        $buildDir = $targetDir.'/build/'.$buildId;
+        $zipPath = $targetDir.'/build/'.$buildId.'.zip';
+
+        try {
+            $this->buildPackage($request, $sourceDir, $buildDir, $zipPath);
+        } catch (\Throwable $e) {
+            File::delete($zipPath);
+
+            throw $e;
+        } finally {
             File::deleteDirectory($buildDir);
         }
+
+        return response()->download($zipPath, 'listen-chrome-extension.zip', [
+            'Content-Type' => 'application/zip',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+        ])->deleteFileAfterSend();
+    }
+
+    /** The extension, set up for this site, zipped at $zipPath from a copy in $buildDir. */
+    private function buildPackage(Request $request, string $sourceDir, string $buildDir, string $zipPath): void
+    {
         if (! File::copyDirectory($sourceDir, $buildDir)) {
             throw new \RuntimeException('Unable to prepare extension package.');
         }
@@ -183,15 +208,7 @@ class ExtensionController extends Controller
             }
         }
 
-        $zipPath = $targetDir.'/listen-chrome-extension.zip';
         $this->buildZip($buildDir, $zipPath, 'listen-chrome-extension');
-
-        return response()->download($zipPath, 'listen-chrome-extension.zip', [
-            'Content-Type' => 'application/zip',
-            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
-            'Pragma' => 'no-cache',
-            'Expires' => '0',
-        ]);
     }
 
     private function buildZip(string $sourceDir, string $zipPath, string $rootFolder = ''): void
