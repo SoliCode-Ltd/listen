@@ -117,6 +117,33 @@ class JoinPausesTest extends TestCase
         }
     }
 
+    public function test_a_long_dialogue_is_joined_on_disk_with_a_readers_pause_between_its_pieces(): void
+    {
+        config(['services.gemini_tts.max_dialogue_chars_per_request' => 300]);
+        $script = implode("\n", [
+            'Sara: '.str_repeat('We should leave early tomorrow. ', 4),
+            'Omar: '.str_repeat('The road is long and the bridge is closed. ', 3),
+            'Sara: '.str_repeat('Then we take the coast road instead. ', 4),
+            'Omar: '.str_repeat('Fine, I will pack the car tonight. ', 4),
+        ]);
+        Http::fake(fn () => Http::response(['candidates' => [['content' => ['parts' => [[
+            'inlineData' => ['mimeType' => 'audio/L16;codec=pcm;rate=24000', 'data' => base64_encode($this->take())],
+        ]]]]]]));
+
+        $result = app(GeminiTtsProvider::class)->synthesize($script, 'en', ['speakers' => [
+            ['name' => 'Sara', 'voice_name' => 'Kore'],
+            ['name' => 'Omar', 'voice_name' => 'Puck'],
+        ]]);
+
+        // Each piece ends at the end of a turn: a sentence's pause, its own quiet cut.
+        $this->assertStringEndsWith('.wav', $result['audio_path']);
+        [, $gaps] = $this->silences((string) Storage::disk('public')->get($result['audio_path']));
+        $this->assertGreaterThanOrEqual(1, count($gaps));
+        foreach ($gaps as $k => $gap) {
+            $this->assertEqualsWithDelta(JoinPauses::SENTENCE, $gap, 0.011, 'join '.($k + 1));
+        }
+    }
+
     public function test_a_piece_with_no_sound_is_joined_whole(): void
     {
         $quiet = str_repeat("\0", 2 * 24000);
