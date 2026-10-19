@@ -15,6 +15,15 @@ on:
       label:
         description: A name for this set of recordings (before, after, ...)
         default: before
+  # Until this file is on main (manual runs need that), a change to it on the
+  # branch being tried runs it once, with the label below.
+  push:
+    branches: [solicode/eloquent-noether-e1jfjs]
+    paths:
+      - .github/workflows/listening-test.yml
+
+env:
+  LABEL: ${{ inputs.label || 'before' }}
 
 permissions:
   contents: read
@@ -66,12 +75,12 @@ jobs:
           echo "$(grep -c '^{' result.jsonl) case(s) back"
 
       - name: Measure
-        run: python3 scripts/tts/listening_measure.py result.jsonl recordings "${{ inputs.label }}"
+        run: python3 scripts/tts/listening_measure.py result.jsonl recordings "$LABEL"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: listening-test-${{ inputs.label }}-${{ github.run_number }}
+          name: listening-test-${{ env.LABEL }}-${{ github.run_number }}
           path: recordings/
           if-no-files-found: ignore
           retention-days: 30
