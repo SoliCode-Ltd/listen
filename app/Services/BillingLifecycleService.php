@@ -25,6 +25,13 @@ class BillingLifecycleService
 
     public function sendPreRenewalReminders(): int
     {
+        // Staging runs on a copy of live members: they never get reminders from it.
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('plan end reminder emails');
+
+            return 0;
+        }
+
         $sent = 0;
         $days = array_values(array_unique(array_filter(
             array_map(fn ($v) => (int) $v, (array) config('listen.billing.pre_renewal_reminder_days', [7, 1])),
@@ -39,11 +46,13 @@ class BillingLifecycleService
                 ->whereDate('current_period_end', now()->copy()->addDays($day)->toDateString())
                 ->whereHas('plan', fn ($q) => $q->where('price_cents', '>', 0)->where('is_active', true));
 
+            // A reminder sent more than two days ago was for an earlier end date (the
+            // plan was renewed or extended since), so this one is still to be sent.
             if ($day === 7) {
-                $query->whereNull('billing_reminder_7d_sent_at');
+                $query->where(fn ($q) => $q->whereNull('billing_reminder_7d_sent_at')->orWhere('billing_reminder_7d_sent_at', '<', now()->subDays(2)));
             }
             if ($day === 1) {
-                $query->whereNull('billing_reminder_1d_sent_at');
+                $query->where(fn ($q) => $q->whereNull('billing_reminder_1d_sent_at')->orWhere('billing_reminder_1d_sent_at', '<', now()->subDays(2)));
             }
 
             $query->chunkById(100, function ($subscriptions) use ($day, &$sent) {
@@ -64,32 +73,37 @@ class BillingLifecycleService
                         continue;
                     }
 
+                    // So this plan does not renew by card (paid by InstaPay / Vodafone
+                    // Cash, or given by the team): say when it ends, not that it renews.
                     $periodEnd = $subscription->current_period_end?->format('M j, Y') ?? 'soon';
                     $planName = (string) ($subscription->plan?->name ?? 'your plan');
                     $displayName = $this->displayName($user);
 
                     $subject = $day === 1
-                        ? 'Your subscription renews tomorrow'
-                        : 'Your subscription renews in '.$day.' days';
+                        ? 'Your plan ends tomorrow'
+                        : 'Your plan ends in '.$day.' days';
                     $body = $this->composeBody(
                         $displayName,
-                        ["{$planName} renews on {$periodEnd}."],
+                        ["{$planName} ends on {$periodEnd}. It does not renew by itself."],
                         [
                             'Plan' => $planName,
-                            'Renewal Date' => $periodEnd,
+                            'End Date' => $periodEnd,
                             'Days Remaining' => (string) $day,
                             'Subscription Status' => ucfirst((string) ($subscription->status ?? 'active')),
                         ],
-                        'To avoid interruption, update your payment method at '.$this->manageBillingUrl()
+                        'To keep it, renew or choose a plan at '.$this->manageBillingUrl()
                     );
 
-                    $this->sendMail(
+                    $wasSent = $this->sendMail(
                         $user,
                         $subject,
                         $body,
                         "renewal-reminder:{$subscription->id}:{$day}:{$periodEnd}",
                         24 * 14
                     );
+                    if (! $wasSent) {
+                        continue;
+                    }
 
                     $subscription->forceFill([
                         'billing_reminder_7d_sent_at' => $day === 7 ? now() : $subscription->billing_reminder_7d_sent_at,
@@ -170,11 +184,12 @@ class BillingLifecycleService
             'Update your payment method at '.$this->manageBillingUrl()
         );
 
-        $this->sendMail($user, $subject, $body, "payment-failed:{$subscription->id}:{$graceEnds}", 24 * 14);
-
-        $subscription->forceFill([
-            'billing_failed_notice_sent_at' => now(),
-        ])->save();
+        // Marked as sent only once it was, so a later failure tries the warning again.
+        if ($this->sendMail($user, $subject, $body, "payment-failed:{$subscription->id}:{$graceEnds}", 24 * 14)) {
+            $subscription->forceFill([
+                'billing_failed_notice_sent_at' => now(),
+            ])->save();
+        }
     }
 
     public function handlePaymentRecovered(object $invoice): void
@@ -370,14 +385,25 @@ class BillingLifecycleService
         return User::query()->where('stripe_id', $stripeCustomerId)->first();
     }
 
-    private function sendMail(User $user, string $subject, string $body, ?string $dedupeKey = null, int $ttlHours = 72): void
+    /**
+     * Whether the email went out now. Not when it was sent before (the dedupe key),
+     * on a server that is not the live site, or when sending failed; a failed send
+     * is not remembered, so a later run can try again.
+     */
+    private function sendMail(User $user, string $subject, string $body, ?string $dedupeKey = null, int $ttlHours = 72): bool
     {
         if (! $user->email) {
-            return;
+            return false;
+        }
+
+        if (! LiveServer::allowsCustomerActions()) {
+            LiveServer::skipped('billing email "'.$subject.'"', ['user_id' => $user->id]);
+
+            return false;
         }
 
         if ($dedupeKey !== null && $this->shouldSkipEmail($dedupeKey, $ttlHours)) {
-            return;
+            return false;
         }
 
         try {
@@ -385,12 +411,20 @@ class BillingLifecycleService
                 $message->to($user->email, $user->name ?: null)->subject($subject);
             });
         } catch (\Throwable $exception) {
+            if ($dedupeKey !== null) {
+                Cache::forget($this->emailCacheKey($dedupeKey));
+            }
+
             Log::warning('Unable to send billing lifecycle email.', [
                 'user_id' => $user->id,
                 'subject' => $subject,
                 'error' => $exception->getMessage(),
             ]);
+
+            return false;
         }
+
+        return true;
     }
 
     private function latestBillingSubscription(User $user): ?BillingSubscription
@@ -446,9 +480,12 @@ class BillingLifecycleService
 
     private function shouldSkipEmail(string $key, int $ttlHours = 72): bool
     {
-        $cacheKey = 'billing_lifecycle_email:'.sha1($key);
+        return ! Cache::add($this->emailCacheKey($key), now()->timestamp, now()->addHours(max(1, $ttlHours)));
+    }
 
-        return ! Cache::add($cacheKey, now()->timestamp, now()->addHours(max(1, $ttlHours)));
+    private function emailCacheKey(string $key): string
+    {
+        return 'billing_lifecycle_email:'.sha1($key);
     }
 
     /**
