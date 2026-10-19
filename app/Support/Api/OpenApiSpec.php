@@ -571,7 +571,7 @@ final class OpenApiSpec
         $descriptions = [
             '400' => 'The body is not valid JSON, or the Idempotency-Key is too long.',
             '401' => 'Missing or invalid API key.',
-            '402' => 'Not enough credits on the plan or on the key\'s monthly limit.',
+            '402' => 'Not enough credits on the plan or on the key\'s monthly limit, or the plan\'s monthly request limit is reached.',
             '403' => 'Your plan or key does not allow this: the API is not in your plan or starts after the first payment, the key lacks a permission, or an option is not in your plan (feature_not_in_plan, with the plans that include it).',
             '404' => 'Not found.',
             '409' => 'Not possible yet: the item is still being made, or a request with the same Idempotency-Key is still running.',

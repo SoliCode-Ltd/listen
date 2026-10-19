@@ -77,6 +77,20 @@ class DeveloperDocsWordingTest extends TestCase
         $this->assertApiError($this->apiGet($plain, '/history/'.$generation->id.'/audio?output_format=aiff'), 422, 'invalid_output_format', 'invalid_request_error', 'output_format');
     }
 
+    public function test_quota_exceeded_also_answers_the_monthly_request_limit(): void
+    {
+        $this->docs('en')->assertSee('Your plan does not have enough credits left this month, or its monthly request limit is reached.');
+        $this->docs('ar')->assertSee('لا تكفي أرصدة باقتك المتبقية هذا الشهر، أو بلغت باقتك حدها الشهري من الطلبات.');
+        $spec = (string) json_encode($this->getJson('/v1/openapi.json')->assertOk()->json());
+        $this->assertStringContainsString("or the plan's monthly request limit is reached.", $spec);
+
+        // With credits left, the plan's last generation of the month is the last one.
+        $plain = $this->issueKey($this->apiMember($this->apiPlan(['monthly_requests' => 1])))['plain'];
+        $voice = $this->premiumVoice();
+        $this->speak($plain, $voice, ['text' => 'First of the month.'])->assertOk();
+        $this->assertApiError($this->speak($plain, $voice, ['text' => 'Second of the month.']), 402, 'quota_exceeded', 'quota_error');
+    }
+
     public function test_mp3_is_always_accepted_but_may_come_back_as_wav(): void
     {
         $this->docs('en')
