@@ -12,12 +12,18 @@ final class DialectCounts
 {
     public static function arabic(): int
     {
-        return self::roundDown(count(array_filter(ArabicDialects::ALL, fn (array $row): bool => $row['region'] !== 'fusha')));
+        return self::roundDown(self::spokenArabic());
     }
 
     public static function english(): int
     {
         return self::roundDown(count(EnglishAccents::ALL));
+    }
+
+    /** Every spoken Arabic dialect, exactly, as the dialect hub counts them: Fusha and its styles left out. */
+    public static function spokenArabic(): int
+    {
+        return count(array_filter(ArabicDialects::ALL, fn (array $row): bool => $row['region'] !== 'fusha'));
     }
 
     private static function roundDown(int $count): int

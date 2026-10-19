@@ -31,6 +31,28 @@ class DialectCountsTest extends TestCase
         $this->assertGreaterThanOrEqual(60, DialectCounts::english());
     }
 
+    public function test_the_dialect_hub_counts_the_spoken_dialects_and_names_fusha_apart(): void
+    {
+        $spoken = array_filter(ArabicDialects::ALL, fn (array $row): bool => $row['region'] !== 'fusha');
+        $countries = count(array_unique(array_map(fn (string $code): ?string => ArabicDialects::countryOf($code), array_keys($spoken))));
+        $this->assertSame(count($spoken), DialectCounts::spokenArabic());
+        $this->assertLessThan(count(ArabicDialects::ALL), count($spoken), 'Fusha and its styles are rows of the catalog too');
+        $this->assertSame(count(ArabicDialects::COUNTRIES) - 1, $countries);
+
+        $this->page('en', 'seo.arabic-dialects')->assertOk()
+            ->assertSee('Listen speaks '.count($spoken).' Arabic accents from '.$countries.' countries plus Modern Standard Arabic')
+            ->assertSee(count($spoken).' accents from '.$countries.' countries, plus Modern Standard Arabic (Fusha).')
+            ->assertSee('choose Fusha or one of '.count($spoken).' Arabic accents.')
+            ->assertDontSee(count(ArabicDialects::ALL).' Arabic accents')
+            ->assertDontSee('Arab countries');
+        $this->page('ar', 'seo.arabic-dialects')->assertOk()
+            ->assertSee('منصة إسمع تتكلم '.count($spoken).' لكنة عربية من '.$countries.' دولة بالإضافة إلى الفصحى')
+            ->assertSee(count($spoken).' لكنة من '.$countries.' دولة، بالإضافة إلى العربية الفصحى.')
+            ->assertSee('واختر الفصحى أو واحدة من '.count($spoken).' لكنة عربية.')
+            ->assertDontSee(count(ArabicDialects::ALL).' لكنة')
+            ->assertDontSee('دولة عربية');
+    }
+
     public function test_every_number_written_in_the_language_files_matches_the_catalogs(): void
     {
         $arabic = [

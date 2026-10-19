@@ -398,19 +398,23 @@ final class SeoDialectPages
      */
     public static function hubContent(string $locale): array
     {
+        // Fusha and its styles are named apart, not counted among the accents or their countries.
+        $accents = DialectCounts::spokenArabic();
+        $countries = count(ArabicDialects::COUNTRIES) - 1;
+
         if ($locale === 'ar') {
             return [
                 'eyebrow' => 'اللهجات العربية',
                 'h1' => 'تحويل النص إلى صوت باللهجات العربية والفصحى',
-                'intro' => 'منصة إسمع تتكلم '.count(ArabicDialects::ALL).' لكنة عربية من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة بالإضافة إلى الفصحى: لهجات الخليج والشام ومصر والسودان والعراق واليمن والمغرب العربي. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
+                'intro' => 'منصة إسمع تتكلم '.$accents.' لكنة عربية من '.$countries.' دولة بالإضافة إلى الفصحى: لهجات الخليج والشام ومصر والسودان والعراق واليمن والمغرب العربي. اختر لهجة جمهورك واسمع نصك بنطق أهل البلد.',
                 'faq_title' => 'الأسئلة الشائعة',
                 'faqs' => [
-                    ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => count(ArabicDialects::ALL).' لكنة من '.(count(ArabicDialects::COUNTRIES) - 1).' دولة عربية، بالإضافة إلى العربية الفصحى.'],
+                    ['question' => 'كم لهجة عربية تدعمها منصة إسمع؟', 'answer' => $accents.' لكنة من '.$countries.' دولة، بالإضافة إلى العربية الفصحى.'],
                     ['question' => 'هل أكتب النص بالعامية أم بالفصحى؟', 'answer' => 'للحصول على أكثر نتيجة طبيعية اكتب النص باللهجة نفسها. ويمكنك أيضاً كتابة نص فصيح واختيار اللهجة.'],
                     ['question' => 'هل يمكن التجربة قبل الاشتراك؟', 'answer' => 'نعم، يحصل كل حساب جديد على رصيد صغير لتجربة الأصوات واللهجات في العرض التجريبي.'],
                 ],
                 'cta_title' => 'اسمع نصك بلهجة جمهورك',
-                'cta_body' => 'أنشئ حسابك واختر من أكثر من '.count(ArabicDialects::ALL).' لكنة عربية.',
+                'cta_body' => 'أنشئ حسابك واختر الفصحى أو واحدة من '.$accents.' لكنة عربية.',
                 'cta_primary' => 'أنشئ حسابك',
             ];
         }
@@ -418,15 +422,15 @@ final class SeoDialectPages
         return [
             'eyebrow' => 'Arabic dialects',
             'h1' => 'Text to Speech in Every Major Arabic Dialect',
-            'intro' => 'Listen speaks '.count(ArabicDialects::ALL).' Arabic accents from '.(count(ArabicDialects::COUNTRIES) - 1).' countries plus Modern Standard Arabic: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi dialects. Pick your audience\'s dialect and hear your script the way locals say it.',
+            'intro' => 'Listen speaks '.$accents.' Arabic accents from '.$countries.' countries plus Modern Standard Arabic: Gulf, Levantine, Egyptian, Sudanese, Iraqi, Yemeni and Maghrebi dialects. Pick your audience\'s dialect and hear your script the way locals say it.',
             'faq_title' => 'Frequently asked questions',
             'faqs' => [
-                ['question' => 'How many Arabic dialects does Listen support?', 'answer' => count(ArabicDialects::ALL).' accents from '.(count(ArabicDialects::COUNTRIES) - 1).' Arab countries, plus Modern Standard Arabic (Fusha).'],
+                ['question' => 'How many Arabic dialects does Listen support?', 'answer' => $accents.' accents from '.$countries.' countries, plus Modern Standard Arabic (Fusha).'],
                 ['question' => 'Should I write the script in dialect or in Fusha?', 'answer' => 'For the most natural result, write the script in the dialect itself. You can also write in Fusha and choose a dialect.'],
                 ['question' => 'Can I try it before I subscribe?', 'answer' => 'Yes. Every new account gets a small allowance to try the voices and dialects in the demo.'],
             ],
             'cta_title' => 'Speak your audience\'s dialect',
-            'cta_body' => 'Create your account and choose from '.count(ArabicDialects::ALL).' Arabic accents.',
+            'cta_body' => 'Create your account and choose Fusha or one of '.$accents.' Arabic accents.',
             'cta_primary' => 'Create your account',
         ];
     }
