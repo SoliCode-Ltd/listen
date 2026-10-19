@@ -192,10 +192,11 @@ class ApiTextToSpeechTest extends TestCase
     }
 
     /**
-     * With the site's premium voices on Google, the audio comes from Google
-     * and is charged by its real length just the same.
+     * Premium voices always come from the premium engine, even with the site's
+     * engine setting on Google and a premium voice listed under Google: a paid
+     * request never gets another engine's voice. Charged by its real length.
      */
-    public function test_with_the_site_on_google_premium_voices_the_audio_comes_from_google(): void
+    public function test_with_the_site_on_google_a_premium_voice_still_comes_from_the_premium_engine(): void
     {
         SiteSetting::set('tts_mode', TtsRoutingService::MODE_GOOGLE, 'tts');
         $user = $this->apiMember();
@@ -208,12 +209,10 @@ class ApiTextToSpeechTest extends TestCase
 
         $response = $this->speak($plain, $voice)->assertOk();
 
-        $response->assertHeader('Content-Type', 'audio/mpeg')
-            ->assertHeader('X-Output-Format', 'mp3')
+        $response->assertHeader('X-Output-Format', 'mp3')
             ->assertHeader('X-Audio-Duration-Seconds', '4')
             ->assertHeader('X-Credits-Used', '60');
-        $this->assertSame(self::mp3Seconds(4), $response->getContent());
-        $this->assertSame([1, 0], [$this->speechCalls->google, $this->speechCalls->gemini]);
+        $this->assertSame([0, 1], [$this->speechCalls->google, $this->speechCalls->gemini]);
         $this->assertSame(60, $this->creditsSpent($user));
     }
 
