@@ -754,7 +754,7 @@ class SeoHelper
             "# {$siteName}",
             '',
             '> Listen (Arabic: منصة إسمع) is an AI text to speech platform for Arabic and English at ' . $base . '. It speaks Modern Standard Arabic (Fusha), '
-                . (count(ArabicDialects::ALL) - 1) . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with emotion and performance styles, sound environments, translation and a Chrome extension.',
+                . DialectCounts::spokenArabic() . ' Arabic dialect accents from ' . (count(ArabicDialects::COUNTRIES) - 1) . ' countries and ' . count(EnglishAccents::ALL) . ' English accents, with emotion and performance styles, sound environments, translation and a Chrome extension.',
             '',
             '## Official URLs',
             "- [Home (English)]({$base}/en): overview, voice samples",
@@ -763,7 +763,7 @@ class SeoHelper
             "- [Arabic text to speech]({$base}/en/text-to-speech-arabic) · [Arabic version]({$base}/ar/text-to-speech-arabic)",
             "- [AI text to speech]({$base}/en/ai-text-to-speech)",
             "- [AI voice generator]({$base}/en/ai-voice-generator)",
-            "- [Voice samples]({$base}/en/voice-samples): every English accent, mood, conversation and sound environment, ready to play; the Arabic page ({$base}/ar/voice-samples) has every Arabic dialect",
+            "- [Voice samples]({$base}/en/voice-samples): samples of English accents, moods, conversations and sound environments, ready to play; the Arabic page ({$base}/ar/voice-samples) has samples of Arabic dialects",
             "- [Pricing]({$base}/en/pricing): monthly plans; new accounts can try the voices in the demo first",
             "- [Chrome extension]({$base}/en/browsers-extension): reads selected text on any web page",
             "- [Contact]({$base}/en/contact-us)",
