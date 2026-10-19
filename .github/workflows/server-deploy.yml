@@ -40,6 +40,11 @@ name: Server deploy
 #            first), the share of sign-ups per network address (counts only,
 #            never an address) and the speech and credit settings. Prints
 #            member ids only.
+#   page-check: staging only. Shows the pages members use inside the app,
+#            in English and Arabic, as a free and a paying test member, and
+#            fails on an error, a wrong status or text shown as its key
+#            (scripts/support/staging_page_check.php). Billing pages are left
+#            out: staging runs the live Stripe keys.
 # New migrations and composer.lock changes are reported, not run.
 
 on:
@@ -51,7 +56,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, data-checks, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, data-checks, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -339,6 +344,15 @@ jobs:
           REMOTE
             rm -f ~/.ssh/id_deploy
             exit 0
+          fi
+          if [ "$MODE" = page-check ]; then
+            [ "$TARGET" = staging ] || { echo "page-check runs on staging only"; exit 1; }
+            failed=0
+            for l in en ar; do
+              $S "$FIND; LOCALE=$l php" < scripts/support/staging_page_check.php || failed=1
+            done
+            rm -f ~/.ssh/id_deploy
+            exit "$failed"
           fi
           if [ "$MODE" = indexnow ]; then
             $S "$FIND; php artisan seo:indexnow"
