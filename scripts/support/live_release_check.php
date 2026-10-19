@@ -188,9 +188,11 @@ $section('Plans (credits, minutes, limits, profit at full use)', function () use
 $section('Paying members this month', function () use ($mask, $problem) {
     $access = app(\App\Services\PlanAccessService::class);
     $ym = now()->format('Y-m');
-    $subs = Subscription::query()->where('status', 'active')->with('plan')->get()
+    $all = Subscription::query()->where('status', 'active')->with('plan')->get()
         ->filter(fn ($s) => $s->plan && (int) $s->plan->price_cents > 0);
-    echo '  Active paid subscriptions: '.$subs->count()."\n";
+    // A plan whose period ended (a month paid by hand, a plan given for a while) is the free plan now, as it should be.
+    $subs = $all->filter(fn ($s) => $s->current_period_end === null || $s->current_period_end->gte(now()->subHours(2)));
+    echo '  Active paid subscriptions: '.$subs->count().($all->count() > $subs->count() ? ' (and '.($all->count() - $subs->count()).' whose period ended, now on the free plan)' : '')."\n";
     foreach ($subs as $sub) {
         $user = User::query()->find($sub->user_id);
         if (! $user) {

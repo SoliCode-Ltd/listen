@@ -1,0 +1,58 @@
+<?php
+
+/*
+ * For the "Server deploy" workflow's data-checks mode, on either site: reads,
+ * in a READ ONLY database session, the paid plans marked past due, the members
+ * the wording rule blocked (paying ones first, with the words), how sign-ups
+ * spread over network addresses (counts only, never an address) and the
+ * speech and credit settings. Prints member ids only, and writes nothing.
+ *
+ *   ssh user@host 'cd ~/public_html && php' < scripts/support/data_checks.php
+ */
+require 'vendor/autoload.php';
+$app = require 'bootstrap/app.php';
+$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+if (in_array(Illuminate\Support\Facades\DB::connection()->getDriverName(), ['mysql', 'mariadb'], true)) {
+    Illuminate\Support\Facades\DB::statement('SET SESSION TRANSACTION READ ONLY');
+}
+$db = fn (string $t) => Illuminate\Support\Facades\DB::table($t);
+echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n";
+
+echo "== Paid plans marked past due (compare each with Stripe) ==\n";
+$rows = $db('subscriptions')->where('status', 'active')->where('billing_payment_state', 'past_due')->orderBy('id')
+    ->get(['id', 'user_id', 'plan_id', 'billing_grace_ends_at', 'current_period_end', 'updated_at']);
+foreach ($rows as $r) { echo '  ', json_encode($r, JSON_UNESCAPED_SLASHES), "\n"; }
+if ($rows->isEmpty()) { echo "  none\n"; }
+
+echo "== Members blocked by the wording rule ==\n";
+$wording = App\Models\User::query()->where('is_blocked', true)->whereNull('blocked_by')
+    ->whereIn('blocked_reason', [App\Services\BlockedUserService::DEFAULT_REASON_EN, App\Services\BlockedUserService::DEFAULT_REASON_AR])
+    ->orderBy('id')->get();
+$paying = $wording->filter(fn ($u) => App\Support\PaidMember::is($u));
+echo '  blocked by it: ', $wording->count(), ', of whom pay or have paid: ', $paying->count(), "\n";
+if ($paying->isNotEmpty()) { echo '  paying member ids (unblock these first): ', $paying->pluck('id')->implode(', '), "\n"; }
+if ($wording->isNotEmpty()) {
+    echo '  member ids: ', $wording->pluck('id')->implode(', '), "\n";
+    $terms = $db('blocked_generations')->whereIn('user_id', $wording->pluck('id'))->selectRaw('matched_term, count(*) as n')
+        ->groupBy('matched_term')->orderByDesc('n')->limit(25)->get();
+    echo '  words that refused their texts: ', $terms->map(fn ($t) => $t->matched_term.' ('.$t->n.')')->implode(', '), "\n";
+}
+$all = App\Models\User::query()->where('is_blocked', true)->count();
+echo '  all blocked members: ', $all, ' (multi-account and admin blocks included)', "\n";
+
+echo "== Sign-ups per network address (counts only, never an address) ==\n";
+$total = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->count();
+$top = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')
+    ->selectRaw('registration_ip, count(*) as n')->groupBy('registration_ip')->orderByDesc('n')->limit(5)->get();
+$distinct = $db('users')->whereNotNull('registration_ip')->where('registration_ip', '<>', '')->distinct()->count('registration_ip');
+echo '  members with a sign-up address: ', $total, ', different addresses: ', $distinct, "\n";
+foreach ($top as $i => $t) {
+    $public = filter_var($t->registration_ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+    printf("  #%d busiest address: %d sign-ups (%.1f%%), %s\n", $i + 1, $t->n, $total > 0 ? 100 * $t->n / $total : 0, $public ? 'a public address' : 'a PRIVATE or local address (the site sees its proxy)');
+}
+
+echo "== Settings ==\n";
+foreach (['credit_periods_from', 'tts_mode', 'gemini_tts_model', 'demo_char_allowance'] as $key) {
+    $value = $db('site_settings')->where('key', $key)->value('value');
+    echo '  ', str_pad($key, 22), ($value === null || $value === '' ? '(not set)' : $value), "\n";
+}
