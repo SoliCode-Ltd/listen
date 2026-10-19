@@ -82,7 +82,7 @@
 
   <main class="container legal-page">
     @php
-      $effectiveDate = app()->getLocale() === 'ar' ? '22 فبراير 2026' : 'February 22, 2026';
+      $effectiveDate = app()->getLocale() === 'ar' ? '19 أكتوبر 2026' : 'October 19, 2026';
       $supportEmailLink = '<a href="mailto:support@listenai.studio">support@listenai.studio</a>';
     @endphp
     <article class="legal-shell">
@@ -98,6 +98,12 @@
           <li>{{ __('ui.legal.privacy.s1_2') }}</li>
           <li>{{ __('ui.legal.privacy.s1_3') }}</li>
           <li>{{ __('ui.legal.privacy.s1_4') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_5') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_6') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_7') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_8') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_9') }}</li>
+          <li>{{ __('ui.legal.privacy.s1_10') }}</li>
         </ul>
       </section>
 
@@ -128,7 +134,7 @@
 
       <section class="legal-section">
         <h2>{{ __('ui.legal.privacy.s6_title') }}</h2>
-        <p>{{ __('ui.legal.privacy.s6_body') }}</p>
+        <p>{!! __('ui.legal.privacy.s6_body', ['email' => $supportEmailLink]) !!}</p>
       </section>
 
       <section class="legal-section">
