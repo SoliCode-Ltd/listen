@@ -14,7 +14,11 @@
         <tbody>
             @foreach ($lines as $line)
                 <tr class="border-t border-gray-200 dark:border-white/10 align-top">
-                    <td class="py-2 pe-3 whitespace-nowrap font-mono text-xs">{{ number_format((float) ($line['start'] ?? 0), 1) }}–{{ number_format((float) ($line['end'] ?? 0), 1) }} s</td>
+                    <td class="py-2 pe-3 whitespace-nowrap font-mono text-xs">{{ number_format((float) ($line['start'] ?? 0), 2) }}–{{ number_format((float) ($line['end'] ?? 0), 2) }} s
+                        @if(isset($line['heard_start']) && abs((float) $line['heard_start'] - (float) $line['start']) >= 0.05)
+                            <br><span class="text-gray-500">set to the speech, was {{ number_format((float) $line['heard_start'], 2) }}</span>
+                        @endif
+                    </td>
                     <td class="py-2 pe-3 whitespace-nowrap text-xs">{{ $line['speaker'] ?? '—' }}{{ isset($line['voice']) ? ' · '.$line['voice'] : '' }}@if(! empty($line['emotion']))<br><span class="text-gray-500">{{ $line['emotion'] }}</span>@endif</td>
                     <td class="py-2 pe-3" dir="auto">{{ $line['original'] ?? '' }}</td>
                     <td class="py-2 pe-3" dir="auto">{{ $line['dubbed'] ?? '' }}</td>

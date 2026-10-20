@@ -107,10 +107,10 @@ class VideoDubberTest extends TestCase
         $this->assertSame(2, $r['segments']);
         $this->assertSame(['input_tokens' => 260, 'audio_tokens' => 192, 'output_tokens' => 90, 'thinking_tokens' => 40], array_intersect_key($r['transcribe'], array_flip(['input_tokens', 'audio_tokens', 'output_tokens', 'thinking_tokens'])));
         $this->assertSame(mb_strlen('هلا والله، حياك.') + mb_strlen('نشوفك بكرة.'), $r['voicing']['characters']);
-        // In order of time; the first line (3.4 s in a 2.8 s room) is sped up.
+        // In order of time; the first line (3.4 s for 2.8 s) is sped up, the second (2 s for 2.5 s) drawn out a little to fill its time.
         $this->assertSame('هلا والله، حياك.', $r['lines'][0]['dubbed']);
         $this->assertGreaterThan(1.0, $r['lines'][0]['tempo']);
-        $this->assertSame(1.0, $r['lines'][1]['tempo']);
+        $this->assertSame(VideoDubber::MIN_TEMPO, $r['lines'][1]['tempo']);
         $this->assertFileExists($r['output']);
         $this->assertFileExists($r['preview']);
         // The voiced lines are not left on the disk.
@@ -123,17 +123,37 @@ class VideoDubberTest extends TestCase
         $this->assertStringContainsString('Audio: aac', $probe->getErrorOutput());
     }
 
-    public function test_lines_are_placed_at_their_time_and_sped_up_only_as_far_as_allowed(): void
+    public function test_lines_keep_to_the_original_timing_within_natural_speeds(): void
     {
         $plan = VideoDubber::plan([
-            ['start' => 0.5, 'end' => 2, 'voiced_seconds' => 1.5],
-            ['start' => 2.0, 'end' => 4, 'voiced_seconds' => 3.0],   // 2 s of room: x1.3 at most, 0.31 s over
-            ['start' => 4.0, 'end' => 9, 'voiced_seconds' => 2.0],
+            ['start' => 0.5, 'end' => 1.9, 'voiced_seconds' => 1.4], // as long as the original: as it is
+            ['start' => 2.0, 'end' => 4, 'voiced_seconds' => 3.0],   // 3 s for 1.95 s of room: x1.25 at most, 0.45 s over
+            ['start' => 4.0, 'end' => 4.9, 'voiced_seconds' => 0.85], // a little short: drawn out to end with the original
+            ['start' => 6.0, 'end' => 9, 'voiced_seconds' => 2.0],   // far shorter: drawn out only as far as sounds natural
         ], 10.0);
 
-        $this->assertSame([500, 2000, 4000], array_column($plan, 'delay_ms'));
-        $this->assertSame([1.0, 1.3, 1.0], array_column($plan, 'tempo'));
-        $this->assertEqualsWithDelta(0.31, $plan[1]['overrun'], 0.01);
+        $this->assertSame([500, 2000, 4000, 6000], array_column($plan, 'delay_ms'));
+        $this->assertSame([1.0, VideoDubber::MAX_TEMPO, 0.944, VideoDubber::MIN_TEMPO], array_column($plan, 'tempo'));
+        $this->assertEqualsWithDelta(0.45, $plan[1]['overrun'], 0.01);
+    }
+
+    public function test_each_line_starts_and_ends_where_the_original_speaker_does(): void
+    {
+        // 10 s, quiet at -60 dB; speech at -20 dB from 1.3 to 3.2 s and from 4.0 to 6.0 s; nothing near 8 s.
+        $envelope = [];
+        for ($f = 0; $f < 1000; $f++) {
+            $t = $f / 100;
+            $envelope[] = ($t >= 1.3 && $t < 3.2) || ($t >= 4.0 && $t < 6.0) ? -20.0 : -60.0;
+        }
+        $segments = VideoDubber::refineTimes([
+            ['start' => 1.0, 'end' => 3.0],   // heard a little early, and ending early
+            ['start' => 4.4, 'end' => 6.3],   // heard late, and ending late
+            ['start' => 7.8, 'end' => 8.6],   // no speech there: as it was
+        ], $envelope, 10.0);
+
+        $this->assertSame([1.3, 4.0, 7.8], array_column($segments, 'start'));
+        $this->assertSame([3.2, 6.0, 8.6], array_column($segments, 'end'));
+        $this->assertSame([1.0, 4.4, 7.8], array_column($segments, 'heard_start'), 'what the model said stays for the report');
     }
 
     public function test_tokens_and_characters_turn_into_money(): void
@@ -199,7 +219,7 @@ class VideoDubberTest extends TestCase
         // One that hears it all as music: it plays all through, under the new line too.
         $this->fakeSeparator('cp "$in" "$rest"; head -c "$(stat -c %s "$in")" /dev/zero > "$voices"');
         $out = $this->dubSilently($video, 'music', 'music-only');
-        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2), $this->level($out['file'], 1.4, 1.2), 1.5, 'the music under the new line');
+        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2) - 6, $this->level($out['file'], 1.4, 1.2), 1.5, 'the music under the new line, 6 dB down as a dubbing mixer sets it');
         $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'and between lines');
 
         // When it fails, the filters take over: the original between lines, nothing of a mono voice under them.

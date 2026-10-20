@@ -139,9 +139,11 @@
             @if($account['credits_used'] > 0)
               <tfoot>
                 <tr>
-                  <td colspan="4">{{ __('ui.dub.ledger_total') }}</td>
+                  {{-- Each total under its own column: the voice time under the length, the credits under the credits. --}}
+                  <td colspan="3">{{ __('ui.dub.ledger_total') }}</td>
+                  <td class="num">{{ $dubTime($account['seconds_used']) }}</td>
                   <td class="num">{{ number_format($account['credits_used']) }}</td>
-                  <td colspan="2">{{ $dubTime($account['seconds_used']) }}</td>
+                  <td colspan="2"></td>
                 </tr>
               </tfoot>
             @endif
