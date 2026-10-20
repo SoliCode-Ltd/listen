@@ -247,6 +247,7 @@ class VideoDubStorageTest extends TestCase
                 'video_dubbing_free_max_seconds' => 45,
                 'video_dubbing_free_keep_hours' => 12,
                 'video_dubbing_max_upload_mb' => 120,
+                'video_dubbing_free_max_upload_mb' => 40,
                 'video_dubbing_drive_enabled' => false,
                 'video_dubbing_server_keep_days' => 14,
             ])
@@ -258,11 +259,14 @@ class VideoDubStorageTest extends TestCase
         $this->assertSame(14, VideoDubbing::serverKeepDays());
         $this->assertFalse(DriveArchive::enabled());
         $this->assertSame(120, VideoDubbing::uploadSettingMb());
+        $this->assertSame(40, VideoDubbing::uploadSettingMb(true), 'the demo\'s own size');
 
         $member = $this->member(dubbing: false, name: 'Mona');
         $studio = VideoDubbing::studio($member, request());
         $this->assertSame(45, $studio['max_seconds']);
         $this->assertSame(12, $studio['keep_hours']);
+        $this->assertSame(VideoDubbing::maxUploadMb(true), $studio['max_mb'], 'a free member sees the free size');
+        $this->assertSame(VideoDubbing::maxUploadMb(), VideoDubbing::studio($this->member(dubbing: true, name: 'Yousef'), request())['max_mb']);
         $this->actingAs($member)->get(route('dub.page'))->assertOk()->assertSee(__('ui.dub.drop_seconds', ['seconds' => 45]));
     }
 

@@ -57,8 +57,11 @@ class VideoDubController extends Controller
         $user = $request->user();
         abort_unless(VideoDubbing::openTo($user), 404);
         $language = $request->input('language') === 'en' ? 'en' : 'ar';
+        $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
+        $free = ! VideoDubbing::planIncludes($plan);
         $validated = $request->validate([
-            'video' => ['required', 'file', 'max:'.(VideoDubbing::maxUploadMb() * 1024),
+            // The free dub has its own largest video (Video Dubbing → Settings).
+            'video' => ['required', 'file', 'max:'.(VideoDubbing::maxUploadMb($free) * 1024),
                 'mimetypes:video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp'],
             'language' => ['nullable', Rule::in(VideoDubbing::LANGUAGES)],
             // An Arabic dialect, or an English accent.
@@ -78,8 +81,6 @@ class VideoDubController extends Controller
             throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
         }
 
-        $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
-        $free = ! VideoDubbing::planIncludes($plan);
         if ($free) {
             $this->assertMayDubFree($user, $request);
         } else {

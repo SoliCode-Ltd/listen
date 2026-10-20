@@ -311,6 +311,13 @@ class VideoDubPageTest extends TestCase
         $this->assertSame(250, VideoDubbing::uploadSettingMb());
         $server = VideoDubbing::serverUploadMb();
         $this->assertSame($server === null ? 250 : min(250, $server), VideoDubbing::maxUploadMb(), 'members see what they can really send');
+
+        // The free dub (the demo) follows the plans' size until it has its own.
+        $this->assertSame(250, VideoDubbing::uploadSettingMb(true));
+        SiteSetting::set('video_dubbing_free_max_upload_mb', 80, 'video_dubbing');
+        $this->assertSame(80, VideoDubbing::uploadSettingMb(true));
+        $this->assertSame(250, VideoDubbing::uploadSettingMb());
+        $this->assertSame($server === null ? 80 : min(80, $server), VideoDubbing::maxUploadMb(true));
     }
 
     public function test_an_admin_removing_a_dub_lets_the_member_dub_again(): void

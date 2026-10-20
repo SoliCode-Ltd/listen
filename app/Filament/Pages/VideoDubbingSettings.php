@@ -47,6 +47,7 @@ class VideoDubbingSettings extends Page implements HasForms
         $this->form->fill([
             'video_dubbing_audience' => VideoDubbing::audience(),
             'video_dubbing_max_upload_mb' => VideoDubbing::uploadSettingMb(),
+            'video_dubbing_free_max_upload_mb' => VideoDubbing::uploadSettingMb(true),
             'video_dubbing_free_max_seconds' => VideoDubbing::freeMaxSeconds(),
             'video_dubbing_free_keep_hours' => VideoDubbing::freeKeepHours(),
             'video_dubbing_drive_enabled' => DriveArchive::enabled(),
@@ -78,23 +79,35 @@ class VideoDubbingSettings extends Page implements HasForms
                     ]),
                 Forms\Components\Section::make('Uploads and the free dub')
                     ->description('What the upload box shows: the largest file, and the longest video. A plan\'s longest video is set on the plan (Plans → Dub my video).')
-                    ->columns(3)
+                    ->columns(2)
                     ->schema([
-                        Forms\Components\TextInput::make('video_dubbing_max_upload_mb')
-                            ->label('Largest video members can upload')
+                        Forms\Components\Placeholder::make('server_upload_limit')
+                            ->label('')
+                            ->columnSpanFull()
+                            ->visible(fn (): bool => self::serverCapsUploads())
+                            ->content(fn (): HtmlString => new HtmlString(sprintf(
+                                '<div style="padding:.75rem 1rem;border-radius:.6rem;background:rgba(220,38,38,.08);color:#b91c1c;font-weight:600;line-height:1.6">'
+                                .'This server accepts uploads of %d MB at most, so the upload box shows %d MB whatever is set below. '
+                                .'To allow more, raise "upload_max_filesize" and "post_max_size" in the server\'s PHP settings to the size you want (a little more for post_max_size).</div>',
+                                (int) VideoDubbing::serverUploadMb(), (int) VideoDubbing::serverUploadMb()))),
+                        Forms\Components\TextInput::make('video_dubbing_free_max_upload_mb')
+                            ->label('Largest video for the free dub (demo)')
                             ->numeric()
                             ->integer()
                             ->minValue(10)
                             ->maxValue(2000)
                             ->suffix('MB')
                             ->required()
-                            ->helperText(function (): string {
-                                $server = VideoDubbing::serverUploadMb();
-
-                                return $server === null
-                                    ? 'This server sets no upload limit of its own.'
-                                    : sprintf('This server takes %d MB at most in one upload, so members see %d MB. To allow more, raise "upload_max_filesize" and "post_max_size" in the server\'s PHP settings.', $server, VideoDubbing::maxUploadMb());
-                            }),
+                            ->helperText(fn (): string => 'Members without a plan with dubbing. They see '.VideoDubbing::maxUploadMb(true).' MB now.'),
+                        Forms\Components\TextInput::make('video_dubbing_max_upload_mb')
+                            ->label('Largest video for plans with dubbing')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(10)
+                            ->maxValue(2000)
+                            ->suffix('MB')
+                            ->required()
+                            ->helperText(fn (): string => 'Members whose plan includes dubbing. They see '.VideoDubbing::maxUploadMb().' MB now.'),
                         Forms\Components\TextInput::make('video_dubbing_free_max_seconds')
                             ->label('Longest free video')
                             ->numeric()
@@ -191,6 +204,14 @@ class VideoDubbingSettings extends Page implements HasForms
             ->statePath('data');
     }
 
+    /** Whether the server's own upload limit is below what is set here, so members see less. */
+    private static function serverCapsUploads(): bool
+    {
+        $server = VideoDubbing::serverUploadMb();
+
+        return $server !== null && $server < max(VideoDubbing::uploadSettingMb(), VideoDubbing::uploadSettingMb(true));
+    }
+
     /** Connected to which account, or what to set up first. */
     private static function driveStatus(): HtmlString
     {
@@ -213,6 +234,7 @@ class VideoDubbingSettings extends Page implements HasForms
         $audience = (string) ($state['video_dubbing_audience'] ?? VideoDubbing::AUDIENCE_PREVIEW);
         SiteSetting::set('video_dubbing_audience', $audience === VideoDubbing::AUDIENCE_EVERYONE ? $audience : VideoDubbing::AUDIENCE_PREVIEW, self::GROUP);
         SiteSetting::set('video_dubbing_max_upload_mb', max(10, (int) ($state['video_dubbing_max_upload_mb'] ?? 300)), self::GROUP);
+        SiteSetting::set('video_dubbing_free_max_upload_mb', max(10, (int) ($state['video_dubbing_free_max_upload_mb'] ?? 300)), self::GROUP);
         SiteSetting::set('video_dubbing_free_max_seconds', max(5, min(180, (int) ($state['video_dubbing_free_max_seconds'] ?? 60))), self::GROUP);
         SiteSetting::set('video_dubbing_free_keep_hours', max(1, min(168, (int) ($state['video_dubbing_free_keep_hours'] ?? 24))), self::GROUP);
         SiteSetting::set('video_dubbing_drive_enabled', ! empty($state['video_dubbing_drive_enabled']) ? '1' : '0', self::GROUP);

@@ -175,15 +175,22 @@ final class VideoDubbing
         return ['model' => round($model, 5), 'voice' => round($voice, 5), 'total' => round($model + $voice, 5)];
     }
 
-    /** The largest video the admin allows (Video Dubbing → Settings), in MB. */
-    public static function uploadSettingMb(): int
+    /**
+     * The largest video the admin allows (Video Dubbing → Settings), in MB:
+     * for members on a plan with dubbing, or for the free dub (the demo's
+     * visitors), which is the plans' size until the admin sets its own.
+     */
+    public static function uploadSettingMb(bool $free = false): int
     {
-        return max(1, (int) SiteSetting::get('video_dubbing_max_upload_mb', (int) config('listen.dubbing.max_upload_mb', 300)));
+        $plans = max(1, (int) SiteSetting::get('video_dubbing_max_upload_mb', (int) config('listen.dubbing.max_upload_mb', 300)));
+
+        return $free ? max(1, (int) SiteSetting::get('video_dubbing_free_max_upload_mb', $plans)) : $plans;
     }
 
     /**
-     * What this server's PHP takes in one request, in MB (the smaller of
-     * upload_max_filesize and post_max_size); null when it sets no limit.
+     * What this server's PHP takes in one upload, in MB: the smaller of
+     * upload_max_filesize and post_max_size less 1 MB for the rest of the
+     * form; null when it sets no limit.
      */
     public static function serverUploadMb(): ?int
     {
@@ -200,18 +207,20 @@ final class VideoDubbing
                 default => $number,
             };
 
-            return (int) floor($bytes / 1024 / 1024);
+            $mb = (int) floor($bytes / 1024 / 1024);
+
+            return $key === 'post_max_size' ? $mb - 1 : $mb;
         }, ['upload_max_filesize', 'post_max_size']), fn (?int $mb): bool => $mb !== null);
 
         return $limits === [] ? null : max(1, min($limits));
     }
 
     /** The largest video a member can really send: the admin's setting, within what the server takes. */
-    public static function maxUploadMb(): int
+    public static function maxUploadMb(bool $free = false): int
     {
         $server = self::serverUploadMb();
 
-        return $server === null ? self::uploadSettingMb() : min(self::uploadSettingMb(), $server);
+        return $server === null ? self::uploadSettingMb($free) : min(self::uploadSettingMb($free), $server);
     }
 
     /** The longest free video (Video Dubbing → Settings), in seconds; also a plan's when it sets none. */
@@ -381,7 +390,7 @@ final class VideoDubbing
             ],
             'min_seconds' => (int) config('listen.dubbing.min_seconds', 3),
             'max_seconds' => self::maxSeconds($plan, ! $included),
-            'max_mb' => self::maxUploadMb(),
+            'max_mb' => self::maxUploadMb(! $included),
             // How long finished videos stay to watch: a free one for hours, a plan's as long as it keeps voices.
             'keep_hours' => self::freeKeepHours(),
             'keep_days' => $included ? self::keepDays($plan) : null,
