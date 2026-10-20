@@ -217,7 +217,6 @@
       font-variant-numeric: tabular-nums;
     }
     .price-period { color: var(--muted); font-size: .95rem; font-weight: 500; }
-    .price-usd { color: var(--muted); font-size: .84rem; font-weight: 600; }
     .price-note { color: var(--muted); font-size: .84rem; min-height: 0; }
     .price-note:empty { display: none; }
     .price-note.savings { color: color-mix(in oklab, var(--ok) 50%, var(--text)); font-weight: 600; }
@@ -1032,6 +1031,7 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.motion')
   @include('components.orb-script')
   @php
     $pricingI18n = [
@@ -1070,10 +1070,6 @@
           var priceValue = card.querySelector('.price-value');
           var priceNote = card.querySelector('.price-note-text');
           if (!priceValue || !priceNote) return;
-
-          // A price in another currency: the US-dollar price a card is charged, for the cycle shown.
-          var usd = card.querySelector('.price-usd');
-          if (usd) usd.textContent = String(usd.getAttribute(isYearly ? 'data-yearly' : 'data-monthly') || '');
 
           // How long the discount lasts and the regular price after it, for the cycle shown.
           var terms = card.querySelector('.discount-terms');

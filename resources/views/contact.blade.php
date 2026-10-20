@@ -300,6 +300,7 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.motion')
   @php
     $contactI18n = [
       'send_message' => __('ui.contact.send_message'),

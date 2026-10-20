@@ -550,6 +550,7 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @include('components.motion')
   @php
     $extensionI18n = [
       'api_key_active' => __('ui.extension.api_key_active'),

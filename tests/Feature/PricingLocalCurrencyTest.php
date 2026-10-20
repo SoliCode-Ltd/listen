@@ -35,7 +35,7 @@ class PricingLocalCurrencyTest extends TestCase
         ]);
     }
 
-    public function test_local_prices_say_they_are_a_guide_and_show_the_dollar_price(): void
+    public function test_local_prices_say_they_are_a_guide_and_show_only_the_local_price(): void
     {
         SiteSetting::set('pricing_forced_country_code', 'MX', 'billing');
         Http::fake(['https://open.er-api.com/*' => Http::response(['result' => 'success', 'rates' => ['USD' => 1, 'MXN' => 18.4575]])]);
@@ -44,12 +44,11 @@ class PricingLocalCurrencyTest extends TestCase
             $this->pricingPage($locale)
                 ->assertSee(__('ui.pricing.currency_note', ['currency' => 'MXN'], $locale))
                 ->assertSee($this->formatted(7383, 'MXN', $locale))
-                // The dollar price beside it, the one the card is charged: $4 a month, $3.20 on the yearly price.
-                ->assertSee(__('ui.pricing.usd_price', ['price' => "\u{2066}".$this->formatted(400, 'USD', $locale)."\u{2069}"], $locale))
-                ->assertSee('data-yearly="'.e(__('ui.pricing.usd_price', ['price' => "\u{2066}".$this->formatted(320, 'USD', $locale)."\u{2069}"], $locale)).'"', false);
+                // Only the visitor's own currency on the cards: no dollar price beside it.
+                ->assertDontSee('class="price-usd"', false);
         }
 
-        $this->pricingPage('en')->assertSee('$4');
+        $this->pricingPage('en')->assertDontSee('$4');
     }
 
     public function test_a_visitor_in_the_united_states_sees_dollars_and_no_note(): void
@@ -93,7 +92,7 @@ class PricingLocalCurrencyTest extends TestCase
                 ->assertSee('data-display-manual="1"', false)
                 ->assertSee(__('ui.pricing.currency_note_egp', [], $locale))
                 ->assertDontSee(__('ui.pricing.currency_note', ['currency' => 'EGP'], $locale))
-                ->assertSee(__('ui.pricing.usd_price', ['price' => "\u{2066}".$this->formatted(400, 'USD', $locale)."\u{2069}"], $locale));
+                ->assertDontSee('class="price-usd"', false);
         }
     }
 
