@@ -22,6 +22,7 @@ use App\Support\GeminiVocalTags;
 use App\Support\TextChunker;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 require 'vendor/autoload.php';
 $app = require 'bootstrap/app.php';
@@ -74,7 +75,7 @@ AudioGeneration::query()
     ->where('is_dialogue', false)
     ->whereNotNull('tts_latency_ms')
     ->where('created_at', '>=', now()->subDays(60))
-    ->select(['id', 'input_text', 'target_language', 'duration_seconds', 'tts_latency_ms', 'tts_model', 'settings_snapshot'])
+    ->select(['id', 'input_text', 'target_language', 'duration_seconds', 'tts_latency_ms', 'tts_model', 'settings_snapshot', 'audio_path'])
     ->chunkById(500, function ($generations) use (&$rows, $piecesOf, $parallel): void {
         foreach ($generations as $g) {
             $text = (string) $g->input_text;
@@ -91,6 +92,7 @@ AudioGeneration::query()
                 // Kept on voices made since pieces went out over every key (GeminiTtsProvider).
                 'at_once' => (int) ((($g->settings_snapshot ?? [])['pieces_check'] ?? [])['pieces_at_once'] ?? 0),
                 'peak_mb' => (int) ((($g->settings_snapshot ?? [])['pieces_check'] ?? [])['peak_memory_mb'] ?? 0),
+                'audio_path' => (string) $g->audio_path,
             ];
         }
     });
@@ -150,6 +152,10 @@ if ($member !== '') {
     foreach (array_slice($rows, 0, 12) as $r) {
         printf("  #%d %s chars, %d pieces: %.1f min of audio, the voices took %.0f s%s\n", $r['id'], number_format($r['chars']), $r['pieces'], $r['audio'] / 60, $r['making'],
             $r['at_once'] > 0 ? sprintf(' (%d at a time, peak memory %d MB)', $r['at_once'], $r['peak_mb']) : '');
+        // Only a member's own voices, and only on the member's request: where the recording plays.
+        if ($r['audio_path'] !== '') {
+            echo '    ', Storage::disk('public')->url($r['audio_path']), "\n";
+        }
     }
     echo "\n";
 }
