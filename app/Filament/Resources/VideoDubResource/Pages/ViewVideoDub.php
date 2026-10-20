@@ -28,13 +28,12 @@ class ViewVideoDub extends ViewRecord
             VideoDubResource::removeAction(Actions\Action::make('remove'))
                 ->after(fn () => $this->refreshFormData(['status', 'files_deleted_at'])),
             Actions\Action::make('deleteFiles')
-                ->label('Delete the videos now')
                 ->icon('heroicon-o-trash')
                 ->color('danger')
                 ->label('Delete only the videos')
                 ->visible(fn (VideoDub $record): bool => $record->files_deleted_at === null && ! $record->isWorking())
                 ->requiresConfirmation()
-                ->modalDescription('Deletes the dubbed videos from the server. The dub still counts for the member (Remove gives it back). This cannot be undone.')
+                ->modalDescription('Deletes the dubbed videos from the server and from Google Drive. The dub still counts for the member (Remove gives it back). This cannot be undone.')
                 ->action(function (VideoDub $record): void {
                     VideoDubResource::deleteFiles($record);
                     $this->refreshFormData(['files_deleted_at']);

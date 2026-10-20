@@ -126,9 +126,7 @@ class VideoDubResource extends Resource
                         ->state(fn (VideoDub $r): string => $r->errorText())->placeholder('—'),
                 ]),
             Infolists\Components\Section::make('Videos')
-                ->description(fn (VideoDub $r): string => $r->files_deleted_at
-                    ? 'Deleted '.$r->files_deleted_at->diffForHumans().'.'
-                    : 'Kept until '.$r->created_at?->copy()->addHours((int) config('listen.dubbing.keep_hours', 48))->toDayDateTimeString().'.')
+                ->description(fn (VideoDub $r): string => self::keptText($r))
                 ->columns(2)
                 ->schema([
                     Infolists\Components\ViewEntry::make('clean_video')
@@ -225,10 +223,20 @@ class VideoDubResource extends Resource
                     ->formatStateUsing(fn ($state): string => number_format((float) $state, 0).' s')
                     ->placeholder('—')
                     ->toggleable(),
-                Tables\Columns\IconColumn::make('files_deleted_at')
-                    ->label('Videos kept')
-                    ->state(fn (VideoDub $r): bool => $r->files_deleted_at === null && $r->status === VideoDub::READY)
-                    ->boolean()
+                Tables\Columns\TextColumn::make('files_deleted_at')
+                    ->label('Video kept in')
+                    ->state(fn (VideoDub $r): string => match (true) {
+                        filled($r->drive_file_id) => 'Google Drive',
+                        $r->status === VideoDub::READY && $r->files_deleted_at === null => 'Server',
+                        $r->status === VideoDub::READY => 'Deleted',
+                        default => '—',
+                    })
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Google Drive' => 'success',
+                        'Server' => 'info',
+                        default => 'gray',
+                    })
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Sent')
@@ -304,10 +312,28 @@ class VideoDubResource extends Resource
             });
     }
 
-    /** Deletes a dub's videos now (they would go after keep_hours anyway); the row and its figures stay. */
+    /** Where the videos are, and until when the member sees them. */
+    public static function keptText(VideoDub $dub): string
+    {
+        $until = \App\Support\VideoDubbing::availableUntil($dub);
+        $member = $dub->status !== VideoDub::READY ? '' : ($until === null
+            ? ' The member sees it for as long as their plan keeps voices (no limit).'
+            : ($until->isFuture() ? ' The member sees it until '.$until->toDayDateTimeString().'.' : ' The member no longer sees it (since '.$until->toDayDateTimeString().').'));
+
+        return match (true) {
+            filled($dub->drive_file_id) => 'In Google Drive (Listen Studio) since '.$dub->archived_at?->toDayDateTimeString().', not on the server.'.$member,
+            $dub->files_deleted_at !== null => 'Deleted '.$dub->files_deleted_at->diffForHumans().'.',
+            default => 'On the server.'.($dub->status === VideoDub::READY && is_array($dub->reservation) ? ' It moves to Google Drive once Drive is connected (Video Dubbing → Settings).' : '').$member,
+        };
+    }
+
+    /** Deletes a dub's videos now, from the server and Google Drive; the row and its figures stay. */
     public static function deleteFiles(VideoDub $dub): void
     {
         Storage::disk('local')->deleteDirectory((string) $dub->folder);
+        if ($dub->drive_file_id) {
+            app(VideoDubRunner::class)->deleteFromDrive($dub);
+        }
         $dub->update(['files_deleted_at' => now()]);
         Notification::make()->title('Videos deleted')->success()->send();
     }

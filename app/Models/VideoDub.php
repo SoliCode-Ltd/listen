@@ -49,6 +49,8 @@ class VideoDub extends Model
         'progress',
         'keep_background',
         'language',
+        'drive_file_id',
+        'archived_at',
     ];
 
     protected $casts = [
@@ -61,6 +63,7 @@ class VideoDub extends Model
         'files_deleted_at' => 'datetime',
         'progress' => 'integer',
         'keep_background' => 'boolean',
+        'archived_at' => 'datetime',
     ];
 
     public function user(): BelongsTo

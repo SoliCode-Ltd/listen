@@ -162,11 +162,13 @@ return [
     'dubbing' => [
         // "Dub my video" (App\Http\Controllers\VideoDubController).
         'min_seconds' => (int) env('LISTEN_DUB_MIN_SECONDS', 3),
+        // The longest free video, and a plan's when it sets none (the admin can change it in Video Dubbing → Settings).
         'max_seconds' => (int) env('LISTEN_DUB_MAX_SECONDS', 60),
         // The admin can change it (Video Dubbing → Settings); the server's own PHP limits still apply.
         'max_upload_mb' => (int) env('LISTEN_DUB_MAX_UPLOAD_MB', 300),
-        // Hours the videos are kept before their files are deleted (dubs:prune).
-        'keep_hours' => (int) env('LISTEN_DUB_KEEP_HOURS', 48),
+        // Hours a free dub stays on the member's dashboard before its files are deleted (Video Dubbing → Settings).
+        // A plan's dubs stay as long as the plan keeps voices, in Google Drive once it is connected (dubs:prune).
+        'free_keep_hours' => (int) env('LISTEN_DUB_FREE_KEEP_HOURS', 24),
         // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.
         'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
         // Minutes after which a dub still working is failed and its credits given back.

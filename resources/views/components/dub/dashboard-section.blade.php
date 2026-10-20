@@ -85,7 +85,7 @@
     @endif
 
     {{-- What a dub costs is above: the studio shows only what the chosen video will use. --}}
-    <x-dub.studio :dub="$dub" :compact-meter="true" />
+    <x-dub.studio :dub="$dub" :compact-meter="true" :on-dashboard="true" />
 
     @if($account['included'] || $account['rows'] !== [])
       <section class="dub-ledger" aria-labelledby="dubLedgerTitle">

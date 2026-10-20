@@ -52,6 +52,13 @@ Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', \App\Http\Contr
     ->whereIn('kind', ['clean', 'preview'])
     ->name('admin.video-dubs.file');
 
+// Video Dubbing → Settings: connect the site's Google Drive, where the dubbed videos are kept.
+// The callback's address is the one added to the Google client's redirect addresses.
+Route::middleware('auth')->get('/admin-drive/google/connect', [\App\Http\Controllers\AdminDriveController::class, 'connect'])
+    ->name('admin.drive.connect');
+Route::middleware('auth')->get('/admin-drive/google/callback', [\App\Http\Controllers\AdminDriveController::class, 'callback'])
+    ->name('admin.drive.callback');
+
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
     $dom = new \DOMDocument('1.0', 'UTF-8');

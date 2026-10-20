@@ -270,6 +270,8 @@
           title = t.lock_used_title;
           text = plan ? t.lock_used_text_plan.replace(':plan', plan) : t.lock_used_text;
           link(t.see_plans, c.upgrade.url, true);
+          // Off the dashboard, the way to the video they made.
+          if (!c.onDashboard && c.hasVideos) link(t.watch_mine, c.urls.dashboard, false);
           break;
         case 'day_full':
           title = t.lock_day_title; text = t.lock_day_text;
@@ -290,7 +292,19 @@
       root.dataset.dubState = c.state;
     }
 
+    // The demo's free-video box, where the text studio shows its characters.
+    function syncAllowance() {
+      var left = c.state === 'used' ? 0 : 1;
+      document.querySelectorAll('[data-dub-allowance]').forEach(function (box) {
+        var value = box.querySelector('[data-dub-allowance-value]');
+        var fill = box.querySelector('[data-dub-allowance-fill]');
+        if (value && t.allowance_value) value.textContent = t.allowance_value.replace(':left', left);
+        if (fill) fill.style.width = (left ? 100 : 0) + '%';
+      });
+    }
+
     function idle() {
+      syncAllowance();
       renderLock();
       renderMeter();
       if (!allowed()) { show('lock'); return; }
@@ -394,6 +408,16 @@
     }
     function finished(dub) {
       show('done');
+      var a = q('[data-dub-download]');
+      if (!c.onDashboard) {
+        // Finished videos are watched on the dashboard only.
+        q('[data-dub-done-note]').textContent = dub.free ? t.done_elsewhere_free.replace(':hours', c.keepHours) : t.done_elsewhere;
+        a.hidden = false;
+        a.href = c.urls.dashboard;
+        a.textContent = t.open_dashboard;
+        c.hasVideos = true;
+        return;
+      }
       var video = q('[data-dub-result]');
       if (dub.watch_url && video.getAttribute('src') !== dub.watch_url) video.src = dub.watch_url;
       var bits = [];
@@ -402,7 +426,6 @@
       if (dub.kept_background) bits.push(t.done_music);
       if (dub.free) bits.push(t.done_free);
       q('[data-dub-done-note]').textContent = bits.join(' · ');
-      var a = q('[data-dub-download]');
       a.hidden = !dub.download_url;
       if (dub.download_url) { a.href = dub.download_url; a.textContent = downloadLabel(dub); }
     }
@@ -436,7 +459,7 @@
           var body = {};
           try { body = JSON.parse(xhr.responseText || '{}'); } catch (e) { /* not JSON */ }
           if (xhr.status === 202) {
-            if (body.studio) { c.state = body.studio.state; c.usage = body.studio.usage; }
+            if (body.studio) { c.state = body.studio.state; c.usage = body.studio.usage; syncAllowance(); }
             chosen = null;
             follow(body);
             return;
@@ -456,6 +479,7 @@
     var history = q('[data-dub-history]');
     var items = q('[data-dub-items]');
     function addToHistory(dub) {
+      if (!history) return;
       var old = items.querySelector('[data-dub-id="' + dub.id + '"]');
       var card = el('article', 'dub-item');
       card.dataset.dubId = dub.id;

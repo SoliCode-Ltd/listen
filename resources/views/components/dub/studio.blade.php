@@ -9,10 +9,16 @@
   The left card goes from the drop zone to the chosen video, its upload and
   dubbing progress, and the finished video; what may not be done yet shows
   in its place, with the pickers and voices still there to try.
+
+  The finished videos are watched on the dashboard only ($onDashboard):
+  elsewhere (the demo, the page) the studio says the video is ready there.
 --}}
-@props(['dub', 'hidden' => false, 'compactMeter' => false])
+@props(['dub', 'hidden' => false, 'compactMeter' => false, 'onDashboard' => false])
 @php
   $dubAr = app()->getLocale() === 'ar';
+  $dubKeptText = $dub['free']
+      ? __('ui.dub.kept_free', ['hours' => $dub['keep_hours']])
+      : ((int) $dub['keep_days'] > 0 ? trans_choice('ui.dub.kept_days', (int) $dub['keep_days'], ['count' => (int) $dub['keep_days']]) : __('ui.dub.kept_always'));
   $dubConfig = [
       'state' => $dub['state'],
       // On the dashboard the account above says what is left: the studio says only what the chosen video uses.
@@ -35,8 +41,12 @@
           'defaultDialect' => $l['default_dialect'],
       ])->all(),
       'language' => $dub['language'],
-      'dubs' => $dub['dubs'],
-      'urls' => $dub['urls'],
+      // Off the dashboard only the dub in progress, to follow it to the end.
+      'dubs' => $onDashboard ? $dub['dubs'] : array_values(array_filter($dub['dubs'], fn (array $d): bool => in_array($d['status'], ['queued', 'processing'], true))),
+      'onDashboard' => $onDashboard,
+      'hasVideos' => collect($dub['dubs'])->contains(fn (array $d): bool => filled($d['watch_url'])),
+      'keepHours' => $dub['keep_hours'],
+      'urls' => $dub['urls'] + ['dashboard' => route('dashboard').'#dubVideoSection'],
       'i18n' => __('ui.dub.js'),
   ];
 @endphp
@@ -101,9 +111,13 @@
             </ol>
           </div>
 
-          {{-- Finished --}}
-          <div class="dub-done" data-dub-view="done" hidden>
-            <video data-dub-result controls playsinline preload="metadata"></video>
+          {{-- Finished: watched here on the dashboard, elsewhere a way to it --}}
+          <div class="dub-done @unless($onDashboard) is-elsewhere @endunless" data-dub-view="done" hidden>
+            @if($onDashboard)
+              <video data-dub-result controls playsinline preload="metadata"></video>
+            @else
+              <span class="dub-done-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.2 4.2L19 7"/></svg></span>
+            @endif
             <div class="dub-done-row">
               <div class="dub-done-text">
                 <strong data-dub-done-title>{{ __('ui.dub.js.done_title') }}</strong>
@@ -163,13 +177,15 @@
     </aside>
   </form>
 
-  <section class="dub-history" data-dub-history hidden>
-    <header>
-      <h2>{{ __('ui.dub.your_dubs') }}</h2>
-      <p>{{ __('ui.dub.kept_for', ['hours' => $dub['keep_hours']]) }}</p>
-    </header>
-    <div class="dub-history-grid" data-dub-items></div>
-  </section>
+  @if($onDashboard)
+    <section class="dub-history" data-dub-history hidden>
+      <header>
+        <h2>{{ __('ui.dub.your_dubs') }}</h2>
+        <p>{{ $dubKeptText }}</p>
+      </header>
+      <div class="dub-history-grid" data-dub-items></div>
+    </section>
+  @endif
 
   <script type="application/json" data-dub-config>@json($dubConfig, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG)</script>
 </section>

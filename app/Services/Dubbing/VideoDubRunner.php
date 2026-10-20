@@ -6,6 +6,7 @@ use App\Jobs\GenerateAudioJob;
 use App\Models\VideoDub;
 use App\Services\Billing\MemberUsageMeter;
 use App\Support\VideoDubbing;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\Storage;
  * Dubs a video a member sent (App\Http\Controllers\VideoDubController), after
  * the reply has been sent, in the same PHP process, as the studio makes long
  * texts: no queue worker is needed and the web server's time limit never cuts
- * it short. A dub that fails gives back what its plan was charged, once.
+ * it short. A dub that fails gives back what its plan was charged, once. A
+ * paid one then goes to the site's Google Drive, when it is switched on.
  */
 class VideoDubRunner
 {
@@ -78,10 +80,46 @@ class VideoDubRunner
         } catch (\Throwable $e) {
             Log::warning('A video dub failed.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
             $this->fail($dub->id, self::messageFor($e));
+
+            return;
         } finally {
             if ($source !== null) {
                 $disk->delete($source);
             }
+        }
+
+        // A paid dub goes to Google Drive now; a free one once its member's day is over (dubs:prune).
+        $dub = $dub->fresh();
+        if (is_array($dub?->reservation)) {
+            $this->archive($dub);
+        }
+    }
+
+    /**
+     * A dub goes to the site's Google Drive (DriveArchive) and off the
+     * server; when Drive is off or refuses, it stays here and dubs:prune
+     * tries again.
+     */
+    public function archive(?VideoDub $dub): bool
+    {
+        if (! $dub || ! DriveArchive::active()) {
+            return false;
+        }
+        // One upload of a video at a time: the run that made it and the sweep may both try.
+        $lock = Cache::lock('video-dub-drive:'.$dub->id, 1800);
+        if (! $lock->get()) {
+            return false;
+        }
+        try {
+            $fresh = $dub->fresh();
+
+            return $fresh !== null && app(DriveArchive::class)->archive($fresh);
+        } catch (\Throwable $e) {
+            Log::warning('A dubbed video could not be put in Google Drive; it stays on the server for now.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
+
+            return false;
+        } finally {
+            $lock->release();
         }
     }
 
@@ -126,8 +164,22 @@ class VideoDubRunner
         if ($removed?->folder) {
             Storage::disk('local')->deleteDirectory($removed->folder);
         }
+        if ($removed?->drive_file_id) {
+            $this->deleteFromDrive($removed);
+        }
 
         return $removed !== null;
+    }
+
+    /** Its copy in Google Drive, deleted (an admin removed the dub, or deleted its videos). */
+    public function deleteFromDrive(VideoDub $dub): void
+    {
+        try {
+            app(DriveArchive::class)->delete((string) $dub->drive_file_id);
+            $dub->forceFill(['drive_file_id' => null])->save();
+        } catch (\Throwable $e) {
+            Log::warning('A dubbed video could not be deleted from Google Drive.', ['video_dub_id' => $dub->id, 'error' => $e->getMessage()]);
+        }
     }
 
     /**

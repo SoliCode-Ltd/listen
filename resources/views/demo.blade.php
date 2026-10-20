@@ -85,6 +85,23 @@
         </div>
       </div>
 
+      @if($dubStudio ?? null)
+        {{-- The free video, where the text studio shows its trial characters (the dubbing studio's own box stays hidden here). --}}
+        @php $dubLeft = $dubStudio['state'] === 'used' ? 0 : 1; @endphp
+        <div class="s-card" data-studio-pane="dub" data-dub-allowance style="padding:1rem 1.25rem; margin-bottom:1.1rem">
+          <div class="quota-panel">
+            <div class="q-head">
+              <span class="q-label">{{ __('ui.dub.allowance_label') }}</span>
+              <strong class="q-value" data-dub-allowance-value>{{ __('ui.dub.js.allowance_value', ['left' => $dubLeft]) }}</strong>
+            </div>
+            <div class="quota-track">
+              <div class="quota-fill" data-dub-allowance-fill style="width: {{ $dubLeft ? 100 : 0 }}%; background: linear-gradient(90deg, var(--primary-color, #8b5cf6), var(--secondary-color, #ec4899))"></div>
+            </div>
+            <div class="quota-note">{{ __('ui.dub.allowance_note', ['seconds' => $dubStudio['max_seconds']]) }}</div>
+          </div>
+        </div>
+      @endif
+
       <form id="demoForm" class="vs-layout demo-vs-layout" data-studio-pane="tts">
         @php
           $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
@@ -227,7 +244,7 @@
 
       {{-- The free dub: the same studio around a video (components/dub/studio.blade.php). --}}
       @if($dubStudio ?? null)
-        <x-dub.studio :dub="$dubStudio" />
+        <x-dub.studio :dub="$dubStudio" :compact-meter="true" />
       @endif
     </section>
   </main>

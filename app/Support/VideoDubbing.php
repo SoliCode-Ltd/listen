@@ -214,12 +214,74 @@ final class VideoDubbing
         return $server === null ? self::uploadSettingMb() : min(self::uploadSettingMb(), $server);
     }
 
+    /** The longest free video (Video Dubbing → Settings), in seconds; also a plan's when it sets none. */
+    public static function freeMaxSeconds(): int
+    {
+        return max(5, min(180, (int) SiteSetting::get('video_dubbing_free_max_seconds', (int) config('listen.dubbing.max_seconds', 60))));
+    }
+
     /** The longest video this dub may be: the plan's, or the site's for a free one. */
     public static function maxSeconds(?Plan $plan, bool $free): int
     {
-        $site = max(5, (int) config('listen.dubbing.max_seconds', 60));
+        $site = self::freeMaxSeconds();
 
         return $free ? $site : max(5, min(180, (int) ($plan?->video_dub_max_seconds ?: $site)));
+    }
+
+    /** How long a free dub stays on the member's dashboard (Video Dubbing → Settings), in hours. */
+    public static function freeKeepHours(): int
+    {
+        return max(1, min(168, (int) SiteSetting::get('video_dubbing_free_keep_hours', (int) config('listen.dubbing.free_keep_hours', 24))));
+    }
+
+    /**
+     * With Google Drive off (Video Dubbing → Settings): days a video stays on
+     * the server, counted from when it was made and never before its member's
+     * time is over; 0 keeps them.
+     */
+    public static function serverKeepDays(): int
+    {
+        return max(0, min(3650, (int) SiteSetting::get('video_dubbing_server_keep_days', 30)));
+    }
+
+    /** Days a plan keeps a member's dubbed videos to watch: as long as it keeps their voices; 0 is no limit. */
+    public static function keepDays(?Plan $plan): int
+    {
+        return max(0, (int) ($plan?->recent_voices_days ?? 7));
+    }
+
+    /**
+     * Until when the member can watch and download a dub: a free one for
+     * freeKeepHours(), one their plan paid for as long as their plan keeps
+     * voices (null: no end). Past it a paid video stays in the site's Google
+     * Drive (DriveArchive); the member no longer sees it. $planDays: the
+     * member's plan's keepDays(), when the caller has it already.
+     */
+    public static function availableUntil(VideoDub $dub, ?int $planDays = null): ?\Illuminate\Support\Carbon
+    {
+        $made = $dub->created_at ?? now();
+        if (! is_array($dub->reservation) || $dub->status !== VideoDub::READY) {
+            return $made->copy()->addHours(self::freeKeepHours());
+        }
+        $days = $planDays ?? self::keepDaysFor((int) $dub->user_id);
+
+        return $days > 0 ? $made->copy()->addDays($days) : null;
+    }
+
+    /** The member's plan's keepDays(). */
+    public static function keepDaysFor(int $userId): int
+    {
+        return self::keepDays(app(PlanAccessService::class)->resolveAccessPlanForUserId($userId));
+    }
+
+    /** Whether the member can still watch and download it. */
+    public static function available(VideoDub $dub, ?int $planDays = null): bool
+    {
+        $until = self::availableUntil($dub, $planDays);
+
+        return $dub->status === VideoDub::READY
+            && ($dub->drive_file_id !== null || $dub->files_deleted_at === null)
+            && ($until === null || $until->isFuture());
     }
 
     /** Videos a month the plan allows; 0 when only its credits count. */
@@ -320,7 +382,9 @@ final class VideoDubbing
             'min_seconds' => (int) config('listen.dubbing.min_seconds', 3),
             'max_seconds' => self::maxSeconds($plan, ! $included),
             'max_mb' => self::maxUploadMb(),
-            'keep_hours' => (int) config('listen.dubbing.keep_hours', 48),
+            // How long finished videos stay to watch: a free one for hours, a plan's as long as it keeps voices.
+            'keep_hours' => self::freeKeepHours(),
+            'keep_days' => $included ? self::keepDays($plan) : null,
             'credits_per_second' => Credits::PER_SECOND,
             'languages' => $languages,
             'language' => 'ar',
@@ -351,10 +415,11 @@ final class VideoDubbing
         $dubs = VideoDub::query()->where('user_id', $user->id)
             ->where(fn ($q) => $q->where('period_ym', $period['key'])->orWhere(fn ($q) => $q->whereNull('period_ym')->where('created_at', '>=', $period['starts_at'])))
             ->latest('id')->limit(200)->get();
-        $rows = $dubs->map(function (VideoDub $dub) use ($arabic): array {
+        $days = self::keepDaysFor((int) $user->id);
+        $rows = $dubs->map(function (VideoDub $dub) use ($arabic, $days): array {
             $charged = is_array($dub->reservation) && ! in_array($dub->status, VideoDub::GIVEN_BACK, true) ? (int) $dub->reservation['credits'] : 0;
 
-            return self::present($dub) + [
+            return self::present($dub, $days) + [
                 'date' => $dub->created_at?->copy()->locale($arabic ? 'ar' : 'en')->isoFormat('D MMM, HH:mm'),
                 'dialect_label' => VoiceFlag::label($dub->dialect, $arabic),
                 'charged' => $charged,
@@ -376,12 +441,21 @@ final class VideoDubbing
         ];
     }
 
-    /** @return array<int, array<string, mixed>> */
+    /**
+     * The member's dubs still to watch (and the one in progress, and a recent failed one).
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public static function recent(User $user): array
     {
-        return VideoDub::query()->where('user_id', $user->id)->whereNull('files_deleted_at')->where('status', '!=', VideoDub::REMOVED)
-            ->where('created_at', '>=', now()->subHours((int) config('listen.dubbing.keep_hours', 48)))
-            ->latest('id')->limit(10)->get()->map(fn (VideoDub $dub): array => self::present($dub))->all();
+        $days = self::keepDaysFor((int) $user->id);
+
+        return VideoDub::query()->where('user_id', $user->id)->where('status', '!=', VideoDub::REMOVED)
+            ->where(fn ($q) => $q->whereNull('files_deleted_at')->orWhereNotNull('drive_file_id'))
+            ->latest('id')->limit(40)->get()
+            ->filter(fn (VideoDub $dub): bool => $dub->isWorking() || self::available($dub, $days)
+                || ($dub->status === VideoDub::FAILED && $dub->created_at?->gt(now()->subHours(self::freeKeepHours()))))
+            ->take(10)->map(fn (VideoDub $dub): array => self::present($dub, $days))->values()->all();
     }
 
     /**
@@ -389,9 +463,11 @@ final class VideoDubbing
      *
      * @return array<string, mixed>
      */
-    public static function present(VideoDub $dub): array
+    public static function present(VideoDub $dub, ?int $planDays = null): array
     {
-        $ready = $dub->status === VideoDub::READY && $dub->files_deleted_at === null;
+        $planDays ??= is_array($dub->reservation) && $dub->status === VideoDub::READY ? self::keepDaysFor((int) $dub->user_id) : 0;
+        $ready = self::available($dub, $planDays);
+        $until = self::availableUntil($dub, $planDays);
         $report = (array) ($dub->report ?? []);
 
         return [
@@ -412,7 +488,7 @@ final class VideoDubbing
             'status_url' => route('dub.status', ['id' => $dub->id]),
             'watch_url' => $ready ? route('dub.watch', ['id' => $dub->id]) : null,
             'download_url' => $ready && $dub->has_clean ? route('dub.download', ['id' => $dub->id]) : null,
-            'expires_at' => $dub->created_at?->copy()->addHours((int) config('listen.dubbing.keep_hours', 48))->toIso8601String(),
+            'expires_at' => $until?->toIso8601String(),
         ];
     }
 

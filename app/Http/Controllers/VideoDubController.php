@@ -7,6 +7,7 @@ use App\Models\VideoDub;
 use App\Services\Billing\MemberUsageMeter;
 use App\Services\DemoFraudService;
 use App\Services\DemoLinkedAccounts;
+use App\Services\Dubbing\DriveArchive;
 use App\Services\Dubbing\VideoDubber;
 use App\Services\Dubbing\VideoDubRunner;
 use App\Services\PlanAccessService;
@@ -20,7 +21,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -168,13 +168,21 @@ class VideoDubController extends Controller
         return response()->json(VideoDubbing::present($this->ownDub($request, $id)));
     }
 
-    /** The dub to watch on the page: with the mark when it was free, else the clean copy. */
-    public function watch(Request $request, int $id): BinaryFileResponse
+    /**
+     * The dub to watch: with the mark when it was free, else the clean copy,
+     * from the server or, once it is there, from the site's Google Drive.
+     * Only while it is kept (VideoDubbing::availableUntil()).
+     */
+    public function watch(Request $request, int $id): Response
     {
         $dub = $this->ownDub($request, $id);
-        $file = $dub->is_free ? 'dub-preview.mp4' : 'dub.mp4';
-        $path = $dub->path($file);
-        abort_unless($dub->status === VideoDub::READY && $dub->files_deleted_at === null && Storage::disk('local')->exists($path), 404);
+        abort_unless(VideoDubbing::available($dub), 404);
+        if ($dub->drive_file_id) {
+            return app(DriveArchive::class)->stream($dub->drive_file_id, $request->header('Range'), 'listen-dub-'.$dub->id.'.mp4', false);
+        }
+        // A free dub its member paid for since plays clean.
+        $path = $dub->path(! is_array($dub->reservation) && $dub->has_preview ? 'dub-preview.mp4' : 'dub.mp4');
+        abort_unless(Storage::disk('local')->exists($path), 404);
 
         return response()->file(Storage::disk('local')->path($path), ['Content-Type' => 'video/mp4', 'Cache-Control' => 'private, max-age=3600']);
     }
@@ -187,7 +195,7 @@ class VideoDubController extends Controller
     {
         $dub = $this->ownDub($request, $id);
         $path = $dub->path('dub.mp4');
-        abort_unless($dub->status === VideoDub::READY && $dub->has_clean && $dub->files_deleted_at === null && Storage::disk('local')->exists($path), 404);
+        abort_unless(VideoDubbing::available($dub) && $dub->has_clean && ($dub->drive_file_id || Storage::disk('local')->exists($path)), 404);
 
         if (! is_array($dub->reservation)) {
             $userId = (int) $request->user()->id;
@@ -212,6 +220,10 @@ class VideoDubController extends Controller
             } catch (ValidationException $e) {
                 return back(fallback: route('dub.page'))->with('dub_error', collect($e->errors())->flatten()->first());
             }
+        }
+
+        if ($dub->drive_file_id) {
+            return app(DriveArchive::class)->stream($dub->drive_file_id, null, 'listen-dub-'.$dub->id.'.mp4', true);
         }
 
         return response()->download(Storage::disk('local')->path($path), 'listen-dub-'.$dub->id.'.mp4', ['Content-Type' => 'video/mp4']);
