@@ -81,7 +81,7 @@ class LongFormSamplesTest extends TestCase
         $page->assertSee('href="#long-reads"', false);
         $page->assertSee('The Clockmaker of Harrow Lane');
         $page->assertSee('12× faster than listening');
-        $page->assertSee('Made on 20 October 2026');
+        $page->assertSee('Real recordings, made with our Studio Max plan.');
         $page->assertSee('Read by Sarah · 7,800 characters', false);
         $page->assertSeeInOrder(['id="english-accents"', 'id="long-reads"', 'id="moods"'], false);
     }
@@ -117,7 +117,7 @@ class LongFormSamplesTest extends TestCase
         $this->assertSame('13:04', LongFormSamples::clock(784));
         $this->assertSame('1:02:05', LongFormSamples::clock(3725));
         $this->assertSame('38 s', LongFormSamples::madeIn(38.2));
-        $this->assertSame('1 min 12 s', LongFormSamples::madeIn(72));
+        $this->assertSame('65 s', LongFormSamples::madeIn(65.2));
     }
 
     /**

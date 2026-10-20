@@ -23,6 +23,8 @@ use App\Models\Subscription;
 use App\Models\User;
 use App\Models\Voice;
 use App\Services\PlanAccessService;
+use App\Services\Tts\GeminiKeyManager;
+use App\Support\GeminiTtsModel;
 use App\Support\VoiceCatalog;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Http\Request;
@@ -77,6 +79,23 @@ if (! $plan) {
 Subscription::withoutEvents(fn () => $access->assignPlan($member, $plan));
 fwrite(STDERR, "Member {$member->id} on {$plan->slug} (up to ".number_format((int) $plan->max_chars_per_request)." characters at once), ".count($samples)." text(s).\n");
 
+// Each text starts only once every key has room, so all its pieces can go out at once
+// (a key busy with members' voices would send them in two rounds). At most 3 minutes.
+$keys = app(GeminiKeyManager::class);
+$allRoom = function () use ($keys): int {
+    $total = count($keys->getAllKeys());
+    for ($waited = 0; $waited < 180; $waited += 10) {
+        $room = count($keys->keysWithRoom(GeminiTtsModel::resolve()));
+        if ($room >= $total) {
+            return $room;
+        }
+        fwrite(STDERR, "{$room} of {$total} keys have room; waiting.\n");
+        sleep(10);
+    }
+
+    return count($keys->keysWithRoom(GeminiTtsModel::resolve()));
+};
+
 $guard = $app['auth']->guard('web');
 try {
     foreach ($samples as $sample) {
@@ -95,6 +114,7 @@ try {
                 'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
             ];
 
+            $line['keys_with_room'] = $allRoom();
             $guard->setUser($member);
             $last = (int) AudioGeneration::query()->where('user_id', $member->id)->max('id');
             $request = Request::create('/en/dashboard/queue', 'POST', $payload, [], [], ['HTTP_ACCEPT' => 'application/json', 'HTTP_X_REQUESTED_WITH' => 'XMLHttpRequest']);

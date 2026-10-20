@@ -1048,17 +1048,10 @@ html[data-theme="light"] {
   padding: clamp(20px, 3vw, 28px);
   border-radius: var(--card-radius);
   border: 1px solid var(--line);
-  background:
-    radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--vs-long-a) 12%, transparent), transparent 60%),
-    var(--vs-card);
+  background: var(--vs-card);
   box-shadow: var(--card-shadow);
   overflow: hidden;
   transition: border-color .2s ease, box-shadow .2s ease;
-}
-html[dir="rtl"] .vs-long {
-  background:
-    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--vs-long-a) 12%, transparent), transparent 60%),
-    var(--vs-card);
 }
 .vs-long.is-playing {
   border-color: var(--vs-long-a);

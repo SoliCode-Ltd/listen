@@ -80,15 +80,10 @@ final class LongFormSamples
         return $h > 0 ? sprintf('%d:%02d:%02d', $h, $m, $s) : sprintf('%d:%02d', $m, $s);
     }
 
-    /** "38 s", or "1 min 12 s" from a minute up. */
+    /** "38 s", "65 s": always in seconds. */
     public static function madeIn(float $seconds): string
     {
-        $total = max(1, (int) round($seconds));
-        if ($total < 60) {
-            return __('ui.samples.long_seconds', ['n' => $total]);
-        }
-
-        return __('ui.samples.long_minutes', ['m' => intdiv($total, 60), 's' => $total % 60]);
+        return __('ui.samples.long_seconds', ['n' => max(1, (int) round($seconds))]);
     }
 
     /**
