@@ -626,9 +626,9 @@ class GeminiTtsProvider implements TtsProviderInterface
         $pieces = [];
         foreach ($voiceConfig['vocal_parts'] ?? [['text' => $text, 'cues' => []]] as $partIndex => $part) {
             $partStyle = GeminiVocalTags::withCues($stylePrompt, $part['cues']);
-            // Read 4 at a time: earlier rounds stay full, the last one shares the rest.
+            // Read a round at a time (piecesAtOnce()): earlier rounds stay full, the last one shares the rest.
             $chunks = mb_strlen($part['text']) > $maxChars
-                ? TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', max(1, (int) config('services.gemini_tts.max_parallel_requests', 4)))
+                ? TextChunker::pieces($part['text'], $maxChars, 'mb_strlen', $this->piecesAtOnce(count($this->keysForRound())))
                 : [['text' => $part['text'], 'gap' => '']];
             foreach ($chunks as $chunk) {
                 $pieces[] = [(int) $partIndex, $chunk, $partStyle];
@@ -667,6 +667,10 @@ class GeminiTtsProvider implements TtsProviderInterface
             if ($checked['retaken'] > 0) {
                 Log::info('Gemini TTS: pieces of a long voice were taken again.', $checked);
             }
+            // Kept with the voice (Server deploy speed-check): how many pieces went out
+            // at once, and the most memory the process took, against live's fixed limit.
+            $checked['pieces_at_once'] = $this->piecesAtOnce(count($this->keysForRound()));
+            $checked['peak_memory_mb'] = (int) round(memory_get_peak_usage(true) / 1048576);
         }
 
         return [
@@ -713,13 +717,15 @@ class GeminiTtsProvider implements TtsProviderInterface
     }
 
     /**
-     * Send the pieces in parallel batches, and hand each one over, in order,
-     * as soon as its batch is in: the join writes it to its file and lets it
-     * go, so a long text is never held whole. A piece that fails is sent again
-     * on its own, with the usual retries; one that hit its key's limit (or a
-     * key Google refused) is sent on another key, not the same one again. The
-     * retry budget runs from the start of each batch, so a long text's earlier
-     * batches never use it up for a later piece.
+     * Send the pieces in parallel rounds, and hand each one over, in order,
+     * as soon as its round is in: the join writes it to its file and lets it
+     * go, so a long text is never held whole. A round is spread over the keys
+     * with room (piecesAtOnce()), so the longest studio text goes out at once
+     * instead of four pieces at a time on one key. A piece that fails is sent
+     * again on its own, with the usual retries; one that hit its key's limit
+     * (or a key Google refused) is sent on another key, not the same one
+     * again. The retry budget runs from the start of each round, so a long
+     * text's earlier rounds never use it up for a later piece.
      *
      * Each round's pieces are checked before they are handed over
      * (PieceCheck, when $texts says what each one's text needs): one that
@@ -735,73 +741,91 @@ class GeminiTtsProvider implements TtsProviderInterface
     {
         $timeout = (int) config('services.gemini_tts.timeout_seconds', 60);
         $verifySsl = (bool) config('services.gemini_tts.verify_ssl', true);
-        $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
         $retryBudgetSeconds = max(0, (int) config('services.gemini_tts.retry_budget_seconds', 20));
         $answeredBy = [];
         $history = ['paces' => [], 'pitches' => []];
         $report ??= PieceCheck::emptyReport();
 
-        foreach (array_chunk($payloads, $parallel, true) as $batch) {
+        for ($done = 0, $total = count($payloads); $done < $total; $done += count($batch)) {
+            // A round goes out over every key with room, the least used first, up to
+            // max_parallel_requests pieces on each: each key has its own limits.
+            $keys = $this->keysForRound();
+            $batch = array_slice($payloads, $done, $this->piecesAtOnce(count($keys)), true);
+            $keyOf = [];
+            foreach (array_keys($batch) as $n => $index) {
+                $keyOf[$index] = $keys[$n % count($keys)];
+            }
             $ready = [];
-            // The key in use now: after a piece hit a key's limit, the next one.
-            $keyInfo = $this->currentKeyInfo ?? $this->getAvailableKey();
+            // Each reply (3-4 MB of base64 a minute of audio) is written to its own file as it
+            // comes and read back one at a time, so a round of twelve is not held whole.
+            $sinks = [];
+            foreach (array_keys($batch) as $index) {
+                $sinks[$index] = tempnam(sys_get_temp_dir(), 'listen-piece-') ?: null;
+            }
             $startedAt = microtime(true);
-            $responses = Http::pool(function (Pool $pool) use ($batch, $endpoint, $timeout, $verifySsl, $keyInfo) {
+            $responses = Http::pool(function (Pool $pool) use ($batch, $endpoint, $timeout, $verifySsl, $keyOf, $sinks) {
                 foreach ($batch as $index => $payload) {
                     $pool->as('part' . $index)
                         ->timeout($timeout)
-                        ->withOptions(['verify' => $verifySsl])
+                        ->withOptions(['verify' => $verifySsl] + ($sinks[$index] !== null ? ['sink' => $sinks[$index]] : []))
                         ->withHeaders([
                             'Content-Type' => 'application/json',
-                            'x-goog-api-key' => $keyInfo['key'],
+                            'x-goog-api-key' => $keyOf[$index]['key'],
                         ])
                         ->post($endpoint, $payload);
                 }
             });
 
-            foreach ($batch as $index => $payload) {
-                // Each reply is let go once its audio is out.
-                $response = $responses['part' . $index] ?? null;
-                unset($responses['part' . $index]);
-                $error = $response instanceof \Throwable ? $response->getMessage() : null;
-                $part = null;
+            try {
+                foreach ($batch as $index => $payload) {
+                    $keyInfo = $keyOf[$index];
+                    // Each reply is let go once its audio is out.
+                    $response = $responses['part' . $index] ?? null;
+                    unset($responses['part' . $index]);
+                    $error = $response instanceof \Throwable ? $response->getMessage() : null;
+                    $part = null;
 
-                if ($response instanceof Response && $response->ok() && is_array($response->json())) {
-                    try {
-                        $part = $this->extractAudioFromResponse($response->json());
-                        $answeredBy[$index] = $keyInfo['name'];
-                    } catch (TransientGeminiException $e) {
-                        $error = $e->getMessage();
+                    if ($response instanceof Response && $response->ok() && is_array($response->json())) {
+                        try {
+                            $part = $this->extractAudioFromResponse($response->json());
+                            $answeredBy[$index] = $keyInfo['name'];
+                        } catch (TransientGeminiException $e) {
+                            $error = $e->getMessage();
+                        }
+                        if ($part !== null) {
+                            $response = null;
+                            $ready[$index] = $part;
+                            $part = null;
+
+                            continue;
+                        }
+                    } elseif ($response instanceof Response) {
+                        $error = 'HTTP ' . $response->status() . ': ' . mb_substr($response->body(), 0, 200);
                     }
-                    if ($part !== null) {
-                        $response = null;
-                        $ready[$index] = $part;
-                        $part = null;
 
-                        continue;
+                    $elapsed = microtime(true) - $startedAt;
+                    Log::warning('Gemini TTS piece failed.', [
+                        'piece' => $index + 1,
+                        'pieces' => count($payloads),
+                        'elapsed_seconds' => round($elapsed, 1),
+                        'error' => mb_substr((string) $error, 0, 300),
+                    ]);
+                    // Only the key was at fault: the piece is sent on another key, whatever the time.
+                    $keyAtFault = $response instanceof Response && $this->setKeyAside($response, $keyInfo, $endpoint);
+                    if (! $keyAtFault && $elapsed >= $retryBudgetSeconds) {
+                        throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
                     }
-                } elseif ($response instanceof Response) {
-                    $error = 'HTTP ' . $response->status() . ': ' . mb_substr($response->body(), 0, 200);
-                }
 
-                $elapsed = microtime(true) - $startedAt;
-                Log::warning('Gemini TTS piece failed.', [
-                    'piece' => $index + 1,
-                    'pieces' => count($payloads),
-                    'elapsed_seconds' => round($elapsed, 1),
-                    'error' => mb_substr((string) $error, 0, 300),
-                ]);
-                // Only the key was at fault: the piece is sent on another key, whatever the time.
-                $keyAtFault = $response instanceof Response && $this->setKeyAside($response, $keyInfo, $endpoint);
-                if (! $keyAtFault && $elapsed >= $retryBudgetSeconds) {
-                    throw new TransientGeminiException('Gemini TTS piece ' . ($index + 1) . ' of ' . count($payloads) . ' failed: ' . mb_substr((string) $error, 0, 200));
+                    $response = null;
+                    $ready[$index] = $this->requestAudio($endpoint, $payload);
+                    $answeredBy[$index] = ($this->currentKeyInfo ?? $keyInfo)['name'];
                 }
-
-                $response = null;
-                $ready[$index] = $this->requestAudio($endpoint, $payload);
-                $answeredBy[$index] = ($this->currentKeyInfo ?? $keyInfo)['name'];
+            } finally {
+                unset($responses, $response);
+                foreach (array_filter($sinks) as $sink) {
+                    @unlink($sink);
+                }
             }
-            unset($responses);
 
             // The round's takes, checked against their texts and the voice so far:
             // one that stands out is taken once more, and the better one is kept.
@@ -861,12 +885,45 @@ class GeminiTtsProvider implements TtsProviderInterface
             $this->getKeyManager()->markOutForSpendingCap($keyInfo['name']);
         }
 
-        // Once for the batch: its other pieces went on the same key.
-        if (($this->currentKeyInfo['name'] ?? null) === $keyInfo['name'] && count($this->getKeyManager()->getAllKeys()) > 1) {
-            $this->rotateToNextKey();
+        // The key in use moves on from it; a round's other key at its minute's
+        // limit is set aside for the minute, so the next round skips it.
+        if (($this->currentKeyInfo['name'] ?? null) === $keyInfo['name']) {
+            if (count($this->getKeyManager()->getAllKeys()) > 1) {
+                $this->rotateToNextKey();
+            }
+        } elseif ($status === 429 && ! $spendingCap && ! GeminiKeyManager::isDailyQuotaError($status, $body)) {
+            $this->getKeyManager()->markKeyExhausted($keyInfo['name']);
         }
 
         return true;
+    }
+
+    /**
+     * The keys a round of pieces goes out on: every key with room this minute
+     * and today, the least used first; at least the key in use.
+     *
+     * @return array<int, array{key: string, name: string, index: int}>
+     */
+    private function keysForRound(): array
+    {
+        $manager = $this->getKeyManager();
+        $keys = count($manager->getAllKeys()) > 1 ? $manager->keysWithRoom($this->currentModel) : [];
+
+        return $keys !== [] ? $keys : [$this->currentKeyInfo ?? $this->getAvailableKey()];
+    }
+
+    /**
+     * How many pieces are read at the same time over $keys keys:
+     * services.gemini_tts.max_parallel_requests on each key (each has its own
+     * limits), at most services.gemini_tts.max_parallel_total. With 3 keys,
+     * 12: the 8,000 characters Studio Max allows (about 10 pieces) are read in
+     * one round of about half a minute, where 4 on one key took 3.
+     */
+    private function piecesAtOnce(int $keys): int
+    {
+        $perKey = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
+
+        return max(1, min(max(1, (int) config('services.gemini_tts.max_parallel_total', 12)), $perKey * max(1, $keys)));
     }
 
     /**

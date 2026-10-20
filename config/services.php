@@ -94,6 +94,8 @@ return [
         // Longer single-voice texts are read in pieces sent at the same time.
         'max_chars_per_request' => (int) env('GEMINI_TTS_MAX_CHARS_PER_REQUEST', 900),
         'max_parallel_requests' => (int) env('GEMINI_TTS_MAX_PARALLEL_REQUESTS', 4),
+        // At most this many pieces of a long text at the same time, over all the keys (4 on each).
+        'max_parallel_total' => (int) env('GEMINI_TTS_MAX_PARALLEL_TOTAL', 12),
         // Each piece of a long text is checked before it is joined, and one that
         // stops early, repeats itself, stalls or strays from the voice's pace or
         // pitch is taken once more (App\Support\PieceCheck).

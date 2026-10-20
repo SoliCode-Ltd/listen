@@ -33,10 +33,11 @@ echo 'Now (UTC): ', now()->utc()->toDateTimeString(), "\n\n";
 
 $maxChars = max(200, (int) config('services.gemini_tts.max_chars_per_request', 900));
 $parallel = max(1, (int) config('services.gemini_tts.max_parallel_requests', 4));
+$keyCount = count(app(GeminiKeyManager::class)->getAllKeys());
+$together = max(1, min(max(1, (int) config('services.gemini_tts.max_parallel_total', 12)), $parallel * max(1, $keyCount)));
 echo "== How a long premium voice is made ==\n";
-printf("Model: %s. Pieces of up to %d characters, %d at a time; a piece waits up to %d s; %d key(s).\n",
-    (string) config('services.gemini_tts.model'), $maxChars, $parallel, (int) config('services.gemini_tts.timeout_seconds', 60),
-    count(app(GeminiKeyManager::class)->getAllKeys()));
+printf("Model: %s. Pieces of up to %d characters, %d at a time on each key and %d in all; a piece waits up to %d s; %d key(s).\n",
+    (string) config('services.gemini_tts.model'), $maxChars, $parallel, $together, (int) config('services.gemini_tts.timeout_seconds', 60), $keyCount);
 printf("Made after the reply from %d characters; piece check %s.\n\n",
     (int) config('listen.audio.force_async_chars', 2500), config('services.gemini_tts.check_pieces', true) ? 'on' : 'off');
 
@@ -68,7 +69,7 @@ AudioGeneration::query()
     ->where('is_dialogue', false)
     ->whereNotNull('tts_latency_ms')
     ->where('created_at', '>=', now()->subDays(60))
-    ->select(['id', 'input_text', 'target_language', 'duration_seconds', 'tts_latency_ms', 'tts_model'])
+    ->select(['id', 'input_text', 'target_language', 'duration_seconds', 'tts_latency_ms', 'tts_model', 'settings_snapshot'])
     ->chunkById(500, function ($generations) use (&$rows, $piecesOf, $parallel): void {
         foreach ($generations as $g) {
             $text = (string) $g->input_text;
@@ -82,6 +83,9 @@ AudioGeneration::query()
                 'audio' => (float) $g->duration_seconds,
                 'making' => $g->tts_latency_ms / 1000,
                 'model' => (string) $g->tts_model,
+                // Kept on voices made since pieces went out over every key (GeminiTtsProvider).
+                'at_once' => (int) ((($g->settings_snapshot ?? [])['pieces_check'] ?? [])['pieces_at_once'] ?? 0),
+                'peak_mb' => (int) ((($g->settings_snapshot ?? [])['pieces_check'] ?? [])['peak_memory_mb'] ?? 0),
             ];
         }
     });
@@ -105,7 +109,7 @@ foreach ([[1, 1], [2, 4], [5, 8], [9, 16], [17, 32], [33, 64], [65, 100000]] as 
         $quantile(array_column($set, 'making'), .5), $quantile(array_column($set, 'making'), .9),
         $quantile($rounds, .5), $quantile($speed, .5));
 }
-echo "(medians; \"per round\" is the making time over the rounds of {$parallel} pieces; \"audio a second\" is the seconds of audio one second of making gave)\n\n";
+echo "(medians, of voices made {$parallel} pieces at a time on one key; \"per round\" is the making time over those rounds; \"audio a second\" is the seconds of audio one second of making gave)\n\n";
 
 $long = array_values(array_filter($rows, fn ($r) => $r['pieces'] > 1));
 $charsPerAudioSecond = ['ar' => [], 'en' => []];
@@ -126,17 +130,21 @@ foreach (Plan::query()->orderBy('price_cents')->get() as $plan) {
     }
     $pieces = (int) ceil($limit / ($maxChars * 0.95));
     $rounds = (int) ceil($pieces / $parallel);
-    printf("  %-12s %s up to %s characters: about %d pieces, %d rounds, %.0f min to make (p90 %.0f min); %.1f h of Arabic audio or %.1f h of English\n",
-        $plan->slug, $plan->is_active ? '(on sale)' : '(off)', number_format($limit), $pieces, $rounds, $rounds * $roundTime / 60, $rounds * $roundTime90 / 60,
-        $limit / max(1, $quantile($charsPerAudioSecond['ar'], .5)) / 3600, $limit / max(1, $quantile($charsPerAudioSecond['en'], .5)) / 3600);
+    // Spread over the keys (GeminiTtsProvider::piecesAtOnce()), a round is as slow as its slowest piece: about the p90.
+    $spread = (int) ceil($pieces / $together);
+    printf("  %-12s %s up to %s characters: about %d pieces; %d at a time on one key: %d rounds, %.1f min (p90 %.1f min); %d at a time over the keys: %d round(s), about %.1f min; %.1f min of Arabic audio or %.1f min of English\n",
+        $plan->slug, $plan->is_active ? '(on sale)' : '(off)', number_format($limit), $pieces, $parallel, $rounds, $rounds * $roundTime / 60, $rounds * $roundTime90 / 60,
+        $together, $spread, $spread * $roundTime90 / 60,
+        $limit / max(1, $quantile($charsPerAudioSecond['ar'], .5)) / 60, $limit / max(1, $quantile($charsPerAudioSecond['en'], .5)) / 60);
 }
 echo "\n";
 
 echo "== The longest premium voices made in the last 60 days ==\n";
 usort($rows, fn ($a, $b) => $b['chars'] <=> $a['chars']);
 foreach (array_slice($rows, 0, 12) as $r) {
-    printf("  #%d %s, %s chars, %d pieces: %.1f min of audio made in %.1f min\n",
-        $r['id'], $r['model'] ?: '-', number_format($r['chars']), $r['pieces'], $r['audio'] / 60, $r['making'] / 60);
+    printf("  #%d %s, %s chars, %d pieces: %.1f min of audio made in %.1f min%s\n",
+        $r['id'], $r['model'] ?: '-', number_format($r['chars']), $r['pieces'], $r['audio'] / 60, $r['making'] / 60,
+        $r['at_once'] > 0 ? sprintf(' (%d at a time, peak memory %d MB)', $r['at_once'], $r['peak_mb']) : '');
 }
 echo "\n";
 

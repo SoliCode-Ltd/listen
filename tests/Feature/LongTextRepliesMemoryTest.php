@@ -71,6 +71,36 @@ class LongTextRepliesMemoryTest extends TestCase
         $this->assertLessThan(8 * 1048576, $growth, 'three times the text, about the same memory');
     }
 
+    public function test_a_full_round_over_three_keys_stays_well_within_the_live_servers_memory(): void
+    {
+        $keys = [
+            ['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1],
+            ['key' => 'k2', 'name' => 'GEMINI_TTS_API_KEY_2', 'index' => 2],
+            ['key' => 'k3', 'name' => 'GEMINI_TTS_API_KEY_3', 'index' => 3],
+        ];
+        $manager = \Mockery::mock(GeminiKeyManager::class);
+        $manager->shouldReceive('getAllKeys')->andReturn($keys);
+        $manager->shouldReceive('getAvailableKey')->andReturn($keys[0]);
+        $manager->shouldReceive('keysWithRoom')->andReturn($keys);
+        $manager->shouldReceive('recordUsage')->andReturnNull();
+        $this->app->instance(GeminiKeyManager::class, $manager);
+        // Twelve pieces read at once, each a long piece's 70 seconds of audio (900 characters).
+        $pcm = str_repeat($this->fiftySeconds(), 2);
+        $pcm = substr($pcm, 0, 70 * 48000);
+        $this->fake(['candidates' => [['content' => ['parts' => [['inlineData' => ['mimeType' => 'audio/L16;codec=pcm;rate=24000', 'data' => base64_encode($pcm)]]]]]]]);
+        unset($pcm);
+        $text = trim(str_repeat('The rain had stopped by the time we reached the old bridge over the river and waited there. ', 24));
+
+        gc_collect_cycles();
+        $before = memory_get_usage();
+        memory_reset_peak_usage();
+        app(GeminiTtsProvider::class)->synthesize($text, 'en', ['voice_name' => 'Kore', 'gender' => 'female']);
+        $peak = memory_get_peak_usage() - $before;
+
+        // Live's web server allows 512 MB (a voice made after the reply raises it to 1 GB); the app itself takes about 40.
+        $this->assertLessThan(150 * 1048576, $peak, 'a round of twelve long pieces: '.round($peak / 1048576).' MB');
+    }
+
     /**
      * How much more memory 24 pieces take than 8.
      */

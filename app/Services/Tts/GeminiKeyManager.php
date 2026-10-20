@@ -94,23 +94,36 @@ class GeminiKeyManager
      */
     public function getAvailableKey(?string $model = null): ?array
     {
-        $keys = $this->getAllKeys();
+        return $this->keysWithRoom($model)[0] ?? null;
+    }
 
-        foreach ($keys as $keyInfo) {
+    /**
+     * The keys with room left this minute and today (not out for the day on
+     * this model, nor stopped by their spending cap), the least used this
+     * minute first, then in their order. Each key has its own limits, so
+     * handing out the least used one spreads the voices over all of them:
+     * before, every request went to the first key until it hit its limit
+     * (on live in October 2026 the first key was set aside 94 times in two
+     * weeks, the second 3 times, the third never).
+     *
+     * @return array<int, array{key: string, name: string, index: int}>
+     */
+    public function keysWithRoom(?string $model = null): array
+    {
+        $keys = [];
+        foreach ($this->getAllKeys() as $keyInfo) {
             if ($model !== null && $this->isOutForToday($keyInfo['name'], $model)) {
                 continue;
             }
             $stats = $this->getKeyStats($keyInfo['name']);
-            
-            // Check if key has capacity
-            if ($stats['rpm_remaining'] > 0 && 
-                $stats['rpd_remaining'] > 0 && 
-                $stats['tpm_remaining'] > 1000) { // Need at least 1K tokens
-                return $keyInfo;
+            // Need at least 1K tokens.
+            if ($stats['rpm_remaining'] > 0 && $stats['rpd_remaining'] > 0 && $stats['tpm_remaining'] > 1000) {
+                $keys[] = [$stats['rpm_used'], $keyInfo];
             }
         }
+        usort($keys, fn (array $a, array $b): int => [$a[0], $a[1]['index']] <=> [$b[0], $b[1]['index']]);
 
-        return null;
+        return array_column($keys, 1);
     }
 
     /**
