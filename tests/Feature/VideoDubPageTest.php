@@ -368,6 +368,55 @@ class VideoDubPageTest extends TestCase
             ->assertStatus(422);
     }
 
+    public function test_the_chosen_voice_reads_every_line_unless_each_person_is_asked_for(): void
+    {
+        $this->openToEveryone();
+        // A man who talks most, and lines the model gave to a woman and to a second man.
+        Http::fake(['*' => Http::response(['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'music',
+            'speakers' => [['id' => 'A', 'gender' => 'male', 'voice' => 'older man'], ['id' => 'B', 'gender' => 'female', 'voice' => 'young woman'], ['id' => 'C', 'gender' => 'male']],
+            'segments' => [
+                ['start' => 0.2, 'end' => 3.0, 'speaker' => 'A', 'original' => 'One.', 'dubbed' => 'واحد.'],
+                ['start' => 3.2, 'end' => 4.4, 'speaker' => 'B', 'original' => 'Two.', 'dubbed' => 'اثنان.'],
+                ['start' => 4.6, 'end' => 5.8, 'speaker' => 'C', 'original' => 'Three.', 'dubbed' => 'ثلاثة.'],
+            ]])]]]]], 'usageMetadata' => []])]);
+        foreach (['Kore' => 'female', 'Charon' => 'male', 'Leda' => 'female'] as $name => $gender) {
+            Voice::query()->create(['internal_voice_id' => 'gemini-ar-'.$name, 'language' => 'ar', 'gender' => $gender, 'tier' => 'hd',
+                'display_name' => $name, 'is_active' => true, 'provider' => 'gemini', 'provider_voice_id' => $name]);
+        }
+        $used = [];
+        $ffmpeg = AudioFormats::ffmpegPath();
+        $tts = \Mockery::mock(GeminiTtsProvider::class);
+        $tts->shouldReceive('synthesize')->andReturnUsing(function (string $text, string $language, array $config) use (&$used, $ffmpeg) {
+            $used[$text] = $config;
+            $path = 'audio/line-'.bin2hex(random_bytes(3)).'.mp3';
+            @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
+            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=500:duration=1', '-c:a', 'libmp3lame', Storage::disk('public')->path($path)]))->mustRun();
+
+            return ['audio_path' => $path, 'duration_seconds' => 1];
+        });
+        $keys = \Mockery::mock(GeminiKeyManager::class);
+        $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
+        $keys->shouldReceive('recordUsage');
+        $this->app->instance(VideoDubber::class, new VideoDubber($keys, $tts));
+        $user = $this->member(dubbing: true);
+        // The member picks a woman's voice for a video a man narrates.
+        $kore = VoiceCatalog::keyFromId((int) Voice::query()->where('provider_voice_id', 'Kore')->value('id'));
+
+        $this->actingAs($user)->post(route('dub.store'), ['voice_key' => $kore] + $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
+        $this->assertSame(['Kore', 'Kore', 'Kore'], array_values(array_column($used, 'voice_name')), 'by default the chosen voice reads every line');
+        foreach ($used as $config) {
+            $this->assertStringNotContainsString('older man', $config['style_prompt'] ?? '', 'no other person\'s description read in the chosen voice');
+        }
+
+        // Asked for: each person their own voice, a woman's for the woman.
+        $used = [];
+        $this->actingAs($this->member(dubbing: true))->post(route('dub.store'), ['voice_key' => $kore, 'each_speaker' => '1'] + $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
+        $this->assertSame('Kore', $used['واحد.']['voice_name']);
+        $this->assertNotSame('Kore', $used['اثنان.']['voice_name']);
+        $this->assertSame('female', Voice::query()->where('provider_voice_id', $used['اثنان.']['voice_name'])->value('gender'));
+        $this->assertTrue(VideoDub::query()->latest('id')->first()->each_speaker);
+    }
+
     public function test_a_member_whose_credits_follow_the_plan_dates_can_dub(): void
     {
         // As on the servers: credits counted from the plan's own dates, so the period reads "2026-10-20 20:17".

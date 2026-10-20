@@ -36,8 +36,7 @@ use Symfony\Component\Process\Process;
  *      network) splits the original into its voices and the rest; the rest
  *      plays all through, and the original voices only between the new
  *      lines (where they are crowds, singing, recitation in the background),
- *      never under one, where the music goes 6 dB down as a dubbing mixer
- *      sets it. Where the model is not set up or busy, filters take
+ *      never under one. Where the model is not set up or busy, filters take
  *      the old voice out under each new line (only the sides of a stereo mix
  *      stay there; a mono track goes quiet). A preview copy carries the
  *      Listen mark, which means encoding the picture again.
@@ -77,8 +76,6 @@ final class VideoDubber
 
     private const BRIDGE = 1.0;
 
-    /** How far the music and effects go down under a new line, as a dubbing mixer would (6 dB), so the voice sits clear above them. */
-    private const DUCK = 0.5;
 
     /** The most a line is turned up or down to the original speaker's loudness (more raised its breaths and noises). */
     private const MAX_GAIN_DB = 6.0;
@@ -109,7 +106,7 @@ final class VideoDubber
      * $o['progress'] hears each step: listening, voicing (line, of lines),
      * mixing, marking.
      *
-     * @param  array{language: string, dialect: string, voice: string, voices?: array<string, array<int, string>>, style?: ?string, emotion?: ?string, background?: string, preview?: bool, out_dir: string, name: string, progress?: callable(string, int, int): void}  $o
+     * @param  array{language: string, dialect: string, voice: string, voices?: array<string, array<int, string>>, each_speaker?: bool, style?: ?string, emotion?: ?string, background?: string, preview?: bool, out_dir: string, name: string, progress?: callable(string, int, int): void}  $o
      * @return array<string, mixed>
      */
     public function dub(string $video, array $o): array
@@ -151,8 +148,9 @@ final class VideoDubber
 
             // 3. Each line voiced, with the site's own rewrite off: the lines are already in the dialect.
             $voices = self::assignVoices($heard['speakers'], $segments, $o['voice'], (array) ($o['voices'] ?? []));
-            // Each person's voice, described once and given with every line, so it stays the same voice.
-            $characters = array_column($heard['speakers'], 'voice', 'id');
+            // With a voice for each person: how each speaks, described once and given with every line, so it stays the same.
+            // With one voice for all, none: a description of one person read in the voice chosen for another changed it.
+            $characters = ($o['each_speaker'] ?? false) ? array_column($heard['speakers'], 'voice', 'id') : [];
             $report['speakers'] = array_values(array_map(fn (array $s): array => $s + ['voice' => $voices[$s['id']] ?? $o['voice']], $heard['speakers']));
             $t = microtime(true);
             $rewrite = config('services.gemini_tts.dialect_rewrite');
@@ -486,8 +484,8 @@ final class VideoDubber
         $prompt = "You are preparing a professional dub of a video. Listen to its audio closely.\n"
             ."1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
             ."with its start and end in seconds from the beginning of the audio.\n"
-            ."2. Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe their voice for a voice actor "
-            ."in at most 12 words of English (age, pitch, pace, character, for example \"warm older man, slow and calm, documentary narrator\"). "
+            ."2. Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe how they speak for a voice actor "
+            ."in at most 10 words of English: pace, energy and manner only, not age or gender (for example \"slow and calm, documentary narrator\"). "
             ."One person is one letter all through, also across music, pauses or a change of mood; give a new letter only when a clearly different person speaks.\n"
             ."3. For each segment say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
             ."that fits best: {$emotions}; \"delivery\" is a short direction in English (energy, pace, loudness, attitude), at most 15 words, "
@@ -648,8 +646,8 @@ final class VideoDubber
                 array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $track);
             }
             $under = self::underLines($plan);
-            // The music and effects a little down under each new line, as a dubbing mixer sets them.
-            $filters[] = '['.$next.":a]aresample=48000,volume='1-".self::DUCK."*({$under})':eval=frame[bg]";
+            // The music and effects as they were, all through.
+            $filters[] = '['.$next.':a]aresample=48000[bg]';
             $filters[] = '['.($next + 1).":a]aresample=48000,volume='1-({$under})':eval=frame[ov]";
             $filters[] = '[bg][ov][dub]amix=inputs=3:normalize=0:dropout_transition=0,'.self::LIMITER.'[mix]';
             $audioOut = '[mix]';

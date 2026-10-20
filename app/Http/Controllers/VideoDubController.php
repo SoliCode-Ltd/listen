@@ -158,6 +158,8 @@ class VideoDubController extends Controller
             'performance_style' => ['nullable', 'string', Rule::in(TtsStudioConfig::performanceStyleValues())],
             'emotion' => ['nullable', 'string', Rule::in(TtsStudioConfig::emotionValues())],
             'background' => ['nullable', Rule::in(['keep', 'replace'])],
+            // Off: the chosen voice reads every line. On: each person in the video their own voice.
+            'each_speaker' => ['nullable', 'boolean'],
         ])->validate();
         $voice = VideoDubbing::voiceName($validated['voice_key'], $language);
         if ($voice === null) {
@@ -207,6 +209,7 @@ class VideoDubController extends Controller
             'performance_style' => $validated['performance_style'] ?? null,
             'emotion' => $validated['emotion'] ?? null,
             'keep_background' => ($validated['background'] ?? 'keep') !== 'replace',
+            'each_speaker' => (bool) ($validated['each_speaker'] ?? false),
             'original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 200),
             'video_seconds' => min($probe['seconds'], $max),
             'folder' => $folder,

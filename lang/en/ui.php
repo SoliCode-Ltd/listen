@@ -2032,6 +2032,8 @@ return [
         'change_video' => 'Choose another video',
         'keep_title' => 'Keep the music and sound effects',
         'keep_hint' => 'Only the voices change. Turn this off to replace all the sound.',
+        'each_speaker_title' => 'A different voice for each person',
+        'each_speaker_hint' => 'Off: your chosen voice reads every line. On: each person in the video gets a voice of their own.',
         'voice_label' => 'Main voice',
         'your_dubs' => 'Your dubbed videos',
         'allowance_label' => 'Free video',

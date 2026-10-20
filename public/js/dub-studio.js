@@ -152,6 +152,7 @@
     var meter = q('[data-dub-meter]');
     var errorBox = q('[data-dub-error]');
     var keep = q('[data-dub-keep]');
+    var eachSpeaker = q('[data-dub-each-speaker]');
     var voiceSelect = form.querySelector('select[name="voice_key"]');
     var dialectSelect = form.querySelector('select[name="dialect"]');
     var chosen = null;
@@ -209,6 +210,7 @@
       var canSend = name === 'chosen' && allowed();
       submit.disabled = !canSend;
       keep.closest('.dub-toggle').hidden = name === 'lock' || name === 'done';
+      eachSpeaker.closest('.dub-toggle').hidden = name === 'lock' || name === 'done';
     }
     function allowed() { return c.state === 'free' || c.state === 'paid'; }
     function showError(message) {
@@ -505,6 +507,7 @@
       var data = new FormData(form);
       data.delete('video');
       data.set('background', keep.checked ? 'keep' : 'replace');
+      data.set('each_speaker', eachSpeaker.checked ? '1' : '0');
       working('upload', 0, t.working_upload, t.working_upload_note);
       deviceSignal().then(function (d) {
         var device = d.id ? { 'X-Client-Device': d.id, 'X-Client-Device-Touch': d.touch ? '1' : '0' } : {};

@@ -84,7 +84,7 @@ class VideoDubberTest extends TestCase
 
         $dubber = new VideoDubber($keys, $tts);
         $stages = [];
-        $r = $dubber->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'voices' => ['male' => ['Puck', 'Orus'], 'female' => ['Kore', 'Leda']],
+        $r = $dubber->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'voices' => ['male' => ['Puck', 'Orus'], 'female' => ['Kore', 'Leda']], 'each_speaker' => true,
             'out_dir' => $this->dir, 'name' => 'out', 'progress' => function (string $stage) use (&$stages) { $stages[] = $stage; }]);
 
         // The one who says the most reads in the member's voice, the woman in a woman's voice; each line in the original's mood.
@@ -219,7 +219,7 @@ class VideoDubberTest extends TestCase
         // One that hears it all as music: it plays all through, under the new line too.
         $this->fakeSeparator('cp "$in" "$rest"; head -c "$(stat -c %s "$in")" /dev/zero > "$voices"');
         $out = $this->dubSilently($video, 'music', 'music-only');
-        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2) - 6, $this->level($out['file'], 1.4, 1.2), 1.5, 'the music under the new line, 6 dB down as a dubbing mixer sets it');
+        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2), $this->level($out['file'], 1.4, 1.2), 1.5, 'the music under the new line, as it was');
         $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'and between lines');
 
         // When it fails, the filters take over: the original between lines, nothing of a mono voice under them.
