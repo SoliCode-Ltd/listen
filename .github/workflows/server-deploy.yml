@@ -79,6 +79,11 @@ name: Server deploy
 #            length, the speaking rates by language and engine, and a fit of
 #            the seconds against what the texts hold. Totals only, never a
 #            text or a member (scripts/support/speech_rates.php).
+#   plan-lines: read-only (READ ONLY database session). Which plans' own card
+#            lines still say "Priority Queue" / "Processing priority" /
+#            "أولوية المعالجة", with each plan's lines before as JSON.
+#            plan-lines-apply takes those lines out (and only those), printing
+#            the same backup (scripts/support/plan_lines.php).
 #   owner-todo: read-only (READ ONLY database session). Whether the things
 #            only the owner changes in the admin are still to do: plan card
 #            lines that promise a queue or priority, saved plan descriptions,
@@ -112,7 +117,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, plan-lines, plan-lines-apply, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -389,6 +394,11 @@ jobs:
           fi
           if [ "$MODE" = speech-rates ]; then
             tool speech_rates.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = plan-lines ] || [ "$MODE" = plan-lines-apply ]; then
+            tool plan_lines.php | $S "$FIND; APPLY=$([ "$MODE" = plan-lines-apply ] && echo 1 || echo 0) php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
