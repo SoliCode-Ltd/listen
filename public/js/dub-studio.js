@@ -119,7 +119,8 @@
     if (m > 0) return t.minutes.replace(':m', m);
     return t.seconds.replace(':s', s);
   }
-  function num(n) { return Number(n || 0).toLocaleString(document.documentElement.lang === 'ar' ? 'ar-EG' : 'en-US'); }
+  // Western digits in both languages, as the rest of the site writes numbers.
+  function num(n) { return Number(n || 0).toLocaleString('en-US'); }
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
