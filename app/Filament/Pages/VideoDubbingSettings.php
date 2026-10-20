@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\SiteSetting;
 use App\Models\VideoDub;
 use App\Services\Dubbing\DriveArchive;
+use App\Services\Dubbing\VoiceSeparator;
 use App\Support\VideoDubbing;
 use App\Support\VoiceCloningAccess;
 use Filament\Forms;
@@ -51,6 +52,7 @@ class VideoDubbingSettings extends Page implements HasForms
             'video_dubbing_free_max_seconds' => VideoDubbing::freeMaxSeconds(),
             'video_dubbing_free_keep_hours' => VideoDubbing::freeKeepHours(),
             'video_dubbing_drive_enabled' => DriveArchive::enabled(),
+            'video_dubbing_separation' => VoiceSeparator::enabled(),
             'video_dubbing_server_keep_days' => VideoDubbing::serverKeepDays(),
             'video_dubbing_drive_client_id' => (string) SiteSetting::get('video_dubbing_drive_client_id', ''),
             // Never shown back: left empty keeps the saved one.
@@ -117,6 +119,29 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->suffix('hours')
                             ->required()
                             ->helperText('Then the member no longer sees it. A plan\'s videos stay as long as the plan keeps voices (Plans → "Recent Voices Retention").'),
+                    ]),
+                Forms\Components\Section::make('Taking the old voices out')
+                    ->description('Before the new voices go in, a separation model on this server takes the original voices out of the video\'s sound and keeps its music and effects, so no old voice is heard under a new one. Without it, simple filters are used, which leave some of the old voice.')
+                    ->schema([
+                        Forms\Components\Placeholder::make('separator_status')
+                            ->label('Status')
+                            ->content(fn (): HtmlString => self::separatorStatus()),
+                        Forms\Components\Actions::make([
+                            Forms\Components\Actions\Action::make('install_separator')
+                                ->label(fn (): string => VoiceSeparator::installed() ? 'Install again' : 'Install on this server')
+                                ->icon('heroicon-o-arrow-down-tray')
+                                ->color(fn (): string => VoiceSeparator::installed() ? 'gray' : 'primary')
+                                ->requiresConfirmation()
+                                ->modalHeading('Install the voice separation?')
+                                ->modalDescription('Downloads about 190 MB (the model and what runs it) and tests it, in the background. It takes a minute or two; refresh this page to see how it went. Dubs keep working meanwhile.')
+                                ->action(function (): void {
+                                    VoiceSeparator::installAfterResponse();
+                                    Notification::make()->title('Installing in the background: refresh this page in a minute or two.')->success()->send();
+                                }),
+                        ]),
+                        Forms\Components\Toggle::make('video_dubbing_separation')
+                            ->label('Use it for every dub')
+                            ->helperText('On: the old voices are taken out of the whole track. Off: the filters only.'),
                     ]),
                 Forms\Components\Section::make('Where the videos are kept')
                     ->description('Members see their videos only while their time lasts. You keep every video and all the figures here, in Video Dubbing → Dubs.')
@@ -195,6 +220,28 @@ class VideoDubbingSettings extends Page implements HasForms
             ->statePath('data');
     }
 
+    /** Installed or not, what it needs, and how the last install went. */
+    private static function separatorStatus(): HtmlString
+    {
+        $install = VoiceSeparator::installStatus();
+        $last = $install === null ? '' : match ($install['state']) {
+            'running' => '<br>Installing now: '.e($install['message']),
+            'failed' => '<br><span style="color:#b91c1c;font-weight:600">The last install failed: '.e($install['message']).'</span>',
+            default => '',
+        };
+        if (VoiceSeparator::installed()) {
+            $d = VoiceSeparator::details() ?? [];
+
+            return new HtmlString(sprintf('<strong>Installed</strong>%s. One dub uses it at a time (about 1.4 GB of memory while it runs); a dub that cannot wait for it uses the filters.%s',
+                isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '', $last));
+        }
+        $python = VoiceSeparator::python();
+
+        return new HtmlString(($python === null
+            ? '<strong>Not installed.</strong> This server has no Python 3 in the usual places, which it needs. Ask the host to install python3 (or set LISTEN_DUB_SEPARATOR_PYTHON to where it is), then press Install.'
+            : '<strong>Not installed.</strong> Press Install (or run <code>php artisan dubs:separator install</code> on the server). Until then dubs use the filters.').$last);
+    }
+
     /** Connected to which account, or what to set up first. */
     private static function driveStatus(): HtmlString
     {
@@ -221,6 +268,7 @@ class VideoDubbingSettings extends Page implements HasForms
         SiteSetting::set('video_dubbing_free_max_seconds', max(5, min(180, (int) ($state['video_dubbing_free_max_seconds'] ?? 60))), self::GROUP);
         SiteSetting::set('video_dubbing_free_keep_hours', max(1, min(168, (int) ($state['video_dubbing_free_keep_hours'] ?? 24))), self::GROUP);
         SiteSetting::set('video_dubbing_drive_enabled', ! empty($state['video_dubbing_drive_enabled']) ? '1' : '0', self::GROUP);
+        SiteSetting::set('video_dubbing_separation', ! empty($state['video_dubbing_separation']) ? '1' : '0', self::GROUP);
         SiteSetting::set('video_dubbing_server_keep_days', max(0, min(3650, (int) ($state['video_dubbing_server_keep_days'] ?? 30))), self::GROUP);
         SiteSetting::set('video_dubbing_drive_client_id', trim((string) ($state['video_dubbing_drive_client_id'] ?? '')), self::GROUP);
         $secret = trim((string) ($state['video_dubbing_drive_client_secret'] ?? ''));

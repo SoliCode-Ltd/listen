@@ -114,6 +114,14 @@ class VideoDubResource extends Resource
                     Infolists\Components\TextEntry::make('performance_style')->label('Style')->placeholder('—'),
                     Infolists\Components\TextEntry::make('emotion')->placeholder('—'),
                     Infolists\Components\TextEntry::make('report.segments')->label('Lines spoken')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('report.separation.method')
+                        ->label('Old voices taken out by')
+                        ->formatStateUsing(fn (?string $state): string => match ($state) {
+                            'model' => 'The separation model',
+                            'filters' => 'Filters (the model was not set up, busy or failed)',
+                            default => '—',
+                        })
+                        ->placeholder('—'),
                     Infolists\Components\TextEntry::make('report.fit.sped_up')
                         ->label('Lines sped up to fit')
                         ->state(fn (VideoDub $r): ?string => isset($r->report['fit']) ? $r->report['fit']['sped_up'].' (fastest ×'.$r->report['fit']['max_tempo'].')' : null)

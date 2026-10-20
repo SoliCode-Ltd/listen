@@ -246,9 +246,9 @@ class VideoDubController extends Controller
         return response()->json(VideoDubbing::present($dub) + ['studio' => $this->studioAfter($user, $request)], 202);
     }
 
-    public function status(Request $request, int $id): JsonResponse
+    public function status(Request $request, string $code): JsonResponse
     {
-        return response()->json(VideoDubbing::present($this->ownDub($request, $id)));
+        return response()->json(VideoDubbing::present($this->ownDub($request, $code)));
     }
 
     /**
@@ -256,9 +256,9 @@ class VideoDubController extends Controller
      * from the server or, once it is there, from the site's Google Drive.
      * Only while it is kept (VideoDubbing::availableUntil()).
      */
-    public function watch(Request $request, int $id): Response
+    public function watch(Request $request, string $code): Response
     {
-        $dub = $this->ownDub($request, $id);
+        $dub = $this->ownDub($request, $code);
         abort_unless(VideoDubbing::available($dub), 404);
         if ($dub->drive_file_id) {
             return app(DriveArchive::class)->stream($dub->drive_file_id, $request->header('Range'), 'listen-dub-'.$dub->id.'.mp4', false);
@@ -274,9 +274,9 @@ class VideoDubController extends Controller
      * The copy without the mark: a plan with dubbing only. A free dub made
      * before subscribing is paid for now, once, then downloaded.
      */
-    public function download(Request $request, int $id): Response
+    public function download(Request $request, string $code): Response
     {
-        $dub = $this->ownDub($request, $id);
+        $dub = $this->ownDub($request, $code);
         $path = $dub->path('dub.mp4');
         abort_unless(VideoDubbing::available($dub) && $dub->has_clean && ($dub->drive_file_id || Storage::disk('local')->exists($path)), 404);
 
@@ -382,8 +382,9 @@ class VideoDubController extends Controller
         return $upload;
     }
 
-    private function ownDub(Request $request, int $id): VideoDub
+    /** A dub of this member's, by the random code its links carry (never by its number). */
+    private function ownDub(Request $request, string $code): VideoDub
     {
-        return VideoDub::query()->whereKey($id)->where('user_id', (int) $request->user()->id)->firstOrFail();
+        return VideoDub::query()->where('code', $code)->where('user_id', (int) $request->user()->id)->firstOrFail();
     }
 }

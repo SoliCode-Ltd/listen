@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Str;
 
 /**
  * A video a member sent to "Dub my video" (App\Http\Controllers\VideoDubController).
@@ -65,6 +66,14 @@ class VideoDub extends Model
         'keep_background' => 'boolean',
         'archived_at' => 'datetime',
     ];
+
+    /** Each dub's links carry a random code, never its number (VideoDubController). */
+    protected static function booted(): void
+    {
+        static::creating(function (VideoDub $dub): void {
+            $dub->code ??= Str::random(32);
+        });
+    }
 
     public function user(): BelongsTo
     {

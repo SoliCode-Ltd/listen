@@ -98,9 +98,9 @@ class VideoDubPageTest extends TestCase
         $this->assertFalse(Storage::disk('local')->exists($dub->path('source.mp4')), 'the upload is deleted once dubbed');
         $this->assertSame(0, (int) UsageCounter::query()->where('user_id', $user->id)->value('total_chars'));
 
-        $this->get(route('dub.watch', ['id' => $dub->id]))->assertOk();
+        $this->get(route('dub.watch', ['code' => $dub->code]))->assertOk();
         // The clean copy needs a plan with dubbing.
-        $this->get(route('dub.download', ['id' => $dub->id]))->assertRedirect();
+        $this->get(route('dub.download', ['code' => $dub->code]))->assertRedirect();
 
         $this->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])
             ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.free_used'));
@@ -112,7 +112,7 @@ class VideoDubPageTest extends TestCase
             ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.free_used'));
 
         // Nobody else can watch it.
-        $this->get(route('dub.watch', ['id' => $dub->id]))->assertNotFound();
+        $this->get(route('dub.watch', ['code' => $dub->code]))->assertNotFound();
     }
 
     public function test_a_plan_with_dubbing_pays_in_credits_and_downloads_the_clean_copy(): void
@@ -131,7 +131,15 @@ class VideoDubPageTest extends TestCase
         $this->assertSame(VideoDubbing::estimate(6.0)['credits'], (int) UsageCounter::query()->where('user_id', $user->id)->value('total_chars'));
         $this->assertSame(90, VideoDubbing::estimate(6.0)['credits'], 'six seconds of video, six seconds of voice');
 
-        $this->get(route('dub.download', ['id' => $dub->id]))->assertOk()->assertDownload('listen-dub-'.$dub->id.'.mp4');
+        $this->get(route('dub.download', ['code' => $dub->code]))->assertOk()->assertDownload('listen-dub-'.$dub->id.'.mp4');
+
+        // Its links carry a random code, never its number; nobody else can open them.
+        $this->assertMatchesRegularExpression('/^[A-Za-z0-9]{32}$/', (string) $dub->code);
+        $this->assertStringContainsString('/dub-my-video/'.$dub->code.'/download', $sent->json('download_url') ?? VideoDubbing::present($dub->fresh())['download_url']);
+        $this->get('/dub-my-video/'.$dub->id.'/download')->assertNotFound();
+        $this->get('/dub-my-video/'.$dub->id.'/watch')->assertNotFound();
+        $this->actingAs($this->member(dubbing: true))->get(route('dub.download', ['code' => $dub->code]))->assertNotFound();
+        $this->assertNotSame($dub->code, VideoDub::query()->create(['user_id' => $user->id, 'status' => VideoDub::FAILED, 'dialect' => 'ar-SA', 'voice' => 'Puck', 'video_seconds' => 5])->code);
     }
 
     public function test_a_failed_dub_gives_its_credits_back_and_old_files_are_deleted(): void
@@ -273,7 +281,7 @@ class VideoDubPageTest extends TestCase
         $dub = VideoDub::query()->create(['user_id' => $member->id, 'status' => VideoDub::PROCESSING, 'stage' => 'voicing', 'progress' => 47,
             'is_free' => false, 'dialect' => 'ar-EG', 'voice' => 'Puck', 'video_seconds' => 20]);
 
-        $this->actingAs($member)->getJson(route('dub.status', ['id' => $dub->id]))
+        $this->actingAs($member)->getJson(route('dub.status', ['code' => $dub->code]))
             ->assertOk()->assertJsonPath('stage', 'voicing')->assertJsonPath('progress', 47)->assertJsonPath('watch_url', null);
     }
 
@@ -421,7 +429,7 @@ class VideoDubPageTest extends TestCase
         $this->assertFalse(Storage::disk('local')->exists($first->folder), 'the video is deleted');
         $this->assertSame('free', VideoDubbing::studio($free, request())['state']);
         $this->actingAs($free)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202)->assertJsonPath('free', true);
-        $this->actingAs($free)->get(route('dub.watch', ['id' => $first->id]))->assertNotFound();
+        $this->actingAs($free)->get(route('dub.watch', ['code' => $first->code]))->assertNotFound();
 
         // A paid dub: its credits and the month's video come back.
         $paid = $this->member(dubbing: true);

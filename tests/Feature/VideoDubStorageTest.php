@@ -106,17 +106,17 @@ class VideoDubStorageTest extends TestCase
         $this->assertStringContainsString('holiday clip', $this->uploadMeta['name']);
 
         // The member watches it from the site, which reads it from Drive (with the player's range).
-        $watch = $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]), ['Range' => 'bytes=0-'])->assertStatus(206);
+        $watch = $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]), ['Range' => 'bytes=0-'])->assertStatus(206);
         $this->assertSame('VIDEO-BYTES', $watch->streamedContent());
         Http::assertSent(fn (Request $r): bool => str_contains($r->url(), '/files/drive-file-1') && $r->hasHeader('Range', 'bytes=0-'));
-        $this->actingAs($member)->get(route('dub.download', ['id' => $dub->id]))->assertSuccessful()
+        $this->actingAs($member)->get(route('dub.download', ['code' => $dub->code]))->assertSuccessful()
             ->assertHeader('Content-Disposition', 'attachment; filename="listen-dub-'.$dub->id.'.mp4"');
-        $this->actingAs($member)->get(route('dashboard'))->assertOk()->assertSee(route('dub.watch', ['id' => $dub->id]));
+        $this->actingAs($member)->get(route('dashboard'))->assertOk()->assertSee(route('dub.watch', ['code' => $dub->code]));
 
         // Past the plan's days the member no longer sees it; the admin still does.
         $this->travel(8)->days();
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertNotFound();
-        $this->actingAs($member)->get(route('dub.download', ['id' => $dub->id]))->assertNotFound();
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertNotFound();
+        $this->actingAs($member)->get(route('dub.download', ['code' => $dub->code]))->assertNotFound();
         $this->assertSame([], VideoDubbing::recent($member));
         $admin = User::factory()->create(['is_admin' => true]);
         $this->assertSame('VIDEO-BYTES', $this->actingAs($admin)->get(route('admin.video-dubs.file', ['dub' => $dub->id, 'kind' => 'clean']))->assertStatus(206)->streamedContent());
@@ -165,8 +165,8 @@ class VideoDubStorageTest extends TestCase
         // While the member's day lasts it stays on the server, to watch with the mark.
         $this->artisan('dubs:prune')->assertSuccessful();
         $this->assertNull($dub->fresh()->drive_file_id);
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertOk();
-        $watch = route('dub.watch', ['id' => $dub->id]);
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertOk();
+        $watch = route('dub.watch', ['code' => $dub->code]);
         $this->actingAs($member)->get(route('dashboard'))->assertOk()->assertSee($watch)->assertSee(__('ui.dub.kept_free', ['hours' => 24]));
         // Never on the demo: there the studio says it is ready on the dashboard.
         $demo = $this->actingAs($member)->get(route('demo.page'))->assertOk()->assertSee('data-dub-studio', false)->getContent();
@@ -183,7 +183,7 @@ class VideoDubStorageTest extends TestCase
         $this->assertSame('CLEAN-VIDEO', $this->uploaded, 'the copy without the mark is kept');
         $this->assertFalse(Storage::disk('local')->exists($dub->folder));
 
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertNotFound();
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertNotFound();
         $this->actingAs($member)->get(route('dashboard'))->assertOk()->assertDontSee($watch);
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin)->get(route('admin.video-dubs.file', ['dub' => $dub->id, 'kind' => 'clean']))->assertStatus(206);
@@ -199,13 +199,13 @@ class VideoDubStorageTest extends TestCase
         $this->artisan('dubs:prune')->assertSuccessful();
         $this->assertNull($dub->fresh()->drive_file_id, 'not sent to Drive');
         $this->assertSame(1, count($this->made), 'only the folder made when connecting');
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertOk();
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertOk();
 
         // The plan's 7 days are over: the member no longer sees it, the server keeps it for 30.
         $this->travel(10)->days();
         $this->artisan('dubs:prune')->assertSuccessful();
         $this->assertTrue(Storage::disk('local')->exists($dub->path('dub.mp4')));
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertNotFound();
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertNotFound();
 
         $this->travel(21)->days();
         $this->artisan('dubs:prune')->assertSuccessful();
@@ -219,7 +219,7 @@ class VideoDubStorageTest extends TestCase
         $this->travel(90)->days();
         $this->artisan('dubs:prune')->assertSuccessful();
         $this->assertNull($kept->fresh()->files_deleted_at);
-        $this->actingAs($always)->get(route('dub.watch', ['id' => $kept->id]))->assertOk();
+        $this->actingAs($always)->get(route('dub.watch', ['code' => $kept->code]))->assertOk();
     }
 
     public function test_without_drive_connected_nothing_is_sent_and_nothing_breaks(): void
@@ -231,7 +231,7 @@ class VideoDubStorageTest extends TestCase
         $this->artisan('dubs:prune')->assertSuccessful();
         $this->assertNull($dub->fresh()->drive_file_id);
         $this->assertSame([], $this->made);
-        $this->actingAs($member)->get(route('dub.watch', ['id' => $dub->id]))->assertOk();
+        $this->actingAs($member)->get(route('dub.watch', ['code' => $dub->code]))->assertOk();
 
         $admin = User::factory()->create(['is_admin' => true]);
         $this->actingAs($admin)->get(VideoDubbingSettings::getUrl())->assertOk()
@@ -268,6 +268,30 @@ class VideoDubStorageTest extends TestCase
         $this->assertSame(VideoDubbing::maxUploadMb(true), $studio['max_mb'], 'a free member sees the free size');
         $this->assertSame(VideoDubbing::maxUploadMb(), VideoDubbing::studio($this->member(dubbing: true, name: 'Yousef'), request())['max_mb']);
         $this->actingAs($member)->get(route('dub.page'))->assertOk()->assertSee(__('ui.dub.drop_seconds', ['seconds' => 45]));
+    }
+
+    public function test_the_admin_sees_and_installs_the_voice_separation(): void
+    {
+        config(['listen.dubbing.separator.dir' => sys_get_temp_dir().'/separator-'.bin2hex(random_bytes(4))]);
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)->get(VideoDubbingSettings::getUrl())->assertOk()
+            ->assertSee('Taking the old voices out')->assertSee('Not installed')->assertSee('Install on this server');
+        $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::active());
+
+        // The Install button runs it after the reply and keeps how it went for the page.
+        $installer = \Mockery::mock(\App\Services\Dubbing\VoiceSeparator::class)->makePartial();
+        $installer->shouldReceive('install')->atLeast()->once()->andReturnUsing(function (callable $say): void {
+            $say('Testing it…');
+        });
+        $this->app->instance(\App\Services\Dubbing\VoiceSeparator::class, $installer);
+        \App\Services\Dubbing\VoiceSeparator::installAfterResponse();
+        $this->assertSame('running', \App\Services\Dubbing\VoiceSeparator::installStatus()['state']);
+        $this->app->terminate();
+        $this->assertSame('done', \App\Services\Dubbing\VoiceSeparator::installStatus()['state']);
+
+        // Switched off in the settings.
+        Livewire::test(VideoDubbingSettings::class)->fillForm(['video_dubbing_separation' => false])->call('save')->assertHasNoFormErrors();
+        $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::enabled());
     }
 
     private function connect(): void

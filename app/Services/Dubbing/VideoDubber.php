@@ -29,11 +29,14 @@ use Symfony\Component\Process\Process;
  *      style or an emotion for the whole video, in the original's mood;
  *   4. each line is placed at its segment's start (sped up a little, at
  *      most MAX_TEMPO, when it runs past the next one). Where the video has
- *      music or other sound, it stays: under each new line the old voice is
- *      carved out of the original track (what sits in the middle of a
- *      stereo mix is taken out and the voice's frequencies turned down),
- *      and between lines the original plays as it was. A preview copy
- *      carries the Listen mark, which means encoding the picture again.
+ *      music or other sound, it stays, as dubbing studios keep it: the old
+ *      voices are taken out of the whole track by a separation model
+ *      (VoiceSeparator, run on this server while steps 2 and 3 wait on the
+ *      network) and the new voices go over what is left. Where the model is
+ *      not set up or busy, the old voice is taken out under each new line by
+ *      filters (only the sides of a stereo mix stay there; a mono track goes
+ *      quiet) and the original plays between lines. A preview copy carries
+ *      the Listen mark, which means encoding the picture again.
  *
  * It returns what each step took: the model's tokens, the characters voiced,
  * the server's processing time and the files' sizes.
@@ -52,7 +55,17 @@ final class VideoDubber
     /** Seconds over which the original fades between itself and its carved copy around each line. */
     private const RAMP = 0.15;
 
-    public function __construct(private GeminiKeyManager $keys, private GeminiTtsProvider $tts) {}
+    /**
+     * A voice line into stereo at its own level in both sides: ffmpeg's own
+     * conversion (and the one it slips in to make a mix's inputs agree)
+     * turns each side of a mono track 3 dB down.
+     */
+    private const VOICE_STEREO = 'aformat=channel_layouts=mono,pan=stereo|c0=c0|c1=c0';
+
+    /** The separation model's sample rate (resources/dubbing/separate.py). */
+    private const SEPARATION_RATE = 44100;
+
+    public function __construct(private GeminiKeyManager $keys, private GeminiTtsProvider $tts, private ?VoiceSeparator $separator = null) {}
 
     /**
      * $o['voice'] reads the main speaker; $o['voices'] (speech engine voices
@@ -74,6 +87,8 @@ final class VideoDubber
         $tmp = sys_get_temp_dir().'/dub-'.bin2hex(random_bytes(5));
         @mkdir($tmp, 0700, true);
         $made = [];
+        $separator = $this->separator ?? app(VoiceSeparator::class);
+        $separating = null;
 
         try {
             $report['video_seconds'] = $this->duration($ffmpeg, $video);
@@ -82,6 +97,12 @@ final class VideoDubber
             $progress('listening', 0, 1);
             $speech = $tmp.'/speech.mp3';
             $report['extract'] = $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libmp3lame', '-b:a', '32k', $speech]);
+            // The whole sound, for the model that takes the voices out: it works while the lines are heard and voiced.
+            $wantsBackground = ($o['background'] ?? 'keep') !== 'replace' && VoiceSeparator::active() && $this->probe($video)['sound'];
+            if ($wantsBackground) {
+                $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-af', self::stereo($this->probe($video)['channels']).',aresample='.self::SEPARATION_RATE, '-f', 'f32le', $tmp.'/sound.f32']);
+                $separating = $separator->start($tmp.'/sound.f32', $tmp.'/background.f32');
+            }
 
             // 2. What is said, by whom and how, timed, and the dubbed lines.
             $t = microtime(true);
@@ -123,15 +144,25 @@ final class VideoDubber
                 'overrun_seconds' => round(array_sum(array_column($plan, 'overrun')), 2)];
             $keep = ($o['background'] ?? 'keep') !== 'replace' && $heard['background'] !== 'none' && $this->probe($video)['sound'];
             $report['kept_background'] = $keep;
+            $background = null;
+            if ($keep && $wantsBackground) {
+                $t = microtime(true);
+                // Busy with another dub when this one began: it waits its turn here, a few minutes at most.
+                $background = $separating !== null ? $separator->finish($separating) : $separator->run($tmp.'/sound.f32', $tmp.'/background.f32', 240);
+                $separating = null;
+                $report['separation'] = ['method' => $background !== null ? 'model' : 'filters', 'waited_seconds' => round(microtime(true) - $t, 2)];
+            } elseif ($keep) {
+                $report['separation'] = ['method' => 'filters'];
+            }
             @mkdir($o['out_dir'], 0755, true);
             $clean = $o['out_dir'].'/'.$o['name'].'.mp4';
-            $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null));
+            $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null, $background));
             $report['output_bytes'] = filesize($clean);
             $report['output'] = $clean;
             if ($o['preview'] ?? true) {
                 $progress('marking', 0, 1);
                 $preview = $o['out_dir'].'/'.$o['name'].'-preview.mp4';
-                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $preview, $this->markFile($ffmpeg, $tmp, $video)));
+                $report['preview_encode'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $preview, $this->markFile($ffmpeg, $tmp, $video), $background));
                 $report['preview_bytes'] = filesize($preview);
                 $report['preview'] = $preview;
             }
@@ -142,6 +173,9 @@ final class VideoDubber
 
             return $report;
         } finally {
+            if ($separating !== null) {
+                $separator->cancel($separating);
+            }
             foreach ($made as $path) {
                 Storage::disk('public')->delete($path);
             }
@@ -390,46 +424,53 @@ final class VideoDubber
     }
 
     /**
-     * The new voice over the picture. With $keepBackground the original track
-     * stays: as it is between lines, and under each line carved (its middle
-     * taken out where it is stereo, the voice's frequencies turned down) so
-     * the old voice gives way to the new one while the music plays on.
+     * The new voice over the picture. With $keepBackground the video's other
+     * sound stays: $background, the sound with its voices taken out by the
+     * model (raw float stereo), plays all through; without it, the original
+     * plays between lines and under each line only its sides (the old voice,
+     * in the middle, goes, and with it a mono track's music) so no old voice
+     * is heard under a new one.
      *
      * @param  array<int, array{audio: ?string, delay_ms: int, tempo: float, from: float, until: float}>  $plan
      * @param  array{path: string, margin: int}|null  $mark
      * @return array<int, string>
      */
-    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark): array
+    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?string $background = null): array
     {
         $cmd = [$ffmpeg, '-v', 'error', '-y', '-i', $video];
         foreach ($plan as $p) {
             array_push($cmd, '-i', (string) $p['audio']);
         }
+        $next = count($plan) + 1;
         $filters = [];
         $labels = '';
         foreach ($plan as $i => $p) {
             $tempo = $p['tempo'] > 1.0 ? 'atempo='.$p['tempo'].',' : '';
-            $filters[] = '['.($i + 1).':a]aformat=sample_rates=48000:channel_layouts=stereo,'.$tempo.'adelay=delays='.$p['delay_ms'].':all=1[s'.$i.']';
+            $filters[] = '['.($i + 1).':a]'.self::VOICE_STEREO.',aresample=48000,'.$tempo.'adelay=delays='.$p['delay_ms'].':all=1[s'.$i.']';
             $labels .= '[s'.$i.']';
         }
         $filters[] = $labels.'amix=inputs='.count($plan).':normalize=0:dropout_transition=0[dub]';
         $audioOut = '[dub]';
-        if ($keepBackground) {
+        if ($keepBackground && $background !== null) {
+            // The video's sound without its voices, all through, the new voices over it.
+            array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $background);
+            $filters[] = '['.$next.':a]aformat=sample_rates=48000:channel_layouts=stereo[bg]';
+            $filters[] = '[bg][dub]amix=inputs=2:normalize=0:dropout_transition=0,alimiter=limit=0.95[mix]';
+            $audioOut = '[mix]';
+            $next++;
+        } elseif ($keepBackground) {
             $under = self::underLines($plan);
-            $filters[] = '[0:a]aformat=sample_rates=48000:channel_layouts=stereo,asplit=3[oa][ob][oc]';
+            $filters[] = '[0:a]'.self::stereo($this->probe($video)['channels']).',aresample=48000,asplit=2[oa][ob]';
             // Between lines: the original as it is.
             $filters[] = "[oa]volume='1-({$under})':eval=frame[clear]";
-            // Under lines: the sides of a stereo mix (a voice sits in the middle; nothing is left of a mono track)…
-            $filters[] = '[ob]pan=stereo|c0=c0-c1|c1=c1-c0,volume=0.8[side]';
-            // …with the whole track, its voice frequencies turned well down.
-            $filters[] = '[oc]equalizer=f=300:t=q:w=1.2:g=-18,equalizer=f=1000:t=q:w=1.2:g=-26,equalizer=f=3000:t=q:w=1.2:g=-22,volume=0.5[eq]';
-            $filters[] = "[side][eq]amix=inputs=2:normalize=0,volume='{$under}':eval=frame[carved]";
+            // Under lines: only the sides of a stereo mix, where music spreads and a voice does not (a mono track goes quiet).
+            $filters[] = "[ob]pan=stereo|c0=c0-c1|c1=c1-c0,volume='{$under}':eval=frame[carved]";
             $filters[] = '[clear][carved][dub]amix=inputs=3:normalize=0:dropout_transition=0,alimiter=limit=0.95[mix]';
             $audioOut = '[mix]';
         }
         $videoMap = ['-map', '0:v:0', '-c:v', 'copy'];
         if ($mark !== null) {
-            $markInput = count($plan) + 1;
+            $markInput = $next;
             array_push($cmd, '-i', $mark['path']);
             $filters[] = '['.$markInput.':v]format=rgba,colorchannelmixer=aa=0.92[mk]';
             $filters[] = '[0:v][mk]overlay=W-w-'.$mark['margin'].':H-h-'.$mark['margin'].'[v]';
@@ -479,10 +520,19 @@ final class VideoDubber
     }
 
     /**
-     * How long a video runs and whether it has a picture and a sound track;
-     * throws when it cannot be read at all.
+     * A video's sound into stereo, at its own level: a mono track the same in
+     * both sides, a stereo one as it is, more channels mixed down.
+     */
+    public static function stereo(int $channels): string
+    {
+        return $channels === 1 ? 'pan=stereo|c0=c0|c1=c0' : 'aformat=channel_layouts=stereo';
+    }
+
+    /**
+     * How long a video runs, whether it has a picture and a sound track, and
+     * how many channels the sound has; throws when it cannot be read at all.
      *
-     * @return array{seconds: float, picture: bool, sound: bool}
+     * @return array{seconds: float, picture: bool, sound: bool, channels: int}
      */
     public function probe(string $video): array
     {
@@ -491,8 +541,16 @@ final class VideoDubber
         $process->setTimeout(30)->run();
         $info = $process->getErrorOutput();
 
+        $layout = preg_match('/Stream #.*Audio:[^\n]*?Hz, ([^,\n]+)/', $info, $m) ? trim($m[1]) : 'stereo';
+        $channels = match (true) {
+            $layout === 'mono' => 1,
+            $layout === 'stereo' => 2,
+            preg_match('/^(\d+) channels/', $layout, $c) === 1 => (int) $c[1],
+            default => 6,
+        };
+
         return ['seconds' => $this->duration($ffmpeg, $video), 'picture' => preg_match('/Stream #.*Video:/', $info) === 1,
-            'sound' => preg_match('/Stream #.*Audio:/', $info) === 1];
+            'sound' => preg_match('/Stream #.*Audio:/', $info) === 1, 'channels' => $channels];
     }
 
     private function duration(string $ffmpeg, string $video): float

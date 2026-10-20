@@ -249,9 +249,9 @@ Route::group([
         Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1,dub-store')->name('dub.store');
         // The video itself, sent in pieces before the dub is asked for.
         Route::post('/upload', [\App\Http\Controllers\VideoDubController::class, 'startUpload'])->middleware('throttle:10,1,dub-upload')->name('dub.upload.start');
-        Route::get('/{id}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->whereNumber('id')->name('dub.status');
-        Route::get('/{id}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->whereNumber('id')->name('dub.watch');
-        Route::get('/{id}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->whereNumber('id')->name('dub.download');
+        Route::get('/{code}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->where('code', '[A-Za-z0-9]{32}')->name('dub.status');
+        Route::get('/{code}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->where('code', '[A-Za-z0-9]{32}')->name('dub.watch');
+        Route::get('/{code}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->where('code', '[A-Za-z0-9]{32}')->name('dub.download');
     });
     // Each piece of a video: kept light (no plan check), many a minute for a large one.
     // Each limit counts on its own (the third part names it): the pieces never use up the dub's.

@@ -505,9 +505,9 @@ final class VideoDubbing
             'speakers' => count((array) ($report['speakers'] ?? [])),
             'kept_background' => (bool) ($report['kept_background'] ?? false),
             'error' => $dub->status === VideoDub::FAILED ? $dub->errorText() : null,
-            'status_url' => route('dub.status', ['id' => $dub->id]),
-            'watch_url' => $ready ? route('dub.watch', ['id' => $dub->id]) : null,
-            'download_url' => $ready && $dub->has_clean ? route('dub.download', ['id' => $dub->id]) : null,
+            'status_url' => route('dub.status', ['code' => $dub->code]),
+            'watch_url' => $ready ? route('dub.watch', ['code' => $dub->code]) : null,
+            'download_url' => $ready && $dub->has_clean ? route('dub.download', ['code' => $dub->code]) : null,
             'expires_at' => $until?->toIso8601String(),
         ];
     }

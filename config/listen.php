@@ -169,6 +169,13 @@ return [
         // Hours a free dub stays on the member's dashboard before its files are deleted (Video Dubbing → Settings).
         // A plan's dubs stay as long as the plan keeps voices, in Google Drive once it is connected (dubs:prune).
         'free_keep_hours' => (int) env('LISTEN_DUB_FREE_KEEP_HOURS', 24),
+        // Taking the old voices out (App\Services\Dubbing\VoiceSeparator): this server's Python 3 when it is
+        // not in the usual places, the processor threads one separation uses, and where it is set up.
+        'separator' => [
+            'python' => env('LISTEN_DUB_SEPARATOR_PYTHON', ''),
+            'threads' => (int) env('LISTEN_DUB_SEPARATOR_THREADS', 2),
+            'dir' => env('LISTEN_DUB_SEPARATOR_DIR', ''),
+        ],
         // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.
         'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
         // Minutes after which a dub still working is failed and its credits given back.

@@ -110,7 +110,8 @@
                   <td class="num">{{ $row['date'] }}</td>
                   <td>{{ $row['name'] !== '' ? \Illuminate\Support\Str::limit($row['name'], 40) : __('ui.dub.js.your_video') }}</td>
                   <td>{{ $row['dialect_label'] }}</td>
-                  <td class="num" dir="ltr">{{ gmdate('i:s', (int) round($row['seconds'])) }}</td>
+                  {{-- Only the time reads left to right; the cell lines up with its heading. --}}
+                  <td class="num"><span dir="ltr">{{ intdiv((int) round($row['seconds']), 60) }}:{{ str_pad((string) ((int) round($row['seconds']) % 60), 2, '0', STR_PAD_LEFT) }}</span></td>
                   <td class="num">{{ $row['charged'] > 0 ? number_format($row['charged']) : '—' }}</td>
                   <td>
                     @if($row['status'] === 'failed')

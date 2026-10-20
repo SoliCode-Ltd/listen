@@ -21,7 +21,7 @@ use Illuminate\Support\Facades\Storage;
 class VideoDubRunner
 {
     /** A minute of video takes about two minutes; this leaves room for a slow day. */
-    public const SECONDS = 600;
+    public const SECONDS = 900;
 
     public function __construct(private VideoDubber $dubber, private MemberUsageMeter $meter) {}
 

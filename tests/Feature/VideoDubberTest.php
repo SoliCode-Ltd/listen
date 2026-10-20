@@ -172,6 +172,57 @@ class VideoDubberTest extends TestCase
         }
     }
 
+    public function test_with_the_separation_model_the_old_voices_are_taken_out_of_the_whole_track(): void
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        $video = $this->dir.'/talk.mp4';
+        (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15', '-f', 'lavfi', '-i', 'sine=frequency=700:sample_rate=48000:d=6',
+            '-t', '6', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', $video]))->mustRun();
+        $answer = ['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'music',
+            'segments' => [['start' => 1.0, 'end' => 3.0, 'speaker' => 'A', 'original' => 'Hi.', 'dubbed' => 'هلا.']]])]]]]], 'usageMetadata' => []];
+        Http::fake(['*' => Http::response($answer)]);
+
+        // A stand-in for the model: what it leaves of the sound is silence (all of this sound is "voice").
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        $out = $this->dubSilently($video, 'music', 'separated');
+        $this->assertSame('model', $out['report']['separation']['method']);
+        $this->assertLessThan(-60, $this->level($out['file'], 4.0, 1.5), 'what the model left plays all through: here, nothing of the old voice, even between lines');
+
+        // When it fails, the filters take over: the original between lines, nothing of a mono voice under them.
+        $this->fakeSeparator('exit 1');
+        $out = $this->dubSilently($video, 'music', 'filtered');
+        $this->assertSame('filters', $out['report']['separation']['method']);
+        $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'between lines, the original');
+        $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2), 'under the new line no old voice is heard');
+
+        // Switched off by the admin: not used.
+        \App\Models\SiteSetting::set('video_dubbing_separation', '0', 'video_dubbing');
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        $this->assertSame('filters', $this->dubSilently($video, 'music', 'off')['report']['separation']['method']);
+    }
+
+    public function test_the_installer_picks_builds_this_server_can_run(): void
+    {
+        $this->assertTrue(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('onnxruntime-1.31.0-cp313-cp313-manylinux_2_28_x86_64.whl', 'x86_64', [2, 31]));
+        $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('onnxruntime-1.31.0-cp313-cp313-manylinux_2_28_x86_64.whl', 'x86_64', [2, 27]), 'a newer C library than the server has');
+        $this->assertTrue(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('numpy-2.0.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl', 'x86_64', [2, 28]));
+        $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('numpy-2.0.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl', 'x86_64', [2, 28]), 'another processor');
+        $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('numpy-2.0.2-cp39-cp39-musllinux_1_1_x86_64.whl', 'x86_64', [2, 28]));
+    }
+
+    /** A separator set up with a stand-in for Python that runs $body with $in and $out set. */
+    private function fakeSeparator(string $body): void
+    {
+        $dir = $this->dir.'/separator';
+        @mkdir($dir.'/lib', 0755, true);
+        file_put_contents($dir.'/model.onnx', 'model');
+        file_put_contents($dir.'/ready.json', '{}');
+        $python = $this->dir.'/python';
+        file_put_contents($python, "#!/bin/sh\nfor last; do :; done\nout=\"\$last\"\nin=\$(eval echo \\\"\\\$\$((\$# - 1))\\\")\n{$body}\n");
+        chmod($python, 0755);
+        config(['listen.dubbing.separator.python' => $python, 'listen.dubbing.separator.dir' => $dir]);
+    }
+
     public function test_the_model_answer_is_made_safe(): void
     {
         $heard = VideoDubber::readHeard(['background' => 'Loud', 'speakers' => [['id' => 'A', 'gender' => 'FEMALE']], 'segments' => [
