@@ -52,7 +52,6 @@ class VideoDub extends Model
         'language',
         'drive_file_id',
         'archived_at',
-        'each_speaker',
     ];
 
     protected $casts = [
@@ -66,7 +65,6 @@ class VideoDub extends Model
         'progress' => 'integer',
         'keep_background' => 'boolean',
         'archived_at' => 'datetime',
-        'each_speaker' => 'boolean',
     ];
 
     /** Each dub's links carry a random code, never its number (VideoDubController). */

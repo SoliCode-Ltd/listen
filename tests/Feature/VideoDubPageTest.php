@@ -368,7 +368,7 @@ class VideoDubPageTest extends TestCase
             ->assertStatus(422);
     }
 
-    public function test_the_chosen_voice_reads_every_line_unless_each_person_is_asked_for(): void
+    public function test_the_chosen_voice_reads_every_line(): void
     {
         $this->openToEveryone();
         // A man who talks most, and lines the model gave to a woman and to a second man.
@@ -408,13 +408,10 @@ class VideoDubPageTest extends TestCase
             $this->assertStringNotContainsString('older man', $config['style_prompt'] ?? '', 'no other person\'s description read in the chosen voice');
         }
 
-        // Asked for: each person their own voice, a woman's for the woman.
-        $used = [];
-        $this->actingAs($this->member(dubbing: true))->post(route('dub.store'), ['voice_key' => $kore, 'each_speaker' => '1'] + $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
-        $this->assertSame('Kore', $used['واحد.']['voice_name']);
-        $this->assertNotSame('Kore', $used['اثنان.']['voice_name']);
-        $this->assertSame('female', Voice::query()->where('provider_voice_id', $used['اثنان.']['voice_name'])->value('gender'));
-        $this->assertTrue(VideoDub::query()->latest('id')->first()->each_speaker);
+        // The studio's own words for anything that goes wrong, in the page's language (never a server's raw message).
+        $page = $this->actingAs($user)->get(route('dub.page'))->assertOk()->getContent();
+        $this->assertStringContainsString(json_encode(__('ui.dub.js.failed_server'), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG), $page);
+        $this->assertStringNotContainsString('data-dub-each-speaker', $page, 'no switch for a voice per person');
     }
 
     public function test_a_member_whose_credits_follow_the_plan_dates_can_dub(): void

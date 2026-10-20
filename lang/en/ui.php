@@ -2032,8 +2032,6 @@ return [
         'change_video' => 'Choose another video',
         'keep_title' => 'Keep the music and sound effects',
         'keep_hint' => 'Only the voices change. Turn this off to replace all the sound.',
-        'each_speaker_title' => 'A different voice for each person',
-        'each_speaker_hint' => 'Off: your chosen voice reads every line. On: each person in the video gets a voice of their own.',
         'voice_label' => 'Main voice',
         'your_dubs' => 'Your dubbed videos',
         'allowance_label' => 'Free video',
@@ -2169,6 +2167,8 @@ return [
             'download_clean_paid' => 'Download without the mark (:credits credits)',
             'expired_page' => 'This page has been open a long time. Refresh it and try again.',
             'network' => 'The upload did not get through. Check your connection and try again.',
+            'too_many' => 'Too many tries in a short time. Please wait a minute, then try again.',
+            'failed_server' => 'Something went wrong on our side. Nothing was charged; please try again in a moment.',
         ],
     ],
 ];

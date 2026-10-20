@@ -56,10 +56,9 @@ class VideoDubRunner
                 'language' => $dub->language ?: 'ar',
                 'dialect' => $dub->dialect,
                 'voice' => $dub->voice,
-                // Only when the member asked: the other people in the video get voices of their own;
-                // else the chosen voice reads every line.
-                'voices' => $dub->each_speaker ? VideoDubbing::voicePool($dub->dialect, $dub->language ?: 'ar') : [],
-                'each_speaker' => (bool) $dub->each_speaker,
+                // The voice the member chose reads every line: the model that hears the video often takes one
+                // narrator for several people, and a voice that changes partway is the worse mistake.
+                'voices' => [],
                 // Empty: each line as the video says it.
                 'style' => $dub->performance_style,
                 'emotion' => $dub->emotion,

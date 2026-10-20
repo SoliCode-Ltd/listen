@@ -152,7 +152,6 @@
     var meter = q('[data-dub-meter]');
     var errorBox = q('[data-dub-error]');
     var keep = q('[data-dub-keep]');
-    var eachSpeaker = q('[data-dub-each-speaker]');
     var voiceSelect = form.querySelector('select[name="voice_key"]');
     var dialectSelect = form.querySelector('select[name="dialect"]');
     var chosen = null;
@@ -210,7 +209,6 @@
       var canSend = name === 'chosen' && allowed();
       submit.disabled = !canSend;
       keep.closest('.dub-toggle').hidden = name === 'lock' || name === 'done';
-      eachSpeaker.closest('.dub-toggle').hidden = name === 'lock' || name === 'done';
     }
     function allowed() { return c.state === 'free' || c.state === 'paid'; }
     function showError(message) {
@@ -446,10 +444,17 @@
     // limit on one request's size can stop a large one, and a piece lost on
     // the way is sent again rather than the whole video. Then the dub is
     // asked for with the upload's id.
+    // What the member is told: the site's own words in their language, never a server's raw message.
     function errorOf(xhr, body) {
       if (xhr.status === 413) return t.too_big.replace(':mb', c.maxMb);
       if (xhr.status === 419) return t.expired_page;
-      return (body.errors ? Object.keys(body.errors).map(function (k) { return body.errors[k][0]; })[0] : '') || body.message || t.failed;
+      if (xhr.status === 429) return t.too_many;
+      if (xhr.status === 422 && body.errors) {
+        var first = Object.keys(body.errors).map(function (k) { return body.errors[k][0]; })[0];
+        if (first) return first;
+      }
+      if (xhr.status === 0) return t.network;
+      return t.failed_server;
     }
     function request(method, url, body, headers, onProgress) {
       return new Promise(function (resolve, reject) {
@@ -507,7 +512,6 @@
       var data = new FormData(form);
       data.delete('video');
       data.set('background', keep.checked ? 'keep' : 'replace');
-      data.set('each_speaker', eachSpeaker.checked ? '1' : '0');
       working('upload', 0, t.working_upload, t.working_upload_note);
       deviceSignal().then(function (d) {
         var device = d.id ? { 'X-Client-Device': d.id, 'X-Client-Device-Touch': d.touch ? '1' : '0' } : {};

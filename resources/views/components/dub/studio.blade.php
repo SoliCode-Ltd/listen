@@ -150,16 +150,6 @@
           </span>
         </label>
 
-        {{-- Off (the default): the voice chosen below reads every line. --}}
-        <label class="dub-toggle">
-          <input type="checkbox" data-dub-each-speaker>
-          <span class="dub-switch" aria-hidden="true"></span>
-          <span class="dub-toggle-text">
-            <strong>{{ __('ui.dub.each_speaker_title') }}</strong>
-            <small>{{ __('ui.dub.each_speaker_hint') }}</small>
-          </span>
-        </label>
-
         <div class="dub-meter" data-dub-meter></div>
         <p class="dub-error" data-dub-error role="alert" hidden></p>
 
