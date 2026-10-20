@@ -170,5 +170,14 @@ return [
         'free_per_day' => (int) env('LISTEN_DUB_FREE_PER_DAY', 50),
         // Minutes after which a dub still working is failed and its credits given back.
         'stuck_minutes' => (int) env('LISTEN_DUB_STUCK_MINUTES', 20),
+        // What a dub costs us, for the admin's figures only (US dollars a million tokens).
+        // The speech engine bills its voice by the second, about 25 tokens each.
+        'prices' => [
+            'text_in' => (float) env('LISTEN_DUB_PRICE_TEXT_IN', 0.5),
+            'audio_in' => (float) env('LISTEN_DUB_PRICE_AUDIO_IN', 1.0),
+            'text_out' => (float) env('LISTEN_DUB_PRICE_TEXT_OUT', 3.0),
+            'voice_out' => (float) env('LISTEN_DUB_PRICE_VOICE_OUT', 9.0),
+            'voice_tokens_per_second' => (int) env('LISTEN_DUB_VOICE_TOKENS_PER_SECOND', 25),
+        ],
     ],
 ];

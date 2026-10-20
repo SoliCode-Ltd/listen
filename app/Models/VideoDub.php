@@ -24,6 +24,7 @@ class VideoDub extends Model
         'is_free',
         'dialect',
         'voice',
+        'voice_key',
         'performance_style',
         'emotion',
         'original_name',

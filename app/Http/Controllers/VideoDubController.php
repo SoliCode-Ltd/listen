@@ -132,6 +132,7 @@ class VideoDubController extends Controller
             'is_free' => $free,
             'dialect' => $validated['dialect'],
             'voice' => $voice,
+            'voice_key' => $validated['voice_key'],
             'performance_style' => $validated['performance_style'] ?? null,
             'emotion' => $validated['emotion'] ?? null,
             'original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 200),

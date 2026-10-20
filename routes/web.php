@@ -47,6 +47,11 @@ Route::middleware('auth')->get('/admin-audio/cloned-voices/{voice}/{kind}', Admi
     ->whereIn('kind', ['sample', 'consent'])
     ->name('admin.cloned-voices.audio');
 
+Route::middleware('auth')->get('/admin-video/dubs/{dub}/{kind}', \App\Http\Controllers\AdminVideoDubFileController::class)
+    ->whereNumber('dub')
+    ->whereIn('kind', ['clean', 'preview'])
+    ->name('admin.video-dubs.file');
+
 // SEO: Sitemap
 Route::get('/sitemap.xml', function () {
     $dom = new \DOMDocument('1.0', 'UTF-8');

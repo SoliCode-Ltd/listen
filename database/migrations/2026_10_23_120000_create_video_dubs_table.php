@@ -25,7 +25,9 @@ return new class extends Migration
                 // A free marked preview, or paid for from the plan's credits.
                 $table->boolean('is_free')->default(false);
                 $table->string('dialect', 10);
+                // The speech engine's voice, and the studio library's card it was picked as.
                 $table->string('voice', 40);
+                $table->string('voice_key', 40)->nullable();
                 $table->string('performance_style', 40)->nullable();
                 $table->string('emotion', 40)->nullable();
                 $table->string('original_name')->nullable();

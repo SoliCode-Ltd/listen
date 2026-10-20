@@ -21,13 +21,13 @@ class VideoDubbingSettings extends Page implements HasForms
 {
     use InteractsWithForms;
 
-    protected static ?string $navigationIcon = 'heroicon-o-film';
+    protected static ?string $navigationIcon = 'heroicon-o-adjustments-horizontal';
 
-    protected static ?string $navigationGroup = 'Voice Cloning';
+    protected static ?string $navigationGroup = 'Video Dubbing';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 2;
 
-    protected static ?string $navigationLabel = 'Video Dubbing';
+    protected static ?string $navigationLabel = 'Settings';
 
     protected static ?string $title = 'Video Dubbing Settings';
 

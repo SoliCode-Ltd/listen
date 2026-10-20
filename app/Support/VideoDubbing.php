@@ -137,4 +137,27 @@ final class VideoDubbing
     {
         return array_map(fn (array $row): string => $arabic ? $row['ar'] : $row['en'], ArabicDialects::ALL);
     }
+
+    /**
+     * About what a finished dub cost us, in US dollars, from what its report
+     * counted (listen.dubbing.prices): the text model's tokens and the
+     * seconds of voice. Null when it has no report (it failed early).
+     *
+     * @param  array<string, mixed>|null  $report
+     * @return array{model: float, voice: float, total: float}|null
+     */
+    public static function cost(?array $report): ?array
+    {
+        if (! isset($report['transcribe'], $report['voicing'])) {
+            return null;
+        }
+        $p = (array) config('listen.dubbing.prices');
+        $t = $report['transcribe'];
+        $audio = (int) ($t['audio_tokens'] ?? 0);
+        $model = (max(0, (int) ($t['input_tokens'] ?? 0) - $audio) * (float) $p['text_in'] + $audio * (float) $p['audio_in']
+            + ((int) ($t['output_tokens'] ?? 0) + (int) ($t['thinking_tokens'] ?? 0)) * (float) $p['text_out']) / 1e6;
+        $voice = (float) ($report['voicing']['voiced_seconds'] ?? 0) * (int) $p['voice_tokens_per_second'] * (float) $p['voice_out'] / 1e6;
+
+        return ['model' => round($model, 5), 'voice' => round($voice, 5), 'total' => round($model + $voice, 5)];
+    }
 }

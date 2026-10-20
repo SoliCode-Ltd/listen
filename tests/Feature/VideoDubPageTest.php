@@ -149,6 +149,28 @@ class VideoDubPageTest extends TestCase
         $this->assertFalse(Storage::disk('local')->exists($dub->folder));
     }
 
+    public function test_the_admin_sees_every_dub_with_its_figures_lines_and_videos(): void
+    {
+        $this->openToEveryone();
+        $this->fakeEngine();
+        $member = $this->member(dubbing: true);
+        $sent = $this->actingAs($member)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
+        $dub = VideoDub::query()->findOrFail($sent->json('id'));
+        $this->assertNotNull(VideoDubbing::cost($dub->report)['total'] ?? null, 'a finished dub has a cost');
+
+        // A member cannot open the admin's copy of a video.
+        $this->get(route('admin.video-dubs.file', ['dub' => $dub->id, 'kind' => 'clean']))->assertForbidden();
+
+        $admin = User::factory()->create(['is_admin' => true]);
+        $this->actingAs($admin)->get(\App\Filament\Resources\VideoDubResource::getUrl('index'))
+            ->assertOk()->assertSee('Dub my video')->assertSee('Dubs today')->assertSee($member->email)->assertSee('Saudi (Najdi)');
+        $this->actingAs($admin)->get(\App\Filament\Resources\VideoDubResource::getUrl('view', ['record' => $dub]))
+            ->assertOk()->assertSee('Othman (Puck)')->assertSee('هلا والله.')->assertSee('Hello there.')
+            ->assertSee('/admin-video/dubs/'.$dub->id.'/clean', false)->assertSee('90 credits', false);
+        $this->get(route('admin.video-dubs.file', ['dub' => $dub->id, 'kind' => 'clean']))->assertOk();
+        $this->get(route('filament.admin.pages.video-dubbing-settings'))->assertOk();
+    }
+
     public function test_a_voice_the_library_does_not_offer_is_refused(): void
     {
         $this->openToEveryone();
