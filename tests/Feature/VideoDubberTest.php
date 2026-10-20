@@ -57,7 +57,7 @@ class VideoDubberTest extends TestCase
         $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
         $keys->shouldReceive('recordUsage');
         Http::fake(['*' => Http::response([
-            'candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'music', 'speakers' => [['id' => 'A', 'gender' => 'male'], ['id' => 'B', 'gender' => 'female']], 'segments' => [
+            'candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'music', 'speakers' => [['id' => 'A', 'gender' => 'male', 'voice' => 'young energetic host, fast'], ['id' => 'B', 'gender' => 'female', 'voice' => 'warm woman, calm']], 'segments' => [
                 ['start' => 3.0, 'end' => 5.5, 'speaker' => 'B', 'emotion' => 'warm', 'delivery' => 'soft and smiling', 'original' => 'See you tomorrow.', 'dubbed' => 'نشوفك بكرة.'],
                 ['start' => 0.2, 'end' => 2.8, 'speaker' => 'A', 'emotion' => 'excited', 'delivery' => 'big and bright, like a show host', 'original' => 'Hello there, welcome.', 'dubbed' => 'هلا والله، حياك.'],
             ]])]]]]],
@@ -91,10 +91,16 @@ class VideoDubberTest extends TestCase
         $this->assertSame('Puck', $voiced['هلا والله، حياك.']['voice_name']);
         $this->assertSame('Kore', $voiced['نشوفك بكرة.']['voice_name']);
         $this->assertSame('excited', $voiced['هلا والله، حياك.']['emotion']);
-        $this->assertStringContainsString('like a show host', $voiced['هلا والله، حياك.']['style_prompt']);
+        // Each line with its speaker's one description of their voice, so they sound the same person all through.
+        $this->assertStringContainsString('young energetic host, fast', $voiced['هلا والله، حياك.']['style_prompt']);
+        $this->assertStringContainsString('warm woman, calm', $voiced['نشوفك بكرة.']['style_prompt']);
+        $this->assertStringNotContainsString('like a show host', $voiced['هلا والله، حياك.']['style_prompt']);
         $this->assertSame(['listening', 'voicing', 'voicing', 'mixing', 'marking'], $stages);
         $this->assertSame('music', $r['background']);
         $this->assertTrue($r['kept_background']);
+        // Each line brought to the loudness of the original speech.
+        $this->assertNotNull($r['loudness']['target_db']);
+        $this->assertCount(2, $r['loudness']['gains_db']);
         $this->assertSame('B', $r['lines'][1]['speaker']);
 
         $this->assertEqualsWithDelta(6.0, $r['video_seconds'], 0.1);
@@ -153,10 +159,11 @@ class VideoDubberTest extends TestCase
 
         $answer = fn (string $background) => ['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => $background,
             'segments' => [['start' => 1.0, 'end' => 3.0, 'speaker' => 'A', 'original' => 'Hi.', 'dubbed' => 'هلا.']]])]]]]], 'usageMetadata' => []];
-        Http::fake(['*' => Http::sequence()->push($answer('music'))->push($answer('none'))]);
+        Http::fake(['*' => Http::sequence()->push($answer('music'))->push($answer('none'))->push($answer('music'))]);
 
-        foreach (['music' => true, 'none' => false] as $background => $kept) {
-            $out = $this->dubSilently($video, $background, 'mix-'.$background);
+        // The model's "no music" does not drop the sound; only the member's choice does.
+        foreach (['music' => true, 'none' => true, 'replace' => false] as $background => $kept) {
+            $out = $this->dubSilently($video, $background, 'mix-'.$background, $background === 'replace' ? ['background' => 'replace'] : []);
             $this->assertSame($kept, $out['report']['kept_background']);
             $before = $this->level($video, 4.0, 1.5);
             $after = $this->level($out['file'], 4.0, 1.5);
@@ -167,7 +174,7 @@ class VideoDubberTest extends TestCase
                 $this->assertLessThan($this->level($video, 1.4, 1.2, 'bandpass=f=700:w=60,') - 15, $this->level($out['file'], 1.4, 1.2, 'bandpass=f=700:w=60,'), 'the old voice under the new line');
                 $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2, 'bandpass=f=330:w=40,'), $this->level($out['file'], 1.4, 1.2, 'bandpass=f=330:w=40,'), 4, 'the music under the new line');
             } else {
-                $this->assertLessThan(-60, $after, 'with only a voice in the video, nothing of it is left');
+                $this->assertLessThan(-60, $after, 'the member chose to replace all the sound: nothing of it is left');
             }
         }
     }
@@ -182,11 +189,18 @@ class VideoDubberTest extends TestCase
             'segments' => [['start' => 1.0, 'end' => 3.0, 'speaker' => 'A', 'original' => 'Hi.', 'dubbed' => 'هلا.']]])]]]]], 'usageMetadata' => []];
         Http::fake(['*' => Http::response($answer)]);
 
-        // A stand-in for the model: what it leaves of the sound is silence (all of this sound is "voice").
-        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        // A stand-in for the model that hears all of this sound as voices: they play between the new lines, never under one.
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$rest"; cp "$in" "$voices"; echo "progress 1 1"');
         $out = $this->dubSilently($video, 'music', 'separated');
         $this->assertSame('model', $out['report']['separation']['method']);
-        $this->assertLessThan(-60, $this->level($out['file'], 4.0, 1.5), 'what the model left plays all through: here, nothing of the old voice, even between lines');
+        $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'between lines, the original voices (crowds, singing, recitation) as they were');
+        $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2), 'under the new line no old voice is heard');
+
+        // One that hears it all as music: it plays all through, under the new line too.
+        $this->fakeSeparator('cp "$in" "$rest"; head -c "$(stat -c %s "$in")" /dev/zero > "$voices"');
+        $out = $this->dubSilently($video, 'music', 'music-only');
+        $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2), $this->level($out['file'], 1.4, 1.2), 1.5, 'the music under the new line');
+        $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'and between lines');
 
         // When it fails, the filters take over: the original between lines, nothing of a mono voice under them.
         $this->fakeSeparator('exit 1');
@@ -196,14 +210,14 @@ class VideoDubberTest extends TestCase
         $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2), 'under the new line no old voice is heard');
 
         // Too little memory free on the server just now: not started, the filters instead.
-        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        $this->fakeSeparator('cp "$in" "$rest"; cp "$in" "$voices"');
         config(['listen.dubbing.separator.min_free_mb' => 100_000_000]);
         $this->assertSame('filters', $this->dubSilently($video, 'music', 'busy')['report']['separation']['method']);
         config(['listen.dubbing.separator.min_free_mb' => 0]);
 
         // Switched off by the admin: not used.
         \App\Models\SiteSetting::set('video_dubbing_separation', '0', 'video_dubbing');
-        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        $this->fakeSeparator('cp "$in" "$rest"; cp "$in" "$voices"');
         $this->assertSame('filters', $this->dubSilently($video, 'music', 'off')['report']['separation']['method']);
     }
 
@@ -216,7 +230,7 @@ class VideoDubberTest extends TestCase
         $this->assertFalse(\App\Services\Dubbing\VoiceSeparator::fitsPlatform('numpy-2.0.2-cp39-cp39-musllinux_1_1_x86_64.whl', 'x86_64', [2, 28]));
     }
 
-    /** A separator set up with a stand-in for Python that runs $body with $in and $out set. */
+    /** A separator set up with a stand-in for Python that runs $body with $in, $rest and $voices set (the last three arguments). */
     private function fakeSeparator(string $body): void
     {
         $dir = $this->dir.'/separator';
@@ -224,7 +238,7 @@ class VideoDubberTest extends TestCase
         file_put_contents($dir.'/model.onnx', 'model');
         file_put_contents($dir.'/ready.json', '{}');
         $python = $this->dir.'/python';
-        file_put_contents($python, "#!/bin/sh\nfor last; do :; done\nout=\"\$last\"\nin=\$(eval echo \\\"\\\$\$((\$# - 1))\\\")\n{$body}\n");
+        file_put_contents($python, "#!/bin/sh\nn=\$#\nvoices=\$(eval echo \"\\\${\$n}\")\nrest=\$(eval echo \"\\\${\$((n - 1))}\")\nin=\$(eval echo \"\\\${\$((n - 2))}\")\n{$body}\n");
         chmod($python, 0755);
         config(['listen.dubbing.separator.python' => $python, 'listen.dubbing.separator.dir' => $dir]);
     }
@@ -239,7 +253,7 @@ class VideoDubberTest extends TestCase
         ]]);
 
         $this->assertSame('ambient', $heard['background'], 'unsure: keep the sound');
-        $this->assertSame([['id' => 'A', 'gender' => 'female'], ['id' => 'C', 'gender' => 'male']], $heard['speakers']);
+        $this->assertSame([['id' => 'A', 'gender' => 'female', 'voice' => ''], ['id' => 'C', 'gender' => 'male', 'voice' => '']], $heard['speakers']);
         $this->assertSame(['أ', 'ب'], array_column($heard['segments'], 'dubbed'));
         $this->assertNull($heard['segments'][0]['emotion']);
         $this->assertSame('excited', $heard['segments'][1]['emotion']);
@@ -254,9 +268,15 @@ class VideoDubberTest extends TestCase
             $segments, 'Charon', ['male' => ['Puck'], 'female' => ['Kore']]);
         // B talks the most: the member's voice. A takes the next man's voice; C the next woman's.
         $this->assertSame(['B' => 'Charon', 'A' => 'Puck', 'C' => 'Kore'], $voices);
+        // One of the lead's gender who says almost nothing (most often the lead split in two) keeps the lead's voice.
+        $this->assertSame(['A' => 'Charon', 'B' => 'Charon'], VideoDubber::assignVoices([['id' => 'A', 'gender' => 'male'], ['id' => 'B', 'gender' => 'male']],
+            [['speaker' => 'A', 'start' => 0, 'end' => 30], ['speaker' => 'B', 'start' => 30, 'end' => 31]], 'Charon', ['male' => ['Puck']]));
 
         $line = ['emotion' => 'sad', 'delivery' => 'quiet, close to tears'];
-        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'emotion' => 'sad', 'style_prompt' => 'quiet, close to tears Overall feeling: sad.'],
+        // Every line of a speaker: the same voice description; only the feeling changes.
+        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'emotion' => 'sad', 'style_prompt' => 'One steady voice for this person in every line: warm older man, slow and calm. Feeling of this line: sad.'],
+            VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG'], 'warm older man, slow and calm.'));
+        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'emotion' => 'sad', 'style_prompt' => 'One steady voice for this person in every line. Feeling of this line: sad.'],
             VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG']));
         $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'performance_style' => 'promo', 'emotion' => 'sad'],
             VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG', 'style' => 'promo']));
@@ -269,7 +289,7 @@ class VideoDubberTest extends TestCase
      *
      * @return array{report: array<string, mixed>, file: string}
      */
-    private function dubSilently(string $video, string $background, string $name): array
+    private function dubSilently(string $video, string $background, string $name, array $options = []): array
     {
         $ffmpeg = AudioFormats::ffmpegPath();
         $keys = \Mockery::mock(GeminiKeyManager::class);
@@ -283,7 +303,7 @@ class VideoDubberTest extends TestCase
 
             return ['audio_path' => $path, 'duration_seconds' => 2];
         });
-        $report = (new VideoDubber($keys, $tts))->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'preview' => false, 'out_dir' => $this->dir, 'name' => $name]);
+        $report = (new VideoDubber($keys, $tts))->dub($video, $options + ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'preview' => false, 'out_dir' => $this->dir, 'name' => $name]);
 
         return ['report' => $report, 'file' => $report['output']];
     }

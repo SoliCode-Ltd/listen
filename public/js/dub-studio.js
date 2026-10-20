@@ -369,6 +369,7 @@
     function stageOf(dub) {
       switch (dub.stage) {
         case 'voicing': return ['voicing', t.working_voicing, t.working_voicing_note];
+        case 'separating': return ['mixing', t.working_separating, t.working_separating_note];
         case 'mixing': case 'marking': return ['mixing', t.working_mixing, dub.kept_background === false ? t.working_mixing_replace : t.working_mixing_note];
         default: return ['listening', t.working_listening, t.working_listening_note];
       }

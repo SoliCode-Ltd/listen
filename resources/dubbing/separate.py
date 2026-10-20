@@ -1,13 +1,13 @@
-"""Dub my video: takes the voices out of a video's sound, leaving its music
-and effects (App\\Services\\Dubbing\\VoiceSeparator runs it).
+"""Dub my video: splits a video's sound into its voices and the rest (music
+and effects), for App\\Services\\Dubbing\\VoiceSeparator.
 
 An MDX-Net model (ONNX) gives the sound without the voices from the whole
-sound, in chunks of about six seconds; the site mixes the new voices over it.
+sound, in chunks of about six seconds; the voices are the sound less that.
 Reads and writes raw 32-bit float stereo at 44.1 kHz (the site's ffmpeg makes
 and reads them), so it needs nothing but onnxruntime and numpy, which the
-installer unpacks into --lib.
+installer unpacks into --lib. Says "progress DONE TOTAL" after each chunk.
 
-    separate.py --lib DIR --model FILE [--threads N] IN.f32 OUT.f32
+    separate.py --lib DIR --model FILE [--threads N] IN.f32 REST.f32 VOICES.f32
     separate.py --lib DIR --model FILE --check
 """
 import argparse
@@ -73,10 +73,11 @@ def main():
     session = ort.InferenceSession(args.model, options, providers=['CPUExecutionProvider'])
     name = session.get_inputs()[0].name
 
-    def background(mix):
+    def background(mix, report=False):
         n = mix.shape[1]
         pad = gen - n % gen
         padded = np.concatenate([np.zeros((2, trim), np.float32), mix, np.zeros((2, pad + trim), np.float32)], 1)
+        total = (n + pad + gen - 1) // gen
         out = []
         i = 0
         while i < n + pad:
@@ -88,6 +89,8 @@ def main():
             full[1, :dim_f] = p[2] + 1j * p[3]
             out.append(istft(full)[:, trim:-trim])
             i += gen
+            if report:
+                print('progress %d %d' % (len(out), total), flush=True)
         return np.concatenate(out, 1)[:, :n] * compensate
 
     if args.check:
@@ -95,11 +98,14 @@ def main():
         print('ok')
         return
 
-    source, target = args.paths
+    source, rest_path, voices_path = args.paths
     started = time.time()
     mix = np.fromfile(source, dtype=np.float32).reshape(-1, 2).T.copy()
-    np.clip(background(mix), -1, 1).T.astype(np.float32).tofile(target)
-    print('%.1f seconds of sound in %.1f seconds' % (mix.shape[1] / sr, time.time() - started))
+    rest = background(mix, report=True)
+    np.clip(rest, -1, 1).T.astype(np.float32).tofile(rest_path)
+    # The voices: everything the model did not keep, so the two together are the sound as it was.
+    np.clip(mix - rest, -1, 1).T.astype(np.float32).tofile(voices_path)
+    print('%.1f seconds of sound in %.1f seconds' % (mix.shape[1] / sr, time.time() - started), flush=True)
 
 
 if __name__ == '__main__':

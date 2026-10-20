@@ -2106,6 +2106,8 @@ return [
             'working_listening_note' => 'Who speaks, what they say and how they say it. You can leave this page; it carries on.',
             'working_voicing' => 'Recording the new voices',
             'working_voicing_note' => 'Each line in your dialect, with the feeling of the original.',
+            'working_separating' => 'Separating the music from the voices',
+            'working_separating_note' => 'So only the new voices are heard, with the music and effects as they were.',
             'working_mixing' => 'Putting it all together',
             'working_mixing_note' => 'The new voices on the picture, with the music and effects.',
             'working_mixing_replace' => 'The new voices on the picture.',

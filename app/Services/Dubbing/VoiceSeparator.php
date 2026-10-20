@@ -133,13 +133,14 @@ class VoiceSeparator
     }
 
     /**
-     * Starts taking the voices out of $in (raw float stereo, 44.1 kHz) into
-     * $out while the dub goes on with its other steps. Null when it is not
-     * set up, or another dub is using it now.
+     * Starts splitting $in (raw float stereo, 44.1 kHz) into $rest (its music
+     * and effects) and $voices while the dub goes on with its other steps.
+     * Null when it is not set up, another dub is using it now, or the server
+     * has too little memory free.
      *
-     * @return array{process: Process, lock: Lock, out: string, started: float}|null
+     * @return array{process: Process, lock: Lock, rest: string, voices: string, started: float}|null
      */
-    public function start(string $in, string $out): ?array
+    public function start(string $in, string $rest, string $voices): ?array
     {
         if (! self::active()) {
             return null;
@@ -155,7 +156,7 @@ class VoiceSeparator
             return null;
         }
         try {
-            $process = $this->process($in, $out);
+            $process = $this->process($in, $rest, $voices);
             $process->start();
         } catch (\Throwable $e) {
             $lock->release();
@@ -164,26 +165,36 @@ class VoiceSeparator
             return null;
         }
 
-        return ['process' => $process, 'lock' => $lock, 'out' => $out, 'started' => microtime(true)];
+        return ['process' => $process, 'lock' => $lock, 'rest' => $rest, 'voices' => $voices, 'started' => microtime(true)];
     }
 
     /**
-     * Waits for a separation start() began; the sound without voices, or null
-     * when it failed (the dub then uses the filters).
+     * Waits for a separation start() began, telling $progress how far it is
+     * ('separating', chunks done, chunks); the two tracks, or null when it
+     * failed (the dub then uses the filters).
      *
-     * @param  array{process: Process, lock: Lock, out: string, started: float}  $job
+     * @param  array{process: Process, lock: Lock, rest: string, voices: string, started: float}  $job
+     * @param  (callable(string, int, int): void)|null  $progress
+     * @return array{rest: string, voices: string}|null
      */
-    public function finish(array $job): ?string
+    public function finish(array $job, ?callable $progress = null): ?array
     {
         try {
-            $job['process']->wait();
-            if (! $job['process']->isSuccessful() || ! is_file($job['out']) || filesize($job['out']) === 0) {
-                Log::warning('Voice separation failed.', ['error' => mb_substr(trim($job['process']->getErrorOutput()), -400)]);
+            $process = $job['process'];
+            while ($process->isRunning()) {
+                if ($progress !== null && preg_match_all('/progress (\d+) (\d+)/', $process->getIncrementalOutput(), $m) > 0) {
+                    $progress('separating', (int) end($m[1]), (int) end($m[2]));
+                }
+                usleep(500_000);
+                $process->checkTimeout();
+            }
+            if (! $process->isSuccessful() || ! is_file($job['rest']) || filesize($job['rest']) === 0 || ! is_file($job['voices'])) {
+                Log::warning('Voice separation failed.', ['error' => mb_substr(trim($process->getErrorOutput()), -400)]);
 
                 return null;
             }
 
-            return $job['out'];
+            return ['rest' => $job['rest'], 'voices' => $job['voices']];
         } catch (\Throwable $e) {
             Log::warning('Voice separation failed.', ['error' => $e->getMessage()]);
 
@@ -206,8 +217,11 @@ class VoiceSeparator
     /**
      * Separates now, waiting up to $wait seconds for another dub's to finish:
      * for a dub whose start() found it busy.
+     *
+     * @param  (callable(string, int, int): void)|null  $progress
+     * @return array{rest: string, voices: string}|null
      */
-    public function run(string $in, string $out, int $wait): ?string
+    public function run(string $in, string $rest, string $voices, int $wait, ?callable $progress = null): ?array
     {
         if (! self::active()) {
             return null;
@@ -225,7 +239,7 @@ class VoiceSeparator
             return null;
         }
         try {
-            $process = $this->process($in, $out);
+            $process = $this->process($in, $rest, $voices);
             $process->start();
         } catch (\Throwable $e) {
             $lock->release();
@@ -234,13 +248,29 @@ class VoiceSeparator
             return null;
         }
 
-        return $this->finish(['process' => $process, 'lock' => $lock, 'out' => $out, 'started' => microtime(true)]);
+        return $this->finish(['process' => $process, 'lock' => $lock, 'rest' => $rest, 'voices' => $voices, 'started' => microtime(true)], $progress);
     }
 
-    private function process(string $in, string $out): Process
+    /**
+     * Processor threads one separation uses: the configured number, else all
+     * but one of the server's cores, four at most (it runs one at a time).
+     */
+    public static function threads(): int
     {
-        $threads = max(1, (int) config('listen.dubbing.separator.threads', 2));
-        $process = new Process([(string) self::python(), '-s', self::script(), '--lib', self::lib(), '--model', self::model(), '--threads', (string) $threads, $in, $out],
+        $configured = (int) config('listen.dubbing.separator.threads', 0);
+        if ($configured > 0) {
+            return $configured;
+        }
+        $info = @file_get_contents('/proc/cpuinfo');
+        $cores = is_string($info) ? preg_match_all('/^processor\s*:/m', $info) : 2;
+
+        return max(1, min(4, $cores - 1));
+    }
+
+    private function process(string $in, string $rest, string $voices): Process
+    {
+        $threads = self::threads();
+        $process = new Process([(string) self::python(), '-s', self::script(), '--lib', self::lib(), '--model', self::model(), '--threads', (string) $threads, $in, $rest, $voices],
             null, ['OMP_NUM_THREADS' => (string) $threads, 'PYTHONDONTWRITEBYTECODE' => '1']);
 
         return $process->setTimeout(self::TIMEOUT);

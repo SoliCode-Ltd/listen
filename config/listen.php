@@ -173,7 +173,8 @@ return [
         // not in the usual places, the processor threads one separation uses, and where it is set up.
         'separator' => [
             'python' => env('LISTEN_DUB_SEPARATOR_PYTHON', ''),
-            'threads' => (int) env('LISTEN_DUB_SEPARATOR_THREADS', 2),
+            // 0: all but one of the server's cores, four at most.
+            'threads' => (int) env('LISTEN_DUB_SEPARATOR_THREADS', 0),
             // It takes about 1.4 GB while it runs: it starts only with this much free, else the dub uses the filters.
             'min_free_mb' => (int) env('LISTEN_DUB_SEPARATOR_MIN_FREE_MB', 2048),
             'dir' => env('LISTEN_DUB_SEPARATOR_DIR', ''),

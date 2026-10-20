@@ -28,15 +28,17 @@ use Symfony\Component\Process\Process;
  *      of the same kind for the others) and, unless the member chose a
  *      style or an emotion for the whole video, in the original's mood;
  *   4. each line is placed at its segment's start (sped up a little, at
- *      most MAX_TEMPO, when it runs past the next one). Where the video has
- *      music or other sound, it stays, as dubbing studios keep it: the old
- *      voices are taken out of the whole track by a separation model
+ *      most MAX_TEMPO, when it runs past the next one) at the loudness the
+ *      original speaker had. The video's other sound stays (unless the
+ *      member turned it off), as dubbing studios keep it: a separation model
  *      (VoiceSeparator, run on this server while steps 2 and 3 wait on the
- *      network) and the new voices go over what is left. Where the model is
- *      not set up or busy, the old voice is taken out under each new line by
- *      filters (only the sides of a stereo mix stay there; a mono track goes
- *      quiet) and the original plays between lines. A preview copy carries
- *      the Listen mark, which means encoding the picture again.
+ *      network) splits the original into its voices and the rest; the rest
+ *      plays all through, and the original voices only between the new
+ *      lines (where they are crowds, singing, recitation in the background),
+ *      never under one. Where the model is not set up or busy, filters take
+ *      the old voice out under each new line (only the sides of a stereo mix
+ *      stay there; a mono track goes quiet). A preview copy carries the
+ *      Listen mark, which means encoding the picture again.
  *
  * It returns what each step took: the model's tokens, the characters voiced,
  * the server's processing time and the files' sizes.
@@ -52,8 +54,22 @@ final class VideoDubber
     /** Sound tags a dubbed line may carry where the original has the sound (GeminiVocalTags). */
     public const SOUND_TAGS = ['laugh', 'chuckle', 'giggle', 'sigh', 'gasp', 'breath', 'whispers', 'shout', 'cry', 'sob', 'groan', 'hmm', 'short pause', 'long pause'];
 
-    /** Seconds over which the original fades between itself and its carved copy around each line. */
-    private const RAMP = 0.15;
+    /** Seconds over which the original voices fade out before a new line and back after it. */
+    private const RAMP = 0.12;
+
+    /**
+     * The old voice is taken out a little before each new line and a little
+     * after it, for the model's timings that are a moment off; gaps between
+     * lines shorter than BRIDGE stay without it, so it does not flicker in.
+     */
+    private const LEAD = 0.25;
+
+    private const TAIL = 0.35;
+
+    private const BRIDGE = 0.8;
+
+    /** A speaker's share of the talk under which, in the lead's gender, they read in the lead's voice. */
+    private const MINOR_SHARE = 0.08;
 
     /**
      * A voice line into stereo at its own level in both sides: ffmpeg's own
@@ -101,7 +117,7 @@ final class VideoDubber
             $wantsBackground = ($o['background'] ?? 'keep') !== 'replace' && VoiceSeparator::active() && $this->probe($video)['sound'];
             if ($wantsBackground) {
                 $this->run([$ffmpeg, '-v', 'error', '-y', '-i', $video, '-vn', '-af', self::stereo($this->probe($video)['channels']).',aresample='.self::SEPARATION_RATE, '-f', 'f32le', $tmp.'/sound.f32']);
-                $separating = $separator->start($tmp.'/sound.f32', $tmp.'/background.f32');
+                $separating = $separator->start($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32');
             }
 
             // 2. What is said, by whom and how, timed, and the dubbed lines.
@@ -117,6 +133,8 @@ final class VideoDubber
 
             // 3. Each line voiced, with the site's own rewrite off: the lines are already in the dialect.
             $voices = self::assignVoices($heard['speakers'], $segments, $o['voice'], (array) ($o['voices'] ?? []));
+            // Each person's voice, described once and given with every line, so it stays the same voice.
+            $characters = array_column($heard['speakers'], 'voice', 'id');
             $report['speakers'] = array_values(array_map(fn (array $s): array => $s + ['voice' => $voices[$s['id']] ?? $o['voice']], $heard['speakers']));
             $t = microtime(true);
             $rewrite = config('services.gemini_tts.dialect_rewrite');
@@ -125,7 +143,7 @@ final class VideoDubber
             try {
                 foreach ($segments as $i => $segment) {
                     $progress('voicing', $i, count($segments));
-                    $result = $this->tts->synthesize($segment['dubbed'], $o['language'], self::voiceConfig($segment, $voices[$segment['speaker']] ?? $o['voice'], $o));
+                    $result = $this->tts->synthesize($segment['dubbed'], $o['language'], self::voiceConfig($segment, $voices[$segment['speaker']] ?? $o['voice'], $o, $characters[$segment['speaker']] ?? ''));
                     $made[] = $result['audio_path'];
                     $segments[$i]['audio'] = Storage::disk('public')->path($result['audio_path']);
                     $segments[$i]['voiced_seconds'] = AudioDuration::ofStoredFile($result['audio_path']) ?? (float) ($result['duration_seconds'] ?? 0);
@@ -138,22 +156,28 @@ final class VideoDubber
                 'voiced_seconds' => round(array_sum(array_column($segments, 'voiced_seconds')), 2)];
 
             // 4. Placed and put back onto the picture, over what else the video plays.
-            $progress('mixing', 0, 1);
             $plan = self::plan($segments, $report['video_seconds']);
             $report['fit'] = ['sped_up' => count(array_filter($plan, fn ($p) => $p['tempo'] > 1.0)), 'max_tempo' => max(array_column($plan, 'tempo')),
                 'overrun_seconds' => round(array_sum(array_column($plan, 'overrun')), 2)];
-            $keep = ($o['background'] ?? 'keep') !== 'replace' && $heard['background'] !== 'none' && $this->probe($video)['sound'];
+            // The member's choice alone decides: the model's guess that there is no music is not reason enough to drop the sound.
+            $keep = ($o['background'] ?? 'keep') !== 'replace' && $this->probe($video)['sound'];
             $report['kept_background'] = $keep;
             $background = null;
             if ($keep && $wantsBackground) {
                 $t = microtime(true);
                 // Busy with another dub when this one began: it waits its turn here, a few minutes at most.
-                $background = $separating !== null ? $separator->finish($separating) : $separator->run($tmp.'/sound.f32', $tmp.'/background.f32', 240);
+                $background = $separating !== null
+                    ? $separator->finish($separating, $progress)
+                    : $separator->run($tmp.'/sound.f32', $tmp.'/rest.f32', $tmp.'/voices.f32', 240, $progress);
                 $separating = null;
                 $report['separation'] = ['method' => $background !== null ? 'model' : 'filters', 'waited_seconds' => round(microtime(true) - $t, 2)];
             } elseif ($keep) {
                 $report['separation'] = ['method' => 'filters'];
             }
+            $progress('mixing', 0, 1);
+            // Every line at the loudness the original speaker had, so none jumps out or falls away.
+            $plan = $this->evenLoudness($ffmpeg, $plan, $background !== null ? $background['voices'] : $speech, $background !== null);
+            $report['loudness'] = ['target_db' => $plan[0]['target_db'] ?? null, 'gains_db' => array_column($plan, 'gain_db')];
             @mkdir($o['out_dir'], 0755, true);
             $clean = $o['out_dir'].'/'.$o['name'].'.mp4';
             $report['mux'] = $this->run($this->muxCommand($ffmpeg, $video, $plan, $report['video_seconds'], $keep, $clean, null, $background));
@@ -168,7 +192,8 @@ final class VideoDubber
             }
             $report['lines'] = array_map(fn ($s, $p) => ['start' => $s['start'], 'end' => $s['end'], 'speaker' => $s['speaker'], 'emotion' => $s['emotion'],
                 'delivery' => $s['delivery'], 'original' => $s['original'], 'dubbed' => $s['dubbed'],
-                'voiced_seconds' => round($s['voiced_seconds'], 2), 'tempo' => $p['tempo']], $segments, $plan);
+                'voiced_seconds' => round($s['voiced_seconds'], 2), 'tempo' => $p['tempo'], 'gain_db' => $p['gain_db'] ?? 0.0,
+                'voice' => $voices[$s['speaker']] ?? $o['voice']], $segments, $plan);
             $report['total_seconds'] = round(microtime(true) - $started, 2);
 
             return $report;
@@ -188,14 +213,17 @@ final class VideoDubber
 
     /**
      * How one line is read: in its speaker's voice and the dialect; in the
-     * style and emotion the member chose for the whole video, or else as the
-     * original was said (its emotion and the direction the model wrote).
+     * style and emotion the member chose for the whole video, or else in the
+     * original's mood. Every line of a speaker is given the same description
+     * of their voice ($character), and only the line's feeling changes: each
+     * line is voiced on its own, and free directions line by line made the
+     * same person sound like someone else from one line to the next.
      *
      * @param  array{emotion: ?string, delivery: string}  $segment
      * @param  array<string, mixed>  $o
      * @return array<string, string>
      */
-    public static function voiceConfig(array $segment, string $voice, array $o): array
+    public static function voiceConfig(array $segment, string $voice, array $o, string $character = ''): array
     {
         $style = trim((string) ($o['style'] ?? ''));
         $emotion = trim((string) ($o['emotion'] ?? ''));
@@ -204,9 +232,10 @@ final class VideoDubber
             return $config + array_filter(['performance_style' => $style, 'emotion' => $emotion !== '' ? $emotion : ($segment['emotion'] ?? '')]);
         }
 
-        // Following the video: its own mood, said the way the original says it.
+        // Following the video: the same voice all through, in each line's own mood.
         $mood = (string) ($segment['emotion'] ?? '');
-        $direction = trim($segment['delivery'].($mood !== '' ? ' Overall feeling: '.$mood.'.' : ''));
+        $direction = trim('One steady voice for this person in every line'.(trim($character) !== '' ? ': '.rtrim(trim($character), '.') : '').'.'
+            .($mood !== '' ? ' Feeling of this line: '.$mood.'.' : ''));
 
         return $config + array_filter(['emotion' => $mood, 'style_prompt' => $direction]);
     }
@@ -214,7 +243,10 @@ final class VideoDubber
     /**
      * Which voice reads each speaker: the member's choice for the one who
      * says the most; each other speaker the next voice of their gender that
-     * is not taken yet (the member's voice when there is none left).
+     * is not taken yet (the member's voice when there is none left). One who
+     * says very little (under MINOR_SHARE of the talk) in the lead's gender
+     * reads in the lead's voice: that is most often the lead split in two by
+     * the model, and a voice that changes for one line is the worse mistake.
      *
      * @param  array<int, array{id: string, gender: string}>  $speakers
      * @param  array<int, array{speaker: string, start: float, end: float}>  $segments
@@ -231,8 +263,15 @@ final class VideoDubber
         $lead = (string) array_key_first($talk);
         $voices = [$lead => $main];
         $taken = [$main => true];
+        $all = max(0.1, array_sum($talk));
+        $leadGender = collect($speakers)->firstWhere('id', $lead)['gender'] ?? null;
         foreach ($speakers as $speaker) {
             if (isset($voices[$speaker['id']])) {
+                continue;
+            }
+            if ($speaker['gender'] === $leadGender && ($talk[$speaker['id']] ?? 0) / $all < self::MINOR_SHARE) {
+                $voices[$speaker['id']] = $main;
+
                 continue;
             }
             $pick = null;
@@ -303,7 +342,9 @@ final class VideoDubber
         $prompt = "You are preparing a professional dub of a video. Listen to its audio closely.\n"
             ."1. Split what is said into segments at natural sentence or phrase boundaries, each 2 to 10 seconds long and spoken by one person, "
             ."with its start and end in seconds from the beginning of the audio.\n"
-            ."2. Tell the people apart: give each a letter (A, B, ...) and say whether they sound male or female.\n"
+            ."2. Tell the people apart: give each a letter (A, B, ...), say whether they sound male or female, and describe their voice for a voice actor "
+            ."in at most 12 words of English (age, pitch, pace, character, for example \"warm older man, slow and calm, documentary narrator\"). "
+            ."One person is one letter all through, also across music, pauses or a change of mood; give a new letter only when a clearly different person speaks.\n"
             ."3. For each segment say how it is spoken, as a director would brief a voice actor: \"emotion\" is the one word from this list "
             ."that fits best: {$emotions}; \"delivery\" is a short direction in English (energy, pace, loudness, attitude), at most 15 words, "
             ."for example \"bright and fast, smiling, building to a big finish\".\n"
@@ -312,7 +353,7 @@ final class VideoDubber
             ."numbers right. Where the speaker laughs, sighs, gasps, whispers, shouts or pauses, put the matching tag at that place in the dubbed line, "
             ."only from these: {$tags}.\n"
             ."5. Say what plays besides the speech: \"music\" if there is music, \"ambient\" for other sound (crowd, street, room, effects), \"none\" if only the voice.\n"
-            .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male"}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
+            .'Return only JSON: {"background": "music", "speakers": [{"id": "A", "gender": "male", "voice": "..."}], "segments": [{"start": 0.0, "end": 3.2, "speaker": "A", '
             .'"emotion": "excited", "delivery": "...", "original": "...", "dubbed": "..."}]}. If nothing is spoken, return {"background": "music", "speakers": [], "segments": []}.';
         $base = rtrim((string) config('services.gemini_tts.endpoint', 'https://generativelanguage.googleapis.com/v1beta'), '/');
         $body = [
@@ -364,10 +405,12 @@ final class VideoDubber
     {
         $emotions = array_flip(TtsStudioConfig::emotionValues());
         $genders = [];
+        $characters = [];
         foreach ((array) ($data['speakers'] ?? []) as $speaker) {
             $id = mb_substr(trim((string) ($speaker['id'] ?? '')), 0, 8);
             if ($id !== '') {
                 $genders[$id] = strtolower((string) ($speaker['gender'] ?? '')) === 'female' ? 'female' : 'male';
+                $characters[$id] = mb_substr(trim(preg_replace('/\s+/', ' ', (string) ($speaker['voice'] ?? ''))), 0, 120);
             }
         }
         $segments = [];
@@ -394,7 +437,8 @@ final class VideoDubber
 
         return [
             'segments' => $segments,
-            'speakers' => array_values(array_map(fn (string $id, string $gender): array => ['id' => $id, 'gender' => $gender], array_keys($genders), $genders)),
+            'speakers' => array_values(array_map(fn (string $id, string $gender): array => ['id' => $id, 'gender' => $gender, 'voice' => $characters[$id] ?? ''],
+                array_keys($genders), $genders)),
             // When the model does not say, the original sound is kept: dropping music is the worse mistake.
             'background' => in_array($background, ['music', 'ambient', 'none'], true) ? $background : 'ambient',
         ];
@@ -425,17 +469,18 @@ final class VideoDubber
 
     /**
      * The new voice over the picture. With $keepBackground the video's other
-     * sound stays: $background, the sound with its voices taken out by the
-     * model (raw float stereo), plays all through; without it, the original
-     * plays between lines and under each line only its sides (the old voice,
-     * in the middle, goes, and with it a mono track's music) so no old voice
-     * is heard under a new one.
+     * sound stays: with $background (the model's two tracks, raw float
+     * stereo) its rest plays all through and its voices only between the new
+     * lines; without it, the original plays between lines and under each
+     * line only its sides (the old voice, in the middle, goes, and with it a
+     * mono track's music), so no old voice is heard under a new one.
      *
      * @param  array<int, array{audio: ?string, delay_ms: int, tempo: float, from: float, until: float}>  $plan
      * @param  array{path: string, margin: int}|null  $mark
+     * @param  array{rest: string, voices: string}|null  $background
      * @return array<int, string>
      */
-    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?string $background = null): array
+    private function muxCommand(string $ffmpeg, string $video, array $plan, float $seconds, bool $keepBackground, string $out, ?array $mark, ?array $background = null): array
     {
         $cmd = [$ffmpeg, '-v', 'error', '-y', '-i', $video];
         foreach ($plan as $p) {
@@ -446,18 +491,23 @@ final class VideoDubber
         $labels = '';
         foreach ($plan as $i => $p) {
             $tempo = $p['tempo'] > 1.0 ? 'atempo='.$p['tempo'].',' : '';
-            $filters[] = '['.($i + 1).':a]'.self::VOICE_STEREO.',aresample=48000,'.$tempo.'adelay=delays='.$p['delay_ms'].':all=1[s'.$i.']';
+            $gain = abs((float) ($p['gain_db'] ?? 0)) >= 0.1 ? 'volume='.$p['gain_db'].'dB,' : '';
+            $filters[] = '['.($i + 1).':a]'.self::VOICE_STEREO.',aresample=48000,'.$gain.$tempo.'adelay=delays='.$p['delay_ms'].':all=1[s'.$i.']';
             $labels .= '[s'.$i.']';
         }
         $filters[] = $labels.'amix=inputs='.count($plan).':normalize=0:dropout_transition=0[dub]';
         $audioOut = '[dub]';
         if ($keepBackground && $background !== null) {
-            // The video's sound without its voices, all through, the new voices over it.
-            array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $background);
-            $filters[] = '['.$next.':a]aformat=sample_rates=48000:channel_layouts=stereo[bg]';
-            $filters[] = '[bg][dub]amix=inputs=2:normalize=0:dropout_transition=0,alimiter=limit=0.95[mix]';
+            // The rest of the sound (music, effects) all through; the original voices only between the new lines.
+            foreach ([$background['rest'], $background['voices']] as $track) {
+                array_push($cmd, '-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $track);
+            }
+            $under = self::underLines($plan);
+            $filters[] = '['.$next.':a]aresample=48000[bg]';
+            $filters[] = '['.($next + 1).":a]aresample=48000,volume='1-({$under})':eval=frame[ov]";
+            $filters[] = '[bg][ov][dub]amix=inputs=3:normalize=0:dropout_transition=0,alimiter=limit=0.95[mix]';
             $audioOut = '[mix]';
-            $next++;
+            $next += 2;
         } elseif ($keepBackground) {
             $under = self::underLines($plan);
             $filters[] = '[0:a]'.self::stereo($this->probe($video)['channels']).',aresample=48000,asplit=2[oa][ob]';
@@ -482,9 +532,34 @@ final class VideoDubber
     }
 
     /**
-     * An expression of the time t, for ffmpeg's volume filter: 1 while a new
-     * line plays (or the old one it replaces), 0 between lines, fading over
-     * RAMP seconds either side.
+     * Where the old voices are taken out: each new line from a little before
+     * it starts (LEAD) to a little after it or the original ends (TAIL),
+     * with gaps shorter than BRIDGE closed.
+     *
+     * @param  array<int, array{from: float, until: float}>  $plan
+     * @return array<int, array{0: float, 1: float}>
+     */
+    public static function windows(array $plan): array
+    {
+        $spans = array_map(fn (array $p): array => [max(0.0, $p['from'] - self::LEAD), $p['until'] + self::TAIL], $plan);
+        usort($spans, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+        $merged = [];
+        foreach ($spans as $span) {
+            $last = count($merged) - 1;
+            if ($last >= 0 && $span[0] - $merged[$last][1] < self::BRIDGE) {
+                $merged[$last][1] = max($merged[$last][1], $span[1]);
+            } else {
+                $merged[] = $span;
+            }
+        }
+
+        return array_map(fn (array $w): array => [round($w[0], 3), round($w[1], 3)], $merged);
+    }
+
+    /**
+     * An expression of the time t, for ffmpeg's volume filter: 1 where the
+     * old voices are taken out (windows()), 0 elsewhere, fading over RAMP
+     * seconds either side.
      *
      * @param  array<int, array{from: float, until: float}>  $plan
      */
@@ -492,13 +567,49 @@ final class VideoDubber
     {
         $r = self::RAMP;
         $parts = [];
-        foreach ($plan as $p) {
-            $a = round($p['from'] - $r, 3);
-            $b = round($p['until'] + $r, 3);
-            $parts[] = "clip((t-{$a})/{$r},0,1)*clip(({$b}-t)/{$r},0,1)";
+        foreach (self::windows($plan) as [$a, $b]) {
+            $a0 = round($a - $r, 3);
+            $b1 = round($b + $r, 3);
+            $parts[] = "clip((t-{$a0})/{$r},0,1)*clip(({$b1}-t)/{$r},0,1)";
         }
 
         return $parts === [] ? '0' : 'min(1,'.implode('+', $parts).')';
+    }
+
+    /**
+     * Each line's gain to the loudness the original speaker had: the voices
+     * of the original where the lines are ($reference: the model's voices,
+     * raw float stereo, or the whole sound), both measured on the speech
+     * alone (silences left out). A line is turned up or down by at most
+     * 10 dB; nothing changes where the original cannot be measured.
+     *
+     * @param  array<int, array<string, mixed>>  $plan
+     * @return array<int, array<string, mixed>>
+     */
+    private function evenLoudness(string $ffmpeg, array $plan, string $reference, bool $raw): array
+    {
+        $speechOnly = 'silenceremove=start_periods=1:start_threshold=-45dB:stop_periods=-1:stop_threshold=-45dB:stop_duration=0.25';
+        $ranges = implode('+', array_map(fn (array $p): string => 'between(t,'.$p['from'].','.$p['until'].')', $plan));
+        $input = $raw ? ['-f', 'f32le', '-ar', (string) self::SEPARATION_RATE, '-ac', '2', '-i', $reference] : ['-i', $reference];
+        $target = $ranges === '' ? null : $this->meanVolume(array_merge([$ffmpeg, '-hide_banner'], $input, ['-af', "aselect='{$ranges}',{$speechOnly},volumedetect", '-f', 'null', '-']));
+        $target = $target === null ? null : max(-32.0, min(-12.0, $target));
+        foreach ($plan as $i => $p) {
+            $level = $target === null || ! is_string($p['audio'] ?? null) ? null
+                : $this->meanVolume([$ffmpeg, '-hide_banner', '-i', $p['audio'], '-af', $speechOnly.',volumedetect', '-f', 'null', '-']);
+            $plan[$i]['target_db'] = $target;
+            $plan[$i]['gain_db'] = $level === null ? 0.0 : round(max(-10.0, min(10.0, $target - $level)), 1);
+        }
+
+        return $plan;
+    }
+
+    /** @param  array<int, string>  $cmd  an ffmpeg run ending in volumedetect */
+    private function meanVolume(array $cmd): ?float
+    {
+        $process = new Process($cmd);
+        $process->setTimeout(120)->run();
+
+        return preg_match('/mean_volume:\s*(-?[\d.]+) dB/', $process->getErrorOutput(), $m) ? (float) $m[1] : null;
     }
 
     /**

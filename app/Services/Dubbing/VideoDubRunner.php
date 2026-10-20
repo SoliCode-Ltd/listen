@@ -125,16 +125,18 @@ class VideoDubRunner
 
     /**
      * How far along the dub is, for the page's progress bar: listening is the
-     * first tenth, voicing runs to four fifths line by line, then the mix
-     * and, for a free dub, the mark.
+     * first tenth, voicing runs to three quarters line by line, then what is
+     * left of separating the music from the voices (it runs from the start,
+     * alongside), the mix and, for a free dub, the mark.
      */
     private function progress(VideoDub $dub, string $stage, int $done, int $total): void
     {
         $percent = match ($stage) {
             'listening' => 8,
-            'voicing' => 15 + (int) round(65 * $done / max(1, $total)),
-            'mixing' => 85,
-            'marking' => 92,
+            'voicing' => 15 + (int) round(60 * $done / max(1, $total)),
+            'separating' => 76 + (int) round(14 * $done / max(1, $total)),
+            'mixing' => 91,
+            'marking' => 95,
             default => (int) $dub->progress,
         };
         $dub->forceFill(['stage' => $stage, 'progress' => max((int) $dub->progress, min(99, $percent))])->save();
