@@ -2040,6 +2040,7 @@ return [
         'kept_days' => '{1} Your videos can be watched and downloaded here for 1 day after they are made.|[2,*] Your videos can be watched and downloaded here for :count days after they are made.',
         'kept_always' => 'Your videos can be watched and downloaded here for as long as you are on your plan.',
         'pick_voice' => 'Choose one of the voices in the library.',
+        'upload_lost' => 'The video did not finish uploading. Please choose it again.',
         'one_at_a_time' => 'Your last video is still being dubbed. Wait for it to finish, then send the next one.',
         'too_short' => 'The video is too short: it needs at least :seconds seconds.',
         'too_long' => 'The video is too long: it can be :seconds seconds at most. Trim it and try again.',

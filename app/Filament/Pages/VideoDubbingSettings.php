@@ -81,15 +81,6 @@ class VideoDubbingSettings extends Page implements HasForms
                     ->description('What the upload box shows: the largest file, and the longest video. A plan\'s longest video is set on the plan (Plans → Dub my video).')
                     ->columns(2)
                     ->schema([
-                        Forms\Components\Placeholder::make('server_upload_limit')
-                            ->label('')
-                            ->columnSpanFull()
-                            ->visible(fn (): bool => self::serverCapsUploads())
-                            ->content(fn (): HtmlString => new HtmlString(sprintf(
-                                '<div style="padding:.75rem 1rem;border-radius:.6rem;background:rgba(220,38,38,.08);color:#b91c1c;font-weight:600;line-height:1.6">'
-                                .'This server accepts uploads of %d MB at most, so the upload box shows %d MB whatever is set below. '
-                                .'To allow more, raise "upload_max_filesize" and "post_max_size" in the server\'s PHP settings to the size you want (a little more for post_max_size).</div>',
-                                (int) VideoDubbing::serverUploadMb(), (int) VideoDubbing::serverUploadMb()))),
                         Forms\Components\TextInput::make('video_dubbing_free_max_upload_mb')
                             ->label('Largest video for the free dub (demo)')
                             ->numeric()
@@ -98,7 +89,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->maxValue(2000)
                             ->suffix('MB')
                             ->required()
-                            ->helperText(fn (): string => 'Members without a plan with dubbing. They see '.VideoDubbing::maxUploadMb(true).' MB now.'),
+                            ->helperText('Members without a plan with dubbing.'),
                         Forms\Components\TextInput::make('video_dubbing_max_upload_mb')
                             ->label('Largest video for plans with dubbing')
                             ->numeric()
@@ -107,7 +98,7 @@ class VideoDubbingSettings extends Page implements HasForms
                             ->maxValue(2000)
                             ->suffix('MB')
                             ->required()
-                            ->helperText(fn (): string => 'Members whose plan includes dubbing. They see '.VideoDubbing::maxUploadMb().' MB now.'),
+                            ->helperText(fn (): string => 'Members whose plan includes dubbing. Videos are sent in pieces of '.intdiv(VideoDubbing::chunkBytes(), 1024 * 1024).' MB, so the server\'s own upload limit does not cap this.'),
                         Forms\Components\TextInput::make('video_dubbing_free_max_seconds')
                             ->label('Longest free video')
                             ->numeric()
@@ -202,14 +193,6 @@ class VideoDubbingSettings extends Page implements HasForms
                     ]),
             ])
             ->statePath('data');
-    }
-
-    /** Whether the server's own upload limit is below what is set here, so members see less. */
-    private static function serverCapsUploads(): bool
-    {
-        $server = VideoDubbing::serverUploadMb();
-
-        return $server !== null && $server < max(VideoDubbing::uploadSettingMb(), VideoDubbing::uploadSettingMb(true));
     }
 
     /** Connected to which account, or what to set up first. */

@@ -17,7 +17,9 @@ use App\Support\VideoDubbing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -38,6 +40,11 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class VideoDubController extends Controller
 {
+    /** Where videos sent in pieces are joined, on the private disk (dubs:prune deletes ones left behind). */
+    public const UPLOADS = 'dub-uploads';
+
+    public const UPLOAD_HOURS = 3;
+
     public function __construct(private PlanAccessService $plans) {}
 
     public function show(Request $request): Response
@@ -51,7 +58,83 @@ class VideoDubController extends Controller
         ]));
     }
 
+    /**
+     * Starts sending a video in pieces (the page always does): what it is and
+     * how big, checked before a byte is sent, so nobody waits for a large
+     * video to arrive to be told it cannot be dubbed. Then uploadChunk() for
+     * each piece, then store() with the upload's id. Each request stays far
+     * below any limit on one request's size, on the server or in front of it.
+     */
+    public function startUpload(Request $request): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+        abort_unless(VideoDubbing::openTo($user), 404);
+        $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
+        $free = ! VideoDubbing::planIncludes($plan);
+        $mb = VideoDubbing::maxUploadMb($free);
+        $request->validate([
+            'name' => ['required', 'string', 'max:255', 'regex:/\.(mp4|mov|webm|mkv|m4v|3gp)$/i'],
+            'size' => ['required', 'integer', 'min:1', 'max:'.($mb * 1024 * 1024)],
+        ], [
+            'name.regex' => __('ui.dub.js.not_video'),
+            'size.max' => __('ui.dub.js.too_big', ['mb' => $mb]),
+        ]);
+        $this->assertMayStart($user, $request, $plan, $free);
+
+        $id = Str::random(40);
+        $upload = ['id' => $id, 'user_id' => (int) $user->id, 'name' => mb_substr((string) $request->input('name'), 0, 200),
+            'size' => (int) $request->input('size'), 'path' => self::UPLOADS.'/'.$id.'.part'];
+        Storage::disk('local')->put($upload['path'], '');
+        Cache::put('dub-upload:'.$id, $upload, now()->addHours(self::UPLOAD_HOURS));
+
+        return response()->json(['id' => $id, 'chunk_bytes' => VideoDubbing::chunkBytes(), 'chunk_url' => route('dub.upload.chunk', ['id' => $id])], 201);
+    }
+
+    /**
+     * One piece of a video, as the request's body, at the place X-Upload-Offset
+     * says. A piece sent again (its answer was lost) is not added twice: the
+     * reply says how much has arrived, and the page carries on from there.
+     */
+    public function uploadChunk(Request $request, string $id): JsonResponse
+    {
+        $upload = $this->ownUpload($request, $id);
+        $path = Storage::disk('local')->path($upload['path']);
+
+        return Cache::lock('dub-upload-lock:'.$id, 120)->block(30, function () use ($request, $upload, $path): JsonResponse {
+            clearstatcache(true, $path);
+            $received = is_file($path) ? (int) filesize($path) : 0;
+            $offset = (int) $request->header('X-Upload-Offset', '-1');
+            if ($offset !== $received) {
+                return response()->json(['received' => $received], $offset < $received ? 200 : 409);
+            }
+            $in = $request->getContent(true);
+            $out = fopen($path, 'ab');
+            // Never more than the piece size, nor past the size announced.
+            stream_copy_to_stream($in, $out, min(VideoDubbing::chunkBytes() + 1024 * 1024, $upload['size'] - $received));
+            fclose($out);
+            clearstatcache(true, $path);
+
+            return response()->json(['received' => (int) filesize($path)]);
+        });
+    }
+
     public function store(Request $request, VideoDubber $dubber): JsonResponse
+    {
+        // A video sent in pieces: its joined file goes to the dub, or is deleted.
+        $upload = $request->filled('upload_id') ? $this->finishedUpload($request, (string) $request->input('upload_id')) : null;
+        try {
+            return $this->dub($request, $dubber, $upload);
+        } finally {
+            if ($upload !== null) {
+                Storage::disk('local')->delete($upload['path']);
+                Cache::forget('dub-upload:'.$upload['id']);
+            }
+        }
+    }
+
+    /** @param  array<string, mixed>|null  $upload */
+    private function dub(Request $request, VideoDubber $dubber, ?array $upload): JsonResponse
     {
         /** @var User $user */
         $user = $request->user();
@@ -59,7 +142,11 @@ class VideoDubController extends Controller
         $language = $request->input('language') === 'en' ? 'en' : 'ar';
         $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
         $free = ! VideoDubbing::planIncludes($plan);
-        $validated = $request->validate([
+        $data = $request->all();
+        if ($upload !== null) {
+            $data['video'] = new UploadedFile(Storage::disk('local')->path($upload['path']), $upload['name'], null, null, true);
+        }
+        $validated = Validator::make($data, [
             // The free dub has its own largest video (Video Dubbing → Settings).
             'video' => ['required', 'file', 'max:'.(VideoDubbing::maxUploadMb($free) * 1024),
                 'mimetypes:video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp'],
@@ -71,27 +158,22 @@ class VideoDubController extends Controller
             'performance_style' => ['nullable', 'string', Rule::in(TtsStudioConfig::performanceStyleValues())],
             'emotion' => ['nullable', 'string', Rule::in(TtsStudioConfig::emotionValues())],
             'background' => ['nullable', Rule::in(['keep', 'replace'])],
-        ]);
+        ])->validate();
         $voice = VideoDubbing::voiceName($validated['voice_key'], $language);
         if ($voice === null) {
             throw ValidationException::withMessages(['voice_key' => __('ui.dub.pick_voice')]);
         }
-
-        if (VideoDub::query()->where('user_id', $user->id)->whereIn('status', [VideoDub::QUEUED, VideoDub::PROCESSING])->exists()) {
-            throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
-        }
-
-        if ($free) {
-            $this->assertMayDubFree($user, $request);
-        } else {
-            $this->assertWithinMonth($user, $plan);
-        }
+        $this->assertMayStart($user, $request, $plan, $free);
 
         // Kept on the private disk: only its owner can watch it, through this controller.
         $folder = 'dubs/'.now()->format('Ymd').'/'.Str::random(24);
         $file = $validated['video'];
         $extension = strtolower($file->getClientOriginalExtension() ?: 'mp4');
-        $source = $file->storeAs($folder, 'source.'.(preg_match('/^[a-z0-9]{2,4}$/', $extension) ? $extension : 'mp4'), 'local');
+        $name = 'source.'.(preg_match('/^[a-z0-9]{2,4}$/', $extension) ? $extension : 'mp4');
+        // A video sent in pieces is moved, not copied: it can be hundreds of MB.
+        $source = $upload !== null
+            ? (Storage::disk('local')->move($upload['path'], $folder.'/'.$name) ? $folder.'/'.$name : throw new \RuntimeException('The uploaded video could not be moved.'))
+            : $file->storeAs($folder, $name, 'local');
 
         try {
             $probe = $dubber->probe(Storage::disk('local')->path($source));
@@ -230,6 +312,19 @@ class VideoDubController extends Controller
         return response()->download(Storage::disk('local')->path($path), 'listen-dub-'.$dub->id.'.mp4', ['Content-Type' => 'video/mp4']);
     }
 
+    /** One dub at a time, then the free dub's rules or the plan's month. */
+    private function assertMayStart(User $user, Request $request, ?\App\Models\Plan $plan, bool $free): void
+    {
+        if (VideoDub::query()->where('user_id', $user->id)->whereIn('status', [VideoDub::QUEUED, VideoDub::PROCESSING])->exists()) {
+            throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
+        }
+        if ($free) {
+            $this->assertMayDubFree($user, $request);
+        } else {
+            $this->assertWithinMonth($user, $plan);
+        }
+    }
+
     /**
      * One free dub per person, when today's free dubs for the site are not used
      * up, from an account with a confirmed email and not an automated browser.
@@ -263,6 +358,28 @@ class VideoDubController extends Controller
     private function studioAfter(User $user, Request $request): array
     {
         return array_intersect_key(VideoDubbing::studio($user, $request), array_flip(['state', 'usage']));
+    }
+
+    /** @return array<string, mixed> An upload of this member's that is still open. */
+    private function ownUpload(Request $request, string $id): array
+    {
+        $upload = Cache::get('dub-upload:'.$id);
+        abort_unless(is_array($upload) && (int) $upload['user_id'] === (int) $request->user()->id, 404);
+
+        return $upload;
+    }
+
+    /** @return array<string, mixed> An upload of this member's with every piece in. */
+    private function finishedUpload(Request $request, string $id): array
+    {
+        $upload = Cache::get('dub-upload:'.$id);
+        $disk = Storage::disk('local');
+        if (! is_array($upload) || (int) $upload['user_id'] !== (int) $request->user()->id || ! $disk->exists($upload['path'])
+            || $disk->size($upload['path']) !== (int) $upload['size']) {
+            throw ValidationException::withMessages(['video' => __('ui.dub.upload_lost')]);
+        }
+
+        return $upload;
     }
 
     private function ownDub(Request $request, int $id): VideoDub

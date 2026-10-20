@@ -215,12 +215,22 @@ final class VideoDubbing
         return $limits === [] ? null : max(1, min($limits));
     }
 
-    /** The largest video a member can really send: the admin's setting, within what the server takes. */
+    /**
+     * The largest video a member can send: the admin's setting. The page
+     * sends it in pieces (chunkBytes()), so no limit of the server's or of
+     * anything in front of it on one request's size stands in the way.
+     */
     public static function maxUploadMb(bool $free = false): int
+    {
+        return self::uploadSettingMb($free);
+    }
+
+    /** The size of each piece the page sends a video in: 8 MB, or less where the server takes less in one request. */
+    public static function chunkBytes(): int
     {
         $server = self::serverUploadMb();
 
-        return $server === null ? self::uploadSettingMb($free) : min(self::uploadSettingMb($free), $server);
+        return max(1, min(8, $server === null ? 8 : $server - 1)) * 1024 * 1024;
     }
 
     /** The longest free video (Video Dubbing → Settings), in seconds; also a plan's when it sets none. */
@@ -402,6 +412,7 @@ final class VideoDubbing
             'dubs' => $user ? self::recent($user) : [],
             'urls' => [
                 'store' => route('dub.store'),
+                'upload' => route('dub.upload.start'),
                 'login' => route('login'),
                 'register' => route('register'),
                 'verify' => route('verification.send'),

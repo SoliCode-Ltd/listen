@@ -127,9 +127,11 @@
     if (text != null) n.textContent = text;
     return n;
   }
+  // The form token: the page's meta tag where it has one, else the studio's own (its config).
+  var studioToken = '';
   function csrf() {
     var m = document.querySelector('meta[name="csrf-token"]');
-    return m ? m.content : '';
+    return m && m.content ? m.content : studioToken;
   }
 
   // ---------- One studio ----------
@@ -137,6 +139,7 @@
     var configNode = root.querySelector('[data-dub-config]');
     if (!configNode) return;
     var c = JSON.parse(configNode.textContent || '{}');
+    if (c.csrf) studioToken = c.csrf;
     var t = c.i18n || {};
     var form = root.querySelector('[data-dub-form]');
     var q = function (sel) { return root.querySelector(sel); };
@@ -436,42 +439,93 @@
       reset();
     });
 
+    // The video goes in pieces of a few MB (the server says how big), so no
+    // limit on one request's size can stop a large one, and a piece lost on
+    // the way is sent again rather than the whole video. Then the dub is
+    // asked for with the upload's id.
+    function errorOf(xhr, body) {
+      if (xhr.status === 413) return t.too_big.replace(':mb', c.maxMb);
+      if (xhr.status === 419) return t.expired_page;
+      return (body.errors ? Object.keys(body.errors).map(function (k) { return body.errors[k][0]; })[0] : '') || body.message || t.failed;
+    }
+    function request(method, url, body, headers, onProgress) {
+      return new Promise(function (resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open(method, url);
+        xhr.setRequestHeader('Accept', 'application/json');
+        xhr.setRequestHeader('X-CSRF-TOKEN', csrf());
+        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+        Object.keys(headers || {}).forEach(function (k) { xhr.setRequestHeader(k, headers[k]); });
+        if (onProgress) xhr.upload.onprogress = onProgress;
+        xhr.onload = function () {
+          var json = {};
+          try { json = JSON.parse(xhr.responseText || '{}'); } catch (e) { /* not JSON */ }
+          resolve({ xhr: xhr, body: json });
+        };
+        xhr.onerror = function () { reject(new Error('network')); };
+        xhr.send(body);
+      });
+    }
+    function wait(ms) { return new Promise(function (ok) { setTimeout(ok, ms); }); }
+    function sendPieces(file, upload) {
+      var size = file.size;
+      var stalls = 0;
+      // One piece, sent again after a pause when it did not get through (a few times).
+      function sendOne(offset, tries) {
+        var piece = file.slice(offset, Math.min(size, offset + upload.chunk_bytes));
+        return request('POST', upload.chunk_url, piece, { 'Content-Type': 'application/octet-stream', 'X-Upload-Offset': String(offset) }, function (e) {
+          if (e.lengthComputable) working('upload', ((offset + e.loaded) / size) * 100, t.working_upload, t.working_upload_note);
+        }).then(function (r) {
+          // 409: the server has a different amount; it says how much, and the next piece starts there.
+          if ((r.xhr.status === 200 || r.xhr.status === 409) && typeof r.body.received === 'number') return r.body.received;
+          return Promise.reject(r);
+        }).catch(function (r) {
+          var status = r && r.xhr ? r.xhr.status : 0;
+          if (tries >= 4 || (status > 0 && status < 500)) return Promise.reject(r);
+          return wait(1500 * (tries + 1)).then(function () { return sendOne(offset, tries + 1); });
+        });
+      }
+      function from(offset) {
+        if (offset >= size) return Promise.resolve();
+        return sendOne(offset, 0).then(function (received) {
+          stalls = received > offset ? 0 : stalls + 1;
+          if (stalls > 4) return Promise.reject(null);
+          return from(received);
+        });
+      }
+      return from(0);
+    }
+
     form.addEventListener('submit', function (ev) {
       ev.preventDefault();
       if (!chosen || !allowed()) return;
       showError('');
+      var file = chosen;
       var data = new FormData(form);
-      data.set('video', chosen);
+      data.delete('video');
       data.set('background', keep.checked ? 'keep' : 'replace');
       working('upload', 0, t.working_upload, t.working_upload_note);
       deviceSignal().then(function (d) {
-        var xhr = new XMLHttpRequest();
-        xhr.open('POST', c.urls.store);
-        xhr.setRequestHeader('Accept', 'application/json');
-        xhr.setRequestHeader('X-CSRF-TOKEN', csrf());
-        xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-        if (d.id) { xhr.setRequestHeader('X-Client-Device', d.id); xhr.setRequestHeader('X-Client-Device-Touch', d.touch ? '1' : '0'); }
-        xhr.upload.onprogress = function (e) {
-          if (e.lengthComputable) working('upload', (e.loaded / e.total) * 100, t.working_upload, t.working_upload_note);
-        };
-        xhr.upload.onload = function () { working('listening', 2, t.working_checking, t.working_checking_note); };
-        xhr.onload = function () {
-          var body = {};
-          try { body = JSON.parse(xhr.responseText || '{}'); } catch (e) { /* not JSON */ }
-          if (xhr.status === 202) {
-            if (body.studio) { c.state = body.studio.state; c.usage = body.studio.usage; syncAllowance(); }
-            chosen = null;
-            follow(body);
-            return;
-          }
-          var message = xhr.status === 413 ? t.too_big.replace(':mb', c.maxMb)
-            : xhr.status === 419 ? t.expired_page
-            : (body.errors ? Object.keys(body.errors).map(function (k) { return body.errors[k][0]; })[0] : '') || body.message || t.failed;
-          showError(message);
-          idle();
-        };
-        xhr.onerror = function () { showError(t.network); idle(); };
-        xhr.send(data);
+        var device = d.id ? { 'X-Client-Device': d.id, 'X-Client-Device-Touch': d.touch ? '1' : '0' } : {};
+        var start = new FormData();
+        start.set('name', file.name || 'video.mp4');
+        start.set('size', String(file.size));
+        return request('POST', c.urls.upload, start, device).then(function (r) {
+          if (r.xhr.status !== 201) return Promise.reject(r);
+          return sendPieces(file, r.body).then(function () {
+            working('listening', 2, t.working_checking, t.working_checking_note);
+            data.set('upload_id', r.body.id);
+            return request('POST', c.urls.store, data, device);
+          });
+        }).then(function (r) {
+          if (r.xhr.status !== 202) return Promise.reject(r);
+          if (r.body.studio) { c.state = r.body.studio.state; c.usage = r.body.studio.usage; syncAllowance(); }
+          chosen = null;
+          follow(r.body);
+        });
+      }).catch(function (r) {
+        showError(r && r.xhr ? errorOf(r.xhr, r.body || {}) : t.network);
+        idle();
       });
     });
 

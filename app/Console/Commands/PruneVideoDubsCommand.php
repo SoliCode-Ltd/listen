@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Http\Controllers\VideoDubController;
 use App\Models\VideoDub;
 use App\Services\Dubbing\DriveArchive;
 use App\Services\Dubbing\VideoDubRunner;
@@ -13,8 +14,9 @@ use Illuminate\Support\Facades\Storage;
  * Dub my video: fails the dubs still working long after they started (their
  * process died) and gives back what they were charged; moves finished videos
  * to the site's Google Drive (a paid one that could not go when it was made,
- * a free one once its member's day is over); and, with Drive off, deletes the
- * server copies older than the admin's days whose members' time is over.
+ * a free one once its member's day is over); with Drive off, deletes the
+ * server copies older than the admin's days whose members' time is over; and
+ * deletes the pieces of videos whose sending was never finished.
  * The rows stay, so a free dub stays used after its files are gone.
  */
 class PruneVideoDubsCommand extends Command
@@ -61,7 +63,18 @@ class PruneVideoDubsCommand extends Command
                 }
             });
 
-        $this->info(sprintf('%d stuck dub(s) failed, %d video(s) moved to Google Drive, files of %d old dub(s) deleted.', $stuck->count(), $archived, $deleted));
+        // Videos whose sending was never finished (the page was closed half way).
+        $abandoned = 0;
+        $disk = Storage::disk('local');
+        foreach ($disk->files(VideoDubController::UPLOADS) as $part) {
+            if ($disk->lastModified($part) < now()->subHours(VideoDubController::UPLOAD_HOURS)->getTimestamp()) {
+                $disk->delete($part);
+                $abandoned++;
+            }
+        }
+
+        $this->info(sprintf('%d stuck dub(s) failed, %d video(s) moved to Google Drive, files of %d old dub(s) deleted, %d unfinished upload(s) deleted.',
+            $stuck->count(), $archived, $deleted, $abandoned));
 
         return self::SUCCESS;
     }

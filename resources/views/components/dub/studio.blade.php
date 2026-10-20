@@ -48,6 +48,8 @@
       'keepHours' => $dub['keep_hours'],
       'urls' => $dub['urls'] + ['dashboard' => route('dashboard').'#dubVideoSection'],
       'i18n' => __('ui.dub.js'),
+      // The pages have no form-token meta tag: the uploads send this one.
+      'csrf' => csrf_token(),
   ];
 @endphp
 <section class="dub-studio" data-dub-studio data-studio-pane="dub" @if($hidden) hidden @endif aria-label="{{ __('ui.dub.studio_label') }}">

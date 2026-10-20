@@ -304,20 +304,100 @@ class VideoDubPageTest extends TestCase
         $this->assertArrayHasKey('ar-SA', $studio['languages']['ar']['dialects']);
     }
 
-    public function test_the_upload_limit_is_the_admins_within_what_the_server_takes(): void
+    public function test_the_upload_limit_is_the_admins_whatever_the_server_takes_in_one_request(): void
     {
         $this->assertSame(300, VideoDubbing::uploadSettingMb(), 'the default');
         SiteSetting::set('video_dubbing_max_upload_mb', 250, 'video_dubbing');
         $this->assertSame(250, VideoDubbing::uploadSettingMb());
+        $this->assertSame(250, VideoDubbing::maxUploadMb(), 'sent in pieces, so the server\'s own limit on one request does not cap it');
         $server = VideoDubbing::serverUploadMb();
-        $this->assertSame($server === null ? 250 : min(250, $server), VideoDubbing::maxUploadMb(), 'members see what they can really send');
+        $this->assertLessThanOrEqual($server === null ? 8 * 1024 * 1024 : max(1, $server - 1) * 1024 * 1024, VideoDubbing::chunkBytes(), 'each piece fits in one request');
 
         // The free dub (the demo) follows the plans' size until it has its own.
         $this->assertSame(250, VideoDubbing::uploadSettingMb(true));
         SiteSetting::set('video_dubbing_free_max_upload_mb', 80, 'video_dubbing');
-        $this->assertSame(80, VideoDubbing::uploadSettingMb(true));
-        $this->assertSame(250, VideoDubbing::uploadSettingMb());
-        $this->assertSame($server === null ? 80 : min(80, $server), VideoDubbing::maxUploadMb(true));
+        $this->assertSame(80, VideoDubbing::maxUploadMb(true));
+        $this->assertSame(250, VideoDubbing::maxUploadMb());
+    }
+
+    public function test_a_video_sent_in_pieces_is_joined_and_dubbed(): void
+    {
+        $this->openToEveryone();
+        $this->fakeEngine();
+        $user = $this->member(dubbing: true);
+        $bytes = (string) file_get_contents($this->video);
+        $size = strlen($bytes);
+
+        $start = $this->actingAs($user)->postJson(route('dub.upload.start'), ['name' => 'holiday clip.mp4', 'size' => $size])->assertCreated();
+        $url = $start->json('chunk_url');
+        $this->assertSame(VideoDubbing::chunkBytes(), $start->json('chunk_bytes'));
+        $third = intdiv($size, 3);
+
+        $this->assertSame($third, $this->piece($url, 0, substr($bytes, 0, $third))->assertOk()->json('received'));
+        // A piece sent again (its answer was lost) is not added twice.
+        $this->assertSame($third, $this->piece($url, 0, substr($bytes, 0, $third))->assertOk()->json('received'));
+        // A piece from too far on is refused, with where to carry on from.
+        $this->assertSame($third, $this->piece($url, $third * 2, substr($bytes, $third * 2))->assertStatus(409)->json('received'));
+        $this->piece($url, $third, substr($bytes, $third, $third))->assertOk();
+        $this->assertSame($size, $this->piece($url, $third * 2, substr($bytes, $third * 2))->assertOk()->json('received'));
+
+        // Nobody else can add to it.
+        $other = $this->member(dubbing: true);
+        $this->actingAs($other)->call('POST', $url, [], [], [], ['HTTP_X_UPLOAD_OFFSET' => (string) $size, 'CONTENT_TYPE' => 'application/octet-stream', 'HTTP_ACCEPT' => 'application/json'], 'x')->assertNotFound();
+        $this->actingAs($other)->post(route('dub.store'), ['upload_id' => $start->json('id')] + array_diff_key($this->form(), ['video' => 1]), ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.upload_lost'));
+
+        $sent = $this->actingAs($user)->post(route('dub.store'), ['upload_id' => $start->json('id')] + array_diff_key($this->form(), ['video' => 1]), ['Accept' => 'application/json'])
+            ->assertStatus(202);
+        $dub = VideoDub::query()->findOrFail($sent->json('id'));
+        $this->assertSame(VideoDub::READY, $dub->status, (string) $dub->error_message);
+        $this->assertSame('holiday clip.mp4', $dub->original_name);
+        $this->assertEqualsWithDelta(6.0, $dub->video_seconds, 0.2, 'the joined video is the whole video');
+        $this->assertSame([], Storage::disk('local')->files(\App\Http\Controllers\VideoDubController::UPLOADS), 'the pieces are not left behind');
+
+        // Used once only.
+        $this->actingAs($user)->post(route('dub.store'), ['upload_id' => $start->json('id')] + array_diff_key($this->form(), ['video' => 1]), ['Accept' => 'application/json'])
+            ->assertStatus(422);
+    }
+
+    public function test_a_member_whose_credits_follow_the_plan_dates_can_dub(): void
+    {
+        // As on the servers: credits counted from the plan's own dates, so the period reads "2026-10-20 20:17".
+        SiteSetting::set(\App\Support\CreditPeriod::SWITCH_SETTING, now()->subMonths(2)->toDateTimeString(), 'billing');
+        $this->openToEveryone();
+        $this->fakeEngine();
+        $user = $this->member(dubbing: true);
+        \App\Models\Subscription::query()->where('user_id', $user->id)->update(['current_period_start' => now()->subDays(3)->setTime(14, 37), 'current_period_end' => now()->addDays(27)->setTime(14, 37)]);
+
+        $sent = $this->actingAs($user)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
+        $dub = VideoDub::query()->findOrFail($sent->json('id'));
+        $this->assertGreaterThan(7, strlen((string) $dub->period_ym), 'the whole period is kept');
+        $this->assertSame(\App\Support\CreditPeriod::counter($user->id)->period_ym, $dub->period_ym);
+        $this->assertSame(1, VideoDubbing::dubsThisMonth($user->id), 'counted in the member\'s own month');
+    }
+
+    public function test_a_video_that_cannot_be_dubbed_is_refused_before_it_is_sent(): void
+    {
+        $this->openToEveryone();
+        $this->fakeEngine();
+        SiteSetting::set('video_dubbing_free_max_upload_mb', 50, 'video_dubbing');
+        $user = $this->member(dubbing: false);
+
+        $this->actingAs($user)->postJson(route('dub.upload.start'), ['name' => 'clip.mp4', 'size' => 51 * 1024 * 1024])
+            ->assertStatus(422)->assertJsonPath('errors.size.0', __('ui.dub.js.too_big', ['mb' => 50]));
+        $this->actingAs($user)->postJson(route('dub.upload.start'), ['name' => 'notes.pdf', 'size' => 1000])
+            ->assertStatus(422)->assertJsonPath('errors.name.0', __('ui.dub.js.not_video'));
+
+        // Their free dub used: told so before a byte of the next video is sent.
+        $this->actingAs($user)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202);
+        $this->actingAs($user)->postJson(route('dub.upload.start'), ['name' => 'clip.mp4', 'size' => 1000])
+            ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.free_used'));
+
+        // A sending never finished is deleted after a few hours.
+        Storage::disk('local')->put(\App\Http\Controllers\VideoDubController::UPLOADS.'/left.part', 'half');
+        $this->travel(4)->hours();
+        $this->artisan('dubs:prune')->assertSuccessful();
+        $this->assertFalse(Storage::disk('local')->exists(\App\Http\Controllers\VideoDubController::UPLOADS.'/left.part'));
     }
 
     public function test_an_admin_removing_a_dub_lets_the_member_dub_again(): void
@@ -392,6 +472,12 @@ class VideoDubPageTest extends TestCase
             ->assertStatus(422)->assertJsonPath('errors.video.0', __('ui.dub.too_long', ['seconds' => 5]));
         $this->assertSame(0, VideoDub::query()->count());
         $this->assertSame([], Storage::disk('local')->allFiles());
+    }
+
+    /** One piece of a video sent in pieces, as the page sends it. */
+    private function piece(string $url, int $offset, string $bytes): \Illuminate\Testing\TestResponse
+    {
+        return $this->call('POST', $url, [], [], [], ['HTTP_X_UPLOAD_OFFSET' => (string) $offset, 'CONTENT_TYPE' => 'application/octet-stream', 'HTTP_ACCEPT' => 'application/json'], $bytes);
     }
 
     private function openToEveryone(): void

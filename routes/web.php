@@ -246,11 +246,17 @@ Route::group([
     // Dub my video: the page for everyone it is open to; the rest needs an account.
     Route::get('/dub-my-video', [\App\Http\Controllers\VideoDubController::class, 'show'])->name('dub.page');
     Route::middleware(['auth', 'subscription.sync'])->prefix('dub-my-video')->group(function (): void {
-        Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1')->name('dub.store');
+        Route::post('/', [\App\Http\Controllers\VideoDubController::class, 'store'])->middleware('throttle:10,1,dub-store')->name('dub.store');
+        // The video itself, sent in pieces before the dub is asked for.
+        Route::post('/upload', [\App\Http\Controllers\VideoDubController::class, 'startUpload'])->middleware('throttle:10,1,dub-upload')->name('dub.upload.start');
         Route::get('/{id}/status', [\App\Http\Controllers\VideoDubController::class, 'status'])->whereNumber('id')->name('dub.status');
         Route::get('/{id}/watch', [\App\Http\Controllers\VideoDubController::class, 'watch'])->whereNumber('id')->name('dub.watch');
         Route::get('/{id}/download', [\App\Http\Controllers\VideoDubController::class, 'download'])->whereNumber('id')->name('dub.download');
     });
+    // Each piece of a video: kept light (no plan check), many a minute for a large one.
+    // Each limit counts on its own (the third part names it): the pieces never use up the dub's.
+    Route::middleware(['auth', 'throttle:600,1,dub-piece'])->post('/dub-my-video/upload/{id}', [\App\Http\Controllers\VideoDubController::class, 'uploadChunk'])
+        ->where('id', '[A-Za-z0-9]{40}')->name('dub.upload.chunk');
 
     Route::middleware(['auth'])->group(function () {
         Route::get('/referral/stats', [\App\Http\Controllers\ReferralController::class, 'stats'])->name('referral.stats');
