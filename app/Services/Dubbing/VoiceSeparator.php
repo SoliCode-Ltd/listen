@@ -20,8 +20,11 @@ use Symfony\Component\Process\Process;
  * up (Video Dubbing → Settings, or `php artisan dubs:separator install`):
  * the wheels that fit this server's Python and the model, each checked
  * against its published checksum, then a test run. It takes about 1.4 GB of
- * memory while it runs, so the whole site runs one at a time; a dub that
- * cannot wait for it, or a server without it, uses VideoDubber's filters.
+ * memory while it runs, so the whole site runs one at a time, and only when
+ * the server has the memory free (enoughMemory()); should the server still
+ * run short, the system stops it first (it says so itself), never the site.
+ * A dub that cannot wait for it, or a server without it, uses VideoDubber's
+ * filters.
  */
 class VoiceSeparator
 {
@@ -89,6 +92,30 @@ class VoiceSeparator
         return self::enabled() && self::installed();
     }
 
+    /** @return array{total_mb: int, free_mb: int}|null The server's memory, as the system counts it. */
+    public static function memory(): ?array
+    {
+        $info = @file_get_contents('/proc/meminfo');
+        if (! is_string($info) || ! preg_match('/^MemTotal:\s+(\d+)/m', $info, $t) || ! preg_match('/^MemAvailable:\s+(\d+)/m', $info, $a)) {
+            return null;
+        }
+
+        return ['total_mb' => intdiv((int) $t[1], 1024), 'free_mb' => intdiv((int) $a[1], 1024)];
+    }
+
+    /**
+     * Whether the server has the memory free for one separation, with room to
+     * spare (listen.dubbing.separator.min_free_mb), from the system's own
+     * count of what is available. Where it cannot be read, it goes ahead: the
+     * system would stop it before anything else.
+     */
+    public static function enoughMemory(): bool
+    {
+        $memory = self::memory();
+
+        return $memory === null || $memory['free_mb'] >= max(0, (int) config('listen.dubbing.separator.min_free_mb', 2048));
+    }
+
     /** @return array<string, mixed>|null What install() set up: the versions and when. */
     public static function details(): ?array
     {
@@ -119,6 +146,12 @@ class VoiceSeparator
         }
         $lock = Cache::lock(self::LOCK, self::TIMEOUT + 60);
         if (! $lock->get()) {
+            return null;
+        }
+        if (! self::enoughMemory()) {
+            $lock->release();
+            Log::info('Voice separation skipped: the server has too little memory free just now.');
+
             return null;
         }
         try {
@@ -183,6 +216,12 @@ class VoiceSeparator
         try {
             $lock->block($wait);
         } catch (\Throwable) {
+            return null;
+        }
+        if (! self::enoughMemory()) {
+            $lock->release();
+            Log::info('Voice separation skipped: the server has too little memory free just now.');
+
             return null;
         }
         try {

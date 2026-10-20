@@ -174,6 +174,8 @@ return [
         'separator' => [
             'python' => env('LISTEN_DUB_SEPARATOR_PYTHON', ''),
             'threads' => (int) env('LISTEN_DUB_SEPARATOR_THREADS', 2),
+            // It takes about 1.4 GB while it runs: it starts only with this much free, else the dub uses the filters.
+            'min_free_mb' => (int) env('LISTEN_DUB_SEPARATOR_MIN_FREE_MB', 2048),
             'dir' => env('LISTEN_DUB_SEPARATOR_DIR', ''),
         ],
         // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.

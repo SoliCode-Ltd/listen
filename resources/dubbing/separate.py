@@ -24,6 +24,12 @@ def main():
     parser.add_argument('paths', nargs='*')
     args = parser.parse_args()
     sys.path.insert(0, args.lib)
+    # Should the server ever run short of memory, this is what the system stops first: never the site.
+    try:
+        with open('/proc/self/oom_score_adj', 'w') as f:
+            f.write('1000')
+    except OSError:
+        pass
 
     import numpy as np
     import onnxruntime as ort

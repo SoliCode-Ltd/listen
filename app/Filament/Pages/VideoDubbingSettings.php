@@ -232,14 +232,27 @@ class VideoDubbingSettings extends Page implements HasForms
         if (VoiceSeparator::installed()) {
             $d = VoiceSeparator::details() ?? [];
 
-            return new HtmlString(sprintf('<strong>Installed</strong>%s. One dub uses it at a time (about 1.4 GB of memory while it runs); a dub that cannot wait for it uses the filters.%s',
-                isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '', $last));
+            return new HtmlString(sprintf('<strong>Installed</strong>%s. One dub uses it at a time (about 1.4 GB of memory while it runs), and only when %d MB are free; a dub that cannot wait for it, or finds too little memory free, uses the filters. Should the server run short anyway, the system stops the separation first, never the site.%s%s',
+                isset($d['installed_at']) ? ' on '.e(\Illuminate\Support\Carbon::parse($d['installed_at'])->toDayDateTimeString()).' (Python '.e(substr((string) ($d['python_version'] ?? ''), 0, 1).'.'.substr((string) ($d['python_version'] ?? ''), 1)).')' : '',
+                (int) config('listen.dubbing.separator.min_free_mb', 2048), self::memoryLine(), $last));
         }
         $python = VoiceSeparator::python();
 
-        return new HtmlString(($python === null
+        return new HtmlString(self::memoryLine(false).($python === null
             ? '<strong>Not installed.</strong> This server has no Python 3 in the usual places, which it needs. Ask the host to install python3 (or set LISTEN_DUB_SEPARATOR_PYTHON to where it is), then press Install.'
             : '<strong>Not installed.</strong> Press Install (or run <code>php artisan dubs:separator install</code> on the server). Until then dubs use the filters.').$last);
+    }
+
+    /** The server's memory, from the system's own count. */
+    private static function memoryLine(bool $leadingBreak = true): string
+    {
+        $memory = VoiceSeparator::memory();
+        if ($memory === null) {
+            return '';
+        }
+        $line = sprintf('This server: %.1f GB of memory, %.1f GB free now.', $memory['total_mb'] / 1024, $memory['free_mb'] / 1024);
+
+        return $leadingBreak ? '<br>'.$line : $line.'<br>';
     }
 
     /** Connected to which account, or what to set up first. */

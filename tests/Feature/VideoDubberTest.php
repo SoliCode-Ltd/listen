@@ -195,6 +195,12 @@ class VideoDubberTest extends TestCase
         $this->assertEqualsWithDelta($this->level($video, 4.0, 1.5), $this->level($out['file'], 4.0, 1.5), 1.5, 'between lines, the original');
         $this->assertLessThan(-60, $this->level($out['file'], 1.4, 1.2), 'under the new line no old voice is heard');
 
+        // Too little memory free on the server just now: not started, the filters instead.
+        $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
+        config(['listen.dubbing.separator.min_free_mb' => 100_000_000]);
+        $this->assertSame('filters', $this->dubSilently($video, 'music', 'busy')['report']['separation']['method']);
+        config(['listen.dubbing.separator.min_free_mb' => 0]);
+
         // Switched off by the admin: not used.
         \App\Models\SiteSetting::set('video_dubbing_separation', '0', 'video_dubbing');
         $this->fakeSeparator('head -c "$(stat -c %s "$in")" /dev/zero > "$out"');
