@@ -21,6 +21,7 @@
   $voiceSection = $isArabicUi ? ['id' => 'arabic-dialects', 'copy' => 'arabic'] : ['id' => 'english-accents', 'copy' => 'english'];
   $sections = array_values(array_filter([
     $voices !== [] ? ['id' => $voiceSection['id'], 'label' => __('ui.samples.'.$voiceSection['copy'].'_title'), 'count' => count($voices)] : null,
+    $longReads !== [] ? ['id' => 'long-reads', 'label' => __('ui.samples.long_title'), 'count' => count($longReads)] : null,
     $moods !== [] ? ['id' => 'moods', 'label' => __('ui.samples.moods_title'), 'count' => count($moods)] : null,
     $dialogues !== [] ? ['id' => 'conversations', 'label' => __('ui.samples.conversations_title'), 'count' => count($dialogues)] : null,
     $environments !== [] ? ['id' => 'sound-environments', 'label' => __('ui.samples.environments_title'), 'count' => count($environments)] : null,
@@ -386,6 +387,28 @@
       </section>
     @endif
 
+    @if($longReads !== [])
+      {{-- Whole texts made in one go, each with the time it took to make: measured, never estimated. --}}
+      <section class="samples-section" data-orb-follow id="long-reads" aria-labelledby="long-reads-title">
+        <div class="vs-head" data-orb-host>
+          <x-orb :name="'longform'" class="vs-head-orb" />
+          <div>
+            <h2 class="vs-title" id="long-reads-title">{{ __('ui.samples.long_title') }}</h2>
+            <p class="vs-lead">{{ __('ui.samples.long_lead') }}</p>
+          </div>
+        </div>
+        <div class="vs-long-grid">
+          @foreach($longReads as $read)
+            @include('components.home.long-read', ['read' => $read])
+          @endforeach
+        </div>
+        @php $recordedOn = collect($longReads)->pluck('recorded_on')->filter()->last(); @endphp
+        @if($recordedOn)
+          <p class="vs-long-note">{{ __('ui.samples.long_note', ['date' => $recordedOn]) }}</p>
+        @endif
+      </section>
+    @endif
+
     @if($moods !== [])
       {{-- The same voices sorted by how they speak: one mood at a time. --}}
       <section class="samples-section" data-orb-follow id="moods" aria-labelledby="moods-title">
@@ -740,6 +763,93 @@
       }, { rootMargin: '-40% 0px -55% 0px' });
       document.querySelectorAll('.samples-section').forEach(function (s) { observer.observe(s); });
     }
+  })();
+
+  /* ── Long reads: each card's race runs once it is seen; one recording plays at a time, and can be moved through ── */
+  (function () {
+    var cards = document.querySelectorAll('[data-long]');
+    if (!cards.length) return;
+    if (window.IntersectionObserver && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      var seen = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          seen.unobserve(entry.target);
+          entry.target.classList.add('is-racing');
+          // Two frames, so the empty bars are drawn before they run.
+          requestAnimationFrame(function () { requestAnimationFrame(function () { entry.target.classList.remove('is-waiting'); }); });
+        });
+      }, { threshold: .4 });
+      cards.forEach(function (card) { card.classList.add('is-waiting'); seen.observe(card); });
+    }
+
+    var audio = new Audio();
+    audio.preload = 'none';
+    var current = null, dragging = false;
+    function fmt(t) {
+      t = Math.max(0, Math.round(t || 0));
+      var h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s = t % 60;
+      return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (s < 10 ? '0' : '') + s;
+    }
+    function length(card) {
+      return current === card && isFinite(audio.duration) && audio.duration > 0 ? audio.duration : (parseFloat(card.getAttribute('data-seconds')) || 0);
+    }
+    function paint(card, t) {
+      var d = length(card), r = d > 0 ? Math.min(1, t / d) : 0, seek = card.querySelector('[data-long-seek]');
+      if (!dragging) seek.value = String(Math.round(r * 1000));
+      seek.style.setProperty('--at', (r * 100).toFixed(2) + '%');
+      seek.setAttribute('aria-valuetext', fmt(t) + ' / ' + fmt(d));
+      card.querySelector('[data-long-now]').textContent = fmt(t);
+    }
+    function playing(card, on) {
+      if (!card) return;
+      var btn = card.querySelector('[data-long-play]');
+      card.classList.toggle('is-playing', on);
+      btn.setAttribute('aria-label', btn.getAttribute(on ? 'data-label-pause' : 'data-label-play'));
+    }
+    function play(card) {
+      if (current !== card) {
+        playing(current, false);
+        current = card;
+        audio.src = card.getAttribute('data-src');
+        // A card moved along before it played starts from there.
+        var at = card.__at || 0;
+        if (at > 0) {
+          var jump = function () { audio.removeEventListener('loadedmetadata', jump); try { audio.currentTime = at; } catch (e) {} };
+          audio.addEventListener('loadedmetadata', jump);
+        }
+      }
+      var p = audio.play();
+      if (p && p.catch) p.catch(function () { playing(card, false); });
+    }
+    cards.forEach(function (card) {
+      card.querySelector('[data-long-play]').addEventListener('click', function () {
+        if (current === card && !audio.paused) audio.pause(); else play(card);
+      });
+      var seek = card.querySelector('[data-long-seek]');
+      seek.addEventListener('input', function () {
+        dragging = true;
+        var at = parseInt(seek.value, 10) / 1000 * length(card);
+        card.__at = at;
+        paint(card, at);
+        if (current === card) { try { audio.currentTime = at; } catch (e) {} }
+      });
+      seek.addEventListener('change', function () { dragging = false; });
+    });
+    audio.addEventListener('play', function () {
+      playing(current, true);
+      document.querySelectorAll('audio').forEach(function (el) { if (!el.paused) el.pause(); });
+      document.dispatchEvent(new CustomEvent('listen:audio-play', { detail: { source: audio } }));
+    });
+    audio.addEventListener('pause', function () { playing(current, false); });
+    audio.addEventListener('timeupdate', function () {
+      if (!current || dragging) return;
+      current.__at = audio.currentTime;
+      paint(current, audio.currentTime);
+    });
+    audio.addEventListener('ended', function () { if (current) { current.__at = 0; playing(current, false); } });
+    document.addEventListener('listen:audio-play', function (e) {
+      if (e.detail && e.detail.source !== audio && !audio.paused) audio.pause();
+    });
   })();
   </script>
 </body>

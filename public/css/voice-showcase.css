@@ -1017,3 +1017,191 @@ html:not([data-theme="light"]) .vs-env-switch button[data-vp-mode="place"][aria-
   .tour-item.is-picked .tour-orb { --orb-size: 176px; }
   .tour-caption { min-height: 10.5rem; padding: 0 4vw; }
 }
+
+/* ───────────── Long reads: whole texts, with the time each took to make ───────────── */
+:root {
+  --vs-long-a: #8E2DE2;
+  --vs-long-b: #FF8A3D;
+  --vs-long-text: #FFB27A;
+  --vs-long-lane: rgba(255, 255, 255, .07);
+  --vs-long-listen: rgba(255, 255, 255, .26);
+}
+html[data-theme="light"] {
+  --vs-long-a: #7B22D4;
+  --vs-long-b: #F06A1A;
+  --vs-long-text: #A84300;
+  --vs-long-lane: rgba(21, 21, 28, .06);
+  --vs-long-listen: rgba(21, 21, 28, .2);
+}
+.vs-long-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.vs-long {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+  padding: clamp(20px, 3vw, 28px);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(120% 70% at 100% 0%, color-mix(in srgb, var(--vs-long-a) 12%, transparent), transparent 60%),
+    var(--vs-card);
+  box-shadow: var(--card-shadow);
+  overflow: hidden;
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+html[dir="rtl"] .vs-long {
+  background:
+    radial-gradient(120% 70% at 0% 0%, color-mix(in srgb, var(--vs-long-a) 12%, transparent), transparent 60%),
+    var(--vs-card);
+}
+.vs-long.is-playing {
+  border-color: var(--vs-long-a);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--vs-long-a) 22%, transparent);
+}
+.vs-long-head { display: grid; gap: 6px; min-width: 0; }
+.vs-long-kind {
+  color: var(--vs-long-text);
+  font-size: .78rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+html[lang="ar"] .vs-long-kind { letter-spacing: 0; font-size: .86rem; }
+.vs-long-title { margin: 0; font-size: clamp(1.2rem, 2vw, 1.45rem); line-height: 1.3; text-wrap: balance; }
+.vs-long-by { display: flex; align-items: center; gap: 10px; margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.vs-long-by img { flex: none; width: 28px; height: 28px; border-radius: 50%; object-fit: cover; }
+.vs-long-by span { min-width: 0; font-variant-numeric: tabular-nums; }
+
+/* The race: both bars start together; making it is done almost before listening has begun. */
+.vs-long-race { display: grid; gap: 14px; }
+.vs-long-lane {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  row-gap: 7px;
+}
+.vs-long-label { color: var(--muted); font-size: .86rem; font-weight: 600; }
+.vs-long-figure {
+  font-size: clamp(1.35rem, 2.6vw, 1.75rem);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+.vs-long-lane.is-made .vs-long-figure { color: var(--vs-long-text); }
+.vs-long-track {
+  grid-column: 1 / -1;
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--vs-long-lane);
+  overflow: hidden;
+}
+.vs-long-fill {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: 0;
+  width: 100%;
+  border-radius: inherit;
+  transform-origin: left center;
+  transform: scaleX(var(--race, 1));
+}
+html[dir="rtl"] .vs-long-fill { transform-origin: right center; }
+.vs-long-lane.is-made .vs-long-fill {
+  width: calc(var(--share) * 100%);
+  min-width: 6px;
+  background: linear-gradient(90deg, var(--vs-long-a), var(--vs-long-b));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--vs-long-b) 55%, transparent);
+}
+html[dir="rtl"] .vs-long-lane.is-made .vs-long-fill { background: linear-gradient(270deg, var(--vs-long-a), var(--vs-long-b)); }
+.vs-long-lane.is-listen .vs-long-fill { background: var(--vs-long-listen); }
+/* Before the card is seen both bars are empty; then they run, the made one in a blink. */
+.vs-long.is-waiting .vs-long-fill { --race: 0; }
+.vs-long.is-racing .vs-long-lane.is-made .vs-long-fill { transition: transform .5s cubic-bezier(.2, .8, .2, 1) .15s; }
+.vs-long.is-racing .vs-long-lane.is-listen .vs-long-fill { transition: transform 4.5s cubic-bezier(.35, 0, .25, 1) .15s; }
+.vs-long-times {
+  justify-self: start;
+  align-self: flex-start;
+  margin: -4px 0 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  color: var(--vs-long-text);
+  background: color-mix(in srgb, var(--vs-long-b) 13%, transparent);
+  font-size: .9rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The player: a long recording needs a place to jump to, and the time. */
+.vs-long-player { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.vs-long .vs-play { background: var(--vs-long-a); }
+.vs-long .vs-play:hover { background: color-mix(in srgb, var(--vs-long-a) 82%, #000); }
+.vs-long.is-playing .vs-play::after { border-color: var(--vs-long-a); }
+.vs-long .vs-play .vs-icon-pause, .vs-long.is-playing .vs-play .vs-icon-play { display: none; }
+.vs-long.is-playing .vs-play .vs-icon-pause { display: block; }
+.vs-long-seek {
+  --at: 0%;
+  flex: 1;
+  min-width: 0;
+  height: 22px;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.vs-long-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--vs-long-a) var(--at), var(--vs-long-lane) var(--at));
+}
+html[dir="rtl"] .vs-long-seek::-webkit-slider-runnable-track { background: linear-gradient(270deg, var(--vs-long-a) var(--at), var(--vs-long-lane) var(--at)); }
+.vs-long-seek::-moz-range-track { height: 4px; border-radius: 4px; background: var(--vs-long-lane); }
+.vs-long-seek::-moz-range-progress { height: 4px; border-radius: 4px; background: var(--vs-long-a); }
+.vs-long-seek::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+}
+.vs-long-seek::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: var(--text); }
+.vs-long-seek:focus-visible { outline: 2px solid var(--vs-long-a); outline-offset: 4px; border-radius: 4px; }
+.vs-long-clock { flex: none; color: var(--muted); font-size: .86rem; font-variant-numeric: tabular-nums; direction: ltr; }
+
+/* The whole text, folded away until asked for. */
+.vs-long-text { border-top: 1px solid var(--line); padding-top: 14px; }
+.vs-long-text summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--vs-brand-text);
+  font-size: .92rem;
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+.vs-long-text summary::-webkit-details-marker { display: none; }
+.vs-long-text summary::after { content: ""; width: 7px; height: 7px; border-inline-end: 2px solid currentColor; border-block-end: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .2s ease; }
+.vs-long-text[open] summary::after { transform: translateY(2px) rotate(-135deg); }
+.vs-long-text summary:focus-visible { outline: 2px solid var(--brand-subtle, var(--vs-long-a)); outline-offset: 3px; border-radius: 4px; }
+.vs-long-text > div { max-height: 22rem; margin-top: 12px; overflow-y: auto; padding-inline-end: 6px; color: var(--muted); font-size: .98rem; line-height: 1.8; }
+.vs-long-text p { margin: 0 0 .9em; max-width: 68ch; }
+.vs-long-text p:last-child { margin-bottom: 0; }
+.vs-long-note { margin: 16px auto 0; max-width: 60rem; color: var(--muted); font-size: .86rem; line-height: 1.6; text-align: center; text-wrap: balance; }
+
+@media (max-width: 860px) {
+  .vs-long-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vs-long.is-waiting .vs-long-fill { --race: 1; }
+  .vs-long.is-racing .vs-long-fill { transition: none !important; }
+}

@@ -22,6 +22,8 @@ class Orbs
         'dialogue' => ['#15606B', '#2DB7A6', '#A294FF', '#EEF0FF'],
         // Sound environments: a deep space lit by one warm light.
         'places' => ['#14295E', '#2672B4', '#46C6CC', '#F6D38A'],
+        // Long reads: a whole evening's listening, made before the kettle boils. Plum, violet and an ember.
+        'longform' => ['#3B0F4D', '#8E2DE2', '#FF8A3D', '#FFE7B8'],
         // Plans, from the lightest to the deepest. Each has its own colours, never the
         // Listen orb's, so no two orbs on the pricing page look alike.
         'starter' => ['#124456', '#46B0A2', '#BDEBDA', '#F5FFFA'],

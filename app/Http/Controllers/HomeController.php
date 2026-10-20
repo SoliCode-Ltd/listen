@@ -25,6 +25,7 @@ use App\Services\Tts\TtsRoutingService;
 use App\Services\TtsService;
 use App\Support\AudioEffects;
 use App\Support\HeroCast;
+use App\Support\LongFormSamples;
 use App\Support\AudioUrl;
 use App\Support\DemoAllowance;
 use App\Support\DialogueSpeakers;
@@ -257,6 +258,7 @@ class HomeController extends Controller
 
         return view('samples', $data + [
             'environments' => $this->environmentSamples($language),
+            'longReads' => LongFormSamples::forPage($language),
         ]);
     }
 
