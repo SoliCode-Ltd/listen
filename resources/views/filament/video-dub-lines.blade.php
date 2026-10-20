@@ -18,6 +18,12 @@
                         @if(isset($line['heard_start']) && abs((float) $line['heard_start'] - (float) $line['start']) >= 0.05)
                             <br><span class="text-gray-500">set to the speech, was {{ number_format((float) $line['heard_start'], 2) }}</span>
                         @endif
+                        @if(! empty($line['heard_again']))
+                            <br><span class="text-gray-500">heard again: left out the first time</span>
+                        @endif
+                        @if((float) ($line['original_left'] ?? 0) > 0)
+                            <br><span class="text-gray-500">original voice back for the last {{ number_format((float) $line['original_left'], 1) }} s</span>
+                        @endif
                     </td>
                     <td class="py-2 pe-3 whitespace-nowrap text-xs">{{ $line['speaker'] ?? '—' }}{{ isset($line['voice']) ? ' · '.$line['voice'] : '' }}@if(! empty($line['emotion']))<br><span class="text-gray-500">{{ $line['emotion'] }}</span>@endif</td>
                     <td class="py-2 pe-3" dir="auto">{{ $line['original'] ?? '' }}</td>
