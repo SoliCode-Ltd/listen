@@ -1,5 +1,8 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.dashboard_title'), 'page' => 'dashboard'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  @if($dubStudio ?? null)
+    <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
   <style>
     /* Background orbs */
     .bg-orb {
@@ -2399,6 +2402,13 @@
             <span class="dm-label">{{ __('ui.dashboard.generate_new_voice') }}</span>
             <span class="dm-short">{{ __('ui.dashboard.tab_create') }}</span>
           </a>
+          @if($dubStudio ?? null)
+          <a class="dashboard-menu-link" href="#dubVideoSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg>
+            <span class="dm-label">{{ __('ui.dub.nav') }}</span>
+            <span class="dm-short">{{ __('ui.dub.nav_short') }}</span>
+          </a>
+          @endif
           <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M12 7.8V12l3 2"/></svg>
             <span class="dm-label">{{ __('ui.dashboard.recent_voices') }}</span>
@@ -2753,6 +2763,11 @@
         </div>
       </article>
     </section>
+
+    {{-- Dub a video: its own section, with what each dub took from the plan. --}}
+    @if($dubStudio ?? null)
+      <x-dub.dashboard-section :dub="$dubStudio" :account="$dubAccount" />
+    @endif
 
     <section id="planDefaultsSection" class="dashboard-panel" data-dashboard-section>
       <article class="page-card reveal sidebar-info plan-card">
@@ -6501,6 +6516,9 @@
   </script>
   @endif
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  @if($dubStudio ?? null)
+    <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>
 </html>

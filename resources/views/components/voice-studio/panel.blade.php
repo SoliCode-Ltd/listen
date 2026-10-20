@@ -5,7 +5,7 @@
   style and emotion sit on the text box (voice-studio.setbar), and the tags
   in the toolbar above the text. Behaviour in js/voice-studio.js.
 --}}
-@props(['showTags' => true, 'tagsLock' => null])
+@props(['showTags' => true, 'tagsLock' => null, 'prefix' => ''])
 @php
   $vsAr = app()->getLocale() === 'ar';
   // Locked tags still show (dimmed, with an upgrade button) unless no plan on sale has them.
@@ -49,7 +49,7 @@
   </header>
 
   <div class="vs-lib" data-vs-library>
-    <select name="voice_key" id="voice_key" class="vs-hidden-field" tabindex="-1" aria-hidden="true" data-speaker-avatar></select>
+    <select name="voice_key" id="{{ $prefix }}voice_key" class="vs-hidden-field" tabindex="-1" aria-hidden="true" data-speaker-avatar></select>
     <div class="vs-lib-tabs" role="tablist" aria-label="{{ __('ui.dashboard.library.title') }}">
       <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="all" aria-selected="true">{{ __('ui.dashboard.library.all') }} <small data-vs-lib-count="all"></small></button>
       <button type="button" class="vs-lib-tab" role="tab" data-vs-lib-tab="favorites" aria-selected="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.5s-7.5-4.4-7.5-10A4.3 4.3 0 0 1 12 7.8a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10-7.5 10z"/></svg>{{ __('ui.dashboard.library.favorites') }} <small data-vs-lib-count="favorites"></small></button>

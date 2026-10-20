@@ -31,6 +31,19 @@ class VideoDubStats extends BaseWidget
 
     protected function getStats(): array
     {
+        try {
+            return $this->stats();
+        } catch (\Throwable $e) {
+            // The list of dubs must open whatever goes wrong here.
+            report($e);
+
+            return [Stat::make('Figures', '—')->description('Could not be worked out: '.mb_substr($e->getMessage(), 0, 120))->color('danger')];
+        }
+    }
+
+    /** @return array<int, Stat> */
+    private function stats(): array
+    {
         $since = now()->subDays(30);
         $month = VideoDub::query()->where('created_at', '>=', $since)->get(['id', 'user_id', 'status', 'is_free', 'video_seconds', 'reservation', 'report', 'created_at']);
         $today = $month->filter(fn (VideoDub $d): bool => $d->created_at >= now()->startOfDay());

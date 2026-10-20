@@ -38,6 +38,11 @@ class VideoDub extends Model
         'browser',
         'device',
         'files_deleted_at',
+        'period_ym',
+        'stage',
+        'progress',
+        'keep_background',
+        'language',
     ];
 
     protected $casts = [
@@ -48,6 +53,8 @@ class VideoDub extends Model
         'reservation' => 'array',
         'report' => 'array',
         'files_deleted_at' => 'datetime',
+        'progress' => 'integer',
+        'keep_background' => 'boolean',
     ];
 
     public function user(): BelongsTo
@@ -58,6 +65,14 @@ class VideoDub extends Model
     public function isWorking(): bool
     {
         return in_array($this->status, [self::QUEUED, self::PROCESSING], true);
+    }
+
+    /** Why it failed, in the reader's language (kept as a translation key; older rows as text). */
+    public function errorText(): string
+    {
+        $message = (string) $this->error_message;
+
+        return str_starts_with($message, 'ui.dub.') ? (string) __($message) : $message;
     }
 
     /** A file of this dub on the local disk: source.*, dub.mp4 or preview.mp4. */

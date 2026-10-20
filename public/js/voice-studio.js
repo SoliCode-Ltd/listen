@@ -255,7 +255,8 @@
       var row = info[opt.value] || {};
       var item = { value: opt.value, label: String(opt.textContent || '').trim(), desc: row.d || '', disabled: opt.disabled };
       if (!opt.value) {
-        item.desc = t(meta, isDialect ? 'auto_desc' : kind + '_default_desc') || t(meta, 'default_desc');
+        // A page may say what its default does (the dubbing studio: "as in the video").
+        item.desc = opt.getAttribute('data-desc') || t(meta, isDialect ? 'auto_desc' : kind + '_default_desc') || t(meta, 'default_desc');
         item.icon = icon('g-auto');
         item.group = '';
         return item;

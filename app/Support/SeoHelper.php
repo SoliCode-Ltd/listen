@@ -212,9 +212,9 @@ class SeoHelper
             // Kept out of search results while it is being tried; open it to search when it launches.
             'dub' => [
                 'label' => 'Dub my video',
-                'title' => 'Dub My Video into Arabic',
+                'title' => 'Dub My Video into Arabic or English',
                 'title_key' => 'ui.dub.seo_title',
-                'description' => 'Upload a short video and hear it dubbed into the Arabic dialect you choose.',
+                'description' => 'Upload a short video and hear it dubbed into the Arabic dialect or English accent you choose.',
                 'description_key' => 'ui.dub.seo_description',
                 'robots' => 'noindex,nofollow,noarchive,nosnippet',
                 'path' => '/dub-my-video',

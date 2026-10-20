@@ -1,6 +1,9 @@
 @include('components.page-head', ['pageTitle' => __('ui.seo.demo_title'), 'page' => 'demo'])
   <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
   <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
+  @if($dubStudio ?? null)
+    <link rel="stylesheet" href="{{ asset('css/dub-studio.css') }}?v={{ filemtime(public_path('css/dub-studio.css')) }}">
+  @endif
   <script>
     (() => {
       const saved = localStorage.getItem('listen_theme');
@@ -42,11 +45,15 @@
     </section>
 
     {{-- ── Studio workspace: laid out like the dashboard generator ── --}}
-    <section class="studio-workspace">
+    <section class="studio-workspace" @if($dubStudio ?? null) data-studio-host data-studio="tts" @endif>
+      {{-- Text to speech or Dub a video: the same voices and choices, a script or a video. --}}
+      @if($dubStudio ?? null)
+        <x-dub.mode-switch />
+      @endif
       {{-- An email sign-up confirms its address first: what to do, with a button for a new link. --}}
       @include('components.verify-email-notice', ['verifyEmail' => $verifyEmail ?? null, 'verifyEmailTitle' => __('ui.verify_email.notice_title')])
       {{-- Quota --}}
-      <div class="s-card reveal" id="quotaBox" style="padding:1rem 1.25rem">
+      <div class="s-card reveal" id="quotaBox" data-studio-pane="tts" style="padding:1rem 1.25rem">
         <div class="quota-panel">
           <div class="q-head">
             <span class="q-label">{{ __('ui.demo.trial_allowance') }}</span>
@@ -78,7 +85,7 @@
         </div>
       </div>
 
-      <form id="demoForm" class="vs-layout demo-vs-layout">
+      <form id="demoForm" class="vs-layout demo-vs-layout" data-studio-pane="tts">
         @php
           $isArabicLocale = str_starts_with(strtolower((string) app()->getLocale()), 'ar');
           // Premium samples use the studio tags: [delivery] from that point on, <sound> where it happens.
@@ -194,7 +201,7 @@
       </form>
 
       {{-- Below, as on the dashboard: the result --}}
-      <div class="demo-output">
+      <div class="demo-output" data-studio-pane="tts">
 
         <div class="s-card output-panel" id="audioWrap" style="display:none;">
           <div class="panel-title">
@@ -217,6 +224,11 @@
           </div>
         </div>
       </div>
+
+      {{-- The free dub: the same studio around a video (components/dub/studio.blade.php). --}}
+      @if($dubStudio ?? null)
+        <x-dub.studio :dub="$dubStudio" />
+      @endif
     </section>
   </main>
 
@@ -1404,6 +1416,9 @@
     @endif
   @endauth
   <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  @if($dubStudio ?? null)
+    <script src="{{ asset('js/dub-studio.js') }}?v={{ filemtime(public_path('js/dub-studio.js')) }}" defer></script>
+  @endif
   <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
 </body>
 </html>

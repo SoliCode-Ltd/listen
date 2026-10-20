@@ -7,6 +7,7 @@ use App\Services\Dubbing\VideoDubber;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\AudioFormats;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
@@ -20,6 +21,9 @@ use Tests\TestCase;
  */
 class VideoDubberTest extends TestCase
 {
+    // The studio's emotion list is read from the site settings.
+    use RefreshDatabase;
+
     private string $dir;
 
     protected function setUp(): void
@@ -53,9 +57,9 @@ class VideoDubberTest extends TestCase
         $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
         $keys->shouldReceive('recordUsage');
         Http::fake(['*' => Http::response([
-            'candidates' => [['content' => ['parts' => [['text' => json_encode(['segments' => [
-                ['start' => 3.0, 'end' => 5.5, 'original' => 'See you tomorrow.', 'dubbed' => 'نشوفك بكرة.'],
-                ['start' => 0.2, 'end' => 2.8, 'original' => 'Hello there, welcome.', 'dubbed' => 'هلا والله، حياك.'],
+            'candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => 'music', 'speakers' => [['id' => 'A', 'gender' => 'male'], ['id' => 'B', 'gender' => 'female']], 'segments' => [
+                ['start' => 3.0, 'end' => 5.5, 'speaker' => 'B', 'emotion' => 'warm', 'delivery' => 'soft and smiling', 'original' => 'See you tomorrow.', 'dubbed' => 'نشوفك بكرة.'],
+                ['start' => 0.2, 'end' => 2.8, 'speaker' => 'A', 'emotion' => 'excited', 'delivery' => 'big and bright, like a show host', 'original' => 'Hello there, welcome.', 'dubbed' => 'هلا والله، حياك.'],
             ]])]]]]],
             'usageMetadata' => ['promptTokenCount' => 260, 'candidatesTokenCount' => 90, 'thoughtsTokenCount' => 40,
                 'promptTokensDetails' => [['modality' => 'TEXT', 'tokenCount' => 68], ['modality' => 'AUDIO', 'tokenCount' => 192]]],
@@ -64,7 +68,9 @@ class VideoDubberTest extends TestCase
         // Each line voiced: a real short clip on the public disk, the second one too long for its room.
         $tts = \Mockery::mock(GeminiTtsProvider::class);
         $n = 0;
-        $tts->shouldReceive('synthesize')->twice()->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg, &$n) {
+        $voiced = [];
+        $tts->shouldReceive('synthesize')->twice()->andReturnUsing(function (string $text, string $language, array $config) use ($ffmpeg, &$n, &$voiced) {
+            $voiced[$text] = $config;
             $this->assertSame('ar', $language);
             $this->assertSame('ar-SA', $config['dialect']);
             $this->assertFalse(config('services.gemini_tts.dialect_rewrite'), 'the lines are already in the dialect');
@@ -77,7 +83,19 @@ class VideoDubberTest extends TestCase
         });
 
         $dubber = new VideoDubber($keys, $tts);
-        $r = $dubber->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'out_dir' => $this->dir, 'name' => 'out']);
+        $stages = [];
+        $r = $dubber->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'voices' => ['male' => ['Puck', 'Orus'], 'female' => ['Kore', 'Leda']],
+            'out_dir' => $this->dir, 'name' => 'out', 'progress' => function (string $stage) use (&$stages) { $stages[] = $stage; }]);
+
+        // The one who says the most reads in the member's voice, the woman in a woman's voice; each line in the original's mood.
+        $this->assertSame('Puck', $voiced['هلا والله، حياك.']['voice_name']);
+        $this->assertSame('Kore', $voiced['نشوفك بكرة.']['voice_name']);
+        $this->assertSame('excited', $voiced['هلا والله، حياك.']['emotion']);
+        $this->assertStringContainsString('like a show host', $voiced['هلا والله، حياك.']['style_prompt']);
+        $this->assertSame(['listening', 'voicing', 'voicing', 'mixing', 'marking'], $stages);
+        $this->assertSame('music', $r['background']);
+        $this->assertTrue($r['kept_background']);
+        $this->assertSame('B', $r['lines'][1]['speaker']);
 
         $this->assertEqualsWithDelta(6.0, $r['video_seconds'], 0.1);
         $this->assertSame(2, $r['segments']);
@@ -122,5 +140,106 @@ class VideoDubberTest extends TestCase
         // 100 x 0.5 + 1900 x 1 + 500 x 3 = 3450 per million; 800 x 20 = 16000 per million.
         $this->assertEqualsWithDelta(0.00345, $cost['model'], 1e-9);
         $this->assertEqualsWithDelta(0.016, $cost['voice'], 1e-9);
+    }
+
+    public function test_the_music_plays_on_while_the_old_voice_gives_way_to_the_new_one(): void
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        // Music on the sides of a stereo mix, a voice in the middle, all the way through.
+        $video = $this->dir.'/talk.mp4';
+        (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'testsrc2=size=320x240:rate=15',
+            '-f', 'lavfi', '-i', 'aevalsrc=0.2*sin(2*PI*220*t)+0.25*sin(2*PI*700*t)*(0.6+0.4*sin(2*PI*3*t))|0.2*sin(2*PI*330*t)+0.25*sin(2*PI*700*t)*(0.6+0.4*sin(2*PI*3*t)):s=48000:d=6',
+            '-t', '6', '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '192k', '-shortest', $video]))->mustRun();
+
+        $answer = fn (string $background) => ['candidates' => [['content' => ['parts' => [['text' => json_encode(['background' => $background,
+            'segments' => [['start' => 1.0, 'end' => 3.0, 'speaker' => 'A', 'original' => 'Hi.', 'dubbed' => 'هلا.']]])]]]]], 'usageMetadata' => []];
+        Http::fake(['*' => Http::sequence()->push($answer('music'))->push($answer('none'))]);
+
+        foreach (['music' => true, 'none' => false] as $background => $kept) {
+            $out = $this->dubSilently($video, $background, 'mix-'.$background);
+            $this->assertSame($kept, $out['report']['kept_background']);
+            $before = $this->level($video, 4.0, 1.5);
+            $after = $this->level($out['file'], 4.0, 1.5);
+            if ($kept) {
+                // Between lines the original is as it was…
+                $this->assertEqualsWithDelta($before, $after, 1.5, 'the music between lines');
+                // …and under the line its middle (the voice, at 700 Hz) is carved out while the sides (the music) stay.
+                $this->assertLessThan($this->level($video, 1.4, 1.2, 'bandpass=f=700:w=60,') - 15, $this->level($out['file'], 1.4, 1.2, 'bandpass=f=700:w=60,'), 'the old voice under the new line');
+                $this->assertEqualsWithDelta($this->level($video, 1.4, 1.2, 'bandpass=f=330:w=40,'), $this->level($out['file'], 1.4, 1.2, 'bandpass=f=330:w=40,'), 4, 'the music under the new line');
+            } else {
+                $this->assertLessThan(-60, $after, 'with only a voice in the video, nothing of it is left');
+            }
+        }
+    }
+
+    public function test_the_model_answer_is_made_safe(): void
+    {
+        $heard = VideoDubber::readHeard(['background' => 'Loud', 'speakers' => [['id' => 'A', 'gender' => 'FEMALE']], 'segments' => [
+            ['start' => 2, 'end' => 1, 'speaker' => 'A', 'emotion' => 'Excited', 'delivery' => str_repeat('x', 400), 'original' => 'b', 'dubbed' => 'ب'],
+            ['start' => 0, 'speaker' => 'C', 'emotion' => 'made-up', 'dubbed' => 'أ'],
+            ['start' => 'soon', 'dubbed' => 'ج'],
+            ['start' => 3, 'dubbed' => ' '],
+        ]]);
+
+        $this->assertSame('ambient', $heard['background'], 'unsure: keep the sound');
+        $this->assertSame([['id' => 'A', 'gender' => 'female'], ['id' => 'C', 'gender' => 'male']], $heard['speakers']);
+        $this->assertSame(['أ', 'ب'], array_column($heard['segments'], 'dubbed'));
+        $this->assertNull($heard['segments'][0]['emotion']);
+        $this->assertSame('excited', $heard['segments'][1]['emotion']);
+        $this->assertSame(2.0, $heard['segments'][1]['end'], 'never ends before it starts');
+        $this->assertSame(160, mb_strlen($heard['segments'][1]['delivery']));
+    }
+
+    public function test_each_speaker_gets_a_voice_and_the_member_can_set_the_mood_for_all(): void
+    {
+        $segments = [['speaker' => 'A', 'start' => 0, 'end' => 2], ['speaker' => 'B', 'start' => 2, 'end' => 9], ['speaker' => 'C', 'start' => 9, 'end' => 10]];
+        $voices = VideoDubber::assignVoices([['id' => 'A', 'gender' => 'male'], ['id' => 'B', 'gender' => 'female'], ['id' => 'C', 'gender' => 'female']],
+            $segments, 'Charon', ['male' => ['Puck'], 'female' => ['Kore']]);
+        // B talks the most: the member's voice. A takes the next man's voice; C the next woman's.
+        $this->assertSame(['B' => 'Charon', 'A' => 'Puck', 'C' => 'Kore'], $voices);
+
+        $line = ['emotion' => 'sad', 'delivery' => 'quiet, close to tears'];
+        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'emotion' => 'sad', 'style_prompt' => 'quiet, close to tears Overall feeling: sad.'],
+            VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG']));
+        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'performance_style' => 'promo', 'emotion' => 'sad'],
+            VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG', 'style' => 'promo']));
+        $this->assertSame(['voice_name' => 'Puck', 'dialect' => 'ar-EG', 'emotion' => 'joyful'],
+            VideoDubber::voiceConfig($line, 'Puck', ['dialect' => 'ar-EG', 'emotion' => 'joyful']));
+    }
+
+    /**
+     * Dubs $video with one silent line (the model's answer faked by the caller), so what is heard is what is left of the original.
+     *
+     * @return array{report: array<string, mixed>, file: string}
+     */
+    private function dubSilently(string $video, string $background, string $name): array
+    {
+        $ffmpeg = AudioFormats::ffmpegPath();
+        $keys = \Mockery::mock(GeminiKeyManager::class);
+        $keys->shouldReceive('keysInOrder')->andReturn([['key' => 'k1', 'name' => 'GEMINI_TTS_API_KEY', 'index' => 1]]);
+        $keys->shouldReceive('recordUsage');
+        $tts = \Mockery::mock(GeminiTtsProvider::class);
+        $tts->shouldReceive('synthesize')->andReturnUsing(function () use ($ffmpeg) {
+            $path = 'audio/silent-'.bin2hex(random_bytes(3)).'.mp3';
+            @mkdir(dirname(Storage::disk('public')->path($path)), 0755, true);
+            (new Process([$ffmpeg, '-v', 'error', '-y', '-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=mono', '-t', '2', '-c:a', 'libmp3lame', Storage::disk('public')->path($path)]))->mustRun();
+
+            return ['audio_path' => $path, 'duration_seconds' => 2];
+        });
+        $report = (new VideoDubber($keys, $tts))->dub($video, ['language' => 'ar', 'dialect' => 'ar-SA', 'voice' => 'Puck', 'preview' => false, 'out_dir' => $this->dir, 'name' => $name]);
+
+        return ['report' => $report, 'file' => $report['output']];
+    }
+
+    /** The sound's level, in dB, over $length seconds from $from (after $filter, when given). */
+    private function level(string $file, float $from, float $length, string $filter = ''): float
+    {
+        $process = new Process([AudioFormats::ffmpegPath(), '-hide_banner', '-ss', (string) $from, '-t', (string) $length, '-i', $file,
+            '-af', $filter.'astats=measure_overall=RMS_level:measure_perchannel=none', '-f', 'null', '-']);
+        $process->mustRun();
+        preg_match_all('/RMS level dB: (-?[\d.]+|-inf)/', $process->getErrorOutput(), $m);
+        $value = end($m[1]);
+
+        return $value === '-inf' || $value === false ? -120.0 : (float) $value;
     }
 }

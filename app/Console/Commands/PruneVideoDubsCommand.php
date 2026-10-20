@@ -25,7 +25,7 @@ class PruneVideoDubsCommand extends Command
             ->where('updated_at', '<', now()->subMinutes(max(5, (int) config('listen.dubbing.stuck_minutes', 20))))
             ->pluck('id');
         foreach ($stuck as $id) {
-            $runner->fail((int) $id, __('ui.dub.error_generic'));
+            $runner->fail((int) $id, 'ui.dub.error_generic');
         }
 
         $deleted = 0;

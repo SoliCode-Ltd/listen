@@ -6,7 +6,6 @@ use App\Filament\Resources\VideoDubResource\Pages;
 use App\Models\VideoDub;
 use App\Models\Voice;
 use App\Services\Dubbing\VideoDubRunner;
-use App\Support\ArabicDialects;
 use App\Support\VideoDubbing;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -69,7 +68,7 @@ class VideoDubResource extends Resource
 
     public static function dialectLabel(?string $code): string
     {
-        return ArabicDialects::ALL[(string) $code]['en'] ?? (string) $code;
+        return \App\Support\VoiceFlag::label((string) $code, false);
     }
 
     /** The studio's name for the voice (the library card it was picked as), with the speech engine's. */
@@ -107,7 +106,8 @@ class VideoDubResource extends Resource
                     Infolists\Components\TextEntry::make('created_at')->label('Sent')->dateTime(),
                     Infolists\Components\TextEntry::make('original_name')->label('File')->placeholder('—'),
                     Infolists\Components\TextEntry::make('video_seconds')->label('Video length')->suffix(' s'),
-                    Infolists\Components\TextEntry::make('dialect')->formatStateUsing(fn (?string $state): string => self::dialectLabel($state)),
+                    Infolists\Components\TextEntry::make('language')->formatStateUsing(fn (?string $state): string => $state === 'en' ? 'English' : 'Arabic'),
+                    Infolists\Components\TextEntry::make('dialect')->label('Dialect or accent')->formatStateUsing(fn (?string $state): string => self::dialectLabel($state)),
                     Infolists\Components\TextEntry::make('voice')->state(fn (VideoDub $r): string => self::voiceLabel($r)),
                     Infolists\Components\TextEntry::make('performance_style')->label('Style')->placeholder('—'),
                     Infolists\Components\TextEntry::make('emotion')->placeholder('—'),
@@ -120,7 +120,8 @@ class VideoDubResource extends Resource
             Infolists\Components\Section::make('Why it failed')
                 ->visible(fn (VideoDub $r): bool => $r->status === VideoDub::FAILED)
                 ->schema([
-                    Infolists\Components\TextEntry::make('error_message')->label('What the member saw')->placeholder('—'),
+                    Infolists\Components\TextEntry::make('error_message')->label('What the member saw')
+                        ->state(fn (VideoDub $r): string => $r->errorText())->placeholder('—'),
                 ]),
             Infolists\Components\Section::make('Videos')
                 ->description(fn (VideoDub $r): string => $r->files_deleted_at
@@ -239,8 +240,10 @@ class VideoDubResource extends Resource
                     ->label('Paid by')
                     ->trueLabel('Free dubs')
                     ->falseLabel('Plan credits'),
+                Tables\Filters\SelectFilter::make('language')
+                    ->options(['ar' => 'Arabic', 'en' => 'English']),
                 Tables\Filters\SelectFilter::make('dialect')
-                    ->options(array_map(fn (array $row): string => $row['en'], ArabicDialects::ALL))
+                    ->options(VideoDubbing::dialects(false, 'ar') + VideoDubbing::dialects(false, 'en'))
                     ->searchable(),
                 Tables\Filters\SelectFilter::make('period')
                     ->label('Sent')
@@ -267,13 +270,18 @@ class VideoDubResource extends Resource
     /** Fails a dub stuck in progress and gives the member back what it was charged. */
     public static function failStuck(VideoDub $dub): void
     {
-        app(VideoDubRunner::class)->fail((int) $dub->id, __('ui.dub.error_generic'));
+        app(VideoDubRunner::class)->fail((int) $dub->id, 'ui.dub.error_generic');
         Notification::make()->title('Marked failed; any credits were given back')->success()->send();
     }
 
     public static function canCreate(): bool
     {
         return false;
+    }
+
+    public static function getWidgets(): array
+    {
+        return [\App\Filament\Widgets\VideoDubStats::class];
     }
 
     public static function getPages(): array

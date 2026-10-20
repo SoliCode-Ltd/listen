@@ -10,7 +10,6 @@ use App\Services\DemoLinkedAccounts;
 use App\Services\Dubbing\VideoDubber;
 use App\Services\Dubbing\VideoDubRunner;
 use App\Services\PlanAccessService;
-use App\Support\ArabicDialects;
 use App\Support\EmailVerification;
 use App\Support\TtsStudioConfig;
 use App\Support\VideoDubbing;
@@ -25,14 +24,17 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * "Dub my video": a member uploads a short video, picks a dialect and a voice,
- * and gets it back in that dialect (App\Services\Dubbing\VideoDubber).
+ * "Dub my video": a member uploads a short video, picks Arabic (a dialect) or
+ * English (an accent) and a voice, and gets it back in that dialect (App\Services\Dubbing\VideoDubber). The
+ * same studio sits on its own page, in the demo and on the dashboard
+ * (components/dub/studio.blade.php); all of them send here.
  *
  * Without a plan that includes dubbing a member gets one free dub, watched
  * with the Listen mark and never downloaded without it; with one, the dub is
- * paid in credits and the clean copy can be downloaded. A member who
- * subscribes after their free dub can download it clean, paid then.
- * Who may see the page at all: App\Support\VideoDubbing.
+ * paid in credits (up to the plan's videos a month and its longest video)
+ * and the clean copy can be downloaded. A member who subscribes after their
+ * free dub can download it clean, paid then. Who may see it at all, and what
+ * the studio shows: App\Support\VideoDubbing.
  */
 class VideoDubController extends Controller
 {
@@ -42,31 +44,11 @@ class VideoDubController extends Controller
     {
         $user = $request->user();
         abort_unless(VideoDubbing::openTo($user), 404);
-        $arabic = app()->getLocale() === 'ar';
-        $plan = $user ? $this->plans->resolveAccessPlanForUserId((int) $user->id) : null;
-        $included = VideoDubbing::planIncludes($plan);
 
-        $response = response()->view('dub', [
+        return VideoDubbing::withBrowserCookie($request, response()->view('dub', [
             'user' => $user,
-            'included' => $included,
-            'freeUsed' => $user && ! $included ? VideoDubbing::freeUsed($user, $request) : false,
-            'upgradePlan' => $included ? null : VideoDubbing::cheapestPlan(),
-            'needsEmail' => $user !== null && ! $included && EmailVerification::requiredForFreeUse($user),
-            'dubs' => $user ? $this->recent($user) : [],
-            // The studio's own pickers: its voice library, dialects, styles and emotions.
-            'voices' => VideoDubbing::voices(),
-            'defaultVoiceKey' => VideoDubbing::defaultVoiceKey(),
-            'dialects' => VideoDubbing::dialects($arabic),
-            'styles' => TtsStudioConfig::performanceStyleCatalog(),
-            'emotions' => TtsStudioConfig::emotionCatalog(),
-            'arabic' => $arabic,
-            'maxSeconds' => (int) config('listen.dubbing.max_seconds', 60),
-            'minSeconds' => (int) config('listen.dubbing.min_seconds', 3),
-            'maxMb' => (int) config('listen.dubbing.max_upload_mb', 100),
-            'keepHours' => (int) config('listen.dubbing.keep_hours', 48),
-        ]);
-
-        return $this->withBrowserCookie($request, $response);
+            'dubStudio' => VideoDubbing::studio($user, $request),
+        ]));
     }
 
     public function store(Request $request, VideoDubber $dubber): JsonResponse
@@ -74,15 +56,20 @@ class VideoDubController extends Controller
         /** @var User $user */
         $user = $request->user();
         abort_unless(VideoDubbing::openTo($user), 404);
+        $language = $request->input('language') === 'en' ? 'en' : 'ar';
         $validated = $request->validate([
             'video' => ['required', 'file', 'max:'.((int) config('listen.dubbing.max_upload_mb', 100) * 1024),
                 'mimetypes:video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp'],
-            'dialect' => ['required', 'string', Rule::in(array_keys(ArabicDialects::ALL))],
+            'language' => ['nullable', Rule::in(VideoDubbing::LANGUAGES)],
+            // An Arabic dialect, or an English accent.
+            'dialect' => ['required', 'string', Rule::in(array_keys(VideoDubbing::dialects(false, $language)))],
             'voice_key' => ['required', 'string', 'max:40'],
+            // Empty: each line as the video says it.
             'performance_style' => ['nullable', 'string', Rule::in(TtsStudioConfig::performanceStyleValues())],
             'emotion' => ['nullable', 'string', Rule::in(TtsStudioConfig::emotionValues())],
+            'background' => ['nullable', Rule::in(['keep', 'replace'])],
         ]);
-        $voice = VideoDubbing::voiceName($validated['voice_key']);
+        $voice = VideoDubbing::voiceName($validated['voice_key'], $language);
         if ($voice === null) {
             throw ValidationException::withMessages(['voice_key' => __('ui.dub.pick_voice')]);
         }
@@ -91,13 +78,12 @@ class VideoDubController extends Controller
             throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
         }
 
-        // Style and emotion left on "Default" get the site's defaults, as in the studio.
-        $validated = array_merge($validated, TtsStudioConfig::withDefaultChoices($validated, 'ar'));
-
         $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
         $free = ! VideoDubbing::planIncludes($plan);
         if ($free) {
             $this->assertMayDubFree($user, $request);
+        } else {
+            $this->assertWithinMonth($user, $plan);
         }
 
         // Kept on the private disk: only its owner can watch it, through this controller.
@@ -112,13 +98,13 @@ class VideoDubController extends Controller
             $probe = null;
         }
         $min = (int) config('listen.dubbing.min_seconds', 3);
-        $max = (int) config('listen.dubbing.max_seconds', 60);
+        $max = VideoDubbing::maxSeconds($plan, $free);
         $problem = match (true) {
             $probe === null || ! $probe['picture'] => __('ui.dub.error_unreadable'),
             ! $probe['sound'] => __('ui.dub.error_no_sound'),
             $probe['seconds'] < $min => __('ui.dub.too_short', ['seconds' => $min]),
-            // A second over is the rounding of phones' "1:00" clips.
-            $probe['seconds'] > $max + 1 => __('ui.dub.too_long', ['seconds' => $max]),
+            // Half a second over is the rounding of phones' "1:00" clips.
+            $probe['seconds'] > $max + 0.5 => __('ui.dub.too_long', ['seconds' => $max]),
             default => null,
         };
         if ($problem !== null) {
@@ -129,12 +115,15 @@ class VideoDubController extends Controller
         $row = [
             'user_id' => $user->id,
             'status' => VideoDub::QUEUED,
+            'stage' => 'queued',
             'is_free' => $free,
+            'language' => $language,
             'dialect' => $validated['dialect'],
             'voice' => $voice,
             'voice_key' => $validated['voice_key'],
             'performance_style' => $validated['performance_style'] ?? null,
             'emotion' => $validated['emotion'] ?? null,
+            'keep_background' => ($validated['background'] ?? 'keep') !== 'replace',
             'original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 200),
             'video_seconds' => min($probe['seconds'], $max),
             'folder' => $folder,
@@ -153,7 +142,12 @@ class VideoDubController extends Controller
             } else {
                 $quotaPlan = $this->plans->resolveQuotaPlanForUserId((int) $user->id, $plan);
                 $dub = app(MemberUsageMeter::class)->reserveCredits((int) $user->id, $quotaPlan, VideoDubbing::estimate($row['video_seconds']),
-                    fn (array $reservation): VideoDub => VideoDub::query()->create($row + ['reservation' => $reservation]));
+                    function (array $reservation) use ($row, $user, $plan): VideoDub {
+                        // Counted again under the meter's locks: two uploads at once cannot both take the month's last video.
+                        $this->assertWithinMonth($user, $plan);
+
+                        return VideoDub::query()->create($row + ['reservation' => $reservation, 'period_ym' => $reservation['period']]);
+                    });
             }
         } catch (\Throwable $e) {
             Storage::disk('local')->deleteDirectory($folder);
@@ -166,12 +160,12 @@ class VideoDubController extends Controller
 
         VideoDubRunner::runAfterResponse((int) $dub->id);
 
-        return response()->json($this->present($dub), 202);
+        return response()->json(VideoDubbing::present($dub) + ['studio' => $this->studioAfter($user, $request)], 202);
     }
 
     public function status(Request $request, int $id): JsonResponse
     {
-        return response()->json($this->present($this->ownDub($request, $id)));
+        return response()->json(VideoDubbing::present($this->ownDub($request, $id)));
     }
 
     /** The dub to watch on the page: with the mark when it was free, else the clean copy. */
@@ -216,7 +210,7 @@ class VideoDubController extends Controller
             } catch (\LogicException) {
                 // Already paid by the other click: the transaction gave this one back.
             } catch (ValidationException $e) {
-                return redirect()->route('dub.page')->with('dub_error', collect($e->errors())->flatten()->first());
+                return back(fallback: route('dub.page'))->with('dub_error', collect($e->errors())->flatten()->first());
             }
         }
 
@@ -243,48 +237,23 @@ class VideoDubController extends Controller
         }
     }
 
+    /** The plan's videos a month, when it has a number. */
+    private function assertWithinMonth(User $user, ?\App\Models\Plan $plan): void
+    {
+        $limit = VideoDubbing::monthlyLimit($plan);
+        if ($limit > 0 && VideoDubbing::dubsThisMonth((int) $user->id) >= $limit) {
+            throw ValidationException::withMessages(['video' => trans_choice('ui.dub.month_used', $limit, ['count' => $limit])]);
+        }
+    }
+
+    /** What the studio shows once a dub is on its way (the free one used, a video less this month). */
+    private function studioAfter(User $user, Request $request): array
+    {
+        return array_intersect_key(VideoDubbing::studio($user, $request), array_flip(['state', 'usage']));
+    }
+
     private function ownDub(Request $request, int $id): VideoDub
     {
         return VideoDub::query()->whereKey($id)->where('user_id', (int) $request->user()->id)->firstOrFail();
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function recent(User $user): array
-    {
-        return VideoDub::query()->where('user_id', $user->id)->whereNull('files_deleted_at')
-            ->where('created_at', '>=', now()->subHours((int) config('listen.dubbing.keep_hours', 48)))
-            ->latest('id')->limit(10)->get()->map(fn (VideoDub $dub): array => $this->present($dub))->all();
-    }
-
-    /** @return array<string, mixed> */
-    private function present(VideoDub $dub): array
-    {
-        $ready = $dub->status === VideoDub::READY && $dub->files_deleted_at === null;
-
-        return [
-            'id' => $dub->id,
-            'status' => $dub->status,
-            'free' => $dub->is_free,
-            'name' => (string) $dub->original_name,
-            'dialect' => $dub->dialect,
-            'seconds' => (float) $dub->video_seconds,
-            'error' => $dub->status === VideoDub::FAILED ? (string) $dub->error_message : null,
-            'status_url' => route('dub.status', ['id' => $dub->id]),
-            'watch_url' => $ready ? route('dub.watch', ['id' => $dub->id]) : null,
-            'download_url' => $ready && $dub->has_clean ? route('dub.download', ['id' => $dub->id]) : null,
-            'expires_at' => $dub->created_at?->copy()->addHours((int) config('listen.dubbing.keep_hours', 48))->toIso8601String(),
-        ];
-    }
-
-    /** The browser cookie that ties accounts made in one browser to one free dub, as the demo's does. */
-    private function withBrowserCookie(Request $request, Response $response): Response
-    {
-        if (DemoLinkedAccounts::browserFrom($request) !== null) {
-            return $response;
-        }
-
-        $response->headers->setCookie(cookie(DemoLinkedAccounts::BROWSER_COOKIE, Str::random(48), 60 * 24 * 730, '/', null, $request->isSecure(), true, false, 'lax'));
-
-        return $response;
     }
 }

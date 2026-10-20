@@ -29,8 +29,8 @@ class DubMeasureCommand extends Command
         {--lengths=15,30,60 : Test video lengths, in seconds}
         {--dialects=ar-SA,ar-EG,ar-LB,ar-XA : Dialects to dub into}
         {--voice=Puck : The voice that reads the dubbed lines}
-        {--style=conversational : Performance style}
-        {--keep-original=0 : The original sound under the new voice (0 replaces it, 0.15 keeps it quietly)}
+        {--style= : Performance style for every line (empty: each line as the video says it)}
+        {--background=keep : keep the music and effects, or replace all the sound}
         {--in-price=0 : Text model price per million text input tokens, USD (to turn tokens into money)}
         {--audio-price=0 : Text model price per million audio input tokens, USD}
         {--out-price=0 : Text model price per million output and thinking tokens, USD}
@@ -76,7 +76,7 @@ class DubMeasureCommand extends Command
 
         $ttsPrice = $this->option('tts-price') !== null ? (float) $this->option('tts-price') : (float) config('services.gemini_tts.cost_per_million_chars', 0);
         $prices = ['in' => (float) $this->option('in-price'), 'audio' => (float) $this->option('audio-price'), 'out' => (float) $this->option('out-price'), 'tts' => $ttsPrice];
-        $this->line(sprintf('Run %s: %d video(s) x %d dialect(s), voice %s, style %s.', $run, count($videos), count($dialects), $this->option('voice'), $this->option('style')));
+        $this->line(sprintf('Run %s: %d video(s) x %d dialect(s), voice %s, style %s.', $run, count($videos), count($dialects), $this->option('voice'), $this->option('style') ?: 'as the video'));
 
         $reports = [];
         foreach ($videos as $seconds => $video) {
@@ -85,7 +85,7 @@ class DubMeasureCommand extends Command
                 try {
                     $r = $dubber->dub($video, [
                         'language' => str_starts_with($dialect, 'ar') ? 'ar' : 'en', 'dialect' => $dialect, 'voice' => (string) $this->option('voice'),
-                        'style' => (string) $this->option('style'), 'keep_original' => (float) $this->option('keep-original'),
+                        'style' => (string) $this->option('style'), 'background' => (string) $this->option('background'),
                         'preview' => true, 'out_dir' => $dir, 'name' => $name,
                     ]);
                     $r['cost'] = self::cost($r, $prices);

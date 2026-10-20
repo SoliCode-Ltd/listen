@@ -5,6 +5,7 @@ namespace App\Services\Dubbing;
 use App\Jobs\GenerateAudioJob;
 use App\Models\VideoDub;
 use App\Services\Billing\MemberUsageMeter;
+use App\Support\VideoDubbing;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -50,19 +51,26 @@ class VideoDubRunner
                 throw new \RuntimeException('The uploaded video is missing.');
             }
             $report = $this->dubber->dub($disk->path($source), [
-                'language' => 'ar',
+                'language' => $dub->language ?: 'ar',
                 'dialect' => $dub->dialect,
                 'voice' => $dub->voice,
+                // The other people in the video get voices of their own.
+                'voices' => VideoDubbing::voicePool($dub->dialect, $dub->language ?: 'ar'),
+                // Empty: each line as the video says it.
                 'style' => $dub->performance_style,
                 'emotion' => $dub->emotion,
+                'background' => $dub->keep_background === false ? 'replace' : 'keep',
                 // Only a free dub is watched with the mark; a paid one is watched as it is downloaded.
                 'preview' => $dub->is_free,
                 'out_dir' => $disk->path($dub->folder),
                 'name' => 'dub',
+                'progress' => fn (string $stage, int $done, int $total) => $this->progress($dub, $stage, $done, $total),
             ]);
             unset($report['output'], $report['preview']);
             $dub->update([
                 'status' => VideoDub::READY,
+                'stage' => 'ready',
+                'progress' => 100,
                 'has_clean' => $disk->exists($dub->path('dub.mp4')),
                 'has_preview' => $disk->exists($dub->path('dub-preview.mp4')),
                 'report' => $report,
@@ -78,6 +86,23 @@ class VideoDubRunner
     }
 
     /**
+     * How far along the dub is, for the page's progress bar: listening is the
+     * first tenth, voicing runs to four fifths line by line, then the mix
+     * and, for a free dub, the mark.
+     */
+    private function progress(VideoDub $dub, string $stage, int $done, int $total): void
+    {
+        $percent = match ($stage) {
+            'listening' => 8,
+            'voicing' => 15 + (int) round(65 * $done / max(1, $total)),
+            'mixing' => 85,
+            'marking' => 92,
+            default => (int) $dub->progress,
+        };
+        $dub->forceFill(['stage' => $stage, 'progress' => max((int) $dub->progress, min(99, $percent))])->save();
+    }
+
+    /**
      * Marks a dub failed and gives back what its plan was charged, exactly
      * once however many places try (the run, the stuck-dub sweep).
      */
@@ -88,7 +113,7 @@ class VideoDubRunner
             if (! $dub || ! $dub->isWorking()) {
                 return false;
             }
-            $dub->update(['status' => VideoDub::FAILED, 'error_message' => mb_substr($message, 0, 500)]);
+            $dub->update(['status' => VideoDub::FAILED, 'stage' => 'failed', 'error_message' => mb_substr($message, 0, 500)]);
             if (is_array($dub->reservation)) {
                 $this->meter->giveBack((int) $dub->user_id, $dub->reservation);
             }
@@ -97,13 +122,17 @@ class VideoDubRunner
         }, 3);
     }
 
-    /** What the member is told: the dubber's own words when they are about the video, else a plain apology. */
+    /**
+     * What the member is told, kept as its translation key (VideoDub::errorText()
+     * says it in the language of whoever reads it): the dubber's own words when
+     * they are about the video, else a plain apology.
+     */
     private static function messageFor(\Throwable $e): string
     {
         return match (true) {
-            str_contains($e->getMessage(), 'No speech') => __('ui.dub.error_no_speech'),
-            str_contains($e->getMessage(), 'could not be read') => __('ui.dub.error_unreadable'),
-            default => __('ui.dub.error_generic'),
+            str_contains($e->getMessage(), 'No speech') => 'ui.dub.error_no_speech',
+            str_contains($e->getMessage(), 'could not be read') => 'ui.dub.error_unreadable',
+            default => 'ui.dub.error_generic',
         };
     }
 }

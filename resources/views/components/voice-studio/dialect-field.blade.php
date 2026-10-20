@@ -5,10 +5,10 @@
 --}}
 <div class="vs-field" data-vs-dialect-field>
   <div class="vs-field-label">
-    <span id="dialectPickLabel">{{ __('ui.dashboard.dialect') }}</span>
+    <span id="{{ $prefix ?? '' }}dialectPickLabel">{{ __('ui.dashboard.dialect') }}</span>
   </div>
-  <select name="dialect" id="dialect" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
+  <select name="dialect" id="{{ $prefix ?? '' }}dialect" class="vs-hidden-field" tabindex="-1" aria-hidden="true">
     <option value="">{{ __('ui.dashboard.dialect_auto') }}</option>
   </select>
-  @include('components.voice-studio.pick-button', ['kind' => 'dialect', 'labelId' => 'dialectPickLabel', 'value' => __('ui.dashboard.dialect_auto')])
+  @include('components.voice-studio.pick-button', ['kind' => 'dialect', 'idPrefix' => $prefix ?? '', 'labelId' => ($prefix ?? '').'dialectPickLabel', 'value' => __('ui.dashboard.dialect_auto')])
 </div>
