@@ -119,7 +119,7 @@ on:
         type: string
         default: ""
       member:
-        description: "email-check, demo-links and join-check: a member's email or member id"
+        description: "email-check, demo-links, join-check and speed-check: a member's email or member id"
         type: string
         default: ""
 
@@ -398,7 +398,8 @@ jobs:
             exit 0
           fi
           if [ "$MODE" = speed-check ]; then
-            tool speed_check.php | $S "$FIND; nice php"
+            printf '%s' "$MEMBER" | grep -qE '^[A-Za-z0-9._%+@-]*$' || { echo "member must be an email or a member id"; exit 1; }
+            tool speed_check.php | $S "$FIND; MEMBER='$MEMBER' nice php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi

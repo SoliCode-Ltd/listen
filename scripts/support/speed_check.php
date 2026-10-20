@@ -12,6 +12,7 @@
  * never a text, a member or a key. Writes nothing.
  *
  *   ssh user@host 'cd ~/public_html && php' < scripts/support/speed_check.php
+ *   ssh user@host 'cd ~/public_html && MEMBER=someone@example.com php' < scripts/support/speed_check.php
  */
 
 use App\Models\AudioGeneration;
@@ -61,8 +62,12 @@ $piecesOf = function (string $text) use ($maxChars, $parallel): int {
     return max(1, $n);
 };
 
+// MEMBER (an email or a member id): only that member's voices, listed one by one (e.g. the listening test's on staging).
+$member = trim((string) getenv('MEMBER'));
+$memberId = $member === '' ? null : (ctype_digit($member) ? (int) $member : (int) DB::table('users')->where('email', $member)->value('id'));
 $rows = [];
 AudioGeneration::query()
+    ->when($member !== '', fn ($q) => $q->where('user_id', $memberId ?: 0))
     ->where('status', 'done')
     ->where('voice_tier', 'hd')
     ->where('tts_provider', 'gemini')
@@ -139,6 +144,15 @@ foreach (Plan::query()->orderBy('price_cents')->get() as $plan) {
 }
 echo "\n";
 
+if ($member !== '') {
+    echo "== Member {$memberId}'s premium voices, newest first ==\n";
+    usort($rows, fn ($a, $b) => $b['id'] <=> $a['id']);
+    foreach (array_slice($rows, 0, 12) as $r) {
+        printf("  #%d %s chars, %d pieces: %.1f min of audio, the voices took %.0f s%s\n", $r['id'], number_format($r['chars']), $r['pieces'], $r['audio'] / 60, $r['making'],
+            $r['at_once'] > 0 ? sprintf(' (%d at a time, peak memory %d MB)', $r['at_once'], $r['peak_mb']) : '');
+    }
+    echo "\n";
+}
 echo "== The longest premium voices made in the last 60 days ==\n";
 usort($rows, fn ($a, $b) => $b['chars'] <=> $a['chars']);
 foreach (array_slice($rows, 0, 12) as $r) {
