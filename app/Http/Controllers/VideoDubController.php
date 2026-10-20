@@ -12,6 +12,7 @@ use App\Services\Dubbing\VideoDubRunner;
 use App\Services\PlanAccessService;
 use App\Support\ArabicDialects;
 use App\Support\EmailVerification;
+use App\Support\TtsStudioConfig;
 use App\Support\VideoDubbing;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,10 +53,12 @@ class VideoDubController extends Controller
             'upgradePlan' => $included ? null : VideoDubbing::cheapestPlan(),
             'needsEmail' => $user !== null && ! $included && EmailVerification::requiredForFreeUse($user),
             'dubs' => $user ? $this->recent($user) : [],
-            'dialects' => VideoDubbing::dialectGroups($arabic),
-            'voices' => VideoDubbing::VOICES,
-            'styles' => VideoDubbing::styles($arabic),
-            'emotions' => VideoDubbing::emotions($arabic),
+            // The studio's own pickers: its voice library, dialects, styles and emotions.
+            'voices' => VideoDubbing::voices(),
+            'defaultVoiceKey' => VideoDubbing::defaultVoiceKey(),
+            'dialects' => VideoDubbing::dialects($arabic),
+            'styles' => TtsStudioConfig::performanceStyleCatalog(),
+            'emotions' => TtsStudioConfig::emotionCatalog(),
             'arabic' => $arabic,
             'maxSeconds' => (int) config('listen.dubbing.max_seconds', 60),
             'minSeconds' => (int) config('listen.dubbing.min_seconds', 3),
@@ -75,14 +78,21 @@ class VideoDubController extends Controller
             'video' => ['required', 'file', 'max:'.((int) config('listen.dubbing.max_upload_mb', 100) * 1024),
                 'mimetypes:video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp'],
             'dialect' => ['required', 'string', Rule::in(array_keys(ArabicDialects::ALL))],
-            'voice' => ['required', 'string', Rule::in(array_keys(VideoDubbing::VOICES))],
-            'performance_style' => ['nullable', 'string', Rule::in(array_keys(VideoDubbing::styles(false)))],
-            'emotion' => ['nullable', 'string', Rule::in(array_keys(VideoDubbing::emotions(false)))],
+            'voice_key' => ['required', 'string', 'max:40'],
+            'performance_style' => ['nullable', 'string', Rule::in(TtsStudioConfig::performanceStyleValues())],
+            'emotion' => ['nullable', 'string', Rule::in(TtsStudioConfig::emotionValues())],
         ]);
+        $voice = VideoDubbing::voiceName($validated['voice_key']);
+        if ($voice === null) {
+            throw ValidationException::withMessages(['voice_key' => __('ui.dub.pick_voice')]);
+        }
 
         if (VideoDub::query()->where('user_id', $user->id)->whereIn('status', [VideoDub::QUEUED, VideoDub::PROCESSING])->exists()) {
             throw ValidationException::withMessages(['video' => __('ui.dub.one_at_a_time')]);
         }
+
+        // Style and emotion left on "Default" get the site's defaults, as in the studio.
+        $validated = array_merge($validated, TtsStudioConfig::withDefaultChoices($validated, 'ar'));
 
         $plan = $this->plans->resolveAccessPlanForUserId((int) $user->id);
         $free = ! VideoDubbing::planIncludes($plan);
@@ -121,7 +131,7 @@ class VideoDubController extends Controller
             'status' => VideoDub::QUEUED,
             'is_free' => $free,
             'dialect' => $validated['dialect'],
-            'voice' => $validated['voice'],
+            'voice' => $voice,
             'performance_style' => $validated['performance_style'] ?? null,
             'emotion' => $validated['emotion'] ?? null,
             'original_name' => mb_substr((string) $file->getClientOriginalName(), 0, 200),

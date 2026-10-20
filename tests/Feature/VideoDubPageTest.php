@@ -8,12 +8,14 @@ use App\Models\Subscription;
 use App\Models\UsageCounter;
 use App\Models\User;
 use App\Models\VideoDub;
+use App\Models\Voice;
 use App\Services\DemoLinkedAccounts;
 use App\Services\Dubbing\VideoDubber;
 use App\Services\Tts\GeminiKeyManager;
 use App\Services\Tts\GeminiTtsProvider;
 use App\Support\AudioFormats;
 use App\Support\VideoDubbing;
+use App\Support\VoiceCatalog;
 use App\Support\VoiceCloningAccess;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -84,6 +86,9 @@ class VideoDubPageTest extends TestCase
 
         $dub = VideoDub::query()->findOrFail($sent->json('id'));
         $this->assertSame(VideoDub::READY, $dub->status, $dub->error_message ?? '');
+        $this->assertSame('Puck', $dub->voice, 'the studio voice card resolves to its speech engine voice');
+        $this->assertSame('conversational', $dub->performance_style);
+        $this->assertNotNull($dub->emotion, 'an emotion left on Default gets the studio default');
         $this->assertTrue($dub->has_preview);
         $this->assertNull($dub->reservation, 'a free dub costs the member nothing');
         $this->assertFalse(Storage::disk('local')->exists($dub->path('source.mp4')), 'the upload is deleted once dubbed');
@@ -144,6 +149,25 @@ class VideoDubPageTest extends TestCase
         $this->assertFalse(Storage::disk('local')->exists($dub->folder));
     }
 
+    public function test_a_voice_the_library_does_not_offer_is_refused(): void
+    {
+        $this->openToEveryone();
+        $user = $this->member(dubbing: true);
+
+        $this->actingAs($user)->post(route('dub.store'), ['voice_key' => 'voice_999999'] + $this->form(), ['Accept' => 'application/json'])
+            ->assertStatus(422)->assertJsonValidationErrors('voice_key');
+        $this->assertSame(0, VideoDub::query()->count());
+    }
+
+    public function test_the_page_shows_the_studio_voice_library(): void
+    {
+        $this->openToEveryone();
+        $this->form();
+        $this->actingAs($this->member(dubbing: true))->get(route('dub.page'))->assertOk()
+            ->assertSee('data-vs-panel', false)->assertSee('data-vs-library', false)->assertSee('name="performance_style"', false)
+            ->assertSee('name="emotion"', false)->assertSee('Othman');
+    }
+
     public function test_a_video_too_long_or_without_sound_is_refused_before_anything_is_spent(): void
     {
         $this->openToEveryone();
@@ -175,10 +199,13 @@ class VideoDubPageTest extends TestCase
     /** @return array<string, mixed> */
     private function form(): array
     {
+        $voice = Voice::query()->firstOrCreate(['internal_voice_id' => 'gemini-ar-othman'], ['language' => 'ar', 'gender' => 'male', 'tier' => 'hd',
+            'display_name' => 'Othman', 'is_active' => true, 'provider' => 'gemini', 'provider_voice_id' => 'Puck']);
+
         return [
             'video' => new UploadedFile($this->video, 'holiday clip.mp4', 'video/mp4', null, true),
             'dialect' => 'ar-SA',
-            'voice' => 'Puck',
+            'voice_key' => VoiceCatalog::keyFromId((int) $voice->id),
             'performance_style' => 'conversational',
         ];
     }

@@ -25,20 +25,6 @@ final class VideoDubbing
 
     public const AUDIENCE_EVERYONE = 'everyone';
 
-    /** The voices offered: the studio's own names for the speech engine's voices. */
-    public const VOICES = [
-        'Puck' => ['en' => 'Othman', 'ar' => 'عثمان', 'gender' => 'male'],
-        'Charon' => ['en' => 'Waleed', 'ar' => 'وليد', 'gender' => 'male'],
-        'Orus' => ['en' => 'Abdulaziz', 'ar' => 'عبدالعزيز', 'gender' => 'male'],
-        'Fenrir' => ['en' => 'Saud', 'ar' => 'سعود', 'gender' => 'male'],
-        'Iapetus' => ['en' => 'Fahad', 'ar' => 'فهد', 'gender' => 'male'],
-        'Leda' => ['en' => 'Noura', 'ar' => 'نورة', 'gender' => 'female'],
-        'Kore' => ['en' => 'Lamya', 'ar' => 'لمياء', 'gender' => 'female'],
-        'Aoede' => ['en' => 'Khadija', 'ar' => 'خديجة', 'gender' => 'female'],
-        'Zephyr' => ['en' => 'Sawsan', 'ar' => 'سوسن', 'gender' => 'female'],
-        'Despina' => ['en' => 'Maha', 'ar' => 'مها', 'gender' => 'female'],
-    ];
-
     public static function audience(): string
     {
         return SiteSetting::get('video_dubbing_audience', self::AUDIENCE_PREVIEW) === self::AUDIENCE_EVERYONE
@@ -113,46 +99,42 @@ final class VideoDubbing
     }
 
     /**
-     * Dialects grouped by region, for the picker.
+     * The studio's premium Arabic voices (the speech engine dubbing uses), as
+     * the studio's voice library lists them: avatar, gender, preview.
      *
-     * @return array<string, array{label: string, options: array<string, string>}>
+     * @return array<int, array<string, mixed>>
      */
-    public static function dialectGroups(bool $arabic): array
+    public static function voices(): array
     {
-        $groups = [];
-        foreach (ArabicDialects::regions() as $region => $names) {
-            $groups[$region] = ['label' => $arabic ? $names['ar'] : $names['en'], 'options' => []];
-        }
-        foreach (ArabicDialects::ALL as $code => $row) {
-            $groups[$row['region']]['options'][$code] = $arabic ? $row['ar'] : $row['en'];
-        }
+        $voices = VoiceCatalog::publicCatalog(VoiceTier::HD, 'gemini')['ar'] ?? [];
 
-        return array_filter($groups, fn (array $group): bool => $group['options'] !== []);
+        return array_values(array_filter($voices, fn (array $voice): bool => ! str_starts_with((string) $voice['key'], 'cloned_')));
     }
 
-    /** @return array<string, string> */
-    public static function styles(bool $arabic): array
+    /** The speech engine's name for a voice of the library, or null when it is not one dubbing offers. */
+    public static function voiceName(?string $voiceKey): ?string
     {
-        return self::labels(TtsStudioConfig::performanceStyleCatalog(), $arabic);
+        $voice = VoiceCatalog::findByKeyForLanguage($voiceKey, 'ar', VoiceTier::HD, 'gemini');
+
+        return $voice ? VoiceCatalog::providerVoiceIdForName((string) $voice->internal_voice_id) : null;
     }
 
-    /** @return array<string, string> */
-    public static function emotions(bool $arabic): array
+    /** The voice the library starts on: the studio's default Arabic premium voice, else the first. */
+    public static function defaultVoiceKey(): ?string
     {
-        return self::labels(TtsStudioConfig::emotionCatalog(), $arabic);
+        $voices = self::voices();
+        $default = VoiceCatalog::voiceMeta(VoiceCatalog::defaultForLanguageAndProvider('ar', VoiceTier::HD, 'gemini'))['key'] ?? null;
+
+        return collect($voices)->firstWhere('key', $default)['key'] ?? ($voices[0]['key'] ?? null);
     }
 
     /**
-     * @param  array<int, array{value: string, label: string, label_ar?: string}>  $rows
+     * Every Arabic dialect, for the studio's dialect picker.
+     *
      * @return array<string, string>
      */
-    private static function labels(array $rows, bool $arabic): array
+    public static function dialects(bool $arabic): array
     {
-        $labels = [];
-        foreach ($rows as $row) {
-            $labels[$row['value']] = $arabic && filled($row['label_ar'] ?? null) ? (string) $row['label_ar'] : (string) $row['label'];
-        }
-
-        return $labels;
+        return array_map(fn (array $row): string => $arabic ? $row['ar'] : $row['en'], ArabicDialects::ALL);
     }
 }

@@ -1,4 +1,7 @@
 @include('components.page-head', ['pageTitle' => __('ui.dub.seo_title'), 'page' => 'dub'])
+  {{-- The studio's look: the same voice library, pickers and editor card as the dashboard and the demo. --}}
+  <link rel="stylesheet" href="{{ asset('css/voice-studio.css') }}?v={{ filemtime(public_path('css/voice-studio.css')) }}">
+  <link rel="stylesheet" href="{{ asset('css/demo-studio.css') }}?v={{ filemtime(public_path('css/demo-studio.css')) }}">
   <style>
     .dub-main{padding:1.5rem 0 3.5rem}
     .dub-hero{text-align:center;max-width:720px;margin:0 auto 2rem}
@@ -12,15 +15,17 @@
     .dub-steps strong{display:block;margin-bottom:.15rem}
     .dub-steps span{color:var(--muted);font-size:.9rem;line-height:1.45}
 
-    .dub-card{max-width:860px;margin:0 auto 2rem;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius-lg);box-shadow:var(--shadow);padding:1.5rem}
-    .dub-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:1.4rem}
-    .dub-drop{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.5rem;min-height:250px;border:2px dashed var(--line-strong);border-radius:var(--radius-lg);padding:1.2rem;cursor:pointer;transition:border-color .2s,background .2s;background:var(--surface2)}
+    .dub-studio{margin-bottom:2rem}
+    .dub-lang{display:inline-flex;align-items:center;min-height:2.5rem;padding:0 .9rem;border:1px solid var(--line);border-radius:12px;font-weight:700}
+    .dub-chosen{color:var(--muted);font-size:.9rem;background:none;border:0;padding:0;cursor:pointer;font:inherit;text-align:start}
+    .dub-chosen:hover{color:var(--text);text-decoration:underline}
+    .dub-drop{margin:1rem 1.2rem;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:.5rem;min-height:300px;border:2px dashed var(--line-strong);border-radius:var(--radius-lg);padding:1.2rem;cursor:pointer;transition:border-color .2s,background .2s;background:var(--surface2)}
     .dub-drop:hover,.dub-drop.is-over{border-color:var(--a);background:var(--brand-subtle)}
     .dub-drop svg{width:44px;height:44px;color:var(--a)}
     .dub-drop strong{font-size:1.05rem}
     .dub-drop small{color:var(--muted)}
     .dub-drop input{position:absolute;inset:0;opacity:0;cursor:pointer}
-    .dub-drop video{width:100%;max-height:260px;border-radius:var(--radius);background:#000}
+    .dub-drop video{width:100%;max-height:340px;border-radius:var(--radius);background:#000}
     .dub-drop.has-video{padding:.6rem;cursor:default}
     .dub-drop.has-video input{display:none}
     .dub-drop [hidden]{display:none!important}
@@ -28,23 +33,10 @@
     .dub-file{display:flex;justify-content:space-between;gap:.5rem;width:100%;font-size:.86rem;color:var(--muted)}
     .dub-file button{background:none;border:0;color:var(--accent-text);font-weight:700;cursor:pointer;padding:0}
 
-    .dub-field{margin-bottom:1rem}
-    .dub-field label,.dub-field .dub-label{display:block;font-weight:700;margin-bottom:.4rem;font-size:.93rem}
-    .dub-field select{width:100%;padding:.65rem .75rem;border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--text);font:inherit}
-    .dub-voices{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:.45rem}
-    .dub-voice{position:relative}
-    .dub-voice input{position:absolute;opacity:0}
-    .dub-voice span{display:flex;flex-direction:column;padding:.5rem .6rem;border:1px solid var(--line-strong);border-radius:var(--radius);cursor:pointer;font-weight:700;font-size:.9rem;transition:border-color .15s,background .15s}
-    .dub-voice small{font-weight:500;color:var(--muted);font-size:.76rem}
-    .dub-voice input:checked + span{border-color:var(--a);background:color-mix(in oklab,var(--a) 22%,var(--surface));box-shadow:0 0 0 1px var(--a)}
-    .dub-voice input:focus-visible + span{outline:2px solid var(--a);outline-offset:2px}
-    .dub-two{display:grid;grid-template-columns:1fr 1fr;gap:.8rem}
 
-    .dub-cost{display:flex;gap:.6rem;align-items:flex-start;padding:.75rem .9rem;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--line);font-size:.9rem;line-height:1.5;margin:.3rem 0 1rem}
+    .dub-cost{margin:0 1.2rem 1rem!important;display:flex;gap:.6rem;align-items:flex-start;padding:.75rem .9rem;border-radius:var(--radius);background:var(--surface2);border:1px solid var(--line);font-size:.9rem;line-height:1.5}
     .dub-cost svg{flex:0 0 20px;width:20px;height:20px;color:var(--a);margin-top:.1rem}
-    .dub-error{color:var(--danger);font-weight:600;margin:.2rem 0 .8rem;font-size:.92rem}
-    .dub-submit{width:100%}
-    .dub-submit:disabled{opacity:.55;cursor:not-allowed}
+    .dub-error{color:var(--danger);font-weight:600;margin:0 1.2rem .8rem;font-size:.92rem}
 
     .dub-note{max-width:860px;margin:0 auto 1.2rem;padding:1rem 1.2rem;border-radius:var(--radius-lg);border:1px solid var(--line);background:var(--surface)}
     .dub-note h2{margin:0 0 .35rem;font-size:1.15rem}
@@ -72,8 +64,6 @@
 
     @media (max-width:760px){
       .dub-steps{grid-template-columns:1fr}
-      .dub-grid{grid-template-columns:1fr}
-      .dub-card{padding:1rem}
     }
   </style>
 </head>
@@ -126,9 +116,16 @@
     @endif
 
     @if($user && ($included || (!$freeUsed && !$needsEmail)))
-    <form class="dub-card" id="dubForm" novalidate>
-      <div class="dub-grid">
-        <div>
+    <form class="vs-layout demo-vs-layout dub-studio" id="dubForm" novalidate>
+      <div class="vs-main">
+        <div class="vs-editor-card">
+          {{-- The studio's settings bar: dialect, performance style and emotion, with their pickers. --}}
+          <x-voice-studio.setbar :styles="$styles" :emotions="$emotions">
+            <div>
+              <span class="vs-field-label">{{ __('ui.dub.language') }}</span>
+              <span class="dub-lang">{{ __('ui.dub.language_arabic') }}</span>
+            </div>
+          </x-voice-studio.setbar>
           <div class="dub-drop" id="dubDrop">
             <input type="file" id="dubVideo" name="video" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp,.mp4,.mov,.webm,.mkv,.m4v,.3gp">
             <div id="dubDropEmpty">
@@ -139,59 +136,29 @@
             <video id="dubPreview" controls playsinline hidden></video>
             <div class="dub-file" id="dubFile" hidden><span id="dubFileName"></span><button type="button" id="dubChange">{{ __('ui.dub.change_video') }}</button></div>
           </div>
-        </div>
-        <div>
-          <div class="dub-field">
-            <label for="dubDialect">{{ __('ui.dub.dialect') }}</label>
-            <select id="dubDialect" name="dialect">
-              @foreach($dialects as $group)
-                <optgroup label="{{ $group['label'] }}">
-                  @foreach($group['options'] as $code => $label)
-                    <option value="{{ $code }}" @selected($code === 'ar-SA')>{{ $label }}</option>
-                  @endforeach
-                </optgroup>
-              @endforeach
-            </select>
+          <div class="dub-cost" id="dubCost">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+            <span id="dubCostText">{{ $included ? __('ui.dub.cost_member_pick') : __('ui.dub.cost_free') }}</span>
           </div>
-          <div class="dub-field" role="radiogroup" aria-labelledby="dubVoiceLabel">
-            <span class="dub-label" id="dubVoiceLabel">{{ __('ui.dub.voice') }}</span>
-            <div class="dub-voices">
-              @foreach($voices as $value => $voice)
-                <label class="dub-voice">
-                  <input type="radio" name="voice" value="{{ $value }}" @checked($loop->first)>
-                  <span>{{ $arabic ? $voice['ar'] : $voice['en'] }}<small>{{ __('ui.dub.voice_'.$voice['gender']) }}</small></span>
-                </label>
-              @endforeach
-            </div>
-          </div>
-          <div class="dub-two">
-            <div class="dub-field">
-              <label for="dubStyle">{{ __('ui.dub.style') }}</label>
-              <select id="dubStyle" name="performance_style">
-                @foreach($styles as $value => $label)
-                  <option value="{{ $value }}" @selected($value === 'conversational')>{{ $label }}</option>
-                @endforeach
-              </select>
-            </div>
-            <div class="dub-field">
-              <label for="dubEmotion">{{ __('ui.dub.emotion') }}</label>
-              <select id="dubEmotion" name="emotion">
-                <option value="">{{ __('ui.dub.emotion_auto') }}</option>
-                @foreach($emotions as $value => $label)
-                  <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-              </select>
+          <p class="dub-error" id="dubError" role="alert" hidden></p>
+          <div class="vs-editor-foot">
+            <button type="button" class="dub-chosen" id="dubChosen" title="{{ __('ui.dub.change_voice') }}"></button>
+            <div class="generate-row">
+              <button class="btn-generate" type="submit" id="dubSubmit" disabled>
+                <span>
+                  <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                  <span id="dubSubmitText">{{ $included ? __('ui.dub.submit') : __('ui.dub.submit_free') }}</span>
+                </span>
+              </button>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="dub-cost" id="dubCost">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-        <span id="dubCostText">{{ $included ? __('ui.dub.cost_member_pick') : __('ui.dub.cost_free') }}</span>
-      </div>
-      <p class="dub-error" id="dubError" role="alert" hidden></p>
-      <button type="submit" class="btn btn-primary dub-submit" id="dubSubmit" disabled>{{ $included ? __('ui.dub.submit') : __('ui.dub.submit_free') }}</button>
+      {{-- The studio's voice library: every premium Arabic voice with its avatar and a sample to hear. --}}
+      <aside class="vs-side">
+        <x-voice-studio.panel :show-tags="false" />
+      </aside>
     </form>
     @endif
 
@@ -206,6 +173,10 @@
 
   @include('components.footer')
   @include('components.scripts')
+  @if($user && ($included || (!$freeUsed && !$needsEmail)))
+  <script src="{{ asset('js/voice-studio-icons.js') }}?v={{ filemtime(public_path('js/voice-studio-icons.js')) }}" defer></script>
+  <script src="{{ asset('js/voice-studio.js') }}?v={{ filemtime(public_path('js/voice-studio.js')) }}" defer></script>
+  @endif
 
   @if($user)
   <script>
@@ -215,7 +186,7 @@
     const INCLUDED = @json($included);
     const MIN = {{ $minSeconds }}, MAX = {{ $maxSeconds }}, MAX_MB = {{ $maxMb }};
     const STORE_URL = @json(route('dub.store'));
-    const DIALECTS = @json(collect($dialects)->flatMap(fn ($g) => $g['options']));
+    const DIALECTS = @json($dialects);
     const CSRF = document.querySelector('meta[name="csrf-token"]')?.content || @json(csrf_token());
     const items = document.getElementById('dubItems');
     const list = document.getElementById('dubList');
@@ -332,6 +303,33 @@
 
     if (!form) return;
 
+    /* ── The studio's pickers: filled here, drawn by js/voice-studio.js once the page has loaded ── */
+    const voiceSelect = document.getElementById('voice_key');
+    const dialectSelect = document.getElementById('dialect');
+    const chosenLabel = document.getElementById('dubChosen');
+    (@json($voices)).forEach((voice) => {
+      const opt = document.createElement('option');
+      opt.value = voice.key;
+      opt.textContent = (@json($arabic) && voice.label_ar) ? voice.label_ar : voice.label;
+      if (voice.avatar) opt.dataset.avatar = voice.avatar;
+      voiceSelect.appendChild(opt);
+    });
+    voiceSelect.value = @json($defaultVoiceKey) || (voiceSelect.options[0]?.value || '');
+    dialectSelect.innerHTML = '';
+    Object.entries(DIALECTS).forEach(([code, label]) => dialectSelect.appendChild(new Option(label, code)));
+    dialectSelect.value = 'ar-SA';
+    const styleSelect = document.getElementById('performance_style');
+    if (styleSelect && [...styleSelect.options].some((o) => o.value === 'conversational')) styleSelect.value = 'conversational';
+    function showChosen() {
+      const voice = voiceSelect.selectedOptions[0]?.textContent || '';
+      const dialect = dialectSelect.selectedOptions[0]?.textContent || '';
+      chosenLabel.textContent = [voice, dialect].filter(Boolean).join(' · ');
+    }
+    chosenLabel.addEventListener('click', () => document.querySelector('.vs-side')?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    voiceSelect.addEventListener('change', showChosen);
+    dialectSelect.addEventListener('change', showChosen);
+    showChosen();
+
     /* ── Picking the video ── */
     const input = document.getElementById('dubVideo');
     const drop = document.getElementById('dubDrop');
@@ -339,6 +337,7 @@
     const empty = document.getElementById('dubDropEmpty');
     const fileBox = document.getElementById('dubFile');
     const submit = document.getElementById('dubSubmit');
+    const submitText = document.getElementById('dubSubmitText');
     const error = document.getElementById('dubError');
     const costText = document.getElementById('dubCostText');
     let chosen = null, seconds = 0;
@@ -378,7 +377,7 @@
       ev.preventDefault();
       if (!chosen) { showError(T.pick_first); return; }
       showError('');
-      submit.disabled = true; submit.textContent = T.uploading;
+      submit.disabled = true; submitText.textContent = T.uploading;
       await devicePromise;
       const data = new FormData(form);
       data.set('video', chosen);
@@ -404,7 +403,7 @@
       } catch (e) {
         showError(T.network);
       }
-      submit.textContent = INCLUDED ? T.submit : T.submit_free;
+      submitText.textContent = INCLUDED ? T.submit : T.submit_free;
       submit.disabled = !chosen;
     });
   })();
