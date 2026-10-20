@@ -442,7 +442,7 @@ return [
                 ['503', 'queue_unavailable', 'A background generation could not start; nothing was charged. Try again shortly.'],
                 ['503', 'capacity_reached', 'The API has reached its speech capacity for today; try again the next day.'],
                 ['503', 'api_paused', 'The API is paused for maintenance; try again later.'],
-                ['500', 'internal_error', 'Something went wrong on our side. Try again; if it persists, contact support with the `request_id`.'],
+                ['500', 'internal_error', 'Something went wrong. Try again; if it persists, contact support with the `request_id`.'],
             ],
         ],
 

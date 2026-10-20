@@ -283,7 +283,7 @@ class GenerationErrorsAndChoicesTest extends TestCase
         $this->assertSame('ar-EG', $error->dialect);
         $this->assertSame(2, $error->occurrences);
         $this->assertStringContainsString('HTTP 500: internal', $error->message);
-        $this->assertSame('Voice generation failed. Please try again.', $error->user_message);
+        $this->assertSame("Your voice couldn't be created this time, and no credits were used. Please try again.", $error->user_message);
         $this->assertTrue($error->context['final']);
     }
 

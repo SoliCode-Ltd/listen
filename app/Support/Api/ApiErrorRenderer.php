@@ -113,12 +113,12 @@ final class ApiErrorRenderer
                 $status === 401 => ApiError::invalidKey(),
                 $status === 403 => new ApiError(403, ApiError::TYPE_PERMISSION, 'forbidden', 'You do not have access to this resource.'),
                 $status === 503 => new ApiError(503, ApiError::TYPE_API, 'service_unavailable', 'The service is temporarily unavailable. Please try again shortly.'),
-                $status >= 500 => new ApiError($status, ApiError::TYPE_API, 'internal_error', 'Something went wrong on our side. Please try again.'),
+                $status >= 500 => new ApiError($status, ApiError::TYPE_API, 'internal_error', 'Something went wrong. Please try again.'),
                 default => new ApiError($status, ApiError::TYPE_INVALID_REQUEST, 'bad_request', 'The request could not be processed.'),
             };
         }
 
         return new ApiError(500, ApiError::TYPE_API, 'internal_error',
-            'Something went wrong on our side. Please try again; if it keeps happening, contact support with the request_id.');
+            'Something went wrong. Please try again; if it keeps happening, contact support with the request_id.');
     }
 }

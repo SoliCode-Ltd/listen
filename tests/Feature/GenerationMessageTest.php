@@ -23,7 +23,10 @@ class GenerationMessageTest extends TestCase
 {
     use RefreshDatabase;
 
-    private const FAILED = 'Voice generation failed. Please try again.';
+    private const FAILED = "Your voice couldn't be created this time, and no credits were used. Please try again.";
+
+    /** What a failed voice kept before October 2026. */
+    private const FORMER_FAILED = 'Voice generation failed. Please try again.';
 
     protected function tearDown(): void
     {
@@ -53,19 +56,49 @@ class GenerationMessageTest extends TestCase
         $this->assertSame(self::FAILED, GenerationMessage::stored('ui.backend.dashboard_voice_generation_failed_try_again'), 'kept in English whatever the page language');
     }
 
+    public function test_a_message_kept_in_the_former_wording_is_shown_in_todays(): void
+    {
+        $former = [
+            self::FORMER_FAILED => 'ui.backend.dashboard_voice_generation_failed_try_again',
+            "Our premium voices are unavailable right now because of a limit on our side. Nothing was charged, and we're working on it." => 'ui.backend.premium_voices_our_limit',
+            'أصواتنا المميزة مشغولة الآن، ولم يُخصم أي رصيد من حسابك. حاول مرة أخرى بعد دقيقة.' => 'ui.backend.premium_voices_busy',
+        ];
+        foreach ($former as $kept => $key) {
+            foreach (['en', 'ar'] as $locale) {
+                app()->setLocale($locale);
+                $this->assertSame(trans($key, [], $locale), GenerationMessage::forDisplay($kept), "{$key} in {$locale}");
+            }
+        }
+    }
+
+    public function test_no_failure_message_puts_the_fault_on_the_site(): void
+    {
+        $keys = ['ui.backend.premium_voices_busy', 'ui.backend.premium_voices_our_limit', 'ui.backend.cloned_voices_our_limit',
+            'ui.backend.cloned_voice_daily_limit', 'ui.backend.dashboard_voice_generation_failed_try_again', 'ui.backend.generation_stuck_refunded',
+            'ui.voice_cloning.failure_region', 'ui.voice_cloning.failure_key', 'ui.voice_cloning.failure_quota',
+            'ui.voice_cloning.failure_network', 'ui.voice_cloning.failure_server', 'ui.dashboard.server_overload'];
+        foreach ($keys as $key) {
+            $this->assertDoesNotMatchRegularExpression("/on our side|our end|our server|our limit|we stopped|we're working/i", trans($key, [], 'en'), $key);
+            $this->assertStringNotContainsString('من جهتنا', trans($key, [], 'ar'), $key);
+            $this->assertStringNotContainsString('خادمنا', trans($key, [], 'ar'), $key);
+        }
+        $this->assertStringContainsString('very high demand', trans('ui.backend.premium_voices_our_limit', [], 'en'));
+        $this->assertStringContainsString('إقبالاً كبيراً', trans('ui.backend.premium_voices_our_limit', [], 'ar'));
+    }
+
     public function test_the_studio_shows_a_failed_voice_in_arabic(): void
     {
         $user = $this->member();
         AudioGeneration::query()->create([
             'user_id' => $user->id, 'user_sequence_number' => 1, 'input_text' => 'Hello there', 'target_language' => 'en',
-            'voice_tier' => 'standard', 'status' => 'failed', 'error_message' => self::FAILED,
+            'voice_tier' => 'standard', 'status' => 'failed', 'error_message' => self::FORMER_FAILED,
         ]);
         app()->setLocale('ar');
 
         $html = $this->actingAs($user)->getLocalizedRoute('dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString('<small style="color: var(--danger);">'.e(trans('ui.backend.dashboard_voice_generation_failed_try_again', [], 'ar')).'</small>', $html);
-        $this->assertStringNotContainsString(self::FAILED, $html);
+        $this->assertStringNotContainsString(self::FORMER_FAILED, $html);
     }
 
     public function test_a_failed_studio_generation_answers_in_the_members_language_and_keeps_english(): void
