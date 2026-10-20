@@ -402,10 +402,7 @@
             @include('components.home.long-read', ['read' => $read])
           @endforeach
         </div>
-        @php $recordedOn = collect($longReads)->pluck('recorded_on')->filter()->last(); @endphp
-        @if($recordedOn)
-          <p class="vs-long-note">{{ __('ui.samples.long_note', ['date' => $recordedOn]) }}</p>
-        @endif
+        <p class="vs-long-note">{{ __('ui.samples.long_note') }}</p>
       </section>
     @endif
 

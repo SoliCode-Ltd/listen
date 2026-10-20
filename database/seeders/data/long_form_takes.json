@@ -19,6 +19,16 @@
     "site": "live",
     "text_sha1": "f18de40eeef0f6ed4eb30f759c29b627024c9a81"
   },
+  "long-en-clockmaker": {
+    "made_in_seconds": 65.2,
+    "audio_seconds": 572.11,
+    "characters": 7800,
+    "pieces": 10,
+    "pieces_at_once": 8,
+    "recorded_at": "2026-10-20T02:44:04+00:00",
+    "site": "live",
+    "text_sha1": "31664efbc003234df2c935135ba99be5cab89d16"
+  },
   "long-en-deep-sea": {
     "made_in_seconds": 30.1,
     "audio_seconds": 408.26,
