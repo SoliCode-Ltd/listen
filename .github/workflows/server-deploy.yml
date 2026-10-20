@@ -79,6 +79,11 @@ name: Server deploy
 #            length, the speaking rates by language and engine, and a fit of
 #            the seconds against what the texts hold. Totals only, never a
 #            text or a member (scripts/support/speech_rates.php).
+#   owner-todo: read-only (READ ONLY database session). Whether the things
+#            only the owner changes in the admin are still to do: plan card
+#            lines that promise a queue or priority, saved plan descriptions,
+#            SEO texts saved over the pages' own, referral campaigns switched
+#            on (scripts/support/owner_todo.php). No member data.
 #   speed-check: read-only (READ ONLY database session). How long premium
 #            voices really take to make, by how many pieces they are read in,
 #            and so how long a text at each plan's longest allowed length
@@ -107,7 +112,7 @@ on:
         default: staging
       mode:
         type: choice
-        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
+        options: [inspect, deploy, ffmpeg, indexnow, migrate, queue, settings, php-limits, data-checks, email-check, demo-links, promises, speech-rates, speed-check, owner-todo, join-check, wording-blocks, wording-blocks-apply, page-check, billing-trace, plan-audit]
         default: inspect
       customer:
         description: "billing-trace only: the Stripe customer id (cus_...)"
@@ -384,6 +389,11 @@ jobs:
           fi
           if [ "$MODE" = speech-rates ]; then
             tool speech_rates.php | $S "$FIND; php"
+            rm -f ~/.ssh/id_deploy
+            exit 0
+          fi
+          if [ "$MODE" = owner-todo ]; then
+            tool owner_todo.php | $S "$FIND; php"
             rm -f ~/.ssh/id_deploy
             exit 0
           fi
