@@ -313,6 +313,48 @@ class VideoDubPageTest extends TestCase
         $this->assertSame($server === null ? 250 : min(250, $server), VideoDubbing::maxUploadMb(), 'members see what they can really send');
     }
 
+    public function test_an_admin_removing_a_dub_lets_the_member_dub_again(): void
+    {
+        $this->openToEveryone();
+        $this->fakeEngine();
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        // A free dub: removed from the admin list, the member gets their free dub back.
+        $free = $this->member(dubbing: false);
+        $first = VideoDub::query()->findOrFail($this->actingAs($free)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202)->json('id'));
+        $this->actingAs($free)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(422);
+
+        $this->actingAs($admin);
+        \Livewire\Livewire::test(\App\Filament\Resources\VideoDubResource\Pages\ListVideoDubs::class)
+            ->assertTableActionVisible('remove', $first)
+            ->callTableAction('remove', $first);
+        $first->refresh();
+        $this->assertSame(VideoDub::REMOVED, $first->status);
+        $this->assertNotNull($first->files_deleted_at);
+        $this->assertFalse(Storage::disk('local')->exists($first->folder), 'the video is deleted');
+        $this->assertSame('free', VideoDubbing::studio($free, request())['state']);
+        $this->actingAs($free)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202)->assertJsonPath('free', true);
+        $this->actingAs($free)->get(route('dub.watch', ['id' => $first->id]))->assertNotFound();
+
+        // A paid dub: its credits and the month's video come back.
+        $paid = $this->member(dubbing: true);
+        Plan::query()->where('video_dubbing_enabled', true)->update(['video_dubs_per_month' => 1]);
+        $dub = VideoDub::query()->findOrFail($this->actingAs($paid)->post(route('dub.store'), $this->form(), ['Accept' => 'application/json'])->assertStatus(202)->json('id'));
+        $this->assertSame(90, (int) UsageCounter::query()->where('user_id', $paid->id)->value('total_chars'));
+        $this->assertSame('limit', VideoDubbing::studio($paid, request())['state']);
+
+        $this->actingAs($admin);
+        \Livewire\Livewire::test(\App\Filament\Resources\VideoDubResource\Pages\ViewVideoDub::class, ['record' => $dub->id])->callAction('remove');
+        $this->assertSame(VideoDub::REMOVED, $dub->fresh()->status);
+        $this->assertSame(0, (int) UsageCounter::query()->where('user_id', $paid->id)->value('total_chars'), 'credits given back');
+        $this->assertSame('paid', VideoDubbing::studio($paid, request())['state'], 'the month\'s video given back');
+        // Once only: a second removal gives nothing more.
+        $this->assertFalse(app(\App\Services\Dubbing\VideoDubRunner::class)->remove((int) $dub->id));
+        $this->assertSame(0, (int) UsageCounter::query()->where('user_id', $paid->id)->value('total_chars'));
+        // The member's history says it was given back.
+        $this->actingAs($paid)->get(route('dashboard'))->assertOk()->assertSee(__('ui.dub.status_removed'));
+    }
+
     public function test_a_voice_the_library_does_not_offer_is_refused(): void
     {
         $this->openToEveryone();

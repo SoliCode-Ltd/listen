@@ -2082,6 +2082,7 @@ return [
         'status_ready' => 'Ready',
         'status_working' => 'Dubbing',
         'status_failed' => 'Not charged',
+        'status_removed' => 'Given back',
         'status_free' => 'Free',
         'files_gone' => 'Video deleted',
         'download' => 'Download',

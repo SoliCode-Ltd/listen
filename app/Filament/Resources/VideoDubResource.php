@@ -42,6 +42,7 @@ class VideoDubResource extends Resource
         VideoDub::PROCESSING => 'Dubbing',
         VideoDub::READY => 'Ready',
         VideoDub::FAILED => 'Failed',
+        VideoDub::REMOVED => 'Removed (given back)',
     ];
 
     public static function getNavigationBadge(): ?string
@@ -62,6 +63,7 @@ class VideoDubResource extends Resource
             VideoDub::READY => 'success',
             VideoDub::QUEUED, VideoDub::PROCESSING => 'warning',
             VideoDub::FAILED => 'danger',
+            VideoDub::REMOVED => 'gray',
             default => 'gray',
         };
     }
@@ -256,7 +258,50 @@ class VideoDubResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                self::removeAction(Tables\Actions\Action::make('remove')),
+            ])
+            ->bulkActions([
+                Tables\Actions\BulkAction::make('removeSelected')
+                    ->label('Remove and give back')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->color('danger')
+                    ->requiresConfirmation()
+                    ->modalDescription(self::REMOVE_TEXT)
+                    ->deselectRecordsAfterCompletion()
+                    ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
+                        $count = $records->filter(fn (VideoDub $dub): bool => app(VideoDubRunner::class)->remove((int) $dub->id))->count();
+                        Notification::make()->title($count.' dub(s) removed and given back')->success()->send();
+                    }),
             ]);
+    }
+
+    public const REMOVE_TEXT = 'Deletes the video and gives back what it took, so the member can dub again: their free dub, or the credits and this month\'s video. The dub stays in this list, marked removed. This cannot be undone.';
+
+    /**
+     * Remove: the video goes and what it took comes back to the member
+     * (VideoDubRunner::remove()), for a row of the list or a dub's page.
+     *
+     * @template T of \Filament\Actions\Action|\Filament\Tables\Actions\Action
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function removeAction(\Filament\Actions\Action|Tables\Actions\Action $action): \Filament\Actions\Action|Tables\Actions\Action
+    {
+        return $action
+            ->label('Remove')
+            ->icon('heroicon-o-arrow-uturn-left')
+            ->color('danger')
+            ->visible(fn (VideoDub $record): bool => ! $record->isWorking() && $record->status !== VideoDub::REMOVED)
+            ->requiresConfirmation()
+            ->modalHeading('Remove this dub and give it back?')
+            ->modalDescription(self::REMOVE_TEXT)
+            ->modalSubmitActionLabel('Remove and give back')
+            ->action(function (VideoDub $record): void {
+                app(VideoDubRunner::class)->remove((int) $record->id)
+                    ? Notification::make()->title('Removed: the member can dub again')->success()->send()
+                    : Notification::make()->title('Not removed: it is still being dubbed, or was removed already')->warning()->send();
+            });
     }
 
     /** Deletes a dub's videos now (they would go after keep_hours anyway); the row and its figures stay. */

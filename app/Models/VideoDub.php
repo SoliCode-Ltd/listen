@@ -18,6 +18,12 @@ class VideoDub extends Model
 
     public const FAILED = 'failed';
 
+    /** Taken away by an admin, who gave back what it took (VideoDubRunner::remove()). */
+    public const REMOVED = 'removed';
+
+    /** Dubs that took nothing in the end: not the free dub, not a video of the month, no credits. */
+    public const GIVEN_BACK = [self::FAILED, self::REMOVED];
+
     protected $fillable = [
         'user_id',
         'status',

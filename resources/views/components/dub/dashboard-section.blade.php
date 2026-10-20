@@ -115,6 +115,8 @@
                   <td>
                     @if($row['status'] === 'failed')
                       <span class="dub-badge is-failed">{{ __('ui.dub.status_failed') }}</span>
+                    @elseif($row['status'] === 'removed')
+                      <span class="dub-badge is-free">{{ __('ui.dub.status_removed') }}</span>
                     @elseif($row['status'] === 'ready')
                       <span class="dub-badge {{ $row['free'] ? 'is-free' : 'is-ready' }}">{{ $row['free'] ? __('ui.dub.status_free') : __('ui.dub.status_ready') }}</span>
                     @else

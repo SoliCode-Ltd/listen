@@ -2085,6 +2085,7 @@ return [
         'status_ready' => 'جاهز',
         'status_working' => 'قيد الدبلجة',
         'status_failed' => 'لم يُخصم',
+        'status_removed' => 'أُعيد إليك',
         'status_free' => 'مجاني',
         'files_gone' => 'حُذف الفيديو',
         'download' => 'تحميل',

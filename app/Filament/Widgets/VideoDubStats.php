@@ -48,18 +48,20 @@ class VideoDubStats extends BaseWidget
         $month = VideoDub::query()->where('created_at', '>=', $since)->get(['id', 'user_id', 'status', 'is_free', 'video_seconds', 'reservation', 'report', 'created_at']);
         $today = $month->filter(fn (VideoDub $d): bool => $d->created_at >= now()->startOfDay());
         $done = $month->where('status', VideoDub::READY);
+        $removed = $month->where('status', VideoDub::REMOVED);
         $failed = $month->where('status', VideoDub::FAILED);
         $finished = $done->count() + $failed->count();
-        $costs = $done->map(fn (VideoDub $d): float => VideoDubbing::cost($d->report)['total'] ?? 0.0);
+        // A dub removed afterwards was still made: it cost us all the same.
+        $costs = $done->merge($removed)->map(fn (VideoDub $d): float => VideoDubbing::cost($d->report)['total'] ?? 0.0);
         $freeCost = $done->where('is_free', true)->sum(fn (VideoDub $d): float => VideoDubbing::cost($d->report)['total'] ?? 0.0);
         $credits = $month->sum(fn (VideoDub $d): int => is_array($d->reservation) ? (int) $d->reservation['credits'] : 0);
         $waits = $done->map(fn (VideoDub $d): float => (float) ($d->report['total_seconds'] ?? 0))->filter();
         $freeCap = (int) config('listen.dubbing.free_per_day', 50);
-        $freeToday = $today->where('is_free', true)->where('status', '!=', VideoDub::FAILED)->count();
+        $freeToday = $today->where('is_free', true)->whereNotIn('status', VideoDub::GIVEN_BACK)->count();
         $daily = collect(range(29, 0))->map(fn (int $ago): int => $month->filter(fn (VideoDub $d): bool => $d->created_at->isSameDay(now()->subDays($ago)))->count())->all();
 
         // Members who had their free dub and then paid for one: what the free dub is for.
-        $freeUsers = VideoDub::query()->where('is_free', true)->where('status', '!=', VideoDub::FAILED)->distinct()->pluck('user_id');
+        $freeUsers = VideoDub::query()->where('is_free', true)->whereNotIn('status', VideoDub::GIVEN_BACK)->distinct()->pluck('user_id');
         $converted = $freeUsers->isEmpty() ? 0 : VideoDub::query()->whereIn('user_id', $freeUsers)->whereNotNull('reservation')->distinct()->count('user_id');
 
         return [
@@ -83,7 +85,7 @@ class VideoDubStats extends BaseWidget
                 ->descriptionIcon('heroicon-m-currency-dollar')
                 ->color('danger'),
             Stat::make('Failed', $finished > 0 ? round($failed->count() / $finished * 100).'%' : '—')
-                ->description($failed->count().' of '.$finished.' finished dubs · credits given back')
+                ->description($failed->count().' of '.$finished.' finished dubs · credits given back'.($removed->isNotEmpty() ? ' · '.$removed->count().' removed by an admin' : ''))
                 ->descriptionIcon('heroicon-m-exclamation-triangle')
                 ->color($finished > 0 && $failed->count() / $finished > 0.2 ? 'danger' : 'gray'),
             Stat::make('Average wait', $waits->isEmpty() ? '—' : number_format($waits->avg(), 0).' s')

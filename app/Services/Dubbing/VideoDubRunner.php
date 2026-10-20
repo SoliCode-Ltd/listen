@@ -103,6 +103,34 @@ class VideoDubRunner
     }
 
     /**
+     * An admin takes a finished (or failed) dub away to let the member dub
+     * again: its videos are deleted and what it took is given back, exactly
+     * once: the free dub, or the month's video and the credits (a failed
+     * dub gave its credits back already). The row stays, marked removed,
+     * so the figures still show it. A dub still working is left alone.
+     */
+    public function remove(int $dubId): bool
+    {
+        $removed = DB::transaction(function () use ($dubId): ?VideoDub {
+            $dub = VideoDub::query()->whereKey($dubId)->lockForUpdate()->first();
+            if (! $dub || $dub->isWorking() || $dub->status === VideoDub::REMOVED) {
+                return null;
+            }
+            if (is_array($dub->reservation) && $dub->status !== VideoDub::FAILED) {
+                $this->meter->giveBack((int) $dub->user_id, $dub->reservation);
+            }
+            $dub->update(['status' => VideoDub::REMOVED, 'stage' => 'removed', 'files_deleted_at' => now()]);
+
+            return $dub;
+        }, 3);
+        if ($removed?->folder) {
+            Storage::disk('local')->deleteDirectory($removed->folder);
+        }
+
+        return $removed !== null;
+    }
+
+    /**
      * Marks a dub failed and gives back what its plan was charged, exactly
      * once however many places try (the run, the stuck-dub sweep).
      */

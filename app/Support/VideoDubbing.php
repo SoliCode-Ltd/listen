@@ -75,7 +75,8 @@ final class VideoDubbing
 
     /**
      * Whether this person has had their free dub: this account, any account
-     * linked to it, or this browser or device. A failed one does not count.
+     * linked to it, or this browser or device. A failed one does not count,
+     * nor one an admin removed (to let them dub again).
      */
     public static function freeUsed(User $user, Request $request): bool
     {
@@ -85,7 +86,7 @@ final class VideoDubbing
 
         return VideoDub::query()
             ->where('is_free', true)
-            ->where('status', '!=', VideoDub::FAILED)
+            ->whereNotIn('status', VideoDub::GIVEN_BACK)
             ->where(function ($q) use ($ids, $user, $browser, $device): void {
                 $q->whereIn('user_id', array_values(array_unique([...$ids, $user->id])));
                 if ($browser !== null) {
@@ -103,7 +104,7 @@ final class VideoDubbing
     {
         $limit = (int) config('listen.dubbing.free_per_day', 50);
 
-        return $limit > 0 && VideoDub::query()->where('is_free', true)->where('status', '!=', VideoDub::FAILED)
+        return $limit > 0 && VideoDub::query()->where('is_free', true)->whereNotIn('status', VideoDub::GIVEN_BACK)
             ->where('created_at', '>=', now()->startOfDay())->count() >= $limit;
     }
 
@@ -230,7 +231,7 @@ final class VideoDubbing
     /** Paid dubs in the member's current credit month (failed ones gave their credits back and do not count). */
     public static function dubsThisMonth(int $userId): int
     {
-        return VideoDub::query()->where('user_id', $userId)->where('is_free', false)->where('status', '!=', VideoDub::FAILED)
+        return VideoDub::query()->where('user_id', $userId)->where('is_free', false)->whereNotIn('status', VideoDub::GIVEN_BACK)
             ->where('period_ym', CreditPeriod::counter($userId)->period_ym)->count();
     }
 
@@ -351,7 +352,7 @@ final class VideoDubbing
             ->where(fn ($q) => $q->where('period_ym', $period['key'])->orWhere(fn ($q) => $q->whereNull('period_ym')->where('created_at', '>=', $period['starts_at'])))
             ->latest('id')->limit(200)->get();
         $rows = $dubs->map(function (VideoDub $dub) use ($arabic): array {
-            $charged = is_array($dub->reservation) && $dub->status !== VideoDub::FAILED ? (int) $dub->reservation['credits'] : 0;
+            $charged = is_array($dub->reservation) && ! in_array($dub->status, VideoDub::GIVEN_BACK, true) ? (int) $dub->reservation['credits'] : 0;
 
             return self::present($dub) + [
                 'date' => $dub->created_at?->copy()->locale($arabic ? 'ar' : 'en')->isoFormat('D MMM, HH:mm'),
@@ -365,7 +366,7 @@ final class VideoDubbing
             'rows' => $rows,
             'credits_used' => $credits,
             'seconds_used' => Credits::secondsFor($credits),
-            'videos_used' => $dubs->where('is_free', false)->where('status', '!=', VideoDub::FAILED)->count(),
+            'videos_used' => $dubs->where('is_free', false)->whereNotIn('status', VideoDub::GIVEN_BACK)->count(),
             'videos_limit' => (int) ($studio['usage']['dubs_limit'] ?? 0),
             'credits_left' => (int) ($studio['usage']['credits_left'] ?? 0),
             'seconds_left' => (int) ($studio['usage']['seconds_left'] ?? 0),
@@ -378,7 +379,7 @@ final class VideoDubbing
     /** @return array<int, array<string, mixed>> */
     public static function recent(User $user): array
     {
-        return VideoDub::query()->where('user_id', $user->id)->whereNull('files_deleted_at')
+        return VideoDub::query()->where('user_id', $user->id)->whereNull('files_deleted_at')->where('status', '!=', VideoDub::REMOVED)
             ->where('created_at', '>=', now()->subHours((int) config('listen.dubbing.keep_hours', 48)))
             ->latest('id')->limit(10)->get()->map(fn (VideoDub $dub): array => self::present($dub))->all();
     }
