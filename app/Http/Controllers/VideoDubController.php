@@ -58,7 +58,7 @@ class VideoDubController extends Controller
         abort_unless(VideoDubbing::openTo($user), 404);
         $language = $request->input('language') === 'en' ? 'en' : 'ar';
         $validated = $request->validate([
-            'video' => ['required', 'file', 'max:'.((int) config('listen.dubbing.max_upload_mb', 100) * 1024),
+            'video' => ['required', 'file', 'max:'.(VideoDubbing::maxUploadMb() * 1024),
                 'mimetypes:video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp'],
             'language' => ['nullable', Rule::in(VideoDubbing::LANGUAGES)],
             // An Arabic dialect, or an English accent.

@@ -174,6 +174,45 @@ final class VideoDubbing
         return ['model' => round($model, 5), 'voice' => round($voice, 5), 'total' => round($model + $voice, 5)];
     }
 
+    /** The largest video the admin allows (Video Dubbing → Settings), in MB. */
+    public static function uploadSettingMb(): int
+    {
+        return max(1, (int) SiteSetting::get('video_dubbing_max_upload_mb', (int) config('listen.dubbing.max_upload_mb', 300)));
+    }
+
+    /**
+     * What this server's PHP takes in one request, in MB (the smaller of
+     * upload_max_filesize and post_max_size); null when it sets no limit.
+     */
+    public static function serverUploadMb(): ?int
+    {
+        $limits = array_filter(array_map(function (string $key): ?int {
+            $value = trim((string) ini_get($key));
+            if ($value === '' || $value === '0' || $value === '-1') {
+                return null;
+            }
+            $number = (float) $value;
+            $bytes = match (strtoupper(substr($value, -1))) {
+                'G' => $number * 1024 ** 3,
+                'M' => $number * 1024 ** 2,
+                'K' => $number * 1024,
+                default => $number,
+            };
+
+            return (int) floor($bytes / 1024 / 1024);
+        }, ['upload_max_filesize', 'post_max_size']), fn (?int $mb): bool => $mb !== null);
+
+        return $limits === [] ? null : max(1, min($limits));
+    }
+
+    /** The largest video a member can really send: the admin's setting, within what the server takes. */
+    public static function maxUploadMb(): int
+    {
+        $server = self::serverUploadMb();
+
+        return $server === null ? self::uploadSettingMb() : min(self::uploadSettingMb(), $server);
+    }
+
     /** The longest video this dub may be: the plan's, or the site's for a free one. */
     public static function maxSeconds(?Plan $plan, bool $free): int
     {
@@ -279,7 +318,7 @@ final class VideoDubbing
             ],
             'min_seconds' => (int) config('listen.dubbing.min_seconds', 3),
             'max_seconds' => self::maxSeconds($plan, ! $included),
-            'max_mb' => (int) config('listen.dubbing.max_upload_mb', 100),
+            'max_mb' => self::maxUploadMb(),
             'keep_hours' => (int) config('listen.dubbing.keep_hours', 48),
             'credits_per_second' => Credits::PER_SECOND,
             'languages' => $languages,

@@ -10,11 +10,13 @@
   dubbing progress, and the finished video; what may not be done yet shows
   in its place, with the pickers and voices still there to try.
 --}}
-@props(['dub', 'hidden' => false])
+@props(['dub', 'hidden' => false, 'compactMeter' => false])
 @php
   $dubAr = app()->getLocale() === 'ar';
   $dubConfig = [
       'state' => $dub['state'],
+      // On the dashboard the account above says what is left: the studio says only what the chosen video uses.
+      'compactMeter' => $compactMeter,
       'free' => $dub['free'],
       'email' => $dub['email'],
       'usage' => $dub['usage'],
@@ -56,15 +58,19 @@
 
         <div class="dub-stage" data-dub-stage>
           {{-- Nothing chosen yet --}}
-          <label class="dub-drop" data-dub-view="drop">
-            <input type="file" name="video" data-dub-file accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp,.mp4,.mov,.webm,.mkv,.m4v,.3gp">
+          <div class="dub-drop" data-dub-view="drop" role="button" tabindex="0" aria-label="{{ __('ui.dub.drop_title') }}">
+            <input type="file" name="video" data-dub-file tabindex="-1" aria-hidden="true" accept="video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-m4v,video/3gpp,.mp4,.mov,.webm,.mkv,.m4v,.3gp">
             <span class="dub-drop-art" aria-hidden="true">
               <svg viewBox="0 0 48 48"><rect x="6" y="11" width="28" height="26" rx="5"/><path d="M34 21l8-5v16l-8-5"/><path class="dub-drop-wave" d="M13 24h2M18 20v8M22 22v4M26 19v10"/></svg>
             </span>
-            <strong>{{ __('ui.dub.drop_title') }}</strong>
+            <span class="dub-drop-title">{{ __('ui.dub.drop_title') }}</span>
             <span class="dub-drop-or">{!! __('ui.dub.drop_or', ['choose' => '<u>'.e(__('ui.dub.drop_choose')).'</u>']) !!}</span>
-            <small data-dub-limits>{{ __('ui.dub.drop_hint', ['seconds' => $dub['max_seconds'], 'mb' => $dub['max_mb']]) }}</small>
-          </label>
+            <span class="dub-drop-limits" data-dub-limits>
+              <span>{{ __('ui.dub.drop_formats') }}</span>
+              <span>{{ __('ui.dub.drop_seconds', ['seconds' => $dub['max_seconds']]) }}</span>
+              <span>{{ __('ui.dub.drop_size', ['mb' => $dub['max_mb']]) }}</span>
+            </span>
+          </div>
 
           {{-- A video chosen, ready to send --}}
           <div class="dub-chosen" data-dub-view="chosen" hidden>

@@ -216,8 +216,14 @@
     // ---------- What it costs, and what is left ----------
     function renderMeter() {
       meter.innerHTML = '';
-      meter.hidden = !(c.state === 'free' || c.state === 'paid');
+      // On the dashboard the account above already says what is left: only what this video uses.
+      meter.hidden = !(c.state === 'free' || c.state === 'paid') || (c.compactMeter && !(c.state === 'paid' && chosen && seconds));
       if (meter.hidden) return;
+      if (c.compactMeter) {
+        var only = el('p', 'dub-meter-main', t.meter_video.replace(':time', fmtLong(Math.ceil(Math.min(seconds, c.maxSeconds)), t)).replace(':credits', num(Math.ceil(Math.min(seconds, c.maxSeconds)) * c.creditsPerSecond)));
+        meter.appendChild(only);
+        return;
+      }
       var main = el('p', 'dub-meter-main');
       var aside = el('p', 'dub-meter-aside');
       if (c.state === 'free') {
@@ -321,6 +327,8 @@
     fileInput.addEventListener('change', function () { pick(fileInput.files[0]); });
     q('[data-dub-change]').addEventListener('click', function () { reset(); fileInput.click(); });
     var drop = views.drop;
+    drop.addEventListener('click', function (ev) { if (ev.target !== fileInput) fileInput.click(); });
+    drop.addEventListener('keydown', function (ev) { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); fileInput.click(); } });
     ['dragenter', 'dragover'].forEach(function (e) { drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.add('is-over'); }); });
     ['dragleave', 'drop'].forEach(function (e) { drop.addEventListener(e, function (ev) { ev.preventDefault(); drop.classList.remove('is-over'); }); });
     drop.addEventListener('drop', function (ev) { if (ev.dataTransfer && ev.dataTransfer.files[0]) pick(ev.dataTransfer.files[0]); });

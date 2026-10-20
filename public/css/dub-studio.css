@@ -95,7 +95,9 @@
 }
 .dub-drop:hover, .dub-drop.is-over { border-color: var(--a); background-color: color-mix(in oklab, var(--a) 6%, var(--surface)); }
 .dub-drop.is-over { transform: scale(1.005); }
-.dub-drop input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.dub-drop:focus-visible { outline: 2px solid var(--a); outline-offset: 3px; }
+/* The file field stays out of sight: the whole zone opens it (js/dub-studio.js). */
+.dub-drop input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
 .dub-drop-art {
   display: grid;
   place-items: center;
@@ -108,10 +110,22 @@
 }
 .dub-drop-art svg { width: 38px; height: 38px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 .dub-drop-wave { stroke-width: 2.6; }
-.dub-drop strong { font-size: 1.08rem; }
-.dub-drop-or { color: var(--muted); }
+.dub-studio .dub-drop-art { flex: 0 0 auto; width: 68px; height: 68px; margin: 0 0 .7rem; }
+.dub-studio .dub-drop-art svg { width: 38px; height: 38px; }
+.dub-drop-title { display: block; font-size: 1.2rem; font-weight: 800; line-height: 1.4; color: var(--text); }
+.dub-drop-or { display: block; font-size: 1rem; line-height: 1.5; color: color-mix(in oklab, var(--text) 72%, var(--muted)); }
 .dub-drop-or u { color: var(--a); font-weight: 700; text-decoration: none; }
-.dub-drop small { color: var(--muted); font-size: .82rem; }
+.dub-drop-limits { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem; margin-top: .8rem; }
+.dub-drop-limits span {
+  padding: .3rem .7rem;
+  border-radius: 99px;
+  border: 1px solid color-mix(in oklab, var(--line) 90%, transparent);
+  background: var(--surface);
+  color: color-mix(in oklab, var(--text) 75%, var(--muted));
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
 
 .dub-chosen, .dub-done { display: grid; gap: .7rem; }
 .dub-chosen video, .dub-done video, .dub-item video {
@@ -305,9 +319,10 @@ html[dir="rtl"] .dub-toggle input:checked + .dub-switch::after { transform: tran
 .dub-studio.is-working .dub-toggle { opacity: .55; pointer-events: none; }
 
 /* ---------- Earlier dubs ---------- */
-.dub-history header { margin-bottom: .9rem; }
-.dub-history h2 { margin: 0 0 .2rem; font-size: 1.2rem; }
-.dub-history header p { margin: 0; color: var(--muted); font-size: .88rem; }
+.dub-history { margin-top: 1.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.dub-history header { margin-bottom: 1.1rem; }
+.dub-studio .dub-history h2 { margin: 0 0 .35rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; }
+.dub-history header p { margin: 0; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .98rem; line-height: 1.6; }
 .dub-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); gap: 1rem; }
 .dub-item {
   display: grid;
@@ -326,38 +341,46 @@ html[dir="rtl"] .dub-toggle input:checked + .dub-switch::after { transform: tran
 .dub-item .dub-link { justify-self: start; margin-top: .2rem; font-size: .88rem; }
 
 /* ---------- Dashboard: dubbing's own section ---------- */
-.dub-account { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; margin: 0 0 1.4rem; }
+.dub-account { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; margin: 0 0 1.2rem; }
 .dub-stat {
-  display: grid;
-  gap: .25rem;
-  padding: .95rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: .45rem;
+  padding: 1.1rem 1.15rem;
   border: 1px solid color-mix(in oklab, var(--line) 85%, transparent);
-  border-radius: 16px;
+  border-radius: 18px;
   background: var(--surface);
+  box-shadow: 0 1px 2px rgba(15, 12, 40, .04);
 }
-.dub-stat small { color: var(--muted); font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-.dub-stat strong { font-size: 1.35rem; font-variant-numeric: tabular-nums; }
-.dub-stat span { color: var(--muted); font-size: .8rem; }
+.dub-stat-head { display: flex; align-items: center; gap: .55rem; }
+.dub-stat-icon { display: grid; place-items: center; flex: 0 0 32px; width: 32px; height: 32px; border-radius: 10px; background: color-mix(in oklab, var(--a) 12%, transparent); color: var(--a); }
+.dub-stat-icon svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.dub-stat-label { font-size: .9rem; font-weight: 700; line-height: 1.35; color: color-mix(in oklab, var(--text) 80%, var(--muted)); }
+.dub-stat-value { font-size: 1.6rem; font-weight: 800; line-height: 1.2; font-variant-numeric: tabular-nums; color: var(--text); }
+.dub-stat-value small { margin-inline-start: .3rem; font-size: 1rem; font-weight: 700; color: var(--muted); }
+.dub-stat-note { font-size: .84rem; line-height: 1.45; color: var(--muted); }
 .dub-stat-bar { height: 6px; border-radius: 99px; background: color-mix(in oklab, var(--a) 12%, transparent); overflow: hidden; margin-top: .2rem; }
 .dub-stat-bar i { display: block; height: 100%; border-radius: inherit; background: var(--a); }
 .dub-rule {
-  display: flex;
-  gap: .7rem;
-  align-items: flex-start;
-  margin: 0 0 1.4rem;
-  padding: .85rem 1rem;
-  border-radius: 14px;
-  background: color-mix(in oklab, var(--a) 6%, transparent);
-  font-size: .9rem;
-  line-height: 1.5;
+  margin: 0 0 1.5rem;
+  padding: 1rem 1.2rem;
+  border: 1px solid color-mix(in oklab, var(--a) 18%, var(--line));
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--a) 5%, var(--surface));
 }
-.dub-rule svg { flex: 0 0 20px; width: 20px; height: 20px; fill: none; stroke: var(--a); stroke-width: 2; margin-top: .1rem; }
-.dub-ledger { margin-top: 1.8rem; }
-.dub-ledger h2 { margin: 0 0 .2rem; font-size: 1.2rem; }
-.dub-ledger > p { margin: 0 0 .9rem; color: var(--muted); font-size: .88rem; }
+.dub-rule-title { display: flex; align-items: center; gap: .5rem; margin-bottom: .7rem; font-size: 1rem; }
+.dub-rule-title svg { flex: 0 0 20px; width: 20px; height: 20px; fill: none; stroke: var(--a); stroke-width: 2; }
+.dub-rule p { margin: 0; font-size: .95rem; line-height: 1.6; color: color-mix(in oklab, var(--text) 80%, var(--muted)); }
+.dub-rule ul { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; padding: 0; list-style: none; }
+.dub-rule li { display: grid; gap: .15rem; padding: .7rem .85rem; border-radius: 12px; background: var(--surface); border: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.dub-rule li b { font-size: .95rem; }
+.dub-rule li span { font-size: .9rem; color: color-mix(in oklab, var(--text) 72%, var(--muted)); }
+.dub-ledger { margin-top: 2.2rem; padding-top: 2rem; border-top: 1px solid color-mix(in oklab, var(--line) 80%, transparent); }
+.page-card .dub-ledger h2, .dub-ledger h2 { margin: 0 0 .35rem; font-size: 1.4rem; font-weight: 800; line-height: 1.3; }
+.dub-ledger > p { margin: 0 0 1.1rem; color: color-mix(in oklab, var(--text) 70%, var(--muted)); font-size: .98rem; line-height: 1.6; }
 .dub-ledger-wrap { overflow-x: auto; border: 1px solid color-mix(in oklab, var(--line) 85%, transparent); border-radius: 16px; background: var(--surface); }
 .dub-ledger table { width: 100%; border-collapse: collapse; font-size: .88rem; }
-.dub-ledger th { text-align: start; padding: .7rem .9rem; color: var(--muted); font-weight: 600; font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid color-mix(in oklab, var(--line) 85%, transparent); white-space: nowrap; }
+.dub-ledger th { text-align: start; padding: .7rem .9rem; color: var(--muted); font-weight: 700; font-size: .82rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 85%, transparent); white-space: nowrap; }
 .dub-ledger td { padding: .75rem .9rem; border-bottom: 1px solid color-mix(in oklab, var(--line) 60%, transparent); vertical-align: middle; }
 .dub-ledger tr:last-child td { border-bottom: 0; }
 .dub-ledger td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -371,6 +394,7 @@ html[dir="rtl"] .dub-toggle input:checked + .dub-switch::after { transform: tran
 
 @media (max-width: 900px) {
   .dub-account { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dub-rule ul { grid-template-columns: 1fr; }
   .dub-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
@@ -381,6 +405,5 @@ html[dir="rtl"] .dub-toggle input:checked + .dub-switch::after { transform: tran
   .dub-drop, .dub-lock { min-height: 240px; }
   .dub-percent { font-size: 1.25rem; }
 }
-.dub-section-lead { margin: -.3rem 0 1.3rem; max-width: 70ch; color: var(--muted); line-height: 1.6; }
+.dub-section-lead { margin: -.4rem 0 1.4rem; font-size: 1rem; color: color-mix(in oklab, var(--text) 70%, var(--muted)); line-height: 1.6; }
 .dub-ledger .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-.dub-stat strong span { font-size: 1rem; color: var(--muted); font-weight: 600; }

@@ -232,7 +232,7 @@ class VideoDubPageTest extends TestCase
             ->assertSee('holiday clip.mp4')->assertSee('"state":"paid"', false)
             // Six seconds of video, ninety credits, in the row and the month's total.
             ->assertSee('<td class="num">90</td>', false)
-            ->assertSee(__('ui.dub.rule', ['credits' => 15, 'example' => '450']));
+            ->assertSee(__('ui.dub.rule_title'))->assertSee(__('ui.dub.rule_example_value', ['credits' => '450']));
     }
 
     public function test_a_plan_sets_its_videos_a_month(): void
@@ -302,6 +302,15 @@ class VideoDubPageTest extends TestCase
         $this->assertSame('Oliver', $studio['languages']['en']['voices'][0]['label']);
         $this->assertArrayHasKey('en-GB', $studio['languages']['en']['dialects']);
         $this->assertArrayHasKey('ar-SA', $studio['languages']['ar']['dialects']);
+    }
+
+    public function test_the_upload_limit_is_the_admins_within_what_the_server_takes(): void
+    {
+        $this->assertSame(300, VideoDubbing::uploadSettingMb(), 'the default');
+        SiteSetting::set('video_dubbing_max_upload_mb', 250, 'video_dubbing');
+        $this->assertSame(250, VideoDubbing::uploadSettingMb());
+        $server = VideoDubbing::serverUploadMb();
+        $this->assertSame($server === null ? 250 : min(250, $server), VideoDubbing::maxUploadMb(), 'members see what they can really send');
     }
 
     public function test_a_voice_the_library_does_not_offer_is_refused(): void

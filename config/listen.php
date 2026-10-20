@@ -163,7 +163,8 @@ return [
         // "Dub my video" (App\Http\Controllers\VideoDubController).
         'min_seconds' => (int) env('LISTEN_DUB_MIN_SECONDS', 3),
         'max_seconds' => (int) env('LISTEN_DUB_MAX_SECONDS', 60),
-        'max_upload_mb' => (int) env('LISTEN_DUB_MAX_UPLOAD_MB', 100),
+        // The admin can change it (Video Dubbing → Settings); the server's own PHP limits still apply.
+        'max_upload_mb' => (int) env('LISTEN_DUB_MAX_UPLOAD_MB', 300),
         // Hours the videos are kept before their files are deleted (dubs:prune).
         'keep_hours' => (int) env('LISTEN_DUB_KEEP_HOURS', 48),
         // Free marked previews for the whole site a day, so a rush of sign-ups cannot run up the bill.

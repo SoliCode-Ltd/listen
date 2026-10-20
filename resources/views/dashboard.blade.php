@@ -2409,11 +2409,6 @@
             <span class="dm-short">{{ __('ui.dub.nav_short') }}</span>
           </a>
           @endif
-          <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M12 7.8V12l3 2"/></svg>
-            <span class="dm-label">{{ __('ui.dashboard.recent_voices') }}</span>
-            <span class="dm-short">{{ __('ui.dashboard.tab_history') }}</span>
-          </a>
           @if(($voiceCloningVisible ?? false) || ($voiceCloningUpgrade ?? false))
           <a class="dashboard-menu-link" href="#voiceCloningSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.8 20a6.4 6.4 0 0 1 12.4 0M17.5 9.5a3 3 0 0 1 0 5M20 7a6.5 6.5 0 0 1 0 10"/></svg>
@@ -2421,6 +2416,12 @@
             <span class="dm-short">{{ __('ui.dashboard.tab_cloning') }}</span>
           </a>
           @endif
+          {{-- What was made, after the ways to make it. --}}
+          <a class="dashboard-menu-link" href="#recentVoicesSection" data-dashboard-nav>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1M3.5 4v4.5H8"/><path d="M12 7.8V12l3 2"/></svg>
+            <span class="dm-label">{{ __('ui.dashboard.recent_voices') }}</span>
+            <span class="dm-short">{{ __('ui.dashboard.tab_history') }}</span>
+          </a>
           <a class="dashboard-menu-link {{ $dashboardStartSection === 'commandCenterSection' ? 'active' : '' }}" href="#commandCenterSection" data-dashboard-nav>
             <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.6"/></svg>
             <span class="dm-label">{{ __('ui.dashboard.command_center') }}</span>

@@ -37,7 +37,10 @@ class VideoDubbingSettings extends Page implements HasForms
 
     public function mount(): void
     {
-        $this->form->fill(['video_dubbing_audience' => VideoDubbing::audience()]);
+        $this->form->fill([
+            'video_dubbing_audience' => VideoDubbing::audience(),
+            'video_dubbing_max_upload_mb' => VideoDubbing::uploadSettingMb(),
+        ]);
     }
 
     public function form(Form $form): Form
@@ -58,6 +61,21 @@ class VideoDubbingSettings extends Page implements HasForms
                                 VideoDubbing::AUDIENCE_EVERYONE => 'Anyone signed in gets one free dub with the Listen mark. Plans with "Include video dubbing" switched on pay from their credits and download without the mark.',
                             ])
                             ->required(),
+                        Forms\Components\TextInput::make('video_dubbing_max_upload_mb')
+                            ->label('Largest video members can upload')
+                            ->numeric()
+                            ->integer()
+                            ->minValue(10)
+                            ->maxValue(2000)
+                            ->suffix('MB')
+                            ->required()
+                            ->helperText(function (): string {
+                                $server = VideoDubbing::serverUploadMb();
+
+                                return $server === null
+                                    ? 'This server sets no upload limit of its own.'
+                                    : sprintf('This server\'s PHP takes %d MB at most in one upload (the smaller of upload_max_filesize and post_max_size), so members see %d MB. To allow more, raise both in the server\'s PHP settings.', $server, VideoDubbing::maxUploadMb());
+                            }),
                     ]),
                 Forms\Components\Section::make('Statistics')
                     ->schema([
@@ -78,7 +96,9 @@ class VideoDubbingSettings extends Page implements HasForms
 
     public function save(): void
     {
-        $audience = (string) ($this->form->getState()['video_dubbing_audience'] ?? VideoDubbing::AUDIENCE_PREVIEW);
+        $state = $this->form->getState();
+        $audience = (string) ($state['video_dubbing_audience'] ?? VideoDubbing::AUDIENCE_PREVIEW);
+        SiteSetting::set('video_dubbing_max_upload_mb', max(10, (int) ($state['video_dubbing_max_upload_mb'] ?? 300)), 'video_dubbing');
         SiteSetting::set('video_dubbing_audience', $audience === VideoDubbing::AUDIENCE_EVERYONE ? $audience : VideoDubbing::AUDIENCE_PREVIEW, 'video_dubbing');
         SiteSetting::flushGroupCache('video_dubbing');
 

@@ -30,39 +30,62 @@
     @if($account['included'])
       <div class="dub-account">
         <div class="dub-stat">
-          <small>{{ __('ui.dub.stat_videos') }}</small>
-          <strong>{{ number_format($account['videos_used']) }}@if($account['videos_limit'] > 0)<span> / {{ number_format($account['videos_limit']) }}</span>@endif</strong>
-          <span>{{ $account['videos_limit'] > 0 ? __('ui.dub.stat_videos_of', ['limit' => number_format($account['videos_limit'])]) : __('ui.dub.stat_videos_open') }}</span>
+          <div class="dub-stat-head">
+            <span class="dub-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2.5"/><path d="M16 10.5l5-3v9l-5-3"/></svg></span>
+            <span class="dub-stat-label">{{ __('ui.dub.stat_videos') }}</span>
+          </div>
+          <div class="dub-stat-value">{{ number_format($account['videos_used']) }}@if($account['videos_limit'] > 0)<small>/ {{ number_format($account['videos_limit']) }}</small>@endif</div>
+          <div class="dub-stat-note">{{ $account['videos_limit'] > 0 ? __('ui.dub.stat_videos_of', ['limit' => number_format($account['videos_limit'])]) : __('ui.dub.stat_videos_open') }}</div>
           @if($videoShare !== null)<div class="dub-stat-bar" aria-hidden="true"><i style="width: {{ $videoShare }}%"></i></div>@endif
         </div>
         <div class="dub-stat">
-          <small>{{ __('ui.dub.stat_used') }}</small>
-          <strong>{{ $dubTime($account['seconds_used']) }}</strong>
-          <span>{{ __('ui.dub.stat_used_note', ['credits' => number_format($account['credits_used'])]) }}</span>
+          <div class="dub-stat-head">
+            <span class="dub-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg></span>
+            <span class="dub-stat-label">{{ __('ui.dub.stat_used') }}</span>
+          </div>
+          <div class="dub-stat-value">{{ $dubTime($account['seconds_used']) }}</div>
+          <div class="dub-stat-note">{{ __('ui.dub.stat_used_note', ['credits' => number_format($account['credits_used'])]) }}</div>
         </div>
         <div class="dub-stat">
-          <small>{{ __('ui.dub.stat_left') }}</small>
-          <strong>{{ $dubTime($account['seconds_left']) }}</strong>
-          <span>{{ __('ui.dub.stat_left_note', ['credits' => number_format($account['credits_left'])]) }}</span>
+          <div class="dub-stat-head">
+            <span class="dub-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 7v10M20 10v4"/></svg></span>
+            <span class="dub-stat-label">{{ __('ui.dub.stat_left') }}</span>
+          </div>
+          <div class="dub-stat-value">{{ $dubTime($account['seconds_left']) }}</div>
+          <div class="dub-stat-note">{{ __('ui.dub.stat_left_note', ['credits' => number_format($account['credits_left'])]) }}</div>
         </div>
         <div class="dub-stat">
-          <small>{{ __('ui.dub.stat_longest') }}</small>
-          <strong>{{ __('ui.dub.stat_longest_value', ['seconds' => $account['max_seconds']]) }}</strong>
-          <span>{{ __('ui.dub.stat_longest_note') }}</span>
+          <div class="dub-stat-head">
+            <span class="dub-stat-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 12h16M4 12l3-3M4 12l3 3M20 12l-3-3M20 12l-3 3"/></svg></span>
+            <span class="dub-stat-label">{{ __('ui.dub.stat_longest') }}</span>
+          </div>
+          <div class="dub-stat-value">{{ __('ui.dub.stat_longest_value', ['seconds' => $account['max_seconds']]) }}</div>
+          <div class="dub-stat-note">{{ __('ui.dub.stat_longest_note') }}</div>
         </div>
       </div>
-      <p class="dub-rule">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-        <span>{{ __('ui.dub.rule', ['credits' => $perSecond, 'example' => number_format(30 * $perSecond)]) }}</span>
-      </p>
+      <div class="dub-rule">
+        <strong class="dub-rule-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          {{ __('ui.dub.rule_title') }}
+        </strong>
+        <ul>
+          <li><b>{{ __('ui.dub.rule_second') }}</b><span>{{ __('ui.dub.rule_second_value', ['credits' => $perSecond]) }}</span></li>
+          <li><b>{{ __('ui.dub.rule_example') }}</b><span>{{ __('ui.dub.rule_example_value', ['credits' => number_format(30 * $perSecond)]) }}</span></li>
+          <li><b>{{ __('ui.dub.rule_failed') }}</b><span>{{ __('ui.dub.rule_failed_value') }}</span></li>
+        </ul>
+      </div>
     @else
-      <p class="dub-rule">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
-        <span><strong>{{ __('ui.dub.upgrade_title') }}.</strong> {{ __('ui.dub.upgrade_text') }}</span>
-      </p>
+      <div class="dub-rule">
+        <strong class="dub-rule-title">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1"/></svg>
+          {{ __('ui.dub.upgrade_title') }}
+        </strong>
+        <p>{{ __('ui.dub.upgrade_text') }}</p>
+      </div>
     @endif
 
-    <x-dub.studio :dub="$dub" />
+    {{-- What a dub costs is above: the studio shows only what the chosen video will use. --}}
+    <x-dub.studio :dub="$dub" :compact-meter="true" />
 
     @if($account['included'] || $account['rows'] !== [])
       <section class="dub-ledger" aria-labelledby="dubLedgerTitle">
